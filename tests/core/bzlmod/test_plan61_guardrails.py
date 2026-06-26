@@ -37,8 +37,15 @@ async def _bzlmod_counters(
     *args: str,
     rel_cwd: Path | None = None,
     env: dict[str, str] | None = None,
+    detail_prefix: str | None = None,
 ) -> BzlmodCounters:
-    result = await buck.audit("bzlmod-counters", *args, rel_cwd=rel_cwd, env=env)
+    counter_args = []
+    if detail_prefix is not None:
+        counter_args.extend(["--detail-prefix", detail_prefix])
+    counter_args.extend(args)
+    result = await buck.audit(
+        "bzlmod-counters", *counter_args, rel_cwd=rel_cwd, env=env
+    )
     counters = json.loads(result.stdout)
     assert isinstance(counters, dict)
     return counters
@@ -48,9 +55,22 @@ async def _audit_cells_and_counters(
     buck: Buck,
     rel_cwd: Path | None = None,
     env: dict[str, str] | None = None,
+    detail_prefix: str | None = None,
 ) -> tuple[str, BzlmodCounters]:
     result = await buck.audit("cell", rel_cwd=rel_cwd, env=env)
-    return result.stdout, await _bzlmod_counters(buck, rel_cwd=rel_cwd, env=env)
+    return result.stdout, await _bzlmod_counters(
+        buck, rel_cwd=rel_cwd, env=env, detail_prefix=detail_prefix
+    )
+
+
+async def _audit_cells_and_workspace_counters(
+    buck: Buck,
+    rel_cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> tuple[str, BzlmodCounters]:
+    return await _audit_cells_and_counters(
+        buck, rel_cwd=rel_cwd, env=env, detail_prefix=str(buck.cwd / "MODULE.bazel")
+    )
 
 
 def _write(path: Path, content: str) -> None:
@@ -2287,11 +2307,11 @@ single_version_override(
 
     write_lockfile()
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
@@ -2312,7 +2332,7 @@ bazel_dep(name = "ddd", version = "1.0.0")
 """,
     )
     write_lockfile()
-    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" in output
 
@@ -2411,11 +2431,11 @@ single_version_override(
 
     write_lockfile()
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
@@ -2429,7 +2449,7 @@ single_version_override(
 
     _write(ccc_override / "source.json", "{}\n")
     write_lockfile()
-    output, _delete_recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _delete_recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
 
@@ -2449,7 +2469,7 @@ bazel_dep(name = "ddd", version = "1.0.0")
 """,
     )
     write_lockfile()
-    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" in output
 
@@ -2539,10 +2559,10 @@ single_version_override(
     assert "override.example" in failure_stderr
 
     _write(source_json, source_content)
-    output, created = await _audit_cells_and_counters(buck, env=env)
+    output, created = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert warm["bzlmod_resolution_compute"] == created["bzlmod_resolution_compute"]
 
@@ -2765,11 +2785,11 @@ multiple_version_override(
 
     write_lockfile()
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
@@ -2783,7 +2803,7 @@ multiple_version_override(
 
     _write(ccc_override / "source.json", "{}\n")
     write_lockfile()
-    output, _delete_recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _delete_recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
 
@@ -2797,7 +2817,7 @@ multiple_version_override(
 
     _write(ccc_override / "source.json", "{}\n")
     write_lockfile()
-    output, _parse_recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _parse_recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" not in output
 
@@ -2817,7 +2837,7 @@ bazel_dep(name = "ddd", version = "1.0.0")
 """,
     )
     write_lockfile()
-    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert "ddd" in output
 
@@ -2908,10 +2928,10 @@ multiple_version_override(
     assert "override.example" in failure_stderr
 
     _write(source_json, source_content)
-    output, created = await _audit_cells_and_counters(buck, env=env)
+    output, created = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert "ccc" in output
     assert warm["bzlmod_resolution_compute"] == created["bzlmod_resolution_compute"]
 
@@ -2972,10 +2992,10 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     )
 
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
-    output, second = await _audit_cells_and_counters(buck, env=env)
+    output, second = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert second["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
@@ -3053,10 +3073,10 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
     write_lockfile()
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
@@ -3069,7 +3089,7 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     assert registry_url in failure
 
     _write(registry_file, "{}\n")
-    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
 
@@ -3139,10 +3159,10 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     assert registry_url in failure
 
     _write(registry_file, registry_content)
-    output, created = await _audit_cells_and_counters(buck, env=env)
+    output, created = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == created["bzlmod_resolution_compute"]
 
@@ -3207,10 +3227,10 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
     write_lockfile()
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
@@ -3224,7 +3244,7 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
     _write(registry_file, "{}\n")
     write_lockfile()
-    output, _parse_recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _parse_recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
     _write_bytes(registry_file, b"\xff\xfeinvalid registry metadata\n")
@@ -3237,7 +3257,7 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
     _write(registry_file, "{}\n")
     write_lockfile()
-    output, _utf8_recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _utf8_recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
 
@@ -3321,10 +3341,10 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
     write_lockfile()
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
@@ -3344,7 +3364,7 @@ bazel_dep(name = "{repaired_module_name}", version = "{module_version}")
 """,
     )
     write_lockfile()
-    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert repaired_module_name in output
 
@@ -3427,10 +3447,10 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
     write_lockfile()
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
@@ -3450,7 +3470,7 @@ bazel_dep(name = "{repaired_module_name}", version = "{module_version}")
 """,
     )
     write_lockfile()
-    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert repaired_module_name in output
 
@@ -3533,10 +3553,10 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
 
     write_lockfile()
     env = {"XDG_CACHE_HOME": str(cache_home)}
-    output, first = await _audit_cells_and_counters(buck, env=env)
+    output, first = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == first["bzlmod_resolution_compute"]
 
@@ -3557,7 +3577,7 @@ bazel_dep(name = "{repaired_module_name}", version = "{module_version}")
 """,
     )
     write_lockfile()
-    output, _recovered = await _audit_cells_and_counters(buck, env=env)
+    output, _recovered = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert repaired_module_name in output
 
@@ -3625,10 +3645,10 @@ bazel_dep(name = "{module_name}", version = "{module_version}")
     assert module_name in failure_stderr
 
     _write(source_json, source_content)
-    output, created = await _audit_cells_and_counters(buck, env=env)
+    output, created = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
 
-    output, warm = await _audit_cells_and_counters(buck, env=env)
+    output, warm = await _audit_cells_and_workspace_counters(buck, env=env)
     assert module_name in output
     assert warm["bzlmod_resolution_compute"] == created["bzlmod_resolution_compute"]
 

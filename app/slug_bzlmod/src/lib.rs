@@ -168,6 +168,7 @@ pub use dice_graph::allow_yanked_versions_digest;
 pub use dice_graph::append_resolved_non_root_modules;
 pub use dice_graph::bazel_canonical_module_repo_name;
 pub use dice_graph::bzlmod_event_counters;
+pub use dice_graph::bzlmod_event_counters_for_detail_prefix;
 pub use dice_graph::bzlmod_resolved_graph_digest;
 pub use dice_graph::canonicalize_repo_mapping_overrides_targets;
 pub use dice_graph::canonicalize_repo_mapping_snapshot_targets;

@@ -18,6 +18,10 @@ use crate::AuditSubcommand;
     about = "Print Plan 61 bzlmod observability counters as JSON."
 )]
 pub struct AuditBzlmodCountersCommand {
+    /// Only include events whose detail starts with this prefix.
+    #[clap(long = "detail-prefix")]
+    pub detail_prefix: Option<String>,
+
     /// Command doesn't need these flags, but they are used in mode files, so we need to keep them.
     #[clap(flatten)]
     _target_cfg: TargetCfgUnusedOptions,

@@ -640,6 +640,49 @@ impl BzlmodResolvedGraphSourceInputsValue {
 
         hex::encode(hasher.finalize())
     }
+
+    fn clean_resolution_event_digest<K: Hash>(&self, key: &K, graph: &ResolvedGraph) -> String {
+        use sha2::Digest;
+        use sha2::Sha256;
+        let mut hasher = Sha256::new();
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.root_module_file.path.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.root_module_file.input_digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.lockfile_inputs
+            .hash_clean_resolution_event_identity(graph, &mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        hash_graph_resolution_event_identity(graph, &mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.local_override_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.non_registry_override_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        // Raw registry inputs include unused lockfile URLs, which command-end
+        // lockfile normalization can prune without doing fresh resolution work.
+        let mut kh = std::collections::hash_map::DefaultHasher::new();
+        self.override_patch_inputs.digest.hash(&mut kh);
+        hasher.update(kh.finish().to_le_bytes());
+
+        hex::encode(hasher.finalize())
+    }
 }
 
 #[derive(Clone, Debug, Display, Allocative)]
@@ -1522,14 +1565,15 @@ fn record_clean_bzlmod_resolution_compute_if_changed(
     key: &BzlmodResolvedModuleGraphKey,
     resolution_key: &BzlmodResolutionKey,
     inputs: &BzlmodResolvedGraphSourceInputsValue,
-    non_root_digest: &str,
+    graph: &ResolvedGraph,
+    _non_root_digest: &str,
 ) {
     let cache_key = format!(
         "{}:{}",
         resolution_key.workspace_id.stable_hash(),
         resolution_key.command_policy_digest
     );
-    let input_digest = inputs.identity_digest_with_key_and_non_root_files(key, non_root_digest);
+    let input_digest = inputs.clean_resolution_event_digest(key, graph);
     let mut last = LAST_RECORDED_BZLMOD_RESOLUTION_DIGEST
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
@@ -1681,6 +1725,7 @@ async fn compute_bzlmod_resolved_module_graph(
         key,
         &resolution_key,
         &inputs,
+        outputs.graph.as_ref(),
         &non_root_digest,
     );
 
@@ -2012,6 +2057,15 @@ impl BzlmodLockfileInputsValue {
         hash_lockfile_content_identity(&self.hidden_lockfile, state);
     }
 
+    fn hash_clean_resolution_event_identity<H: std::hash::Hasher>(
+        &self,
+        graph: &ResolvedGraph,
+        state: &mut H,
+    ) {
+        self.lockfile_mode.hash(state);
+        hash_visible_lockfile_resolution_identity(&self.visible_lockfile, graph, state);
+    }
+
     pub fn has_untracked_inputs(&self) -> bool {
         self.visible_lockfile
             .as_ref()
@@ -2139,6 +2193,68 @@ fn hash_lockfile_content_identity<H: std::hash::Hasher>(
             value.digest.hash(state);
         }
         None => false.hash(state),
+    }
+}
+
+fn hash_visible_lockfile_resolution_identity<H: std::hash::Hasher>(
+    value: &Option<Arc<LockfileContentValue>>,
+    graph: &ResolvedGraph,
+    state: &mut H,
+) {
+    match value {
+        Some(value) => {
+            true.hash(state);
+            value.path.hash(state);
+            match (&value.digest, &value.lockfile) {
+                (None, _) => {
+                    "missing".hash(state);
+                }
+                (Some(digest), None) => {
+                    "unparsed".hash(state);
+                    digest.hash(state);
+                }
+                (Some(_), Some(lockfile)) => {
+                    "parsed".hash(state);
+                    let mut registry_urls: Vec<_> = graph.registry_file_hashes.keys().collect();
+                    registry_urls.sort();
+                    for url in registry_urls {
+                        url.hash(state);
+                        lockfile.registry_file_hashes.get(url).hash(state);
+                    }
+
+                    let mut selected_yanked_keys: Vec<_> =
+                        graph.selected_yanked_versions.keys().collect();
+                    selected_yanked_keys.sort();
+                    for module_version in selected_yanked_keys {
+                        module_version.hash(state);
+                        lockfile
+                            .selected_yanked_versions
+                            .get(module_version)
+                            .hash(state);
+                    }
+                }
+            }
+        }
+        None => false.hash(state),
+    }
+}
+
+fn hash_graph_resolution_event_identity<H: std::hash::Hasher>(
+    graph: &ResolvedGraph,
+    state: &mut H,
+) {
+    let mut registry_files: Vec<_> = graph.registry_file_hashes.iter().collect();
+    registry_files.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (url, hash) in registry_files {
+        url.hash(state);
+        hash.hash(state);
+    }
+
+    let mut selected_yanked_versions: Vec<_> = graph.selected_yanked_versions.iter().collect();
+    selected_yanked_versions.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (module_version, reason) in selected_yanked_versions {
+        module_version.hash(state);
+        reason.hash(state);
     }
 }
 
@@ -6350,6 +6466,8 @@ static REPO_MATERIALIZATION_HIT: AtomicU64 = AtomicU64::new(0);
 static REPO_MATERIALIZATION_MISS_REASON: AtomicU64 = AtomicU64::new(0);
 static LOCKFILE_READ: AtomicU64 = AtomicU64::new(0);
 static LOCKFILE_WRITE_ATTEMPT: AtomicU64 = AtomicU64::new(0);
+static BZLMOD_EVENT_DETAIL_COUNTS: OnceLock<Mutex<HashMap<(BzlmodEventKind, String), u64>>> =
+    OnceLock::new();
 
 fn counter(kind: BzlmodEventKind) -> &'static AtomicU64 {
     match kind {
@@ -6368,12 +6486,20 @@ fn counter(kind: BzlmodEventKind) -> &'static AtomicU64 {
 }
 
 pub fn record_bzlmod_event(kind: BzlmodEventKind, detail: impl AsRef<str>) -> u64 {
+    let detail = detail.as_ref();
     let count = counter(kind).fetch_add(1, Ordering::Relaxed) + 1;
+    {
+        let mut detail_counts = BZLMOD_EVENT_DETAIL_COUNTS
+            .get_or_init(|| Mutex::new(HashMap::new()))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *detail_counts.entry((kind, detail.to_owned())).or_insert(0) += 1;
+    }
     tracing::debug!(
         target: "slug_bzlmod::plan61",
         event_name = kind.as_str(),
         count,
-        detail = detail.as_ref(),
+        detail,
         "bzlmod plan61 event"
     );
     count
@@ -6392,6 +6518,42 @@ pub fn bzlmod_event_counters() -> BzlmodEventCounters {
         repo_materialization_miss_reason: REPO_MATERIALIZATION_MISS_REASON.load(Ordering::Relaxed),
         lockfile_read: LOCKFILE_READ.load(Ordering::Relaxed),
         lockfile_write_attempt: LOCKFILE_WRITE_ATTEMPT.load(Ordering::Relaxed),
+    }
+}
+
+pub fn bzlmod_event_counters_for_detail_prefix(prefix: &str) -> BzlmodEventCounters {
+    let detail_counts = BZLMOD_EVENT_DETAIL_COUNTS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut counters = BzlmodEventCounters::default();
+    for ((kind, detail), count) in detail_counts.iter() {
+        if detail.starts_with(prefix) {
+            add_bzlmod_event_count(&mut counters, *kind, *count);
+        }
+    }
+    counters
+}
+
+fn add_bzlmod_event_count(counters: &mut BzlmodEventCounters, kind: BzlmodEventKind, count: u64) {
+    match kind {
+        BzlmodEventKind::BzlmodResolutionCompute => counters.bzlmod_resolution_compute += count,
+        BzlmodEventKind::ModuleFileParse => counters.module_file_parse += count,
+        BzlmodEventKind::ExtensionEval => counters.extension_eval += count,
+        BzlmodEventKind::ExtensionReplayHit => counters.extension_replay_hit += count,
+        BzlmodEventKind::ExtensionReplayMissReason => {
+            counters.extension_replay_miss_reason += count
+        }
+        BzlmodEventKind::ExtensionSpokesCompute => counters.extension_spokes_compute += count,
+        BzlmodEventKind::RepoMaterializationStateRead => {
+            counters.repo_materialization_state_read += count
+        }
+        BzlmodEventKind::RepoMaterializationHit => counters.repo_materialization_hit += count,
+        BzlmodEventKind::RepoMaterializationMissReason => {
+            counters.repo_materialization_miss_reason += count
+        }
+        BzlmodEventKind::LockfileRead => counters.lockfile_read += count,
+        BzlmodEventKind::LockfileWriteAttempt => counters.lockfile_write_attempt += count,
     }
 }
 
@@ -6818,6 +6980,33 @@ mod tests {
         }
     }
 
+    fn resolved_graph_source_inputs_with_visible_lockfile(
+        visible_digest: &str,
+        lockfile: Lockfile,
+    ) -> BzlmodResolvedGraphSourceInputsValue {
+        let mut inputs = resolved_graph_source_inputs_for_test(
+            Some("root-a"),
+            None,
+            "local-a",
+            "reg-a",
+            "patch-a",
+        );
+        inputs.lockfile_inputs = Arc::new(BzlmodLockfileInputsValue {
+            hidden_lockfile_path: None,
+            visible_lockfile_digest: Some(visible_digest.to_owned()),
+            hidden_lockfile_digest: None,
+            visible_lockfile: Some(Arc::new(LockfileContentValue {
+                path: Arc::new(PathBuf::from("/tmp/workspace/MODULE.bazel.lock")),
+                digest: Some(visible_digest.to_owned()),
+                tracked_by_dice: true,
+                lockfile: Some(Arc::new(lockfile)),
+            })),
+            hidden_lockfile: None,
+            lockfile_mode: LockfileMode::Update,
+        });
+        inputs
+    }
+
     #[test]
     fn resolved_graph_source_inputs_identity_digest_tracks_source_components() {
         let key = TestSourceInputsKey { name: "same-key" };
@@ -6894,6 +7083,77 @@ mod tests {
                 "patch-b"
             )
             .identity_digest_with_key(&key)
+        );
+    }
+
+    #[test]
+    fn clean_resolution_event_digest_ignores_irrelevant_lockfile_registry_hashes() {
+        let key = TestSourceInputsKey { name: "same-key" };
+        let mut graph = ResolvedGraph::default();
+        let used_url = "https://registry.example/modules/dep/1.0/source.json";
+        graph
+            .registry_file_hashes
+            .insert(used_url.to_owned(), "used-hash".to_owned());
+
+        let mut with_extra = Lockfile::new();
+        with_extra
+            .registry_file_hashes
+            .insert(used_url.to_owned(), "used-hash".to_owned());
+        with_extra.registry_file_hashes.insert(
+            "https://registry.example/modules/unused/1.0/source.json".to_owned(),
+            "unused-hash".to_owned(),
+        );
+        let mut normalized = Lockfile::new();
+        normalized
+            .registry_file_hashes
+            .insert(used_url.to_owned(), "used-hash".to_owned());
+
+        let first = resolved_graph_source_inputs_with_visible_lockfile(
+            "visible-digest-with-extra",
+            with_extra,
+        )
+        .clean_resolution_event_digest(&key, &graph);
+        let mut normalized_inputs = resolved_graph_source_inputs_with_visible_lockfile(
+            "visible-digest-normalized",
+            normalized,
+        );
+        normalized_inputs.registry_file_inputs = Arc::new(RegistryFileInputsValue {
+            digest: "normalized-registry-inputs".to_owned(),
+            has_inputs: true,
+            cache_safe: true,
+            has_untracked_inputs: false,
+        });
+        let second = normalized_inputs.clean_resolution_event_digest(&key, &graph);
+
+        assert_eq!(
+            first, second,
+            "command-end lockfile normalization must not count as a fresh clean resolution"
+        );
+
+        let mut changed_used = Lockfile::new();
+        changed_used
+            .registry_file_hashes
+            .insert(used_url.to_owned(), "changed-hash".to_owned());
+        let changed = resolved_graph_source_inputs_with_visible_lockfile(
+            "visible-digest-changed",
+            changed_used,
+        )
+        .clean_resolution_event_digest(&key, &graph);
+
+        assert_ne!(
+            first, changed,
+            "used registry lockfile facts must still participate in resolution event identity"
+        );
+
+        let mut changed_graph = graph.clone();
+        changed_graph
+            .registry_file_hashes
+            .insert(used_url.to_owned(), "changed-graph-hash".to_owned());
+        let changed_graph_digest =
+            normalized_inputs.clean_resolution_event_digest(&key, &changed_graph);
+        assert_ne!(
+            first, changed_graph_digest,
+            "used registry graph facts must still participate in resolution event identity"
         );
     }
 
@@ -7713,6 +7973,33 @@ mod tests {
             BzlmodEventKind::ExtensionReplayMissReason.as_str(),
             "extension_replay_miss_reason"
         );
+    }
+
+    #[test]
+    fn event_counters_can_be_filtered_by_detail_prefix() {
+        let prefix = "/tmp/slug-bzlmod-detail-prefix/unit/";
+        let other_prefix = "/tmp/slug-bzlmod-detail-prefix/other/";
+        let before = bzlmod_event_counters_for_detail_prefix(prefix);
+
+        record_bzlmod_event(
+            BzlmodEventKind::BzlmodResolutionCompute,
+            format!("{prefix}MODULE.bazel"),
+        );
+        record_bzlmod_event(
+            BzlmodEventKind::ModuleFileParse,
+            format!("{prefix}registry/MODULE.bazel"),
+        );
+        record_bzlmod_event(
+            BzlmodEventKind::BzlmodResolutionCompute,
+            format!("{other_prefix}MODULE.bazel"),
+        );
+
+        let after = bzlmod_event_counters_for_detail_prefix(prefix);
+        assert_eq!(
+            after.bzlmod_resolution_compute,
+            before.bzlmod_resolution_compute + 1
+        );
+        assert_eq!(after.module_file_parse, before.module_file_parse + 1);
     }
 
     #[test]

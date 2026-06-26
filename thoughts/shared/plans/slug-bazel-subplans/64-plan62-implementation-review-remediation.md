@@ -835,6 +835,16 @@ hidden-lockfile, and reproducible-extension confidence:
   stale visible module-extension entry. Facts-only lockfiles proceed to fresh
   extension evaluation and then validate facts, while stale extension entries
   still fail with the Bazel-shaped stale-lockfile error.
+- clean bzlmod resolution evidence now uses root/override/patch inputs plus the
+  graph-relevant registry and selected-yanked facts that Bazel rewrites into the
+  command-end lockfile. It intentionally ignores raw aggregate registry inputs
+  and low-level non-root digest variants, so lockfile normalization and same
+  command graph-key alternation no longer count as fresh resolution work while
+  used registry/yanked facts still invalidate the evidence counter.
+- `audit bzlmod-counters --detail-prefix=<prefix>` now exposes exact-detail
+  counter slices. The registry `source.json` guardrails use the root
+  `MODULE.bazel` detail prefix so unrelated bzlmod events in the same daemon do
+  not contaminate the resolution-count assertion.
 
 Bazel source anchors:
 
@@ -900,19 +910,30 @@ TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
 TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
 TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_lockfile_mode_error_rejects_changed_extension_facts -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  clean_resolution_event_digest -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  event_counters_can_be_filtered_by_detail_prefix -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_single_version_override_registry_source_json_delete_invalidates_bzlmod_resolution -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k 'source_json' -s --tb=short
 TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -s --tb=short
-cargo fmt -p slug_bzlmod --check
+cargo fmt -p slug_bzlmod -p slug_cmd_audit_client -p slug_cmd_audit_server --check
 git diff --check
 ```
 
 Remaining gaps:
 
 - Full `tests/core/bzlmod/test_plan61_guardrails.py` was rerun and is not clean:
-  181 passed / 5 failed. The failures cluster around registry `source.json`
-  warm invalidation counters, post-write lockfile replay expectations, and
-  `inject_repo` mapping replay after a MODULE edit. Fix or explicitly hand off
-  these before declaring Plan 64 complete.
+  184 passed / 2 failed. The remaining failures are
+  `test_missing_lockfile_extension_executes_once_then_reuses_dice_state`, where
+  the second run records one additional extension replay hit, and
+  `test_inject_repo_keyword_alias_maps_generated_repo_and_replays`, where the
+  post-edit run does not record a fresh extension eval. Fix or explicitly hand
+  off these before declaring Plan 64 complete.
 - Once Plan 64's focused lockfile/replay lane is no longer blocking, return
   ownership to Plan 34's REAPI executor proof instead of opening new
   compatibility lanes.

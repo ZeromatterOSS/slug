@@ -10,6 +10,7 @@ use std::io::Write;
 
 use async_trait::async_trait;
 use slug_bzlmod::bzlmod_event_counters;
+use slug_bzlmod::bzlmod_event_counters_for_detail_prefix;
 use slug_cli_proto::ClientContext;
 use slug_cmd_audit_client::bzlmod_counters::AuditBzlmodCountersCommand;
 use slug_server_ctx::ctx::ServerCommandContextTrait;
@@ -26,7 +27,11 @@ impl ServerAuditSubcommand for AuditBzlmodCountersCommand {
         _client_ctx: ClientContext,
     ) -> slug_error::Result<()> {
         let mut stdout = stdout.as_writer();
-        serde_json::to_writer_pretty(&mut stdout, &bzlmod_event_counters())?;
+        let counters = match self.detail_prefix.as_deref() {
+            Some(prefix) => bzlmod_event_counters_for_detail_prefix(prefix),
+            None => bzlmod_event_counters(),
+        };
+        serde_json::to_writer_pretty(&mut stdout, &counters)?;
         writeln!(stdout)?;
         Ok(())
     }
