@@ -52,8 +52,9 @@ shortcut.
   as `cpu_count` flow to RE.
 - `tests/plan34/test_reapi_local_executor_smoke.py` is a repo-owned local REAPI
   smoke. It uses `SLUG_PLAN34_NATIVELINK_BIN` when set, otherwise it discovers a
-  sibling checkout's `../nativelink/target/debug/nativelink` binary. `test.py`
-  now includes `tests/plan34/` in the normal Python integration entrypoint and
+  sibling checkout's CI-profile `../nativelink/target/smol/nativelink` binary
+  before falling back to `../nativelink/target/debug/nativelink`. `test.py` now
+  includes `tests/plan34/` in the normal Python integration entrypoint and
   passes the built Slug binary through `TEST_EXECUTABLE`/`SLUG_BIN`; the smoke
   resolves these executable paths before changing into fixture workspaces. The
   NativeLink smoke runs when a NativeLink binary is available and skips cleanly
@@ -133,6 +134,11 @@ shortcut.
 - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q` proves
   the Plan 34 guard and smoke are reachable through the same Slug-binary
   environment used by `test.py`/CI.
+- `env -u SLUG_PLAN34_NATIVELINK_BIN TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug
+  python -m pytest -q tests/plan34/ -s --tb=short` proves the local Plan 34
+  suite discovers the sibling CI-profile NativeLink `target/smol/nativelink`
+  binary by default and still reports zero direct-local actions for the REAPI
+  smoke fixtures.
 - `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/core/analysis/test_native_rules.py -q -k 'build_config_defaults or action_env_overrides'`
   proves `ctx.configuration.default_shell_env` contains Bazel-shaped defaults
   and that explicit `--action_env` values override them.
@@ -177,6 +183,7 @@ hosted run still needs to be recorded as accepted runtime evidence.
   - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q`
   - `SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   - Set `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink` when no sibling
+    `../nativelink/target/smol/nativelink` or
     `../nativelink/target/debug/nativelink` binary is available.
 - Bazel default shell env:
   - `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/core/analysis/test_native_rules.py -q -k 'build_config_defaults or action_env_overrides'`

@@ -3,6 +3,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
@@ -11,9 +12,10 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SIBLING_NATIVELINK_BIN = (
-    REPO_ROOT.parent / "nativelink" / "target" / "debug" / "nativelink"
-)
+SIBLING_NATIVELINK_BIN_CANDIDATES = [
+    REPO_ROOT.parent / "nativelink" / "target" / "smol" / "nativelink",
+    REPO_ROOT.parent / "nativelink" / "target" / "debug" / "nativelink",
+]
 SHELL_FIXTURE_ROOT = REPO_ROOT / "tests/core/executor/test_outputs_ordering_data"
 CC_ACTIONS_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/cc_actions"
 RULES_CC_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/rules_cc"
@@ -64,12 +66,55 @@ def _nativelink_binary() -> Path:
     nativelink_bin = _existing_executable_from_env("SLUG_PLAN34_NATIVELINK_BIN")
     if nativelink_bin is not None:
         return nativelink_bin
-    if _is_executable(SIBLING_NATIVELINK_BIN):
-        return SIBLING_NATIVELINK_BIN
+    for candidate in SIBLING_NATIVELINK_BIN_CANDIDATES:
+        if _is_executable(candidate):
+            return candidate
     pytest.skip(
         "set SLUG_PLAN34_NATIVELINK_BIN or build "
+        "../nativelink/target/smol/nativelink or "
         "../nativelink/target/debug/nativelink to run the local REAPI executor smoke"
     )
+
+
+def _write_executable(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
+def test_nativelink_binary_env_var_wins(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    env_bin = _write_executable(tmp_path / "env" / "nativelink")
+    smol_bin = _write_executable(tmp_path / "smol" / "nativelink")
+
+    monkeypatch.setenv("SLUG_PLAN34_NATIVELINK_BIN", str(env_bin))
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "SIBLING_NATIVELINK_BIN_CANDIDATES",
+        [smol_bin],
+    )
+
+    assert _nativelink_binary() == env_bin
+
+
+def test_nativelink_binary_discovers_smol_before_debug(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    smol_bin = _write_executable(tmp_path / "smol" / "nativelink")
+    debug_bin = _write_executable(tmp_path / "debug" / "nativelink")
+
+    monkeypatch.delenv("SLUG_PLAN34_NATIVELINK_BIN", raising=False)
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "SIBLING_NATIVELINK_BIN_CANDIDATES",
+        [smol_bin, debug_bin],
+    )
+
+    assert _nativelink_binary() == smol_bin
 
 
 def _free_port() -> int:
