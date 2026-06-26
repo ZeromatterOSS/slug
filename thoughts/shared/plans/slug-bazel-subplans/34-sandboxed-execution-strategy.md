@@ -62,8 +62,10 @@ shortcut.
   and builds fast in-repo fixtures through `--remote_executor` and
   `--remote_cache`. The shell and platform-exec-properties fixtures
   intentionally omit `--remote-only` to prove the RE-configured default and
-  platform-derived executor paths; the C-source and `@rules_cc` fixtures also
-  pass `--remote-only` as an explicit strategy check.
+  platform-derived executor paths. A bare-`--remote_executor` shell fixture
+  intentionally omits `--remote_cache` and proves Plan 25's executor-endpoint
+  CAS/AC fallback at the execution boundary. The C-source and `@rules_cc`
+  fixtures also pass `--remote-only` as an explicit strategy check.
 - The smoke proves a one-action shell fixture, a one-action platform
   `exec_properties` fixture, a three-action C-source Starlark rule fixture, and
   a real `@rules_cc` `cc_binary` fixture cross REAPI with what-ran
@@ -114,6 +116,8 @@ shortcut.
 - `SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   proves local NativeLink-backed REAPI execution for repo-owned fixtures with
   `reapi_actions=1` for the no-`--remote-only` shell fixture,
+  `reapi_actions=1` for the bare-`--remote_executor` shell fixture with no
+  explicit `--remote_cache`,
   `reapi_actions=1` for the no-`--remote-only` platform `exec_properties`
   fixture, `reapi_actions=3` for the C-source Starlark rule fixture,
   `reapi_actions=2` for the `@rules_cc` fixture,

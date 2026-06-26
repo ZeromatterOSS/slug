@@ -458,6 +458,63 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
             pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(nativelink_lines))
 
 
+def test_native_link_bare_remote_executor_supplies_reapi_cache_endpoint(
+    tmp_path: Path,
+) -> None:
+    slug_bin = _slug_binary()
+    nativelink_bin = _nativelink_binary()
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _copy_fixture(
+        SHELL_FIXTURE_ROOT,
+        workspace,
+        [".buckroot", "MODULE.bazel", "BUILD.bazel", "defs.bzl"],
+    )
+
+    nativelink_root = tmp_path / "nativelink"
+    nativelink_root.mkdir()
+    frontend_port = _free_port()
+    worker_port = _free_port()
+    config = nativelink_root / "nativelink.json5"
+    _write_nativelink_config(config, nativelink_root, frontend_port, worker_port)
+
+    proc, nativelink_lines = _start_nativelink(nativelink_bin, config, frontend_port)
+    isolation = "plan34-bare-remote-executor-smoke"
+    remote_endpoint = f"grpc://127.0.0.1:{frontend_port}"
+
+    try:
+        build = _run(
+            [
+                str(slug_bin),
+                "--isolation-dir",
+                isolation,
+                "build",
+                "//:foo",
+                "--show-output",
+                f"--remote_executor={remote_endpoint}",
+                "--remote_default_exec_properties=cpu_count=1",
+            ],
+            cwd=workspace,
+        )
+        build_output = build.stdout + build.stderr
+        assert "BUILD SUCCEEDED" in build_output
+        assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
+        assert "RE Session:" in build_output
+        _assert_materialized_show_outputs(build, workspace, expected_count=1)
+        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
+        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
+    finally:
+        _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+            pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(nativelink_lines))
+
+
 def test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback(
     tmp_path: Path,
 ) -> None:

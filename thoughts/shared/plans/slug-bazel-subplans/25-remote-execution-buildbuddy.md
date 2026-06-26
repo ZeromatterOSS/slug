@@ -59,6 +59,10 @@ boundary. Those are Plan 24 and Plan 34.
 - `get_default_executor_config(..., remote_execution_configured = true, ...)`
   promotes the OSS default executor from direct local to
   `RemoteEnabled(Remote)`.
+- Plan 34 now includes a NativeLink/local-REAPI smoke where `--remote_executor`
+  is set and `--remote_cache` is omitted. The build executes through REAPI,
+  uploads inputs, materializes output, and has zero direct-local actions,
+  proving the bare-executor CAS/AC fallback against a real executor service.
 
 This proves configuration reaches the RE client boundary; it does not prove that
 every build action executes through REAPI. Plan 34 owns that execution-boundary
@@ -71,17 +75,18 @@ proof.
 - `cargo test -p slug_server re_config_overlay_projects_reapi_executor_snapshot --lib`
 - `cargo test -p slug_server re_config_overlay_keeps_remote_cache_cache_only --lib`
 - `cargo test -p slug_server oss_default_executor_ --lib`
+- `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py::test_native_link_bare_remote_executor_supplies_reapi_cache_endpoint -q -s`
 
 ## Remaining Gaps
 
-- Plan 34 has a sibling-binary NativeLink/local-REAPI smoke for shell,
-  platform `exec_properties`, C-source, and `@rules_cc` fixtures. Keep
-  transport changes pointed at making that path routine rather than adding
-  direct executor shortcuts.
+- Plan 34 has a NativeLink/local-REAPI smoke for shell, bare
+  `--remote_executor`, platform `exec_properties`, C-source, and `@rules_cc`
+  fixtures. Keep transport changes pointed at making that path routine rather
+  than adding direct executor shortcuts.
 - Keep BuildBuddy hosted execution as supplemental public/open-source evidence
   only. Do not commit credentials, private endpoints, or private workspace names.
 
 ## Next Owner
 
-Plan 34 should take the next slice: promote the local NativeLink REAPI smoke
-from sibling-binary local gate into a routine CI gate.
+Plan 34 should take the next slice: observe the hosted Linux run of the
+NativeLink REAPI gate and keep the local REAPI path routine.
