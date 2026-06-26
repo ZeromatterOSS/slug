@@ -14,9 +14,13 @@ use dice::UserComputationData;
 use dice::testing::DiceBuilder;
 use dupe::Dupe;
 use slug_build_api::actions::execute::dice_data::set_fallback_executor_config;
+use slug_common::dice::cells::SetCellResolver;
 use slug_configured::execution::ExecutionPlatformsKey;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::bzl::ImportPath;
+use slug_core::cells::CellResolver;
+use slug_core::cells::cell_root_path::CellRootPathBuf;
+use slug_core::cells::name::CellName;
 use slug_core::configuration::data::ConfigurationData;
 use slug_core::execution_types::executor_config::CommandExecutorConfig;
 use slug_core::package::PackageLabel;
@@ -133,11 +137,16 @@ async fn test_get_node() -> slug_error::Result<()> {
 
     let mut data = UserComputationData::new();
     set_fallback_executor_config(&mut data.data, CommandExecutorConfig::testing_local());
-    let computations = DiceBuilder::new()
-        .mock_and_return(InterpreterResultsKey(pkg), Ok(Arc::new(eval_result)))
+    let mut computations = DiceBuilder::new()
+        .mock_and_return(InterpreterResultsKey(pkg, None), Ok(Arc::new(eval_result)))
         .mock_and_return(ExecutionPlatformsKey, Ok(None))
         .build(data)
         .unwrap();
+    computations.set_cell_resolver(CellResolver::testing_with_name_and_path(
+        CellName::testing_new("cell"),
+        CellRootPathBuf::testing_new("cell"),
+    ))?;
+    computations.set_is_bzlmod(false)?;
     let mut computations = computations.commit().await;
 
     let node = computations.get_target_node(&label1).await?;

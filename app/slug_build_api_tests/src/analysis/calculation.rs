@@ -24,6 +24,7 @@ use slug_build_api::interpreter::rule_defs::provider::callable::register_provide
 use slug_build_api::interpreter::rule_defs::provider::registration::register_builtin_providers;
 use slug_build_api::keep_going::HasKeepGoing;
 use slug_build_api::spawner::BuckSpawner;
+use slug_common::dice::cells::SetCellResolver;
 use slug_common::dice::data::testing::SetTestingIoProvider;
 use slug_common::legacy_configs::configs::LegacyBuckConfig;
 use slug_common::package_listing::listing::PackageListing;
@@ -139,7 +140,7 @@ async fn test_analysis_calculation() -> slug_error::Result<()> {
             Ok(module),
         )
         .mock_and_return(
-            InterpreterResultsKey(PackageLabel::testing_parse("cell//pkg")),
+            InterpreterResultsKey(PackageLabel::testing_parse("cell//pkg"), None),
             Ok(Arc::new(eval_res)),
         )
         .mock_and_return(ExecutionPlatformsKey, Ok(None))
@@ -158,6 +159,7 @@ async fn test_analysis_calculation() -> slug_error::Result<()> {
             data
         })
         .unwrap();
+    dice.set_is_bzlmod(false)?;
     setup_interpreter_basic(
         &mut dice,
         resolver,

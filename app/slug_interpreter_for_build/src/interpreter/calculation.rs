@@ -27,6 +27,7 @@ use futures::future::BoxFuture;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use slug_common::dice::cells::HasCellResolver;
+use slug_common::file_ops::dice::DiceFileComputations;
 use slug_common::package_listing::dice::DicePackageListingResolver;
 use slug_core::build_file_path::BuildFilePath;
 use slug_core::bzl::ImportPath;
@@ -65,7 +66,8 @@ use crate::interpreter::package_file_calculation::EvalPackageFile;
 
 // Key for 'InterpreterCalculation::get_interpreter_results'
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
-pub struct InterpreterResultsKey(pub PackageLabel);
+#[display("{}:{:?}", _0, _1)]
+pub struct InterpreterResultsKey(pub PackageLabel, pub Option<Arc<str>>);
 
 static INTERPRETER_RESULTS_ACTIVE: AtomicUsize = AtomicUsize::new(0);
 static INTERPRETER_RESULTS_QUEUED: AtomicUsize = AtomicUsize::new(0);
@@ -276,9 +278,18 @@ impl TargetGraphCalculationImpl for TargetGraphCalculationInstance {
         ctx: &'a mut DiceComputations,
         package: PackageLabel,
     ) -> BoxFuture<'a, slug_error::Result<Arc<EvaluationResult>>> {
-        ctx.compute(&InterpreterResultsKey(package.dupe()))
-            .map(|v| v?.map_err(slug_error::Error::from))
-            .boxed()
+        async move {
+            let external_tree_generation =
+                DiceFileComputations::external_tree_generation_for_cell(ctx, package.cell_name())
+                    .await?;
+            ctx.compute(&InterpreterResultsKey(
+                package.dupe(),
+                external_tree_generation,
+            ))
+            .await?
+            .map_err(slug_error::Error::from)
+        }
+        .boxed()
     }
 }
 

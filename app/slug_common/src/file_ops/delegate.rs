@@ -100,6 +100,13 @@ pub trait FileOpsDelegate: Send + Sync {
         Ok(metadata.is_some())
     }
 
+    async fn external_tree_generation(
+        &self,
+        _ctx: &mut DiceComputations<'_>,
+    ) -> slug_error::Result<Option<Arc<str>>> {
+        Ok(None)
+    }
+
     fn eq_token(&self) -> PartialEqAny<'_>;
 }
 
@@ -288,6 +295,13 @@ impl FileOpsDelegateWithIgnores {
         path: &CellRelativePath,
     ) -> slug_error::Result<Option<RawPathMetadata>> {
         self.delegate.read_path_metadata_if_exists(ctx, path).await
+    }
+
+    pub async fn external_tree_generation(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+    ) -> slug_error::Result<Option<Arc<str>>> {
+        self.delegate.external_tree_generation(ctx).await
     }
 
     pub async fn is_ignored(

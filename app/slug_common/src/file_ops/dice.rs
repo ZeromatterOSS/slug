@@ -142,9 +142,11 @@ impl DiceFileComputations {
         ctx: &mut DiceComputations<'_>,
         path: &Path,
     ) -> slug_error::Result<Option<String>> {
+        let tree_generation = current_external_tree_generation_for_path(ctx, path)?;
         let value = ctx
             .compute(&WatchedAbsFileKey {
                 path: Arc::new(path.to_path_buf()),
+                tree_generation,
             })
             .await??;
         match &value.content {
@@ -169,8 +171,10 @@ impl DiceFileComputations {
         ctx: &mut DiceComputations<'_>,
         path: &Path,
     ) -> slug_error::Result<Arc<WatchedAbsPathMetadataValue>> {
+        let tree_generation = current_external_tree_generation_for_path(ctx, path)?;
         ctx.compute(&WatchedAbsPathMetadataKey {
             path: Arc::new(path.to_path_buf()),
+            tree_generation,
         })
         .await?
     }
@@ -283,6 +287,16 @@ impl DiceFileComputations {
         cell: CellName,
     ) -> slug_error::Result<Arc<[FileNameBuf]>> {
         ctx.get_buildfiles(cell).await
+    }
+
+    pub async fn external_tree_generation_for_cell(
+        ctx: &mut DiceComputations<'_>,
+        cell: CellName,
+    ) -> slug_error::Result<Option<Arc<str>>> {
+        get_delegated_file_ops(ctx, cell, CheckIgnores::No)
+            .await?
+            .external_tree_generation(ctx)
+            .await
     }
 }
 
@@ -495,11 +509,13 @@ impl FileChangeTracker {
     pub fn abs_file_contents_changed(&mut self, path: PathBuf) {
         self.abs_files_to_dirty.insert(WatchedAbsFileKey {
             path: Arc::new(path.clone()),
+            tree_generation: None,
         });
         if let Some(parent) = path.parent() {
             self.abs_dir_entries_to_dirty
                 .insert(WatchedAbsDirEntriesKey {
                     path: Arc::new(parent.to_path_buf()),
+                    tree_generation: None,
                 });
         }
     }
@@ -509,14 +525,17 @@ impl FileChangeTracker {
     pub fn abs_path_added_or_removed(&mut self, path: PathBuf) {
         self.abs_paths_to_dirty.insert(WatchedAbsPathMetadataKey {
             path: Arc::new(path.clone()),
+            tree_generation: None,
         });
         self.abs_files_to_dirty.insert(WatchedAbsFileKey {
             path: Arc::new(path.clone()),
+            tree_generation: None,
         });
         if let Some(parent) = path.parent() {
             self.abs_dir_entries_to_dirty
                 .insert(WatchedAbsDirEntriesKey {
                     path: Arc::new(parent.to_path_buf()),
+                    tree_generation: None,
                 });
         }
     }
@@ -851,9 +870,10 @@ fn read_watched_abs_path_metadata_value(
 }
 
 #[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
-#[display("WatchedAbsFileKey({})", path.display())]
+#[display("WatchedAbsFileKey({}, {:?})", path.display(), tree_generation)]
 struct WatchedAbsFileKey {
     path: Arc<PathBuf>,
+    tree_generation: Option<Arc<str>>,
 }
 
 #[async_trait]
@@ -902,9 +922,14 @@ impl Key for WatchedAbsFileKey {
 }
 
 #[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
-#[display("WatchedAbsPathMetadataKey({})", path.display())]
+#[display(
+    "WatchedAbsPathMetadataKey({}, {:?})",
+    path.display(),
+    tree_generation
+)]
 struct WatchedAbsPathMetadataKey {
     path: Arc<PathBuf>,
+    tree_generation: Option<Arc<str>>,
 }
 
 #[async_trait]
@@ -1030,9 +1055,14 @@ fn read_watched_abs_dir_entries(path: &Path) -> slug_error::Result<WatchedAbsDir
 }
 
 #[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
-#[display("WatchedAbsDirEntriesKey({})", path.display())]
+#[display(
+    "WatchedAbsDirEntriesKey({}, {:?})",
+    path.display(),
+    tree_generation
+)]
 struct WatchedAbsDirEntriesKey {
     path: Arc<PathBuf>,
+    tree_generation: Option<Arc<str>>,
 }
 
 #[async_trait]
@@ -1102,17 +1132,7 @@ impl Key for ExternalTreeGenerationKey {
         _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let marker_path = self.tree_root.join(".slug_repo_complete");
-        match std::fs::read_to_string(&marker_path) {
-            Ok(content) => Ok(Arc::from(content.trim().to_string().into_boxed_str())),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Arc::from("marker-absent")),
-            Err(e) => Err(slug_error::slug_error!(
-                slug_error::ErrorTag::Environment,
-                "Failed to read generation marker {:?}: {}",
-                marker_path,
-                e
-            )),
-        }
+        read_external_tree_generation_marker(&self.tree_root)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1130,6 +1150,34 @@ impl Key for ExternalTreeGenerationKey {
         InvalidationSourcePriority::High
     }
 }
+
+pub fn read_external_tree_generation_marker(tree_root: &Path) -> slug_error::Result<Arc<str>> {
+    let marker_path = tree_root.join(".slug_repo_complete");
+    match std::fs::read_to_string(&marker_path) {
+        Ok(content) => Ok(Arc::from(content.trim().to_string().into_boxed_str())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Arc::from("marker-absent")),
+        Err(e) => Err(slug_error::slug_error!(
+            slug_error::ErrorTag::Environment,
+            "Failed to read generation marker {:?}: {}",
+            marker_path,
+            e
+        )),
+    }
+}
+
+fn current_external_tree_generation_for_path(
+    ctx: &mut DiceComputations<'_>,
+    path: &Path,
+) -> slug_error::Result<Option<Arc<str>>> {
+    let Some(registry) = ctx.global_data().get_watched_abs_input_registry() else {
+        return Ok(None);
+    };
+    let Some(tree_root) = registry.is_under_tree_root(path) else {
+        return Ok(None);
+    };
+    Ok(Some(read_external_tree_generation_marker(&tree_root)?))
+}
+
 /// Public helper: compute a `WatchedAbsFileKey` for an absolute path and return
 /// the raw bytes + SHA-256 digest. Used by external-cell delegates that need
 /// DICE-tracked file reads outside the project root.
@@ -1137,8 +1185,10 @@ pub async fn compute_watched_abs_file(
     ctx: &mut DiceComputations<'_>,
     path: PathBuf,
 ) -> slug_error::Result<Arc<WatchedAbsFileValue>> {
+    let tree_generation = current_external_tree_generation_for_path(ctx, &path)?;
     ctx.compute(&WatchedAbsFileKey {
         path: Arc::new(path),
+        tree_generation,
     })
     .await?
 }
@@ -1148,8 +1198,10 @@ pub async fn compute_watched_abs_path_metadata(
     ctx: &mut DiceComputations<'_>,
     path: PathBuf,
 ) -> slug_error::Result<Arc<WatchedAbsPathMetadataValue>> {
+    let tree_generation = current_external_tree_generation_for_path(ctx, &path)?;
     ctx.compute(&WatchedAbsPathMetadataKey {
         path: Arc::new(path),
+        tree_generation,
     })
     .await?
 }
@@ -1159,8 +1211,20 @@ pub async fn compute_watched_abs_dir_entries(
     ctx: &mut DiceComputations<'_>,
     path: PathBuf,
 ) -> slug_error::Result<Arc<WatchedAbsDirEntriesValue>> {
+    let tree_generation = current_external_tree_generation_for_path(ctx, &path)?;
     ctx.compute(&WatchedAbsDirEntriesKey {
         path: Arc::new(path),
+        tree_generation,
+    })
+    .await?
+}
+
+pub async fn compute_external_tree_generation(
+    ctx: &mut DiceComputations<'_>,
+    tree_root: PathBuf,
+) -> slug_error::Result<Arc<str>> {
+    ctx.compute(&ExternalTreeGenerationKey {
+        tree_root: Arc::new(tree_root),
     })
     .await?
 }

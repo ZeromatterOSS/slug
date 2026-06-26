@@ -5,8 +5,8 @@
 > Created: 2026-06-11
 >
 > Follow-up owner: [Plan 64](./64-plan62-implementation-review-remediation.md)
-> Phase 64.7 adds the same-daemon semantic replay guardrail that proves the
-> generation marker edge invalidates external-tree package/file reads end to end.
+> Phase 64.7 landed the same-daemon semantic replay guardrail proving external
+> tree generation changes invalidate package/file reads end to end.
 >
 > Root-cause investigation: `/var/mnt/dev/tmp/dice_commit_fix_plan.md`
 
@@ -149,3 +149,13 @@ invalidated → content differs → dependents recompute.
 - `cargo test -p slug_common -- file_ops watched_abs` — all passed (6 tests
   including new `diff_detects_generation_marker_change`)
 - `cargo test -p slug_external_cells` — 13 passed
+
+### Plan 64.7 closure — DONE
+
+- Same-daemon regression:
+  `tests/core/bzlmod/test_plan61_guardrails.py::test_external_tree_generation_change_invalidates_external_package_reads`.
+- The regression covers extension-repo package reads across create/delete style
+  generation changes and failed before watched-abs/package keys carried the
+  current external-tree generation.
+- Current owner for remaining bzlmod remediation is Plan 64 Phases 64.4,
+  64.5, 64.8, and 64.9.

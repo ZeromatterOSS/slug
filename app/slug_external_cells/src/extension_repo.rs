@@ -329,6 +329,22 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
         }
     }
 
+    async fn external_tree_generation(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+    ) -> slug_error::Result<Option<Arc<str>>> {
+        if let Some(registry) = ctx.global_data().get_watched_abs_input_registry() {
+            registry.register_tree_root(self.source_path.clone());
+        }
+        // This method is used to construct higher-level DICE keys after the
+        // extension repo delegate has materialized the current tree. Read the
+        // marker directly so same-command re-materialization is not masked by a
+        // still-valid previous `ExternalTreeGenerationKey` value.
+        let generation =
+            slug_common::file_ops::dice::read_external_tree_generation_marker(&self.source_path)?;
+        Ok(Some(generation))
+    }
+
     fn eq_token(&self) -> PartialEqAny<'_> {
         PartialEqAny::always_false()
     }

@@ -115,7 +115,7 @@ assert_eq_size!(BuildKey, [usize; 4]);
 assert_eq_size!(AnalysisKey, [usize; 2]);
 assert_eq_size!(EnsureTransitiveSetProjectionKey, [usize; 5]);
 assert_eq_size!(EnsureProjectedArtifactKey, [usize; 7]);
-assert_eq_size!(InterpreterResultsKey, [usize; 1]);
+assert_eq_size!(InterpreterResultsKey, [usize; 3]);
 assert_eq_size!(PackageListingKey, [usize; 1]);
 assert_eq_size!(BuildArtifact, [usize; 6]);
 assert_eq_size!(NodeKey, [usize; 7]);
@@ -567,10 +567,10 @@ fn start_backend(
 
 struct BuildSignalReceiver<T> {
     receiver: ReceiverStream<BuildSignal>,
-    // Maps a PackageLabel to the first PackageLabel that had an edge to it. When that PackageLabel
-    // shows up, we'll give it a dependency on said first PackageLabel that had an edge to it, which
-    // is how we discovered its existence.
-    first_edge_to_load: HashMap<PackageLabel, PackageLabel>,
+    // Maps a PackageLabel to the first load key that had an edge to it. When that PackageLabel
+    // shows up, we'll give it a dependency on that first load key, which is how we discovered its
+    // existence.
+    first_edge_to_load: HashMap<PackageLabel, InterpreterResultsKey>,
     backend: T,
 
     // TODO(rajneeshl): When Test listing and execution are on DICE, we can remove this and use
@@ -666,10 +666,11 @@ where
     /// then inject some extra edges that indicate which packages have now become visible as a
     /// result of this load.
     fn enrich_load(&mut self, evaluation: &mut Evaluation) {
-        let pkg = match &evaluation.key {
-            NodeKey::InterpreterResultsKey(InterpreterResultsKey(pkg)) => pkg,
+        let load_key = match &evaluation.key {
+            NodeKey::InterpreterResultsKey(load_key) => load_key,
             _ => return,
         };
+        let pkg = &load_key.0;
 
         if let NodeExtraData::Load(LoadNodeData {
             dep_packages: Some(dep_packages),
@@ -678,7 +679,7 @@ where
             for dep_pkg in dep_packages {
                 self.first_edge_to_load
                     .entry(dep_pkg.dupe())
-                    .or_insert_with(|| pkg.dupe());
+                    .or_insert_with(|| load_key.dupe());
             }
         }
 
@@ -687,9 +688,7 @@ where
         if let Some(first_edge) = first_edge {
             evaluation
                 .dep_keys
-                .push(NodeKey::InterpreterResultsKey(InterpreterResultsKey(
-                    first_edge.dupe(),
-                )));
+                .push(NodeKey::InterpreterResultsKey(first_edge.dupe()));
         }
     }
 

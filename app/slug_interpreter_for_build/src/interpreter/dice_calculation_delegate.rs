@@ -527,6 +527,10 @@ impl<'c, 'd: 'c> DiceCalculationDelegate<'c, 'd> {
         &mut self,
         package: PackageLabel,
     ) -> slug_error::Result<Option<(PackageFilePath, AstModule, ModuleDeps)>> {
+        let external_tree_generation =
+            DiceFileComputations::external_tree_generation_for_cell(self.ctx, package.cell_name())
+                .await?;
+
         // Note:
         /// To avoid paying the cost of read_dir when computing if any specific file has changed (e.g. PACKAGE),
         /// we depend on directory_sublisting_matching_any_case_key to invalidate all files that match (regardless of case).
@@ -543,7 +547,8 @@ impl<'c, 'd: 'c> DiceCalculationDelegate<'c, 'd> {
         // Here we put the package file check behind an additional dice key so that we don't recompute on irrelevant
         // changes to the directory contents.
         #[derive(Debug, Display, Clone, Allocative, Eq, PartialEq, Hash)]
-        struct PackageFileLookupKey(PackageLabel);
+        #[display("{}:{:?}", _0, _1)]
+        struct PackageFileLookupKey(PackageLabel, Option<Arc<str>>);
 
         #[async_trait]
         impl Key for PackageFileLookupKey {
@@ -581,7 +586,10 @@ impl<'c, 'd: 'c> DiceCalculationDelegate<'c, 'd> {
 
         match self
             .ctx
-            .compute(&PackageFileLookupKey(package.dupe()))
+            .compute(&PackageFileLookupKey(
+                package.dupe(),
+                external_tree_generation,
+            ))
             .await??
         {
             Some(package_file_path) => {
@@ -638,8 +646,13 @@ impl<'c, 'd: 'c> DiceCalculationDelegate<'c, 'd> {
         &mut self,
         path: PackageLabel,
     ) -> slug_error::Result<SuperPackage> {
+        let external_tree_generation =
+            DiceFileComputations::external_tree_generation_for_cell(self.ctx, path.cell_name())
+                .await?;
+
         #[derive(Debug, Display, Clone, Allocative, Eq, PartialEq, Hash)]
-        struct PackageFileKey(PackageLabel);
+        #[display("{}:{:?}", _0, _1)]
+        struct PackageFileKey(PackageLabel, Option<Arc<str>>);
 
         #[async_trait]
         impl Key for PackageFileKey {
@@ -674,7 +687,7 @@ impl<'c, 'd: 'c> DiceCalculationDelegate<'c, 'd> {
         }
 
         self.ctx
-            .compute(&PackageFileKey(path))
+            .compute(&PackageFileKey(path, external_tree_generation))
             .await?
             .map_err(slug_error::Error::from)
     }

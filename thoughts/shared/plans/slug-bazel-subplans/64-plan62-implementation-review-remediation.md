@@ -526,6 +526,8 @@ cargo test -p slug_bzlmod repo_spec lockfile extension_execution_dice extensions
 
 ### Phase 64.7: Add End-to-End External-Tree Generation Replay Coverage
 
+**Completed:** 2026-06-25
+
 **Scope:** Plan 63 guardrail coverage.
 
 1. Add a same-daemon test that reads a file/package from an extension-generated
@@ -548,6 +550,27 @@ cargo test -p slug_bzlmod repo_spec lockfile extension_execution_dice extensions
 cargo test -p slug_common -- file_ops watched_abs
 cargo test -p slug_external_cells extension_repo -- --nocapture
 ```
+
+**Implementation evidence (2026-06-25):**
+
+- Added a same-daemon bzlmod regression that builds an extension-generated repo
+  through three repository generations (`data` -> `created` -> `data`) and
+  proves package reads, source-file target lookups, and on-disk repo contents
+  follow the current `.slug_repo_complete` generation.
+- The regression first exposed a stale mix of old `BUILD.bazel` contents and
+  new directory contents. The fix makes external repo generation part of the
+  package/interpreter result keys and the watched-absolute file, metadata, and
+  directory-entry keys.
+- `ExtensionRepoFileOpsDelegate::external_tree_generation` reads the current
+  marker after delegate materialization, so same-command re-materialization is
+  not masked by the previous transaction's cached generation node.
+- Validation:
+  - `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_external_tree_generation_change_invalidates_external_package_reads -rx --tb=short`
+  - `cargo test -p slug_common external_tree_generation_replay_observes_create_edit_delete -- --nocapture`
+  - `cargo test -p slug_external_cells extension_repo -- --nocapture`
+  - `cargo test -p slug_interpreter_for_build eval_package_file -- --nocapture`
+  - `cargo test -p slug_build_api_tests test_analysis_calculation -- --nocapture`
+  - `cargo test -p slug_build_api_tests test_get_node -- --nocapture`
 
 ### Phase 64.8: Run the Bzlmod String/Data-Structure Audit
 

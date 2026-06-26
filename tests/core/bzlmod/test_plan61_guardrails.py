@@ -11732,6 +11732,81 @@ use_repo(ext, "output_digest_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_external_tree_generation_change_invalidates_external_package_reads(
+    buck: Buck,
+) -> None:
+    """Plan 64.7: same-daemon external-tree generation invalidates package reads."""
+    canonical_repo = "_main+generation_ext+generation_repo"
+    repo_dir = buck.cwd / "bazel-external" / canonical_repo
+    marker = repo_dir / ".slug_repo_complete"
+    _write(buck.cwd / "generation.txt", "first\n")
+    _write(
+        buck.cwd / "generation_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    generation = repository_ctx.read(Label("//:generation.txt"))
+    if generation == "first\\n":
+        repository_ctx.file("data.txt", "first payload\\n")
+        repository_ctx.file("BUILD.bazel", "filegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+    elif generation == "second\\n":
+        repository_ctx.file("created.txt", "second payload\\n")
+        repository_ctx.file("BUILD.bazel", "filegroup(name = \\"created\\", srcs = [\\"created.txt\\"])\\n")
+    elif generation == "third\\n":
+        repository_ctx.file("data.txt", "third payload\\n")
+        repository_ctx.file("BUILD.bazel", "filegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+    else:
+        fail("unexpected generation: %s" % generation)
+
+generation_repo_rule = repository_rule(
+    implementation = _repo_impl,
+)
+
+def _generation_ext_impl(module_ctx):
+    generation_repo_rule(name = "generation_repo")
+
+generation_ext = module_extension(
+    implementation = _generation_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan64_external_tree_generation")
+
+generation = use_extension("//:generation_ext.bzl", "generation_ext")
+use_repo(generation, "generation_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+
+    await buck.build("@generation_repo//:data")
+    assert marker.exists()
+    first_marker = marker.read_text()
+    assert (repo_dir / "data.txt").read_text() == "first payload\n"
+
+    _write(buck.cwd / "generation.txt", "second\n")
+    await buck.build("@generation_repo//:created")
+    second_marker = marker.read_text()
+    assert second_marker != first_marker
+    assert (repo_dir / "created.txt").read_text() == "second payload\n"
+    assert not (repo_dir / "data.txt").exists()
+
+    _write(buck.cwd / "generation.txt", "third\n")
+    with pytest.raises(BuckException) as exc:
+        await buck.build("@generation_repo//:created")
+    assert "Unknown target `created`" in str(exc.value), (
+        exc.value.stderr + "\nSTDOUT:\n" + exc.value.stdout
+    )
+    third_marker = marker.read_text()
+    assert third_marker != second_marker
+    assert (repo_dir / "data.txt").read_text() == "third payload\n"
+    assert not (repo_dir / "created.txt").exists()
+
+    await buck.build("@generation_repo//:data")
+    assert (repo_dir / "data.txt").read_text() == "third payload\n"
+    assert not (repo_dir / "created.txt").exists()
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_no_stub_failures_cover_missing_generated_repo_and_repo_rule_failure(
     buck: Buck,
 ) -> None:

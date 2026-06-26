@@ -15,10 +15,10 @@ use dupe::OptionDupedExt;
 use indoc::indoc;
 use slug_analysis::attrs::resolve::ctx::AnalysisQueryResult;
 use slug_analysis::attrs::resolve::ctx::AttrResolutionContext;
+use slug_analysis::attrs::resolve::ctx::ResolvedDep;
 use slug_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 use slug_build_api::interpreter::rule_defs::provider::builtin::template_placeholder_info::FrozenTemplatePlaceholderInfo;
 use slug_build_api::interpreter::rule_defs::provider::callable::register_provider;
-use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use slug_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use slug_build_api::interpreter::rule_defs::provider::registration::register_builtin_providers;
 use slug_core::configuration::data::ConfigurationData;
@@ -34,7 +34,6 @@ use starlark::environment::FrozenModule;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Module;
-use starlark::values::FrozenValueTyped;
 use starlark::values::dict::FrozenDictRef;
 use starlark_map::small_map::SmallMap;
 use starlark_map::smallmap;
@@ -218,13 +217,17 @@ pub(crate) fn resolution_ctx_with_providers(
         fn get_dep(
             &mut self,
             target: &ConfiguredProvidersLabel,
-        ) -> slug_error::Result<FrozenValueTyped<'v, FrozenProviderCollection>> {
-            Ok(self
+        ) -> slug_error::Result<ResolvedDep<'v>> {
+            let providers = self
                 .deps
                 .get(target)
                 .duped()
                 .buck_error_context("missing dep")?
-                .add_heap_ref(self.module.frozen_heap()))
+                .add_heap_ref(self.module.frozen_heap());
+            Ok(ResolvedDep {
+                label: target.dupe(),
+                providers,
+            })
         }
 
         fn resolve_unkeyed_placeholder(
