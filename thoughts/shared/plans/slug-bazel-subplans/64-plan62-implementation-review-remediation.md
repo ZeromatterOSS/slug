@@ -668,6 +668,8 @@ cargo test -p slug_external_cells extension_repo -- --nocapture
 
 **Scope:** audit first, selective implementation later.
 
+**Completed:** 2026-06-26
+
 1. Create or update the Plan 26 audit artifact for bzlmod:
    `thoughts/shared/research/2026-04-string-interning-audit.md`.
 2. Classify at least these candidates:
@@ -694,11 +696,37 @@ cargo test -p slug_external_cells extension_repo -- --nocapture
   text, arbitrary tag values, or user-visible output.
 - Any implementation has before/after memory or load evidence.
 
+**Implementation evidence (2026-06-26):**
+
+- Refreshed `thoughts/shared/research/2026-04-string-interning-audit.md`
+  against the live `slug_bzlmod` structs and sort sites, including
+  `BzlmodExtensionAggregationsDataValue`, `ModuleVersionsValue`,
+  `ModuleExtensionResult`, `ExtensionSpokesValue`, repo mappings, and
+  lockfile output boundaries.
+- No code rewrite was justified: the remaining `HashMap<String, ...>` and
+  `FxHashMap<String, ...>` candidates are either lookup-only low-cardinality
+  maps, deterministic only after explicit sorting, or Bazel-visible/arbitrary
+  user text that should not be interned mechanically.
+- The next implementation owner is still Plan 26.4, gated on a bzlmod-heavy
+  memory/load profile and a typed-name design that preserves Bazel-visible
+  output, lockfile JSON, DICE identity, and action/cache identity.
+
+**Validation (2026-06-26):**
+
+- `cargo fmt --check -p slug_bzlmod` passed.
+- `TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod lockfile -- --nocapture`
+  passed: 88 tests.
+- `TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod extension_execution_dice -- --nocapture`
+  passed: 55 tests.
+- `TMPDIR=/var/mnt/dev/slug/.tmp git diff --check` passed.
+
 **Suggested validation:**
 
 ```sh
-cargo test -p slug_bzlmod
-cargo test -p slug_common bzlmod
+cargo fmt --check -p slug_bzlmod
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod lockfile -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod extension_execution_dice -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp git diff --check
 ```
 
 ### Phase 64.9: Classify Workspace Artifacts

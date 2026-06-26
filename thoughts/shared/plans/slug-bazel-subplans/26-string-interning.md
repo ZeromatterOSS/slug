@@ -162,6 +162,12 @@ Produce `thoughts/shared/research/2026-04-string-interning-audit.md`
 with a ranked table of string-heavy structures introduced or heavily
 modified during Bazel compatibility work.
 
+Plan 64.8 closed the `slug_bzlmod` subset of this audit on 2026-06-26:
+the live bzlmod structures are classified in
+`thoughts/shared/research/2026-04-string-interning-audit.md`, and no
+typed-name or map-shape rewrite is justified without a memory/load profile.
+The broader Plan 26 audit and implementation phases remain open.
+
 For each candidate record:
 
 - file and type
