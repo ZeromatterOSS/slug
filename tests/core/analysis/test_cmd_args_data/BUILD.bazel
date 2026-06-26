@@ -12,6 +12,7 @@ load(
     "args_format_each",
     "args_map_each",
     "args_map_each_sequence",
+    "args_nested_param_file",
     "args_omit_if_empty",
     "args_output_artifact",
     "args_terminate_with",
@@ -82,6 +83,10 @@ args_depset_add_all_transforms(
 
 args_depset_add_joined_transforms(
     name = "args_depset_add_joined_transforms",
+)
+
+args_nested_param_file(
+    name = "args_nested_param_file",
 )
 
 output_artifact_in_relative_to(

@@ -185,6 +185,16 @@ async def test_args_depset_add_joined_transforms(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_cmd_args_data")
+async def test_nested_args_use_param_file_materializes_slot(buck: Buck) -> None:
+    """Nested args.use_param_file(use_always=True) replaces only that Args slot."""
+    result = await buck.build("//:args_nested_param_file")
+    output = result.get_build_report().output_for_target("//:args_nested_param_file")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["runfiles_dir", "retain_a,retain_b", "source=dest"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
 async def test_args_add_format_with_artifact(buck: Buck) -> None:
     """args.add with format= applies a format string to an artifact path."""
     result = await buck.build("//:args_output_artifact")

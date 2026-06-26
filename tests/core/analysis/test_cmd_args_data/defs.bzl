@@ -302,6 +302,42 @@ args_depset_add_joined_transforms = rule(
 )
 
 
+def _args_nested_param_file_impl(ctx):
+    out = ctx.actions.declare_file("nested_param_file.txt")
+    script = """
+import pathlib
+import sys
+
+out = pathlib.Path(sys.argv[1])
+args = sys.argv[2:]
+if len(args) != 1 or not args[0].startswith("--cargo_manifest_args=@"):
+    raise SystemExit("expected one paramfile arg, got %r" % (args,))
+param = pathlib.Path(args[0].split("@", 1)[1])
+out.write_text("\\n".join(param.read_text().splitlines()) + "\\n")
+"""
+
+    main_args = ctx.actions.args()
+    main_args.add("python3")
+    main_args.add("-c")
+    main_args.add(script)
+    main_args.add(out.as_output())
+
+    manifest_args = ctx.actions.args()
+    manifest_args.use_param_file("--cargo_manifest_args=@%s", use_always = True)
+    manifest_args.add("runfiles_dir")
+    manifest_args.add("retain_a,retain_b")
+    manifest_args.add("source=dest")
+
+    ctx.actions.run([main_args, manifest_args], category = "nested_param_file")
+    return [DefaultInfo(default_output = out)]
+
+
+args_nested_param_file = rule(
+    implementation = _args_nested_param_file_impl,
+    attrs = {},
+)
+
+
 def _output_artifact_in_relative_to_impl(ctx):
     source = ctx.file.source
     out = ctx.actions.declare_file("relative_to_test.txt")
