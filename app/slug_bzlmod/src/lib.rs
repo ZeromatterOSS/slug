@@ -1101,9 +1101,12 @@ async fn validate_lockfile_extension_replay_for_extension(
             allow_missing_loads: true,
         })
         .await??;
-    let usages_digest = compute_extension_input_hash(aggregation.aggregated.as_ref());
     let repo_env = bzlmod_repo_env_for_workspace_id(ctx, workspace_id.clone()).await?;
     let repo_mappings = bzlmod_repo_mappings_for_workspace_id(ctx, workspace_id.clone()).await?;
+    let usages_digest = extension_execution_dice::compute_extension_usages_digest(
+        aggregation.aggregated.as_ref(),
+        repo_mappings.repo_mapping_overrides.as_ref(),
+    );
 
     for lockfile_value in [
         lockfile_inputs.visible_lockfile.as_ref(),

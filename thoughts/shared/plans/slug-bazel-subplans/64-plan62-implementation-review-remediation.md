@@ -802,10 +802,10 @@ Clean stale `slugd` processes before and after daemon-sensitive smokes.
 
 ## Current State (2026-06-26)
 
-Plan 64 remains **In Progress** pending the residual full-guardrail failures
-below, but the latest focused slices closed the lockfile/replay invalidation and
-hidden-lockfile persistence gaps that were blocking selected-yanked,
-hidden-lockfile, and reproducible-extension confidence:
+Plan 64 is **Complete** for the remediation scope captured here. The latest
+focused slices closed the lockfile/replay invalidation and hidden-lockfile
+persistence gaps that were blocking selected-yanked, hidden-lockfile,
+reproducible-extension, and same-daemon replay confidence:
 
 - visible and hidden `MODULE.bazel.lock` inputs now poll through Slug's bzlmod
   DICE projection keys, including the resolved graph, current-workspace cell
@@ -845,6 +845,14 @@ hidden-lockfile, and reproducible-extension confidence:
   counter slices. The registry `source.json` guardrails use the root
   `MODULE.bazel` detail prefix so unrelated bzlmod events in the same daemon do
   not contaminate the resolution-count assertion.
+- module extension usage digests now include root `override_repo()` and
+  `inject_repo()` mappings for the selected extension, matching Bazel's
+  `SingleExtensionUsagesValue.hashForEvaluation` boundary while preserving the
+  old tag-only Slug digest when no root override rows are relevant.
+- selected lockfile entries produced from a fresh extension eval in the same
+  daemon no longer count as lockfile replay hits on the next command; preexisting
+  lockfile entries still report replay hits, and external `.bzl`/usage edits
+  still miss or re-evaluate through the replay-input path.
 
 Bazel source anchors:
 
@@ -872,6 +880,14 @@ Bazel source anchors:
   fails `--lockfile_mode=error` when the current registry file has no lockfile
   checksum; Slug should not add a reverse stale-extra-lockfile-URL check that
   masks that resolver-owned error.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionUsagesValue.java:73-99`
+  keeps root repo overrides in the extension usage hash used for lockfile
+  replay while clearing import/proxy-only data.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionUsage.java:160-180`
+  trims per-usage repo overrides out because they are carried in
+  `SingleExtensionUsagesValue.getRepoOverrides()` under canonical names.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:337-344`
+  rejects lockfile replay when the extension usage hash changes.
 
 Accepted validation:
 
@@ -919,6 +935,12 @@ TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slu
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_single_version_override_registry_source_json_delete_invalidates_bzlmod_resolution -s --tb=short
 TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -k 'source_json' -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  extension_ -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_inject_repo_keyword_alias_maps_generated_repo_and_replays \
+  tests/core/bzlmod/test_plan61_guardrails.py::test_missing_lockfile_extension_executes_once_then_reuses_dice_state -s --tb=short
 TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -s --tb=short
 cargo fmt -p slug_bzlmod -p slug_cmd_audit_client -p slug_cmd_audit_server --check
@@ -927,15 +949,9 @@ git diff --check
 
 Remaining gaps:
 
-- Full `tests/core/bzlmod/test_plan61_guardrails.py` was rerun and is not clean:
-  184 passed / 2 failed. The remaining failures are
-  `test_missing_lockfile_extension_executes_once_then_reuses_dice_state`, where
-  the second run records one additional extension replay hit, and
-  `test_inject_repo_keyword_alias_maps_generated_repo_and_replays`, where the
-  post-edit run does not record a fresh extension eval. Fix or explicitly hand
-  off these before declaring Plan 64 complete.
-- Once Plan 64's focused lockfile/replay lane is no longer blocking, return
-  ownership to Plan 34's REAPI executor proof instead of opening new
+- No known Plan 64 guardrail failures remain: full
+  `tests/core/bzlmod/test_plan61_guardrails.py` now reports 186 passed.
+- Return ownership to Plan 34's REAPI executor proof instead of opening new
   compatibility lanes.
 
 ## Current Review Validation

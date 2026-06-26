@@ -39,6 +39,8 @@ use std::hash::Hash;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::OnceLock;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -123,6 +125,70 @@ pub fn repo_mapping_overrides_identity_digest(
     overrides: &RepoMappingOverrides,
 ) -> Result<String, serde_json::Error> {
     stable_json_digest(overrides)
+}
+
+pub(crate) fn compute_extension_usages_digest(
+    extension: &AggregatedExtension,
+    repo_mapping_overrides: &RepoMappingOverrides,
+) -> String {
+    use sha2::Digest;
+    use sha2::Sha256;
+
+    let base_digest = compute_extension_input_hash(extension);
+    let Some(overrides) =
+        repo_mapping_overrides_for_extension(repo_mapping_overrides, &extension.extension_id)
+    else {
+        return base_digest;
+    };
+    if overrides.is_empty() {
+        return base_digest;
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update(base_digest.as_bytes());
+    hasher.update([0u8]);
+
+    for (generated_repo, replacement_repo) in overrides {
+        hasher.update(generated_repo.as_bytes());
+        hasher.update([0u8]);
+        hasher.update(replacement_repo.as_bytes());
+        hasher.update([0u8]);
+    }
+
+    base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        hasher.finalize(),
+    )
+}
+
+fn repo_mapping_overrides_for_extension<'a>(
+    overrides: &'a RepoMappingOverrides,
+    extension_id: &str,
+) -> Option<&'a BTreeMap<String, String>> {
+    overrides.get(extension_id).or_else(|| {
+        let canonical_id = crate::lockfile::lockfile_canonical_extension_id(extension_id);
+        overrides.get(&canonical_id)
+    })
+}
+
+// Instrumentation only: selected cache entries produced from a fresh eval in
+// this daemon are not counted as lockfile replay hits on a later command.
+static FRESH_EXTENSION_EVAL_IDENTITIES: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+
+fn record_fresh_extension_eval_identity(key: &ModuleExtensionFreshEvalKey) {
+    let mut identities = FRESH_EXTENSION_EVAL_IDENTITIES
+        .get_or_init(|| Mutex::new(HashSet::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    identities.insert(key.identity_digest());
+}
+
+fn has_fresh_extension_eval_identity(key: &ModuleExtensionFreshEvalKey) -> bool {
+    let identities = FRESH_EXTENSION_EVAL_IDENTITIES
+        .get_or_init(|| Mutex::new(HashSet::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    identities.contains(&key.identity_digest())
 }
 
 fn create_extension_execution_key_from_aggregation(
@@ -567,7 +633,10 @@ async fn extension_spokes_identity_for_aggregation(
     let repo_mappings =
         crate::bzlmod_repo_mappings_for_workspace_id(ctx, workspace_id.clone()).await?;
     let repo_env = crate::bzlmod_repo_env_for_workspace_id(ctx, workspace_id.clone()).await?;
-    let usages_digest = compute_extension_input_hash(aggregation.aggregated.as_ref());
+    let usages_digest = compute_extension_usages_digest(
+        aggregation.aggregated.as_ref(),
+        repo_mappings.repo_mapping_overrides.as_ref(),
+    );
     let replay_inputs = ctx
         .compute(&ModuleExtensionReplayInputsKey {
             workspace_id: workspace_id.clone(),
@@ -1015,7 +1084,10 @@ impl Key for ExtensionSpokesKey {
             aggregated: self.aggregated.clone(),
             root_module_name: self.root_module_name.clone(),
         };
-        let usages_digest = compute_extension_input_hash(aggregation.aggregated.as_ref());
+        let usages_digest = compute_extension_usages_digest(
+            aggregation.aggregated.as_ref(),
+            self.repo_mapping_overrides.as_ref(),
+        );
         if !self.usages_digest.is_empty() && self.usages_digest.as_ref() != usages_digest {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Tier0,
@@ -2080,6 +2152,47 @@ impl ModuleExtensionFreshEvalKey {
             repo_mapping_overrides: key.repo_mapping_overrides.clone(),
         }
     }
+
+    fn identity_digest(&self) -> String {
+        use sha2::Digest;
+        use sha2::Sha256;
+
+        let mut hasher = Sha256::new();
+        hasher.update(self.extension_id.as_bytes());
+        hasher.update([0u8]);
+        hasher.update(self.input_hash.as_bytes());
+        hasher.update([0u8]);
+        hasher.update(self.bzl_transitive_digest.as_bytes());
+        hasher.update([0u8]);
+        hasher.update(self.root_module_name.as_bytes());
+        hasher.update([0u8]);
+        if let Some(project_root) = &self.project_root {
+            hasher.update(project_root.to_string_lossy().as_bytes());
+        }
+        hasher.update([0u8]);
+        hasher.update(self.workspace_id.stable_hash().as_bytes());
+        hasher.update([0u8]);
+        hasher.update(facts_identity(&self.prior_facts).as_bytes());
+        hasher.update([0u8]);
+        hasher.update(
+            stable_json_digest(self.repo_env.as_ref())
+                .expect("BTreeMap<String, String> serialization is infallible")
+                .as_bytes(),
+        );
+        hasher.update([0u8]);
+        hasher.update(
+            repo_mappings_identity_digest(self.repo_mappings.as_ref())
+                .expect("RepoMappingSnapshot serialization is infallible")
+                .as_bytes(),
+        );
+        hasher.update([0u8]);
+        hasher.update(
+            repo_mapping_overrides_identity_digest(self.repo_mapping_overrides.as_ref())
+                .expect("RepoMappingOverrides serialization is infallible")
+                .as_bytes(),
+        );
+        hex::encode(hasher.finalize())
+    }
 }
 
 impl std::hash::Hash for ModuleExtensionFreshEvalKey {
@@ -2208,6 +2321,8 @@ impl Key for ModuleExtensionFreshEvalKey {
             result.repo_count()
         );
 
+        record_fresh_extension_eval_identity(self);
+
         Ok(Arc::new(result))
     }
 
@@ -2240,6 +2355,8 @@ impl Key for ModuleExtensionExecutionKey {
 
         let prior_facts = self.replay_inputs.prior_facts.clone();
         let workspace_lockfile_facts = self.replay_inputs.workspace_lockfile_facts.clone();
+        let fresh_eval_key =
+            ModuleExtensionFreshEvalKey::from_execution_key(self, Arc::new(prior_facts.clone()));
 
         // 1. Consume replay inputs selected by `ModuleExtensionReplayInputsKey`.
         //    Extension execution must not reopen lockfiles or decide which
@@ -2254,24 +2371,31 @@ impl Key for ModuleExtensionExecutionKey {
             )
             .await?
         {
-            let source = self
-                .replay_inputs
-                .selected_cache_identity
-                .as_ref()
-                .map(|identity| identity.source);
-            match source {
-                Some(crate::dice_graph::LockfileContentKind::Hidden) => tracing::info!(
-                    "Extension '{}' hidden lockfile cache HIT: using {} cached repo specs",
-                    self.extension_id,
-                    selected_cache.repo_specs.len()
-                ),
-                _ => tracing::info!(
-                    "Extension '{}' cache HIT: using {} cached repo specs",
-                    self.extension_id,
-                    selected_cache.repo_specs.len()
-                ),
+            if has_fresh_extension_eval_identity(&fresh_eval_key) {
+                tracing::debug!(
+                    "Extension '{}' selected cache matches a fresh same-daemon eval; not counting it as a replay hit",
+                    self.extension_id
+                );
+            } else {
+                let source = self
+                    .replay_inputs
+                    .selected_cache_identity
+                    .as_ref()
+                    .map(|identity| identity.source);
+                match source {
+                    Some(crate::dice_graph::LockfileContentKind::Hidden) => tracing::info!(
+                        "Extension '{}' hidden lockfile cache HIT: using {} cached repo specs",
+                        self.extension_id,
+                        selected_cache.repo_specs.len()
+                    ),
+                    _ => tracing::info!(
+                        "Extension '{}' cache HIT: using {} cached repo specs",
+                        self.extension_id,
+                        selected_cache.repo_specs.len()
+                    ),
+                }
+                selected_cache.record_hit(&self.extension_id);
             }
-            selected_cache.record_hit(&self.extension_id);
 
             let recorded_input_context =
                 ModuleExtensionRecordedInputContext::from_selected_cache(&selected_cache);
@@ -2294,12 +2418,7 @@ impl Key for ModuleExtensionExecutionKey {
             return Ok(Arc::new(result));
         }
 
-        let result = ctx
-            .compute(&ModuleExtensionFreshEvalKey::from_execution_key(
-                self,
-                Arc::new(prior_facts),
-            ))
-            .await??;
+        let result = ctx.compute(&fresh_eval_key).await??;
         validate_error_mode_facts(
             &self.extension_id,
             self.replay_inputs.lockfile_mode,
@@ -5124,6 +5243,53 @@ mod tests {
         assert_ne!(
             digest_empty, digest_with,
             "Empty and non-empty overrides must produce distinct digests"
+        );
+    }
+
+    #[test]
+    fn extension_usages_digest_tracks_root_repo_overrides() {
+        use crate::ExtensionTag;
+        use crate::extensions::AggregatedExtension;
+
+        let mut extension = AggregatedExtension::new("@root//:ext.bzl", "ext");
+        extension.add_module_tags("root", vec![ExtensionTag::new("tag".to_owned())]);
+        let tag_only = compute_extension_input_hash(&extension);
+        let empty: crate::RepoMappingOverrides = std::collections::BTreeMap::new();
+        assert_eq!(
+            compute_extension_usages_digest(&extension, &empty),
+            tag_only,
+            "empty root overrides should preserve the existing tag-only digest"
+        );
+
+        let mut helper_a = std::collections::BTreeMap::new();
+        helper_a.insert("injected_helper".to_owned(), "helper_a".to_owned());
+        let mut with_helper_a: crate::RepoMappingOverrides = std::collections::BTreeMap::new();
+        with_helper_a.insert(extension.extension_id.clone(), helper_a.clone());
+        let digest_a = compute_extension_usages_digest(&extension, &with_helper_a);
+        assert_ne!(
+            digest_a, tag_only,
+            "root inject_repo/override_repo rows must participate in usage identity"
+        );
+
+        let mut helper_b = std::collections::BTreeMap::new();
+        helper_b.insert("injected_helper".to_owned(), "helper_b".to_owned());
+        let mut with_helper_b: crate::RepoMappingOverrides = std::collections::BTreeMap::new();
+        with_helper_b.insert(extension.extension_id.clone(), helper_b);
+        assert_ne!(
+            digest_a,
+            compute_extension_usages_digest(&extension, &with_helper_b),
+            "changing the selected injected repo must invalidate replay"
+        );
+
+        let mut canonical_spelling: crate::RepoMappingOverrides = std::collections::BTreeMap::new();
+        canonical_spelling.insert(
+            crate::lockfile::lockfile_canonical_extension_id(&extension.extension_id),
+            helper_a,
+        );
+        assert_eq!(
+            digest_a,
+            compute_extension_usages_digest(&extension, &canonical_spelling),
+            "canonical lockfile extension IDs should select the same override rows"
         );
     }
 
