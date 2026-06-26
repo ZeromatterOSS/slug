@@ -58,7 +58,9 @@ shortcut.
   passes the built Slug binary through `TEST_EXECUTABLE`/`SLUG_BIN`; the smoke
   resolves these executable paths before changing into fixture workspaces. The
   NativeLink smoke runs when a NativeLink binary is available and skips cleanly
-  otherwise.
+  otherwise, except on Linux GitHub Actions where a missing NativeLink binary is
+  now a hard failure so the hosted gate cannot pass by silently skipping the
+  REAPI proof.
 - The smoke starts a local all-in-one NativeLink REAPI service with one worker
   and builds fast in-repo fixtures through `--remote_executor` and
   `--remote_cache`. The shell and platform-exec-properties fixtures
@@ -139,6 +141,14 @@ shortcut.
   suite discovers the sibling CI-profile NativeLink `target/smol/nativelink`
   binary by default and still reports zero direct-local actions for the REAPI
   smoke fixtures.
+- `python -m pytest -q tests/plan34/test_reapi_local_executor_smoke.py::test_nativelink_binary_env_var_wins
+  tests/plan34/test_reapi_local_executor_smoke.py::test_nativelink_binary_discovers_smol_before_debug
+  tests/plan34/test_reapi_local_executor_smoke.py::test_nativelink_binary_fails_on_linux_github_actions_without_binary
+  tests/plan34/test_reapi_local_executor_smoke.py::test_nativelink_binary_skips_without_binary_outside_linux_github_actions
+  --tb=short` proves Linux CI cannot skip the NativeLink REAPI smoke if
+  `.github/actions/setup_plan34_nativelink` fails to provision a binary, while
+  local and non-Linux hosts can still skip when no local REAPI service is
+  available.
 - `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/core/analysis/test_native_rules.py -q -k 'build_config_defaults or action_env_overrides'`
   proves `ctx.configuration.default_shell_env` contains Bazel-shaped defaults
   and that explicit `--action_env` values override them.

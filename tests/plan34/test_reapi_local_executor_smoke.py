@@ -69,6 +69,14 @@ def _nativelink_binary() -> Path:
     for candidate in SIBLING_NATIVELINK_BIN_CANDIDATES:
         if _is_executable(candidate):
             return candidate
+    if (
+        os.environ.get("GITHUB_ACTIONS") == "true"
+        and os.environ.get("RUNNER_OS") == "Linux"
+    ):
+        pytest.fail(
+            "Linux GitHub Actions must run .github/actions/setup_plan34_nativelink "
+            "before tests/plan34/ so the REAPI smoke cannot pass by skipping"
+        )
     pytest.skip(
         "set SLUG_PLAN34_NATIVELINK_BIN or build "
         "../nativelink/target/smol/nativelink or "
@@ -115,6 +123,38 @@ def test_nativelink_binary_discovers_smol_before_debug(
     )
 
     assert _nativelink_binary() == smol_bin
+
+
+def test_nativelink_binary_fails_on_linux_github_actions_without_binary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SLUG_PLAN34_NATIVELINK_BIN", raising=False)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("RUNNER_OS", "Linux")
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "SIBLING_NATIVELINK_BIN_CANDIDATES",
+        [],
+    )
+
+    with pytest.raises(pytest.fail.Exception, match="setup_plan34_nativelink"):
+        _nativelink_binary()
+
+
+def test_nativelink_binary_skips_without_binary_outside_linux_github_actions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SLUG_PLAN34_NATIVELINK_BIN", raising=False)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("RUNNER_OS", "macOS")
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "SIBLING_NATIVELINK_BIN_CANDIDATES",
+        [],
+    )
+
+    with pytest.raises(pytest.skip.Exception):
+        _nativelink_binary()
 
 
 def _free_port() -> int:
