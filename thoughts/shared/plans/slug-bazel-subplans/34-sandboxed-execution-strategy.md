@@ -104,8 +104,9 @@ shortcut.
   wiring guard now fails if the Linux job stops running that setup action before
   the Python integration entrypoint. `run_test_py` also exports
   `SLUG_PLAN34_EVIDENCE_JSONL` and uploads a
-  `plan34-reapi-evidence-${{ runner.os }}` artifact when the smoke writes
-  evidence.
+  validates that the Linux evidence file contains the required REAPI,
+  upload/materialization, remote-AC, and zero-direct-local records, then uploads
+  `plan34-reapi-evidence-${{ runner.os }}`.
   The hosted runtime of that gate still needs to be observed.
 - Legacy explicit
   `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` hybrid
@@ -186,13 +187,19 @@ shortcut.
   before `.github/actions/run_test_py`, and that the setup action still builds
   the pinned `target/smol/nativelink` binary and exports
   `SLUG_PLAN34_NATIVELINK_BIN`. It also proves `run_test_py` sets the Plan 34
-  evidence JSONL path and uploads the artifact if present.
+  evidence JSONL path, validates Linux evidence before upload, and uploads the
+  artifact if present.
 - `TMPDIR=/var/mnt/dev/slug/.tmp
-  SLUG_PLAN34_EVIDENCE_JSONL=/var/mnt/dev/slug/.tmp/plan34-reapi-evidence.jsonl
+  SLUG_PLAN34_EVIDENCE_JSONL=/var/mnt/dev/slug/.tmp/plan34-reapi-evidence-validate.jsonl
   TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
-  tests/plan34/ -s --tb=short` writes 9 evidence records with
+  tests/plan34/ -s --tb=short`
+  - Passed: `19 passed in 14.74s`; writes 9 evidence records with
   `reapi_actions=12`, `direct_local_actions=0`, `upload_records=12`,
   `cache_query_actions=1`, and `cache_hit_actions=1`.
+- `python3 tests/plan34/validate_reapi_evidence.py
+  .tmp/plan34-reapi-evidence-validate.jsonl`
+  - Passed with `records=9`, `reapi_actions=12`, `upload_records=12`,
+    `cache_query_actions=1`, and `cache_hit_actions=1`.
 
 The NativeLink smoke is execution-boundary evidence, including a real
 `@rules_cc` compile/link proof. It is now wired as a Linux CI gate; the first
@@ -201,10 +208,11 @@ hosted run still needs to be recorded as accepted runtime evidence.
 ## Remaining Gaps
 
 - Observe the first hosted Linux CI run with
-  `.github/actions/setup_plan34_nativelink` and inspect the uploaded
-  `plan34-reapi-evidence-Linux` artifact. If source-building NativeLink makes
-  routine CI too slow, keep the same REAPI boundary but switch the bootstrap to a
-  faster pinned public artifact/cache path.
+  `.github/actions/setup_plan34_nativelink`; the job now validates
+  `plan34-reapi-evidence-Linux` before upload, so a hosted green Linux run is
+  sufficient runtime evidence. If source-building NativeLink makes routine CI
+  too slow, keep the same REAPI boundary but switch the bootstrap to a faster
+  pinned public artifact/cache path.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
   REAPI surface if it is needed as the executor backend.
 - Keep cache identity and ActionResult replay in Plan 31. Plan 34 only consumes
@@ -219,6 +227,7 @@ hosted run still needs to be recorded as accepted runtime evidence.
 - NativeLink/local-REAPI execution proof:
   - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q`
   - `TMPDIR=/var/mnt/dev/slug/.tmp SLUG_PLAN34_EVIDENCE_JSONL=/var/mnt/dev/slug/.tmp/plan34-reapi-evidence.jsonl TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/plan34/ -s --tb=short`
+  - `python3 tests/plan34/validate_reapi_evidence.py /var/mnt/dev/slug/.tmp/plan34-reapi-evidence.jsonl`
   - `SLUG_BIN=target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py -q -s`
   - Set `SLUG_PLAN34_NATIVELINK_BIN=/path/to/nativelink` when no sibling
     `../nativelink/target/smol/nativelink` or

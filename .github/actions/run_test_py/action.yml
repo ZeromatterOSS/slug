@@ -12,6 +12,12 @@ runs:
       export SLUG_PLAN34_EVIDENCE_JSONL="$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"
       python3 test.py --ci --git --slug=$RUNNER_TEMP/artifacts/slug
     shell: bash
+  - name: Validate Plan 34 REAPI evidence
+    if: runner.os == 'Linux'
+    run: |-
+      set -euo pipefail
+      python3 tests/plan34/validate_reapi_evidence.py "$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"
+    shell: bash
   - name: Upload Plan 34 REAPI evidence
     if: always()
     uses: actions/upload-artifact@v6

@@ -166,6 +166,7 @@ def _record_remote_action_cache_evidence(
             "phase": "remote_action_cache_hit",
             "target": target,
             "remote_service": "local_nativelink",
+            "executor_boundary": "reapi",
             "direct_local_actions": 0,
             "reapi_actions": 0,
             "cache_query_actions": len(cache_hits),
