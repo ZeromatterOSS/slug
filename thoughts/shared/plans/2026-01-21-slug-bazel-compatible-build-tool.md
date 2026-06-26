@@ -1,5 +1,12 @@
 # Slug: Bazel-Compatible Build Tool Implementation Plan
 
+> V1 archive/reference notice: this January roadmap is no longer the canonical
+> implementation plan. New Slug work should start from
+> [Slug V2 Clean-Restart Implementation Plan](./2026-06-26-slug-v2-clean-restart.md).
+> The V1 plan set remains useful as a bug database, validation history, and
+> extraction map, but it should not be extended as the active roadmap unless the
+> V2 plan explicitly delegates a comparison or extraction task here.
+
 ## Overview
 
 Slug is a Bazel 9.0-compatible build tool that leverages Buck2's high-performance Rust internals (DICE incremental computation, starlark-rust interpreter, remote execution architecture). It already supports substantial Bazel BUILD.bazel, bzlmod, and rules\_\* workflows, but the remaining work is tracked as parity gaps rather than treated as full compatibility.

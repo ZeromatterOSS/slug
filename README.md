@@ -54,6 +54,13 @@ The project is provided for educational and research purposes, and is in large
 part an exercise in experimenting with agentic programming on a substantial
 systems codebase.
 
+The current canonical roadmap is the V2 clean restart plan:
+[thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md](thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md).
+The existing implementation remains valuable V1 reference material, but new
+work should target the V2 plan: Bazel-shaped identity and layout from the root,
+Bazel source/tests as the oracle, DICE-owned semantic state, and REAPI-first
+execution.
+
 ### What works today
 
 - **BUILD.bazel / MODULE.bazel** &mdash; Bazel 9.0 build files and bzlmod

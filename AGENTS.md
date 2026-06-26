@@ -6,6 +6,10 @@ Project-wide instructions for AI agents on slug.
 
 **Bazel 9 parity only.** No back-compat for older Bazel or slug's earlier prototype behaviour.
 
+- Current canonical plan:
+  `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`.
+  The January roadmap and numbered V1 subplans are archive/reference material
+  unless the V2 plan explicitly asks an agent to extract or compare them.
 - Bazel 9 removes symbol (`CcInfo`, `PyInfo`, `ProtoInfo` from globals) → slug removes too. No deprecation, no shim.
 - Bazel 9 changes lockfile/WORKSPACE/Starlark API → slug matches exact. Not superset, not subset.
 - Bazel 9 errors on pattern (native `cc_library` without `load("@rules_cc//...")`) → slug errors same message shape.
@@ -24,7 +28,8 @@ Cite Bazel source of truth for parity decisions:
 ## "Parity" concretely
 
 - Bazel 9 errors → slug errors, same kind.
-- Bazel 9 output path → slug output path, same (modulo `bazel-out`/`buck-out`, deliberately different).
+- Bazel 9 output path → slug output path, same. V2 does not inherit the V1
+  `buck-out` exception unless a deliberate Slug extension plan says so.
 - Bazel 9 MODULE.bazel builds → slug builds, same result.
 - Bazel 9 fails → slug fails. Workarounds masking a Bazel 9 failure = bugs.
 
@@ -33,7 +38,10 @@ Cite Bazel source of truth for parity decisions:
 Start from the live checkout, not from memory.
 
 - Read this file, then the current roadmap entry under
-  `thoughts/shared/plans/` (top-level slug-bazel plan + the relevant subplan).
+  `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`, then the
+  relevant V2 subplan under `thoughts/shared/plans/slug-v2-subplans/`.
+  Read V1 plans only when the V2 plan names them as extraction/reference
+  material.
 - If the user names a prompt or plan, read that prompt/plan before editing.
   Prompts live in `thoughts/shared/prompts/`; subplans live in
   `thoughts/shared/plans/slug-bazel-subplans/`.
@@ -71,6 +79,8 @@ computation.
 - Update the owning plan with compact evidence when a result changes the
   project state. Do not use a passing real-world target as proof that structural
   acceptance criteria are complete unless the plan says so.
+- New implementation work should add or strengthen the Bazel oracle fixture
+  first, then port or write code until Slug V2 matches that fixture.
 
 ## NOT in scope
 
