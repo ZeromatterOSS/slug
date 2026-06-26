@@ -18,8 +18,8 @@
 ## Status: PARTIAL
 
 Local and REAPI per-`Args` paramfile slots are implemented and covered by fast
-repo-owned regressions. External cargo-build-script validation and BCR coverage
-scan remain open.
+repo-owned regressions, including a cargo-runfiles-shaped REAPI directory-output
+handoff. Public cargo-build-script validation and BCR coverage scan remain open.
 
 ## Bazel source anchors
 
@@ -61,6 +61,12 @@ scan remain open.
   `Args.use_param_file("--cargo_manifest_args=@%s", use_always=True)` crosses
   REAPI with `executor_boundary="reapi"`, `direct_local_actions=0`, and the
   remote action reading the uploaded paramfile input.
+- Plan 34's `//:cargo_runfiles_param_file` fixture declares a
+  `_bs.cargo_runfiles` directory, populates it from a nested
+  `--cargo_manifest_args=@...` paramfile, then consumes that directory in a
+  downstream RE action. The uploader now materializes and re-uploads recent
+  RE-produced file inputs when the remote CAS reports them missing, avoiding a
+  direct-local shortcut for generated directory handoffs.
 
 ## Accepted evidence
 
@@ -73,14 +79,16 @@ scan remain open.
   - Passed: `2 passed`
 - `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/plan34/test_reapi_local_executor_smoke.py::test_native_link_nested_paramfile_reaches_reapi_input_tree -s --tb=short`
   - Passed: `1 passed in 0.76s`
+- `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/plan34/test_reapi_local_executor_smoke.py::test_native_link_cargo_runfiles_paramfile_advances_reapi_layer -s --tb=short`
+  - Passed: `1 passed in 1.67s`
 - `TMPDIR=/var/mnt/dev/slug/.tmp SLUG_PLAN34_EVIDENCE_JSONL=/var/mnt/dev/slug/.tmp/plan34-reapi-evidence.jsonl TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/plan34/ -s --tb=short`
-  - Passed: `16 passed in 10.94s`; evidence summary:
-    `reapi_actions=10`, `direct_local_actions=0`, `upload_records=10`.
+  - Passed: `17 passed in 20.84s`; evidence summary:
+    `reapi_actions=12`, `direct_local_actions=0`, `upload_records=12`.
 
 ## Remaining gaps
 
-- Run a fast public or repo-owned cargo-build-script smoke that proves the
-  runner receives `--cargo_manifest_args=@...`, creates the declared
+- Run a fast public cargo-build-script smoke that proves a real ruleset runner
+  receives `--cargo_manifest_args=@...`, creates the declared
   `.cargo_runfiles` tree, and advances to a distinct layer.
 - Complete the public BCR `use_param_file(use_always=True)` scan and record
   whether any consumer needs more than per-`Args` slot materialization.
@@ -89,9 +97,9 @@ scan remain open.
 
 ## Next owner
 
-1. Use the smallest public cargo-build-script smoke to prove the runner receives
-   `--cargo_manifest_args=@...`, creates the declared `.cargo_runfiles` tree,
-   and advances to a distinct layer.
+1. Use the smallest public cargo-build-script smoke to prove a real ruleset
+   runner receives `--cargo_manifest_args=@...`, creates the declared
+   `.cargo_runfiles` tree, and advances to a distinct layer.
 2. Complete the public BCR `use_param_file(use_always=True)` scan, then update
    this file with only new accepted evidence and remaining gaps.
 

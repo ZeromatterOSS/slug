@@ -76,6 +76,10 @@ shortcut.
   It also proves a nested `Args.use_param_file("--cargo_manifest_args=@%s",
   use_always=True)` fixture crosses REAPI with the generated paramfile present
   in the uploaded input tree and no direct-local fallback.
+  A two-action cargo-runfiles-shaped fixture now proves a declared directory
+  output produced by one RE action can feed a downstream RE action after Slug
+  materializes and re-uploads recent RE-produced file inputs when the remote CAS
+  reports them missing.
   Each build also runs with `--show-output` and asserts the reported
   `buck-out/...` output path exists, giving explicit output-materialization
   evidence for the REAPI execution path.
@@ -131,6 +135,7 @@ shortcut.
   explicit `--remote_cache`,
   `reapi_actions=1` for the no-`--remote-only` platform `exec_properties`
   fixture, `reapi_actions=1` for the nested `Args.use_param_file` fixture,
+  `reapi_actions=2` for the cargo-runfiles-shaped paramfile fixture,
   `reapi_actions=3` for the C-source Starlark rule fixture,
   `reapi_actions=2` for the `@rules_cc` fixture,
   `executor_boundary="reapi"` on every RE row, `direct_local_actions=0`, and
@@ -185,8 +190,8 @@ shortcut.
 - `TMPDIR=/var/mnt/dev/slug/.tmp
   SLUG_PLAN34_EVIDENCE_JSONL=/var/mnt/dev/slug/.tmp/plan34-reapi-evidence.jsonl
   TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
-  tests/plan34/ -s --tb=short` writes 8 evidence records with
-  `reapi_actions=10`, `direct_local_actions=0`, `upload_records=10`,
+  tests/plan34/ -s --tb=short` writes 9 evidence records with
+  `reapi_actions=12`, `direct_local_actions=0`, `upload_records=12`,
   `cache_query_actions=1`, and `cache_hit_actions=1`.
 
 The NativeLink smoke is execution-boundary evidence, including a real

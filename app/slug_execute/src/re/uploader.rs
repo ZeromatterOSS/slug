@@ -312,6 +312,7 @@ impl Uploader {
                         ref err @ ArtifactNotMaterializedReason::RequiresCasDownload {
                             ref entry,
                             ref info,
+                            ref path,
                             ..
                         },
                     ) => {
@@ -347,18 +348,12 @@ impl Uploader {
                                     ));
                                 }
 
-                                soft_error!(
-                                    "cas_missing",
-                                    slug_error::slug_error!(
-                                        slug_error::ErrorTag::Input,
-                                        "{} (expires = {}) is missing in the CAS but expected to exist as per: {:#}",
-                                        file.digest,
-                                        file.digest.expires()?,
-                                        err
-                                    ),
-                                    quiet: true
-                                )?;
-
+                                upload_files.push(NamedDigest {
+                                    name: fs.resolve(path).as_maybe_relativized_str()?.to_owned(),
+                                    digest,
+                                    ..Default::default()
+                                });
+                                paths_to_materialize.push(path.to_owned());
                                 continue;
                             }
                         }
