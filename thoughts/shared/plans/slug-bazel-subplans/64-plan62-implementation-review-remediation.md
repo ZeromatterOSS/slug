@@ -831,6 +831,10 @@ hidden-lockfile, and reproducible-extension confidence:
   missing-checksum error remains owned by registry resolution, so an extra old
   lockfile URL cannot mask the Bazel-shaped "missing checksum" failure for a
   current registry file.
+- `--lockfile_mode=error` now distinguishes a facts-only visible lockfile from a
+  stale visible module-extension entry. Facts-only lockfiles proceed to fresh
+  extension evaluation and then validate facts, while stale extension entries
+  still fail with the Bazel-shaped stale-lockfile error.
 
 Bazel source anchors:
 
@@ -839,8 +843,14 @@ Bazel source anchors:
 - `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:139-180`
   reads both lockfiles, prefers workspace facts when present, falls back to
   hidden facts, and prefers visible module-extension entries before hidden.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:185-268`
+  runs the extension when no locked extension entry exists, then in
+  `--lockfile_mode=error` compares freshly observed facts against the workspace
+  lockfile facts.
 - `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:354-364`
   intentionally does not diff-check facts when replaying a lockfile extension.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:474-475`
+  owns the stale-lockfile message shape used for `--lockfile_mode=error`.
 - `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java:120-123`
   starts command-end facts from the workspace lockfile, and
   `BazelLockFileModule.java:159-216` writes non-reproducible extension entries to
@@ -883,17 +893,26 @@ TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
 TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
 TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_lockfile_missing_registry_checksum_invalidates_bzlmod_resolution -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  replay_inputs_error_mode -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  extension_cache_candidate_lookup -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_lockfile_mode_error_rejects_changed_extension_facts -s --tb=short
 TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -s --tb=short
+cargo fmt -p slug_bzlmod --check
+git diff --check
 ```
 
 Remaining gaps:
 
 - Full `tests/core/bzlmod/test_plan61_guardrails.py` was rerun and is not clean:
-  180 passed / 6 failed. The failures cluster around registry `source.json`
-  warm invalidation counters, extension-facts error wording, post-write lockfile
-  replay expectations, and `inject_repo` mapping replay after a MODULE edit.
-  Fix or explicitly hand off these before declaring Plan 64 complete.
+  181 passed / 5 failed. The failures cluster around registry `source.json`
+  warm invalidation counters, post-write lockfile replay expectations, and
+  `inject_repo` mapping replay after a MODULE edit. Fix or explicitly hand off
+  these before declaring Plan 64 complete.
 - Once Plan 64's focused lockfile/replay lane is no longer blocking, return
   ownership to Plan 34's REAPI executor proof instead of opening new
   compatibility lanes.

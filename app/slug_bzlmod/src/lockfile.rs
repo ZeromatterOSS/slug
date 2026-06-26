@@ -3385,6 +3385,23 @@ mod tests {
     }
 
     #[test]
+    fn extension_cache_candidate_lookup_uses_extension_id_spellings() {
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            "@@rules_rs+//rs:extensions.bzl%crate".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+
+        assert!(lockfile.has_extension_cache_candidate("@rules_rs//rs:extensions.bzl%crate"));
+        assert!(lockfile.has_extension_cache_candidate("@@rules_rs+//rs:extensions.bzl%crate"));
+        assert!(!lockfile.has_extension_cache_candidate("@@other+//:ext.bzl%ext"));
+    }
+
+    #[test]
     fn extension_cache_misses_on_invalid_empty_target_label() {
         use crate::repository_invocations::AttrValue;
 

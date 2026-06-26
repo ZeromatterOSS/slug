@@ -248,13 +248,21 @@ impl ModuleExtensionReplayInputsValue {
                                 extension_id
                             );
                             // In error mode, a cache miss means the lockfile
-                            // is stale — error instead of silently re-evaluating.
-                            if lockfile_inputs.lockfile_mode == LockfileMode::Error {
-                                return Err(slug_error::slug_error!(
-                                    slug_error::ErrorTag::Input,
-                                    "extension '{}' has digest or entry drift",
-                                    extension_id
-                                ));
+                            // is stale only if a module-extension entry for
+                            // this extension exists. Bazel still evaluates an
+                            // extension when the lockfile has facts but no
+                            // module-extension entry, then validates facts
+                            // after the fresh evaluation.
+                            if lockfile_inputs.lockfile_mode == LockfileMode::Error
+                                && lockfile.has_extension_cache_candidate(extension_id)
+                            {
+                                return Err(ModuleExtensionError::OutdatedLockfile {
+                                    reason: format!(
+                                        "the extension '{}' has changed its lockfile entry",
+                                        extension_id
+                                    ),
+                                }
+                                .into());
                             }
                         }
                     }
@@ -3654,6 +3662,92 @@ mod tests {
         assert!(third.is_none());
 
         Ok(())
+    }
+
+    #[test]
+    fn replay_inputs_error_mode_allows_facts_only_visible_lockfile() -> slug_error::Result<()> {
+        let extension_id = "@@facts+//:facts_ext.bzl%facts_ext";
+        let project_root = PathBuf::from("/tmp/slug-plan64-facts-only-lockfile");
+        let mut lockfile = crate::lockfile::Lockfile::new();
+        lockfile.set_extension_facts(
+            extension_id.to_owned(),
+            serde_json::json!({"resource": {"checksum": "old"}}),
+        );
+        let lockfile_inputs = BzlmodLockfileInputsValue::from_values(
+            None,
+            Some(Arc::new(LockfileContentValue {
+                path: Arc::new(project_root.join("MODULE.bazel.lock")),
+                digest: Some("visible-digest".to_owned()),
+                tracked_by_dice: true,
+                lockfile: Some(Arc::new(lockfile)),
+            })),
+            None,
+            LockfileMode::Error,
+        );
+
+        let replay_inputs = ModuleExtensionReplayInputsValue::from_lockfile_inputs(
+            extension_id,
+            "bzl-digest",
+            "usages-digest",
+            Some(project_root.as_path()),
+            "root",
+            &BTreeMap::new(),
+            &RepoMappingSnapshot::new(),
+            &RepoMappingOverrides::new(),
+            &lockfile_inputs,
+        )?;
+
+        assert!(replay_inputs.selected_cache.is_none());
+        assert!(replay_inputs.workspace_lockfile_facts_present);
+        assert_eq!(
+            replay_inputs.workspace_lockfile_facts,
+            serde_json::json!({"resource": {"checksum": "old"}})
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn replay_inputs_error_mode_rejects_stale_visible_extension_entry() {
+        let extension_id = "@@facts+//:facts_ext.bzl%facts_ext";
+        let project_root = PathBuf::from("/tmp/slug-plan64-stale-extension-entry");
+        let mut lockfile = crate::lockfile::Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("facts_repo".to_owned(), RepoSpec::new("rule".to_owned()));
+        lockfile.set_extension_cache(
+            extension_id.to_owned(),
+            "old-bzl-digest".to_owned(),
+            "old-usages-digest".to_owned(),
+            &repo_specs,
+        );
+        let lockfile_inputs = BzlmodLockfileInputsValue::from_values(
+            None,
+            Some(Arc::new(LockfileContentValue {
+                path: Arc::new(project_root.join("MODULE.bazel.lock")),
+                digest: Some("visible-digest".to_owned()),
+                tracked_by_dice: true,
+                lockfile: Some(Arc::new(lockfile)),
+            })),
+            None,
+            LockfileMode::Error,
+        );
+
+        let err = ModuleExtensionReplayInputsValue::from_lockfile_inputs(
+            extension_id,
+            "new-bzl-digest",
+            "new-usages-digest",
+            Some(project_root.as_path()),
+            "root",
+            &BTreeMap::new(),
+            &RepoMappingSnapshot::new(),
+            &RepoMappingOverrides::new(),
+            &lockfile_inputs,
+        )
+        .unwrap_err();
+        let message = err.to_string();
+
+        assert!(message.contains("MODULE.bazel.lock is no longer up-to-date"));
+        assert!(message.contains(extension_id));
+        assert!(message.contains("bazel mod deps --lockfile_mode=update"));
     }
 
     #[test]
