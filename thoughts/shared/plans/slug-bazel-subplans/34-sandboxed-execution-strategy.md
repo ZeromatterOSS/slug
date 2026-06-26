@@ -67,9 +67,10 @@ shortcut.
 - The smoke proves a one-action shell fixture, a one-action platform
   `exec_properties` fixture, a three-action C-source Starlark rule fixture, and
   a real `@rules_cc` `cc_binary` fixture cross REAPI with what-ran
-  `executor="Re"` and zero direct-local actions. The `rules_cc` fixture no
-  longer needs a test-owned `--action_env=PATH=...`; Slug now applies Bazel 9's
-  default shell action env when rules request `use_default_shell_env`.
+  `executor="Re"`, `executor_boundary="reapi"`, and zero direct-local actions.
+  The `rules_cc` fixture no longer needs a test-owned `--action_env=PATH=...`;
+  Slug now applies Bazel 9's default shell action env when rules request
+  `use_default_shell_env`.
 - It is repeatable on checkouts with a sibling NativeLink build and is wired
   into the CI test entrypoint. Linux CI now has a repo-owned bootstrap action:
   `.github/actions/setup_plan34_nativelink` clones public NativeLink tag
@@ -103,7 +104,8 @@ shortcut.
   `reapi_actions=1` for the no-`--remote-only` shell fixture,
   `reapi_actions=1` for the no-`--remote-only` platform `exec_properties`
   fixture, `reapi_actions=3` for the C-source Starlark rule fixture,
-  `reapi_actions=2` for the `@rules_cc` fixture, `direct_local_actions=0`, and
+  `reapi_actions=2` for the `@rules_cc` fixture,
+  `executor_boundary="reapi"` on every RE row, `direct_local_actions=0`, and
   local command count 0.
 - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q` proves
   the Plan 34 guard and smoke are reachable through the same Slug-binary

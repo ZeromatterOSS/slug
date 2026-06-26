@@ -416,12 +416,14 @@ impl WhatRanOutputWriter for OutputFormatWithWriter<'_> {
                         if re_execute.persistent_worker {
                             JsonReproducer::ReWorker {
                                 digest: &re_execute.action_digest,
+                                executor_boundary: REAPI_EXECUTOR_BOUNDARY,
                                 platform_properties: into_index_map(&re_execute.platform),
                                 action_key: re_execute.action_key.as_deref(),
                             }
                         } else {
                             JsonReproducer::Re {
                                 digest: &re_execute.action_digest,
+                                executor_boundary: REAPI_EXECUTOR_BOUNDARY,
                                 platform_properties: into_index_map(&re_execute.platform),
                                 action_key: re_execute.action_key.as_deref(),
                             }
@@ -523,6 +525,8 @@ fn into_index_map(platform: &Option<slug_data::RePlatform>) -> IndexMap<&str, &s
     })
 }
 
+const REAPI_EXECUTOR_BOUNDARY: &str = "reapi";
+
 #[derive(serde::Serialize)]
 struct JsonCommand<'a> {
     reason: &'a str,
@@ -562,12 +566,14 @@ mod json_reproducer {
         LocalDepFileCache,
         Re {
             digest: &'a str,
+            executor_boundary: &'static str,
             platform_properties: IndexMap<&'a str, &'a str>,
             #[serde(skip_serializing_if = "Option::is_none")]
             action_key: Option<&'a str>,
         },
         ReWorker {
             digest: &'a str,
+            executor_boundary: &'static str,
             platform_properties: IndexMap<&'a str, &'a str>,
             #[serde(skip_serializing_if = "Option::is_none")]
             action_key: Option<&'a str>,
@@ -629,6 +635,26 @@ mod tests {
             identity: "some/target",
             reproducer: JsonReproducer::Re {
                 digest: "placeholder",
+                executor_boundary: REAPI_EXECUTOR_BOUNDARY,
+                platform_properties: indexmap::indexmap! {
+                    "platform" => "linux-remote-execution"
+                },
+                action_key: None,
+            },
+            duration: Some("1".to_owned()),
+            extra: None,
+            std_err: None,
+            scheduling_mode: None,
+        }
+    }
+
+    fn make_base_command_in_re_worker() -> JsonCommand<'static> {
+        JsonCommand {
+            reason: "test.run",
+            identity: "some/target",
+            reproducer: JsonReproducer::ReWorker {
+                digest: "placeholder",
+                executor_boundary: REAPI_EXECUTOR_BOUNDARY,
                 platform_properties: indexmap::indexmap! {
                     "platform" => "linux-remote-execution"
                 },
@@ -709,6 +735,30 @@ mod tests {
     "executor": "Re",
     "details": {
       "digest": "placeholder",
+      "executor_boundary": "reapi",
+      "platform_properties": {
+        "platform": "linux-remote-execution"
+      }
+    }
+  },
+  "duration": "1"
+}"#;
+        assert_eq!(expected, serde_json::to_string_pretty(&command)?);
+        Ok(())
+    }
+
+    #[test]
+    fn serialize_what_ran_command_in_re_worker() -> slug_error::Result<()> {
+        let command = make_base_command_in_re_worker();
+
+        let expected = r#"{
+  "reason": "test.run",
+  "identity": "some/target",
+  "reproducer": {
+    "executor": "ReWorker",
+    "details": {
+      "digest": "placeholder",
+      "executor_boundary": "reapi",
       "platform_properties": {
         "platform": "linux-remote-execution"
       }

@@ -147,6 +147,7 @@ def _assert_reapi_what_ran(
     assert reapi_actions == entries
     for action in reapi_actions:
         details = action["reproducer"]["details"]
+        assert details["executor_boundary"] == "reapi"
         assert details["platform_properties"] == {"cpu_count": "1"}
         assert details["digest"]
 
