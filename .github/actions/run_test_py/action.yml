@@ -6,5 +6,16 @@ runs:
     run: python3 -m pip install -r requirements-test.txt
     shell: bash
   - name: Run test.py
-    run: python3 test.py --ci --git --slug=$RUNNER_TEMP/artifacts/slug
+    run: |-
+      set -euo pipefail
+      mkdir -p "$RUNNER_TEMP/artifacts"
+      export SLUG_PLAN34_EVIDENCE_JSONL="$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"
+      python3 test.py --ci --git --slug=$RUNNER_TEMP/artifacts/slug
     shell: bash
+  - name: Upload Plan 34 REAPI evidence
+    if: always()
+    uses: actions/upload-artifact@v6
+    with:
+      name: plan34-reapi-evidence-${{ runner.os }}
+      path: ${{ runner.temp }}/artifacts/plan34-reapi-evidence.jsonl
+      if-no-files-found: ignore

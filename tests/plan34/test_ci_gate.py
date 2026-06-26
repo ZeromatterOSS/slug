@@ -6,6 +6,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github/workflows/build-and-test.yml"
 SETUP_ACTION = REPO_ROOT / ".github/actions/setup_plan34_nativelink/action.yml"
+RUN_TEST_ACTION = REPO_ROOT / ".github/actions/run_test_py/action.yml"
 
 
 def _load_yaml(path: Path) -> dict:
@@ -62,3 +63,37 @@ def test_plan34_nativelink_setup_action_exports_smoke_binary() -> None:
     assert "target/smol/nativelink" in run_script
     assert "SLUG_PLAN34_NATIVELINK_BIN=$bin" in run_script
     assert ">> \"$GITHUB_ENV\"" in run_script
+
+
+def test_run_test_py_uploads_plan34_reapi_evidence() -> None:
+    action = _load_yaml(RUN_TEST_ACTION)
+    steps = action["runs"]["steps"]
+
+    run_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict) and step.get("name") == "Run test.py"
+    ]
+    assert len(run_steps) == 1
+    run_script = run_steps[0]["run"]
+    assert (
+        'SLUG_PLAN34_EVIDENCE_JSONL="$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"'
+        in run_script
+    )
+
+    upload_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("name") == "Upload Plan 34 REAPI evidence"
+    ]
+    assert len(upload_steps) == 1
+    upload_step = upload_steps[0]
+    assert upload_step["if"] == "always()"
+    assert upload_step["uses"] == "actions/upload-artifact@v6"
+    assert upload_step["with"]["name"] == "plan34-reapi-evidence-${{ runner.os }}"
+    assert (
+        upload_step["with"]["path"]
+        == "${{ runner.temp }}/artifacts/plan34-reapi-evidence.jsonl"
+    )
+    assert upload_step["with"]["if-no-files-found"] == "ignore"

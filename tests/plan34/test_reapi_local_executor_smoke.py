@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -23,6 +24,7 @@ PLATFORM_EXEC_PROPERTIES_FIXTURE_ROOT = (
     REPO_ROOT / "tests/plan34/fixtures/platform_exec_properties"
 )
 DIRECT_LOCAL_EXECUTORS = {"Local", "LocalWorker", "Worker", "WorkerInit"}
+PLAN34_EVIDENCE_ENV = "SLUG_PLAN34_EVIDENCE_JSONL"
 
 
 def _is_executable(path: Path) -> bool:
@@ -89,6 +91,186 @@ def _write_executable(path: Path) -> Path:
     path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     path.chmod(0o755)
     return path
+
+
+def _append_plan34_evidence(record: dict) -> None:
+    output = os.environ.get(PLAN34_EVIDENCE_ENV)
+    if not output:
+        return
+    path = Path(output)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        json.dump({"schema": 1, **record}, f, sort_keys=True)
+        f.write("\n")
+
+
+def _command_summary_line(build: subprocess.CompletedProcess[str]) -> str:
+    for line in (build.stdout + build.stderr).splitlines():
+        marker = "Commands: "
+        if marker in line:
+            return re.sub(r"\x1b\[[0-9;]*m", "", line[line.index(marker) :])
+    return ""
+
+
+def _record_reapi_execution_evidence(
+    *,
+    test_name: str,
+    phase: str = "remote_execution",
+    target: str,
+    build: subprocess.CompletedProcess[str],
+    materialized_outputs: list[Path],
+    reapi_actions: list[dict],
+    upload_records: list[dict],
+) -> None:
+    platform_properties: list[dict] = []
+    for action in reapi_actions:
+        props = action["reproducer"]["details"]["platform_properties"]
+        if props not in platform_properties:
+            platform_properties.append(props)
+
+    _append_plan34_evidence(
+        {
+            "test": test_name,
+            "phase": phase,
+            "target": target,
+            "remote_service": "local_nativelink",
+            "executor_boundary": "reapi",
+            "direct_local_actions": 0,
+            "reapi_actions": len(reapi_actions),
+            "cache_query_actions": 0,
+            "cache_hit_actions": 0,
+            "materialized_outputs": len(materialized_outputs),
+            "upload_records": len(upload_records),
+            "uploaded_digests": sum(
+                record["digests_uploaded"] for record in upload_records
+            ),
+            "uploaded_bytes": sum(record["bytes_uploaded"] for record in upload_records),
+            "platform_properties": platform_properties,
+            "command_summary": _command_summary_line(build),
+        }
+    )
+
+
+def _record_remote_action_cache_evidence(
+    *,
+    test_name: str,
+    target: str,
+    build: subprocess.CompletedProcess[str],
+    materialized_outputs: list[Path],
+    cache_hits: list[dict],
+) -> None:
+    _append_plan34_evidence(
+        {
+            "test": test_name,
+            "phase": "remote_action_cache_hit",
+            "target": target,
+            "remote_service": "local_nativelink",
+            "direct_local_actions": 0,
+            "reapi_actions": 0,
+            "cache_query_actions": len(cache_hits),
+            "cache_hit_actions": len(cache_hits),
+            "materialized_outputs": len(materialized_outputs),
+            "upload_records": 0,
+            "uploaded_digests": 0,
+            "uploaded_bytes": 0,
+            "command_summary": _command_summary_line(build),
+        }
+    )
+
+
+def _assert_and_record_reapi_execution(
+    slug_bin: Path,
+    workspace: Path,
+    isolation: str,
+    *,
+    test_name: str,
+    target: str,
+    build: subprocess.CompletedProcess[str],
+    expected_count: int,
+    phase: str = "remote_execution",
+    action_key_fragments: list[str] | None = None,
+) -> None:
+    materialized_outputs = _assert_materialized_show_outputs(
+        build,
+        workspace,
+        expected_count=1,
+    )
+    reapi_actions = _assert_reapi_what_ran(
+        slug_bin,
+        workspace,
+        isolation,
+        expected_count=expected_count,
+        action_key_fragments=action_key_fragments,
+    )
+    upload_records = _assert_reapi_uploads(
+        slug_bin,
+        workspace,
+        isolation,
+        expected_count=expected_count,
+    )
+    _record_reapi_execution_evidence(
+        test_name=test_name,
+        phase=phase,
+        target=target,
+        build=build,
+        materialized_outputs=materialized_outputs,
+        reapi_actions=reapi_actions,
+        upload_records=upload_records,
+    )
+
+
+def _assert_and_record_remote_action_cache_hit(
+    slug_bin: Path,
+    workspace: Path,
+    isolation: str,
+    *,
+    test_name: str,
+    target: str,
+    build: subprocess.CompletedProcess[str],
+    expected_count: int,
+) -> None:
+    materialized_outputs = _assert_materialized_show_outputs(
+        build,
+        workspace,
+        expected_count=1,
+    )
+    cache_hits = _assert_remote_action_cache_hit(
+        slug_bin,
+        workspace,
+        isolation,
+        expected_count=expected_count,
+    )
+    _record_remote_action_cache_evidence(
+        test_name=test_name,
+        target=target,
+        build=build,
+        materialized_outputs=materialized_outputs,
+        cache_hits=cache_hits,
+    )
+
+
+def test_plan34_evidence_writer_is_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    evidence = tmp_path / "evidence" / "plan34.jsonl"
+    monkeypatch.delenv(PLAN34_EVIDENCE_ENV, raising=False)
+
+    _append_plan34_evidence({"test": "not-written"})
+
+    assert not evidence.exists()
+
+    monkeypatch.setenv(PLAN34_EVIDENCE_ENV, str(evidence))
+    _append_plan34_evidence({"test": "written", "direct_local_actions": 0})
+
+    records = [json.loads(line) for line in evidence.read_text().splitlines()]
+    assert records == [
+        {
+            "schema": 1,
+            "test": "written",
+            "direct_local_actions": 0,
+        }
+    ]
 
 
 def test_nativelink_binary_env_var_wins(
@@ -528,10 +710,15 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
         assert "BUILD SUCCEEDED" in build_output
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
         assert "RE Session:" in build_output
-        _assert_materialized_show_outputs(build, workspace, expected_count=1)
-
-        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
-        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
+        _assert_and_record_reapi_execution(
+            slug_bin,
+            workspace,
+            isolation,
+            test_name="test_native_link_re_config_default_uses_reapi_without_remote_only",
+            target="//:foo",
+            build=build,
+            expected_count=1,
+        )
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -586,9 +773,15 @@ def test_native_link_bare_remote_executor_supplies_reapi_cache_endpoint(
         assert "BUILD SUCCEEDED" in build_output
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
         assert "RE Session:" in build_output
-        _assert_materialized_show_outputs(build, workspace, expected_count=1)
-        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
-        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
+        _assert_and_record_reapi_execution(
+            slug_bin,
+            workspace,
+            isolation,
+            test_name="test_native_link_bare_remote_executor_supplies_reapi_cache_endpoint",
+            target="//:foo",
+            build=build,
+            expected_count=1,
+        )
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -645,13 +838,16 @@ def test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback(
         assert "BUILD SUCCEEDED" in first_output
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in first_output
         assert "RE Session:" in first_output
-        _assert_materialized_show_outputs(
-            first,
+        _assert_and_record_reapi_execution(
+            slug_bin,
             workspace,
+            isolation,
+            test_name="test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback",
+            phase="remote_execution_seed",
+            target="//:foo",
+            build=first,
             expected_count=1,
         )
-        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
-        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
 
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace)
         _remove_local_action_cache_state(workspace, isolation)
@@ -675,11 +871,13 @@ def test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback(
         assert "BUILD SUCCEEDED" in second_output
         assert "Commands: 1 (cached: 1, remote: 0, local: 0)" in second_output
         assert "RE Session:" in second_output
-        _assert_materialized_show_outputs(second, workspace, expected_count=1)
-        _assert_remote_action_cache_hit(
+        _assert_and_record_remote_action_cache_hit(
             slug_bin,
             workspace,
             isolation,
+            test_name="test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback",
+            target="//:foo",
+            build=second,
             expected_count=1,
         )
     finally:
@@ -737,10 +935,15 @@ def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
         assert "BUILD SUCCEEDED" in build_output
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
         assert "RE Session:" in build_output
-        _assert_materialized_show_outputs(build, workspace, expected_count=1)
-
-        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
-        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
+        _assert_and_record_reapi_execution(
+            slug_bin,
+            workspace,
+            isolation,
+            test_name="test_native_link_platform_exec_properties_use_reapi_without_local_fallback",
+            target="//:foo",
+            build=build,
+            expected_count=1,
+        )
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -796,10 +999,15 @@ def test_native_link_cc_actions_reapi_executor_smoke(tmp_path: Path) -> None:
         assert "RE Session:" in build_output
         assert "Commands: 3 (cached: 0, remote: 3, local: 0)" in build_output
         assert "local: 0" in build_output
-        _assert_materialized_show_outputs(build, workspace, expected_count=1)
-
-        _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=3)
-        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=3)
+        _assert_and_record_reapi_execution(
+            slug_bin,
+            workspace,
+            isolation,
+            test_name="test_native_link_cc_actions_reapi_executor_smoke",
+            target="//:hello",
+            build=build,
+            expected_count=3,
+        )
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -855,16 +1063,16 @@ def test_native_link_rules_cc_reapi_executor_smoke(tmp_path: Path) -> None:
         assert "RE Session:" in build_output
         assert "Commands: 2 (cached: 0, remote: 2, local: 0)" in build_output
         assert "local: 0" in build_output
-        _assert_materialized_show_outputs(build, workspace, expected_count=1)
-
-        _assert_reapi_what_ran(
+        _assert_and_record_reapi_execution(
             slug_bin,
             workspace,
             isolation,
+            test_name="test_native_link_rules_cc_reapi_executor_smoke",
+            target="//:hello",
+            build=build,
             expected_count=2,
             action_key_fragments=[" c_compile ", " cpp_link "],
         )
-        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=2)
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
