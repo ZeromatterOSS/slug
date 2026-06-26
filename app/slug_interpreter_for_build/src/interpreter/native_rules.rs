@@ -57,6 +57,7 @@ use starlark::starlark_module;
 use starlark::values::Value;
 use starlark::values::dict::UnpackDictEntries;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
+use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 
 use crate::attrs::coerce::attr_type::AttrTypeExt;
@@ -1961,8 +1962,9 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         target_compatible_with: UnpackListOrTuple<Value<'v>>,
         // target_settings: config_setting labels that must match for this toolchain to be selected
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        target_settings: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] target_settings: NoneOr<
+            UnpackListOrTuple<Value<'v>>,
+        >,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
@@ -2000,15 +2002,24 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let constraints_attr_type = AttrType::list(AttrType::configuration_dep(
             ConfigurationDepKind::CompatibilityAttribute,
         ));
+        let coerce_constraint_values = |items: Vec<Value<'v>>| -> starlark::Result<CoercedAttr> {
+            let value = eval.heap().alloc(items);
+            Ok(constraints_attr_type.coerce(AttrIsConfigurable::No, coercion_ctx, value)?)
+        };
         let coerce_constraint_list =
             |values: UnpackListOrTuple<Value<'v>>| -> starlark::Result<CoercedAttr> {
-                let items: Vec<Value<'v>> = values.into_iter().collect();
-                let value = eval.heap().alloc(items);
-                Ok(constraints_attr_type.coerce(AttrIsConfigurable::No, coercion_ctx, value)?)
+                coerce_constraint_values(values.into_iter().collect())
+            };
+        let coerce_optional_constraint_list =
+            |values: NoneOr<UnpackListOrTuple<Value<'v>>>| -> starlark::Result<CoercedAttr> {
+                match values {
+                    NoneOr::None => coerce_constraint_values(Vec::new()),
+                    NoneOr::Other(values) => coerce_constraint_list(values),
+                }
             };
         let coerced_exec_compat = coerce_constraint_list(exec_compatible_with)?;
         let coerced_target_compat = coerce_constraint_list(target_compatible_with)?;
-        let coerced_target_settings = coerce_constraint_list(target_settings)?;
+        let coerced_target_settings = coerce_optional_constraint_list(target_settings)?;
 
         let target_node = create_native_target_node(
             rule_defs::TOOLCHAIN_RULE.clone(),

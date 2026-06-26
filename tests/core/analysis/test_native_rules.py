@@ -430,6 +430,12 @@ async def test_toolchain_builds(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_toolchain_target_settings_none_builds(buck: Buck) -> None:
+    """toolchain(target_settings = None) is accepted like Bazel 9 generated repos."""
+    await buck.build("//:my_toolchain_none_target_settings")
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_package_group_builds(buck: Buck) -> None:
     """package_group() rule builds successfully."""
     await buck.build("//:all_packages")

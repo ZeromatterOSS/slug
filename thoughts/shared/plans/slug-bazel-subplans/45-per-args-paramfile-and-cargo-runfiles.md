@@ -19,7 +19,9 @@
 
 Local and REAPI per-`Args` paramfile slots are implemented and covered by fast
 repo-owned regressions, including a cargo-runfiles-shaped REAPI directory-output
-handoff. Public cargo-build-script validation and BCR coverage scan remain open.
+handoff. The public registry/rules_rust scan has not found a consumer needing
+more than per-`Args` slot materialization. Public cargo-build-script validation
+remains blocked before the runner.
 
 ## Bazel source anchors
 
@@ -35,6 +37,12 @@ handoff. Public cargo-build-script validation and BCR coverage scan remain open.
 - `/var/mnt/dev/bazel/src/test/java/com/google/devtools/build/lib/starlark/StarlarkRuleImplementationFunctionsTest.java:2580-2608`:
   Bazel's lazy-args test asserts `args.use_param_file(..., use_always=True)`
   spills only that `Args` object's content into the paramfile.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/rules/platform/ToolchainRule.java:96-103`:
+  native `toolchain(target_settings = ...)` is a non-mandatory
+  `BuildType.LABEL_LIST` attribute.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/rules/platform/Toolchain.java:55-58`:
+  Bazel reads `target_settings` through `getPrerequisites(...)`; absent or empty
+  target settings become an empty provider list.
 
 ## Current state
 
@@ -67,6 +75,9 @@ handoff. Public cargo-build-script validation and BCR coverage scan remain open.
   downstream RE action. The uploader now materializes and re-uploads recent
   RE-produced file inputs when the remote CAS reports them missing, avoiding a
   direct-local shortcut for generated directory handoffs.
+- Native `toolchain(target_settings = None)` now coerces explicit `None` to the
+  same empty list shape as omitted `target_settings`, matching the public
+  rules_rust 0.67.0 generated toolchain repo accepted by Bazel 9.1.1.
 
 ## Accepted evidence
 
@@ -84,24 +95,55 @@ handoff. Public cargo-build-script validation and BCR coverage scan remain open.
 - `TMPDIR=/var/mnt/dev/slug/.tmp SLUG_PLAN34_EVIDENCE_JSONL=/var/mnt/dev/slug/.tmp/plan34-reapi-evidence.jsonl TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/plan34/ -s --tb=short`
   - Passed: `17 passed in 20.84s`; evidence summary:
     `reapi_actions=12`, `direct_local_actions=0`, `upload_records=12`.
+- Public BCR registry overlay scan at
+  `bazel-central-registry@a484369fd09f4fb231d34a48365c33da51ca0acb`
+  (`1172` module dirs, `8264` version entries):
+  `rg -n "use_param_file|set_param_file_format|cargo_manifest_args|cargo_runfiles" .tmp/plan45-bcr-scan -g '!**/.git/**'`
+  found no `use_param_file` or cargo-runfiles consumers and only three GHDL
+  overlay `set_param_file_format("multiline")` call sites.
+- Public rules_rust 0.67.0 source scan from the BCR `source.json` archive found
+  per-`Args` uses in `cargo/private/cargo_build_script.bzl`,
+  `test/process_wrapper/process_wrapper_tester.bzl`,
+  `extensions/mdbook/private/mdbook.bzl`, and `rust/private/rustc.bzl`; no
+  scanned call site needs more than per-slot materialization.
+- `cargo build -p slug`
+  - Passed.
+- `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/core/analysis/test_native_rules.py::test_toolchain_builds tests/core/analysis/test_native_rules.py::test_toolchain_target_settings_none_builds -s --tb=short`
+  - Passed: `2 passed in 0.69s`.
+- From the public rules_rust 0.67.0 source checkout:
+  `timeout 60 /var/mnt/dev/slug/target/debug/slug --isolation-dir plan45-rules-rust-public-smoke build @rust_toolchains//:all --show-output -v 5`
+  - Passed: `BUILD SUCCEEDED`; this clears the generated
+    `target_settings = None` blocker.
+- From the same checkout:
+  `timeout 120 /var/mnt/dev/slug/target/debug/slug --isolation-dir plan45-rules-rust-public-smoke build //test/cargo_build_script/run_from_exec_root:rundir_build_rs --show-output`
+  - Failed before the cargo runner: rules_python's `pip_internal` extension
+    failed `module_ctx.read(Label("//tools/publish:requirements_darwin.txt"))`,
+    and toolchain resolution still reported no registrations for
+    `@@//rust:toolchain_type` or `@bazel_tools//tools/cpp:toolchain_type`.
 
 ## Remaining gaps
 
 - Run a fast public cargo-build-script smoke that proves a real ruleset runner
   receives `--cargo_manifest_args=@...`, creates the declared
   `.cargo_runfiles` tree, and advances to a distinct layer.
-- Complete the public BCR `use_param_file(use_always=True)` scan and record
-  whether any consumer needs more than per-`Args` slot materialization.
+- The rules_rust 0.67.0 smoke is currently blocked before that runner by a
+  public rules_python module-extension `module_ctx.read(Label(...))` failure and
+  missing registered toolchains. Route the label-read gap to the bzlmod/module
+  extension owner before treating it as Plan 45 cargo-runfiles evidence.
+- If Plan 45 closure needs more than the BCR registry overlay plus latest
+  rules_rust source scan, run a bounded source-archive scan separately and keep
+  it out of routine validation.
 - Revisit the Plan 44 Phase 3 cleanup hook after the real execroot lands; the
   temporary execroot self-symlink should not become permanent architecture.
 
 ## Next owner
 
-1. Use the smallest public cargo-build-script smoke to prove a real ruleset
-   runner receives `--cargo_manifest_args=@...`, creates the declared
-   `.cargo_runfiles` tree, and advances to a distinct layer.
-2. Complete the public BCR `use_param_file(use_always=True)` scan, then update
-   this file with only new accepted evidence and remaining gaps.
+1. Resolve or route the public rules_rust 0.67.0 pre-runner blocker:
+   rules_python `module_ctx.read(Label(...))` during `pip_internal` and the
+   still-empty registered toolchain set for the cargo-build-script target.
+2. Re-run the same public cargo-build-script smoke and record the first evidence
+   that the real runner receives `--cargo_manifest_args=@...`, creates the
+   declared `.cargo_runfiles` tree, and advances to a distinct layer.
 
 ## Out of scope
 

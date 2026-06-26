@@ -423,6 +423,13 @@ toolchain(
     toolchain_type = ":my_toolchain_type",
 )
 
+toolchain(
+    name = "my_toolchain_none_target_settings",
+    toolchain = ":my_toolchain_impl",
+    toolchain_type = ":my_toolchain_type",
+    target_settings = None,
+)
+
 # === package_group tests ===
 
 package_group(
