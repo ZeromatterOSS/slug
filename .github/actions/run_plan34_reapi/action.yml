@@ -1,0 +1,28 @@
+name: run_plan34_reapi
+description: Run the focused Plan 34 REAPI evidence suite
+runs:
+  using: composite
+  steps:
+  - name: Install Python test dependencies
+    run: python3 -m pip install -r requirements-test.txt
+    shell: bash
+  - name: Run Plan 34 REAPI tests
+    run: |-
+      set -euo pipefail
+      mkdir -p "$RUNNER_TEMP/artifacts"
+      export SLUG_PLAN34_EVIDENCE_JSONL="$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"
+      export TEST_EXECUTABLE="$RUNNER_TEMP/artifacts/slug"
+      python3 -m pytest -q tests/plan34/ -s --tb=short
+    shell: bash
+  - name: Validate Plan 34 REAPI evidence
+    run: |-
+      set -euo pipefail
+      python3 tests/plan34/validate_reapi_evidence.py "$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"
+    shell: bash
+  - name: Upload Plan 34 REAPI evidence
+    if: always()
+    uses: actions/upload-artifact@v6
+    with:
+      name: plan34-reapi-evidence-${{ runner.os }}
+      path: ${{ runner.temp }}/artifacts/plan34-reapi-evidence.jsonl
+      if-no-files-found: ignore

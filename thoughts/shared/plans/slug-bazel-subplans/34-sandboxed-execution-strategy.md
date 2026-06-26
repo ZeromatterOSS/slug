@@ -109,7 +109,11 @@ shortcut.
   The evidence validator now also binds each required smoke fixture/phase to
   its expected action/upload/cache/materialized-output counts, so aggregate-only
   evidence cannot hide a skipped or weakened fixture.
-  The hosted runtime of that gate still needs to be observed.
+  A dedicated `.github/workflows/plan34-reapi.yml` workflow also runs the same
+  NativeLink bootstrap plus the focused `tests/plan34/` evidence suite on
+  GitHub-hosted `ubuntu-latest`, so Plan 34 runtime evidence is not blocked on
+  the broader self-hosted Linux matrix. The hosted runtime of that focused gate
+  still needs to be observed.
 - Legacy explicit
   `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` hybrid
   configs are classified as test/example-only Buck/BXL diagnostic surfaces, not
@@ -223,11 +227,12 @@ hosted run still needs to be recorded as accepted runtime evidence.
 ## Remaining Gaps
 
 - Observe the first hosted Linux CI run with
-  `.github/actions/setup_plan34_nativelink`; the job now validates
-  `plan34-reapi-evidence-Linux` before upload, so a hosted green Linux run is
-  sufficient runtime evidence. If source-building NativeLink makes routine CI
-  too slow, keep the same REAPI boundary but switch the bootstrap to a faster
-  pinned public artifact/cache path.
+  `.github/actions/setup_plan34_nativelink`; both the full Linux job and the
+  focused Plan 34 workflow validate `plan34-reapi-evidence-Linux` before upload,
+  so a hosted green Linux Plan 34 run is sufficient runtime evidence. If
+  source-building NativeLink makes routine CI too slow, keep the same REAPI
+  boundary but switch the bootstrap to a faster pinned public artifact/cache
+  path.
 - Prefer NativeLink as the local REAPI service. Use `actiond` only behind that
   REAPI surface if it is needed as the executor backend.
 - Keep cache identity and ActionResult replay in Plan 31. Plan 34 only consumes
@@ -256,8 +261,10 @@ hosted run still needs to be recorded as accepted runtime evidence.
   - `cargo +stable build --bin nativelink --profile=smol --locked` from a
     NativeLink `v1.5.2` checkout
   - Python YAML parsing of `.github/workflows/build-and-test.yml`,
-    `.github/actions/setup_plan34_nativelink/action.yml`, and
-    `.github/actions/run_test_py/action.yml`
+    `.github/workflows/plan34-reapi.yml`,
+    `.github/actions/setup_plan34_nativelink/action.yml`,
+    `.github/actions/run_test_py/action.yml`, and
+    `.github/actions/run_plan34_reapi/action.yml`
   - `bash -n` over the shell blocks in
     `.github/actions/setup_plan34_nativelink/action.yml`
 

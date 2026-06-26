@@ -1,0 +1,15 @@
+name: Plan 34 REAPI evidence
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  plan34-reapi-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ./.github/actions/setup_linux_env
+    - uses: ./.github/actions/build_debug
+    - uses: ./.github/actions/setup_plan34_nativelink
+    - uses: ./.github/actions/run_plan34_reapi

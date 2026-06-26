@@ -6,8 +6,10 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github/workflows/build-and-test.yml"
+PLAN34_WORKFLOW = REPO_ROOT / ".github/workflows/plan34-reapi.yml"
 SETUP_ACTION = REPO_ROOT / ".github/actions/setup_plan34_nativelink/action.yml"
 RUN_TEST_ACTION = REPO_ROOT / ".github/actions/run_test_py/action.yml"
+RUN_PLAN34_ACTION = REPO_ROOT / ".github/actions/run_plan34_reapi/action.yml"
 VALIDATOR = REPO_ROOT / "tests/plan34/validate_reapi_evidence.py"
 
 
@@ -39,6 +41,23 @@ def test_linux_ci_provisions_nativelink_before_plan34_smoke() -> None:
     test_index = uses.index("./.github/actions/run_test_py")
 
     assert setup_index < test_index
+
+
+def test_dedicated_plan34_workflow_runs_on_github_hosted_linux() -> None:
+    workflow = _load_yaml(PLAN34_WORKFLOW)
+    job = workflow["jobs"]["plan34-reapi-linux"]
+
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 60
+
+    uses = _step_uses(job)
+    build_index = uses.index("./.github/actions/build_debug")
+    setup_index = uses.index("./.github/actions/setup_plan34_nativelink")
+    test_index = uses.index("./.github/actions/run_plan34_reapi")
+
+    assert uses.index("./.github/actions/setup_linux_env") < build_index
+    assert build_index < setup_index < test_index
+    assert "./.github/actions/run_test_py" not in uses
 
 
 def test_plan34_nativelink_setup_action_exports_smoke_binary() -> None:
@@ -96,6 +115,55 @@ def test_run_test_py_uploads_plan34_reapi_evidence() -> None:
         "python3 tests/plan34/validate_reapi_evidence.py "
         '"$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"'
         in validate_step["run"]
+    )
+
+    upload_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("name") == "Upload Plan 34 REAPI evidence"
+    ]
+    assert len(upload_steps) == 1
+    upload_step = upload_steps[0]
+    assert upload_step["if"] == "always()"
+    assert upload_step["uses"] == "actions/upload-artifact@v6"
+    assert upload_step["with"]["name"] == "plan34-reapi-evidence-${{ runner.os }}"
+    assert (
+        upload_step["with"]["path"]
+        == "${{ runner.temp }}/artifacts/plan34-reapi-evidence.jsonl"
+    )
+    assert upload_step["with"]["if-no-files-found"] == "ignore"
+
+
+def test_run_plan34_reapi_action_validates_and_uploads_evidence() -> None:
+    action = _load_yaml(RUN_PLAN34_ACTION)
+    steps = action["runs"]["steps"]
+
+    run_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict) and step.get("name") == "Run Plan 34 REAPI tests"
+    ]
+    assert len(run_steps) == 1
+    run_script = run_steps[0]["run"]
+    assert (
+        'SLUG_PLAN34_EVIDENCE_JSONL="$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"'
+        in run_script
+    )
+    assert 'TEST_EXECUTABLE="$RUNNER_TEMP/artifacts/slug"' in run_script
+    assert "python3 -m pytest -q tests/plan34/ -s --tb=short" in run_script
+
+    validate_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("name") == "Validate Plan 34 REAPI evidence"
+    ]
+    assert len(validate_steps) == 1
+    assert (
+        "python3 tests/plan34/validate_reapi_evidence.py "
+        '"$RUNNER_TEMP/artifacts/plan34-reapi-evidence.jsonl"'
+        in validate_steps[0]["run"]
     )
 
     upload_steps = [
