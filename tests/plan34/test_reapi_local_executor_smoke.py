@@ -104,6 +104,32 @@ def _run(args: list[str], cwd: Path, check: bool = True) -> subprocess.Completed
     return result
 
 
+def _assert_materialized_show_outputs(
+    build: subprocess.CompletedProcess[str],
+    workspace: Path,
+    expected_count: int,
+) -> list[Path]:
+    paths: list[Path] = []
+    for line in (build.stdout + build.stderr).splitlines():
+        line = line.strip()
+        if not line or line.startswith("["):
+            continue
+        parts = line.split(maxsplit=1)
+        if (
+            len(parts) == 2
+            and "//" in parts[0]
+            and parts[1].startswith("buck-out/")
+        ):
+            path = workspace / parts[1]
+            assert path.exists(), path
+            if path.is_file():
+                assert path.stat().st_size > 0, path
+            paths.append(path)
+
+    assert len(paths) == expected_count
+    return paths
+
+
 def _read_what_ran(
     slug_bin: Path,
     workspace: Path,
@@ -406,6 +432,7 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
                 isolation,
                 "build",
                 "//:foo",
+                "--show-output",
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--remote_default_exec_properties=cpu_count=1",
@@ -416,6 +443,7 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
         assert "BUILD SUCCEEDED" in build_output
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
         assert "RE Session:" in build_output
+        _assert_materialized_show_outputs(build, workspace, expected_count=1)
 
         _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
         _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
@@ -463,6 +491,7 @@ def test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback(
                 isolation,
                 "build",
                 "//:foo",
+                "--show-output",
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--remote_default_exec_properties=cpu_count=1",
@@ -474,6 +503,11 @@ def test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback(
         assert "BUILD SUCCEEDED" in first_output
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in first_output
         assert "RE Session:" in first_output
+        _assert_materialized_show_outputs(
+            first,
+            workspace,
+            expected_count=1,
+        )
         _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
         _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
 
@@ -487,6 +521,7 @@ def test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback(
                 isolation,
                 "build",
                 "//:foo",
+                "--show-output",
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--remote_default_exec_properties=cpu_count=1",
@@ -498,6 +533,7 @@ def test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback(
         assert "BUILD SUCCEEDED" in second_output
         assert "Commands: 1 (cached: 1, remote: 0, local: 0)" in second_output
         assert "RE Session:" in second_output
+        _assert_materialized_show_outputs(second, workspace, expected_count=1)
         _assert_remote_action_cache_hit(
             slug_bin,
             workspace,
@@ -548,6 +584,7 @@ def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
                 isolation,
                 "build",
                 "//:foo",
+                "--show-output",
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--platforms=//:re_platform",
@@ -558,6 +595,7 @@ def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
         assert "BUILD SUCCEEDED" in build_output
         assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
         assert "RE Session:" in build_output
+        _assert_materialized_show_outputs(build, workspace, expected_count=1)
 
         _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
         _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
@@ -603,6 +641,7 @@ def test_native_link_cc_actions_reapi_executor_smoke(tmp_path: Path) -> None:
                 isolation,
                 "build",
                 "//:hello",
+                "--show-output",
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--remote_default_exec_properties=cpu_count=1",
@@ -615,6 +654,7 @@ def test_native_link_cc_actions_reapi_executor_smoke(tmp_path: Path) -> None:
         assert "RE Session:" in build_output
         assert "Commands: 3 (cached: 0, remote: 3, local: 0)" in build_output
         assert "local: 0" in build_output
+        _assert_materialized_show_outputs(build, workspace, expected_count=1)
 
         _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=3)
         _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=3)
@@ -660,6 +700,7 @@ def test_native_link_rules_cc_reapi_executor_smoke(tmp_path: Path) -> None:
                 isolation,
                 "build",
                 "//:hello",
+                "--show-output",
                 f"--remote_executor={remote_endpoint}",
                 f"--remote_cache={remote_endpoint}",
                 "--remote_default_exec_properties=cpu_count=1",
@@ -672,6 +713,7 @@ def test_native_link_rules_cc_reapi_executor_smoke(tmp_path: Path) -> None:
         assert "RE Session:" in build_output
         assert "Commands: 2 (cached: 0, remote: 2, local: 0)" in build_output
         assert "local: 0" in build_output
+        _assert_materialized_show_outputs(build, workspace, expected_count=1)
 
         _assert_reapi_what_ran(
             slug_bin,

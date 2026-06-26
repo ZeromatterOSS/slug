@@ -68,6 +68,9 @@ shortcut.
   `exec_properties` fixture, a three-action C-source Starlark rule fixture, and
   a real `@rules_cc` `cc_binary` fixture cross REAPI with what-ran
   `executor="Re"`, `executor_boundary="reapi"`, and zero direct-local actions.
+  Each build also runs with `--show-output` and asserts the reported
+  `buck-out/...` output path exists, giving explicit output-materialization
+  evidence for the REAPI execution path.
   It also reads `log what-uploaded --format json` and asserts one RE upload
   record per executed action with nonzero aggregate uploaded digests/bytes,
   proving the fixture action inputs crossed the CAS/upload side of the REAPI
@@ -116,11 +119,13 @@ shortcut.
   `reapi_actions=2` for the `@rules_cc` fixture,
   `executor_boundary="reapi"` on every RE row, `direct_local_actions=0`, and
   local command count 0. Each fixture also has `what-uploaded` evidence with
-  `upload_records=reapi_actions` and nonzero uploaded digests/bytes.
+  `upload_records=reapi_actions`, nonzero uploaded digests/bytes, and a
+  materialized `--show-output` path.
 - `TEST_EXECUTABLE=$PWD/target/debug/slug python -m pytest tests/plan34/test_reapi_local_executor_smoke.py::test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback -q -s`
   proves NativeLink REAPI Action Cache lookup/update evidence by forcing a
   second build past Slug's local persistent AC and observing `CacheQuery` plus
-  `Cache` with zero remote executions and zero direct-local actions.
+  `Cache` with zero remote executions, zero direct-local actions, and a
+  materialized `--show-output` path.
 - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q` proves
   the Plan 34 guard and smoke are reachable through the same Slug-binary
   environment used by `test.py`/CI.
