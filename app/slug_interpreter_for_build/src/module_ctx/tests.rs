@@ -80,6 +80,38 @@ fn test_module_context_repo_env_is_context_owned() {
 }
 
 #[test]
+fn test_module_context_download_rejects_auth_even_with_allow_fail() {
+    use starlark::environment::Globals;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+
+    let temp_dir = TempDir::new().unwrap();
+    let working_dir = temp_dir.path().join("work");
+    std::fs::create_dir_all(&working_dir).unwrap();
+    let ctx = ModuleContext::empty().with_temp_working_dir(working_dir);
+
+    let module = Module::new();
+    let heap = module.heap();
+    module.set("mctx", heap.alloc(ctx));
+
+    let ast = AstModule::parse(
+        "download_auth.star",
+        r#"mctx.download("http://127.0.0.1:1/never-reached", allow_fail = True, auth = {"http://127.0.0.1:1/never-reached": {"type": "basic", "login": "u", "password": "p"}})"#.to_owned(),
+        &Dialect::Standard,
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    let err = eval.eval_module(ast, &Globals::standard()).unwrap_err();
+
+    assert!(
+        err.to_string().contains("not yet supported"),
+        "auth rejection must fire before allow_fail masks download failure: {err:?}"
+    );
+}
+
+#[test]
 fn test_module_context_records_getenv_inputs() {
     use starlark::environment::Globals;
     use starlark::environment::Module;

@@ -393,7 +393,9 @@ cargo test -p slug_external_cells
   Phase 64.2 concurrency tests).
 - Validation: `cargo test -p slug_bzlmod` → 446 passed, 3 ignored.
 
-### Phase 64.4: Complete Download Headers/Auth Semantics
+### Phase 64.4: Complete Download Headers/Auth Semantics — COMPLETE
+
+**Completed:** 2026-06-26
 
 **Scope:** `repository_ctx.download*`, `module_ctx.download*`, shared download
 helper.
@@ -430,6 +432,33 @@ helper.
 cargo test -p slug_interpreter_for_build repository_ctx -- --nocapture
 cargo test -p slug_interpreter_for_build module_ctx -- --nocapture
 ```
+
+**Implementation evidence (2026-06-26):**
+
+- Bazel 9 source of truth: `StarlarkBaseExternalContext.java:399-422`
+  accepts `headers` dict values as either a string or a sequence of strings;
+  `StarlarkBaseExternalContext.java:323-388` turns `auth` dict entries into
+  request auth headers for `basic` and `pattern`; `download()` and
+  `download_and_extract()` pass both header maps to the download manager at
+  `StarlarkBaseExternalContext.java:807-862` and `:1081-1132`.
+- Slug now parses `headers` values as string or sequence-of-string and forwards
+  them through the shared `DownloadOptions` used by both repository and module
+  contexts.
+- `download_url` prefers the in-process `slug_http` client with connect/read
+  timeouts and only falls back to curl/wget when no Tokio runtime is available;
+  request failures and timeouts are no longer retried through an ambient
+  subprocess path.
+- Non-empty `auth` is rejected with a typed Starlark error before any network
+  request and before `allow_fail` handling, so Slug no longer warns and silently
+  drops authentication semantics.
+- New/strengthened tests:
+  `test_parse_headers_accepts_sequence_values`,
+  `test_download_url_forwards_custom_headers_to_request`,
+  `test_download_url_timeout_is_bounded_without_subprocess_fallback`, and
+  `test_module_context_download_rejects_auth_even_with_allow_fail`.
+- Validation: `cargo test -p slug_interpreter_for_build repository_ctx -- --nocapture`
+  -> 47 passed; `cargo test -p slug_interpreter_for_build module_ctx -- --nocapture`
+  -> 40 passed.
 
 ### Phase 64.5: Wire the Production Lockfile Lifecycle
 

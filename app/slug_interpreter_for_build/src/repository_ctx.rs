@@ -1557,6 +1557,12 @@ pub(crate) fn auth_unsupported_error(
     }
 }
 
+#[derive(Debug)]
+enum HttpClientDownloadError {
+    RuntimeUnavailable(String),
+    RequestFailed(String),
+}
+
 /// Download a file from a URL using the in-process HTTP client.
 ///
 /// Uses `slug_http::HttpClient` with proper timeout and redirect handling.
@@ -1570,13 +1576,14 @@ pub(crate) fn download_url(url: &str, options: &DownloadOptions) -> Result<Vec<u
     // Try in-process HTTP client first.
     match download_with_http_client(url, options) {
         Ok(data) => return Ok(data),
-        Err(e) => {
+        Err(HttpClientDownloadError::RuntimeUnavailable(e)) => {
             tracing::debug!(
                 "In-process HTTP client failed for {}: {}, falling back to curl/wget",
                 url,
                 e
             );
         }
+        Err(HttpClientDownloadError::RequestFailed(e)) => return Err(e),
     }
 
     // Fallback: use curl/wget subprocess.
@@ -1587,8 +1594,12 @@ pub(crate) fn download_url(url: &str, options: &DownloadOptions) -> Result<Vec<u
 ///
 /// Uses `HttpClient::get_with_headers` which preserves the default User-Agent
 /// header and forwards any custom headers from the caller.
-fn download_with_http_client(url: &str, options: &DownloadOptions) -> Result<Vec<u8>, String> {
-    let handle = tokio::runtime::Handle::try_current().map_err(|e| e.to_string())?;
+fn download_with_http_client(
+    url: &str,
+    options: &DownloadOptions,
+) -> Result<Vec<u8>, HttpClientDownloadError> {
+    let handle = tokio::runtime::Handle::try_current()
+        .map_err(|e| HttpClientDownloadError::RuntimeUnavailable(e.to_string()))?;
 
     // We are on a tokio runtime thread (e.g. the DICE executor).  Calling
     // `block_on` directly panics ("Cannot start a runtime from within a
@@ -1598,7 +1609,12 @@ fn download_with_http_client(url: &str, options: &DownloadOptions) -> Result<Vec
         handle.block_on(async {
             let mut builder = slug_http::HttpClientBuilder::https_with_system_roots()
                 .await
-                .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+                .map_err(|e| {
+                    HttpClientDownloadError::RequestFailed(format!(
+                        "Failed to build HTTP client: {}",
+                        e
+                    ))
+                })?;
             builder
                 .with_connect_timeout(Some(options.connect_timeout))
                 .with_read_timeout(Some(options.total_timeout));
@@ -1609,11 +1625,16 @@ fn download_with_http_client(url: &str, options: &DownloadOptions) -> Result<Vec
             } else {
                 client.get_with_headers(url, options.headers.clone()).await
             }
-            .map_err(|e| format!("HTTP request failed: {}", e))?;
+            .map_err(|e| {
+                HttpClientDownloadError::RequestFailed(format!("HTTP request failed: {}", e))
+            })?;
 
-            let body = slug_http::to_bytes(resp.into_body())
-                .await
-                .map_err(|e| format!("Failed to read response body: {}", e))?;
+            let body = slug_http::to_bytes(resp.into_body()).await.map_err(|e| {
+                HttpClientDownloadError::RequestFailed(format!(
+                    "Failed to read response body: {}",
+                    e
+                ))
+            })?;
 
             Ok(body.to_vec())
         })
@@ -2043,8 +2064,8 @@ pub(crate) fn parse_rename_files<'v>(
 /// Parse headers from a Starlark dict value into `Vec<(String, String)>`.
 ///
 /// Accepts `None` (no headers provided) or a Starlark dict mapping string
-/// header names to string header values. Returns an error for non-dict or
-/// non-string key/value types.
+/// header names to either a string header value or a sequence of string header
+/// values, matching Bazel's `headers` argument shape.
 pub(crate) fn parse_headers<'v>(
     headers: Option<Value<'v>>,
 ) -> starlark::Result<Vec<(String, String)>> {
@@ -2073,15 +2094,39 @@ pub(crate) fn parse_headers<'v>(
             )
             .into());
         };
-        let Some(value) = value.unpack_str() else {
+        if let Some(value) = value.unpack_str() {
+            parsed.push((key.to_owned(), value.to_owned()));
+            continue;
+        }
+
+        let sequence_values: Option<Vec<Value<'v>>> = if let Some(list) =
+            starlark::values::list::ListRef::from_value(value)
+        {
+            Some(list.iter().collect())
+        } else {
+            starlark::values::tuple::TupleRef::from_value(value).map(|tuple| tuple.iter().collect())
+        };
+
+        let Some(sequence_values) = sequence_values else {
             return Err(slug_error::slug_error!(
                 slug_error::ErrorTag::Input,
-                "headers values must be strings, got {}",
+                "headers values must be strings or sequences of strings, got {}",
                 value.get_type(),
             )
             .into());
         };
-        parsed.push((key.to_owned(), value.to_owned()));
+
+        for item in sequence_values {
+            let Some(value) = item.unpack_str() else {
+                return Err(slug_error::slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "headers sequence values must be strings, got {}",
+                    item.get_type(),
+                )
+                .into());
+            };
+            parsed.push((key.to_owned(), value.to_owned()));
+        }
     }
 
     Ok(parsed)
@@ -4101,6 +4146,23 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_headers_accepts_sequence_values() {
+        let module = Module::new();
+        let values = module.heap().alloc(vec!["one", "two"]);
+        let dict = module.heap().alloc(AllocDict(vec![("X-Multi", values)]));
+
+        let result = parse_headers(Some(dict)).unwrap();
+
+        assert_eq!(
+            result,
+            vec![
+                ("X-Multi".to_owned(), "one".to_owned()),
+                ("X-Multi".to_owned(), "two".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
     fn test_download_options_default_has_no_headers() {
         let opts = DownloadOptions::default();
         assert!(opts.headers.is_empty());
@@ -4303,7 +4365,6 @@ mod tests {
     #[test]
     fn test_download_headers_dict_parsed_before_network() {
         let (module, _ctx, _temp_dir) = make_eval_and_ctx();
-        let globals = Globals::standard();
         module.set(
             "repository_ctx",
             module.heap().alloc(RepositoryContext::stub("headers_test")),
@@ -4318,6 +4379,112 @@ mod tests {
             .alloc(AllocDict(vec![("X-Custom", module2.heap().alloc("value"))]));
         let parsed = parse_headers(Some(headers_val)).unwrap();
         assert_eq!(parsed, vec![("X-Custom".to_owned(), "value".to_owned())]);
+    }
+
+    fn spawn_header_required_http_server() -> (String, std::thread::JoinHandle<()>) {
+        use std::io::Read;
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::time::Duration;
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut buf = [0u8; 4096];
+            let len = stream.read(&mut buf).unwrap();
+            let request = String::from_utf8_lossy(&buf[..len]).to_ascii_lowercase();
+            let body = if request.contains("\r\nx-plan64-header: present\r\n") {
+                "ok"
+            } else {
+                "missing header"
+            };
+            let status = if body == "ok" {
+                "200 OK"
+            } else {
+                "403 Forbidden"
+            };
+            write!(
+                stream,
+                "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        });
+
+        (format!("http://{addr}/payload.txt"), handle)
+    }
+
+    fn spawn_delayed_http_server(
+        delay: std::time::Duration,
+    ) -> (String, std::thread::JoinHandle<()>) {
+        use std::io::Read;
+        use std::io::Write;
+        use std::net::TcpListener;
+        use std::time::Duration;
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = stream.read(&mut buf);
+            std::thread::sleep(delay);
+            let body = "late";
+            let _ = write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+        });
+
+        (format!("http://{addr}/payload.txt"), handle)
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_download_url_forwards_custom_headers_to_request() {
+        slug_certs::certs::maybe_setup_cryptography();
+        let (url, handle) = spawn_header_required_http_server();
+        let options = DownloadOptions {
+            headers: vec![("X-Plan64-Header".to_owned(), "present".to_owned())],
+            connect_timeout: std::time::Duration::from_secs(2),
+            total_timeout: std::time::Duration::from_secs(5),
+        };
+
+        let data = download_url(&url, &options).unwrap();
+
+        assert_eq!(data, b"ok");
+        handle.join().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_download_url_timeout_is_bounded_without_subprocess_fallback() {
+        slug_certs::certs::maybe_setup_cryptography();
+        let (url, handle) = spawn_delayed_http_server(std::time::Duration::from_millis(500));
+        let options = DownloadOptions {
+            headers: Vec::new(),
+            connect_timeout: std::time::Duration::from_secs(1),
+            total_timeout: std::time::Duration::from_millis(100),
+        };
+
+        let started = std::time::Instant::now();
+        let result = download_url(&url, &options);
+
+        assert!(
+            result.is_err(),
+            "slow server should trip the in-process timeout"
+        );
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(2),
+            "download timeout should remain bounded without subprocess fallback"
+        );
+        handle.join().unwrap();
     }
 
     #[test]
