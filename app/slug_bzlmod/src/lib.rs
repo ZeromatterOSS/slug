@@ -977,10 +977,14 @@ pub async fn validate_lockfile_extension_replay_for_current_workspace(
 ///   `Update` or `Refresh`; `Error` and `Off` skip writing.
 /// * `resolved_graph` — The resolved module graph containing registry file
 ///   hashes and selected yanked versions.
-/// * `new_extension_results` — Extension data from freshly evaluated
-///   extensions, as `(extension_id, LockfileExtensionData)` pairs.
+/// * `new_extension_results` — Non-reproducible extension data from freshly
+///   evaluated extensions, as `(extension_id, LockfileExtensionData)` pairs.
 ///   Bazel 9 reference: `BazelLockFileModule.afterCommand()` iterates
 ///   `evaluator.getDoneValues()` for `SingleExtensionValue` results.
+/// * `hidden_lockfile_path` — Optional output-base lockfile path used for
+///   reproducible extension data.
+/// * `new_reproducible_extension_results` — Reproducible extension data from
+///   freshly evaluated extensions, persisted only to the hidden lockfile.
 /// * `active_extension_ids` — Extension IDs that still have usages in the
 ///   current dep graph. Extensions not in this list are pruned from the
 ///   lockfile. Bazel 9 reference: `depGraphValue.getExtensionUsagesTable()
@@ -989,22 +993,29 @@ pub async fn validate_lockfile_extension_replay_for_current_workspace(
 ///
 /// # Behavior
 ///
-/// - Reads the on-disk visible lockfile (if any).
-/// - Builds a new lockfile from the resolved graph + merged extension data.
-/// - Writes only if the new lockfile differs from the on-disk one (Bazel's
+/// - Reads the on-disk visible and hidden lockfiles (if any).
+/// - Builds a visible lockfile from the resolved graph + merged
+///   non-reproducible extension data.
+/// - Builds a hidden lockfile from reproducible extension data only.
+/// - Writes each file only if its content changed (Bazel's
 ///   `!newLockfile.equals(oldLockfile)` guard).
-/// - Returns `Ok(true)` if a write occurred, `Ok(false)` if skipped.
+/// - Returns `Ok(true)` if either file was written, `Ok(false)` if both skipped.
 pub fn persist_lockfile_after_resolution(
     workspace_root: &std::path::Path,
     lockfile_mode: LockfileMode,
     resolved_graph: &crate::resolution::ResolvedGraph,
     new_extension_results: &[(String, lockfile::LockfileExtensionData)],
+    hidden_lockfile_path: Option<&std::path::Path>,
+    new_reproducible_extension_results: &[(String, lockfile::LockfileExtensionData)],
     active_extension_ids: &[String],
     new_facts: &[(String, serde_json::Value)],
 ) -> slug_error::Result<bool> {
+    use std::fs;
+
     use crate::lockfile::Lockfile;
     use crate::lockfile::LockfileWritePurpose;
     use crate::lockfile::lockfile_path;
+
     match lockfile_mode {
         LockfileMode::Update | LockfileMode::Refresh => {}
         LockfileMode::Error | LockfileMode::Off => return Ok(false),
@@ -1024,13 +1035,42 @@ pub fn persist_lockfile_after_resolution(
         new_facts,
     );
 
-    match existing_lockfile {
-        Some(existing) if existing == new_lockfile => Ok(false),
+    let wrote_visible = match existing_lockfile {
+        Some(existing) if existing == new_lockfile => false,
         _ => {
             new_lockfile.write_for_purpose(&path, LockfileWritePurpose::ResolutionUpdate)?;
-            Ok(true)
+            true
         }
-    }
+    };
+
+    let wrote_hidden = if let Some(hidden_path) = hidden_lockfile_path {
+        let existing_hidden_lockfile: Option<Lockfile> = std::fs::read_to_string(hidden_path)
+            .ok()
+            .and_then(|content| serde_json::from_str::<Lockfile>(&content).ok());
+        let hidden_graph = crate::resolution::ResolvedGraph::default();
+        let new_hidden_lockfile = Lockfile::from_resolved_graph_with_extensions(
+            &hidden_graph,
+            existing_hidden_lockfile.as_ref(),
+            new_reproducible_extension_results,
+            active_extension_ids,
+            new_facts,
+        );
+        match existing_hidden_lockfile {
+            Some(existing) if existing == new_hidden_lockfile => false,
+            _ => {
+                if let Some(parent) = hidden_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                new_hidden_lockfile
+                    .write_for_purpose(hidden_path, LockfileWritePurpose::ResolutionUpdate)?;
+                true
+            }
+        }
+    } else {
+        false
+    };
+
+    Ok(wrote_visible || wrote_hidden)
 }
 
 async fn validate_lockfile_extension_replay_for_extension(

@@ -812,6 +812,10 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
         .visible_lockfile
         .as_ref()
         .and_then(|v| v.lockfile.as_ref());
+    let hidden_lockfile = lockfile_inputs
+        .hidden_lockfile
+        .as_ref()
+        .and_then(|v| v.lockfile.as_ref());
 
     // Extensions already recorded in the injected lockfile must stay active even
     // when nothing was re-aggregated this resolution (a cache-replayed build, in
@@ -822,10 +826,12 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
         aggregations.extension_aggregations.keys().cloned(),
         visible_lockfile
             .into_iter()
+            .chain(hidden_lockfile)
             .flat_map(|lf| lf.module_extensions.keys().cloned()),
     );
 
     let mut new_extension_results: Vec<(String, LockfileExtensionData)> = Vec::new();
+    let mut new_reproducible_extension_results: Vec<(String, LockfileExtensionData)> = Vec::new();
     let mut new_facts: Vec<(String, _)> = Vec::new();
 
     for ext_id in aggregations.extension_aggregations.keys() {
@@ -839,13 +845,17 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
         };
         let (fresh_ext_id, fresh_ext_data) = spokes.lockfile_extension_entry();
         if fresh_ext_data.is_reproducible() {
-            continue;
-        }
-        if !new_extension_results
+            if !new_reproducible_extension_results
+                .iter()
+                .any(|(id, _)| id == &fresh_ext_id)
+            {
+                new_reproducible_extension_results.push((fresh_ext_id.clone(), fresh_ext_data));
+            }
+        } else if !new_extension_results
             .iter()
             .any(|(id, _)| id == &fresh_ext_id)
         {
-            new_extension_results.push((fresh_ext_id, fresh_ext_data));
+            new_extension_results.push((fresh_ext_id.clone(), fresh_ext_data));
         }
         if let Some((fresh_fact_id, fresh_facts)) = spokes.lockfile_facts_entry() {
             if !new_facts.iter().any(|(id, _)| id == &fresh_fact_id) {
@@ -874,11 +884,29 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
         }
     }
 
+    if let Some(lockfile_value) = hidden_lockfile {
+        for ext_id in &active_extension_ids {
+            if let Some(ext_data) = lockfile_value.get_extension_data(ext_id) {
+                if !ext_data.is_reproducible() {
+                    continue;
+                }
+                if !new_reproducible_extension_results
+                    .iter()
+                    .any(|(id, _)| id == ext_id)
+                {
+                    new_reproducible_extension_results.push((ext_id.clone(), ext_data.clone()));
+                }
+            }
+        }
+    }
+
     match persist_lockfile_after_resolution(
         workspace_root,
         lockfile_mode,
         &resolved_graph,
         &new_extension_results,
+        lockfile_inputs.hidden_lockfile_path.as_deref(),
+        &new_reproducible_extension_results,
         &active_extension_ids,
         &new_facts,
     )? {

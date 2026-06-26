@@ -6465,6 +6465,86 @@ use_repo(fresh, "fresh_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_successful_build_persists_reproducible_extension_to_hidden_lockfile(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: reproducible extension info is persisted in HIDDEN_KEY."""
+    module_name = "plan64_reproducible_hidden_lockfile"
+    extension_id = f"@@{module_name}+//:reproducible_ext.bzl%reproducible_ext"
+    visible_lockfile = buck.cwd / "MODULE.bazel.lock"
+    daemon_dir = Path((await buck.debug("daemon-dir")).stdout.strip())
+    hidden_lockfile = daemon_dir / "MODULE.bazel.lock"
+
+    _write(buck.cwd / "watched.txt", "hidden payload\n")
+    _write(
+        buck.cwd / "reproducible_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+reproducible_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _reproducible_ext_impl(module_ctx):
+    payload = module_ctx.read(Label("//:watched.txt"), watch = "yes")
+    reproducible_repo_rule(name = "reproducible_repo", payload = payload)
+    return module_ctx.extension_metadata(
+        facts = {"resource": {"checksum": payload.strip()}},
+        reproducible = True,
+    )
+
+reproducible_ext = module_extension(
+    implementation = _reproducible_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        f"""module(name = "{module_name}")
+
+reproducible = use_extension("//:reproducible_ext.bzl", "reproducible_ext")
+use_repo(reproducible, "reproducible_repo")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_reproducible_repo",
+    srcs = ["@reproducible_repo//:data"],
+)
+""",
+    )
+    assert not visible_lockfile.exists()
+    assert not hidden_lockfile.exists()
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_reproducible_repo")
+    after = await _bzlmod_counters(buck)
+
+    assert after["extension_eval"] > before["extension_eval"]
+    assert visible_lockfile.exists()
+    assert hidden_lockfile.exists()
+
+    visible = json.loads(visible_lockfile.read_text())
+    assert extension_id not in visible["moduleExtensions"]
+    assert visible["facts"][extension_id] == {
+        "resource": {"checksum": "hidden payload"},
+    }
+
+    hidden = json.loads(hidden_lockfile.read_text())
+    extension_data = hidden["moduleExtensions"][extension_id]["general"]
+    assert "reproducible_repo" in extension_data["generatedRepoSpecs"]
+    assert extension_data["moduleExtensionMetadata"] == {"reproducible": True}
+    assert hidden["registryFileHashes"] == {}
+    assert hidden["selectedYankedVersions"] == {}
+    assert hidden["facts"][extension_id] == {
+        "resource": {"checksum": "hidden payload"},
+    }
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only(
     buck: Buck,
 ) -> None:

@@ -802,10 +802,10 @@ Clean stale `slugd` processes before and after daemon-sensitive smokes.
 
 ## Current State (2026-06-26)
 
-Plan 64 remains **In Progress** pending a full guardrail rerun or explicit
-handoff of any residual failures, but the latest focused slice closed the
-lockfile/replay invalidation failures that were blocking selected-yanked and
-hidden-lockfile confidence:
+Plan 64 remains **In Progress** pending the residual full-guardrail failures
+below, but the latest focused slices closed the lockfile/replay invalidation and
+hidden-lockfile persistence gaps that were blocking selected-yanked,
+hidden-lockfile, and reproducible-extension confidence:
 
 - visible and hidden `MODULE.bazel.lock` inputs now poll through Slug's bzlmod
   DICE projection keys, including the resolved graph, current-workspace cell
@@ -821,6 +821,11 @@ hidden-lockfile confidence:
 - the hidden-facts create/edit/delete guardrail now runs in `--lockfile_mode=error`
   to avoid a visible workspace facts entry masking hidden facts, matching Bazel's
   source behavior rather than Slug's earlier test expectation.
+- successful builds now split command-end extension persistence the way Bazel
+  does: non-reproducible extension entries go to the visible workspace
+  `MODULE.bazel.lock`, reproducible entries go to the daemon/output-base hidden
+  `MODULE.bazel.lock`, and both carry relevant facts without copying registry
+  hashes or selected-yanked state into the hidden file.
 
 Bazel source anchors:
 
@@ -835,6 +840,9 @@ Bazel source anchors:
   starts command-end facts from the workspace lockfile, and
   `BazelLockFileModule.java:159-216` writes non-reproducible extension entries to
   the visible workspace lockfile and reproducible entries to the hidden lockfile.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileValue.java:55-88`
+  documents the visible/hidden lockfile split and the hidden lockfile's
+  output-base location and permanence policy.
 
 Accepted validation:
 
@@ -851,16 +859,29 @@ TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slu
 TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_edit_invalidates_replay_in_same_daemon \
   tests/core/bzlmod/test_plan61_guardrails.py::test_lockfile_selected_yanked_version_edit_invalidates_bzlmod_resolution -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod lockfile -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_successful_build_persists_reproducible_extension_to_hidden_lockfile -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_successful_build_persists_fresh_extension_result_to_lockfile \
+  tests/core/bzlmod/test_plan61_guardrails.py::test_successful_build_persists_reproducible_extension_to_hidden_lockfile \
+  tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_read_is_observable_before_extension_replay \
+  tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_edit_invalidates_replay_in_same_daemon \
+  tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_facts_create_edit_delete_are_observed -s --tb=short
 ```
 
 Remaining gaps:
 
-- Full `tests/core/bzlmod/test_plan61_guardrails.py` was not rerun for this
-  slice; do that before declaring Plan 64 complete.
-- Hidden lockfile writing for reproducible extension results is still not wired
-  as a Slug command-end persistence path.
-- Once Plan 64's focused lockfile/replay lane is not blocking, return ownership
-  to Plan 34's REAPI executor proof instead of opening new compatibility lanes.
+- Full `tests/core/bzlmod/test_plan61_guardrails.py` was rerun and is not clean:
+  179 passed / 7 failed. The failures cluster around registry `source.json`
+  warm invalidation counters, missing-registry-checksum error-mode drift,
+  extension-facts error wording, post-write lockfile replay expectations, and
+  `inject_repo` mapping replay after a MODULE edit. Fix or explicitly hand off
+  these before declaring Plan 64 complete.
+- Once Plan 64's focused lockfile/replay lane is no longer blocking, return
+  ownership to Plan 34's REAPI executor proof instead of opening new
+  compatibility lanes.
 
 ## Current Review Validation
 

@@ -3921,6 +3921,8 @@ mod tests {
             LockfileMode::Update,
             &graph,
             &[],
+            None,
+            &[],
             &[],
             &[],
         )
@@ -3957,6 +3959,8 @@ mod tests {
             LockfileMode::Update,
             &graph,
             &[],
+            None,
+            &[],
             &[],
             &[],
         )
@@ -3967,6 +3971,8 @@ mod tests {
             workspace_root,
             LockfileMode::Update,
             &graph,
+            &[],
+            None,
             &[],
             &[],
             &[],
@@ -3991,6 +3997,8 @@ mod tests {
             LockfileMode::Refresh,
             &graph,
             &[],
+            None,
+            &[],
             &[],
             &[],
         )
@@ -4000,6 +4008,93 @@ mod tests {
         assert!(
             workspace_root.join("MODULE.bazel.lock").exists(),
             "refresh mode should create the lockfile when missing"
+        );
+    }
+
+    #[test]
+    fn lockfile_lifecycle_writes_reproducible_extensions_to_hidden_lockfile() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+        let hidden_path = workspace_root.join("buck-out/v2/MODULE.bazel.lock");
+
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "hash1".to_owned(),
+        );
+
+        let extension_id = "@@rules_repo+//ext:repo.bzl%repo".to_owned();
+        let mut reproducible_ext = LockfileExtensionData::new(
+            "bzl_digest".to_owned(),
+            "usages_digest".to_owned(),
+            IndexMap::new(),
+        );
+        reproducible_ext
+            .general
+            .as_mut()
+            .unwrap()
+            .module_extension_metadata = Some(serde_json::json!({"reproducible": true}));
+        let facts = serde_json::json!({"resource": {"checksum": "stable"}});
+
+        let written = crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Update,
+            &graph,
+            &[],
+            Some(&hidden_path),
+            &[(extension_id.clone(), reproducible_ext.clone())],
+            std::slice::from_ref(&extension_id),
+            &[(extension_id.clone(), facts.clone())],
+        )
+        .unwrap();
+
+        assert!(
+            written,
+            "first build should write visible and hidden lockfiles"
+        );
+
+        let visible: Lockfile = serde_json::from_str(
+            &std::fs::read_to_string(workspace_root.join("MODULE.bazel.lock")).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            !visible.module_extensions.contains_key(&extension_id),
+            "reproducible extension cache data should stay out of visible lockfile"
+        );
+        assert_eq!(visible.facts.get(&extension_id), Some(&facts));
+
+        let hidden: Lockfile =
+            serde_json::from_str(&std::fs::read_to_string(&hidden_path).unwrap()).unwrap();
+        assert_eq!(
+            hidden.registry_file_hashes.len(),
+            0,
+            "hidden lockfile should not copy visible registry hashes"
+        );
+        assert_eq!(
+            hidden.selected_yanked_versions.len(),
+            0,
+            "hidden lockfile should not copy visible selected-yanked state"
+        );
+        assert_eq!(
+            hidden.module_extensions.get(&extension_id),
+            Some(&reproducible_ext)
+        );
+        assert_eq!(hidden.facts.get(&extension_id), Some(&facts));
+
+        let second = crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Update,
+            &graph,
+            &[],
+            Some(&hidden_path),
+            &[(extension_id.clone(), reproducible_ext)],
+            &[extension_id.clone()],
+            &[(extension_id, facts)],
+        )
+        .unwrap();
+        assert!(
+            !second,
+            "unchanged visible and hidden lockfiles should not rewrite"
         );
     }
 
@@ -4018,6 +4113,8 @@ mod tests {
             workspace_root,
             LockfileMode::Update,
             &graph,
+            &[],
+            None,
             &[],
             &[],
             &[],
@@ -4058,6 +4155,8 @@ mod tests {
             workspace_root,
             LockfileMode::Update,
             &graph,
+            &[],
+            None,
             &[],
             &[],
             &[],
@@ -4103,6 +4202,8 @@ mod tests {
             LockfileMode::Off,
             &graph,
             &[],
+            None,
+            &[],
             &[],
             &[],
         )
@@ -4125,6 +4226,8 @@ mod tests {
             workspace_root,
             LockfileMode::Error,
             &graph,
+            &[],
+            None,
             &[],
             &[],
             &[],
