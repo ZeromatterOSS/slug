@@ -1789,7 +1789,15 @@ pub async fn materialize_inputs(
                 let path = artifact_fs
                     .buck_out_path_resolver()
                     .resolve_gen(&metadata.path, Some(&metadata.content_hash))?;
-                paths.push(path);
+                if let Some(data) = &metadata.data {
+                    let abs_path = artifact_fs.fs().resolve(&path);
+                    if let Some(parent) = abs_path.parent() {
+                        async_fs_util::create_dir_all(parent).await?;
+                    }
+                    async_fs_util::write(&abs_path, &data.0).await?;
+                } else {
+                    paths.push(path);
+                }
             }
             CommandExecutionInput::ScratchPath(path) => {
                 let path = artifact_fs.buck_out_path_resolver().resolve_scratch(path)?;

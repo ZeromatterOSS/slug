@@ -20,6 +20,7 @@ SIBLING_NATIVELINK_BIN_CANDIDATES = [
 SHELL_FIXTURE_ROOT = REPO_ROOT / "tests/core/executor/test_outputs_ordering_data"
 CC_ACTIONS_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/cc_actions"
 RULES_CC_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/rules_cc"
+PARAMFILE_FIXTURE_ROOT = REPO_ROOT / "tests/plan34/fixtures/paramfile"
 PLATFORM_EXEC_PROPERTIES_FIXTURE_ROOT = (
     REPO_ROOT / "tests/plan34/fixtures/platform_exec_properties"
 )
@@ -943,6 +944,91 @@ def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
             target="//:foo",
             build=build,
             expected_count=1,
+        )
+    finally:
+        _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=5)
+            pytest.fail("NativeLink did not terminate cleanly:\n" + "".join(nativelink_lines))
+
+
+def test_native_link_nested_paramfile_reaches_reapi_input_tree(tmp_path: Path) -> None:
+    slug_bin = _slug_binary()
+    nativelink_bin = _nativelink_binary()
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    _copy_fixture(
+        PARAMFILE_FIXTURE_ROOT,
+        workspace,
+        [".buckroot", "MODULE.bazel", "BUILD.bazel", "defs.bzl"],
+    )
+
+    nativelink_root = tmp_path / "nativelink"
+    nativelink_root.mkdir()
+    frontend_port = _free_port()
+    worker_port = _free_port()
+    config = nativelink_root / "nativelink.json5"
+    _write_nativelink_config(config, nativelink_root, frontend_port, worker_port)
+
+    proc, nativelink_lines = _start_nativelink(nativelink_bin, config, frontend_port)
+    isolation = "plan34-reapi-paramfile-smoke"
+    remote_endpoint = f"grpc://127.0.0.1:{frontend_port}"
+
+    try:
+        build = _run(
+            [
+                str(slug_bin),
+                "--isolation-dir",
+                isolation,
+                "build",
+                "//:nested_param_file",
+                "--show-output",
+                f"--remote_executor={remote_endpoint}",
+                f"--remote_cache={remote_endpoint}",
+                "--remote_default_exec_properties=cpu_count=1",
+                "--remote-only",
+            ],
+            cwd=workspace,
+        )
+        build_output = build.stdout + build.stderr
+        assert "BUILD SUCCEEDED" in build_output
+        assert "RE Session:" in build_output
+        assert "Commands: 1 (cached: 0, remote: 1, local: 0)" in build_output
+        materialized_outputs = _assert_materialized_show_outputs(
+            build,
+            workspace,
+            expected_count=1,
+        )
+        assert materialized_outputs[0].read_text().splitlines() == [
+            "runfiles_dir",
+            "retain_a,retain_b",
+            "source=dest",
+        ]
+        reapi_actions = _assert_reapi_what_ran(
+            slug_bin,
+            workspace,
+            isolation,
+            expected_count=1,
+            action_key_fragments=["nested_param_file"],
+        )
+        upload_records = _assert_reapi_uploads(
+            slug_bin,
+            workspace,
+            isolation,
+            expected_count=1,
+        )
+        _record_reapi_execution_evidence(
+            test_name="test_native_link_nested_paramfile_reaches_reapi_input_tree",
+            target="//:nested_param_file",
+            build=build,
+            materialized_outputs=materialized_outputs,
+            reapi_actions=reapi_actions,
+            upload_records=upload_records,
         )
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)

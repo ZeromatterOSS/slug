@@ -73,6 +73,10 @@ impl ActionMetadataBlobData {
     pub fn from_json(json: String) -> ActionMetadataBlobData {
         ActionMetadataBlobData(json.into_bytes())
     }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> ActionMetadataBlobData {
+        ActionMetadataBlobData(bytes)
+    }
 }
 
 #[derive(Clone)]
@@ -80,6 +84,7 @@ pub struct ActionMetadataBlob {
     pub digest: TrackedFileDigest,
     pub path: BuildArtifactPath,
     pub content_hash: ContentBasedPathHash,
+    pub data: Option<ActionMetadataBlobData>,
 }
 
 pub enum CommandExecutionInput {
@@ -352,6 +357,12 @@ pub struct RemoteWorkerSpec {
     pub concurrency: Option<usize>,
 }
 
+impl RemoteWorkerSpec {
+    pub fn inputs(&self) -> &[CommandExecutionInput] {
+        &self.input_paths.inputs
+    }
+}
+
 /// The data contains the information about the command to be executed.
 pub struct CommandExecutionRequest {
     /// Optional arguments including executable prepended to `args` to get full command line.
@@ -494,6 +505,83 @@ impl CommandExecutionRequest {
         Ok(Self {
             paths: override_paths,
             ..self
+        })
+    }
+
+    pub fn with_args_and_inputs_added(
+        self,
+        args: Vec<String>,
+        added_inputs: impl IntoIterator<Item = CommandExecutionInput>,
+        fs: &ArtifactFs,
+        digest_config: DigestConfig,
+        interner: Option<&DashMapDirectoryInterner<ActionDirectoryMember, TrackedFileDigest>>,
+    ) -> slug_error::Result<Self> {
+        let Self {
+            exe,
+            args: _,
+            paths,
+            env,
+            timeout,
+            executor_preference,
+            host_sharing_requirements,
+            low_pass_filter,
+            working_directory,
+            prefetch_lossy_stderr,
+            outputs_cleanup,
+            local_environment_inheritance,
+            force_full_hybrid_if_capable,
+            disable_miniperf,
+            required_local_resources,
+            worker,
+            remote_worker,
+            unique_input_inodes,
+            remote_dep_file_key,
+            re_gang_workers,
+            remote_execution_dependencies,
+            remote_execution_custom_image,
+            meta_internal_extra_params,
+            outputs_for_error_handler,
+            run_action_key,
+            is_test,
+            param_files: _,
+        } = self;
+        let CommandExecutionPaths {
+            mut inputs,
+            outputs,
+            input_directory: _,
+            output_paths: _,
+            input_files_bytes: _,
+        } = paths;
+        inputs.extend(added_inputs);
+        let paths = CommandExecutionPaths::new(inputs, outputs, fs, digest_config, interner)?;
+        Ok(Self {
+            exe,
+            args,
+            paths,
+            env,
+            timeout,
+            executor_preference,
+            host_sharing_requirements,
+            low_pass_filter,
+            working_directory,
+            prefetch_lossy_stderr,
+            outputs_cleanup,
+            local_environment_inheritance,
+            force_full_hybrid_if_capable,
+            disable_miniperf,
+            required_local_resources,
+            worker,
+            remote_worker,
+            unique_input_inodes,
+            remote_dep_file_key,
+            re_gang_workers,
+            remote_execution_dependencies,
+            remote_execution_custom_image,
+            meta_internal_extra_params,
+            outputs_for_error_handler,
+            run_action_key,
+            is_test,
+            param_files: Vec::new(),
         })
     }
 

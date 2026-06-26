@@ -88,6 +88,7 @@ use slug_execute::execute::command_executor::ActionExecutionTimingData;
 use slug_execute::execute::dep_file_digest::DepFileDigest;
 use slug_execute::execute::environment_inheritance::EnvironmentInheritance;
 use slug_execute::execute::request::ActionMetadataBlob;
+use slug_execute::execute::request::ActionMetadataBlobData;
 use slug_execute::execute::request::CommandExecutionInput;
 use slug_execute::execute::request::CommandExecutionOutput;
 use slug_execute::execute::request::CommandExecutionPaths;
@@ -1070,6 +1071,7 @@ impl RunAction {
                 digest,
                 path,
                 content_hash,
+                data: None,
             }));
 
             let env = cli_ctx
@@ -1363,7 +1365,82 @@ impl RunAction {
             }
         }
 
-        Ok(req)
+        self.add_param_file_inputs(ctx, req)
+    }
+
+    fn add_param_file_inputs(
+        &self,
+        ctx: &mut dyn ActionExecutionCtx,
+        req: CommandExecutionRequest,
+    ) -> slug_error::Result<CommandExecutionRequest> {
+        if req.param_files().is_empty() {
+            return Ok(req);
+        }
+
+        let mut args = req.args().to_vec();
+        let mut param_file_inputs = Vec::new();
+        let mut slots: Vec<(usize, ParamFileSlot)> =
+            req.param_files().iter().cloned().enumerate().collect();
+        slots.sort_by(|(_, a), (_, b)| b.start.cmp(&a.start));
+
+        for (slot_idx, slot) in slots {
+            if slot.end > args.len() || slot.start > slot.end {
+                return Err(slug_error!(
+                    slug_error::ErrorTag::Input,
+                    "Invalid param_file slot: start={} end={} args_len={}",
+                    slot.start,
+                    slot.end,
+                    args.len()
+                ));
+            }
+
+            let slot_args = &args[slot.start..slot.end];
+            let total_len: usize = slot_args.iter().map(|s| s.len() + 1).sum();
+            if !slot.use_always && total_len <= 32768 {
+                continue;
+            }
+
+            let content = rendered_param_file_content(slot_args, slot.format);
+            let content_bytes = content.into_bytes();
+            let digest = slug_common::file_ops::metadata::TrackedFileDigest::from_content(
+                &content_bytes,
+                ctx.digest_config().cas_digest_config(),
+            );
+            let content_hash = ContentBasedPathHash::new(digest.raw_digest().as_bytes())?;
+            let path = BuildArtifactPath::with_root_cell_name(
+                ctx.target().owner().dupe(),
+                ForwardRelativePathBuf::new(format!(
+                    "__slug_param_files__/slug-params-{slot_idx}"
+                ))?,
+                BuckOutPathKind::ContentHash,
+                Some(ctx.fs().cell_resolver().root_cell()),
+            );
+            let project_rel_path = ctx
+                .fs()
+                .buck_out_path_resolver()
+                .resolve_gen(&path, Some(&content_hash))?;
+            let replacement = slot.param_file_arg.replace("%s", project_rel_path.as_str());
+
+            param_file_inputs.push(CommandExecutionInput::ActionMetadata(ActionMetadataBlob {
+                digest,
+                path,
+                content_hash,
+                data: Some(ActionMetadataBlobData::from_bytes(content_bytes)),
+            }));
+            args.splice(slot.start..slot.end, std::iter::once(replacement));
+        }
+
+        if param_file_inputs.is_empty() {
+            return Ok(req);
+        }
+
+        req.with_args_and_inputs_added(
+            args,
+            param_file_inputs,
+            ctx.fs(),
+            ctx.digest_config(),
+            ctx.run_action_knobs().action_paths_interner.as_ref(),
+        )
     }
 
     fn outputs_for_error_handler(&self) -> slug_error::Result<Vec<BuildArtifactPath>> {
@@ -1442,6 +1519,22 @@ fn slot_from_param_file_data(pf: &FrozenParamFileData, start: usize, end: usize)
             StarlarkParamFileFormat::FlagPerLine => ParamFileFormat::FlagPerLine,
             StarlarkParamFileFormat::Shell => ParamFileFormat::Shell,
         },
+    }
+}
+
+fn rendered_param_file_content(args: &[String], format: ParamFileFormat) -> String {
+    match format {
+        ParamFileFormat::Shell => args
+            .iter()
+            .map(|s| {
+                let mut q = String::from("'");
+                q.push_str(&s.replace('\'', "'\\''"));
+                q.push('\'');
+                q
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        ParamFileFormat::Multiline | ParamFileFormat::FlagPerLine => args.join("\n"),
     }
 }
 

@@ -17,9 +17,9 @@
 
 ## Status: PARTIAL
 
-Local per-`Args` paramfile slots are implemented and covered by a fast
-repo-owned regression. External cargo-build-script validation, BCR coverage
-scan, and REAPI delivery of paramfile slots remain open.
+Local and REAPI per-`Args` paramfile slots are implemented and covered by fast
+repo-owned regressions. External cargo-build-script validation and BCR coverage
+scan remain open.
 
 ## Bazel source anchors
 
@@ -51,11 +51,16 @@ scan, and REAPI delivery of paramfile slots remain open.
 - Repo-owned fixture `//:args_nested_param_file` verifies a nested
   `Args.use_param_file("--cargo_manifest_args=@%s", use_always=True)` reaches
   the action as one pointer arg while the nested content lands in the paramfile.
-- RE action preparation currently builds `RE::Command.arguments` from
-  `request.all_args_vec()` in
-  `app/slug_execute/src/execute/command_executor.rs:191-229` and does not
-  consume `request.param_files()`. Direct-local evidence here is not Plan 34
-  REAPI executor-boundary proof.
+- Action request construction now lowers spillable `ParamFileSlot`s into
+  generated `ActionMetadata` inputs with inline blob bytes before RE action
+  preparation. `RE::Command.arguments` receives the formatted paramfile pointer,
+  and the Action/CAS upload path adds the generated paramfile bytes to the RE
+  input tree. The local executor writes the same inline metadata bytes when it
+  runs the request directly.
+- Plan 34's NativeLink fixture `//:nested_param_file` verifies a nested
+  `Args.use_param_file("--cargo_manifest_args=@%s", use_always=True)` crosses
+  REAPI with `executor_boundary="reapi"`, `direct_local_actions=0`, and the
+  remote action reading the uploaded paramfile input.
 
 ## Accepted evidence
 
@@ -66,6 +71,11 @@ scan, and REAPI delivery of paramfile slots remain open.
   - Passed: `17 passed in 5.15s`
 - `cargo test -p slug_execute_impl paramfile --lib -- --nocapture`
   - Passed: `2 passed`
+- `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/plan34/test_reapi_local_executor_smoke.py::test_native_link_nested_paramfile_reaches_reapi_input_tree -s --tb=short`
+  - Passed: `1 passed in 0.76s`
+- `TMPDIR=/var/mnt/dev/slug/.tmp SLUG_PLAN34_EVIDENCE_JSONL=/var/mnt/dev/slug/.tmp/plan34-reapi-evidence.jsonl TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/plan34/ -s --tb=short`
+  - Passed: `16 passed in 10.94s`; evidence summary:
+    `reapi_actions=10`, `direct_local_actions=0`, `upload_records=10`.
 
 ## Remaining gaps
 
@@ -74,21 +84,16 @@ scan, and REAPI delivery of paramfile slots remain open.
   `.cargo_runfiles` tree, and advances to a distinct layer.
 - Complete the public BCR `use_param_file(use_always=True)` scan and record
   whether any consumer needs more than per-`Args` slot materialization.
-- Decide the RE path before claiming parity under remote execution: either
-  materialize `ParamFileSlot` before `re_create_action` and upload those files as
-  RE inputs, or move the same behavior into the Plan 34/25 REAPI input-tree
-  proof. Until then, nested paramfiles are direct-local evidence only.
 - Revisit the Plan 44 Phase 3 cleanup hook after the real execroot lands; the
   temporary execroot self-symlink should not become permanent architecture.
 
 ## Next owner
 
-1. Prioritize Plan 34's NativeLink-backed REAPI proof. If its public fixture uses
-   nested paramfiles, close the RE `ParamFileSlot` delivery gap in the execution
-   boundary rather than adding another local-only workaround.
-2. Otherwise, use this plan for the smallest public cargo-build-script smoke and
-   the BCR scan, then update this file with only new accepted evidence and
-   remaining gaps.
+1. Use the smallest public cargo-build-script smoke to prove the runner receives
+   `--cargo_manifest_args=@...`, creates the declared `.cargo_runfiles` tree,
+   and advances to a distinct layer.
+2. Complete the public BCR `use_param_file(use_always=True)` scan, then update
+   this file with only new accepted evidence and remaining gaps.
 
 ## Out of scope
 

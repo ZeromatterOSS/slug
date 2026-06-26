@@ -46,6 +46,7 @@ use crate::execute::prepared::PreparedAction;
 use crate::execute::prepared::PreparedCommand;
 use crate::execute::prepared::PreparedCommandExecutor;
 use crate::execute::prepared::PreparedCommandOptionalExecutor;
+use crate::execute::request::CommandExecutionInput;
 use crate::execute::request::CommandExecutionRequest;
 use crate::execute::request::ExecutorPreference;
 use crate::execute::request::OutputType;
@@ -230,6 +231,7 @@ impl CommandExecutor {
             let action = re_create_action(
                 request.args().to_vec(),
                 all_args,
+                request.inputs(),
                 request.paths().output_paths(),
                 request.working_directory(),
                 request.env(),
@@ -258,6 +260,7 @@ impl CommandExecutor {
 fn re_create_action(
     args: Vec<String>,
     all_args: Vec<String>,
+    inputs: &[CommandExecutionInput],
     outputs: &[(ProjectRelativePathBuf, OutputType)],
     working_directory: &ProjectRelativePath,
     environment: &SortedVectorMap<String, String>,
@@ -277,6 +280,7 @@ fn re_create_action(
 ) -> slug_error::Result<PreparedAction> {
     let (worker_tool_init_action, command_args) = if let Some(worker) = worker {
         let mut action_and_blobs = ActionDigestAndBlobsBuilder::new(digest_config);
+        action_and_blobs.add_input_metadata_blobs(worker.inputs());
         let command = RE::Command {
             arguments: worker.init.clone(),
             #[allow(deprecated)]
@@ -374,6 +378,7 @@ fn re_create_action(
     }
 
     let mut action_and_blobs = ActionDigestAndBlobsBuilder::new(digest_config);
+    action_and_blobs.add_input_metadata_blobs(inputs.iter());
 
     let mut action = RE::Action {
         input_root_digest: Some(input_digest.to_grpc()),

@@ -16,6 +16,7 @@ use crate::digest_config::DigestConfig;
 use crate::execute::action_digest::ActionDigest;
 use crate::execute::blobs::ActionBlobs;
 use crate::execute::paths_with_digest::PathsWithDigestBlobData;
+use crate::execute::request::CommandExecutionInput;
 
 #[derive(Clone)]
 pub struct ActionDigestAndBlobs {
@@ -40,6 +41,19 @@ impl ActionDigestAndBlobsBuilder {
 
     pub fn add_paths(&mut self, digest: TrackedFileDigest, paths: PathsWithDigestBlobData) {
         self.blobs.add_blob(digest, paths.0);
+    }
+
+    pub fn add_input_metadata_blobs<'a>(
+        &mut self,
+        inputs: impl IntoIterator<Item = &'a CommandExecutionInput>,
+    ) {
+        for input in inputs {
+            if let CommandExecutionInput::ActionMetadata(metadata) = input
+                && let Some(data) = &metadata.data
+            {
+                self.blobs.add_blob(metadata.digest.dupe(), data.clone());
+            }
+        }
     }
 
     pub fn add_command(&mut self, command: &RE::Command) -> TrackedFileDigest {

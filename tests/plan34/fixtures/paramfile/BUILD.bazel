@@ -1,0 +1,5 @@
+load(":defs.bzl", "nested_param_file")
+
+nested_param_file(
+    name = "nested_param_file",
+)
