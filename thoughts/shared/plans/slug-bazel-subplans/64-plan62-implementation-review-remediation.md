@@ -733,6 +733,8 @@ TMPDIR=/var/mnt/dev/slug/.tmp git diff --check
 
 **Scope:** working tree hygiene.
 
+**Completed:** 2026-06-26
+
 1. Inspect:
    - `.hermes/dice-combined.csv`
    - `.hermes/dice-run1.csv`
@@ -754,6 +756,30 @@ TMPDIR=/var/mnt/dev/slug/.tmp git diff --check
   left by this remediation work.
 - No `.buckconfig` returns to examples without an explicit plan decision.
 
+**Implementation evidence (2026-06-26):**
+
+- `.hermes/dice-combined.csv`, `.hermes/dice-run2.csv`, and
+  `.hermes/dice-warm1.csv` are present as zero-byte ignored generated files;
+  `.hermes/dice-run1.csv` is a 679 MB ignored raw Hermes DICE trace.
+- The raw Hermes output is intentionally ignored by `.gitignore`; the tracked
+  summary is `thoughts/shared/research/2026-06-12-hermes-dice-benchmark-trace.md`.
+- `package-lock.json` is absent and ignored by `.gitignore` as accidental npm
+  metadata for this Cargo workspace.
+- `examples/multi_package/.buckconfig` is absent; the example keeps the tracked
+  Bazel-shaped `examples/multi_package/.bazelrc`.
+- `git status --short --untracked-files=all` is clean.
+
+**Validation (2026-06-26):**
+
+```sh
+git status --short --untracked-files=all
+git ls-files -s -- .hermes/dice-combined.csv .hermes/dice-run1.csv \
+  .hermes/dice-run2.csv .hermes/dice-warm1.csv package-lock.json \
+  examples/multi_package/.buckconfig
+git check-ignore -v -- .hermes/dice-combined.csv .hermes/dice-run1.csv \
+  .hermes/dice-run2.csv .hermes/dice-warm1.csv package-lock.json
+```
+
 ## Final Validation Matrix
 
 Run the narrow tests for each phase first. Before closing Plan 64, run:
@@ -773,6 +799,50 @@ If a phase changes the `slug` binary path used by Python tests, rebuild with
 `cargo build -p slug` before invoking `target/debug/slug`.
 
 Clean stale `slugd` processes before and after daemon-sensitive smokes.
+
+## Current State (2026-06-26)
+
+Plan 64 remains **In Progress**. The latest slice closed systemic
+repository-materialization and registry-override guardrail failures without
+reopening Plan 61:
+
+- external patch execution now treats `Skipped patch` output or unchanged
+  preimage state as a failed external patch path and falls back to the
+  in-process patcher;
+- repository-rule `file://` downloads read local files before HTTP fallback;
+- generated-repository `local_repository` paths resolve relative to the
+  workspace root even when execution happens in `.generations`;
+- bzlmod runtime cleanup preserves extension repository canonical symlinks in
+  `bazel-external`;
+- `multiple_version_override(..., registry = ...)` rediscovery uses the actual
+  module name, not the synthetic selected key like `name+version`.
+
+Accepted validation:
+
+```sh
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_common bzlmod
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_external_cells
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_interpreter_for_build
+TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -rx --tb=short
+```
+
+Latest full guardrail result: `174 passed, 11 failed`. The previous
+`multiple_version_override` registry/source-json failure cluster is closed.
+Remaining failures are still Plan 64 replay/lockfile invalidation work:
+
+- selected-yanked-version and missing-registry-checksum visible lockfile edits;
+- hidden lockfile replay/facts create-edit-delete observation;
+- `--lockfile_mode=error` changed extension facts error wording;
+- mapped external extension `.bzl` load edit/create/delete replay miss counters;
+- missing visible lockfile extension replay counter stability;
+- `inject_repo` keyword alias replay invalidation counter.
+
+Next owner: continue in Plan 64's lockfile/replay invalidation lane. Do not
+mark Plan 64 complete until the full guardrail matrix is green or the remaining
+failures are reclassified into a newer owner plan with evidence.
 
 ## Current Review Validation
 

@@ -261,9 +261,11 @@ fn replay_bzlmod_runtime_state(
         .output_base
         .as_ref()
         .join("external_cells/bzlmod");
-    let mut valid_symlink_names = std::collections::HashSet::new();
+    let mut valid_module_symlink_names = std::collections::HashSet::new();
+    let mut valid_external_entries = std::collections::HashSet::new();
     for symlink in cell_graph.module_symlinks.iter() {
-        valid_symlink_names.insert(symlink.entry_name.clone());
+        valid_module_symlink_names.insert(symlink.entry_name.clone());
+        valid_external_entries.insert(symlink.entry_name.clone());
         let link_path = external_base_dir.join(&symlink.entry_name);
         if let Err(e) = ensure_symlink(&link_path, &symlink.source_path) {
             tracing::warn!(
@@ -281,9 +283,12 @@ fn replay_bzlmod_runtime_state(
             );
         }
     }
+    for extension_cell in cell_graph.extension_cells.iter() {
+        valid_external_entries.insert(extension_cell.canonical_name.clone());
+    }
 
-    cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
-    cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
+    cleanup_stale_symlinks(&external_base_dir, &valid_external_entries);
+    cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_module_symlink_names);
 
     let cell_pairs: Vec<(String, String)> = cell_graph
         .cells
@@ -4734,11 +4739,32 @@ use_repo(ext, "generated")
                 canonical_name: "root+ext+repo".to_owned(),
             }]),
         };
+        let extension_generation_dir = fs
+            .path()
+            .root()
+            .as_path()
+            .join("bazel-external/.generations/root+ext+repo.1");
+        std::fs::create_dir_all(&extension_generation_dir)?;
+        std::fs::write(extension_generation_dir.join("data.txt"), "generated")?;
+        let extension_link = fs
+            .path()
+            .root()
+            .as_path()
+            .join("bazel-external/root+ext+repo");
+        ensure_symlink(&extension_link, &extension_generation_dir)?;
+        let stale_link = fs.path().root().as_path().join("bazel-external/stale-repo");
+        ensure_symlink(&stale_link, &extension_generation_dir)?;
 
         replay_bzlmod_runtime_state(&cell_graph, fs.path());
 
         let explicit_link = output_base.as_path().join("external_cells/bzlmod/dep");
         assert_eq!(std::fs::read_link(explicit_link)?, source_path);
+        assert_eq!(
+            std::fs::read_link(&extension_link)?,
+            extension_generation_dir
+        );
+        assert!(extension_link.join("data.txt").exists());
+        assert!(!stale_link.exists());
         let default_link = fs.path().resolve(ProjectRelativePath::new(
             "buck-out/v2/external_cells/bzlmod/dep",
         )?);

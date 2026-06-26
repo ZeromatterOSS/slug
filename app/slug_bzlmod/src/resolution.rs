@@ -448,6 +448,13 @@ enum YankedVersionStatus {
     Unknown,
 }
 
+fn selected_key_actual_module_name(selected_key: &str) -> &str {
+    selected_key
+        .split_once('+')
+        .map(|(module_name, _)| module_name)
+        .unwrap_or(selected_key)
+}
+
 impl MvsResolver {
     /// Create a new MVS resolver with default BCR registry.
     pub async fn new(
@@ -763,7 +770,8 @@ impl MvsResolver {
     ) -> Vec<(String, Version)> {
         let mut needs_rediscovery = Vec::new();
 
-        for (name, selected_version) in selected {
+        for (selected_key, selected_version) in selected {
+            let name = selected_key_actual_module_name(selected_key);
             // Skip overridden modules — they're already at their final version
             if self.overridden_modules.contains_key(name) {
                 continue;
@@ -775,14 +783,14 @@ impl MvsResolver {
             let discovered_versions: Vec<Version> = self
                 .discovered
                 .keys()
-                .filter(|k| k.name == *name)
+                .filter(|k| k.name == name)
                 .filter_map(|k| Version::parse(&k.version).ok())
                 .collect();
 
             // If the selected version wasn't among the discovered versions,
             // we need to discover it at the selected version.
             if !discovered_versions.iter().any(|v| v == selected_version) {
-                needs_rediscovery.push((name.clone(), selected_version.clone()));
+                needs_rediscovery.push((name.to_owned(), selected_version.clone()));
             }
         }
 
@@ -2449,6 +2457,12 @@ module(name = "local_lib", version = "2.0.0")
 
         assert_eq!(resolved.module_dir, module_dir);
         assert_eq!(resolved.module.name, "git_dep");
+    }
+
+    #[test]
+    fn selected_key_actual_module_name_strips_multiple_version_suffix() {
+        assert_eq!(selected_key_actual_module_name("ccc+1.0.0"), "ccc");
+        assert_eq!(selected_key_actual_module_name("bbb"), "bbb");
     }
 
     #[test]

@@ -1151,6 +1151,35 @@ pub(crate) fn try_ensure_label_path_materialized(path: &Path) -> starlark::Resul
     })
 }
 
+fn patch_command_output(output: &std::process::Output) -> String {
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    )
+}
+
+fn patch_tool_reported_skip(output: &std::process::Output) -> bool {
+    patch_command_output(output).contains("Skipped patch")
+}
+
+fn patch_still_matches_preimage(patch_path: &Path, strip: i32, working_dir: &Path) -> bool {
+    let Ok(patch_content) = std::fs::read_to_string(patch_path) else {
+        return false;
+    };
+    let Ok(patch_files) = parse_unified_patch(&patch_content, strip) else {
+        return false;
+    };
+
+    patch_files.iter().all(|patch_file| {
+        let target = working_dir.join(&patch_file.path);
+        let Ok(original) = std::fs::read_to_string(&target) else {
+            return false;
+        };
+        apply_patch_hunks(&original, &patch_file.hunks, &target).is_ok()
+    })
+}
+
 pub(crate) fn apply_unified_patch(
     patch_path: &Path,
     strip: i32,
@@ -1162,12 +1191,16 @@ pub(crate) fn apply_unified_patch(
         .current_dir(working_dir)
         .output()
     {
-        Ok(output) if output.status.success() => return Ok(()),
-        Ok(output) => Some(format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stderr),
-            String::from_utf8_lossy(&output.stdout)
-        )),
+        Ok(output) if output.status.success() && !patch_tool_reported_skip(&output) => {
+            if !patch_still_matches_preimage(patch_path, strip, working_dir) {
+                return Ok(());
+            }
+            Some(format!(
+                "{}patch(1) reported success but the patch still matched the target preimage",
+                patch_command_output(&output)
+            ))
+        }
+        Ok(output) => Some(patch_command_output(&output)),
         Err(e) if e.kind() != ErrorKind::NotFound => {
             return Err(format!("Failed to execute patch: {e}"));
         }
@@ -1182,14 +1215,20 @@ pub(crate) fn apply_unified_patch(
         .output()
         .map_err(|e| format!("Failed to execute patch fallback via git apply: {e}"))?;
 
-    if output.status.success() {
+    let git_error = patch_command_output(&output);
+    if output.status.success()
+        && !git_error.contains("Skipped patch")
+        && !patch_still_matches_preimage(patch_path, strip, working_dir)
+    {
         Ok(())
     } else {
-        let git_error = format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stderr),
-            String::from_utf8_lossy(&output.stdout)
-        );
+        let git_error = if output.status.success() {
+            format!(
+                "{git_error}git apply reported success but the patch still matched the target preimage"
+            )
+        } else {
+            git_error
+        };
         apply_unified_patch_in_process(patch_path, strip, working_dir).map_err(|fallback_error| {
             let patch_error = patch_error
                 .as_deref()
@@ -1572,6 +1611,14 @@ enum HttpClientDownloadError {
 /// Returns the downloaded bytes on success.
 pub(crate) fn download_url(url: &str, options: &DownloadOptions) -> Result<Vec<u8>, String> {
     tracing::info!("Downloading from: {}", url);
+
+    if let Some(path) = slug_bzlmod::local_file_url_path(url) {
+        return std::fs::read(&path)
+            .map_err(|e| format!("Failed to read local file URL '{}': {}", url, e));
+    }
+    if url.starts_with("file://") {
+        return Err(format!("Unsupported local file URL: {}", url));
+    }
 
     // Try in-process HTTP client first.
     match download_with_http_client(url, options) {
@@ -4461,6 +4508,18 @@ mod tests {
 
         assert_eq!(data, b"ok");
         handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_download_url_reads_local_file_urls() {
+        let temp = TempDir::new().unwrap();
+        let payload = temp.path().join("payload.txt");
+        std::fs::write(&payload, b"local file payload").unwrap();
+        let url = format!("file://{}", payload.display());
+
+        let data = download_url(&url, &DownloadOptions::default()).unwrap();
+
+        assert_eq!(data, b"local file payload");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

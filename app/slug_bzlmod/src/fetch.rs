@@ -104,10 +104,20 @@ fn run_patch_tool(
     }
 
     let output = child.wait_with_output().map_err(PatchToolError::Wait)?;
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let combined_output = if stdout.is_empty() {
+        stderr.clone()
+    } else if stderr.is_empty() {
+        stdout.clone()
+    } else {
+        format!("{stdout}{stderr}")
+    };
     if !output.status.success() {
-        return Err(PatchToolError::Failed(
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        ));
+        return Err(PatchToolError::Failed(combined_output));
+    }
+    if combined_output.contains("Skipped patch") {
+        return Err(PatchToolError::Failed(combined_output));
     }
     Ok(())
 }
@@ -1518,30 +1528,52 @@ mod tests {
     }
 
     #[test]
-    fn git_apply_patch_tool_applies_registry_patch_shape() {
+    fn apply_patch_content_applies_registry_patch_shape() {
         let temp_dir = TempDir::new().unwrap();
         let file = temp_dir.path().join("a.txt");
         std::fs::write(&file, "old\n").unwrap();
 
-        let patch = b"diff --git a/a.txt b/a.txt\n\
+        let patch = "diff --git a/a.txt b/a.txt\n\
 --- a/a.txt\n\
 +++ b/a.txt\n\
 @@ -1 +1 @@\n\
 -old\n\
 +new\n";
-        let args = [
-            "apply".to_owned(),
-            "-p1".to_owned(),
-            "--unsafe-paths".to_owned(),
-            "--whitespace=nowarn".to_owned(),
-        ];
 
-        run_patch_tool("git", &args, Some(temp_dir.path()), patch).unwrap();
+        SourceFetcher::apply_patch_content(temp_dir.path(), "registry.patch", 1, patch.as_bytes())
+            .unwrap();
 
         assert_eq!(
             std::fs::read_to_string(file).unwrap().replace("\r\n", "\n"),
             "new\n"
         );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn patch_tool_success_with_skipped_patch_output_is_error() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let script = temp_dir.path().join("fake_patch_tool");
+        std::fs::write(
+            &script,
+            "#!/bin/sh\ncat >/dev/null\nprintf '%s\\n' \"Skipped patch 'a.txt'.\" >&2\nexit 0\n",
+        )
+        .unwrap();
+        let mut permissions = std::fs::metadata(&script).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&script, permissions).unwrap();
+
+        let err = run_patch_tool(
+            script.to_str().unwrap(),
+            &[],
+            Some(temp_dir.path()),
+            b"patch",
+        )
+        .unwrap_err();
+
+        assert!(err.to_string().contains("Skipped patch"));
     }
 
     #[test]

@@ -453,12 +453,22 @@ pub(crate) fn local_repository_source_path(
 
     let path = Path::new(path);
     let resolved = if path.is_relative() {
-        let project_root = working_dir.parent()?.parent()?;
+        let project_root = project_root_for_repository_working_dir(working_dir)?;
         project_root.join(path)
     } else {
         path.to_path_buf()
     };
     Some(resolved.canonicalize().unwrap_or(resolved))
+}
+
+fn project_root_for_repository_working_dir(working_dir: &Path) -> Option<PathBuf> {
+    let parent = working_dir.parent()?;
+    let bazel_external = if parent.file_name() == Some(std::ffi::OsStr::new(".generations")) {
+        parent.parent()?
+    } else {
+        parent
+    };
+    bazel_external.parent().map(Path::to_path_buf)
 }
 
 pub(crate) fn should_skip_local_repository_entry(name: &str) -> bool {
@@ -489,7 +499,7 @@ fn llvm_subproject_layout_is_valid(invocation: &RepositoryInvocation, working_di
     if dir.is_empty() {
         return true;
     }
-    let Some(project_root) = working_dir.parent().and_then(|external| external.parent()) else {
+    let Some(project_root) = project_root_for_repository_working_dir(working_dir) else {
         return false;
     };
     let Some(prefix) = invocation.name.rsplit_once('+').map(|(prefix, _)| prefix) else {
@@ -2337,12 +2347,8 @@ fn execute_local_repository(
     // In Bazel, relative paths in new_local_repository are resolved relative to
     // the workspace root (where MODULE.bazel lives).
     let resolved_path = if Path::new(path).is_relative() {
-        if let Some(bazel_external) = working_dir.parent() {
-            if let Some(project_root) = bazel_external.parent() {
-                project_root.join(path)
-            } else {
-                PathBuf::from(path)
-            }
+        if let Some(project_root) = project_root_for_repository_working_dir(working_dir) {
+            project_root.join(path)
         } else {
             PathBuf::from(path)
         }
@@ -2716,6 +2722,45 @@ mod tests {
                 &local_inv,
                 &working_dir
             ));
+        }
+    }
+
+    #[test]
+    fn local_repository_relative_path_resolves_from_generation_dir() {
+        let temp = TempDir::new().unwrap();
+        let project_root = temp.path();
+        let source_dir = project_root.join("repo_rule_dev_repo");
+        std::fs::create_dir_all(&source_dir).unwrap();
+        std::fs::write(
+            source_dir.join("BUILD.bazel"),
+            "filegroup(name = \"lib\")\n",
+        )
+        .unwrap();
+
+        let canonical_dir = project_root
+            .join("bazel-external")
+            .join("+local_repository+repo_rule_dev_repo");
+        let staging_dir = prepare_staging_dir(&canonical_dir).unwrap();
+        let invocation = RepositoryInvocation::new(
+            "+local_repository+repo_rule_dev_repo".to_owned(),
+            "local_repository".to_owned(),
+        )
+        .with_attr(
+            "path".to_owned(),
+            crate::repository_invocations::AttrValue::String("repo_rule_dev_repo".to_owned()),
+        );
+        let attrs = InvocationAttrs::new(&invocation);
+
+        execute_local_repository(&invocation, &attrs, &staging_dir).unwrap();
+        mark_repo_complete(&staging_dir).unwrap();
+
+        #[cfg(unix)]
+        {
+            let linked_source = std::fs::read_link(&staging_dir).unwrap();
+            assert_eq!(
+                linked_source.canonicalize().unwrap(),
+                source_dir.canonicalize().unwrap()
+            );
         }
     }
 
