@@ -1889,6 +1889,7 @@ pub fn lockfile_canonical_extension_id(internal_id: &str) -> String {
 /// Bazel 9's default lockfile behavior. There is deliberately no process-wide
 /// parse cache here: callers that need replayable lockfile identity must go
 /// through their DICE-owned lockfile content key.
+#[cfg(test)]
 pub fn read_lockfile_at_path(
     path: PathBuf,
     mode: LockfileMode,
@@ -1914,6 +1915,7 @@ pub fn read_lockfile_at_path(
 /// Bazel parses the hidden output-base lockfile as `update` regardless of the
 /// command's visible lockfile mode, and treats read/parse failures as an empty
 /// hidden lockfile. Visible workspace lockfile failures remain hard errors.
+#[cfg(test)]
 pub fn read_hidden_lockfile_path(
     path: &Path,
 ) -> slug_error::Result<Option<std::sync::Arc<Lockfile>>> {
@@ -1932,6 +1934,7 @@ pub fn read_hidden_lockfile_path(
 
 /// Read `MODULE.bazel.lock` from `workspace_root` with explicit Bazel
 /// lockfile policy.
+#[cfg(test)]
 pub fn read_lockfile_with_mode(
     workspace_root: &Path,
     mode: LockfileMode,
@@ -3837,6 +3840,34 @@ mod tests {
     }
 
     #[test]
+    fn lockfile_lifecycle_refresh_mode_creates_lockfile() {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "abcdef1234567890".to_owned(),
+        );
+
+        let written = crate::persist_lockfile_after_resolution(
+            workspace_root,
+            LockfileMode::Refresh,
+            &graph,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
+
+        assert!(written, "refresh mode should write the lockfile");
+        assert!(
+            workspace_root.join("MODULE.bazel.lock").exists(),
+            "refresh mode should create the lockfile when missing"
+        );
+    }
+
+    #[test]
     fn lockfile_lifecycle_error_mode_rejects_registry_hash_drift() {
         let temp_dir = tempfile::TempDir::new().unwrap();
         let workspace_root = temp_dir.path();
@@ -4069,7 +4100,7 @@ mod tests {
 
     #[test]
     fn from_resolved_graph_with_extensions_prunes_inactive_extensions() {
-        let mut graph = crate::resolution::ResolvedGraph::default();
+        let graph = crate::resolution::ResolvedGraph::default();
         let mut old_lockfile = Lockfile::new();
         old_lockfile.module_extensions.insert(
             "@@old_extension//ext.bzl%old".to_owned(),
@@ -4102,7 +4133,7 @@ mod tests {
 
     #[test]
     fn from_resolved_graph_with_extensions_sorts_output_deterministically() {
-        let mut graph = crate::resolution::ResolvedGraph::default();
+        let graph = crate::resolution::ResolvedGraph::default();
         let ext_z = LockfileExtensionData::new("z".to_owned(), "z".to_owned(), IndexMap::new());
         let ext_a = LockfileExtensionData::new("a".to_owned(), "a".to_owned(), IndexMap::new());
 

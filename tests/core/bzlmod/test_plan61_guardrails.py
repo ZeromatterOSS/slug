@@ -6343,6 +6343,50 @@ local_path_override(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_successful_build_persists_visible_lockfile_in_update_mode(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: BazelLockFileModule.afterCommand writes in UPDATE/REFRESH modes."""
+    lockfile = buck.cwd / "MODULE.bazel.lock"
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "lockfile_writer", srcs = [])\n')
+    assert not lockfile.exists()
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:lockfile_writer")
+    after = await _bzlmod_counters(buck)
+
+    assert lockfile.exists()
+    assert after["lockfile_write_attempt"] > before["lockfile_write_attempt"]
+
+    parsed = json.loads(lockfile.read_text())
+    assert parsed["lockFileVersion"] == 26
+    assert parsed["registryFileHashes"] == {}
+
+    first_sha = _sha256(lockfile)
+    await buck.build("//:lockfile_writer")
+    warm = await _bzlmod_counters(buck)
+
+    assert _sha256(lockfile) == first_sha
+    assert warm["lockfile_write_attempt"] == after["lockfile_write_attempt"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
+async def test_successful_build_lockfile_mode_off_skips_visible_lockfile_write(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: BazelLockFileModule.afterCommand skips OFF mode."""
+    lockfile = buck.cwd / "MODULE.bazel.lock"
+    _write(buck.cwd / "BUILD.bazel", 'filegroup(name = "lockfile_writer", srcs = [])\n')
+
+    before = await _bzlmod_counters(buck, "--lockfile_mode=off")
+    await buck.build("//:lockfile_writer", "--lockfile_mode=off")
+    after = await _bzlmod_counters(buck, "--lockfile_mode=off")
+
+    assert not lockfile.exists()
+    assert after["lockfile_write_attempt"] == before["lockfile_write_attempt"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only(
     buck: Buck,
 ) -> None:

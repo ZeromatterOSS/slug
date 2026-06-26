@@ -464,6 +464,11 @@ cargo test -p slug_interpreter_for_build module_ctx -- --nocapture
 
 **Scope:** `slug_bzlmod` lockfile read/write/mode handling and caller plumbing.
 
+**Current state (2026-06-26):** partially complete. The production build path
+now has visible lockfile write coverage and mode coverage for update/off, but
+freshly evaluated module-extension results still need a DICE-owned source before
+this phase can close.
+
 1. Add failing integration tests first:
    - workspace with no `MODULE.bazel.lock`, default/update mode build writes one;
    - second same-daemon build does not rewrite if content is unchanged;
@@ -486,6 +491,54 @@ cargo test -p slug_interpreter_for_build module_ctx -- --nocapture
 - A normal build can create/refresh `MODULE.bazel.lock`.
 - Error/refresh/off modes have visible tests and clear behavior.
 - Dead lockfile helper warnings are eliminated or intentionally cfg-gated.
+
+**Accepted evidence (2026-06-26):**
+
+- Bazel source anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java:57-88`
+  enables command-end writes only for `UPDATE`/`REFRESH`;
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java:189-196`
+  writes the visible lockfile only when contents change;
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java:318-325`
+  serializes `MODULE.bazel.lock`;
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunction.java:71-88`
+  tracks visible/hidden lockfiles as Skyframe inputs and reads the hidden
+  lockfile with update policy;
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileValue.java:55-93`
+  documents the visible/hidden lockfile split.
+- Slug production hook: `app/slug_server_commands/src/build.rs` calls
+  `persist_lockfile_post_build` after a successful build; the writer path in
+  `app/slug_bzlmod/src/lib.rs` writes only for `Update`/`Refresh`, skips
+  `Error`/`Off`, and avoids rewriting unchanged lockfiles.
+- New coverage:
+  `test_successful_build_persists_visible_lockfile_in_update_mode`,
+  `test_successful_build_lockfile_mode_off_skips_visible_lockfile_write`, and
+  `lockfile_lifecycle_refresh_mode_creates_lockfile`.
+- The standalone lockfile read helpers are now `#[cfg(test)]`, eliminating the
+  production dead-code warnings from `cargo build -p slug`.
+
+**Validation (2026-06-26):**
+
+```sh
+cargo fmt --check -p slug_bzlmod
+cargo test -p slug_bzlmod lockfile -- --nocapture
+cargo build -p slug
+TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py \
+  -k "successful_build_persists_visible_lockfile_in_update_mode or successful_build_lockfile_mode_off_skips_visible_lockfile_write" \
+  -rx --tb=short
+git diff --check
+```
+
+**Remaining 64.5 gap:**
+
+- `persist_lockfile_post_build` still preserves extension data/facts from the
+  DICE-injected visible/hidden lockfiles. It does not yet gather freshly
+  evaluated extension results from the owning DICE computation
+  (`ExtensionSpokesKey`/`ExtensionSpokesValue` or the equivalent owner). Do not
+  mark Phase 64.5 complete until a build that evaluates a new module extension
+  writes the resulting lockfile extension data and a replay/error-mode test proves
+  it is consumed.
 
 **Suggested validation:**
 
