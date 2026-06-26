@@ -5,6 +5,7 @@ load(
     "label_keyed_dict_rule",
     "output_attr_rule",
     "output_list_rule",
+    "string_keyed_label_dict_rule",
     "string_dict_iter_rule",
     "string_dict_rule",
     "string_list_dict_rule",
@@ -58,6 +59,20 @@ label_keyed_dict_rule(
     deps = {
         ":dep_a": "role_a",
         ":dep_b": "role_b",
+    },
+)
+
+label_keyed_dict_rule(
+    name = "label_keyed_directory_dict_target",
+    deps = {
+        "include": "headers",
+    },
+)
+
+string_keyed_label_dict_rule(
+    name = "string_keyed_directory_dict_target",
+    deps = {
+        "headers": "include",
     },
 )
 

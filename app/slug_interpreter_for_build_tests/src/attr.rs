@@ -132,8 +132,8 @@ fn attr_label_works() -> slug_error::Result<()> {
         "#
     ))?;
 
-    // In Bazel/Buck2, relative label defaults using ":" prefix are valid.
-    // Bare names without ":" are NOT valid (requires explicit ":" or "//" prefix).
+    // Bazel label defaults use package-context conversion. Both ":target" and
+    // bare target strings resolve relative to the .bzl package.
     let mut t = Tester::new().unwrap();
     t.run_starlark_bzl_test(indoc!(
         r#"
@@ -142,16 +142,12 @@ fn attr_label_works() -> slug_error::Result<()> {
         "#
     ))
     .unwrap();
-    // Bare names (no ":" prefix) should fail with a pattern parse error.
-    t.run_starlark_bzl_test_expecting_error(
-        indoc!(
-            r#"
-            def test():
-                attr.label(default="notatarget")
-            "#
-        ),
-        "Invalid target pattern",
-    );
+    t.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            assert_eq('attrs.dep(default="root//some/package:notatarget")', repr(attr.label(default="notatarget")))
+        "#
+    ))?;
     Ok(())
 }
 
@@ -238,6 +234,186 @@ fn attr_label_list_allow_files_accepts_directory_sources() -> slug_error::Result
         .collect::<Vec<_>>();
     assert_eq!(vec!["include/a.h", "include/bits/b.h"], files);
 
+    Ok(())
+}
+
+#[test]
+fn attr_label_keyed_string_dict_allow_files_accepts_directory_keys() -> slug_error::Result<()> {
+    let mut tester = Tester::new().unwrap();
+    tester.additional_globals(register_builtin_providers);
+    tester.add_import(
+        &ImportPath::testing_new("root//:rules.bzl"),
+        indoc!(
+            r#"
+            def _impl(ctx):
+                return DefaultInfo()
+
+            dir_keyed = rule(
+                impl = _impl,
+                attrs = {
+                    "mapping": attr.label_keyed_string_dict(allow_files = True),
+                },
+            )
+            "#
+        ),
+    )?;
+
+    let build_path = BuildFilePath::testing_new("root//some/package:BUILD.bazel");
+    let result = tester.eval_build_file(
+        &build_path,
+        indoc!(
+            r#"
+            load("//:rules.bzl", "dir_keyed")
+
+            dir_keyed(
+                name = "headers",
+                mapping = {"include": "headers"},
+            )
+            "#
+        ),
+        PackageListing::testing_files(&["include/a.h", "include/bits/b.h"]),
+    )?;
+
+    let target = result
+        .get_target(slug_core::target::name::TargetNameRef::new("headers")?)
+        .expect("target should be recorded");
+    let mapping = target
+        .attr_or_none("mapping", AttrInspectOptions::All)
+        .expect("mapping attr should be present");
+
+    let CoercedAttr::Dict(items) = mapping.value else {
+        panic!("expected dict attr, got {:?}", mapping.value);
+    };
+    assert_eq!(items.len(), 1);
+
+    let (key, value) = &items[0];
+    let CoercedAttr::OneOf(inner, _) = key else {
+        panic!("expected one_of key, got {:?}", key);
+    };
+    let CoercedAttr::SourceFile(CoercedPath::Directory(dir)) = &**inner else {
+        panic!("expected directory source key, got {:?}", inner);
+    };
+    assert_eq!("include", dir.dir.as_str());
+    assert_eq!(
+        vec!["include/a.h", "include/bits/b.h"],
+        dir.files
+            .iter()
+            .map(|path| path.as_str().to_owned())
+            .collect::<Vec<_>>()
+    );
+    let CoercedAttr::String(value) = value else {
+        panic!("expected string value, got {:?}", value);
+    };
+    assert_eq!("headers", value.as_str());
+
+    Ok(())
+}
+
+#[test]
+fn attr_string_keyed_label_dict_allow_files_accepts_directory_values() -> slug_error::Result<()> {
+    let mut tester = Tester::new().unwrap();
+    tester.additional_globals(register_builtin_providers);
+    tester.add_import(
+        &ImportPath::testing_new("root//:rules.bzl"),
+        indoc!(
+            r#"
+            def _impl(ctx):
+                return DefaultInfo()
+
+            string_keyed_dirs = rule(
+                impl = _impl,
+                attrs = {
+                    "mapping": attr.string_keyed_label_dict(allow_files = True),
+                },
+            )
+            "#
+        ),
+    )?;
+
+    let build_path = BuildFilePath::testing_new("root//some/package:BUILD.bazel");
+    let result = tester.eval_build_file(
+        &build_path,
+        indoc!(
+            r#"
+            load("//:rules.bzl", "string_keyed_dirs")
+
+            string_keyed_dirs(
+                name = "headers",
+                mapping = {"headers": "include"},
+            )
+            "#
+        ),
+        PackageListing::testing_files(&["include/a.h", "include/bits/b.h"]),
+    )?;
+
+    let target = result
+        .get_target(slug_core::target::name::TargetNameRef::new("headers")?)
+        .expect("target should be recorded");
+    let mapping = target
+        .attr_or_none("mapping", AttrInspectOptions::All)
+        .expect("mapping attr should be present");
+
+    let CoercedAttr::Dict(items) = mapping.value else {
+        panic!("expected dict attr, got {:?}", mapping.value);
+    };
+    assert_eq!(items.len(), 1);
+
+    let (key, value) = &items[0];
+    let CoercedAttr::String(key) = key else {
+        panic!("expected string key, got {:?}", key);
+    };
+    assert_eq!("headers", key.as_str());
+    let CoercedAttr::OneOf(inner, _) = value else {
+        panic!("expected one_of value, got {:?}", value);
+    };
+    let CoercedAttr::SourceFile(CoercedPath::Directory(dir)) = &**inner else {
+        panic!("expected directory source value, got {:?}", inner);
+    };
+    assert_eq!("include", dir.dir.as_str());
+    assert_eq!(
+        vec!["include/a.h", "include/bits/b.h"],
+        dir.files
+            .iter()
+            .map(|path| path.as_str().to_owned())
+            .collect::<Vec<_>>()
+    );
+
+    Ok(())
+}
+
+#[test]
+fn attr_label_dicts_accept_bazel9_signature_shape() -> slug_error::Result<()> {
+    let mut tester = Tester::new().unwrap();
+    tester.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            attr.label_keyed_string_dict(
+                allow_files = True,
+                allow_rules = None,
+                configurable = True,
+                flags = [],
+                for_dependency_resolution = None,
+                skip_validations = False,
+            )
+            attr.string_keyed_label_dict(
+                allow_files = True,
+                allow_rules = None,
+                configurable = True,
+                flags = [],
+                for_dependency_resolution = None,
+            )
+        "#
+    ))?;
+
+    tester.run_starlark_bzl_test_expecting_error(
+        indoc!(
+            r#"
+            def test():
+                attr.string_keyed_label_dict(allow_single_file = True)
+            "#
+        ),
+        "allow_single_file",
+    );
     Ok(())
 }
 

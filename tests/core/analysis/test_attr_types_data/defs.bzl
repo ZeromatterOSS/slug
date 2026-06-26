@@ -73,6 +73,25 @@ label_keyed_dict_rule = rule(
 )
 
 
+def _string_keyed_label_dict_impl(ctx):
+    """Writes key:basename lines from a string_keyed_label_dict attribute."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = []
+    for key, target in ctx.attr.deps.items():
+        for f in target.files.to_list():
+            lines.append(key + ":" + f.basename)
+    ctx.actions.write(out, "\n".join(sorted(lines)) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+string_keyed_label_dict_rule = rule(
+    implementation = _string_keyed_label_dict_impl,
+    attrs = {
+        "deps": attr.string_keyed_label_dict(allow_files = True),
+    },
+)
+
+
 def _output_attr_impl(ctx):
     """Writes to the named output file declared via attr.output."""
     ctx.actions.write(ctx.outputs.out, "output_written\n")

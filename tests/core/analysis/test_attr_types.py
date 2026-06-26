@@ -59,6 +59,28 @@ async def test_label_keyed_string_dict_attr(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_attr_types_data")
+async def test_label_keyed_string_dict_directory_key(buck: Buck) -> None:
+    """attr.label_keyed_string_dict(allow_files=True) accepts directory keys."""
+    result = await buck.build("//:label_keyed_directory_dict_target")
+    output = result.get_build_report().output_for_target(
+        "//:label_keyed_directory_dict_target"
+    )
+    lines = output.read_text().strip().splitlines()
+    assert "include:headers" in lines
+
+
+@buck_test(data_dir="test_attr_types_data")
+async def test_string_keyed_label_dict_directory_value(buck: Buck) -> None:
+    """attr.string_keyed_label_dict(allow_files=True) accepts directory values."""
+    result = await buck.build("//:string_keyed_directory_dict_target")
+    output = result.get_build_report().output_for_target(
+        "//:string_keyed_directory_dict_target"
+    )
+    lines = output.read_text().strip().splitlines()
+    assert "headers:include" in lines
+
+
+@buck_test(data_dir="test_attr_types_data")
 async def test_attr_output(buck: Buck) -> None:
     """attr.output() declares a single named output file."""
     result = await buck.build("//:output_attr_target")

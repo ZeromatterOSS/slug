@@ -377,6 +377,28 @@ fn parse_allow_files_param<'v>(
     }
 }
 
+fn bazel_label_attr_type(
+    dep_cfg: BazelDepCfg,
+    required_providers: ProviderIdSet,
+    accept_files: bool,
+    allow_directory: bool,
+    transition_uses_plugins: bool,
+) -> AttrType {
+    let dep_type = match dep_cfg {
+        BazelDepCfg::Exec => AttrType::exec_dep(required_providers),
+        BazelDepCfg::Target => AttrType::dep(required_providers, PluginKindSet::EMPTY),
+        BazelDepCfg::Transition(cfg) => {
+            AttrType::transition_dep(required_providers, Some(cfg), transition_uses_plugins)
+        }
+    };
+
+    if accept_files {
+        AttrType::one_of(vec![dep_type, AttrType::source(allow_directory)])
+    } else {
+        dep_type
+    }
+}
+
 /// This type is available as a global `attrs` symbol, to allow the definition of attributes to the `rule` function.
 ///
 /// As an example:
@@ -1066,30 +1088,19 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         } else {
             required_providers
         };
-        let coercer = if accept_files {
-            let dep_type = match dep_cfg {
-                BazelDepCfg::Exec => AttrType::exec_dep(effective_providers),
-                BazelDepCfg::Target => AttrType::dep(effective_providers, PluginKindSet::EMPTY),
-                BazelDepCfg::Transition(cfg) => {
-                    AttrType::transition_dep(effective_providers, Some(cfg), true)
-                }
-            };
-            // Bazel's `allow_files=True` accepts package directory paths in
-            // file-carrying attrs such as rules_cc `hdrs`; list contexts expand
-            // those directories through `CoercedPath::inputs()`. Keep
-            // `allow_single_file=True` file-only so `ctx.file.<attr>` cannot
-            // silently bind a directory.
-            let allow_directory = allow_files_bool && !allow_single_file_bool;
-            AttrType::one_of(vec![dep_type, AttrType::source(allow_directory)])
-        } else {
-            match dep_cfg {
-                BazelDepCfg::Exec => AttrType::exec_dep(effective_providers),
-                BazelDepCfg::Target => AttrType::dep(effective_providers, PluginKindSet::EMPTY),
-                BazelDepCfg::Transition(cfg) => {
-                    AttrType::transition_dep(effective_providers, Some(cfg), true)
-                }
-            }
-        };
+        // Bazel's `allow_files=True` accepts package directory paths in
+        // file-carrying attrs such as rules_cc `hdrs`; list contexts expand
+        // those directories through `CoercedPath::inputs()`. Keep
+        // `allow_single_file=True` file-only so `ctx.file.<attr>` cannot
+        // silently bind a directory.
+        let allow_directory = allow_files_bool && !allow_single_file_bool;
+        let coercer = bazel_label_attr_type(
+            dep_cfg,
+            effective_providers,
+            accept_files,
+            allow_directory,
+            true,
+        );
 
         // Create attribute with aspects attached (Phase 8c)
         let implicit = default.is_none() && !mandatory;
@@ -1184,24 +1195,11 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // IMPORTANT: Try dep first, then source. Both accept label strings like ":foo",
         // but deps (targets) should take precedence over source files. Source files
         // are typically specified as bare filenames like "file.c", not labels.
-        let dep_type = match dep_cfg {
-            BazelDepCfg::Exec => AttrType::exec_dep(required_providers),
-            BazelDepCfg::Target => AttrType::dep(required_providers, PluginKindSet::EMPTY),
-            BazelDepCfg::Transition(cfg) => {
-                AttrType::transition_dep(required_providers, Some(cfg), false)
-            }
-        };
-        let inner = if allow_files_bool {
-            AttrType::one_of(vec![
-                dep_type,
-                // `allow_files=True` label lists are the generic shape behind
-                // Bazel rule attrs like rules_cc `hdrs`. Directory paths in
-                // these lists expand to the files under the directory.
-                AttrType::source(true),
-            ])
-        } else {
-            dep_type
-        };
+        // `allow_files=True` label lists are the generic shape behind Bazel
+        // rule attrs like rules_cc `hdrs`. Directory paths in these lists
+        // expand to the files under the directory.
+        let inner =
+            bazel_label_attr_type(dep_cfg, required_providers, allow_files_bool, true, false);
         let coercer = AttrType::list(inner);
 
         // Create attribute with aspects attached (Phase 8c)
@@ -1334,8 +1332,14 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
-        #[starlark(require = named, default = false)] allow_files: bool,
-        #[starlark(require = named, default = false)] allow_empty: bool,
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        #[starlark(require = named, default = true)] allow_empty: bool,
+        #[starlark(require = named)] configurable: Option<Value<'v>>,
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
+        #[starlark(require = named)] for_dependency_resolution: Option<Value<'v>>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        flags: UnpackListOrTuple<&str>,
+        #[starlark(require = named, default = false)] skip_validations: bool,
         // Bazel-compatible: configuration transition
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         // Bazel-compatible: aspects to apply to dependencies
@@ -1343,24 +1347,20 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         aspects: UnpackListOrTuple<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (allow_files, allow_empty, aspects);
+        let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
+        let _unused = (
+            allow_empty,
+            configurable,
+            allow_rules,
+            for_dependency_resolution,
+            flags,
+            skip_validations,
+            aspects,
+        );
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
-        // Handle cfg parameter: "exec" or config.exec(...) means use exec_dep
-        let is_exec = match cfg {
-            Some(v) => {
-                if let Some(s) = v.unpack_str() {
-                    s == "exec"
-                } else {
-                    v.to_repr().contains("exec")
-                }
-            }
-            None => false,
-        };
-        let label_type = if is_exec {
-            AttrType::exec_dep(required_providers)
-        } else {
-            AttrType::dep(required_providers, PluginKindSet::EMPTY)
-        };
+        let dep_cfg = parse_bazel_dep_cfg(cfg)?;
+        let label_type =
+            bazel_label_attr_type(dep_cfg, required_providers, allow_files_bool, true, false);
         let coercer = AttrType::dict(label_type, AttrType::string(), false);
         // Bazel semantics: non-mandatory dicts default to empty dict
         let effective_default = match (default, mandatory) {
@@ -1383,17 +1383,43 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
-        #[starlark(require = named, default = false)] allow_files: bool,
-        #[starlark(require = named, default = false)] allow_single_file: bool,
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named, default = true)] allow_empty: bool,
+        #[starlark(require = named)] configurable: Option<Value<'v>>,
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
+        #[starlark(require = named)] for_dependency_resolution: Option<Value<'v>>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        flags: UnpackListOrTuple<&str>,
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        aspects: UnpackListOrTuple<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (mandatory, allow_files, allow_single_file, allow_empty);
+        let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
+        let _unused = (
+            allow_empty,
+            configurable,
+            allow_rules,
+            for_dependency_resolution,
+            flags,
+            aspects,
+        );
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
-        let label_type = AttrType::dep(required_providers, PluginKindSet::EMPTY);
+        let dep_cfg = parse_bazel_dep_cfg(cfg)?;
+        let label_type =
+            bazel_label_attr_type(dep_cfg, required_providers, allow_files_bool, true, false);
         // Note: string keys, label values (inverse of label_keyed_string_dict)
         let coercer = AttrType::dict(AttrType::string(), label_type, false);
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+        // Bazel semantics: non-mandatory dicts default to empty dict
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(
+                eval.heap()
+                    .alloc(starlark::collections::SmallMap::<Value, Value>::new()),
+            ),
+            (None, true) => None,
+        };
+        Ok(Attribute::attr(eval, effective_default, doc, coercer)?)
     }
 
     /// Declares an output file that the rule will generate.
