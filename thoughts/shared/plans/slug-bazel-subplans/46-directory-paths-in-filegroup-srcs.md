@@ -3,10 +3,9 @@
 > Parent: [2026-01-21-slug-bazel-compatible-build-tool.md](../2026-01-21-slug-bazel-compatible-build-tool.md)
 >
 > Discovered while implementing Plan 44 Phase 2.5 (per-action execroot
-> for rules_rust runner compatibility). End-to-end verification of
-> `crates__zerocopy-0.8.42//:_bs` was blocked because zeromatter's
-> `llvm_toolchains//:linux_x86_64_cc_toolchain` analysis fails with
-> `Unknown target lib/clang/22` from
+> for rules_rust runner compatibility). End-to-end verification of a public
+> cargo build-script smoke was blocked because an LLVM toolchain target's
+> analysis fails with `Unknown target lib/clang/22` from
 > `llvm-toolchain-minimal-22.1.0-linux-amd64//`.
 
 ## Status: IMPLEMENTED LOCALLY; EXTERNAL LLVM SMOKE PENDING
@@ -30,9 +29,9 @@ Slug's `filegroup` rule rejects this with
 llvm-toolchain-minimal-22.1.0-linux-amd64//`. The dep-coercion path
 synthesizes a target label `:lib/clang/22` that doesn't exist.
 
-This blocks the entire LLVM toolchain analysis chain and, by
-extension, every cargo_build_script in zeromatter whose toolchain
-selection traverses `llvm_toolchains//:linux_x86_64_cc_toolchain`.
+This blocks the LLVM toolchain analysis chain and, by extension, any public
+cargo build-script smoke whose toolchain selection traverses
+`llvm_toolchains//:linux_x86_64_cc_toolchain`.
 
 ## Bazel Source Anchors
 
@@ -49,6 +48,13 @@ selection traverses `llvm_toolchains//:linux_x86_64_cc_toolchain`.
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/packages/Attribute.java:693-710`,
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/packages/BuildType.java:413-429`,
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/cmdline/LabelParser.java:150-153`.
+- Bazel `filegroup` forwards `srcs` through `FileProvider.filesToBuild`:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/rules/filegroup/Filegroup.java:58-107`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/analysis/PrerequisiteArtifacts.java:64-71`.
+- Bazel source-file configured targets expose a one-artifact `FileProvider`,
+  and native `DefaultInfo.files` delegates to that provider:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/analysis/configuredtargets/FileConfiguredTarget.java:82-95`,
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/analysis/DefaultInfo.java:156-160`.
 
 ## Current State
 
@@ -66,21 +72,27 @@ selection traverses `llvm_toolchains//:linux_x86_64_cc_toolchain`.
   `for_dependency_resolution`, `flags`, `configurable`, plus
   `skip_validations` for `label_keyed_string_dict`).
 - The Python fixture proves Starlark user rules can accept directory paths in
-  both dictionary label positions. At `ctx.attr` provider level Slug currently
-  exposes the directory artifact itself (`include`) rather than expanded
-  basenames; the owner-abstraction Rust tests prove coercion records the
-  directory contents.
+  both dictionary label positions. Slug exposes the directory artifact itself
+  (`include`) through `DefaultInfo.files.to_list()`, matching the Bazel 9
+  provider shape. The owner-abstraction Rust tests still prove coercion records
+  the directory contents for execution-time input expansion.
 
 ## Accepted Evidence
 
-- `cargo test -p slug_interpreter_for_build_tests allow_files_accepts_directory -- --nocapture`
-  passed with three directory-source coercion tests.
 - `cargo test -p slug_interpreter_for_build_tests 'attr::' -- --nocapture`
-  passed with 18 attr module tests, including the Bazel 9 signature guard and
-  package-context bare-label default check.
+  passed after the implementation change with 18 attr module tests, including
+  the Bazel 9 signature guard and package-context bare-label default check.
 - `cargo build -p slug` passed after the implementation change.
+- `bazel --version` reported `bazel 9.1.1`; a temporary Bazel workspace with
+  `filegroup(name = "fg", srcs = ["include"])` and a Starlark rule writing
+  `dep[DefaultInfo].files.to_list()` produced `include|include|include`,
+  confirming Bazel 9 exposes the source directory as one artifact rather than
+  expanding to child basenames.
+- `cargo test -p slug_interpreter_for_build_tests allow_files_accepts_directory -- --nocapture`
+  passed on 2026-06-26 with three directory-source coercion tests.
 - `TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q tests/core/analysis/test_attr_types.py -s --tb=short`
-  passed with 10 Python integration tests.
+  passed on 2026-06-26 with 10 Python integration tests, including dictionary
+  attr outputs that report the directory artifact basename `include`.
 
 ## Remaining Gaps
 
@@ -88,15 +100,13 @@ selection traverses `llvm_toolchains//:linux_x86_64_cc_toolchain`.
   next owner should verify Slug now advances past
   `llvm-toolchain-minimal-22.1.0-linux-amd64//:lib/clang/22` and record the
   next blocker, if any.
-- If a ruleset depends on `DefaultInfo.files.to_list()` expanding a source
-  directory into individual file artifacts for Starlark user rules, confirm
-  Bazel 9 behavior and either extend this plan or route the provider-shape work
-  to the Starlark/provider owner.
 
 ## Next Owner
 
-- Run the external LLVM smoke only if the checkout and validation
-  budget make it reasonable; otherwise keep it as the first continuation item.
+- Run the external LLVM smoke only if the checkout and validation budget make
+  it reasonable; otherwise keep it as the first continuation item. The
+  provider-shape question is closed unless future Bazel 9 source or observed
+  behavior contradicts the 9.1.1 smoke above.
 - If that smoke advances to a cargo build-script runner or execroot shape
   failure, route the next blocker to Plan 45 or Plan 44 rather than adding more
   directory-source special cases here.
