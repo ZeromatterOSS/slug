@@ -826,6 +826,11 @@ hidden-lockfile, and reproducible-extension confidence:
   `MODULE.bazel.lock`, reproducible entries go to the daemon/output-base hidden
   `MODULE.bazel.lock`, and both carry relevant facts without copying registry
   hashes or selected-yanked state into the hidden file.
+- `--lockfile_mode=error` no longer treats extra registry file hashes already
+  present in `MODULE.bazel.lock` as stale by itself. The current-resolution
+  missing-checksum error remains owned by registry resolution, so an extra old
+  lockfile URL cannot mask the Bazel-shaped "missing checksum" failure for a
+  current registry file.
 
 Bazel source anchors:
 
@@ -843,6 +848,10 @@ Bazel source anchors:
 - `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileValue.java:55-88`
   documents the visible/hidden lockfile split and the hidden lockfile's
   output-base location and permanence policy.
+- `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java:165-185`
+  fails `--lockfile_mode=error` when the current registry file has no lockfile
+  checksum; Slug should not add a reverse stale-extra-lockfile-URL check that
+  masks that resolver-owned error.
 
 Accepted validation:
 
@@ -869,16 +878,22 @@ TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slu
   tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_read_is_observable_before_extension_replay \
   tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_edit_invalidates_replay_in_same_daemon \
   tests/core/bzlmod/test_plan61_guardrails.py::test_hidden_lockfile_facts_create_edit_delete_are_observed -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod \
+  lockfile_lifecycle_error_mode -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py::test_lockfile_missing_registry_checksum_invalidates_bzlmod_resolution -s --tb=short
+TMPDIR=/var/mnt/dev/slug/.tmp TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+  python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py -s --tb=short
 ```
 
 Remaining gaps:
 
 - Full `tests/core/bzlmod/test_plan61_guardrails.py` was rerun and is not clean:
-  179 passed / 7 failed. The failures cluster around registry `source.json`
-  warm invalidation counters, missing-registry-checksum error-mode drift,
-  extension-facts error wording, post-write lockfile replay expectations, and
-  `inject_repo` mapping replay after a MODULE edit. Fix or explicitly hand off
-  these before declaring Plan 64 complete.
+  180 passed / 6 failed. The failures cluster around registry `source.json`
+  warm invalidation counters, extension-facts error wording, post-write lockfile
+  replay expectations, and `inject_repo` mapping replay after a MODULE edit.
+  Fix or explicitly hand off these before declaring Plan 64 complete.
 - Once Plan 64's focused lockfile/replay lane is no longer blocking, return
   ownership to Plan 34's REAPI executor proof instead of opening new
   compatibility lanes.

@@ -1391,23 +1391,6 @@ impl Lockfile {
             }
         }
 
-        // 3. Resolved-graph drift: compare the lockfile's recorded
-        //    registry hashes with the resolved graph to detect removed
-        //    entries (a module that was in the lockfile but is no longer
-        //    resolved).
-        for url in existing_lockfile.registry_file_hashes.keys() {
-            if !resolved_graph.registry_file_hashes.contains_key(url) {
-                return Err(LockfileError::StaleLockfile {
-                    reason: format!(
-                        "registry file '{}' is in the lockfile but no longer \
-                         in the resolved graph.",
-                        url
-                    ),
-                }
-                .into());
-            }
-        }
-
         Ok(())
     }
 
@@ -4184,6 +4167,28 @@ mod tests {
             msg.contains("new registry file") && msg.contains("not in lockfile"),
             "error mode should detect new registry file: {msg}"
         );
+    }
+
+    #[test]
+    fn lockfile_lifecycle_error_mode_ignores_extra_registry_file_hashes() {
+        let mut graph = crate::resolution::ResolvedGraph::default();
+        graph.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "hash1".to_owned(),
+        );
+
+        let mut existing = Lockfile::new();
+        existing.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel".to_owned(),
+            "hash1".to_owned(),
+        );
+        existing.registry_file_hashes.insert(
+            "https://bcr.bazel.build/modules/old/1.0.0/MODULE.bazel".to_owned(),
+            "old_hash".to_owned(),
+        );
+
+        Lockfile::enforce_error_mode(&graph, &existing)
+            .expect("extra registry hashes should not mask current resolution validation");
     }
 
     #[test]
