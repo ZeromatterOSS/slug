@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -440,6 +441,90 @@ fn test_module_context_read_watch_parameter_records_workspace_inputs() {
             slug_bzlmod::recorded_file_input_with_recorded_path(
                 PathBuf::from("@@//source.txt").as_path(),
                 &watched,
+            )
+            .unwrap()
+        ]
+    );
+}
+
+#[test]
+fn test_module_context_label_keyed_dict_attr_exposes_label_keys() {
+    use starlark::environment::Globals;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+
+    let temp_dir = TempDir::new().unwrap();
+    let requirements = temp_dir
+        .path()
+        .join("tools")
+        .join("publish")
+        .join("requirements_darwin.txt");
+    let working_dir = temp_dir.path().join("work");
+    std::fs::create_dir_all(requirements.parent().unwrap()).unwrap();
+    std::fs::create_dir_all(&working_dir).unwrap();
+    std::fs::write(&requirements, "payload\n").unwrap();
+
+    let mut tags_by_class = HashMap::new();
+    tags_by_class.insert(
+        "parse".to_owned(),
+        vec![SerializedTag::new(vec![(
+            "requirements_by_platform".to_owned(),
+            SerializedTagValue::Dict(vec![(
+                "@@//tools/publish:requirements_darwin.txt".to_owned(),
+                SerializedTagValue::String("osx_*".to_owned()),
+            )]),
+        )])],
+    );
+    let mut ctx = ModuleContext::from_serialized(
+        vec![SerializedModule {
+            name: "root".to_owned(),
+            version: "1.0".to_owned(),
+            is_root: true,
+            is_dev_dependency: false,
+            tags_by_class,
+        }],
+        false,
+    )
+    .with_temp_working_dir(working_dir)
+    .with_label_resolution(temp_dir.path().to_path_buf(), HashMap::new());
+    let mut label_keyed_attrs = HashMap::new();
+    label_keyed_attrs.insert(
+        "parse".to_owned(),
+        HashSet::from(["requirements_by_platform".to_owned()]),
+    );
+    ctx.apply_tag_class_label_keyed_dict_attrs(&label_keyed_attrs);
+    let ctx_handle = ctx.clone();
+
+    let module = Module::new();
+    let heap = module.heap();
+    module.set("mctx", heap.alloc(ctx));
+
+    let ast = AstModule::parse(
+        "label_keyed_dict.star",
+        r#"def run():
+    tag = mctx.modules[0].tags.parse[0]
+    payload = ""
+    for file, platform in tag.requirements_by_platform.items():
+        payload = payload + platform + ":" + mctx.read(file, watch = "yes")
+    return payload
+run()
+"#
+        .to_owned(),
+        &Dialect::Standard,
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    let result = eval.eval_module(ast, &Globals::standard()).unwrap();
+
+    assert_eq!(result.unpack_str(), Some("osx_*:payload\n"));
+    assert_eq!(
+        ctx_handle.recorded_inputs().unwrap(),
+        vec![
+            slug_bzlmod::recorded_file_input_with_recorded_path(
+                PathBuf::from("@@//tools/publish/requirements_darwin.txt").as_path(),
+                &requirements,
             )
             .unwrap()
         ]

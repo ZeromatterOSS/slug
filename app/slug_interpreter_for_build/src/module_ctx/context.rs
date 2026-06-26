@@ -14,6 +14,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -301,6 +302,31 @@ impl ModuleContext {
                             if !existing_keys.contains(attr_name) {
                                 tag.kwargs.push((attr_name.clone(), default_val.clone()));
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Convert dict attributes whose tag-class schema declares label keys into
+    /// Starlark dicts keyed by Label objects.
+    pub fn apply_tag_class_label_keyed_dict_attrs(
+        &mut self,
+        label_keyed_dict_attrs: &HashMap<String, HashSet<String>>,
+    ) {
+        for module in &mut self.modules {
+            for (class_name, tags) in &mut module.tags_by_class {
+                let Some(class_attrs) = label_keyed_dict_attrs.get(class_name) else {
+                    continue;
+                };
+                for tag in tags.iter_mut() {
+                    for (attr_name, value) in &mut tag.kwargs {
+                        if !class_attrs.contains(attr_name) {
+                            continue;
+                        }
+                        if let SerializedTagValue::Dict(entries) = value {
+                            *value = SerializedTagValue::LabelKeyedDict(std::mem::take(entries));
                         }
                     }
                 }

@@ -21,7 +21,8 @@ Local and REAPI per-`Args` paramfile slots are implemented and covered by fast
 repo-owned regressions, including a cargo-runfiles-shaped REAPI directory-output
 handoff. The public registry/rules_rust scan has not found a consumer needing
 more than per-`Args` slot materialization. Public cargo-build-script validation
-remains blocked before the runner.
+still remains blocked before the runner, but the prior rules_python
+`attr.label_keyed_string_dict` `module_ctx.read(...)` blocker is cleared.
 
 ## Bazel source anchors
 
@@ -78,6 +79,10 @@ remains blocked before the runner.
 - Native `toolchain(target_settings = None)` now coerces explicit `None` to the
   same empty list shape as omitted `target_settings`, matching the public
   rules_rust 0.67.0 generated toolchain repo accepted by Bazel 9.1.1.
+- Plan 36 now preserves `attr.label_keyed_string_dict` tag keys as Starlark
+  `Label` objects before extension implementation code sees them. The public
+  rules_rust 0.67.0 cargo-build-script smoke now advances past rules_python's
+  `ctx.read(file)` loop over `requirements_by_platform`.
 
 ## Accepted evidence
 
@@ -116,10 +121,12 @@ remains blocked before the runner.
     `target_settings = None` blocker.
 - From the same checkout:
   `timeout 120 /var/mnt/dev/slug/target/debug/slug --isolation-dir plan45-rules-rust-public-smoke build //test/cargo_build_script/run_from_exec_root:rundir_build_rs --show-output`
-  - Failed before the cargo runner: rules_python's `pip_internal` extension
-    failed `module_ctx.read(Label("//tools/publish:requirements_darwin.txt"))`,
-    and toolchain resolution still reported no registrations for
-    `@@//rust:toolchain_type` or `@bazel_tools//tools/cpp:toolchain_type`.
+  - Failed before the cargo runner at toolchain resolution:
+    `@@//rust:toolchain_type` and `@bazel_tools//tools/cpp:toolchain_type`
+    had no registered toolchains. This run no longer fails in rules_python's
+    `pip_internal` `module_ctx.read(...)` path; the latest run also surfaced a
+    separate lockfile-persistence warning from public JVM/Stardoc extension
+    recorded-input state.
 
 ## Remaining gaps
 
@@ -127,9 +134,9 @@ remains blocked before the runner.
   receives `--cargo_manifest_args=@...`, creates the declared
   `.cargo_runfiles` tree, and advances to a distinct layer.
 - The rules_rust 0.67.0 smoke is currently blocked before that runner by a
-  public rules_python module-extension `module_ctx.read(Label(...))` failure and
-  missing registered toolchains. Route the label-read gap to the bzlmod/module
-  extension owner before treating it as Plan 45 cargo-runfiles evidence.
+  missing registered toolchain set for `@@//rust:toolchain_type` and
+  `@bazel_tools//tools/cpp:toolchain_type`. Route that to the bzlmod/toolchain
+  owner before treating the smoke as Plan 45 cargo-runfiles evidence.
 - If Plan 45 closure needs more than the BCR registry overlay plus latest
   rules_rust source scan, run a bounded source-archive scan separately and keep
   it out of routine validation.
@@ -138,8 +145,7 @@ remains blocked before the runner.
 
 ## Next owner
 
-1. Resolve or route the public rules_rust 0.67.0 pre-runner blocker:
-   rules_python `module_ctx.read(Label(...))` during `pip_internal` and the
+1. Resolve or route the public rules_rust 0.67.0 pre-runner blocker: the
    still-empty registered toolchain set for the cargo-build-script target.
 2. Re-run the same public cargo-build-script smoke and record the first evidence
    that the real runner receives `--cargo_manifest_args=@...`, creates the

@@ -8287,6 +8287,80 @@ use_repo(watch_input, "watched_repo")
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_module_ctx_read_label_keyed_dict_tag_attr_keys(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: attr.label_keyed_string_dict exposes Label keys to extensions."""
+    repo_dir = buck.cwd / "bazel-external" / "_main+label_keyed_read_ext+payload_repo"
+    requirements_dir = buck.cwd / "tools" / "publish"
+    requirements_dir.mkdir(parents=True)
+    _write(requirements_dir / "BUILD.bazel", 'exports_files(["requirements_darwin.txt"])\n')
+    _write(requirements_dir / "requirements_darwin.txt", "first\n")
+    _write(
+        buck.cwd / "label_keyed_read_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+payload_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _label_keyed_read_ext_impl(module_ctx):
+    payload = ""
+    for mod in module_ctx.modules:
+        for tag in mod.tags.parse:
+            for file, platform in tag.requirements_by_platform.items():
+                payload += platform + ":" + module_ctx.read(file, watch = "yes")
+    payload_repo_rule(name = "payload_repo", payload = payload)
+
+label_keyed_read_ext = module_extension(
+    implementation = _label_keyed_read_ext_impl,
+    tag_classes = {
+        "parse": tag_class(attrs = {
+            "requirements_by_platform": attr.label_keyed_string_dict(),
+        }),
+    },
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan36_label_keyed_read")
+
+label_keyed = use_extension("//:label_keyed_read_ext.bzl", "label_keyed_read_ext")
+label_keyed.parse(
+    requirements_by_platform = {
+        "//tools/publish:requirements_darwin.txt": "osx_*",
+    },
+)
+use_repo(label_keyed, "payload_repo")
+""",
+    )
+    _write_minimal_lockfile(buck.cwd / "MODULE.bazel.lock")
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_payload_repo",
+    srcs = ["@payload_repo//:data"],
+)
+""",
+    )
+
+    await buck.build("//:uses_payload_repo")
+    first = await _bzlmod_counters(buck)
+    assert (repo_dir / "data.txt").read_text() == "osx_*:first\n"
+
+    _write(requirements_dir / "requirements_darwin.txt", "second\n")
+    await buck.build("//:uses_payload_repo")
+    second = await _bzlmod_counters(buck)
+
+    assert (repo_dir / "data.txt").read_text() == "osx_*:second\n"
+    assert second["extension_eval"] > first["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_repository_ctx_repo_env_uses_command_key_input(buck: Buck) -> None:
     """Bazel anchors: RepositoryContext.getenv and RepositoryFunction."""
     repo_dir = buck.cwd / "bazel-external" / "_main+repo_env_ext+env_repo"

@@ -44,6 +44,7 @@ pub enum SerializedTagValue {
     Label(String),
     List(Vec<SerializedTagValue>),
     Dict(Vec<(String, SerializedTagValue)>),
+    LabelKeyedDict(Vec<(String, SerializedTagValue)>),
 }
 
 impl SerializedTagValue {
@@ -66,6 +67,18 @@ impl SerializedTagValue {
                         heap.alloc(k.as_str())
                             .get_hashed()
                             .expect("string is hashable"),
+                        v.to_starlark(heap),
+                    );
+                }
+                heap.alloc(Dict::new(map))
+            }
+            SerializedTagValue::LabelKeyedDict(entries) => {
+                let mut map = SmallMap::new();
+                for (k, v) in entries {
+                    map.insert_hashed(
+                        heap.alloc(BazelLabel::parse(k))
+                            .get_hashed()
+                            .expect("label is hashable"),
                         v.to_starlark(heap),
                     );
                 }

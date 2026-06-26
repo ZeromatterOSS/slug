@@ -79,6 +79,8 @@ use slug_interpreter::paths::module::OwnedStarlarkModulePath;
 use slug_interpreter::paths::module::StarlarkModulePath;
 use slug_interpreter::paths::path::OwnedStarlarkPath;
 use slug_interpreter::paths::path::StarlarkPath;
+use slug_node::attrs::attr_type::AttrType;
+use slug_node::attrs::attr_type::AttrTypeInner;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::values::OwnedFrozenValueTyped;
@@ -126,6 +128,29 @@ struct ModuleExtensionLoadedModuleKey {
 struct ModuleExtensionLoadedModuleValue {
     loaded_module: LoadedModule,
     bzl_transitive_digest: Arc<str>,
+}
+
+fn attr_type_is_label_keyed_dict(attr_type: &AttrType) -> bool {
+    match &attr_type.0.inner {
+        AttrTypeInner::Dict(dict) => attr_type_accepts_label_value(&dict.key),
+        _ => false,
+    }
+}
+
+fn attr_type_accepts_label_value(attr_type: &AttrType) -> bool {
+    match &attr_type.0.inner {
+        AttrTypeInner::ConfigurationDep(_)
+        | AttrTypeInner::ConfiguredDep(_)
+        | AttrTypeInner::Dep(_)
+        | AttrTypeInner::Label(_)
+        | AttrTypeInner::PluginDep(_)
+        | AttrTypeInner::Source(_)
+        | AttrTypeInner::SplitTransitionDep(_)
+        | AttrTypeInner::TransitionDep(_) => true,
+        AttrTypeInner::OneOf(one_of) => one_of.xs.iter().any(attr_type_accepts_label_value),
+        AttrTypeInner::Option(option) => attr_type_accepts_label_value(&option.inner),
+        _ => false,
+    }
 }
 
 #[async_trait]
@@ -444,6 +469,7 @@ impl ConcreteModuleExtensionExecutor {
         // (e.g., attr.string_list_dict(default={}) → {} instead of None)
         {
             let mut tag_class_defaults = std::collections::HashMap::new();
+            let mut label_keyed_dict_attrs = std::collections::HashMap::new();
             for (class_name, class_value) in frozen_extension.tag_classes() {
                 if let Some(tag_class) = class_value
                     .downcast_frozen_ref::<crate::module_extension::FrozenStarlarkTagClass>()
@@ -472,10 +498,27 @@ impl ConcreteModuleExtensionExecutor {
                     if !defaults.is_empty() {
                         tag_class_defaults.insert(class_name.clone(), defaults);
                     }
+                    let label_keyed_attrs: std::collections::HashSet<String> = tag_class
+                        .attrs()
+                        .iter()
+                        .filter_map(|(attr_name, attr)| {
+                            if attr_type_is_label_keyed_dict(&attr.coercer_for_default_only()) {
+                                Some(attr_name.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    if !label_keyed_attrs.is_empty() {
+                        label_keyed_dict_attrs.insert(class_name.clone(), label_keyed_attrs);
+                    }
                 }
             }
             if !tag_class_defaults.is_empty() {
                 module_ctx.apply_tag_class_defaults(&tag_class_defaults);
+            }
+            if !label_keyed_dict_attrs.is_empty() {
+                module_ctx.apply_tag_class_label_keyed_dict_attrs(&label_keyed_dict_attrs);
             }
         }
 
