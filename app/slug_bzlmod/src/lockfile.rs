@@ -260,6 +260,30 @@ impl LockfileExtensionData {
         }
     }
 
+    /// Create extension data from freshly evaluated repository specs.
+    ///
+    /// The lockfile is serialized deterministically, so repo specs are sorted
+    /// by internal name rather than preserving `FxHashMap` iteration order.
+    pub fn from_repo_specs_with_recorded_inputs(
+        bzl_transitive_digest: String,
+        usages_digest: String,
+        generated_repo_specs: &fxhash::FxHashMap<String, RepoSpec>,
+        recorded_inputs: Vec<String>,
+    ) -> Self {
+        let mut entries: Vec<_> = generated_repo_specs.iter().collect();
+        entries.sort_by(|a, b| a.0.cmp(b.0));
+        let lockfile_specs: IndexMap<String, LockfileRepoSpec> = entries
+            .into_iter()
+            .map(|(name, spec)| (name.clone(), LockfileRepoSpec::from_repo_spec(spec)))
+            .collect();
+
+        let mut ext_data = Self::new(bzl_transitive_digest, usages_digest, lockfile_specs);
+        if let Some(general) = ext_data.general.as_mut() {
+            general.recorded_inputs = recorded_inputs;
+        }
+        ext_data
+    }
+
     /// Check if the cached data is valid for the given digests.
     ///
     /// Returns true if both the bzl_transitive_digest and usages_digest match.
@@ -1689,21 +1713,12 @@ impl Lockfile {
         generated_repo_specs: &fxhash::FxHashMap<String, RepoSpec>,
         recorded_inputs: Vec<String>,
     ) {
-        // Convert RepoSpecs to lockfile format. Sort by key so the
-        // serialised lockfile JSON is stable across invocations
-        // regardless of the in-memory FxHashMap's insertion order.
-        let mut entries: Vec<_> = generated_repo_specs.iter().collect();
-        entries.sort_by(|a, b| a.0.cmp(b.0));
-        let lockfile_specs: IndexMap<String, LockfileRepoSpec> = entries
-            .into_iter()
-            .map(|(name, spec)| (name.clone(), LockfileRepoSpec::from_repo_spec(spec)))
-            .collect();
-
-        let mut ext_data =
-            LockfileExtensionData::new(bzl_transitive_digest, usages_digest, lockfile_specs);
-        if let Some(general) = ext_data.general.as_mut() {
-            general.recorded_inputs = recorded_inputs;
-        }
+        let ext_data = LockfileExtensionData::from_repo_specs_with_recorded_inputs(
+            bzl_transitive_digest,
+            usages_digest,
+            generated_repo_specs,
+            recorded_inputs,
+        );
 
         tracing::debug!(
             "Caching extension '{}' with {} repo specs",
@@ -2553,6 +2568,34 @@ mod tests {
         assert_eq!(
             general.recorded_inputs,
             vec!["ENV:PLAN61_REPO_ENV first".to_owned()]
+        );
+    }
+
+    #[test]
+    fn lockfile_extension_data_from_repo_specs_sorts_and_records_inputs() {
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert("z_repo".to_owned(), RepoSpec::new("rule_z".to_owned()));
+        repo_specs.insert("a_repo".to_owned(), RepoSpec::new("rule_a".to_owned()));
+
+        let ext_data = LockfileExtensionData::from_repo_specs_with_recorded_inputs(
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+            vec!["FILE:@@//watched.txt abc123".to_owned()],
+        );
+
+        let general = ext_data.general.as_ref().unwrap();
+        assert_eq!(
+            general
+                .generated_repo_specs
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>(),
+            vec!["a_repo".to_owned(), "z_repo".to_owned()]
+        );
+        assert_eq!(
+            general.recorded_inputs,
+            vec!["FILE:@@//watched.txt abc123".to_owned()]
         );
     }
 

@@ -464,10 +464,10 @@ cargo test -p slug_interpreter_for_build module_ctx -- --nocapture
 
 **Scope:** `slug_bzlmod` lockfile read/write/mode handling and caller plumbing.
 
-**Current state (2026-06-26):** partially complete. The production build path
-now has visible lockfile write coverage and mode coverage for update/off, but
-freshly evaluated module-extension results still need a DICE-owned source before
-this phase can close.
+**Current state (2026-06-26):** complete. The production build path creates or
+refreshes `MODULE.bazel.lock` in update/default mode, respects error/off mode
+boundaries, avoids rewriting unchanged content, and persists freshly evaluated
+module-extension results from the owning DICE `ExtensionSpokesValue`.
 
 1. Add failing integration tests first:
    - workspace with no `MODULE.bazel.lock`, default/update mode build writes one;
@@ -495,6 +495,9 @@ this phase can close.
 **Accepted evidence (2026-06-26):**
 
 - Bazel source anchors:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java:69-134`
+  gathers done extension values at command end and records their lockfile info
+  and facts;
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java:57-88`
   enables command-end writes only for `UPDATE`/`REFRESH`;
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java:189-196`
@@ -505,40 +508,47 @@ this phase can close.
   tracks visible/hidden lockfiles as Skyframe inputs and reads the hidden
   lockfile with update policy;
   `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileValue.java:55-93`
-  documents the visible/hidden lockfile split.
+  documents the visible/hidden lockfile split;
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java:278-290`
+  stores bzl/usages digests, recorded inputs, generated repo specs, and
+  extension metadata in fresh lockfile info.
 - Slug production hook: `app/slug_server_commands/src/build.rs` calls
   `persist_lockfile_post_build` after a successful build; the writer path in
   `app/slug_bzlmod/src/lib.rs` writes only for `Update`/`Refresh`, skips
-  `Error`/`Off`, and avoids rewriting unchanged lockfiles.
+  `Error`/`Off`, and avoids rewriting unchanged lockfiles. Fresh extension
+  lockfile data and facts now come from `ExtensionSpokesValue`; visible/hidden
+  lockfile contents are fallback data for active extensions that were not
+  re-evaluated in the current build.
 - New coverage:
   `test_successful_build_persists_visible_lockfile_in_update_mode`,
   `test_successful_build_lockfile_mode_off_skips_visible_lockfile_write`, and
-  `lockfile_lifecycle_refresh_mode_creates_lockfile`.
+  `test_successful_build_persists_fresh_extension_result_to_lockfile`, plus
+  `lockfile_lifecycle_refresh_mode_creates_lockfile` and
+  `lockfile_extension_data_from_repo_specs_sorts_and_records_inputs`.
 - The standalone lockfile read helpers are now `#[cfg(test)]`, eliminating the
   production dead-code warnings from `cargo build -p slug`.
 
 **Validation (2026-06-26):**
 
 ```sh
-cargo fmt --check -p slug_bzlmod
-cargo test -p slug_bzlmod lockfile -- --nocapture
-cargo build -p slug
-TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
+cargo fmt --check -p slug_bzlmod -p slug_server_commands
+TMPDIR=/var/mnt/dev/slug/.tmp cargo test -p slug_bzlmod lockfile -- --nocapture
+TMPDIR=/var/mnt/dev/slug/.tmp cargo build -p slug
+TMPDIR=/var/mnt/dev/slug/.tmp \
+  TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug \
   python -m pytest -q tests/core/bzlmod/test_plan61_guardrails.py \
-  -k "successful_build_persists_visible_lockfile_in_update_mode or successful_build_lockfile_mode_off_skips_visible_lockfile_write" \
+  -k test_successful_build_persists_fresh_extension_result_to_lockfile \
   -rx --tb=short
-git diff --check
+TMPDIR=/var/mnt/dev/slug/.tmp git diff --check
 ```
 
 **Remaining 64.5 gap:**
 
-- `persist_lockfile_post_build` still preserves extension data/facts from the
-  DICE-injected visible/hidden lockfiles. It does not yet gather freshly
-  evaluated extension results from the owning DICE computation
-  (`ExtensionSpokesKey`/`ExtensionSpokesValue` or the equivalent owner). Do not
-  mark Phase 64.5 complete until a build that evaluates a new module extension
-  writes the resulting lockfile extension data and a replay/error-mode test proves
-  it is consumed.
+- None blocking for this phase. Slug still lacks Bazel's evaluator
+  `getDoneValues()` command-end collection abstraction, so the post-build hook
+  asks DICE for current aggregated extension spokes non-fatally rather than only
+  harvesting already-done values. If that becomes a performance issue, track it
+  under a new owner; digest/content compatibility work remains Phase 64.8.
 
 **Suggested validation:**
 

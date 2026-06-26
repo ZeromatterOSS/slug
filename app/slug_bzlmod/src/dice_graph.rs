@@ -47,7 +47,9 @@ use crate::cache::ModuleCache;
 use crate::extensions::AggregatedExtension;
 use crate::extensions::aggregate_extensions_with_policy;
 use crate::lockfile::Lockfile;
+use crate::lockfile::LockfileExtensionData;
 use crate::lockfile::LockfileMode;
+use crate::lockfile::lockfile_canonical_extension_id;
 use crate::lockfile::lockfile_path;
 use crate::parser::ModuleFileInputDigest;
 use crate::parser::validate_parsed_root_extension_repo_directives;
@@ -5967,6 +5969,10 @@ pub struct ExtensionSpokesValue {
     pub project_root: Arc<PathBuf>,
     pub repo_env: Arc<BTreeMap<String, String>>,
     pub spokes: BTreeMap<String, ExtensionSpoke>,
+    #[allocative(skip)]
+    pub lockfile_extension_data: LockfileExtensionData,
+    #[allocative(skip)]
+    pub lockfile_facts: serde_json::Value,
     pub(crate) recorded_inputs: Arc<Vec<String>>,
     pub(crate) recorded_input_workspace_root: Option<Arc<PathBuf>>,
     pub(crate) recorded_input_repo_env: Arc<BTreeMap<String, String>>,
@@ -5991,6 +5997,28 @@ impl ExtensionSpokesValue {
 
     pub fn iter(&self) -> impl Iterator<Item = &ExtensionSpoke> {
         self.spokes.values()
+    }
+
+    pub fn lockfile_extension_entry(&self) -> (String, LockfileExtensionData) {
+        (
+            lockfile_canonical_extension_id(self.extension_id.as_ref()),
+            self.lockfile_extension_data.clone(),
+        )
+    }
+
+    pub fn lockfile_facts_entry(&self) -> Option<(String, serde_json::Value)> {
+        if self.lockfile_facts.is_object()
+            && self
+                .lockfile_facts
+                .as_object()
+                .is_some_and(|facts| facts.is_empty())
+        {
+            return None;
+        }
+        Some((
+            lockfile_canonical_extension_id(self.extension_id.as_ref()),
+            self.lockfile_facts.clone(),
+        ))
     }
 
     pub fn recorded_inputs(&self) -> &[String] {

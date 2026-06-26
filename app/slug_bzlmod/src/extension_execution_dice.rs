@@ -79,6 +79,7 @@ use crate::dice_graph::record_bzlmod_event;
 use crate::dice_graph::validate_extension_aggregations_payload;
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
+use crate::lockfile::LockfileExtensionData;
 use crate::lockfile::LockfileMode;
 use crate::lockfile::SelectedExtensionCache;
 use crate::lockfile::compute_sha256_hex;
@@ -1089,18 +1090,27 @@ impl Key for ExtensionSpokesKey {
                 self.extension_id
             )
         })?;
+        let lockfile_extension_data = LockfileExtensionData::from_repo_specs_with_recorded_inputs(
+            self.bzl_transitive_digest.to_string(),
+            usages_digest.clone(),
+            &result.generated_repo_specs,
+            result.recorded_inputs.clone(),
+        );
+        let lockfile_facts = result.metadata.facts.clone();
 
         Ok(Arc::new(ExtensionSpokesValue {
             workspace_id: self.workspace_id.clone(),
             extension_id: self.extension_id.clone(),
             bzl_transitive_digest: self.bzl_transitive_digest.clone(),
-            usages_digest: self.usages_digest.clone(),
+            usages_digest: Arc::from(usages_digest.as_str()),
             replay_inputs_identity_digest: self.replay_inputs_identity_digest.clone(),
             repo_mappings_digest: Arc::from(repo_mappings_dig.as_str()),
             repo_mapping_overrides_digest: Arc::from(repo_mapping_overrides_dig.as_str()),
             project_root: self.workspace_id.canonical_project_root.clone(),
             repo_env: self.repo_env.clone(),
             spokes,
+            lockfile_extension_data,
+            lockfile_facts,
             recorded_inputs: Arc::new(result.recorded_inputs.clone()),
             recorded_input_workspace_root: result.recorded_input_context.workspace_root.clone(),
             recorded_input_repo_env: result.recorded_input_context.repo_env.clone(),
@@ -3899,6 +3909,12 @@ mod tests {
             project_root: workspace_id.canonical_project_root.clone(),
             repo_env: Arc::new(BTreeMap::new()),
             spokes: BTreeMap::new(),
+            lockfile_extension_data: crate::lockfile::LockfileExtensionData::new(
+                "digest".to_owned(),
+                "usages".to_owned(),
+                indexmap::IndexMap::new(),
+            ),
+            lockfile_facts: serde_json::json!({}),
             recorded_inputs: Arc::new(vec![
                 crate::lockfile::recorded_file_input_with_recorded_path(
                     PathBuf::from("@@//watched.txt").as_path(),

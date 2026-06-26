@@ -772,25 +772,19 @@ async fn build_target(
 /// and lockfile inputs from DICE, then delegates to
 /// `slug_bzlmod::persist_lockfile_after_resolution`.
 ///
-/// Extension data is gathered from the existing DICE-injected lockfile
-/// (visible + hidden), which already contains merged results from all
-/// evaluated extensions. This follows Bazel 9's
-/// `BazelLockFileModule.afterCommand()` pattern of combining old lockfile
-/// entries with newly resolved results.
+/// Fresh extension data is gathered from the current DICE-owned
+/// `ExtensionSpokesValue`s. Visible + hidden lockfile data is retained as a
+/// fallback for active extensions that were not re-evaluated in this build.
+/// This follows Bazel 9's `BazelLockFileModule.afterCommand()` pattern of
+/// combining old lockfile entries with newly evaluated extension results.
 ///
 /// Non-fatal: errors are logged but do not fail the build.
-///
-/// **Limitation:** Extension data and facts are read from the DICE-injected
-/// lockfile contents captured at session start, not from freshly computed
-/// results. This means the function currently acts as a maintenance step for
-/// registry-file-hash drift only. To capture fresh extension results, this
-/// function would need to read from `ExtensionSpokesKey`/`ExtensionSpokesValue`
-/// DICE computations instead.
 async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error::Result<()> {
     use slug_bzlmod::BzlmodExtensionAggregationsDataKey;
     use slug_bzlmod::BzlmodLockfileInputsDataKey;
     use slug_bzlmod::BzlmodLockfileInputsKey;
     use slug_bzlmod::BzlmodResolvedGraphDataKey;
+    use slug_bzlmod::ExtensionSpokesByExtensionIdKey;
     use slug_bzlmod::Lockfile;
     use slug_bzlmod::LockfileExtensionData;
     use slug_bzlmod::persist_lockfile_after_resolution;
@@ -842,6 +836,29 @@ async fn persist_lockfile_post_build(ctx: &dice::DiceTransaction) -> slug_error:
 
     let mut new_extension_results: Vec<(String, LockfileExtensionData)> = Vec::new();
     let mut new_facts: Vec<(String, _)> = Vec::new();
+
+    for ext_id in aggregations.extension_aggregations.keys() {
+        let spokes_key = ExtensionSpokesByExtensionIdKey::for_workspace_id_with_resolution_digest(
+            lockfile_data.workspace_id.clone(),
+            lockfile_data.resolution_digest.clone(),
+            ext_id,
+        );
+        let Some(spokes) = ctx.compute(&spokes_key).await?? else {
+            continue;
+        };
+        let (fresh_ext_id, fresh_ext_data) = spokes.lockfile_extension_entry();
+        if !new_extension_results
+            .iter()
+            .any(|(id, _)| id == &fresh_ext_id)
+        {
+            new_extension_results.push((fresh_ext_id, fresh_ext_data));
+        }
+        if let Some((fresh_fact_id, fresh_facts)) = spokes.lockfile_facts_entry() {
+            if !new_facts.iter().any(|(id, _)| id == &fresh_fact_id) {
+                new_facts.push((fresh_fact_id, fresh_facts));
+            }
+        }
+    }
 
     for lockfile_value in lockfile_values {
         for ext_id in &active_extension_ids {

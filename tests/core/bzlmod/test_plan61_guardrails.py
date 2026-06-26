@@ -6387,6 +6387,79 @@ async def test_successful_build_lockfile_mode_off_skips_visible_lockfile_write(
 
 
 @buck_test(data_dir="test_plan61_guardrails_data")
+async def test_successful_build_persists_fresh_extension_result_to_lockfile(
+    buck: Buck,
+) -> None:
+    """Bazel anchor: SingleExtensionEvalFunction lockFileInfo is written after command."""
+    extension_id = "@@plan64_fresh_lockfile+//:fresh_lockfile_ext.bzl%fresh_lockfile_ext"
+    lockfile = buck.cwd / "MODULE.bazel.lock"
+    _write(buck.cwd / "watched.txt", "fresh payload\n")
+    _write(
+        buck.cwd / "fresh_lockfile_ext.bzl",
+        """def _repo_impl(repository_ctx):
+    repository_ctx.file("data.txt", repository_ctx.attr.payload)
+    repository_ctx.file("BUILD.bazel", "exports_files([\\"data.txt\\"])\\nfilegroup(name = \\"data\\", srcs = [\\"data.txt\\"])\\n")
+
+fresh_repo_rule = repository_rule(
+    implementation = _repo_impl,
+    attrs = {"payload": attr.string()},
+)
+
+def _fresh_lockfile_ext_impl(module_ctx):
+    payload = module_ctx.read(Label("//:watched.txt"), watch = "yes")
+    fresh_repo_rule(name = "fresh_repo", payload = payload)
+    return module_ctx.extension_metadata(
+        facts = {"resource": {"checksum": payload.strip()}},
+    )
+
+fresh_lockfile_ext = module_extension(
+    implementation = _fresh_lockfile_ext_impl,
+)
+""",
+    )
+    _write(
+        buck.cwd / "MODULE.bazel",
+        """module(name = "plan64_fresh_lockfile")
+
+fresh = use_extension("//:fresh_lockfile_ext.bzl", "fresh_lockfile_ext")
+use_repo(fresh, "fresh_repo")
+""",
+    )
+    _write(
+        buck.cwd / "BUILD.bazel",
+        """filegroup(
+    name = "uses_fresh_repo",
+    srcs = ["@fresh_repo//:data"],
+)
+""",
+    )
+    assert not lockfile.exists()
+
+    before = await _bzlmod_counters(buck)
+    await buck.build("//:uses_fresh_repo")
+    after = await _bzlmod_counters(buck)
+
+    assert after["extension_eval"] > before["extension_eval"]
+    assert lockfile.exists()
+
+    parsed = json.loads(lockfile.read_text())
+    extension_data = parsed["moduleExtensions"][extension_id]["general"]
+    assert "fresh_repo" in extension_data["generatedRepoSpecs"]
+    assert "watched.txt" in "\n".join(extension_data["recordedInputs"])
+    assert parsed["facts"][extension_id] == {
+        "resource": {"checksum": "fresh payload"},
+    }
+
+    await buck.kill()
+    before_replay = await _bzlmod_counters(buck, "--lockfile_mode=error")
+    await buck.build("//:uses_fresh_repo", "--lockfile_mode=error")
+    replay = await _bzlmod_counters(buck, "--lockfile_mode=error")
+
+    assert replay["extension_replay_hit"] > before_replay["extension_replay_hit"]
+    assert replay["extension_eval"] == before_replay["extension_eval"]
+
+
+@buck_test(data_dir="test_plan61_guardrails_data")
 async def test_visible_lockfile_read_is_observable_and_ordinary_audit_is_read_only(
     buck: Buck,
 ) -> None:
