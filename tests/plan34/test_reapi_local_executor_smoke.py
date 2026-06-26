@@ -124,6 +124,26 @@ def _read_what_ran(slug_bin: Path, workspace: Path, isolation: str) -> list[dict
     ]
 
 
+def _read_what_uploaded(slug_bin: Path, workspace: Path, isolation: str) -> list[dict]:
+    what_uploaded = _run(
+        [
+            str(slug_bin),
+            "--isolation-dir",
+            isolation,
+            "log",
+            "what-uploaded",
+            "--format",
+            "json",
+        ],
+        cwd=workspace,
+    )
+    return [
+        json.loads(line)
+        for line in (what_uploaded.stdout + what_uploaded.stderr).splitlines()
+        if line.startswith("{")
+    ]
+
+
 def _assert_reapi_what_ran(
     slug_bin: Path,
     workspace: Path,
@@ -160,6 +180,20 @@ def _assert_reapi_what_ran(
             assert any(fragment in action_key for action_key in action_keys)
 
     return reapi_actions
+
+
+def _assert_reapi_uploads(
+    slug_bin: Path,
+    workspace: Path,
+    isolation: str,
+    expected_count: int,
+) -> list[dict]:
+    records = _read_what_uploaded(slug_bin, workspace, isolation)
+    assert len(records) == expected_count
+    assert sum(record["digests_uploaded"] for record in records) > 0
+    assert sum(record["bytes_uploaded"] for record in records) > 0
+    assert all(record["action"] for record in records)
+    return records
 
 
 def _write_nativelink_config(path: Path, root: Path, frontend_port: int, worker_port: int) -> None:
@@ -328,6 +362,7 @@ def test_native_link_re_config_default_uses_reapi_without_remote_only(
         assert "RE Session:" in build_output
 
         _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
+        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -384,6 +419,7 @@ def test_native_link_platform_exec_properties_use_reapi_without_local_fallback(
         assert "RE Session:" in build_output
 
         _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=1)
+        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=1)
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -440,6 +476,7 @@ def test_native_link_cc_actions_reapi_executor_smoke(tmp_path: Path) -> None:
         assert "local: 0" in build_output
 
         _assert_reapi_what_ran(slug_bin, workspace, isolation, expected_count=3)
+        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=3)
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()
@@ -502,6 +539,7 @@ def test_native_link_rules_cc_reapi_executor_smoke(tmp_path: Path) -> None:
             expected_count=2,
             action_key_fragments=[" c_compile ", " cpp_link "],
         )
+        _assert_reapi_uploads(slug_bin, workspace, isolation, expected_count=2)
     finally:
         _run([str(slug_bin), "--isolation-dir", isolation, "kill"], cwd=workspace, check=False)
         proc.terminate()

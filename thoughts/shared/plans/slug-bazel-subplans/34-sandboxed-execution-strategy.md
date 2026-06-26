@@ -68,6 +68,10 @@ shortcut.
   `exec_properties` fixture, a three-action C-source Starlark rule fixture, and
   a real `@rules_cc` `cc_binary` fixture cross REAPI with what-ran
   `executor="Re"`, `executor_boundary="reapi"`, and zero direct-local actions.
+  It also reads `log what-uploaded --format json` and asserts one RE upload
+  record per executed action with nonzero aggregate uploaded digests/bytes,
+  proving the fixture action inputs crossed the CAS/upload side of the REAPI
+  boundary.
   The `rules_cc` fixture no longer needs a test-owned `--action_env=PATH=...`;
   Slug now applies Bazel 9's default shell action env when rules request
   `use_default_shell_env`.
@@ -106,7 +110,8 @@ shortcut.
   fixture, `reapi_actions=3` for the C-source Starlark rule fixture,
   `reapi_actions=2` for the `@rules_cc` fixture,
   `executor_boundary="reapi"` on every RE row, `direct_local_actions=0`, and
-  local command count 0.
+  local command count 0. Each fixture also has `what-uploaded` evidence with
+  `upload_records=reapi_actions` and nonzero uploaded digests/bytes.
 - `TEST_EXECUTABLE=target/debug/slug python -m pytest tests/plan34/ -q` proves
   the Plan 34 guard and smoke are reachable through the same Slug-binary
   environment used by `test.py`/CI.
