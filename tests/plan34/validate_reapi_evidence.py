@@ -21,6 +21,80 @@ REQUIRED_TESTS = {
 }
 EXECUTION_PHASES = {"remote_execution", "remote_execution_seed"}
 CACHE_HIT_PHASE = "remote_action_cache_hit"
+EXPECTED_RECORDS = {
+    (
+        "test_native_link_re_config_default_uses_reapi_without_remote_only",
+        "remote_execution",
+    ): {
+        "reapi_actions": 1,
+        "upload_records": 1,
+        "materialized_outputs": 1,
+    },
+    (
+        "test_native_link_bare_remote_executor_supplies_reapi_cache_endpoint",
+        "remote_execution",
+    ): {
+        "reapi_actions": 1,
+        "upload_records": 1,
+        "materialized_outputs": 1,
+    },
+    (
+        "test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback",
+        "remote_execution_seed",
+    ): {
+        "reapi_actions": 1,
+        "upload_records": 1,
+        "materialized_outputs": 1,
+    },
+    (
+        "test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback",
+        "remote_action_cache_hit",
+    ): {
+        "cache_query_actions": 1,
+        "cache_hit_actions": 1,
+        "materialized_outputs": 1,
+    },
+    (
+        "test_native_link_platform_exec_properties_use_reapi_without_local_fallback",
+        "remote_execution",
+    ): {
+        "reapi_actions": 1,
+        "upload_records": 1,
+        "materialized_outputs": 1,
+    },
+    (
+        "test_native_link_nested_paramfile_reaches_reapi_input_tree",
+        "remote_execution",
+    ): {
+        "reapi_actions": 1,
+        "upload_records": 1,
+        "materialized_outputs": 1,
+    },
+    (
+        "test_native_link_cargo_runfiles_paramfile_advances_reapi_layer",
+        "remote_execution",
+    ): {
+        "reapi_actions": 2,
+        "upload_records": 2,
+        "materialized_outputs": 1,
+    },
+    (
+        "test_native_link_cc_actions_reapi_executor_smoke",
+        "remote_execution",
+    ): {
+        "reapi_actions": 3,
+        "upload_records": 3,
+        "materialized_outputs": 1,
+    },
+    (
+        "test_native_link_rules_cc_reapi_executor_smoke",
+        "remote_execution",
+    ): {
+        "reapi_actions": 2,
+        "upload_records": 2,
+        "materialized_outputs": 1,
+    },
+}
 
 
 class EvidenceError(Exception):
@@ -57,6 +131,7 @@ def load_evidence(path: Path) -> list[dict[str, Any]]:
 def validate_evidence(records: list[dict[str, Any]]) -> dict[str, int]:
     tests = set()
     phases = set()
+    seen_records = set()
     totals = {
         "records": len(records),
         "reapi_actions": 0,
@@ -79,6 +154,19 @@ def validate_evidence(records: list[dict[str, Any]]) -> dict[str, int]:
         if phase not in EXECUTION_PHASES | {CACHE_HIT_PHASE}:
             raise EvidenceError(f"record {index}: unexpected phase {phase!r}")
         phases.add(phase)
+        expected_key = (test_name, phase)
+        expected = EXPECTED_RECORDS.get(expected_key)
+        if expected is None:
+            raise EvidenceError(
+                f"record {index}: unexpected Plan 34 smoke record "
+                f"{test_name!r} phase {phase!r}"
+            )
+        if expected_key in seen_records:
+            raise EvidenceError(
+                f"record {index}: duplicate Plan 34 smoke record "
+                f"{test_name!r} phase {phase!r}"
+            )
+        seen_records.add(expected_key)
 
         if record.get("remote_service") != "local_nativelink":
             raise EvidenceError(f"record {index}: remote_service must be local_nativelink")
@@ -114,6 +202,13 @@ def validate_evidence(records: list[dict[str, Any]]) -> dict[str, int]:
                 raise EvidenceError(
                     f"record {index}: AC hit evidence must include cache hits"
                 )
+        for key, expected_value in expected.items():
+            actual = _as_int(record, key, index)
+            if actual != expected_value:
+                raise EvidenceError(
+                    f"record {index}: {test_name} {phase} expected "
+                    f"{key}={expected_value}, got {actual}"
+                )
 
     missing_tests = sorted(REQUIRED_TESTS - tests)
     if missing_tests:
@@ -124,6 +219,12 @@ def validate_evidence(records: list[dict[str, Any]]) -> dict[str, int]:
     if not phases.intersection(EXECUTION_PHASES) or CACHE_HIT_PHASE not in phases:
         raise EvidenceError(
             "Plan 34 evidence must include remote execution and remote action cache hit phases"
+        )
+    missing_records = sorted(set(EXPECTED_RECORDS) - seen_records)
+    if missing_records:
+        raise EvidenceError(
+            "Plan 34 evidence is missing required smoke phases: "
+            + ", ".join(f"{test}:{phase}" for test, phase in missing_records)
         )
     if totals["direct_local_actions"] != 0:
         raise EvidenceError("Plan 34 evidence contains direct-local actions")

@@ -125,7 +125,16 @@ def _load_validator():
     return module
 
 
-def _required_record(test_name: str, phase: str = "remote_execution") -> dict:
+def _required_record(
+    test_name: str,
+    phase: str,
+    expected: dict[str, int],
+) -> dict:
+    reapi_actions = expected.get("reapi_actions", 0)
+    cache_query_actions = expected.get("cache_query_actions", 0)
+    cache_hit_actions = expected.get("cache_hit_actions", 0)
+    upload_records = expected.get("upload_records", 0)
+    materialized_outputs = expected.get("materialized_outputs", 1)
     record = {
         "schema": 1,
         "test": test_name,
@@ -134,49 +143,27 @@ def _required_record(test_name: str, phase: str = "remote_execution") -> dict:
         "remote_service": "local_nativelink",
         "executor_boundary": "reapi",
         "direct_local_actions": 0,
-        "reapi_actions": 1,
-        "cache_query_actions": 0,
-        "cache_hit_actions": 0,
-        "materialized_outputs": 1,
-        "upload_records": 1,
-        "uploaded_digests": 1,
-        "uploaded_bytes": 1,
-        "command_summary": "Commands: 1 remote",
+        "reapi_actions": reapi_actions,
+        "cache_query_actions": cache_query_actions,
+        "cache_hit_actions": cache_hit_actions,
+        "materialized_outputs": materialized_outputs,
+        "upload_records": upload_records,
+        "uploaded_digests": upload_records,
+        "uploaded_bytes": upload_records,
+        "command_summary": (
+            f"Commands: {cache_hit_actions} cached"
+            if phase == "remote_action_cache_hit"
+            else f"Commands: {reapi_actions} remote"
+        ),
     }
-    if phase == "remote_action_cache_hit":
-        record.update(
-            {
-                "reapi_actions": 0,
-                "cache_query_actions": 1,
-                "cache_hit_actions": 1,
-                "upload_records": 0,
-                "uploaded_digests": 0,
-                "uploaded_bytes": 0,
-                "command_summary": "Commands: 1 cached",
-            }
-        )
     return record
 
 
 def _required_records(validator) -> list[dict]:
-    records = [
-        _required_record(test_name)
-        for test_name in validator.REQUIRED_TESTS
-        if test_name != "test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback"
+    return [
+        _required_record(test_name, phase, expected)
+        for (test_name, phase), expected in validator.EXPECTED_RECORDS.items()
     ]
-    records.append(
-        _required_record(
-            "test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback",
-            phase="remote_execution_seed",
-        )
-    )
-    records.append(
-        _required_record(
-            "test_native_link_remote_action_cache_hit_uses_reapi_without_local_fallback",
-            phase="remote_action_cache_hit",
-        )
-    )
-    return records
 
 
 def test_plan34_evidence_validator_accepts_required_reapi_records() -> None:
@@ -202,3 +189,21 @@ def test_plan34_evidence_validator_rejects_direct_local_actions() -> None:
         assert "direct_local_actions must be 0" in str(error)
     else:
         raise AssertionError("validator accepted direct-local Plan 34 evidence")
+
+
+def test_plan34_evidence_validator_rejects_wrong_fixture_action_count() -> None:
+    validator = _load_validator()
+    records = _required_records(validator)
+    record = next(
+        r
+        for r in records
+        if r["test"] == "test_native_link_cargo_runfiles_paramfile_advances_reapi_layer"
+    )
+    record["reapi_actions"] = 1
+
+    try:
+        validator.validate_evidence(records)
+    except validator.EvidenceError as error:
+        assert "expected reapi_actions=2" in str(error)
+    else:
+        raise AssertionError("validator accepted wrong Plan 34 fixture action count")

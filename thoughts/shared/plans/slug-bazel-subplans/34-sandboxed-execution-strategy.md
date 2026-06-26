@@ -103,10 +103,12 @@ shortcut.
   exports `SLUG_PLAN34_NATIVELINK_BIN` before `run_test_py`. A repo-owned CI
   wiring guard now fails if the Linux job stops running that setup action before
   the Python integration entrypoint. `run_test_py` also exports
-  `SLUG_PLAN34_EVIDENCE_JSONL` and uploads a
-  validates that the Linux evidence file contains the required REAPI,
-  upload/materialization, remote-AC, and zero-direct-local records, then uploads
-  `plan34-reapi-evidence-${{ runner.os }}`.
+  `SLUG_PLAN34_EVIDENCE_JSONL`, validates that the Linux evidence file contains
+  the required REAPI, upload/materialization, remote-AC, and zero-direct-local
+  records, then uploads `plan34-reapi-evidence-${{ runner.os }}`.
+  The evidence validator now also binds each required smoke fixture/phase to
+  its expected action/upload/cache/materialized-output counts, so aggregate-only
+  evidence cannot hide a skipped or weakened fixture.
   The hosted runtime of that gate still needs to be observed.
 - Legacy explicit
   `CommandExecutorConfig(local_enabled=True, remote_enabled=True)` hybrid
@@ -200,6 +202,19 @@ shortcut.
   .tmp/plan34-reapi-evidence-validate.jsonl`
   - Passed with `records=9`, `reapi_actions=12`, `upload_records=12`,
     `cache_query_actions=1`, and `cache_hit_actions=1`.
+- `python -m pytest -q tests/plan34/test_ci_gate.py --tb=short`
+  - Passed: `6 passed in 0.02s`; includes a negative guard that rejects a
+    required fixture with the wrong action count.
+- `TMPDIR=/var/mnt/dev/slug/.tmp
+  SLUG_PLAN34_EVIDENCE_JSONL=/var/mnt/dev/slug/.tmp/plan34-strict-evidence/plan34-reapi-evidence.jsonl
+  TEST_EXECUTABLE=/var/mnt/dev/slug/target/debug/slug python -m pytest -q
+  tests/plan34/ -s --tb=short`
+  - Passed: `20 passed in 14.87s`.
+- `python3 tests/plan34/validate_reapi_evidence.py
+  .tmp/plan34-strict-evidence/plan34-reapi-evidence.jsonl`
+  - Passed with `records=9`, `reapi_actions=12`, `upload_records=12`,
+    `cache_query_actions=1`, and `cache_hit_actions=1` under the stricter
+    per-fixture validator.
 
 The NativeLink smoke is execution-boundary evidence, including a real
 `@rules_cc` compile/link proof. It is now wired as a Linux CI gate; the first
