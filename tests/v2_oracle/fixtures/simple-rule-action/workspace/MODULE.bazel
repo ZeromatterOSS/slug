@@ -1,0 +1,1 @@
+module(name = "simple_rule_action", version = "0.0.0")

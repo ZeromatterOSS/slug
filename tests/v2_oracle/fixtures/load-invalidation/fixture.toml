@@ -1,0 +1,23 @@
+[fixture]
+name = "load-invalidation"
+description = "A loaded .bzl file edit changes the output produced by a second build in the copied workspace."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected after same-daemon semantics are available."
+
+[[commands]]
+name = "prime"
+argv = ["build", "//pkg:message"]
+compare = "semantic"
+expected_exit = 0
+
+[[commands]]
+name = "after_bzl_edit"
+argv = ["build", "//pkg:message"]
+compare = "semantic"
+expected_exit = 0
+
+[[commands.mutations]]
+path = "pkg/message.bzl"
+find = "MESSAGE = \"one\""
+replace = "MESSAGE = \"two\""

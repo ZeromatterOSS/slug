@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "fixture": "version-bazel9",
+  "generated": false,
+  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; bazel.exe attempted network resolution of latest and failed under restricted network.",
+  "commands": []
+}

@@ -1,0 +1,12 @@
+[fixture]
+name = "module-local-override"
+description = "Root module depends on a local_path_override module and builds a target from it."
+comparison = "semantic"
+manifest_roots = ["bazel-bin"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once local registry/network policy is settled."
+
+[[commands]]
+name = "build_dep_target"
+argv = ["build", "@dep//:target"]
+compare = "semantic"
+expected_exit = 0

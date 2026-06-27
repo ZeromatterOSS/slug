@@ -1,0 +1,12 @@
+[fixture]
+name = "simple-rule-action"
+description = "A custom Starlark rule declares and writes one output file."
+comparison = "exact"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected; manifest should contain the declared output."
+
+[[commands]]
+name = "build_write_file"
+argv = ["build", "//pkg:write_file"]
+compare = "exact"
+expected_exit = 0

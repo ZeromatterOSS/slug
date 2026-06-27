@@ -1,0 +1,3 @@
+load(":defs.bzl", "message_rule")
+
+message_rule(name = "message")

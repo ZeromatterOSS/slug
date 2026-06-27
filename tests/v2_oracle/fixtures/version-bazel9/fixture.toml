@@ -1,0 +1,12 @@
+[fixture]
+name = "version-bazel9"
+description = "Version output advertises Slug V2 and Bazel 9 compatibility policy."
+comparison = "message_shape"
+oracle_notes = "Run against Slug V2 with SLUG_V2_BIN once Stage 2 exists."
+
+[[commands]]
+name = "version"
+argv = ["version"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["(Slug V2|Build label: 9\\.)", "(Bazel compatibility: >=9\\.0\\.0|Build label: 9\\.)"]

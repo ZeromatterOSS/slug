@@ -1,0 +1,19 @@
+[fixture]
+name = "exports-and-filegroup"
+description = "exports_files and filegroup are visible to query and produce a small output manifest."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected."
+
+[[commands]]
+name = "query_pkg_all"
+argv = ["query", "//pkg:all"]
+compare = "semantic"
+expected_exit = 0
+stdout_patterns = ["//pkg:data.txt", "//pkg:fg"]
+
+[[commands]]
+name = "build_filegroup"
+argv = ["build", "//pkg:fg"]
+compare = "semantic"
+expected_exit = 0

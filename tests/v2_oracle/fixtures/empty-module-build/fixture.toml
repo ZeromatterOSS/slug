@@ -1,0 +1,13 @@
+[fixture]
+name = "empty-module-build"
+description = "An empty MODULE.bazel workspace builds //:all successfully with no outputs."
+comparison = "semantic"
+manifest_roots = ["bazel-bin"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected."
+
+[[commands]]
+name = "build_all"
+argv = ["build", "//:all"]
+compare = "semantic"
+expected_exit = 0
+stderr_patterns = ["(INFO: Build completed successfully|no targets|Analyzed 0 targets)"]

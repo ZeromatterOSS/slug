@@ -1,0 +1,12 @@
+[fixture]
+name = "negative-no-workspace"
+description = "A WORKSPACE-only root is rejected under the V2 Bazel-9-only policy."
+comparison = "message_shape"
+oracle_notes = "Regenerate against Bazel 9 and Slug V2 once Stage 2 exists."
+
+[[commands]]
+name = "workspace_only_build"
+argv = ["build", "//..."]
+compare = "message_shape"
+expected_exit = 1
+stderr_patterns = ["(MODULE\\.bazel|WORKSPACE|Bazel 9|workspace)"]

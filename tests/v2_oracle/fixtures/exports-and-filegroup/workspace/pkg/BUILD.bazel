@@ -1,0 +1,6 @@
+exports_files(["data.txt"])
+
+filegroup(
+    name = "fg",
+    srcs = ["data.txt"],
+)

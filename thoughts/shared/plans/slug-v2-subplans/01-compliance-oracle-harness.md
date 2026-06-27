@@ -138,6 +138,25 @@ Keep the fixture mapping tied to local Bazel source:
   parsing, normalization, manifest comparison, and failure artifact writing
   without requiring Slug V2 to exist.
 
+
+## Checkpoint Evidence
+
+Stage 1 scaffold checkpoint:
+
+- Added `tools/v2_oracle` and `tools/v2_oracle_lib/` for fixture discovery,
+  TOML parsing, isolated workspace runs, normalization, manifest collection,
+  comparison, and compact failure artifacts.
+- Added initial fixture directories for `version-bazel9`, `empty-module-build`,
+  `exports-and-filegroup`, `simple-rule-action`, `load-invalidation`,
+  `module-local-override`, and `negative-no-workspace`.
+- Local validation: `py -3 tools/v2_oracle list` and bundled-runtime
+  `python -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`
+  passed on Windows.
+- Upstream Bazel expected generation was not updated locally: `bazel --version`
+  resolved through Bazelisk and attempted to fetch `latest` from GCS, which is
+  unavailable under the restricted network proxy. The checked-in
+  `expected/oracle.json` files remain documented placeholders until a local
+  Bazel 9 binary/source build is available.
 ## Validation
 
 ```bash
