@@ -8,8 +8,10 @@
  * above-listed licenses.
  */
 
-use slug_core_v2::PlannedCommand;
+use slug_commands_v2::CommandKind;
+use slug_commands_v2::build::BuildRequest;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    super::planned(PlannedCommand::Build, argv)
+    let result = BuildRequest::parse(&argv).map(|request| request.placeholder_error());
+    super::emit_result(CommandKind::Build, argv, result)
 }

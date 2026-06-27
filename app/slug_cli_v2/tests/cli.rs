@@ -48,10 +48,21 @@ fn planned_build_preserves_unknown_bazel_flag() {
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("\"error\":\"not_yet_implemented\""));
+    assert!(stderr.contains("\"error\":\"planned_placeholder\""));
     assert!(stderr.contains("\"command\":\"build\""));
     assert!(stderr.contains("//:x"));
     assert!(stderr.contains("--unknown_flag"));
+    assert!(stderr.contains("\"owner_stage\":\"Stage 6/7\""));
+}
+
+#[test]
+fn missing_build_target_is_structured_parse_error() {
+    let output = slug().arg("build").output().unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("\"error\":\"command_parse_error\""));
+    assert!(stderr.contains("\"command\":\"build\""));
+    assert!(stderr.contains("build requires a target pattern"));
 }
 
 #[test]
@@ -60,7 +71,7 @@ fn planned_configured_and_action_queries_are_structured() {
         let output = slug().args([command, "//:x"]).output().unwrap();
         assert_eq!(output.status.code(), Some(2));
         let stderr = String::from_utf8(output.stderr).unwrap();
-        assert!(stderr.contains("\"error\":\"not_yet_implemented\""));
+        assert!(stderr.contains("\"error\":\"planned_placeholder\""));
         assert!(stderr.contains(&format!("\"command\":\"{command}\"")));
         assert!(stderr.contains("//:x"));
     }

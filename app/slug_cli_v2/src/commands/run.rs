@@ -8,8 +8,10 @@
  * above-listed licenses.
  */
 
-use slug_core_v2::PlannedCommand;
+use slug_commands_v2::CommandKind;
+use slug_commands_v2::run::RunRequest;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    super::planned(PlannedCommand::Run, argv)
+    let result = RunRequest::parse(&argv).map(|request| request.placeholder_error());
+    super::emit_result(CommandKind::Run, argv, result)
 }

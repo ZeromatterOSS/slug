@@ -8,7 +8,10 @@
  * above-listed licenses.
  */
 
-use slug_core_v2::PlannedCommand;
+use slug_commands_v2::CommandKind;
+use slug_commands_v2::cquery::CqueryRequest;
+
 pub fn run(argv: Vec<String>) -> i32 {
-    super::planned(PlannedCommand::Cquery, argv)
+    let result = CqueryRequest::parse(&argv).map(|request| request.placeholder_error());
+    super::emit_result(CommandKind::Cquery, argv, result)
 }

@@ -17,7 +17,9 @@ pub mod run;
 pub mod test;
 pub mod version;
 
-use slug_core_v2::PlannedCommand;
+use slug_commands_v2::CommandKind;
+use slug_commands_v2::CommandParseError;
+use slug_commands_v2::CommandPlaceholderError;
 use slug_core_v2::error::json_escape;
 
 pub fn dispatch<I, S>(args: I) -> i32
@@ -57,9 +59,39 @@ where
     }
 }
 
-fn planned(command: PlannedCommand, argv: Vec<String>) -> i32 {
-    let error = slug_core_v2::PlaceholderCommandError::not_implemented(command, argv);
-    eprintln!("{error}");
+fn emit_result(
+    command: CommandKind,
+    argv: Vec<String>,
+    result: Result<CommandPlaceholderError, CommandParseError>,
+) -> i32 {
+    match result {
+        Ok(error) => planned(error, argv),
+        Err(error) => parse_error(command, error),
+    }
+}
+
+fn planned(error: CommandPlaceholderError, argv: Vec<String>) -> i32 {
+    let argv = argv
+        .iter()
+        .map(|arg| format!("\"{}\"", json_escape(arg)))
+        .collect::<Vec<_>>()
+        .join(",");
+    eprintln!(
+        "{{\"error\":\"planned_placeholder\",\"command\":\"{}\",\"argv\":[{}],\"owner_stage\":\"{}\",\"reason\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
+        error.command,
+        argv,
+        json_escape(error.owner_stage),
+        json_escape(error.reason),
+    );
+    2
+}
+
+fn parse_error(command: CommandKind, error: CommandParseError) -> i32 {
+    eprintln!(
+        "{{\"error\":\"command_parse_error\",\"command\":\"{}\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
+        command,
+        json_escape(&error.to_string()),
+    );
     2
 }
 

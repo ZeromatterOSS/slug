@@ -7,6 +7,7 @@ repository = { workspace = true }
 version = "0.1.0"
 
 [dependencies]
+slug_commands_v2 = { workspace = true }
 slug_core_v2 = { workspace = true }
 
 [[bin]]
