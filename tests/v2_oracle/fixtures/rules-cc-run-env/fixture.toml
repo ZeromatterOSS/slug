@@ -1,0 +1,12 @@
+[fixture]
+name = "rules-cc-run-env"
+description = "Stage 8 rules_cc fixture for Bazel run environment and runfiles variables under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 oracle generated with rules_cc 0.2.17; compares stable Bazel-provided run environment markers rather than host-specific values."
+
+[[commands]]
+name = "run_env"
+argv = ["run", "//:run_env"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["build-workspace-directory=1", "build-working-directory=1"]

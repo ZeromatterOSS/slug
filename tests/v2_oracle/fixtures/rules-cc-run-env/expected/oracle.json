@@ -1,0 +1,34 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "run",
+        "//:run_env"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "run",
+        "//:run_env"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "run_env",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:run_env (5 packages loaded, 6 targets configured)\nAnalyzing: target //:run_env (5 packages loaded, 6 targets configured)\n\nAnalyzing: target //:run_env (77 packages loaded, 430 targets configured)\n\nAnalyzing: target //:run_env (77 packages loaded, 430 targets configured)\n\nINFO: Analyzed target //:run_env (84 packages loaded, 467 targets configured).\nINFO: Found 1 target...\nTarget //:run_env up-to-date:\n  bazel-bin/run_env.exe\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 7 processes: 5 internal, 2 local.\nINFO: Build completed successfully, 7 total actions\nINFO: Running command line: bazel-bin/run_env.exe",
+      "normalized_stdout": "build-workspace-directory=1\nbuild-working-directory=1\nrunfiles-manifest=0\nrunfiles-dir=0",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:run_env (5 packages loaded, 6 targets configured)\nAnalyzing: target //:run_env (5 packages loaded, 6 targets configured)\n\nAnalyzing: target //:run_env (77 packages loaded, 430 targets configured)\n\nAnalyzing: target //:run_env (77 packages loaded, 430 targets configured)\n\nINFO: Analyzed target //:run_env (84 packages loaded, 467 targets configured).\nINFO: Found 1 target...\nTarget //:run_env up-to-date:\n  bazel-bin/run_env.exe\nINFO: Elapsed time: 6.707s, Critical Path: 0.57s\nINFO: 7 processes: 5 internal, 2 local.\nINFO: Build completed successfully, 7 total actions\nINFO: Running command line: bazel-bin/run_env.exe\n",
+      "stdout": "build-workspace-directory=1\nbuild-working-directory=1\nrunfiles-manifest=0\nrunfiles-dir=0\n"
+    }
+  ],
+  "fixture": "rules-cc-run-env",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

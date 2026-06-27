@@ -1,0 +1,12 @@
+[fixture]
+name = "rules-cc-test-env-inherit"
+description = "Stage 8 rules_cc fixture for Bazel cc_test environment and test-log output under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 oracle generated with rules_cc 0.2.17; uses --test_output=all so stable test environment markers are visible in stdout."
+
+[[commands]]
+name = "test_env"
+argv = ["test", "//:test_env", "--test_output=all"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["test-tmpdir=1", "test-srcdir=1", "test-workspace=1"]

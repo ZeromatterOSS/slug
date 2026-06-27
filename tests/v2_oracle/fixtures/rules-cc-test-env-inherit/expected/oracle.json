@@ -1,0 +1,36 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "test",
+        "//:test_env",
+        "--test_output=all"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "test",
+        "//:test_env",
+        "--test_output=all"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "test_env",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:test_env (5 packages loaded, 6 targets configured)\nAnalyzing: target //:test_env (5 packages loaded, 6 targets configured)\n\nAnalyzing: target //:test_env (77 packages loaded, 432 targets configured)\n\nAnalyzing: target //:test_env (77 packages loaded, 432 targets configured)\n\nINFO: Analyzed target //:test_env (86 packages loaded, 886 targets configured).\nINFO: From Testing //:test_env:\nINFO: Found 1 test target...\nTarget //:test_env up-to-date:\n  bazel-bin/test_env.exe\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 8 processes: 5 internal, 4 local.\nINFO: Build completed successfully, 8 total actions",
+      "normalized_stdout": "==================== Test output for //:test_env:\ntest-tmpdir=1\ntest-srcdir=1\ntest-workspace=1\nxml-output=1\nrunfiles-manifest=1\n================================================================================\n//:test_env                                                              PASSED in <duration>\n\nExecuted 1 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:test_env (5 packages loaded, 6 targets configured)\nAnalyzing: target //:test_env (5 packages loaded, 6 targets configured)\n\nAnalyzing: target //:test_env (77 packages loaded, 432 targets configured)\n\nAnalyzing: target //:test_env (77 packages loaded, 432 targets configured)\n\nINFO: Analyzed target //:test_env (86 packages loaded, 886 targets configured).\nINFO: From Testing //:test_env:\nINFO: Found 1 test target...\nTarget //:test_env up-to-date:\n  bazel-bin/test_env.exe\nINFO: Elapsed time: 6.935s, Critical Path: 0.65s\nINFO: 8 processes: 5 internal, 4 local.\nINFO: Build completed successfully, 8 total actions\n",
+      "stdout": "==================== Test output for //:test_env:\ntest-tmpdir=1\ntest-srcdir=1\ntest-workspace=1\nxml-output=1\nrunfiles-manifest=1\n================================================================================\n//:test_env                                                              PASSED in 0.1s\n\nExecuted 1 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.\n"
+    }
+  ],
+  "fixture": "rules-cc-test-env-inherit",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

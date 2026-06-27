@@ -201,14 +201,19 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
 
 ### Public Ruleset Fixture Start
 
-- Added Bazel 9 oracle fixtures for `rules-cc-basic`, `bazel-skylib-basic`,
-  `rules-python-basic`, `rules-python-runfiles`, `protobuf-basic`,
-  `rules-rust-basic`, and `rules-oci-basic-no-daemon`.
+- Added Bazel 9 oracle fixtures for `rules-cc-basic`, `rules-cc-run-env`,
+  `rules-cc-test-env-inherit`, `bazel-skylib-basic`, `rules-python-basic`,
+  `rules-python-runfiles`, `protobuf-basic`, `rules-rust-basic`, and
+  `rules-oci-basic-no-daemon`.
 - `rules-cc-basic` covers `cc_library`, `cc_binary`, and `cc_test` with
   `rules_cc` loaded from `@rules_cc//cc:defs.bzl`; it was expanded from the
   Plan34 `rules_cc` fixture theme and updated to BCR-resolved module versions
   observed under Bazel 9.1.1 (`rules_cc` 0.2.17, `bazel_features` 1.42.1,
   `bazel_skylib` 1.8.2, `platforms` 1.0.0, `zlib` 1.3.1.bcr.5).
+- `rules-cc-run-env` covers Bazel-provided `bazel run` workspace and runfiles
+  environment markers for a `cc_binary`.
+- `rules-cc-test-env-inherit` covers `cc_test` test-log output for stable
+  `TEST_TMPDIR`, `TEST_SRCDIR`, and `TEST_WORKSPACE` markers.
 - `bazel-skylib-basic` covers the `copy_file` rule from `bazel_skylib` 1.8.2.
 - `rules-python-basic` covers `py_library`, `py_binary`, and `py_test` with
   stable `rules_python` 2.0.3 and an explicit Python 3.12 toolchain extension.
@@ -230,7 +235,7 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
   aquery. Full image execution remains pending on a Linux-backed oracle because
   upstream Bazel/rules_oci fails on this Windows host before the daemon boundary
   when the generated shell wrapper loses JSON quoting.
-- Bazel 9.1.1 expected oracle output was generated for all seven fixtures.
+- Bazel 9.1.1 expected oracle output was generated for all nine fixtures.
   These fixtures currently use message-shape comparison where platform-specific
   output manifests or Python runtime runfiles would otherwise make expectations
   noisy. Upgrade to output/runfiles comparison once the oracle manifest layer is
@@ -245,6 +250,8 @@ Validation run:
 ```bash
 py -3 -B -m tools.v2_oracle list
 py -3 -B -m tools.v2_oracle run --fixture rules-cc-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture rules-cc-run-env --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture rules-cc-test-env-inherit --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture bazel-skylib-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture rules-python-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture rules-python-runfiles --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
