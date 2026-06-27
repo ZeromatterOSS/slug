@@ -20,7 +20,7 @@ python3 tools/v2_oracle run --fixture empty-module-build --bazel /path/to/bazel 
 SLUG_V2_BIN=target/debug/slug python3 tools/v2_oracle run --fixture version-bazel9
 ```
 
-Runs write compact artifacts under `${SLUG_V2_ORACLE_ROOT:-<tmp>/slug-v2-oracle}`.
+Runs write compact artifacts under `${SLUG_V2_ORACLE_ROOT:-target/v2o}`.
 A failed comparison writes `comparison/failures.txt`, `actual.json`, and, when
 available, `expected_vs_actual.diff` inside that fixture run directory.
 

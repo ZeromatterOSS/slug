@@ -1,0 +1,82 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "test",
+        "//pkg:greeter_test",
+        "--test_output=errors"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "test",
+        "//pkg:greeter_test",
+        "--test_output=errors"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "test_rust",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:greeter_test (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:greeter_test (5 packages loaded, 6 targets configured)\n\nAnalyzing: target //pkg:greeter_test (92 packages loaded, 1169 targets configured)\n\nAnalyzing: target //pkg:greeter_test (92 packages loaded, 1169 targets configured)\n\nINFO: Analyzed target //pkg:greeter_test (101 packages loaded, 1232 targets configured).\n[140 / 144] [Prepa] runfiles for @@rules_rust+//util/process_wrapper:process_wrapper\nINFO: Found 1 test target...\nTarget //pkg:greeter_test up-to-date:\n  bazel-bin/pkg/greeter_test.exe\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 145 processes: 140 internal, 6 local.\nINFO: Build completed successfully, 145 total actions",
+      "normalized_stdout": "//pkg:greeter_test                                                       PASSED in <duration>\n\nExecuted 1 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:greeter_test (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:greeter_test (5 packages loaded, 6 targets configured)\n\nAnalyzing: target //pkg:greeter_test (92 packages loaded, 1169 targets configured)\n\nAnalyzing: target //pkg:greeter_test (92 packages loaded, 1169 targets configured)\n\nINFO: Analyzed target //pkg:greeter_test (101 packages loaded, 1232 targets configured).\n[140 / 144] [Prepa] runfiles for @@rules_rust+//util/process_wrapper:process_wrapper\nINFO: Found 1 test target...\nTarget //pkg:greeter_test up-to-date:\n  bazel-bin/pkg/greeter_test.exe\nINFO: Elapsed time: 8.068s, Critical Path: 1.84s\nINFO: 145 processes: 140 internal, 6 local.\nINFO: Build completed successfully, 145 total actions\n",
+      "stdout": "//pkg:greeter_test                                                       PASSED in 0.0s\n\nExecuted 1 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.\n"
+    },
+    {
+      "argv": [
+        "run",
+        "//pkg:hello"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "run",
+        "//pkg:hello"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "run_rust",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:hello (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:hello (0 packages loaded, 3 targets configured).\n[143 / 144] [Prepa] runfiles for //pkg:hello\nINFO: Found 1 target...\nTarget //pkg:hello up-to-date:\n  bazel-bin/pkg/hello.exe\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 6 processes: 5 internal, 1 local.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/pkg/hello.exe",
+      "normalized_stdout": "hello rules_rust",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:hello (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:hello (0 packages loaded, 3 targets configured).\n[143 / 144] [Prepa] runfiles for //pkg:hello\nINFO: Found 1 target...\nTarget //pkg:hello up-to-date:\n  bazel-bin/pkg/hello.exe\nINFO: Elapsed time: 1.382s, Critical Path: 1.02s\nINFO: 6 processes: 5 internal, 1 local.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/pkg/hello.exe\n",
+      "stdout": "hello rules_rust\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//pkg:hello",
+        "--output=summary"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//pkg:hello",
+        "--output=summary"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "aquery_rust_actions",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:hello (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "5 total actions.\n\nMnemonics:\n  SymlinkTree: 1\n  Rustc: 1\n  SourceSymlinkManifest: 1\n  RepoMappingManifest: 1\n  RunfilesTree: 1\n\nConfigurations:\n  x64_windows-fastbuild: 5\n\nExecution Platforms:\n  @@platforms//host:host: 5",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:hello (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.118s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "5 total actions.\n\nMnemonics:\n  SymlinkTree: 1\n  Rustc: 1\n  SourceSymlinkManifest: 1\n  RepoMappingManifest: 1\n  RunfilesTree: 1\n\nConfigurations:\n  x64_windows-fastbuild: 5\n\nExecution Platforms:\n  @@platforms//host:host: 5\n"
+    }
+  ],
+  "fixture": "rules-rust-basic",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

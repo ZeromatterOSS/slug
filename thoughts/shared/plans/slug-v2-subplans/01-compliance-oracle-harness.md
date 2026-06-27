@@ -42,11 +42,11 @@ Use the local Bazel checkout as the source of truth:
   - `expected/oracle.json` for upstream Bazel results;
   - optional extra `expected/` files for exact manifests or normalized event
     slices.
-- Each run gets isolated output roots:
-  - Bazel: `/tmp/slug-v2-oracle/<fixture>/bazel-output-base`;
-  - Slug: `/tmp/slug-v2-oracle/<fixture>/slug-output-base`.
+- Each run gets isolated output roots under the artifact root:
+  - Bazel: `${SLUG_V2_ORACLE_ROOT:-target/v2o}/ob/<fixture>/bazel`;
+  - Slug: `${SLUG_V2_ORACLE_ROOT:-target/v2o}/ob/<fixture>/slug`.
 - Failure artifacts are compact and written under
-  `/tmp/slug-v2-oracle/runs/<fixture>/`.
+  `${SLUG_V2_ORACLE_ROOT:-target/v2o}/runs/<fixture>/`.
 
 Initial concrete files:
 
@@ -157,6 +157,11 @@ Stage 1 scaffold checkpoint:
   unavailable under the restricted network proxy. The checked-in
   `expected/oracle.json` files remain documented placeholders until a local
   Bazel 9 binary/source build is available.
+- Stage 8 `rules_rust` probing shortened the default artifact root to
+  `target/v2o` and Bazel output bases to `ob/<fixture>/<tool>` so Windows
+  toolchain paths do not dominate fixture outcomes; `SLUG_V2_ORACLE_ROOT`
+  still overrides the root.
+
 ## Validation
 
 ```bash

@@ -1,0 +1,26 @@
+[fixture]
+name = "rules-rust-basic"
+description = "Stage 8 rules_rust fixture for rust_library, rust_binary, rust_test, toolchain registration, and runfiles actions under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 oracle generated with rules_rust 0.71.1 and an explicit Rust 1.96.0 toolchain from the rules_rust bzlmod extension."
+
+[[commands]]
+name = "test_rust"
+argv = ["test", "//pkg:greeter_test", "--test_output=errors"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//pkg:greeter_test", "PASSED"]
+
+[[commands]]
+name = "run_rust"
+argv = ["run", "//pkg:hello"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["hello rules_rust"]
+
+[[commands]]
+name = "aquery_rust_actions"
+argv = ["aquery", "//pkg:hello", "--output=summary"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["Rustc: 1", "RunfilesTree: 1", "SymlinkTree: 1"]

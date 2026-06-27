@@ -109,7 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--slug", help="path to Slug V2 binary; defaults to SLUG_V2_BIN")
     run_parser.add_argument("--tool", choices=("auto", "bazel", "slug", "both"), default="auto")
     run_parser.add_argument("--update-expected", action="store_true")
-    run_parser.add_argument("--run-root", help="artifact root; defaults to temp/slug-v2-oracle")
+    run_parser.add_argument("--run-root", help="artifact root; defaults to target/v2o")
     run_parser.add_argument("--timeout", type=int, default=120)
     run_parser.set_defaults(func=cmd_run)
 

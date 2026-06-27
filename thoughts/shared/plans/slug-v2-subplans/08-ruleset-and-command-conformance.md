@@ -202,7 +202,7 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
 ### Public Ruleset Fixture Start
 
 - Added Bazel 9 oracle fixtures for `rules-cc-basic`, `bazel-skylib-basic`,
-  `rules-python-basic`, and `protobuf-basic`.
+  `rules-python-basic`, `protobuf-basic`, and `rules-rust-basic`.
 - `rules-cc-basic` covers `cc_library`, `cc_binary`, and `cc_test` with
   `rules_cc` loaded from `@rules_cc//cc:defs.bzl`; it was expanded from the
   Plan34 `rules_cc` fixture theme and updated to BCR-resolved module versions
@@ -216,15 +216,19 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
   contains the Starlark `ProtoInfo` provider from
   `@protobuf//bazel/private:proto_info.bzl`, and its aquery output contains
   the `GenProtoDescriptorSet` action plus prebuilt `protoc` invocation.
-- Bazel 9.1.1 expected oracle output was generated for all four fixtures.
+- `rules-rust-basic` covers `rust_library`, `rust_binary`, and `rust_test`
+  using the `rules_rust` 0.71.1 bzlmod extension with an explicit Rust 1.96.0
+  toolchain. Its aquery summary records the `Rustc`, `RunfilesTree`, and
+  `SymlinkTree` actions without committing the full platform-specific sysroot
+  input list.
+- Bazel 9.1.1 expected oracle output was generated for all five fixtures.
   These fixtures currently use message-shape comparison where platform-specific
   output manifests or Python runtime runfiles would otherwise make expectations
   noisy. Upgrade to output/runfiles comparison once the oracle manifest layer is
   platform-aware.
-- Checked BCR metadata for the remaining public ruleset probes:
-  rules_rust 0.71.1 and rules_oci 2.3.0. Defer those fixtures to focused
-  follow-up slices because their toolchain/rule APIs need separate oracle
-  probes.
+- Checked BCR metadata for the remaining public ruleset probe: rules_oci 2.3.0.
+  Defer that fixture to a focused follow-up slice because its image/package
+  rule APIs need a separate oracle probe.
 
 Validation run:
 
@@ -234,4 +238,5 @@ py -3 -B -m tools.v2_oracle run --fixture rules-cc-basic --tool bazel --bazel C:
 py -3 -B -m tools.v2_oracle run --fixture bazel-skylib-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture rules-python-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture protobuf-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture rules-rust-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 ```

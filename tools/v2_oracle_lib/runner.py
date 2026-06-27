@@ -4,7 +4,6 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +12,8 @@ from typing import Any
 from .fixture import Fixture, FixtureCommand
 from .manifest import collect_manifest_roots
 from .normalize import normalize_text, path_replacements
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,10 @@ class RunOptions:
 
 
 def default_run_root() -> Path:
-    return Path(os.environ.get("SLUG_V2_ORACLE_ROOT", Path(tempfile.gettempdir()) / "slug-v2-oracle"))
+    configured = os.environ.get("SLUG_V2_ORACLE_ROOT")
+    if configured:
+        return Path(configured)
+    return REPO_ROOT / "target" / "v2o"
 
 
 def _copy_workspace(fixture: Fixture, run_dir: Path) -> Path:
@@ -71,7 +75,7 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
     run_dir = options.run_root / "runs" / fixture.name / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
     workspace = _copy_workspace(fixture, run_dir)
-    output_base = options.run_root / fixture.name / f"{tool.name}-output-base"
+    output_base = options.run_root / "ob" / fixture.name / tool.name
     output_base.mkdir(parents=True, exist_ok=True)
     replacements = path_replacements(workspace=workspace, run_dir=run_dir, output_base=output_base)
 
