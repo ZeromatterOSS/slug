@@ -20,7 +20,9 @@ pub struct ModuleFile {
 pub struct ModuleHeader {
     pub name: String,
     pub version: Option<String>,
+    pub repo_name: Option<String>,
     pub compatibility_level: Option<u64>,
+    pub bazel_compatibility: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,6 +158,7 @@ fn parse_module(args: &str) -> Result<ModuleHeader, String> {
     Ok(ModuleHeader {
         name,
         version: optional_string(&kwargs, "version")?.map(str::to_owned),
+        repo_name: optional_string(&kwargs, "repo_name")?.map(str::to_owned),
         compatibility_level: kwargs
             .get("compatibility_level")
             .map(|value| {
@@ -164,6 +167,8 @@ fn parse_module(args: &str) -> Result<ModuleHeader, String> {
                     .ok_or_else(|| "compatibility_level must be an integer".to_owned())
             })
             .transpose()?,
+        bazel_compatibility: optional_string_list(&kwargs, "bazel_compatibility")?
+            .unwrap_or_default(),
     })
 }
 

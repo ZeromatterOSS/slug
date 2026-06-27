@@ -1,0 +1,1 @@
+module(name = "header_compatibility", version = "0.0.0", repo_name = "root_alias", compatibility_level = 1, bazel_compatibility = [">=9.0.0"])

@@ -230,6 +230,19 @@ Stage 5 override directive parser checkpoint:
 - Validation passed: `cargo fmt -p slug_bzlmod_v2`;
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `py -3 -B -m tools.v2_oracle run --fixture module-override-validation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
+Stage 5 module header parser checkpoint:
+
+- Added `module-header-compatibility`, a Bazel 9.1.1 oracle fixture proving
+  `module(repo_name = ...)` participates in root repository mapping while
+  `bazel_compatibility = [">=9.0.0"]` is accepted by the local Bazel 9 oracle.
+- Extended `slug_bzlmod_v2::ModuleHeader` with `repo_name` and
+  `bazel_compatibility` fields while preserving the existing
+  `compatibility_level` parse path and directive ordering. No V1 bzlmod
+  implementation was extracted.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `py -3 -B -m tools.v2_oracle run --fixture module-header-compatibility --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

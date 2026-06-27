@@ -1,0 +1,12 @@
+[fixture]
+name = "module-header-compatibility"
+description = "module() repo_name and bazel_compatibility fields resolve a root repo alias under Bazel 9."
+comparison = "message_shape"
+oracle_notes = "Generated with upstream Bazel 9.1.1. Querying @root_alias proves module(repo_name = ...) is accepted and visible to repo mapping."
+
+[[commands]]
+name = "query_root_repo_alias"
+argv = ["query", "@root_alias//:MODULE.bazel"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//:MODULE.bazel"]

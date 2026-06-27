@@ -11,7 +11,7 @@ use slug_bzlmod_v2::SingleVersionOverride;
 fn parses_module_directives_in_order() {
     let parsed = ModuleFile::parse(
         r#"
-module(name = "root", version = "0.0.0", compatibility_level = 1)
+module(name = "root", version = "0.0.0", repo_name = "root_alias", compatibility_level = 1, bazel_compatibility = [">=9.0.0"])
 include("//:deps.MODULE.bazel")
 bazel_dep(name = "dep", version = "1.0.0", repo_name = "dep_alias")
 local_path_override(module_name = "dep", path = "../dep")
@@ -24,7 +24,9 @@ register_execution_platforms("//:platform")
     let module = parsed.module.unwrap();
     assert_eq!(module.name, "root");
     assert_eq!(module.version.as_deref(), Some("0.0.0"));
+    assert_eq!(module.repo_name.as_deref(), Some("root_alias"));
     assert_eq!(module.compatibility_level, Some(1));
+    assert_eq!(module.bazel_compatibility, vec![">=9.0.0".to_owned()]);
     assert_eq!(parsed.directives.len(), 5);
     assert_eq!(
         parsed.directives[0],
