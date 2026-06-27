@@ -1,7 +1,34 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "@aaa//:from_bbb"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "@aaa//:from_bbb"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_transitive_dep",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@aaa+//:from_bbb (5 packages loaded, 6 targets configured)\nAnalyzing: target @@aaa+//:from_bbb (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target @@aaa+//:from_bbb (6 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nTarget @@aaa+//:from_bbb up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@aaa+//:from_bbb (5 packages loaded, 6 targets configured)\nAnalyzing: target @@aaa+//:from_bbb (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target @@aaa+//:from_bbb (6 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nTarget @@aaa+//:from_bbb up-to-date (nothing to build)\nINFO: Elapsed time: 3.515s, Critical Path: 0.02s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "module-resolution-basic",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected after adding a local registry fixture.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

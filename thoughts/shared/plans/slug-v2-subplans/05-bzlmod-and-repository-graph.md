@@ -186,9 +186,9 @@ Stage 5 local bzlmod oracle refresh:
   fixtures `module-file-directives` and `module-local-override`. Corrected the
   fixture labels to Bazel-visible source-file targets: `@dep_alias//:target.txt`
   for the `repo_name` case and `@dep//:target.txt` for the plain local override.
-- `module-resolution-basic` remains deferred because it names registry modules
-  and still needs a local registry fixture before it can be generated without
-  network dependency.
+- At this checkpoint, `module-resolution-basic` still named registry modules and
+  remained deferred; the later local transitive-resolution checkpoint below
+  supersedes that for non-registry basic graph coverage.
 - Validation passed: `py -3 -B -m tools.v2_oracle run --fixture module-file-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`;
   same command for `module-local-override`; bundled `python.exe -m pytest -q -p
   no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
@@ -205,6 +205,18 @@ Stage 5 include directive checkpoint:
 - Validation passed: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `py -3 -B -m tools.v2_oracle run --fixture module-file-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`; bundled
   `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 local transitive module-resolution checkpoint:
+
+- Reworked `module-resolution-basic` from unresolved registry module names into
+  a local transitive graph: root depends on `aaa`, `aaa` depends on `bbb`, and
+  root `local_path_override` entries provide both module directories. The
+  fixture builds `@aaa//:from_bbb`, which consumes `@bbb//:target.txt`.
+- Generated Bazel 9.1.1 expected oracle output for the local graph. Registry
+  hash/yanked/version-selection policy remains owned by the later dedicated
+  registry fixtures.
+- Validation passed: `py -3 -B -m tools.v2_oracle run --fixture module-resolution-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`; bundled
+  `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

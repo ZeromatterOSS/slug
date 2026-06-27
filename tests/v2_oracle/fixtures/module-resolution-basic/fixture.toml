@@ -1,11 +1,11 @@
 [fixture]
 name = "module-resolution-basic"
-description = "Root plus two transitive module dependencies for Stage 5 resolution fixtures."
+description = "Root plus two transitive local module dependencies for Stage 5 resolution fixtures."
 comparison = "semantic"
-oracle_notes = "Registry-backed expected output is deferred until a local Bazel 9 registry fixture is available."
+oracle_notes = "Generated with upstream Bazel 9.1.1 using local_path_override modules; registry policy remains covered by later dedicated fixtures."
 
 [[commands]]
-name = "build_all"
-argv = ["build", "//:all"]
+name = "build_transitive_dep"
+argv = ["build", "@aaa//:from_bbb"]
 compare = "semantic"
 expected_exit = 0
