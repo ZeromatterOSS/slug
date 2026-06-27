@@ -12,6 +12,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools.v2_oracle_lib.compare import compare_result, load_expected, write_expected, write_failure_artifacts
+from tools.v2_oracle_lib.evidence import validate_evidence
 from tools.v2_oracle_lib.fixture import discover_fixtures, find_fixture
 from tools.v2_oracle_lib.runner import RunOptions, ToolConfig, default_run_root, run_fixture
 
@@ -83,6 +84,15 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+
+def cmd_validate_evidence(args: argparse.Namespace) -> int:
+    failures = validate_evidence(Path(args.path))
+    if failures:
+        print(json.dumps({"status": "failed", "failures": failures}, indent=2, sort_keys=True))
+        return 1
+    print(json.dumps({"status": "ok", "path": args.path}, indent=2, sort_keys=True))
+    return 0
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="v2_oracle", description="Run Slug V2 oracle fixtures")
     subcommands = parser.add_subparsers(dest="command", required=True)
@@ -103,6 +113,9 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--timeout", type=int, default=120)
     run_parser.set_defaults(func=cmd_run)
 
+    evidence_parser = subcommands.add_parser("validate-evidence", help="validate REAPI evidence JSONL")
+    evidence_parser.add_argument("path")
+    evidence_parser.set_defaults(func=cmd_validate_evidence)
     return parser
 
 

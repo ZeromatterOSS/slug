@@ -206,3 +206,11 @@ slug-v2-oracle validate-evidence /path/to/evidence.jsonl
   app/slug_reapi_v2 app/slug_analysis_v2 app/slug_build_api_v2` returned no
   matches. NativeLink startup, CAS upload, Execute, AC, and materialization are
   not implemented yet, so Stage 7 oracle execution remains skipped.
+- 2026-06-27 Stage 7.8 evidence validator: added
+  `tools/v2_oracle validate-evidence` and `tools/v2_oracle_lib/evidence.py`
+  to validate REAPI JSONL rows for `executor_boundary = "reapi"`, positive
+  REAPI action counts, zero direct-local actions, backend identity, nonempty
+  action/upload/materialized digests, and absence of forbidden local what-ran
+  entries. Validation: `py -3 -B tools/v2_oracle validate-evidence
+  target/v2_oracle_evidence_smoke.jsonl`; bundled Python `pytest -q -p
+  no:cacheprovider tests/v2_oracle/test_v2_oracle.py` passed 11 tests.

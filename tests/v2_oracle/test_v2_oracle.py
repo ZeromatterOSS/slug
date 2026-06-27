@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.v2_oracle_lib.compare import compare_result, write_failure_artifacts
+from tools.v2_oracle_lib.evidence import validate_evidence
 from tools.v2_oracle_lib.fixture import discover_fixtures, load_fixture
 from tools.v2_oracle_lib.manifest import collect_manifest
 from tools.v2_oracle_lib.normalize import normalize_text, path_replacements
@@ -148,3 +149,77 @@ def test_expected_oracle_placeholders_are_documented() -> None:
         assert data["fixture"] == fixture.name
         assert data["generated"] is False
         assert data["oracle_notes"]
+
+def test_validate_evidence_accepts_reapi_rows() -> None:
+    evidence = scratch_dir("evidence") / "evidence.jsonl"
+    evidence.write_text(
+        json.dumps(
+            {
+                "executor_boundary": "reapi",
+                "backend": "nativelink",
+                "reapi_actions": 1,
+                "direct_local_actions": 0,
+                "action_digest": "abc/1",
+                "uploaded_digests": ["def/2"],
+                "materialized_outputs": ["ghi/3"],
+                "what_ran": ["Remote"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert validate_evidence(evidence) == []
+
+
+def test_validate_evidence_rejects_direct_local_rows() -> None:
+    evidence = scratch_dir("evidence-bad") / "evidence.jsonl"
+    evidence.write_text(
+        json.dumps(
+            {
+                "executor_boundary": "local",
+                "backend": "local",
+                "reapi_actions": 0,
+                "direct_local_actions": 1,
+                "action_digests": [],
+                "uploaded_digests": [],
+                "materialized_outputs": [],
+                "what_ran": ["Local"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    failures = validate_evidence(evidence)
+    assert any("executor_boundary" in failure for failure in failures)
+    assert any("direct_local_actions" in failure for failure in failures)
+    assert any("forbidden what_ran" in failure for failure in failures)
+
+
+def test_cli_validate_evidence_outputs_status() -> None:
+    evidence = scratch_dir("evidence-cli") / "evidence.jsonl"
+    evidence.write_text(
+        json.dumps(
+            {
+                "executor_boundary": "reapi",
+                "backend": "nativelink",
+                "reapi_actions": 1,
+                "direct_local_actions": 0,
+                "action_digests": ["abc/1"],
+                "uploaded_digests": ["def/2"],
+                "materialized_outputs": ["ghi/3"],
+                "what_ran": [],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "v2_oracle"), "validate-evidence", str(evidence)],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert '"status": "ok"' in completed.stdout
