@@ -202,8 +202,8 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
 ### Public Ruleset Fixture Start
 
 - Added Bazel 9 oracle fixtures for `rules-cc-basic`, `bazel-skylib-basic`,
-  `rules-python-basic`, `protobuf-basic`, `rules-rust-basic`, and
-  `rules-oci-basic-no-daemon`.
+  `rules-python-basic`, `rules-python-runfiles`, `protobuf-basic`,
+  `rules-rust-basic`, and `rules-oci-basic-no-daemon`.
 - `rules-cc-basic` covers `cc_library`, `cc_binary`, and `cc_test` with
   `rules_cc` loaded from `@rules_cc//cc:defs.bzl`; it was expanded from the
   Plan34 `rules_cc` fixture theme and updated to BCR-resolved module versions
@@ -212,6 +212,9 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
 - `bazel-skylib-basic` covers the `copy_file` rule from `bazel_skylib` 1.8.2.
 - `rules-python-basic` covers `py_library`, `py_binary`, and `py_test` with
   stable `rules_python` 2.0.3 and an explicit Python 3.12 toolchain extension.
+- `rules-python-runfiles` covers `py_binary` imports plus data lookup through
+  Bazel runfiles manifest/directory environment under the same rules_python
+  2.0.3 and Python 3.12 toolchain path.
 - `protobuf-basic` covers `proto_library` loaded from
   `@protobuf//bazel:proto_library.bzl` in protobuf 35.1. Its cquery output
   contains the Starlark `ProtoInfo` provider from
@@ -227,7 +230,7 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
   aquery. Full image execution remains pending on a Linux-backed oracle because
   upstream Bazel/rules_oci fails on this Windows host before the daemon boundary
   when the generated shell wrapper loses JSON quoting.
-- Bazel 9.1.1 expected oracle output was generated for all six fixtures.
+- Bazel 9.1.1 expected oracle output was generated for all seven fixtures.
   These fixtures currently use message-shape comparison where platform-specific
   output manifests or Python runtime runfiles would otherwise make expectations
   noisy. Upgrade to output/runfiles comparison once the oracle manifest layer is
@@ -244,6 +247,7 @@ py -3 -B -m tools.v2_oracle list
 py -3 -B -m tools.v2_oracle run --fixture rules-cc-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture bazel-skylib-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture rules-python-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture rules-python-runfiles --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture protobuf-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture rules-rust-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture rules-oci-basic-no-daemon --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe

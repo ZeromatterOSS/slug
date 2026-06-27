@@ -1,0 +1,14 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+
+py_library(
+    name = "helper",
+    srcs = ["helper.py"],
+)
+
+py_binary(
+    name = "reader",
+    srcs = ["reader.py"],
+    data = ["data/message.txt"],
+    main = "reader.py",
+    deps = [":helper"],
+)

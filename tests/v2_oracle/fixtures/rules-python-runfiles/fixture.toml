@@ -1,0 +1,12 @@
+[fixture]
+name = "rules-python-runfiles"
+description = "Stage 8 rules_python fixture for py_binary imports and runfiles data lookup under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 oracle generated with rules_python 2.0.3 and an explicit Python 3.12 toolchain; compares stdout shape instead of platform-specific runfiles manifests."
+
+[[commands]]
+name = "run_reader"
+argv = ["run", "//pkg:reader"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["import=hello imports", "runfile-data=hello runfiles"]
