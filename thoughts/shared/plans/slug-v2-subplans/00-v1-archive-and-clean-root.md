@@ -91,9 +91,10 @@ git branch v1-archive <v1-commit>
 
 ## Exact Test Criteria
 
-- `git rev-parse slug-v1-archive` equals the commit recorded in `Archive Record`.
+- `git rev-parse slug-v1-archive^{commit}` equals the commit recorded in
+  `Archive Record` because the archive tag is annotated.
 - `git rev-parse v1-archive` equals the same commit.
-- `test "$(git rev-parse slug-v1-archive)" = "$(git rev-parse v1-archive)"`
+- `test "$(git rev-parse slug-v1-archive^{commit})" = "$(git rev-parse v1-archive)"`
   passes.
 - `V1_ARCHIVE.md` and `Archive Record` agree on commit and ref names.
 - `git status --short` after archiving shows only intentionally active V2 work.
@@ -110,20 +111,20 @@ Fill this in during Stage 0 execution:
 
 | Field | Value |
 |-------|-------|
-| V1 commit | TBD |
+| V1 commit | `e218054d4c796655939b968d90208b185decb352` |
 | V1 tag | `slug-v1-archive` |
 | V1 archive branch | `v1-archive` |
 | Physical archive directory | none by default |
-| Dirty files intentionally excluded | TBD |
+| Dirty files intentionally excluded | none; native `git status --short --branch` was clean before archiving |
 
 ## Validation
 
 ```bash
 git status --short --branch
 git diff --name-status
-git rev-parse slug-v1-archive
+git rev-parse slug-v1-archive^{commit}
 git rev-parse v1-archive
-test "$(git rev-parse slug-v1-archive)" = "$(git rev-parse v1-archive)"
+test "$(git rev-parse slug-v1-archive^{commit})" = "$(git rev-parse v1-archive)"
 git tag --list 'slug-v1-*'
 git branch --list 'v1-archive'
 git ls-tree -d HEAD v1-archive
