@@ -1,0 +1,19 @@
+[fixture]
+name = "labels-and-output-paths"
+description = "Bazel-shaped label spelling and generated output path smoke for Stage 3."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 3 paths are wired into Slug V2."
+
+[[commands]]
+name = "query_labels"
+argv = ["query", "//pkg:all"]
+compare = "semantic"
+expected_exit = 0
+stdout_patterns = ["//pkg:source.txt", "//pkg:write_file"]
+
+[[commands]]
+name = "build_generated_output"
+argv = ["build", "//pkg:write_file"]
+compare = "semantic"
+expected_exit = 0

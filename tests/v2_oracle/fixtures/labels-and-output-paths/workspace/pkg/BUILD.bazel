@@ -1,0 +1,4 @@
+load(":defs.bzl", "write_file")
+
+exports_files(["source.txt"])
+write_file(name = "write_file")

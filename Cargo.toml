@@ -5,6 +5,7 @@ members = [
     "app/slug",
     "app/slug_cli_v2",
     "app/slug_core_v2",
+    "app/slug_identity_v2",
     "app/slug_action_impl",
     "app/slug_action_impl_tests",
     "app/slug_action_metadata_proto",
@@ -450,6 +451,7 @@ slug_health_check = { path = "app/slug_health_check" }
 slug_health_check_proto = { path = "app/slug_health_check_proto" }
 slug_host_sharing_proto = { path = "app/slug_host_sharing_proto" }
 slug_http = { path = "app/slug_http" }
+slug_identity_v2 = { path = "app/slug_identity_v2" }
 slug_install_proto = { path = "app/slug_install_proto" }
 slug_interpreter = { path = "app/slug_interpreter" }
 slug_interpreter_for_build = { path = "app/slug_interpreter_for_build" }

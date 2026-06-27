@@ -82,6 +82,21 @@ Add tests for:
 - generated repo aliases that should not collapse to the owner module;
 - output paths for source files versus generated files.
 
+
+## Checkpoint Evidence
+
+Stage 3 initial identity/layout checkpoint:
+
+- Added the `labels-and-output-paths` oracle fixture as the first Stage 3
+  fixture. Expected Bazel output remains a documented placeholder until a local
+  Bazel 9 binary/source build is available.
+- Added `slug_identity_v2` with typed apparent/canonical repo names, repository
+  mappings with mapping ids, package identifiers, target names, apparent and
+  canonical labels, target patterns, stable serialization, and Bazel-shaped
+  execroot/output layout helpers.
+- Local validation passed: `cargo test -p slug_identity_v2`, `py -3 -B
+  tools/v2_oracle list`, and the Stage 3 forbidden-surface grep over
+  `app/slug_identity_v2` returned no matches.
 ## Exact Test Criteria
 
 - Unit tests parse and round-trip at least 50 label/pattern examples copied from
