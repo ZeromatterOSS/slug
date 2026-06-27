@@ -1,0 +1,13 @@
+[fixture]
+name = "test-basic"
+description = "Stage 8 test command reports pass/fail and Bazel-compatible exit status for a shell test."
+comparison = "semantic"
+manifest_roots = ["bazel-testlogs/pkg/probe_test"]
+oracle_notes = "Regenerate with upstream Bazel 9 once test execution, logs, and BEP test events are wired."
+
+[[commands]]
+name = "passing_test"
+argv = ["test", "//pkg:probe_test", "--test_output=all"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["//pkg:probe_test"]

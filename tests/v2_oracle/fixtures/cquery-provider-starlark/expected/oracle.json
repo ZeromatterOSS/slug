@@ -1,0 +1,38 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "//pkg:thing",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//pkg:thing",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cquery_starlark",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/cquery-provider-starlark/20260626-201518-33564-bazel/workspace\n  - Only in new server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/cquery-provider-starlark/20260626-201540-11440-bazel/workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:thing (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:thing (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:thing",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\cquery-provider-starlark\\20260626-201518-33564-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\cquery-provider-starlark\\20260626-201540-11440-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:thing (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:thing (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 3.781s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:thing\n"
+    }
+  ],
+  "fixture": "cquery-provider-starlark",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

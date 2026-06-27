@@ -1,0 +1,109 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "test",
+        "//pkg:probe_test",
+        "--build_event_json_file=bep.json"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "test",
+        "//pkg:probe_test",
+        "--build_event_json_file=bep.json"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "2dc40bc438a564e09e6a18c47d181493f98786b2860ff06e9dc19d3d60d9d918",
+          "mode": "0o444",
+          "path": "test.cache_status",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": 204,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "306950988cd532976214f9c362a88c9d60c34bd8a0e6f759807e226bae783a3f",
+          "mode": "0o444",
+          "path": "test.log",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": 134,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.outputs",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.outputs_manifest",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.raw_splitlogs",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "32a741c8a13e6235f616a41c312274cbc3288c5ceb4589dde94431e5882cda7b",
+          "mode": "0o444",
+          "path": "test.xml",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": 406,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "b5a7960ced825cf944cc63ac980b9bd5729eb9875df8b879ee9cca04edaf0a16",
+          "mode": "0o666",
+          "path": "test.xml.log",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": 18,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "1f1c620a9f8c5372e790e2d3af72988407ff6f034f426961b13c022b064f9e0f",
+          "mode": "0o666",
+          "path": "bep.json",
+          "root": "bep.json",
+          "size": 85433,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "test_with_bep",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/bep-minimal-build-test/20260626-201716-32920-bazel/workspace\n  - Only in new server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/bep-minimal-build-test/20260626-201736-30364-bazel/workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe_test (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe_test (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe_test (78 packages loaded, 846 targets configured).\nINFO: Found 1 test target...\nTarget //pkg:probe_test up-to-date:\n  bazel-bin/pkg/probe_test.bat\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 6 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Build Event Protocol files produced successfully.",
+      "normalized_stdout": "//pkg:probe_test                                                (cached) PASSED in <duration>\n\nExecuted 0 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\bep-minimal-build-test\\20260626-201716-32920-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\bep-minimal-build-test\\20260626-201736-30364-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe_test (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe_test (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe_test (78 packages loaded, 846 targets configured).\nINFO: Found 1 test target...\nTarget //pkg:probe_test up-to-date:\n  bazel-bin/pkg/probe_test.bat\nINFO: Elapsed time: 4.498s, Critical Path: 0.03s\nINFO: 1 process: 6 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Build Event Protocol files produced successfully.\n",
+      "stdout": "//pkg:probe_test                                                (cached) PASSED in 0.1s\n\nExecuted 0 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.\n"
+    }
+  ],
+  "fixture": "bep-minimal-build-test",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

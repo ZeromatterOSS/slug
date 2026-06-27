@@ -1,0 +1,12 @@
+[package]
+description = "Slug V2 Bazel command surface substrate"
+edition = "2024"
+license = { workspace = true }
+name = "slug_commands_v2"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+slug_bep_v2 = { workspace = true }
+slug_identity_v2 = { workspace = true }
+slug_query_v2 = { workspace = true }

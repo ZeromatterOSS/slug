@@ -1,0 +1,12 @@
+[fixture]
+name = "cquery-provider-starlark"
+description = "Stage 8 cquery compares configured provider output through Starlark formatting."
+comparison = "semantic"
+oracle_notes = "Regenerate with upstream Bazel 9 once Stage 6 configured target providers are connected to cquery."
+
+[[commands]]
+name = "cquery_starlark"
+argv = ["cquery", "//pkg:thing", "--output=starlark", "--starlark:expr=str(target.label)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["//pkg:thing"]

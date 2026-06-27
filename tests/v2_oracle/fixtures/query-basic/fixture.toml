@@ -1,0 +1,19 @@
+[fixture]
+name = "query-basic"
+description = "Stage 8 query command compares deps text and streamed JSON-proto output for a small graph."
+comparison = "semantic"
+oracle_notes = "Regenerate with upstream Bazel 9 once Stage 8 query evaluation is wired to the V2 command runner."
+
+[[commands]]
+name = "deps_text"
+argv = ["query", "deps(//pkg:bin)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["//pkg:bin", "//pkg:lib"]
+
+[[commands]]
+name = "deps_json"
+argv = ["query", "--output=streamed_jsonproto", "deps(//pkg:bin)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["//pkg:bin", "//pkg:lib"]

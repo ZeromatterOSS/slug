@@ -1,0 +1,14 @@
+[fixture]
+name = "bep-minimal-build-test"
+description = "Stage 8 BEP fixture expects configured target, action, test result, and build finished events."
+comparison = "message_shape"
+manifest_roots = ["bep.json"]
+oracle_notes = "Regenerate with upstream Bazel 9 once Stage 8 BEP JSON emission is wired to build/test commands."
+
+[[commands]]
+name = "test_with_bep"
+argv = ["test", "//pkg:probe_test", "--build_event_json_file=bep.json"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//pkg:probe_test"]
+manifest_roots = ["bep.json", "bazel-testlogs/pkg/probe_test"]

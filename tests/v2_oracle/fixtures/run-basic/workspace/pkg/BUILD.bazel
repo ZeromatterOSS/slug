@@ -1,0 +1,6 @@
+load(":defs.bzl", "script_binary")
+
+script_binary(
+    name = "hello",
+    message = "runfile payload",
+)

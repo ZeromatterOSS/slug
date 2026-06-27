@@ -1,0 +1,12 @@
+[fixture]
+name = "run-basic"
+description = "Stage 8 run command executes an executable target and compares stdout."
+comparison = "semantic"
+oracle_notes = "Regenerate with upstream Bazel 9 once runfiles materialization and executable handoff are wired."
+
+[[commands]]
+name = "run_hello"
+argv = ["run", "//pkg:hello"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["hello slug", "runfile payload"]

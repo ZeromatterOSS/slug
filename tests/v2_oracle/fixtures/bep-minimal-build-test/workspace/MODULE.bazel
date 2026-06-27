@@ -1,0 +1,1 @@
+module(name = "bep_minimal_build_test", version = "0.1.0")

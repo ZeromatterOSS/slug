@@ -147,3 +147,54 @@ slug-v2-oracle run --fixture run-basic
 slug-v2-oracle run --fixture test-basic
 slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
 ```
+
+## Checkpoint Evidence
+
+### Command Surface Substrate
+
+- Added `slug_commands_v2`, `slug_query_v2`, and `slug_bep_v2` as Stage 8
+  substrates. The command crate parses `build`, `run`, `test`, `query`,
+  `cquery`, and `aquery` request shapes, classifies flags as parse-only,
+  ignored-compatible, or planned, and returns stage-owned placeholder errors
+  rather than inventing analysis or execution workarounds.
+- Added a query expression parser for `deps`, `rdeps`, `kind`, `attr`,
+  `filter`, `buildfiles`, and `tests`. Bazel 9's JSON query output spelling is
+  `streamed_jsonproto`; the fixture and parser tests use that spelling.
+- Added a BEP JSON-lines subset with stable IDs for build started, configured
+  target, action completed, test result, and build finished events.
+- Added command conformance fixtures `query-basic`, `run-basic`, `test-basic`,
+  `cquery-provider-starlark`, `aquery-action-shape`, and
+  `bep-minimal-build-test`. The fixtures use `MODULE.bazel` and Starlark-defined
+  rules instead of removed native shell-language rules.
+- Generated Bazel 9.1.1 expected oracle output for all six command-surface
+  fixtures. `bep-minimal-build-test` currently compares message shape because
+  raw BEP file digests are intentionally not stable between Bazel runs; add a
+  BEP-aware comparator before upgrading it to event-field comparison.
+- `run-basic` proves target execution and stdout comparison. Passthrough arg
+  preservation is pinned in `slug_commands_v2` unit tests; full runfiles and
+  platform-specific argv parity remain follow-up work once the command runner is
+  connected to Stage 7 materialization.
+
+Validation run:
+
+```bash
+cargo fmt -p slug_commands_v2 -p slug_query_v2 -p slug_bep_v2
+CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_commands_v2 -p slug_query_v2 -p slug_bep_v2
+py -3 -B -m tools.v2_oracle list
+py -3 -B -m tools.v2_oracle run --fixture query-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture cquery-provider-starlark --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture aquery-action-shape --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture run-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture test-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture bep-minimal-build-test --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+python -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py
+rg -n "buck-out|BUCK|Buck2|CellResolver|direct-local" app/slug_commands_v2 app/slug_query_v2 app/slug_bep_v2 tests/v2_oracle/fixtures/{query-basic,run-basic,test-basic,aquery-action-shape,cquery-provider-starlark,bep-minimal-build-test}
+```
+
+Skipped from the full Stage 8 validation matrix in this checkpoint:
+
+- Public ruleset fixtures (`rules_cc`, `rules_rust`, `rules_python`, protobuf,
+  bazel_skylib, rules_oci) are still pending fixture creation and dependency
+  pinning.
+- Slug-side oracle runs for the new command fixtures are pending command runner
+  wiring to loading, analysis, REAPI execution, runfiles, and BEP emission.

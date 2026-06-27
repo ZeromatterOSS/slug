@@ -1,0 +1,3 @@
+filegroup(name = "lib", srcs = ["data.txt"])
+
+filegroup(name = "bin", srcs = [":lib"])

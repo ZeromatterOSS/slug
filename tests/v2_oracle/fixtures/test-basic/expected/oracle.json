@@ -1,0 +1,100 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "test",
+        "//pkg:probe_test",
+        "--test_output=all"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "test",
+        "//pkg:probe_test",
+        "--test_output=all"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "2a9e61489ed1a8d317258c98b428838f6aa6914503d7a1782fc6fda2cbe79b52",
+          "mode": "0o444",
+          "path": "test.cache_status",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": 192,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "5f77a3768cd07d83d60ed1e52bdb0aecaa29c1b48d5ec13e7943b8164effea0e",
+          "mode": "0o444",
+          "path": "test.log",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": 133,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.outputs",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.outputs_manifest",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.raw_splitlogs",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "2d76946d7df5db5744c0319f812f7cdea6df36c5c7055f4b2e743da8ca791c36",
+          "mode": "0o444",
+          "path": "test.xml",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": 405,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "2e189fced4e3170ce7dfa9888ac626fba58243ab16771cbf4718afd73fd37e23",
+          "mode": "0o666",
+          "path": "test.xml.log",
+          "root": "bazel-testlogs/pkg/probe_test",
+          "size": 17,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "passing_test",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/test-basic/20260626-201716-37924-bazel/workspace\n  - Only in new server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/test-basic/20260626-201738-23812-bazel/workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe_test (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe_test (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe_test (78 packages loaded, 846 targets configured).\nINFO: Found 1 test target...\nTarget //pkg:probe_test up-to-date:\n  bazel-bin/pkg/probe_test.bat\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 6 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "PASSED: //pkg:probe_test (see C:/users/walter gray/appdata/local/temp/slug-v2-oracle/test-basic/bazel-output-base/execroot/_main/bazel-out/x64_windows-fastbuild/testlogs/pkg/probe_test/test.log)\nINFO: From Testing //pkg:probe_test\n==================== Test output for //pkg:probe_test:\ntest-basic-pass\n================================================================================\n//pkg:probe_test                                                (cached) PASSED in <duration>\n\nExecuted 0 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\test-basic\\20260626-201716-37924-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\test-basic\\20260626-201738-23812-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe_test (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe_test (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe_test (78 packages loaded, 846 targets configured).\nINFO: Found 1 test target...\nTarget //pkg:probe_test up-to-date:\n  bazel-bin/pkg/probe_test.bat\nINFO: Elapsed time: 4.548s, Critical Path: 0.03s\nINFO: 1 process: 6 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": "PASSED: //pkg:probe_test (see C:/users/walter gray/appdata/local/temp/slug-v2-oracle/test-basic/bazel-output-base/execroot/_main/bazel-out/x64_windows-fastbuild/testlogs/pkg/probe_test/test.log)\nINFO: From Testing //pkg:probe_test\n==================== Test output for //pkg:probe_test:\ntest-basic-pass\n================================================================================\n//pkg:probe_test                                                (cached) PASSED in 0.1s\n\nExecuted 0 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.\n"
+    }
+  ],
+  "fixture": "test-basic",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

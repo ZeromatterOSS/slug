@@ -143,12 +143,16 @@ def test_cli_list_outputs_fixture_names() -> None:
     assert "empty-module-build" in completed.stdout
 
 
-def test_expected_oracle_placeholders_are_documented() -> None:
+def test_expected_oracle_metadata_is_documented() -> None:
     for fixture in discover_fixtures(FIXTURES):
         data = json.loads(fixture.expected_oracle.read_text(encoding="utf-8"))
         assert data["fixture"] == fixture.name
-        assert data["generated"] is False
-        assert data["oracle_notes"]
+        assert isinstance(data["generated"], bool)
+        if data["generated"]:
+            assert data["tool"] == "bazel"
+            assert data["commands"]
+        else:
+            assert data["oracle_notes"]
 
 def test_validate_evidence_accepts_reapi_rows() -> None:
     evidence = scratch_dir("evidence") / "evidence.jsonl"
