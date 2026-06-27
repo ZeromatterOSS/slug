@@ -1,7 +1,34 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:bad"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_native_cc",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nERROR: <workspace>/BUILD.bazel:1:1: name 'native' is not defined\nWARNING: Target pattern parsing failed.\nERROR: Skipping '//:bad': no such target '//:bad': target 'bad' not declared in package '' defined by <workspace>/BUILD.bazel\nERROR: no such target '//:bad': target 'bad' not declared in package '' defined by <workspace>/BUILD.bazel\nINFO: Elapsed time: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nERROR: C:/dev/kuro/target/v2o/runs/no-load-native-cc-library/20260626-214527-42308-bazel/workspace/BUILD.bazel:1:1: name 'native' is not defined\nWARNING: Target pattern parsing failed.\nERROR: Skipping '//:bad': no such target '//:bad': target 'bad' not declared in package '' defined by C:/dev/kuro/target/v2o/runs/no-load-native-cc-library/20260626-214527-42308-bazel/workspace/BUILD.bazel\nERROR: no such target '//:bad': target 'bad' not declared in package '' defined by C:/dev/kuro/target/v2o/runs/no-load-native-cc-library/20260626-214527-42308-bazel/workspace/BUILD.bazel\nINFO: Elapsed time: 3.309s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "no-load-native-cc-library",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

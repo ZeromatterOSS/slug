@@ -1,7 +1,83 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//pkg:message"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:message"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806",
+          "mode": "0o444",
+          "path": "message.txt",
+          "root": "bazel-bin/pkg",
+          "size": 4,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "prime",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:message (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:message (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 3.638s, Critical Path: 0.03s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//pkg:message"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:message"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a",
+          "mode": "0o444",
+          "path": "message.txt",
+          "root": "bazel-bin/pkg",
+          "size": 4,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "MESSAGE = \"one\"",
+          "old_digest_hint": "15",
+          "path": "pkg/message.bzl",
+          "replace": "MESSAGE = \"two\""
+        }
+      ],
+      "name": "after_bzl_edit",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (1 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (1 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (1 packages loaded, 1 target configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (1 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (1 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (1 packages loaded, 1 target configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 0.200s, Critical Path: 0.01s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "load-invalidation",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

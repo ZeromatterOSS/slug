@@ -106,6 +106,17 @@ Stage 4 glob/package-boundary checkpoint:
 - Local validation passed: `cargo fmt -p slug_loading_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2`;
   `py -3 -B -m tools.v2_oracle list`; `py -3 -B -m tools.v2_oracle run --fixture glob-package-boundaries --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`;
   bundled `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; and `rg -n "BUCK|TARGETS|buckconfig|CellResolver|CellName" app/slug_loading_v2/src` returned no matches.
+
+Stage 4 Bazel oracle refresh:
+
+- Generated Bazel 9.1.1 expected oracle output for `build-file-loading`,
+  `load-invalidation`, and `no-load-native-cc-library`. The
+  `build-file-loading` query pattern was corrected to match Bazel's observed
+  `//pkg:all` behavior: it lists the rule and alias targets, not the exported
+  source file target.
+- Validation passed: `py -3 -B -m tools.v2_oracle run --fixture build-file-loading --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`;
+  same command for `load-invalidation` and `no-load-native-cc-library`; bundled
+  `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 ## Exact Test Criteria
 
 - Oracle `build-file-loading` fixture covers `exports_files`, `filegroup`,

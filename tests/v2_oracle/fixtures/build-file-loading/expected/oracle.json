@@ -1,7 +1,56 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//pkg:all"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:all"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "query_pkg_all",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:alias_fg\n//pkg:fg\n//pkg:macro_file",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:alias_fg\n//pkg:fg\n//pkg:macro_file\n"
+    },
+    {
+      "argv": [
+        "build",
+        "//pkg:fg"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:fg"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_filegroup",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:fg (4 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:fg (4 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:fg (4 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nTarget //pkg:fg up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:fg (4 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:fg (4 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:fg (4 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nTarget //pkg:fg up-to-date (nothing to build)\nINFO: Elapsed time: 0.586s, Critical Path: 0.03s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "build-file-loading",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

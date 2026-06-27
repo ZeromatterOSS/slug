@@ -10,7 +10,7 @@ name = "query_pkg_all"
 argv = ["query", "//pkg:all"]
 compare = "semantic"
 expected_exit = 0
-stdout_patterns = ["//pkg:data.txt", "//pkg:fg", "//pkg:alias_fg", "//pkg:macro_file"]
+stdout_patterns = ["//pkg:fg", "//pkg:alias_fg", "//pkg:macro_file"]
 
 [[commands]]
 name = "build_filegroup"
