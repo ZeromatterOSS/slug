@@ -1,0 +1,4 @@
+native.cc_library(
+    name = "bad",
+    srcs = ["bad.cc"],
+)

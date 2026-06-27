@@ -1,0 +1,17 @@
+load(":macros.bzl", "make_export")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["data.txt"])
+
+filegroup(
+    name = "fg",
+    srcs = ["data.txt"],
+)
+
+alias(
+    name = "alias_fg",
+    actual = ":fg",
+)
+
+make_export(name = "macro_file", src = "macro.txt")

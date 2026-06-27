@@ -1,0 +1,19 @@
+[fixture]
+name = "build-file-loading"
+description = "BUILD.bazel loading smoke with exports_files, filegroup, alias, visibility, and a loaded macro."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 4 loading is wired into Slug V2."
+
+[[commands]]
+name = "query_pkg_all"
+argv = ["query", "//pkg:all"]
+compare = "semantic"
+expected_exit = 0
+stdout_patterns = ["//pkg:data.txt", "//pkg:fg", "//pkg:alias_fg", "//pkg:macro_file"]
+
+[[commands]]
+name = "build_filegroup"
+argv = ["build", "//pkg:fg"]
+compare = "semantic"
+expected_exit = 0

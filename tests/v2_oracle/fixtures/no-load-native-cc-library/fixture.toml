@@ -1,0 +1,12 @@
+[fixture]
+name = "no-load-native-cc-library"
+description = "Bazel 9 removed native language rules; native.cc_library without rules_cc load is an error."
+comparison = "message_shape"
+oracle_notes = "Regenerate against upstream Bazel 9 and Slug V2 once Stage 4 diagnostics are wired."
+
+[[commands]]
+name = "build_native_cc"
+argv = ["build", "//:bad"]
+compare = "message_shape"
+expected_exit = 1
+stderr_patterns = ["(cc_library|rules_cc|native|no native function)"]

@@ -75,6 +75,20 @@ The first DICE keys are `BzlParseKey`, `LoadLabelResolutionKey`,
 - All filesystem reads are tracked through DICE or a watched input registry.
 - Package loading should be deterministic under parallel evaluation.
 
+
+## Checkpoint Evidence
+
+Stage 4 initial loading/file-discovery checkpoint:
+
+- Added oracle fixture placeholders for `build-file-loading` and
+  `no-load-native-cc-library` before implementation.
+- Added `slug_loading_v2` with Bazel-only workspace root discovery requiring
+  `MODULE.bazel`, `BUILD.bazel`/`BUILD` package-file discovery, `.bzl` load-label
+  parsing through `slug_identity_v2`, initial DICE key-shaped structs, and stub
+  globals for package defaults, attrs, rules, and removed native language rules.
+- Local validation passed: `cargo test -p slug_loading_v2`, `py -3 -B
+  tools/v2_oracle list`, and the Stage 4 forbidden-surface grep over
+  `app/slug_loading_v2` returned no matches.
 ## Exact Test Criteria
 
 - Oracle `build-file-loading` fixture covers `exports_files`, `filegroup`,
