@@ -1,0 +1,14 @@
+[package]
+description = "Slug V2 command line skeleton"
+edition = "2024"
+license = { workspace = true }
+name = "slug_cli_v2"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+slug_core_v2 = { workspace = true }
+
+[[bin]]
+name = "slug"
+path = "src/main.rs"

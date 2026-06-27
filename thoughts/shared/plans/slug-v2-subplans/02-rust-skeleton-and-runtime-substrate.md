@@ -92,6 +92,25 @@ CLI contract does not have to change when the daemon appears.
   `clear-dice` or `new-transaction` control so oracle fixtures can assert warm
   behavior.
 
+
+## Checkpoint Evidence
+
+Stage 2 skeleton checkpoint:
+
+- Added `slug_core_v2` with build identity, structured planned-command errors,
+  `RuntimeMode`, and placeholder capability traits for DICE, events,
+  starlark-rust, and REAPI wrappers.
+- Added `slug_cli_v2` with `slug` binary output, `version`, `help`, and planned
+  `build`, `query`, `test`, and `run` command diagnostics that preserve argv.
+- Converted `tools/v2_oracle` to a Python-executable directory so
+  `python3 tools/v2_oracle ...` still works and `tools/v2_oracle/README.md`
+  documents `SLUG_V2_BIN`.
+- Local validation used a dedicated `.codex-cargo-target` because the existing
+  `target/` tree denied rustc metadata writes under the sandbox.
+- Validation passed: `cargo check -p slug_cli_v2 -p slug_core_v2`,
+  `cargo test -p slug_cli_v2`, `cargo tree -p slug_cli_v2`,
+  `SLUG_V2_BIN=.codex-cargo-target/debug/slug.exe py -3 tools/v2_oracle run --fixture version-bazel9`,
+  and the no-Buck-surface grep over `app/slug_cli_v2 app/slug_core_v2`.
 ## Exact Test Criteria
 
 - `cargo check -p slug_cli_v2 -p slug_core_v2` passes without depending on V1
