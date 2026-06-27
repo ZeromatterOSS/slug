@@ -192,6 +192,19 @@ Stage 5 local bzlmod oracle refresh:
 - Validation passed: `py -3 -B -m tools.v2_oracle run --fixture module-file-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`;
   same command for `module-local-override`; bundled `python.exe -m pytest -q -p
   no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+
+Stage 5 include directive checkpoint:
+
+- Added `include()` to the `slug_bzlmod_v2` parser directive stream and updated
+  `module-file-directives` so its `bazel_dep` and `local_path_override` come
+  from `include("//:deps.MODULE.bazel")`. A scratch Bazel 9.1.1 probe verified
+  this include form before the fixture was updated.
+- Regenerated the `module-file-directives` Bazel oracle after the include move;
+  the fixture still proves the visible `repo_name` mapping via
+  `@dep_alias//:target.txt`.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `py -3 -B -m tools.v2_oracle run --fixture module-file-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`; bundled
+  `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

@@ -8,6 +8,7 @@ fn parses_module_directives_in_order() {
     let parsed = ModuleFile::parse(
         r#"
 module(name = "root", version = "0.0.0", compatibility_level = 1)
+include("//:deps.MODULE.bazel")
 bazel_dep(name = "dep", version = "1.0.0", repo_name = "dep_alias")
 local_path_override(module_name = "dep", path = "../dep")
 register_toolchains("//:toolchain")
@@ -20,9 +21,13 @@ register_execution_platforms("//:platform")
     assert_eq!(module.name, "root");
     assert_eq!(module.version.as_deref(), Some("0.0.0"));
     assert_eq!(module.compatibility_level, Some(1));
-    assert_eq!(parsed.directives.len(), 4);
+    assert_eq!(parsed.directives.len(), 5);
     assert_eq!(
         parsed.directives[0],
+        Directive::Include("//:deps.MODULE.bazel".to_owned())
+    );
+    assert_eq!(
+        parsed.directives[1],
         Directive::BazelDep(BazelDep {
             name: "dep".to_owned(),
             version: "1.0.0".to_owned(),
@@ -31,7 +36,7 @@ register_execution_platforms("//:platform")
         })
     );
     assert_eq!(
-        parsed.directives[1],
+        parsed.directives[2],
         Directive::LocalPathOverride(LocalPathOverride {
             module_name: "dep".to_owned(),
             path: "../dep".to_owned(),

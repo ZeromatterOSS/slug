@@ -25,6 +25,7 @@ pub struct ModuleHeader {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Directive {
+    Include(String),
     BazelDep(BazelDep),
     LocalPathOverride(LocalPathOverride),
     RegisterToolchains(Vec<String>),
@@ -64,6 +65,7 @@ impl ModuleFile {
                 "module" => {
                     module = Some(parse_module(args)?);
                 }
+                "include" => directives.push(Directive::Include(parse_single_label_arg(args)?)),
                 "bazel_dep" => directives.push(Directive::BazelDep(parse_bazel_dep(args)?)),
                 "local_path_override" => {
                     directives.push(Directive::LocalPathOverride(parse_local_path_override(
@@ -126,6 +128,14 @@ fn parse_local_path_override(args: &str) -> Result<LocalPathOverride, String> {
         module_name: required(&kwargs, "module_name")?.to_owned(),
         path: required(&kwargs, "path")?.to_owned(),
     })
+}
+
+fn parse_single_label_arg(args: &str) -> Result<String, String> {
+    let labels = parse_label_args(args)?;
+    if labels.len() != 1 {
+        return Err("include requires exactly one label".to_owned());
+    }
+    Ok(labels.into_iter().next().unwrap())
 }
 
 fn parse_label_args(args: &str) -> Result<Vec<String>, String> {
