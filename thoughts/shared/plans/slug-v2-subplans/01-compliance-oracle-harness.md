@@ -162,6 +162,16 @@ Stage 1 scaffold checkpoint:
   toolchain paths do not dominate fixture outcomes; `SLUG_V2_ORACLE_ROOT`
   still overrides the root.
 
+Stage 1 normalization checkpoint:
+
+- Extended oracle text normalization to collapse stale Bazel server
+  `--workspace_directory` paths from previous fixture runs under both the old
+  temp `slug-v2-oracle/runs/.../workspace` root and the current
+  `target/v2o/runs/.../workspace` root. This keeps regenerated expected output
+  from preserving unrelated prior run IDs when Bazel restarts its server.
+- Validation passed: `py -3 -B -m tools.v2_oracle list`; bundled
+  `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+
 ## Validation
 
 ```bash

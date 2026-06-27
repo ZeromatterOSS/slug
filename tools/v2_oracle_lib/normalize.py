@@ -7,12 +7,16 @@ from typing import Mapping
 ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 TIMING_RE = re.compile(r"\b\d+(?:\.\d+)?s\b")
 UUID_RE = re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b")
+RUN_WORKSPACE_RE = re.compile(
+    r"(?i)(?:[a-z]:)?(?:/[^:\n\r]*?)?/?(?:target/v2o|slug-v2-oracle)/runs/[^/\n\r]+/[^/\n\r]+/workspace"
+)
 
 
 def normalize_text(text: str, replacements: Mapping[str, str] | None = None) -> str:
     normalized = ANSI_RE.sub("", text)
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
     normalized = normalized.replace("\\", "/")
+    normalized = RUN_WORKSPACE_RE.sub("<workspace>", normalized)
     if replacements:
         for raw, token in sorted(replacements.items(), key=lambda item: len(item[0]), reverse=True):
             if raw:

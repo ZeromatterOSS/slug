@@ -59,6 +59,20 @@ def test_normalize_text_strips_host_specific_noise() -> None:
     assert "<uuid>" in normalized
 
 
+def test_normalize_text_strips_prior_run_workspace_paths() -> None:
+    text = (
+        "old --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/"
+        "runs/query-basic/20260626-201440-11824-bazel/workspace/pkg/BUILD.bazel\n"
+        "new --workspace_directory=c:/dev/kuro/target/v2o/"
+        "runs/query-basic/20260626-201458-16100-bazel/workspace"
+    )
+    normalized = normalize_text(text)
+    assert "<workspace>/pkg/BUILD.bazel" in normalized
+    assert "--workspace_directory=<workspace>" in normalized
+    assert "slug-v2-oracle/runs" not in normalized
+    assert "target/v2o/runs" not in normalized
+
+
 def test_manifest_records_digest_and_mode() -> None:
     root = scratch_dir("manifest")
     output = root / "out.txt"
