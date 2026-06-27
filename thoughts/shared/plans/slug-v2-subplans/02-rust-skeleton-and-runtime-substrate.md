@@ -30,6 +30,82 @@ Do not expose or depend on:
 - Buck target-pattern semantics;
 - Buck executor configuration as a user-facing compatibility layer.
 
+## Implementation Slices
+
+### 2.1 Root Crate Layout
+
+Create a small V2 crate set before porting feature code:
+
+| Crate | Purpose |
+|-------|---------|
+| `slug_cli_v2` | argument parsing, command dispatch, version/help text |
+| `slug_core_v2` | shared errors, labels to be replaced by Stage 3, runtime handles |
+| `slug_server_v2` | optional daemon boundary and DICE transaction lifecycle |
+| `slug_oracle_v2` | test-only adapter for Stage 1 harness invocation |
+
+The exact crate names can change, but the separation must stay: CLI should not
+know Buck/Starlark internals, and server/runtime should not parse user-facing
+Bazel semantics directly.
+
+Initial concrete files:
+
+- `app/slug_cli_v2/Cargo.toml`
+- `app/slug_cli_v2/src/main.rs`
+- `app/slug_cli_v2/src/lib.rs`
+- `app/slug_cli_v2/src/commands/{mod.rs,version.rs,build.rs,query.rs,test.rs,run.rs}`
+- `app/slug_cli_v2/tests/cli.rs`
+- `app/slug_core_v2/Cargo.toml`
+- `app/slug_core_v2/src/{error.rs,build_info.rs,lib.rs}`
+- `app/slug_core_v2/src/runtime/{mod.rs,dice.rs,events.rs,starlark.rs,reapi.rs}`
+- `tools/v2_oracle/README.md` documenting `SLUG_V2_BIN`
+
+Delay `app/slug_server_v2` until a Stage 4 or Stage 5 same-daemon fixture
+requires it. Keep `RuntimeMode::{OneShot,Daemon}` in `slug_core_v2` so the
+CLI contract does not have to change when the daemon appears.
+
+### 2.2 Runtime Wrappers
+
+- Add wrapper modules for `dice`, starlark-rust, event logging, and REAPI
+  clients.
+- The wrappers should expose Bazel-neutral capability traits such as
+  `IncrementalEngine`, `StarlarkEvaluator`, `EventSink`, and `RemoteExecutor`.
+- Do not pass Buck2 `CellResolver`, Buck target labels, or
+  `CommandExecutorConfig` through V2 public APIs.
+
+### 2.3 CLI and Process Contract
+
+- `slug version` reports:
+  - Slug V2;
+  - Bazel compatibility floor: `9.0.0`;
+  - commit or build info when available.
+- `slug help` lists only supported V2 commands and marks unimplemented commands
+  as planned rather than silently accepting them.
+- `build`, `test`, `run`, and query commands may initially return a structured
+  `not yet implemented` error, but the command parser must preserve argv for
+  the oracle harness.
+
+### 2.4 Daemon Policy
+
+- Start without a daemon if that keeps Stage 1 simple.
+- Introduce `slug_server_v2` only when Stage 4/5 need same-daemon invalidation.
+- The first daemon must expose a clean shutdown command and a test-only
+  `clear-dice` or `new-transaction` control so oracle fixtures can assert warm
+  behavior.
+
+## Exact Test Criteria
+
+- `cargo check -p slug_cli_v2 -p slug_core_v2` passes without depending on V1
+  app crates other than explicitly vendored Buck2 infrastructure.
+- `cargo tree -p slug_cli_v2` shows no dependency on `app/slug`, `slug_client`,
+  `slug_server`, or V1 `slug_core`.
+- `slug version` exits 0 and prints `Slug V2` plus `Bazel compatibility: >=9.0.0`.
+- `slug help` does not mention `buck`, `BUCK`, `TARGETS`, `cell`, or
+  `.buckconfig`.
+- `slug build //:x --unknown_flag` preserves the unknown Bazel-shaped flag in a
+  structured parse error for later Stage 8 handling.
+- The Stage 1 harness can invoke the V2 binary through an environment variable
+  such as `SLUG_V2_BIN`.
+
 ## Acceptance Criteria
 
 - `slug version` reports Bazel-9-compatible identity policy.
@@ -40,8 +116,10 @@ Do not expose or depend on:
 ## Validation
 
 ```bash
-cargo check -p slug
+cargo check -p slug_cli_v2 -p slug_core_v2
 cargo test -p slug_cli_v2
+SLUG_V2_BIN=target/debug/slug tools/v2_oracle run --fixture version-bazel9
+rg -n "buck|BUCK|TARGETS|CellResolver|buck-out" app/slug_cli_v2 app/slug_core_v2
 git diff --check
 ```
 
