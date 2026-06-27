@@ -163,3 +163,20 @@ slug-v2-oracle run --fixture exec-groups-action-platform --compare actions,provi
 slug-v2-oracle run --fixture transition-basic
 slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,actions
 ```
+
+## Checkpoint Evidence
+
+- 2026-06-27 Stage 6.2 build API substrate: added `slug_build_api_v2` with
+  Bazel-shaped depset order/compatibility/depth checks plus `DefaultInfo`,
+  `OutputGroupInfo`, `RunEnvironmentInfo`, `FilesToRunProvider`, `PlatformInfo`,
+  user providers, and duplicate-provider collection validation. Added
+  `custom-rule-analysis-basic` and `depset-orders-and-rejections` oracle
+  fixtures; expected Bazel outputs remain placeholders because the local
+  `bazel.exe` is Bazelisk and could not fetch Bazel under the restricted
+  network/proxy environment.
+  Validation: `cargo test -p slug_build_api_v2`; `cargo test -p
+  slug_build_api_v2 depset`; `py -3 -B tools/v2_oracle list`; `rg -n
+  "std::fs|process-global|CellResolver|buck-out" app/slug_build_api_v2`
+  returned no matches. Stage 6 commands requiring `slug_analysis_v2` or real
+  configured-target/action/toolchain execution are not yet meaningful until the
+  analysis crate and evaluator slices land.

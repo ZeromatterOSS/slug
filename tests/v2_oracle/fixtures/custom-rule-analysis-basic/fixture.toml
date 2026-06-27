@@ -1,0 +1,12 @@
+[fixture]
+name = "custom-rule-analysis-basic"
+description = "Custom rule returns DefaultInfo and a user provider for Stage 6 analysis fixtures."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 6 configured-target analysis exists."
+
+[[commands]]
+name = "build_custom_rule"
+argv = ["build", "//pkg:custom"]
+compare = "semantic"
+expected_exit = 0

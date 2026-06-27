@@ -1,0 +1,3 @@
+load(":defs.bzl", "custom_rule")
+
+custom_rule(name = "custom")

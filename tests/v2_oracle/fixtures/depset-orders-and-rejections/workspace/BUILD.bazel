@@ -1,0 +1,4 @@
+load(":defs.bzl", "depset_bad", "depset_probe")
+
+depset_probe(name = "probe")
+depset_bad(name = "bad")

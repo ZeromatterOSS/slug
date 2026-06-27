@@ -1,0 +1,18 @@
+[fixture]
+name = "depset-orders-and-rejections"
+description = "Bazel depset order and incompatible-order rejection smoke."
+comparison = "message_shape"
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 6 Starlark evaluation exists."
+
+[[commands]]
+name = "build_depset_probe"
+argv = ["build", "//:probe"]
+compare = "message_shape"
+expected_exit = 0
+
+[[commands]]
+name = "build_bad_depset_order"
+argv = ["build", "//:bad"]
+compare = "message_shape"
+expected_exit = 1
+stderr_patterns = ["Order.*preorder.*incompatible.*postorder"]
