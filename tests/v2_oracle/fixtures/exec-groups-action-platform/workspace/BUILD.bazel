@@ -1,0 +1,16 @@
+load(":defs.bzl", "linux_toolchain_impl", "probe_rule")
+
+constraint_setting(name = "os")
+constraint_value(name = "linux", constraint_setting = ":os")
+constraint_value(name = "macos", constraint_setting = ":os")
+platform(name = "exec_macos", constraint_values = [":macos"])
+platform(name = "exec_linux", constraint_values = [":linux"])
+toolchain_type(name = "demo_type")
+linux_toolchain_impl(name = "linux_impl")
+toolchain(
+    name = "linux_toolchain",
+    exec_compatible_with = [":linux"],
+    toolchain = ":linux_impl",
+    toolchain_type = ":demo_type",
+)
+probe_rule(name = "probe")

@@ -206,3 +206,15 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   `slug-v2-oracle run --fixture actions-api-basic` is still skipped because
   Stage 2 `build` is a placeholder and no configured-target evaluator/aquery
   projection exists yet.
+- 2026-06-27 Stage 6.5 toolchain/platform substrate: added explicit
+  platform constraint sets, execution platforms, registered toolchain inputs,
+  registration DICE key digests, first-compatible-platform resolution events,
+  mandatory-missing diagnostics, resolved toolchain contexts, and exec-group
+  property/context containers under `slug_analysis_v2::toolchains`. Added
+  `toolchain-resolution-first-platform` and `exec-groups-action-platform`
+  oracle fixture scaffolds. Validation: `cargo test -p slug_analysis_v2
+  toolchain`; `cargo test -p slug_analysis_v2`; `py -3 -B tools/v2_oracle
+  list`; `rg -n "std::fs|process-global|CellResolver|buck-out"
+  app/slug_analysis_v2 app/slug_build_api_v2` returned no matches. Oracle
+  fixture execution remains skipped until Stage 2 `build` grows real analysis
+  and toolchain evaluation.
