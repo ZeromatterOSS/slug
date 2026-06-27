@@ -193,11 +193,13 @@ rg -n "buck-out|BUCK|Buck2|CellResolver|direct-local" app/slug_commands_v2 app/s
 
 Skipped from the full Stage 8 validation matrix in this checkpoint:
 
-- Public ruleset fixtures (`rules_cc`, `rules_rust`, `rules_python`, protobuf,
-  bazel_skylib, rules_oci) are still pending fixture creation and dependency
-  pinning.
-- Slug-side oracle runs for the new command fixtures are pending command runner
-  wiring to loading, analysis, REAPI execution, runfiles, and BEP emission.
+- Slug-side oracle runs for the command and public-ruleset fixtures are pending
+  command runner wiring to loading, analysis, REAPI execution, runfiles, and
+  BEP emission.
+- Full `rules_oci` image execution is still a follow-up because upstream
+  Bazel/rules_oci fails on this Windows host before the daemon boundary; keep
+  the landed `rules-oci-basic-no-daemon` fixture as action-graph evidence until
+  a Linux-backed oracle or upstream wrapper fix is available.
 
 ### Public Ruleset Fixture Start
 
