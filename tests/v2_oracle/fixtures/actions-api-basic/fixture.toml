@@ -1,0 +1,12 @@
+[fixture]
+name = "actions-api-basic"
+description = "Starlark action API fixture for write, run, run_shell, symlink, and expand_template IR comparison."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 6 action IR/aquery projection exists."
+
+[[commands]]
+name = "build_actions"
+argv = ["build", "//pkg:actions"]
+compare = "semantic"
+expected_exit = 0

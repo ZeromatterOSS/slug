@@ -1,0 +1,6 @@
+load(":defs.bzl", "actions_rule")
+
+actions_rule(
+    name = "actions",
+    template = "template.txt",
+)

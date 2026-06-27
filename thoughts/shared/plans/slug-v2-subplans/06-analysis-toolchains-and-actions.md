@@ -192,3 +192,17 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   "std::fs|process-global|CellResolver|buck-out" app/slug_analysis_v2
   app/slug_build_api_v2` returned no matches. Real configured-target
   evaluation, action IR, and toolchain resolution remain open Stage 6 slices.
+- 2026-06-27 Stage 6.4 action IR substrate: added
+  `slug_build_api_v2::actions` with action specs, deterministic env/exec
+  property maps, declared output kinds, paramfile records, registry output
+  conflict checks, ctx-style declaration helpers for write/write_json/run/
+  run_shell/symlink/expand_template, and a REAPI command projection that
+  separates output files/directories without executing actions. Wired
+  `AnalysisResult` to carry action specs and added the `actions-api-basic`
+  oracle fixture scaffold. Validation: `cargo test -p slug_build_api_v2`;
+  `cargo test -p slug_analysis_v2`; `py -3 -B tools/v2_oracle list`; `rg -n
+  "std::fs|process-global|CellResolver|buck-out" app/slug_analysis_v2
+  app/slug_build_api_v2` returned no matches. The subplan oracle command
+  `slug-v2-oracle run --fixture actions-api-basic` is still skipped because
+  Stage 2 `build` is a placeholder and no configured-target evaluator/aquery
+  projection exists yet.

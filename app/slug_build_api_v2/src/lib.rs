@@ -8,9 +8,21 @@
  * above-listed licenses.
  */
 
+pub mod actions;
 pub mod depset;
 pub mod providers;
 
+pub use actions::ActionError;
+pub use actions::ActionInput;
+pub use actions::ActionKind;
+pub use actions::ActionOutput;
+pub use actions::ActionOutputKind;
+pub use actions::ActionRegistry;
+pub use actions::ActionSpec;
+pub use actions::CtxActions;
+pub use actions::ParamFile;
+pub use actions::ParamFileFormat;
+pub use actions::ReapiCommandProjection;
 pub use depset::Depset;
 pub use depset::DepsetError;
 pub use depset::DepsetOrder;

@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ProviderCollection;
 
 use crate::key::ConfiguredTargetKey;
@@ -46,6 +47,7 @@ impl AnalysisDiagnostic {
 pub struct AnalysisResult {
     key: ConfiguredTargetKey,
     providers: ProviderCollection,
+    actions: Vec<ActionSpec>,
     declared_outputs: Vec<String>,
     diagnostics: Vec<AnalysisDiagnostic>,
 }
@@ -55,6 +57,7 @@ impl AnalysisResult {
         Self {
             key,
             providers,
+            actions: Vec::new(),
             declared_outputs: Vec::new(),
             diagnostics: Vec::new(),
         }
@@ -68,12 +71,21 @@ impl AnalysisResult {
         &self.providers
     }
 
+    pub fn actions(&self) -> &[ActionSpec] {
+        &self.actions
+    }
+
     pub fn declared_outputs(&self) -> &[String] {
         &self.declared_outputs
     }
 
     pub fn diagnostics(&self) -> &[AnalysisDiagnostic] {
         &self.diagnostics
+    }
+
+    pub fn with_actions(mut self, actions: Vec<ActionSpec>) -> Self {
+        self.actions = actions;
+        self
     }
 
     pub fn with_declared_outputs(mut self, declared_outputs: Vec<String>) -> Self {

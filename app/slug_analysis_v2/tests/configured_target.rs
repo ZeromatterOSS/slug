@@ -20,6 +20,10 @@ use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::DiagnosticSeverity;
 use slug_analysis_v2::TransitionEdge;
 use slug_analysis_v2::TransitionKind;
+use slug_build_api_v2::ActionKind;
+use slug_build_api_v2::ActionOutput;
+use slug_build_api_v2::ActionOutputKind;
+use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
@@ -122,6 +126,14 @@ fn analysis_result_keeps_provider_collection_outputs_and_diagnostics() {
         ConfiguredTargetKey::new(canonical("@@//pkg:custom"), target_config()),
         providers,
     )
+    .with_actions(vec![ActionSpec::new(
+        ActionKind::Write {
+            content: "out".to_owned(),
+            is_executable: false,
+        },
+        "FileWrite",
+        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+    )])
     .with_declared_outputs(vec!["pkg/out.txt".to_owned()])
     .with_diagnostics(vec![AnalysisDiagnostic::new(
         DiagnosticSeverity::Warning,
@@ -132,6 +144,7 @@ fn analysis_result_keeps_provider_collection_outputs_and_diagnostics() {
         result.key().stable_serialize(),
         "@@//pkg:custom [target:targetabc]"
     );
+    assert_eq!(result.actions()[0].mnemonic(), "FileWrite");
     assert_eq!(result.declared_outputs(), &["pkg/out.txt".to_owned()]);
     assert_eq!(
         result.providers().default_info().unwrap().files.to_list(),
