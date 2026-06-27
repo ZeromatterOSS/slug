@@ -57,7 +57,7 @@ Before moving an entry out of `Proposed`, answer:
 | Proposed | Stage 7 / Stage 8 | Plan 34 `cc_actions` and `rules_cc` fixture themes | Stage 7 owns execution evidence; Stage 8 owns ruleset conformance breadth | `rules-cc-reapi-basic` plus Stage 8 rules_cc fixtures |
 | Reference only | Stage 7 | NativeLink source checkout | Backend contract reference, not Slug import | same REAPI evidence with `remote_service=nativelink` |
 | Reference only | Stage 7 | actiond source checkout | Optional REAPI backend validation only | same REAPI evidence with `remote_service=local_actiond` |
-| Proposed | Stage 6 | depset/provider/rule implementation tests | Port tests | Bazel depset/provider oracle probes |
+| Landed | Stage 6 | `app/slug_build_api_tests/src/interpreter/rule_defs/depset.rs`; `app/slug_build_api_tests/src/interpreter/rule_defs/provider/collection.rs` | Rewrite from behavior | V2 commits `9e519f97`, `ed636308`, `aa9b820f`; fixtures `depset-orders-and-rejections`, `custom-rule-analysis-basic`, `ctx-attrs-files-executable`, `default-info-runfiles-executable`, `provider-output-group-basic`; validation in Stage 6 plan |
 | Proposed | Stage 3 | V1 label/repo mapping helpers | Rewrite from behavior | Bazel label/output path oracle fixtures |
 | Proposed | Stage 4 | V1 `slug_interpreter_for_build` globals/loading tests | Port tests, rewrite loading boundary | Bazel `PackageFunction`/`BzlLoadFunction` fixtures |
 | Proposed | Stage 6 | V1 `cc_common` feature and provider work | Port selectively | rules_cc public fixture plus Bazel analysis oracle |
@@ -104,3 +104,16 @@ Doc-only validation:
 ```bash
 git diff --check -- thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md
 ```
+## Landed Evidence
+
+### Stage 6 depset/provider/rule context tests
+
+Status: Landed
+V2 commit: `9e519f97`, `ed636308`, `aa9b820f`
+V1 source inspected: `app/slug_build_api_tests/src/interpreter/rule_defs/depset.rs`, `app/slug_build_api_tests/src/interpreter/rule_defs/provider/collection.rs`
+Bazel oracle: Bazel 9.1 depset/provider probe expectations captured in the V1 tests plus V2 oracle fixture scaffolds
+V2 fixture: `depset-orders-and-rejections`, `custom-rule-analysis-basic`, `ctx-attrs-files-executable`, `default-info-runfiles-executable`, `provider-output-group-basic`
+Expected evidence artifact: Stage 1 oracle expected output remains placeholder until V2 configured-target analysis can execute fixtures
+Implementation summary: Rewrote behavior into V2 depset/provider/context substrates without importing V1 Buck labels, `transitive_set` coercions, or direct-local assumptions
+Validation: `cargo test -p slug_build_api_v2`; `cargo test -p slug_analysis_v2`; `py -3 -B tools/v2_oracle list`; Stage 6 shortcut grep recorded in `06-analysis-toolchains-and-actions.md`
+Residual risk: Starlark evaluator integration and Bazel-generated oracle outputs are still pending
