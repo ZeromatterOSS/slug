@@ -7,6 +7,6 @@ oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once lo
 
 [[commands]]
 name = "build_dep_target"
-argv = ["build", "@dep//:target"]
+argv = ["build", "@dep//:target.txt"]
 compare = "semantic"
 expected_exit = 0

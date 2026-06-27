@@ -179,6 +179,19 @@ Stage 5 initial bzlmod parser checkpoint:
 - Local validation passed: `cargo test -p slug_bzlmod_v2`, `py -3 -B
   tools/v2_oracle list`, and the Stage 5 shortcut grep over
   `app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 local bzlmod oracle refresh:
+
+- Generated Bazel 9.1.1 expected oracle output for the local-path bzlmod
+  fixtures `module-file-directives` and `module-local-override`. Corrected the
+  fixture labels to Bazel-visible source-file targets: `@dep_alias//:target.txt`
+  for the `repo_name` case and `@dep//:target.txt` for the plain local override.
+- `module-resolution-basic` remains deferred because it names registry modules
+  and still needs a local registry fixture before it can be generated without
+  network dependency.
+- Validation passed: `py -3 -B -m tools.v2_oracle run --fixture module-file-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`;
+  same command for `module-local-override`; bundled `python.exe -m pytest -q -p
+  no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

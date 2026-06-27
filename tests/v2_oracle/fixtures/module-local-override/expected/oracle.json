@@ -1,7 +1,34 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "@dep//:target.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "@dep//:target.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_dep_target",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:/dev/kuro/target/v2o/runs/module-local-override/20260626-214824-39540-bazel/workspace\n  - Only in new server: --workspace_directory=c:/dev/kuro/target/v2o/runs/module-local-override/20260626-214916-31156-bazel/workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@dep+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: <output_base>/external/dep+/BUILD.bazel:1:14: @@dep+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-local-override\\20260626-214824-39540-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-local-override\\20260626-214916-31156-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@dep+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: C:/dev/kuro/target/v2o/ob/module-local-override/bazel/external/dep+/BUILD.bazel:1:14: @@dep+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: 4.012s, Critical Path: 0.02s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "module-local-override",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

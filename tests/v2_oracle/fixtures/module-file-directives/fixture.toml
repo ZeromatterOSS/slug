@@ -6,6 +6,6 @@ oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once St
 
 [[commands]]
 name = "build_local_override"
-argv = ["build", "@dep//:target"]
+argv = ["build", "@dep_alias//:target.txt"]
 compare = "semantic"
 expected_exit = 0
