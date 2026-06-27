@@ -190,3 +190,19 @@ slug-v2-oracle run --fixture tag-no-remote-cache
 slug-v2-oracle run --fixture tag-no-cache
 slug-v2-oracle validate-evidence /path/to/evidence.jsonl
 ```
+## Checkpoint Evidence
+
+- 2026-06-27 Stage 7.2/7.3 REAPI substrate: added `slug_reapi_v2`
+  with remote executor/cache config parsing, Bazel-shaped bare
+  `--remote_executor` cache endpoint semantics, cache-only mode distinction,
+  remote headers/instance/default exec properties, SHA-256 REAPI digest helper,
+  Stage 6 action IR to REAPI command projection, action identity serialization,
+  and evidence rows pinning `executor_boundary = "reapi"` with zero
+  direct-local actions. Added oracle fixture scaffolds `shell-action-reapi`,
+  `bare-remote-executor-reapi`, `platform-exec-properties-reapi`, and
+  `remote-cache-only-no-execute`.
+  Validation: `cargo test -p slug_reapi_v2`; `py -3 -B tools/v2_oracle list`;
+  `rg -n "direct-local|DirectLocal|LocalWorker|buck-out|CellResolver|process-global"
+  app/slug_reapi_v2 app/slug_analysis_v2 app/slug_build_api_v2` returned no
+  matches. NativeLink startup, CAS upload, Execute, AC, and materialization are
+  not implemented yet, so Stage 7 oracle execution remains skipped.

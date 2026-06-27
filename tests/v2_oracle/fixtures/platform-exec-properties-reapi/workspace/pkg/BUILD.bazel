@@ -1,0 +1,3 @@
+load(":defs.bzl", "probe_rule")
+
+probe_rule(name = "probe")

@@ -1,0 +1,12 @@
+[fixture]
+name = "remote-cache-only-no-execute"
+description = "Remote cache-only mode must not imply remote execution."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 and NativeLink once Stage 7 execution harness exists."
+
+[[commands]]
+name = "build_probe"
+argv = ["build", "//pkg:probe", "--remote_cache=grpc://127.0.0.1:50051"]
+compare = "semantic"
+expected_exit = 0

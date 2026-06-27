@@ -1,0 +1,11 @@
+[package]
+description = "Slug V2 REAPI configuration and command substrate"
+edition = "2024"
+license = { workspace = true }
+name = "slug_reapi_v2"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+sha2 = { workspace = true }
+slug_build_api_v2 = { workspace = true }

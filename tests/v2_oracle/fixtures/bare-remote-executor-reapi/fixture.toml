@@ -1,0 +1,12 @@
+[fixture]
+name = "bare-remote-executor-reapi"
+description = "Bare --remote_executor supplies CAS/AC endpoint unless --remote_cache overrides it."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 and NativeLink once Stage 7 execution harness exists."
+
+[[commands]]
+name = "build_probe"
+argv = ["build", "//pkg:probe", "--remote_executor=grpc://127.0.0.1:50051"]
+compare = "semantic"
+expected_exit = 0
