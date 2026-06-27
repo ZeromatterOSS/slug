@@ -1,0 +1,8 @@
+filegroup(
+    name = "globbed",
+    srcs = glob(
+        include = ["*.txt", "sub/*.txt", "subpkg/*.txt"],
+        exclude = ["skip.txt"],
+        allow_empty = True,
+    ),
+)

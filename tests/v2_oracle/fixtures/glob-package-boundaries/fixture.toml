@@ -1,0 +1,24 @@
+[fixture]
+name = "glob-package-boundaries"
+description = "Bazel glob excludes explicit excludes and does not cross into subpackages."
+comparison = "message_shape"
+oracle_notes = "Generated with upstream Bazel 9.1.1 on the local Windows host."
+
+[[commands]]
+name = "query_exported_glob_files"
+argv = ["query", "--output=label_kind", "labels(srcs, //pkg:globbed)"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\Asource file //pkg:keep\\.txt\\nsource file //pkg:sub/child\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "allow_empty_false_reports_subpackage_boundary_miss"
+argv = ["query", "--output=label_kind", "labels(srcs, //pkg:globbed)"]
+compare = "message_shape"
+expected_exit = 7
+stderr_patterns = ["glob pattern 'subpkg/\\*.txt' didn't match anything", "allow_empty is set to False"]
+
+[[commands.mutations]]
+path = "pkg/BUILD.bazel"
+find = "allow_empty = True"
+replace = "allow_empty = False"

@@ -89,6 +89,23 @@ Stage 4 initial loading/file-discovery checkpoint:
 - Local validation passed: `cargo test -p slug_loading_v2`, `py -3 -B
   tools/v2_oracle list`, and the Stage 4 forbidden-surface grep over
   `app/slug_loading_v2` returned no matches.
+
+Stage 4 glob/package-boundary checkpoint:
+
+- Added the `glob-package-boundaries` Bazel oracle fixture. The fixture queries
+  `labels(srcs, //pkg:globbed)` for a `glob()`-backed filegroup, proves
+  explicit excludes plus subpackage boundaries leave only `keep.txt` and
+  `sub/child.txt`, and mutates `allow_empty = False` to capture Bazel 9.1.1's
+  per-pattern empty-glob diagnostic for the skipped subpackage pattern.
+- Implemented `slug_loading_v2::glob::expand_glob` as a deterministic loading
+  substrate using Bazel-style slash paths, sorted traversal, package-boundary
+  skipping, watched-directory recording, skipped-subpackage recording, and
+  per-include `allow_empty` validation. This is still a substrate; DICE-owned
+  package loading must consume the watched inputs before claiming same-daemon
+  invalidation parity.
+- Local validation passed: `cargo fmt -p slug_loading_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2`;
+  `py -3 -B -m tools.v2_oracle list`; `py -3 -B -m tools.v2_oracle run --fixture glob-package-boundaries --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`;
+  bundled `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; and `rg -n "BUCK|TARGETS|buckconfig|CellResolver|CellName" app/slug_loading_v2/src` returned no matches.
 ## Exact Test Criteria
 
 - Oracle `build-file-loading` fixture covers `exports_files`, `filegroup`,
