@@ -31,6 +31,8 @@ fn help_is_bazel_v2_specific() {
     let lower = stdout.to_lowercase();
     assert!(stdout.contains("build"));
     assert!(stdout.contains("query"));
+    assert!(stdout.contains("cquery"));
+    assert!(stdout.contains("aquery"));
     assert!(!lower.contains(concat!("bu", "ck")));
     assert!(!stdout.contains(concat!("BU", "CK")));
     assert!(!stdout.contains(concat!("TAR", "GETS")));
@@ -50,4 +52,16 @@ fn planned_build_preserves_unknown_bazel_flag() {
     assert!(stderr.contains("\"command\":\"build\""));
     assert!(stderr.contains("//:x"));
     assert!(stderr.contains("--unknown_flag"));
+}
+
+#[test]
+fn planned_configured_and_action_queries_are_structured() {
+    for command in ["cquery", "aquery"] {
+        let output = slug().args([command, "//:x"]).output().unwrap();
+        assert_eq!(output.status.code(), Some(2));
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains("\"error\":\"not_yet_implemented\""));
+        assert!(stderr.contains(&format!("\"command\":\"{command}\"")));
+        assert!(stderr.contains("//:x"));
+    }
 }

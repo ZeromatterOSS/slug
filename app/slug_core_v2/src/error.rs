@@ -16,6 +16,8 @@ pub enum PlannedCommand {
     Query,
     Test,
     Run,
+    Cquery,
+    Aquery,
 }
 
 impl PlannedCommand {
@@ -25,6 +27,8 @@ impl PlannedCommand {
             Self::Query => "query",
             Self::Test => "test",
             Self::Run => "run",
+            Self::Cquery => "cquery",
+            Self::Aquery => "aquery",
         }
     }
 }

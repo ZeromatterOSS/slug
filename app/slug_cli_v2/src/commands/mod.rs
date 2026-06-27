@@ -8,7 +8,9 @@
  * above-listed licenses.
  */
 
+pub mod aquery;
 pub mod build;
+pub mod cquery;
 pub mod help;
 pub mod query;
 pub mod run;
@@ -41,11 +43,13 @@ where
         }
         "build" => build::run(rest),
         "query" => query::run(rest),
+        "cquery" => cquery::run(rest),
+        "aquery" => aquery::run(rest),
         "test" => test::run(rest),
         "run" => run::run(rest),
         other => {
             eprintln!(
-                "{{\"error\":\"unknown_command\",\"command\":\"{}\",\"known_commands\":[\"version\",\"help\",\"build\",\"query\",\"test\",\"run\"]}}",
+                "{{\"error\":\"unknown_command\",\"command\":\"{}\",\"known_commands\":[\"version\",\"help\",\"build\",\"query\",\"cquery\",\"aquery\",\"test\",\"run\"]}}",
                 json_escape(other)
             );
             2

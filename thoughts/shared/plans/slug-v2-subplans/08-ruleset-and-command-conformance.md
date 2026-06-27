@@ -157,6 +157,9 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   `cquery`, and `aquery` request shapes, classifies flags as parse-only,
   ignored-compatible, or planned, and returns stage-owned placeholder errors
   rather than inventing analysis or execution workarounds.
+- Wired the top-level V2 CLI help and dispatch for `cquery` and `aquery` to
+  structured planned placeholders, keeping the command surface visible without
+  claiming configured-target or action-graph evaluation yet.
 - Added a query expression parser for `deps`, `rdeps`, `kind`, `attr`,
   `filter`, `buildfiles`, and `tests`. Bazel 9's JSON query output spelling is
   `streamed_jsonproto`; the fixture and parser tests use that spelling.
@@ -178,6 +181,8 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
 Validation run:
 
 ```bash
+cargo fmt -p slug_cli_v2 -p slug_core_v2
+CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_cli_v2 -p slug_core_v2
 cargo fmt -p slug_commands_v2 -p slug_query_v2 -p slug_bep_v2
 CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_commands_v2 -p slug_query_v2 -p slug_bep_v2
 py -3 -B -m tools.v2_oracle list

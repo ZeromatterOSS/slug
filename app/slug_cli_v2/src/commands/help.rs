@@ -10,6 +10,6 @@
 
 pub fn print_help() {
     println!(
-        "Slug V2\n\nUSAGE:\n    slug <COMMAND> [ARGS...]\n\nCOMMANDS:\n    version    Print Slug V2 and Bazel compatibility identity\n    help       Print this help text\n    build      Planned Bazel-compatible build command\n    query      Planned Bazel-compatible query command\n    test       Planned Bazel-compatible test command\n    run        Planned Bazel-compatible run command"
+        "Slug V2\n\nUSAGE:\n    slug <COMMAND> [ARGS...]\n\nCOMMANDS:\n    version    Print Slug V2 and Bazel compatibility identity\n    help       Print this help text\n    build      Planned Bazel-compatible build command\n    query      Planned Bazel-compatible query command\n    cquery     Planned Bazel-compatible configured query command\n    aquery     Planned Bazel-compatible action query command\n    test       Planned Bazel-compatible test command\n    run        Planned Bazel-compatible run command"
     );
 }
