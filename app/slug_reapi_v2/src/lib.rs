@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+pub mod action_cache;
 pub mod cas;
 pub mod command;
 pub mod config;
@@ -15,6 +16,10 @@ pub mod digest;
 pub mod evidence;
 pub mod input_tree;
 
+pub use action_cache::ActionCacheEntry;
+pub use action_cache::ActionCacheStatus;
+pub use action_cache::ActionCacheTable;
+pub use action_cache::ActionResult;
 pub use cas::CasUploadPlan;
 pub use cas::GeneratedOutput;
 pub use cas::GeneratedOutputReuploadPlan;

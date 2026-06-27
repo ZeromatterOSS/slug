@@ -225,3 +225,14 @@ slug-v2-oracle validate-evidence /path/to/evidence.jsonl
   app/slug_reapi_v2 app/slug_analysis_v2 app/slug_build_api_v2` returned no
   matches. NativeLink-backed `FindMissingBlobs`, upload, Execute,
   materialization, and AC replay remain pending.
+- 2026-06-27 Stage 7.5 action-cache substrate: added
+  `ActionDigest -> ActionResult` records, action-cache lookup table semantics,
+  local materialized-output stale detection, and remote-CAS orphaned-output
+  detection. Added fixture scaffolds `reapi-action-cache-hit`,
+  `reapi-local-action-cache-hit`, `reapi-stale-local-ac-reexec`, and
+  `reapi-orphaned-remote-ac-reexec`. Validation: `cargo test -p
+  slug_reapi_v2` passed 11 tests; `py -3 -B tools/v2_oracle list`; `rg -n
+  "direct-local|DirectLocal|LocalWorker|buck-out|CellResolver|process-global"
+  app/slug_reapi_v2 app/slug_analysis_v2 app/slug_build_api_v2` returned no
+  matches. Durable SQLite persistence, remote AC service calls, daemon restart
+  replay, and REAPI re-execution still require the Stage 7 backend harness.

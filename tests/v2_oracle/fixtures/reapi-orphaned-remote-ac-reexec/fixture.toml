@@ -1,0 +1,18 @@
+[fixture]
+name = "reapi-orphaned-remote-ac-reexec"
+description = "Remote AC entries whose output blobs are missing should re-execute through REAPI."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 and NativeLink once Stage 7 action-cache harness exists."
+
+[[commands]]
+name = "prime_cache"
+argv = ["build", "//pkg:probe"]
+compare = "semantic"
+expected_exit = 0
+
+[[commands]]
+name = "replay_cache"
+argv = ["build", "//pkg:probe"]
+compare = "semantic"
+expected_exit = 0

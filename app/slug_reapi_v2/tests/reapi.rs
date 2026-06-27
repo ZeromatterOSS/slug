@@ -211,3 +211,62 @@ fn generated_output_reupload_plan_selects_missing_outputs() {
 
     assert_eq!(plan.missing_outputs(), &[missing]);
 }
+#[test]
+fn action_cache_records_action_digest_to_action_result() {
+    use slug_reapi_v2::ActionCacheStatus;
+    use slug_reapi_v2::ActionCacheTable;
+    use slug_reapi_v2::ActionResult;
+    use slug_reapi_v2::GeneratedOutput;
+
+    let action_digest = ReapiDigest::of_bytes(b"action");
+    let output = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"out"));
+    let result = ActionResult::new(vec![output.clone()])
+        .with_stdout_digest(ReapiDigest::of_bytes(b"stdout"));
+    let mut table = ActionCacheTable::new();
+    table.insert(action_digest.clone(), result.clone());
+
+    assert_eq!(table.status_for(&action_digest), ActionCacheStatus::Hit);
+    let entry = table.lookup(&action_digest).unwrap();
+    assert_eq!(entry.action_digest(), &action_digest);
+    assert_eq!(entry.result(), &result);
+    assert_eq!(
+        entry.result().validate_local_outputs(&[output]),
+        ActionCacheStatus::Hit
+    );
+}
+
+#[test]
+fn local_action_cache_detects_stale_materialized_outputs() {
+    use slug_reapi_v2::ActionCacheStatus;
+    use slug_reapi_v2::ActionResult;
+    use slug_reapi_v2::GeneratedOutput;
+
+    let expected = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"expected"));
+    let corrupt = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"corrupt"));
+    let result = ActionResult::new(vec![expected]);
+
+    assert_eq!(
+        result.validate_local_outputs(&[corrupt]),
+        ActionCacheStatus::StaleLocal {
+            missing_paths: vec!["pkg/out.txt".to_owned()]
+        }
+    );
+}
+
+#[test]
+fn remote_action_cache_detects_orphaned_output_blobs() {
+    use slug_reapi_v2::ActionCacheStatus;
+    use slug_reapi_v2::ActionResult;
+    use slug_reapi_v2::GeneratedOutput;
+
+    let present = GeneratedOutput::new("pkg/present.txt", ReapiDigest::of_bytes(b"present"));
+    let missing = GeneratedOutput::new("pkg/missing.txt", ReapiDigest::of_bytes(b"missing"));
+    let result = ActionResult::new(vec![present.clone(), missing.clone()]);
+
+    assert_eq!(
+        result.validate_remote_cas(&[present.digest().clone()]),
+        ActionCacheStatus::OrphanedRemote {
+            missing_digests: vec![missing.digest().clone()]
+        }
+    );
+}
