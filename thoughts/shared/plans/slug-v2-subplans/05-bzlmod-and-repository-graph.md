@@ -164,6 +164,21 @@ Add oracle fixtures for:
 - yanked version with and without allowlist;
 - lockfile deleted, stale, and error-mode stale.
 
+
+## Checkpoint Evidence
+
+Stage 5 initial bzlmod parser checkpoint:
+
+- Added oracle fixture placeholders for `module-file-directives` and
+  `module-resolution-basic` before implementation.
+- Added `slug_bzlmod_v2` with an independent, order-preserving parser for the
+  initial `MODULE.bazel` directives: `module`, `bazel_dep`,
+  `local_path_override`, `register_toolchains`, and
+  `register_execution_platforms`.
+- No V1 bzlmod source was extracted in this checkpoint.
+- Local validation passed: `cargo test -p slug_bzlmod_v2`, `py -3 -B
+  tools/v2_oracle list`, and the Stage 5 shortcut grep over
+  `app/slug_bzlmod_v2` returned no matches.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

@@ -1,0 +1,6 @@
+module(name = "module_file_directives", version = "0.0.0", compatibility_level = 1)
+
+bazel_dep(name = "dep", version = "1.0.0", repo_name = "dep_alias")
+local_path_override(module_name = "dep", path = "dep")
+register_toolchains("//:toolchain")
+register_execution_platforms("//:platform")

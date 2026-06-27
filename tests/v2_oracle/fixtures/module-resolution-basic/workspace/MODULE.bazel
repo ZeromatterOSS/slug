@@ -1,0 +1,4 @@
+module(name = "module_resolution_basic", version = "0.0.0")
+
+bazel_dep(name = "aaa", version = "1.0.0")
+bazel_dep(name = "bbb", version = "2.0.0")

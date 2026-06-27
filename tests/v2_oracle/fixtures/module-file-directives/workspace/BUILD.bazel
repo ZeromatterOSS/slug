@@ -1,0 +1,4 @@
+platform(name = "platform")
+toolchain_type(name = "toolchain_type")
+toolchain(name = "toolchain", toolchain_type = ":toolchain_type", toolchain = ":toolchain_impl")
+filegroup(name = "toolchain_impl")

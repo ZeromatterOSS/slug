@@ -1,0 +1,11 @@
+[fixture]
+name = "module-file-directives"
+description = "MODULE.bazel directive smoke for module, bazel_dep, local_path_override, and registration order."
+comparison = "semantic"
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 5 bzlmod is wired into Slug V2."
+
+[[commands]]
+name = "build_local_override"
+argv = ["build", "@dep//:target"]
+compare = "semantic"
+expected_exit = 0
