@@ -9,8 +9,11 @@
  */
 
 pub mod actions;
+pub mod attrs;
+pub mod ctx;
 pub mod depset;
 pub mod providers;
+pub mod runfiles;
 
 pub use actions::ActionError;
 pub use actions::ActionInput;
@@ -23,6 +26,11 @@ pub use actions::CtxActions;
 pub use actions::ParamFile;
 pub use actions::ParamFileFormat;
 pub use actions::ReapiCommandProjection;
+pub use attrs::AttributeMap;
+pub use attrs::AttributeValue;
+pub use ctx::ResolvedCommand;
+pub use ctx::RuleContext;
+pub use ctx::RuleContextBuilder;
 pub use depset::Depset;
 pub use depset::DepsetError;
 pub use depset::DepsetOrder;
@@ -38,3 +46,4 @@ pub use providers::ProviderValue;
 pub use providers::RunEnvironmentInfo;
 pub use providers::Runfiles;
 pub use providers::UserProvider;
+pub use runfiles::RunfilesBuilder;

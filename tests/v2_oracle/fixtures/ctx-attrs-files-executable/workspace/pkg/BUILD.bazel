@@ -1,0 +1,11 @@
+load(":defs.bzl", "probe_rule", "tool_rule")
+
+tool_rule(name = "tool")
+exports_files(["main.in", "a.in", "b.in"])
+probe_rule(
+    name = "probe",
+    message = "hello",
+    src = "main.in",
+    srcs = ["a.in", "b.in"],
+    tool = ":tool",
+)

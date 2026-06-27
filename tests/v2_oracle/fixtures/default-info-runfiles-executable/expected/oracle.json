@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "fixture": "default-info-runfiles-executable",
+  "generated": false,
+  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
+  "commands": []
+}

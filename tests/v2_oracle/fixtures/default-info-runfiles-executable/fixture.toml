@@ -1,0 +1,12 @@
+[fixture]
+name = "default-info-runfiles-executable"
+description = "DefaultInfo executable and runfiles fixture."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/pkg"]
+oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 6 rule context analysis exists."
+
+[[commands]]
+name = "build_probe"
+argv = ["build", "//pkg:probe"]
+compare = "semantic"
+expected_exit = 0

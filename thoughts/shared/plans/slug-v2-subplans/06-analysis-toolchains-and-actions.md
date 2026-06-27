@@ -218,3 +218,16 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   app/slug_analysis_v2 app/slug_build_api_v2` returned no matches. Oracle
   fixture execution remains skipped until Stage 2 `build` grows real analysis
   and toolchain evaluation.
+- 2026-06-27 Stage 6.3 rule context substrate: added `slug_build_api_v2`
+  attr maps, prepared `RuleContext` accessors for `ctx.attr`, `ctx.file`,
+  `ctx.files`, `ctx.executable`, `ctx.label`, `ctx.outputs`, `ctx.actions`,
+  `ctx.fragments`, `ctx.toolchains`, `ctx.exec_groups`, `ctx.var`,
+  `expand_location`, and `resolve_command`, plus a `RunfilesBuilder` for
+  DefaultInfo runfiles. Added `ctx-attrs-files-executable`,
+  `default-info-runfiles-executable`, and `provider-output-group-basic` oracle
+  fixture scaffolds. Validation: `cargo test -p slug_build_api_v2` (rerun with
+  `CARGO_BUILD_JOBS=1` after a Windows object-file lock); `cargo test -p
+  slug_analysis_v2`; `py -3 -B tools/v2_oracle list`; `rg -n
+  "std::fs|process-global|CellResolver|buck-out" app/slug_analysis_v2
+  app/slug_build_api_v2` returned no matches. Fixture execution remains
+  skipped until Stage 2 `build` has real configured-target analysis.
