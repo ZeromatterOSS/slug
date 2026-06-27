@@ -198,3 +198,34 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
   pinning.
 - Slug-side oracle runs for the new command fixtures are pending command runner
   wiring to loading, analysis, REAPI execution, runfiles, and BEP emission.
+
+### Public Ruleset Fixture Start
+
+- Added Bazel 9 oracle fixtures for `rules-cc-basic`, `bazel-skylib-basic`,
+  and `rules-python-basic`.
+- `rules-cc-basic` covers `cc_library`, `cc_binary`, and `cc_test` with
+  `rules_cc` loaded from `@rules_cc//cc:defs.bzl`; it was expanded from the
+  Plan34 `rules_cc` fixture theme and updated to BCR-resolved module versions
+  observed under Bazel 9.1.1 (`rules_cc` 0.2.17, `bazel_features` 1.42.1,
+  `bazel_skylib` 1.8.2, `platforms` 1.0.0, `zlib` 1.3.1.bcr.5).
+- `bazel-skylib-basic` covers the `copy_file` rule from `bazel_skylib` 1.8.2.
+- `rules-python-basic` covers `py_library`, `py_binary`, and `py_test` with
+  stable `rules_python` 2.0.3 and an explicit Python 3.12 toolchain extension.
+- Bazel 9.1.1 expected oracle output was generated for all three fixtures.
+  These fixtures currently use message-shape comparison where platform-specific
+  output manifests or Python runtime runfiles would otherwise make expectations
+  noisy. Upgrade to output/runfiles comparison once the oracle manifest layer is
+  platform-aware.
+- Checked BCR metadata for the remaining public ruleset probes: protobuf 35.1,
+  rules_rust 0.71.1, and rules_oci 2.3.0. Defer those fixtures to focused
+  follow-up slices because their toolchain/rule APIs need separate oracle
+  probes.
+
+Validation run:
+
+```bash
+py -3 -B -m tools.v2_oracle list
+py -3 -B -m tools.v2_oracle run --fixture rules-cc-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture bazel-skylib-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+py -3 -B -m tools.v2_oracle run --fixture rules-python-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
+```

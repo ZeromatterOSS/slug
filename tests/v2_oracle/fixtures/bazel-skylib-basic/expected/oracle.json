@@ -1,0 +1,44 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:copy"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:copy"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "74d0e5b98a315e0f20bfdbc2ac822fc177c5ee1a3893f857dded13c03487edc0",
+          "mode": "0o444",
+          "path": "copied.txt",
+          "root": "bazel-bin/copied.txt",
+          "size": 21,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "copy_file",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/bazel-skylib-basic/20260626-202909-24088-bazel/workspace\n  - Only in new server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/bazel-skylib-basic/20260626-202924-23732-bazel/workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy (8 packages loaded, 12 targets configured).\nINFO: Found 1 target...\nTarget //:copy up-to-date:\n  bazel-bin/copied.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\bazel-skylib-basic\\20260626-202909-24088-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\bazel-skylib-basic\\20260626-202924-23732-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy (8 packages loaded, 12 targets configured).\nINFO: Found 1 target...\nTarget //:copy up-to-date:\n  bazel-bin/copied.txt\nINFO: Elapsed time: 3.834s, Critical Path: 0.02s\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "bazel-skylib-basic",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

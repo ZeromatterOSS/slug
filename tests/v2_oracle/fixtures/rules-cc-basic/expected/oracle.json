@@ -1,0 +1,645 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:hello"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:hello"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "_objs",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "_objs/hello",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "a66f66d61effafd5e2717998f0f5ee75fcc3fd581e93717ad9da505d6ede32f0",
+          "mode": "0o444",
+          "path": "_objs/hello/main.obj",
+          "root": "bazel-bin",
+          "size": 239783,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "c2565ff9c0b05dcd1c446429cc62ce5dd5da190f2792476ad8a6c8d294a66729",
+          "mode": "0o666",
+          "path": "_objs/hello/main.obj.params",
+          "root": "bazel-bin",
+          "size": 553,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "_objs/hello_lib",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "26d07a3d5e43440a2c743398ef133c3fbe6c58c5c00490b822cc29bb6f319cf8",
+          "mode": "0o444",
+          "path": "_objs/hello_lib/hello.obj",
+          "root": "bazel-bin",
+          "size": 3277,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "4e0920736cd59717a17adf99095c7fbf4b141f459e09ec98ef463a3aa380d25c",
+          "mode": "0o666",
+          "path": "_objs/hello_lib/hello.obj.params",
+          "root": "bazel-bin",
+          "size": 399,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "_objs/hello_test",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "d4f8036d7edb76f2ec6b1644e2b72f4e6dc67e9f1b84ea5d94ea602487e64058",
+          "mode": "0o444",
+          "path": "_objs/hello_test/hello_test.obj",
+          "root": "bazel-bin",
+          "size": 6239,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "95fb8dba496902d492cef4e350603c38537522ed3c058332a354d32705525d4c",
+          "mode": "0o666",
+          "path": "_objs/hello_test/hello_test.obj.params",
+          "root": "bazel-bin",
+          "size": 570,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "cceb4e7d3274ce7af02a87090306e3761a77d878dadd6dcbd30aaca2287e22eb",
+          "mode": "0o555",
+          "path": "hello.exe",
+          "root": "bazel-bin",
+          "size": 16384,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "ab83e7330dc1af902343c75df9e76538d8aa041fd97a9901ddc35b8c4c16458f",
+          "mode": "0o666",
+          "path": "hello.exe-0.params",
+          "root": "bazel-bin",
+          "size": 253,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0ad0ddfa6959e323c9e9aa8491df623b79e46abc51705e22e37a9a4e4fe57a64",
+          "mode": "0o444",
+          "path": "hello.exe.repo_mapping",
+          "root": "bazel-bin",
+          "size": 22,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "hello.exe.runfiles",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o666",
+          "path": "hello.exe.runfiles/MANIFEST",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": "\\\\?\\C:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\rules-cc-basic\\bazel-output-base\\execroot\\_main\\bazel-out\\x64_windows-fastbuild\\bin\\hello.exe.runfiles_manifest",
+          "type": "symlink"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "hello.exe.runfiles/_main",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "c60e0101c76d3c61a22bd9105a3647d2f8c42ec1bb9adf5c545aeea14d226017",
+          "mode": "0o444",
+          "path": "hello.exe.runfiles_manifest",
+          "root": "bazel-bin",
+          "size": 341,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "9d58e245b58874a38c9c4cf12f02a7a37cd17468f8e7a167a827f6c5c19ad9b4",
+          "mode": "0o444",
+          "path": "hello.pdb",
+          "root": "bazel-bin",
+          "size": 536576,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "mode": "0o444",
+          "path": "hello_lib.gen.empty.def",
+          "root": "bazel-bin",
+          "size": 0,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "2d010a724c0db7f4ec9c5c2f306920cfa86c83e35f92eda3807bc060c2f47b5b",
+          "mode": "0o444",
+          "path": "hello_lib.lib",
+          "root": "bazel-bin",
+          "size": 3662,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "fa6c6d86e0dc01f730f092b3f4eecad5845e4b5e60bb32e0e19377edcd8014de",
+          "mode": "0o666",
+          "path": "hello_lib.lib-0.params",
+          "root": "bazel-bin",
+          "size": 151,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "6f7326769fb3e023d76dd9f508faff4af770ff6e42ec2fc0488fedd26f7e6786",
+          "mode": "0o555",
+          "path": "hello_test.exe",
+          "root": "bazel-bin",
+          "size": 13312,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0162bcbc853c24c1a0957375c3c09626db0f881b8ecba7c916a02fb3aa86ffea",
+          "mode": "0o666",
+          "path": "hello_test.exe-0.params",
+          "root": "bazel-bin",
+          "size": 269,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0ad0ddfa6959e323c9e9aa8491df623b79e46abc51705e22e37a9a4e4fe57a64",
+          "mode": "0o444",
+          "path": "hello_test.exe.repo_mapping",
+          "root": "bazel-bin",
+          "size": 22,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "hello_test.exe.runfiles",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o666",
+          "path": "hello_test.exe.runfiles/MANIFEST",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": "\\\\?\\C:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\rules-cc-basic\\bazel-output-base\\execroot\\_main\\bazel-out\\x64_windows-fastbuild\\bin\\hello_test.exe.runfiles_manifest",
+          "type": "symlink"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "hello_test.exe.runfiles/_main",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "3c432679649f929d9826f71e6c87255c3e16e271acfe7abb4f6c035e911cb583",
+          "mode": "0o444",
+          "path": "hello_test.exe.runfiles_manifest",
+          "root": "bazel-bin",
+          "size": 356,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "3687b13ed1b285a0337fca2dba4cd3dfafbbc83e54b4c4d683783012e085d561",
+          "mode": "0o444",
+          "path": "hello_test.pdb",
+          "root": "bazel-bin",
+          "size": 479232,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "build_binary",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/rules-cc-basic/20260626-202734-34632-bazel/workspace\n  - Only in new server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/rules-cc-basic/20260626-202752-25364-bazel/workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:hello (5 packages loaded, 6 targets configured)\nAnalyzing: target //:hello (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:hello (84 packages loaded, 470 targets configured).\nINFO: Found 1 target...\nTarget //:hello up-to-date:\n  bazel-bin/hello.exe\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 9 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\rules-cc-basic\\20260626-202734-34632-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\rules-cc-basic\\20260626-202752-25364-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:hello (5 packages loaded, 6 targets configured)\nAnalyzing: target //:hello (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:hello (84 packages loaded, 470 targets configured).\nINFO: Found 1 target...\nTarget //:hello up-to-date:\n  bazel-bin/hello.exe\nINFO: Elapsed time: 4.303s, Critical Path: 0.02s\nINFO: 1 process: 9 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "test",
+        "//:hello_test",
+        "--test_output=errors"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "test",
+        "//:hello_test",
+        "--test_output=errors"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "_objs",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "_objs/hello",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "a66f66d61effafd5e2717998f0f5ee75fcc3fd581e93717ad9da505d6ede32f0",
+          "mode": "0o444",
+          "path": "_objs/hello/main.obj",
+          "root": "bazel-bin",
+          "size": 239783,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "c2565ff9c0b05dcd1c446429cc62ce5dd5da190f2792476ad8a6c8d294a66729",
+          "mode": "0o666",
+          "path": "_objs/hello/main.obj.params",
+          "root": "bazel-bin",
+          "size": 553,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "_objs/hello_lib",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "26d07a3d5e43440a2c743398ef133c3fbe6c58c5c00490b822cc29bb6f319cf8",
+          "mode": "0o444",
+          "path": "_objs/hello_lib/hello.obj",
+          "root": "bazel-bin",
+          "size": 3277,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "4e0920736cd59717a17adf99095c7fbf4b141f459e09ec98ef463a3aa380d25c",
+          "mode": "0o666",
+          "path": "_objs/hello_lib/hello.obj.params",
+          "root": "bazel-bin",
+          "size": 399,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "_objs/hello_test",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "d4f8036d7edb76f2ec6b1644e2b72f4e6dc67e9f1b84ea5d94ea602487e64058",
+          "mode": "0o444",
+          "path": "_objs/hello_test/hello_test.obj",
+          "root": "bazel-bin",
+          "size": 6239,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "95fb8dba496902d492cef4e350603c38537522ed3c058332a354d32705525d4c",
+          "mode": "0o666",
+          "path": "_objs/hello_test/hello_test.obj.params",
+          "root": "bazel-bin",
+          "size": 570,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "cceb4e7d3274ce7af02a87090306e3761a77d878dadd6dcbd30aaca2287e22eb",
+          "mode": "0o555",
+          "path": "hello.exe",
+          "root": "bazel-bin",
+          "size": 16384,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "ab83e7330dc1af902343c75df9e76538d8aa041fd97a9901ddc35b8c4c16458f",
+          "mode": "0o666",
+          "path": "hello.exe-0.params",
+          "root": "bazel-bin",
+          "size": 253,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0ad0ddfa6959e323c9e9aa8491df623b79e46abc51705e22e37a9a4e4fe57a64",
+          "mode": "0o444",
+          "path": "hello.exe.repo_mapping",
+          "root": "bazel-bin",
+          "size": 22,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "hello.exe.runfiles",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o666",
+          "path": "hello.exe.runfiles/MANIFEST",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": "\\\\?\\C:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\rules-cc-basic\\bazel-output-base\\execroot\\_main\\bazel-out\\x64_windows-fastbuild\\bin\\hello.exe.runfiles_manifest",
+          "type": "symlink"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "hello.exe.runfiles/_main",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "c60e0101c76d3c61a22bd9105a3647d2f8c42ec1bb9adf5c545aeea14d226017",
+          "mode": "0o444",
+          "path": "hello.exe.runfiles_manifest",
+          "root": "bazel-bin",
+          "size": 341,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "9d58e245b58874a38c9c4cf12f02a7a37cd17468f8e7a167a827f6c5c19ad9b4",
+          "mode": "0o444",
+          "path": "hello.pdb",
+          "root": "bazel-bin",
+          "size": 536576,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "mode": "0o444",
+          "path": "hello_lib.gen.empty.def",
+          "root": "bazel-bin",
+          "size": 0,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "2d010a724c0db7f4ec9c5c2f306920cfa86c83e35f92eda3807bc060c2f47b5b",
+          "mode": "0o444",
+          "path": "hello_lib.lib",
+          "root": "bazel-bin",
+          "size": 3662,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "fa6c6d86e0dc01f730f092b3f4eecad5845e4b5e60bb32e0e19377edcd8014de",
+          "mode": "0o666",
+          "path": "hello_lib.lib-0.params",
+          "root": "bazel-bin",
+          "size": 151,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "6f7326769fb3e023d76dd9f508faff4af770ff6e42ec2fc0488fedd26f7e6786",
+          "mode": "0o555",
+          "path": "hello_test.exe",
+          "root": "bazel-bin",
+          "size": 13312,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0162bcbc853c24c1a0957375c3c09626db0f881b8ecba7c916a02fb3aa86ffea",
+          "mode": "0o666",
+          "path": "hello_test.exe-0.params",
+          "root": "bazel-bin",
+          "size": 269,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0ad0ddfa6959e323c9e9aa8491df623b79e46abc51705e22e37a9a4e4fe57a64",
+          "mode": "0o444",
+          "path": "hello_test.exe.repo_mapping",
+          "root": "bazel-bin",
+          "size": 22,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "hello_test.exe.runfiles",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o666",
+          "path": "hello_test.exe.runfiles/MANIFEST",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": "\\\\?\\C:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\rules-cc-basic\\bazel-output-base\\execroot\\_main\\bazel-out\\x64_windows-fastbuild\\bin\\hello_test.exe.runfiles_manifest",
+          "type": "symlink"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "hello_test.exe.runfiles/_main",
+          "root": "bazel-bin",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "3c432679649f929d9826f71e6c87255c3e16e271acfe7abb4f6c035e911cb583",
+          "mode": "0o444",
+          "path": "hello_test.exe.runfiles_manifest",
+          "root": "bazel-bin",
+          "size": 356,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "3687b13ed1b285a0337fca2dba4cd3dfafbbc83e54b4c4d683783012e085d561",
+          "mode": "0o444",
+          "path": "hello_test.pdb",
+          "root": "bazel-bin",
+          "size": 479232,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "e6cfc217eb721fdf1d6114543ea2e9deff916e306650733e6b7538b92f15e7b5",
+          "mode": "0o444",
+          "path": "test.cache_status",
+          "root": "bazel-testlogs/hello_test",
+          "size": 192,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "68171c1cebbf8d6d5a2a69a9587b23b6eb858a2a9ffc9732286876373ba7ceb4",
+          "mode": "0o444",
+          "path": "test.log",
+          "root": "bazel-testlogs/hello_test",
+          "size": 113,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.outputs",
+          "root": "bazel-testlogs/hello_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.outputs_manifest",
+          "root": "bazel-testlogs/hello_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "test.raw_splitlogs",
+          "root": "bazel-testlogs/hello_test",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "5cb10fb1927b379f652b03aa608a52b70849e0909f37fa0b012df8e1b476367f",
+          "mode": "0o444",
+          "path": "test.xml",
+          "root": "bazel-testlogs/hello_test",
+          "size": 381,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "mode": "0o666",
+          "path": "test.xml.log",
+          "root": "bazel-testlogs/hello_test",
+          "size": 0,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "test_binary",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:hello_test (0 packages loaded, 0 targets configured)\nAnalyzing: target //:hello_test (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:hello_test (2 packages loaded, 421 targets configured).\nINFO: Found 1 test target...\nTarget //:hello_test up-to-date:\n  bazel-bin/hello_test.exe\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 7 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "//:hello_test                                                   (cached) PASSED in <duration>\n\nExecuted 0 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:hello_test (0 packages loaded, 0 targets configured)\nAnalyzing: target //:hello_test (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:hello_test (2 packages loaded, 421 targets configured).\nINFO: Found 1 test target...\nTarget //:hello_test up-to-date:\n  bazel-bin/hello_test.exe\nINFO: Elapsed time: 0.316s, Critical Path: 0.02s\nINFO: 1 process: 7 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": "//:hello_test                                                   (cached) PASSED in 0.1s\n\nExecuted 0 out of 1 test: 1 test passes.\nThere were tests whose specified size is too big. Use the --test_verbose_timeout_warnings command line option to see which ones these are.\n"
+    }
+  ],
+  "fixture": "rules-cc-basic",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

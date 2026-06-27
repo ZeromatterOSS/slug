@@ -1,0 +1,19 @@
+[fixture]
+name = "rules-python-basic"
+description = "Stage 8 rules_python fixture for py_library, py_binary, and py_test under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Uses stable rules_python 2.0.3 from the Bazel Central Registry; Python runtime manifests are intentionally not compared until platform-aware runfiles comparison lands."
+
+[[commands]]
+name = "test_python"
+argv = ["test", "//pkg:hello_test", "--test_output=errors"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//pkg:hello_test"]
+
+[[commands]]
+name = "run_python"
+argv = ["run", "//pkg:hello_bin"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["hello rules_python"]

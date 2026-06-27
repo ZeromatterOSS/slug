@@ -1,0 +1,14 @@
+[fixture]
+name = "bazel-skylib-basic"
+description = "Stage 8 bazel_skylib fixture for a common repository rule macro path under Bazel 9 bzlmod."
+comparison = "semantic"
+manifest_roots = ["bazel-bin/copied.txt"]
+oracle_notes = "Bazel 9.1.1 oracle generated with bazel_skylib 1.8.2."
+
+[[commands]]
+name = "copy_file"
+argv = ["build", "//:copy"]
+compare = "semantic"
+expected_exit = 0
+stderr_contains = ["Target //:copy up-to-date"]
+manifest_roots = ["bazel-bin/copied.txt"]

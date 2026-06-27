@@ -1,0 +1,7 @@
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+
+copy_file(
+    name = "copy",
+    src = "input.txt",
+    out = "copied.txt",
+)

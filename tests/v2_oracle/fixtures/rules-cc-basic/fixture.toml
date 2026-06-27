@@ -1,0 +1,22 @@
+[fixture]
+name = "rules-cc-basic"
+description = "Stage 8 rules_cc fixture for cc_library, cc_binary, and cc_test under Bazel 9 bzlmod."
+comparison = "message_shape"
+manifest_roots = ["bazel-bin"]
+oracle_notes = "Bazel 9.1.1 oracle generated on Windows with BCR-resolved rules_cc/toolchain module versions; upgrade to output comparison after platform-aware manifests land."
+
+[[commands]]
+name = "build_binary"
+argv = ["build", "//:hello"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Target //:hello up-to-date"]
+manifest_roots = ["bazel-bin"]
+
+[[commands]]
+name = "test_binary"
+argv = ["test", "//:hello_test", "--test_output=errors"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//:hello_test"]
+manifest_roots = ["bazel-bin", "bazel-testlogs/hello_test"]
