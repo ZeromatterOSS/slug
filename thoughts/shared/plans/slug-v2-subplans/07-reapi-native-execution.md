@@ -214,3 +214,14 @@ slug-v2-oracle validate-evidence /path/to/evidence.jsonl
   entries. Validation: `py -3 -B tools/v2_oracle validate-evidence
   target/v2_oracle_evidence_smoke.jsonl`; bundled Python `pytest -q -p
   no:cacheprovider tests/v2_oracle/test_v2_oracle.py` passed 11 tests.
+- 2026-06-27 Stage 7.3/7.4 input tree and CAS planning substrate: added
+  REAPI input tree assembly for action inputs, tools, and paramfiles, digest
+  parsing/validation, deterministic input-root digests, digest-first CAS upload
+  planning, and generated-output reupload planning. Added oracle fixture
+  scaffolds `reapi-paramfile-input-tree` and
+  `reapi-generated-output-reupload`. Validation: `cargo test -p
+  slug_reapi_v2` passed 8 tests; `py -3 -B tools/v2_oracle list`; `rg -n
+  "direct-local|DirectLocal|LocalWorker|buck-out|CellResolver|process-global"
+  app/slug_reapi_v2 app/slug_analysis_v2 app/slug_build_api_v2` returned no
+  matches. NativeLink-backed `FindMissingBlobs`, upload, Execute,
+  materialization, and AC replay remain pending.

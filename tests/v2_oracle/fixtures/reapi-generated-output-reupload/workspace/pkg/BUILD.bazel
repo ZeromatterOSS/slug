@@ -1,0 +1,4 @@
+load(":defs.bzl", "consumer_rule", "producer_rule")
+
+producer_rule(name = "producer")
+consumer_rule(name = "probe", src = ":producer")

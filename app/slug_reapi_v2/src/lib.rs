@@ -8,11 +8,16 @@
  * above-listed licenses.
  */
 
+pub mod cas;
 pub mod command;
 pub mod config;
 pub mod digest;
 pub mod evidence;
+pub mod input_tree;
 
+pub use cas::CasUploadPlan;
+pub use cas::GeneratedOutput;
+pub use cas::GeneratedOutputReuploadPlan;
 pub use command::ReapiActionIdentity;
 pub use command::ReapiCommand;
 pub use config::RemoteConfig;
@@ -20,3 +25,7 @@ pub use config::RemoteConfigError;
 pub use config::RemoteMode;
 pub use digest::ReapiDigest;
 pub use evidence::ExecutionEvidence;
+pub use input_tree::InputTreeEntryKind;
+pub use input_tree::InputTreeError;
+pub use input_tree::ReapiInputTree;
+pub use input_tree::ReapiInputTreeEntry;

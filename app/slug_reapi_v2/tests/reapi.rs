@@ -104,3 +104,110 @@ fn evidence_rows_pin_reapi_boundary_and_zero_direct_local_actions() {
     assert_eq!(evidence.ac_misses, 1);
     assert_eq!(evidence.materialized_outputs, vec![digest]);
 }
+#[test]
+fn paramfiles_are_part_of_reapi_input_tree() {
+    use slug_build_api_v2::ActionInput;
+    use slug_build_api_v2::ParamFile;
+    use slug_build_api_v2::ParamFileFormat;
+    use slug_reapi_v2::InputTreeEntryKind;
+    use slug_reapi_v2::ReapiInputTree;
+
+    let input_digest = ReapiDigest::of_bytes(b"input");
+    let tool_digest = ReapiDigest::of_bytes(b"tool");
+    let action = ActionSpec::new(
+        ActionKind::Run,
+        "Spawn",
+        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+    )
+    .with_inputs(vec![ActionInput::new(
+        "pkg/input.txt",
+        Some(input_digest.to_string()),
+    )])
+    .with_tools(vec![ActionInput::new(
+        "tools/tool.sh",
+        Some(tool_digest.to_string()),
+    )])
+    .with_param_files(vec![ParamFile::new(
+        "pkg/out.params",
+        vec!["--name".to_owned(), "Slug V2".to_owned()],
+        ParamFileFormat::ShellQuoted,
+    )]);
+
+    let tree = ReapiInputTree::from_action(&action).unwrap();
+    let paths = tree
+        .entries()
+        .iter()
+        .map(|entry| entry.path())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        paths,
+        vec!["pkg/input.txt", "pkg/out.params", "tools/tool.sh"]
+    );
+    assert!(
+        tree.entries()
+            .iter()
+            .any(|entry| entry.kind() == InputTreeEntryKind::ParamFile)
+    );
+    assert_ne!(tree.root_digest(), &ReapiDigest::of_bytes(b""));
+}
+
+#[test]
+fn missing_input_digest_is_rejected_before_upload_planning() {
+    use slug_build_api_v2::ActionInput;
+    use slug_reapi_v2::InputTreeError;
+    use slug_reapi_v2::ReapiInputTree;
+
+    let action = ActionSpec::new(
+        ActionKind::Run,
+        "Spawn",
+        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+    )
+    .with_inputs(vec![ActionInput::new("pkg/input.txt", None)]);
+
+    let err = ReapiInputTree::from_action(&action).unwrap_err();
+    assert!(matches!(err, InputTreeError::MissingDigest { .. }));
+}
+
+#[test]
+fn cas_upload_plan_is_digest_first_and_deduped() {
+    use slug_build_api_v2::ActionInput;
+    use slug_reapi_v2::CasUploadPlan;
+    use slug_reapi_v2::ReapiInputTree;
+
+    let digest = ReapiDigest::of_bytes(b"shared");
+    let action = ActionSpec::new(
+        ActionKind::Run,
+        "Spawn",
+        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+    )
+    .with_inputs(vec![
+        ActionInput::new("pkg/a.txt", Some(digest.to_string())),
+        ActionInput::new("pkg/b.txt", Some(digest.to_string())),
+    ]);
+    let tree = ReapiInputTree::from_action(&action).unwrap();
+
+    let plan = CasUploadPlan::from_missing(&tree, &[digest.clone(), tree.root_digest().clone()]);
+    assert_eq!(
+        plan.missing_blobs(),
+        &[tree.root_digest().clone(), digest.clone()]
+    );
+    assert_eq!(
+        plan.uploaded_bytes(),
+        tree.root_digest().size_bytes() + digest.size_bytes()
+    );
+}
+
+#[test]
+fn generated_output_reupload_plan_selects_missing_outputs() {
+    use slug_reapi_v2::GeneratedOutput;
+    use slug_reapi_v2::GeneratedOutputReuploadPlan;
+
+    let present = GeneratedOutput::new("pkg/present.txt", ReapiDigest::of_bytes(b"present"));
+    let missing = GeneratedOutput::new("pkg/missing.txt", ReapiDigest::of_bytes(b"missing"));
+    let plan = GeneratedOutputReuploadPlan::from_missing(
+        &[present.clone(), missing.clone()],
+        &[missing.digest().clone()],
+    );
+
+    assert_eq!(plan.missing_outputs(), &[missing]);
+}

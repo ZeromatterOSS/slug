@@ -20,6 +20,27 @@ pub struct ReapiDigest {
 }
 
 impl ReapiDigest {
+    pub fn new(hash: impl Into<String>, size_bytes: u64) -> Result<Self, String> {
+        let hash = hash.into();
+        if hash.is_empty() {
+            return Err("REAPI digest hash must not be empty".to_owned());
+        }
+        if !hash.chars().all(|ch| ch.is_ascii_hexdigit()) {
+            return Err(format!("REAPI digest hash must be hex: {hash}"));
+        }
+        Ok(Self { hash, size_bytes })
+    }
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        let Some((hash, size)) = value.split_once('/') else {
+            return Err(format!("REAPI digest must be hash/size: {value}"));
+        };
+        let size_bytes = size
+            .parse()
+            .map_err(|_| format!("REAPI digest size must be an integer: {value}"))?;
+        Self::new(hash, size_bytes)
+    }
+
     pub fn of_bytes(bytes: &[u8]) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(bytes);
