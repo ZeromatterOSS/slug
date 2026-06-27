@@ -1,0 +1,28 @@
+[fixture]
+name = "protobuf-basic"
+description = "Stage 8 protobuf fixture for Starlark proto_library, ProtoInfo, and descriptor generation under Bazel 9 bzlmod."
+comparison = "message_shape"
+manifest_roots = ["bazel-bin/pkg/msg_proto-descriptor-set.proto.bin"]
+oracle_notes = "Bazel 9.1.1 oracle generated with protobuf 35.1 from the Bazel Central Registry; provider output proves the @protobuf Starlark ProtoInfo path instead of a removed native fallback."
+
+[[commands]]
+name = "build_proto"
+argv = ["build", "//pkg:msg_proto"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Target //pkg:msg_proto up-to-date"]
+manifest_roots = ["bazel-bin/pkg/msg_proto-descriptor-set.proto.bin"]
+
+[[commands]]
+name = "cquery_protoinfo"
+argv = ["cquery", "//pkg:msg_proto", "--output=starlark", "--starlark:expr=str(providers(target))"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["ProtoInfo", "msg_proto-descriptor-set.proto.bin", "proto_info.bzl"]
+
+[[commands]]
+name = "aquery_descriptor_action"
+argv = ["aquery", "//pkg:msg_proto", "--output=text"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["Mnemonic: GenProtoDescriptorSet", "protoc", "msg_proto-descriptor-set.proto.bin"]

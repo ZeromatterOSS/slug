@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package slug.v2;
+
+message Greeting {
+  string text = 1;
+}

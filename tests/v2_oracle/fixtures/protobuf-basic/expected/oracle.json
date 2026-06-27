@@ -1,0 +1,114 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//pkg:msg_proto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:msg_proto"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "7929ec89ea132e93811129cf2f90106376eb6fd5ce2168da382bac108f03460a",
+          "mode": "0o444",
+          "path": "msg_proto-descriptor-set.proto.bin",
+          "root": "bazel-bin/pkg/msg_proto-descriptor-set.proto.bin",
+          "size": 66,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "build_proto",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:msg_proto (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:msg_proto (5 packages loaded, 6 targets configured)\n\nAnalyzing: target //pkg:msg_proto (93 packages loaded, 1407 targets configured)\n\nINFO: Analyzed target //pkg:msg_proto (94 packages loaded, 1411 targets configured).\n[1 / 3] [Prepa] Generating Descriptor Set proto_library //pkg:msg_proto ... (2 actions, 0 running)\n[2 / 3] ProtocAuthenticityCheck external/protobuf+/bazel/private/oss/toolchains/prebuilt/validation_output.txt; <duration> local\nINFO: Found 1 target...\nTarget //pkg:msg_proto up-to-date:\n  bazel-bin/pkg/msg_proto-descriptor-set.proto.bin\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 3 processes: 1 internal, 2 local.\nINFO: Build completed successfully, 3 total actions",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:msg_proto (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:msg_proto (5 packages loaded, 6 targets configured)\n\nAnalyzing: target //pkg:msg_proto (93 packages loaded, 1407 targets configured)\n\nINFO: Analyzed target //pkg:msg_proto (94 packages loaded, 1411 targets configured).\n[1 / 3] [Prepa] Generating Descriptor Set proto_library //pkg:msg_proto ... (2 actions, 0 running)\n[2 / 3] ProtocAuthenticityCheck external/protobuf+/bazel/private/oss/toolchains/prebuilt/validation_output.txt; 1s local\nINFO: Found 1 target...\nTarget //pkg:msg_proto up-to-date:\n  bazel-bin/pkg/msg_proto-descriptor-set.proto.bin\nINFO: Elapsed time: 13.088s, Critical Path: 7.02s\nINFO: 3 processes: 1 internal, 2 local.\nINFO: Build completed successfully, 3 total actions\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "//pkg:msg_proto",
+        "--output=starlark",
+        "--starlark:expr=str(providers(target))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//pkg:msg_proto",
+        "--output=starlark",
+        "--starlark:expr=str(providers(target))"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "7929ec89ea132e93811129cf2f90106376eb6fd5ce2168da382bac108f03460a",
+          "mode": "0o444",
+          "path": "msg_proto-descriptor-set.proto.bin",
+          "root": "bazel-bin/pkg/msg_proto-descriptor-set.proto.bin",
+          "size": 66,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "cquery_protoinfo",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:msg_proto (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:msg_proto (94 packages loaded, 1411 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "{\"@@protobuf+//bazel/private:proto_info.bzl%ProtoInfo\": struct(check_deps_sources = depset([<source file pkg/msg.proto>]), direct_descriptor_set = <generated file pkg/msg_proto-descriptor-set.proto.bin>, direct_sources = [<source file pkg/msg.proto>], proto_source_root = \".\", transitive_descriptor_sets = depset([<generated file pkg/msg_proto-descriptor-set.proto.bin>]), transitive_extension_declarations = depset([]), transitive_proto_path = depset([\".\"]), transitive_sources = depset([<source file pkg/msg.proto>], order = \"preorder\")), \"FileProvider\": <unknown object com.google.devtools.build.lib.analysis.FileProvider>, \"FilesToRunProvider\": <unknown object com.google.devtools.build.lib.analysis.FilesToRunProvider>, \"OutputGroupInfo\": struct(_hidden_top_level_INTERNAL_ = depset([]), _validation = depset([<generated file external/protobuf+/bazel/private/oss/toolchains/prebuilt/validation_output.txt>])), \"DefaultInfo\": struct(data_runfiles = <unknown object com.google.devtools.build.lib.analysis.Runfiles>, default_runfiles = <unknown object com.google.devtools.build.lib.analysis.Runfiles>, files = depset([<generated file pkg/msg_proto-descriptor-set.proto.bin>]), files_to_run = <unknown object com.google.devtools.build.lib.analysis.FilesToRunProvider>)}",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:msg_proto (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:msg_proto (94 packages loaded, 1411 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.711s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "{\"@@protobuf+//bazel/private:proto_info.bzl%ProtoInfo\": struct(check_deps_sources = depset([<source file pkg/msg.proto>]), direct_descriptor_set = <generated file pkg/msg_proto-descriptor-set.proto.bin>, direct_sources = [<source file pkg/msg.proto>], proto_source_root = \".\", transitive_descriptor_sets = depset([<generated file pkg/msg_proto-descriptor-set.proto.bin>]), transitive_extension_declarations = depset([]), transitive_proto_path = depset([\".\"]), transitive_sources = depset([<source file pkg/msg.proto>], order = \"preorder\")), \"FileProvider\": <unknown object com.google.devtools.build.lib.analysis.FileProvider>, \"FilesToRunProvider\": <unknown object com.google.devtools.build.lib.analysis.FilesToRunProvider>, \"OutputGroupInfo\": struct(_hidden_top_level_INTERNAL_ = depset([]), _validation = depset([<generated file external/protobuf+/bazel/private/oss/toolchains/prebuilt/validation_output.txt>])), \"DefaultInfo\": struct(data_runfiles = <unknown object com.google.devtools.build.lib.analysis.Runfiles>, default_runfiles = <unknown object com.google.devtools.build.lib.analysis.Runfiles>, files = depset([<generated file pkg/msg_proto-descriptor-set.proto.bin>]), files_to_run = <unknown object com.google.devtools.build.lib.analysis.FilesToRunProvider>)}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//pkg:msg_proto",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//pkg:msg_proto",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "7929ec89ea132e93811129cf2f90106376eb6fd5ce2168da382bac108f03460a",
+          "mode": "0o444",
+          "path": "msg_proto-descriptor-set.proto.bin",
+          "root": "bazel-bin/pkg/msg_proto-descriptor-set.proto.bin",
+          "size": 66,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "aquery_descriptor_action",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:msg_proto (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:msg_proto (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "action 'Generating Descriptor Set proto_library //pkg:msg_proto'\n  Mnemonic: GenProtoDescriptorSet\n  Target: //pkg:msg_proto\n  Configuration: x64_windows-fastbuild\n  Execution platform: @@platforms//host:host\n  ActionKey: 4a5976240dcf06d2dc20b18fca775ec005520ce5b53cc082519da310227f0065\n  Inputs: [external/protobuf++protoc+prebuilt_protoc.win64/bin/protoc.exe, pkg/msg.proto]\n  Outputs: [bazel-out/x64_windows-fastbuild/bin/pkg/msg_proto-descriptor-set.proto.bin]\n  Environment: [PATH=C:/windows/system32;C:/WINDOWS;C:/WINDOWS/System32;C:/WINDOWS/System32/WindowsPowerShell/v1.0, RUNFILES_MANIFEST_ONLY=1]\n  Command Line: external/protobuf++protoc+prebuilt_protoc.win64/bin/protoc.exe /\n    --descriptor_set_out=bazel-out/x64_windows-fastbuild/bin/pkg/msg_proto-descriptor-set.proto.bin /\n    -I. /\n    pkg/msg.proto /\n    --retain_options /\n    --direct_dependencies /\n    pkg/msg.proto /\n    --direct_dependencies_violation_msg=%s is imported, but //pkg:msg_proto doesn't have direct `deps` on a proto_library that 'srcs' it. /\n    --option_dependencies /\n    pkg/msg.proto /\n    --option_dependencies_violation_msg=%s is option imported, but //pkg:msg_proto doesn't have direct `option_deps` on a proto_library that 'srcs' it.\n# Configuration: 19cc2552cfb0d9433b48337adcb68b8e355e3b8e33e1260ff4f592518aca6f8a\n# Execution platform: @@platforms//host:host",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:msg_proto (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:msg_proto (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.095s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "action 'Generating Descriptor Set proto_library //pkg:msg_proto'\n  Mnemonic: GenProtoDescriptorSet\n  Target: //pkg:msg_proto\n  Configuration: x64_windows-fastbuild\n  Execution platform: @@platforms//host:host\n  ActionKey: 4a5976240dcf06d2dc20b18fca775ec005520ce5b53cc082519da310227f0065\n  Inputs: [external/protobuf++protoc+prebuilt_protoc.win64/bin/protoc.exe, pkg/msg.proto]\n  Outputs: [bazel-out/x64_windows-fastbuild/bin/pkg/msg_proto-descriptor-set.proto.bin]\n  Environment: [PATH=C:\\windows\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0, RUNFILES_MANIFEST_ONLY=1]\n  Command Line: external\\protobuf++protoc+prebuilt_protoc.win64\\bin\\protoc.exe \\\n    --descriptor_set_out=bazel-out/x64_windows-fastbuild/bin/pkg/msg_proto-descriptor-set.proto.bin \\\n    -I. \\\n    pkg/msg.proto \\\n    --retain_options \\\n    --direct_dependencies \\\n    pkg/msg.proto \\\n    --direct_dependencies_violation_msg=%s is imported, but //pkg:msg_proto doesn't have direct `deps` on a proto_library that 'srcs' it. \\\n    --option_dependencies \\\n    pkg/msg.proto \\\n    --option_dependencies_violation_msg=%s is option imported, but //pkg:msg_proto doesn't have direct `option_deps` on a proto_library that 'srcs' it.\n# Configuration: 19cc2552cfb0d9433b48337adcb68b8e355e3b8e33e1260ff4f592518aca6f8a\n# Execution platform: @@platforms//host:host\n\n"
+    }
+  ],
+  "fixture": "protobuf-basic",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
