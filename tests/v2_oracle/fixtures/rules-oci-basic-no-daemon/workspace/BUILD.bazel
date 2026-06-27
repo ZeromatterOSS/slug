@@ -1,0 +1,21 @@
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+
+oci_image(
+    name = "image",
+    architecture = "amd64",
+    cmd = ["/hello"],
+    labels = {"org.opencontainers.image.title": "slug-v2-rules-oci"},
+    os = "linux",
+)
+
+oci_load(
+    name = "load",
+    image = ":image",
+    repo_tags = ["slug.local/rules-oci:latest"],
+)
+
+filegroup(
+    name = "image_tar",
+    srcs = [":load"],
+    output_group = "tarball",
+)

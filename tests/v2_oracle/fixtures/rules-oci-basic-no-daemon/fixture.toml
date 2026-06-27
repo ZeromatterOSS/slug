@@ -1,0 +1,19 @@
+[fixture]
+name = "rules-oci-basic-no-daemon"
+description = "Stage 8 rules_oci fixture for daemonless OCI image and tarball action graph analysis under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 oracle generated with rules_oci 2.3.0. On this Windows host, upstream Bazel/rules_oci image execution fails before any daemon boundary because the generated shell wrapper loses Windows JSON quoting; this fixture captures the stable OCIImage and OCITarball action graph until a Linux-backed build oracle is available."
+
+[[commands]]
+name = "aquery_image_actions"
+argv = ["aquery", "//:image", "--output=summary"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["OCIImage: 1", "TemplateExpand: 1"]
+
+[[commands]]
+name = "aquery_tarball_actions"
+argv = ["aquery", "//:load", "--output=summary"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["OCITarball: 1", "OCITarballManifest: 1", "RunfilesTree: 1"]

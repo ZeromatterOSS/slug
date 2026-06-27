@@ -1,0 +1,60 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "aquery",
+        "//:image",
+        "--output=summary"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:image",
+        "--output=summary"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "aquery_image_actions",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:image (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:image (104 packages loaded, 592 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "3 total actions.\n\nMnemonics:\n  OCIImage: 1\n  FileWrite: 1\n  TemplateExpand: 1\n\nConfigurations:\n  x64_windows-fastbuild: 3\n\nExecution Platforms:\n  @@platforms//host:host: 3",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:image (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:image (104 packages loaded, 592 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 4.843s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "3 total actions.\n\nMnemonics:\n  OCIImage: 1\n  FileWrite: 1\n  TemplateExpand: 1\n\nConfigurations:\n  x64_windows-fastbuild: 3\n\nExecution Platforms:\n  @@platforms//host:host: 3\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:load",
+        "--output=summary"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:load",
+        "--output=summary"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "aquery_tarball_actions",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:load (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:load (107 packages loaded, 605 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "9 total actions.\n\nMnemonics:\n  OCITarball: 1\n  SymlinkTree: 1\n  OCITarballManifest: 1\n  SourceSymlinkManifest: 1\n  RepoMappingManifest: 1\n  FileWrite: 1\n  RunfilesTree: 1\n  TemplateExpand: 2\n\nConfigurations:\n  x64_windows-fastbuild: 9\n\nExecution Platforms:\n  @@platforms//host:host: 9",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:load (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:load (107 packages loaded, 605 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.644s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "9 total actions.\n\nMnemonics:\n  OCITarball: 1\n  SymlinkTree: 1\n  OCITarballManifest: 1\n  SourceSymlinkManifest: 1\n  RepoMappingManifest: 1\n  FileWrite: 1\n  RunfilesTree: 1\n  TemplateExpand: 2\n\nConfigurations:\n  x64_windows-fastbuild: 9\n\nExecution Platforms:\n  @@platforms//host:host: 9\n"
+    }
+  ],
+  "fixture": "rules-oci-basic-no-daemon",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
