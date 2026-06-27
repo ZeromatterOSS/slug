@@ -1,0 +1,12 @@
+[fixture]
+name = "module-override-validation"
+description = "Root MODULE.bazel override directives are parsed before Bazel rejects overrides for nonexistent modules."
+comparison = "message_shape"
+oracle_notes = "Generated with upstream Bazel 9.1.1. This fixture intentionally avoids network/archive fetches by relying on Bazel's missing-module override validation."
+
+[[commands]]
+name = "query_rejects_missing_override_targets"
+argv = ["query", "//:all"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["root module specifies overrides on nonexistent module(s): single_missing, multi_missing, archive_missing, git_missing"]

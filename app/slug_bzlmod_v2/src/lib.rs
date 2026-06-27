@@ -10,8 +10,12 @@
 
 pub mod parser;
 
+pub use parser::ArchiveOverride;
 pub use parser::BazelDep;
 pub use parser::Directive;
+pub use parser::GitOverride;
 pub use parser::LocalPathOverride;
 pub use parser::ModuleFile;
 pub use parser::ModuleHeader;
+pub use parser::MultipleVersionOverride;
+pub use parser::SingleVersionOverride;

@@ -217,6 +217,19 @@ Stage 5 local transitive module-resolution checkpoint:
   registry fixtures.
 - Validation passed: `py -3 -B -m tools.v2_oracle run --fixture module-resolution-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`; bundled
   `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+
+Stage 5 override directive parser checkpoint:
+
+- Added `module-override-validation`, a Bazel 9.1.1 oracle fixture proving
+  `single_version_override`, `multiple_version_override`, `archive_override`,
+  and `git_override` are parsed before Bazel rejects root overrides for
+  nonexistent modules with query exit code 48.
+- Extended `slug_bzlmod_v2` parsing with typed override directive structs,
+  string-list values, boolean values, integer values, and order-preserving
+  directive capture. No V1 bzlmod implementation was extracted.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `py -3 -B -m tools.v2_oracle run --fixture module-override-validation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including
