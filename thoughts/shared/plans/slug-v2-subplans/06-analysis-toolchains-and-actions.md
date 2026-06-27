@@ -180,3 +180,15 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   returned no matches. Stage 6 commands requiring `slug_analysis_v2` or real
   configured-target/action/toolchain execution are not yet meaningful until the
   analysis crate and evaluator slices land.
+- 2026-06-27 Stage 6.1 configured-target key substrate: added
+  `slug_analysis_v2` with configuration checksums/kinds, configured target
+  keys based on Stage 3 canonical labels, transition edges, DICE key-shaped
+  semantic input digests for command-line/build-setting/repository/toolchain
+  policy, and an `AnalysisResult` shell over the V2 provider collection. The
+  DICE scaffold introduces no locks or process-global semantic state.
+  Validation: `cargo test -p slug_analysis_v2`; `cargo test -p
+  slug_analysis_v2 toolchain` currently has zero matching tests; `py -3 -B
+  tools/v2_oracle list`; `rg -n
+  "std::fs|process-global|CellResolver|buck-out" app/slug_analysis_v2
+  app/slug_build_api_v2` returned no matches. Real configured-target
+  evaluation, action IR, and toolchain resolution remain open Stage 6 slices.
