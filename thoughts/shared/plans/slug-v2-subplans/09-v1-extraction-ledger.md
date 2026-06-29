@@ -16,6 +16,12 @@ An extraction is acceptable only when it has:
   reject;
 - validation evidence after landing.
 
+The current mixed-root `codex/slugv2` branch is treated as an extraction source
+too. Importing code or fixtures from that branch into a clean-root V2 line must
+record whether the import is a direct cherry-pick, a port, a rewrite from
+behavior, or reference-only. Do not treat mixed-root commits as already accepted
+V2 trunk work merely because they compile in the old workspace.
+
 ## Workflow
 
 1. Open the V2 owner plan and identify the exact behavior needed.
