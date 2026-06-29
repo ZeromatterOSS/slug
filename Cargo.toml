@@ -2,113 +2,17 @@
 members = [
     "allocative/allocative",
     "allocative/allocative_derive",
-    "app/slug",
+    "app/slug_analysis_v2",
     "app/slug_bep_v2",
+    "app/slug_build_api_v2",
+    "app/slug_bzlmod_v2",
     "app/slug_cli_v2",
     "app/slug_commands_v2",
     "app/slug_core_v2",
     "app/slug_identity_v2",
-    "app/slug_query_v2",
     "app/slug_loading_v2",
-    "app/slug_build_api_v2",
-    "app/slug_analysis_v2",
+    "app/slug_query_v2",
     "app/slug_reapi_v2",
-    "app/slug_action_impl",
-    "app/slug_action_impl_tests",
-    "app/slug_action_metadata_proto",
-    "app/slug_analysis",
-    "app/slug_anon_target",
-    "app/slug_cmd_audit_client",
-    "app/slug_cmd_audit_server",
-    "app/slug_bxl",
-    "app/slug_build_event_stream",
-    "app/slug_build_info",
-    "app/slug_certs",
-    "app/slug_cfg_constructor",
-    "app/slug_client",
-    "app/slug_client_ctx",
-    "app/slug_cmd_completion_client",
-    "app/slug_cmd_debug_client",
-    "app/slug_cmd_docs_client",
-    "app/slug_cmd_docs_server",
-    "app/slug_cmd_log_client",
-    "app/slug_cmd_query_server",
-    "app/slug_cmd_rage_client",
-    "app/slug_common",
-    "app/slug_env",
-    "app/slug_configured",
-    "app/slug_core",
-    "app/slug_cli_proto",
-    "app/slug_cmd_targets_server",
-    "app/slug_daemon",
-    "app/slug_directory",
-    "app/slug_downward_api",
-    "app/slug_downward_api_proto",
-    "app/slug_error",
-    "app/slug_error_derive",
-    "app/slug_error_tests",
-    "app/slug_errorformat",
-    "app/slug_event_observer",
-    "app/slug_events",
-    "app/slug_event_log",
-    "app/slug_execute",
-    "app/slug_execute_impl",
-    "app/slug_execute_local",
-    "app/slug_sandbox",
-    "app/slug_external_cells",
-    "app/slug_external_cells_bundled",
-    "app/slug_grpc",
-    "app/slug_health_check",
-    "app/slug_health_check_proto",
-    "app/slug_http",
-    "app/slug_install_proto",
-    "app/slug_interpreter",
-    "app/slug_interpreter_for_build",
-    "app/slug_interpreter_for_build_tests",
-    "app/slug_miniperf",
-    "app/slug_miniperf_proto",
-    "app/slug_node",
-    "app/slug_node_tests",
-    "app/slug_offline_archive",
-    "app/slug_artifact",
-    "app/slug_cmd_starlark_client",
-    "app/slug_cmd_starlark_server",
-    "app/slug_test",
-    "app/slug_test_api",
-    "app/slug_test_proto",
-    "app/slug_test_runner",
-    "app/slug_forkserver",
-    "app/slug_forkserver_proto",
-    "app/slug_fs",
-    "app/slug_profile",
-    "app/slug_protoc_dev",
-    "app/slug_query",
-    "app/slug_query_impls",
-    "app/slug_query_parser",
-    "app/slug_query_derive",
-    "app/slug_re_configuration",
-    "app/slug_resource_control",
-    "app/slug_server",
-    "app/slug_server_commands",
-    "app/slug_server_ctx",
-    "app/slug_server_starlark_debug",
-    "app/slug_transition",
-    "app/slug_util",
-    "app/slug_data",
-    "app/slug_worker_proto",
-    "app/slug_wrapper_common",
-    "app/slug_build_api",
-    "app/slug_build_api_derive",
-    "app/slug_build_api_tests",
-    "app/slug_subscription_proto",
-    "app/slug_critical_path",
-    "app/slug_build_signals",
-    "app/slug_bzlmod_v2",
-    "app/slug_build_signals_impl",
-    "app/slug_bzlmod",
-    "app/slug_eden",
-    "app/slug_validation",
-    "app/slug_host_sharing_proto",
     "dice/dice",
     "dice/dice_error",
     "dice/dice_examples",
@@ -124,12 +28,8 @@ members = [
     "gazebo/strong_hash",
     "gazebo/strong_hash_derive",
     "gazebo/strong_hash_tests",
-    "integrations/resources/rust",
-    "integrations/rust-project",
     "pagable",
     "pagable_derive",
-    "remote_execution/oss/re_grpc",
-    "remote_execution/oss/re_grpc_proto",
     "starlark-rust/starlark",
     "starlark-rust/starlark_bin",
     "starlark-rust/starlark_derive",
@@ -378,13 +278,11 @@ dupe.version = "0.9.0"
 gazebo.features = ["str_pattern_extensions"]
 gazebo.path = "gazebo/gazebo"
 gazebo.version = "0.8.1"
-host_sharing = { path = "host_sharing" }
 lock_free_hashtable = { version = "0.1.0", path = "shed/lock_free_hashtable" }
 lock_free_vec = { path = "shed/lock_free_vec" }
 pagable = { path = "pagable" }
 pagable_derive = { path = "pagable_derive" }
 provider = { path = "shed/provider" }
-remote_execution = { path = "remote_execution/oss/re_grpc" }
 setsketch = { path = "shed/setsketch" }
 starlark = { version = "0.13.0", path = "starlark-rust/starlark" }
 starlark_lsp = { version = "0.13.0", path = "starlark-rust/starlark_lsp" }
@@ -396,108 +294,16 @@ strong_hash.path = "gazebo/strong_hash"
 strong_hash_derive = { path = "gazebo/strong_hash_derive" }
 three_billion_instructions = { path = "shed/three_billion_instructions" }
 
-slug_action_impl = { path = "app/slug_action_impl" }
-slug_action_metadata_proto = { path = "app/slug_action_metadata_proto" }
 slug_analysis_v2 = { path = "app/slug_analysis_v2" }
-slug_analysis = { path = "app/slug_analysis" }
-slug_anon_target = { path = "app/slug_anon_target" }
-slug_artifact = { path = "app/slug_artifact" }
-slug_build_api = { path = "app/slug_build_api" }
-slug_build_api_derive = { path = "app/slug_build_api_derive" }
 slug_build_api_v2 = { path = "app/slug_build_api_v2" }
 slug_bep_v2 = { path = "app/slug_bep_v2" }
-slug_build_event_stream = { path = "app/slug_build_event_stream" }
-slug_build_info = { path = "app/slug_build_info" }
-slug_build_signals = { path = "app/slug_build_signals" }
-slug_build_signals_impl = { path = "app/slug_build_signals_impl" }
-slug_bxl = { path = "app/slug_bxl" }
-slug_bzlmod = { path = "app/slug_bzlmod" }
 slug_bzlmod_v2 = { path = "app/slug_bzlmod_v2" }
-slug_certs = { path = "app/slug_certs" }
-slug_cfg_constructor = { path = "app/slug_cfg_constructor" }
-slug_cli_proto = { path = "app/slug_cli_proto" }
-slug_client = { path = "app/slug_client" }
-slug_client_ctx = { path = "app/slug_client_ctx" }
-slug_cmd_audit_client = { path = "app/slug_cmd_audit_client" }
-slug_cmd_audit_server = { path = "app/slug_cmd_audit_server" }
-slug_cmd_completion_client = { path = "app/slug_cmd_completion_client" }
-slug_cmd_debug_client = { path = "app/slug_cmd_debug_client" }
-slug_cmd_docs_client = { path = "app/slug_cmd_docs_client" }
-slug_cmd_docs_server = { path = "app/slug_cmd_docs_server" }
-slug_cmd_log_client = { path = "app/slug_cmd_log_client" }
-slug_cmd_query_server = { path = "app/slug_cmd_query_server" }
-slug_cmd_rage_client = { path = "app/slug_cmd_rage_client" }
-slug_cmd_starlark_client = { path = "app/slug_cmd_starlark_client" }
-slug_cmd_starlark_server = { path = "app/slug_cmd_starlark_server" }
-slug_cmd_targets_server = { path = "app/slug_cmd_targets_server" }
-slug_common = { path = "app/slug_common" }
-slug_configured = { path = "app/slug_configured" }
-slug_core = { path = "app/slug_core" }
 slug_commands_v2 = { path = "app/slug_commands_v2" }
 slug_core_v2 = { path = "app/slug_core_v2" }
-slug_critical_path = { path = "app/slug_critical_path" }
-slug_daemon = { path = "app/slug_daemon" }
-slug_data = { path = "app/slug_data" }
-slug_directory = { path = "app/slug_directory" }
-slug_downward_api = { path = "app/slug_downward_api" }
-slug_downward_api_proto = { path = "app/slug_downward_api_proto" }
-slug_eden = { path = "app/slug_eden" }
-slug_env = { path = "app/slug_env" }
-slug_error = { path = "app/slug_error" }
-slug_error_derive = { path = "app/slug_error_derive" }
-slug_errorformat = { path = "app/slug_errorformat" }
-slug_event_log = { path = "app/slug_event_log" }
-slug_event_observer = { path = "app/slug_event_observer" }
-slug_events = { path = "app/slug_events" }
-slug_execute = { path = "app/slug_execute" }
-slug_execute_impl = { path = "app/slug_execute_impl" }
-slug_execute_local = { path = "app/slug_execute_local" }
-slug_sandbox = { path = "app/slug_sandbox" }
-slug_external_cells = { path = "app/slug_external_cells" }
-slug_external_cells_bundled = { path = "app/slug_external_cells_bundled" }
-slug_file_watcher = { path = "app/slug_file_watcher" }
-slug_forkserver = { path = "app/slug_forkserver" }
-slug_forkserver_proto = { path = "app/slug_forkserver_proto" }
-slug_fs = { path = "app/slug_fs" }
-slug_grpc = { path = "app/slug_grpc" }
-slug_health_check = { path = "app/slug_health_check" }
-slug_health_check_proto = { path = "app/slug_health_check_proto" }
-slug_host_sharing_proto = { path = "app/slug_host_sharing_proto" }
-slug_http = { path = "app/slug_http" }
 slug_identity_v2 = { path = "app/slug_identity_v2" }
-slug_install_proto = { path = "app/slug_install_proto" }
 slug_loading_v2 = { path = "app/slug_loading_v2" }
-slug_interpreter = { path = "app/slug_interpreter" }
-slug_interpreter_for_build = { path = "app/slug_interpreter_for_build" }
-slug_interpreter_for_build_tests = { path = "app/slug_interpreter_for_build_tests" }
-slug_miniperf = { path = "app/slug_miniperf" }
-slug_miniperf_proto = { path = "app/slug_miniperf_proto" }
-slug_node = { path = "app/slug_node" }
-slug_offline_archive = { path = "app/slug_offline_archive" }
-slug_profile = { path = "app/slug_profile" }
-slug_protoc_dev = { path = "app/slug_protoc_dev" }
-slug_query = { path = "app/slug_query" }
-slug_query_derive = { path = "app/slug_query_derive" }
-slug_query_impls = { path = "app/slug_query_impls" }
-slug_query_parser = { path = "app/slug_query_parser" }
 slug_query_v2 = { path = "app/slug_query_v2" }
 slug_reapi_v2 = { path = "app/slug_reapi_v2" }
-slug_re_configuration = { path = "app/slug_re_configuration" }
-slug_resource_control = { path = "app/slug_resource_control" }
-slug_server = { path = "app/slug_server" }
-slug_server_commands = { path = "app/slug_server_commands" }
-slug_server_ctx = { path = "app/slug_server_ctx" }
-slug_server_starlark_debug = { path = "app/slug_server_starlark_debug" }
-slug_subscription_proto = { path = "app/slug_subscription_proto" }
-slug_test = { path = "app/slug_test" }
-slug_test_api = { path = "app/slug_test_api" }
-slug_test_proto = { path = "app/slug_test_proto" }
-slug_test_runner = { path = "app/slug_test_runner" }
-slug_transition = { path = "app/slug_transition" }
-slug_util = { path = "app/slug_util" }
-slug_validation = { path = "app/slug_validation" }
-slug_worker_proto = { path = "app/slug_worker_proto" }
-slug_wrapper_common = { path = "app/slug_wrapper_common" }
 
 [profile.release]
 incremental = true

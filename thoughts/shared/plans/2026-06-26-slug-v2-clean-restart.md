@@ -30,6 +30,53 @@ branch archive is not enough. A full in-tree archive makes search, codegraph
 indexing, and new-agent orientation worse. If a physical archive is required,
 exclude it from active build metadata and codegraph indexing.
 
+## 2026-06-29 Branch Review And Remediation Gate
+
+Review of `codex/slugv2` found that the clean-restart archive sequence has not
+actually been completed in this checkout:
+
+- `scripts/v2_archive_status.sh` fails because `slug-v1-archive` and
+  `v1-archive` are missing, even though Stage 0 docs recorded them.
+- `codex/slugv2` adds V2 scaffolding on top of the full V1 root instead of
+  resetting the active tree into a clean V2 root. Relative to `main`, the branch
+  adds hundreds of files and no root cleanup.
+- `Cargo.toml` still includes the V1 `app/slug*` workspace members beside the
+  new `app/slug_*_v2` crates, and the active tree still tracks V1-heavy paths
+  such as `app/`, `buck2/`, `prelude/`, and `tests/`.
+- A focused V2 compile check passed for the new crates, so the branch is useful
+  as a prototype and selective patch source, but it is not the V2 trunk shape.
+
+Do not merge or promote the current `codex/slugv2` branch wholesale as the clean
+restart. Before implementation proceeds as V2 trunk, do this sequence:
+
+1. Freeze new feature work on the mixed-root branch.
+2. Pick the V1 preservation commit from the live checkout, verify the worktree
+   state, then create and validate the `slug-v1-archive` tag and `v1-archive`
+   branch.
+3. Start the active V2 line from a clean root worktree: keep root pointers,
+   V2 plans, and intentionally retained infrastructure; remove V1-only source,
+   tests, Buck-shaped metadata, and V1 workspace members from the active build.
+4. Re-import from `codex/slugv2` one bounded stage at a time. Each import needs
+   an owner subplan, an oracle fixture or Bazel source citation, focused
+   validation, and a Stage 9 extraction-ledger entry when it came from V1 or
+   from the mixed-root prototype.
+5. Run `scripts/v2_archive_status.sh`, `git diff --check`, and the touched
+   stage validation before calling the root clean.
+
+Use the saved implementer prompt at
+[thoughts/shared/prompts/2026-06-29-slug-v2-generic-implementer.md](../prompts/2026-06-29-slug-v2-generic-implementer.md)
+for sessions that continue this remediation.
+
+2026-06-29 execution update: the missing local archive refs have been repaired;
+`slug-v1-archive^{commit}` and `v1-archive` now both resolve to
+`e218054d4c796655939b968d90208b185decb352`. Cargo root metadata now exposes only
+V2 app crates as active `app/slug_*` workspace members/dependencies, with V1
+app crates removed from that surface. The branch still tracks V1 source/test
+paths, and `remote_execution` is only a Stage 7 source candidate until its V1
+crate dependencies are wrapped or ported away. The next Stage 0 task is
+physical source/test cleanup or codegraph/build exclusions before importing
+more prototype code.
+
 ## Non-Negotiables
 
 - Bazel 9+ only. No pre-Bazel-9 behavior, no WORKSPACE support, and no legacy
@@ -112,12 +159,7 @@ slice's subplan and record compact evidence in the owning V2 plan.
 
 ## Next Agent Prompt
 
-```text
-Read AGENTS.md and thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md.
-Treat the January roadmap and numbered V1 subplans as archive/reference only.
-Do not edit V1 implementation code unless the current V2 subplan says to
-extract or compare it. Start with Stage 0: preserve the current V1 line with a
-tag/archive branch, then prepare the clean V2 root without physically moving the
-entire V1 tree into the active source path. Keep the commit docs-only unless the
-user explicitly asks to begin source movement.
-```
+Use
+[thoughts/shared/prompts/2026-06-29-slug-v2-generic-implementer.md](../prompts/2026-06-29-slug-v2-generic-implementer.md)
+for implementation sessions. The split-specific remediation instructions live
+in this plan, Stage 0, Stage 9, and `V1_ARCHIVE.md`, not in the prompt.

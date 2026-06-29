@@ -35,10 +35,17 @@ Concrete supporting files for this stage:
 ## Acceptance Criteria
 
 - `git status --short` is understood before any archive action.
-- V1 tag and archive branch names are recorded in this file.
+- V1 tag and archive branch names are recorded in this file and exist in Git.
+- `scripts/v2_archive_status.sh` exits 0 with a clean worktree.
 - Root `README.md` and `AGENTS.md` identify the V2 plan as canonical.
 - The active root does not require new agents to search through V1 source to
   understand where to begin.
+- Active V2 build/workspace metadata does not include V1-only crates, tests, or
+  Buck-shaped user surfaces unless a V2 subplan records them as retained
+  infrastructure.
+- Existing mixed-root work on `codex/slugv2` is classified before reuse:
+  discard, cherry-pick as V2-only, port with an oracle, or keep as
+  reference-only.
 
 ## Implementation Slices
 
@@ -89,6 +96,48 @@ git branch v1-archive <v1-commit>
   not infer ownership from old paths.
 - Do not remove V1 code until the tag and branch validation below pass.
 
+### 0.R 2026-06-29 Mixed-Root Remediation
+
+The `codex/slugv2` branch has useful V2 scaffolding, but it does not satisfy
+Stage 0. The 2026-06-29 review found missing local archive refs and V2 crates
+layered into the still-active V1 Cargo workspace.
+
+Before any further V2 trunk work:
+
+1. Run `scripts/v2_archive_status.sh` and treat a missing tag or branch as a
+   blocker, not a warning.
+2. Re-select the V1 archive commit from the live checkout. If the intended
+   commit remains `e218054d4c796655939b968d90208b185decb352`, create the
+   annotated `slug-v1-archive` tag and `v1-archive` branch there. If not, update
+   this plan and `V1_ARCHIVE.md` before creating refs.
+3. Create a separate clean-root worktree or branch for V2 remediation. Do not
+   keep iterating on the mixed-root tree as if it were the clean trunk.
+4. Remove V1-only workspace membership and build metadata from the active V2
+   root. Keep only root orientation docs, V2 plans, Stage 1 oracle harnesses,
+   V2 crates, and explicitly retained infrastructure.
+5. Treat current `codex/slugv2` commits as a patch queue. Reapply them in stage
+   order only after the owner subplan names the oracle and validation command.
+6. Update Stage 9 for any V1 or mixed-root code imported into the clean root.
+7. Re-run the archive checker, the touched stage tests, and `git diff --check`
+   before declaring Stage 0 complete.
+
+Execution update on 2026-06-29: the local `slug-v1-archive` annotated tag and
+`v1-archive` branch were created at
+`e218054d4c796655939b968d90208b185decb352`, and
+`scripts/v2_archive_status.sh` now verifies the refs. Stage 0 is still not
+complete because the active branch still tracks V1 source/test paths.
+
+Root-metadata update on 2026-06-29: `Cargo.toml` now keeps only V2 app crates
+as active `app/slug_*` workspace members and `slug_*` workspace dependencies.
+The active retained infrastructure members are `allocative`, `dice`,
+`gazebo`, `pagable`, `shed`, `starlark-rust`, and `superconsole`.
+`remote_execution` remains a Stage 7 source candidate, but it is not an active
+workspace member because `remote_execution/oss/re_grpc*` still depends on V1
+`slug_data`, `slug_protoc_dev`, `slug_re_configuration`, and `slug_util`.
+Follow-up clean-root work should remove or exclude V1 source/test paths and
+Buck-shaped metadata without treating the mixed-root `codex/slugv2` commits as
+already accepted V2 trunk.
+
 ## Exact Test Criteria
 
 - `git rev-parse slug-v1-archive^{commit}` equals the commit recorded in
@@ -107,15 +156,18 @@ git branch v1-archive <v1-commit>
 
 ## Archive Record
 
-Fill this in during Stage 0 execution:
+This record was verified in the local `codex/slugv2` checkout on 2026-06-29.
+The archive refs exist, but the branch remains a mixed-root tree until the
+clean-root remediation lands.
 
 | Field | Value |
 |-------|-------|
-| V1 commit | `e218054d4c796655939b968d90208b185decb352` |
-| V1 tag | `slug-v1-archive` |
-| V1 archive branch | `v1-archive` |
+| V1 commit | `e218054d4c796655939b968d90208b185decb352` verified locally on 2026-06-29 |
+| V1 tag | `slug-v1-archive` created as an annotated tag on 2026-06-29 |
+| V1 archive branch | `v1-archive` created on 2026-06-29 |
 | Physical archive directory | none by default |
-| Dirty files intentionally excluded | none; native `git status --short --branch` was clean before archiving |
+| Dirty files intentionally excluded | archive action excluded active V2 remediation docs and prompt only; later root-metadata cleanup changed `Cargo.toml`; no V1 implementation files |
+| Current verification status | archive refs and Cargo root metadata verified; physical V1 source/test cleanup remains pending |
 
 ## Validation
 
