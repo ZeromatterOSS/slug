@@ -34,6 +34,8 @@ pub enum Directive {
     MultipleVersionOverride(MultipleVersionOverride),
     ArchiveOverride(ArchiveOverride),
     GitOverride(GitOverride),
+    UseExtension(UseExtension),
+    UseRepo(UseRepo),
     RegisterToolchains(Vec<String>),
     RegisterExecutionPlatforms(Vec<String>),
 }
@@ -89,6 +91,21 @@ pub struct GitOverride {
     pub patch_strip: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UseExtension {
+    pub proxy_name: String,
+    pub bzl_label: String,
+    pub extension_name: String,
+    pub dev_dependency: bool,
+    pub isolate: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UseRepo {
+    pub extension_proxy: String,
+    pub repos: Vec<String>,
+}
+
 impl ModuleFile {
     pub fn parse(source: &str) -> Result<Self, String> {
         let mut module = None;
@@ -98,13 +115,24 @@ impl ModuleFile {
             if line.is_empty() {
                 continue;
             }
-            let Some((name, args)) = parse_call(line) else {
+            let Some((assignment, name, args)) = parse_statement(line) else {
                 return Err(format!(
                     "line {} is not a supported MODULE.bazel directive",
                     line_number + 1
                 ));
             };
             match name {
+                "use_extension" => {
+                    let Some(proxy_name) = assignment else {
+                        return Err("use_extension requires assignment to a proxy".to_owned());
+                    };
+                    directives.push(Directive::UseExtension(parse_use_extension(
+                        proxy_name, args,
+                    )?));
+                }
+                other if assignment.is_some() => {
+                    return Err(format!("{other} does not support assignment"));
+                }
                 "module" => {
                     module = Some(parse_module(args)?);
                 }
@@ -131,6 +159,9 @@ impl ModuleFile {
                 "git_override" => {
                     directives.push(Directive::GitOverride(parse_git_override(args)?));
                 }
+                "use_repo" => {
+                    directives.push(Directive::UseRepo(parse_use_repo(args)?));
+                }
                 "register_toolchains" => {
                     directives.push(Directive::RegisterToolchains(parse_label_args(args)?));
                 }
@@ -144,6 +175,14 @@ impl ModuleFile {
         }
         Ok(Self { module, directives })
     }
+}
+
+fn parse_statement(line: &str) -> Option<(Option<&str>, &str, &str)> {
+    let (name, args) = parse_call(line)?;
+    let Some((assignment, name)) = name.split_once('=') else {
+        return Some((None, name.trim(), args));
+    };
+    Some((Some(assignment.trim()), name.trim(), args))
 }
 
 fn parse_call(line: &str) -> Option<(&str, &str)> {
@@ -235,6 +274,48 @@ fn parse_git_override(args: &str) -> Result<GitOverride, String> {
     })
 }
 
+fn parse_use_extension(proxy_name: &str, args: &str) -> Result<UseExtension, String> {
+    if proxy_name.is_empty() {
+        return Err("use_extension proxy name must not be empty".to_owned());
+    }
+    let parts = split_args(args);
+    if parts.len() < 2 {
+        return Err("use_extension requires a .bzl label and extension name".to_owned());
+    }
+    let bzl_label = parse_string_literal(parts[0])
+        .ok_or_else(|| "use_extension first argument must be a string label".to_owned())?;
+    let extension_name = parse_string_literal(parts[1])
+        .ok_or_else(|| "use_extension second argument must be a string name".to_owned())?;
+    let kwargs = parse_kwargs_from_parts(&parts[2..])?;
+    Ok(UseExtension {
+        proxy_name: proxy_name.to_owned(),
+        bzl_label,
+        extension_name,
+        dev_dependency: optional_bool(&kwargs, "dev_dependency")?.unwrap_or(false),
+        isolate: optional_bool(&kwargs, "isolate")?.unwrap_or(false),
+    })
+}
+
+fn parse_use_repo(args: &str) -> Result<UseRepo, String> {
+    let parts = split_args(args);
+    let Some((first, repos)) = parts.split_first() else {
+        return Err("use_repo requires an extension proxy".to_owned());
+    };
+    let extension_proxy = parse_symbol_literal(first)
+        .ok_or_else(|| "use_repo first argument must be an extension proxy".to_owned())?;
+    let repos = repos
+        .iter()
+        .map(|repo| {
+            parse_string_literal(repo)
+                .ok_or_else(|| format!("use_repo repository argument must be a string: {repo}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(UseRepo {
+        extension_proxy,
+        repos,
+    })
+}
+
 fn parse_single_label_arg(args: &str) -> Result<String, String> {
     let labels = parse_label_args(args)?;
     if labels.len() != 1 {
@@ -254,8 +335,13 @@ fn parse_label_args(args: &str) -> Result<Vec<String>, String> {
 }
 
 fn parse_kwargs(args: &str) -> Result<BTreeMap<String, Value>, String> {
+    let parts = split_args(args);
+    parse_kwargs_from_parts(&parts)
+}
+
+fn parse_kwargs_from_parts(parts: &[&str]) -> Result<BTreeMap<String, Value>, String> {
     let mut kwargs = BTreeMap::new();
-    for arg in split_args(args) {
+    for arg in parts {
         let Some((key, value)) = arg.split_once('=') else {
             return Err(format!("expected keyword argument, got {arg}"));
         };
@@ -395,6 +481,18 @@ impl Value {
             _ => None,
         }
     }
+}
+
+fn parse_symbol_literal(value: &str) -> Option<String> {
+    let mut chars = value.chars();
+    let first = chars.next()?;
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return None;
+    }
+    if !chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric()) {
+        return None;
+    }
+    Some(value.to_owned())
 }
 
 fn parse_string_literal(value: &str) -> Option<String> {

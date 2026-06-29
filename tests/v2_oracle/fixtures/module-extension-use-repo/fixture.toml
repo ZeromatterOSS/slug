@@ -1,0 +1,12 @@
+[fixture]
+name = "module-extension-use-repo"
+description = "A local module_extension generates a repository imported with use_repo."
+comparison = "message_shape"
+oracle_notes = "Generated with upstream Bazel 9.1.1 from a self-contained module extension and repository_rule; no network access is required."
+
+[[commands]]
+name = "build_generated_repo_file"
+argv = ["build", "@generated//:generated.txt"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]

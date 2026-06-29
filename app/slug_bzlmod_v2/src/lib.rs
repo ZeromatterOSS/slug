@@ -19,3 +19,5 @@ pub use parser::ModuleFile;
 pub use parser::ModuleHeader;
 pub use parser::MultipleVersionOverride;
 pub use parser::SingleVersionOverride;
+pub use parser::UseExtension;
+pub use parser::UseRepo;

@@ -243,6 +243,19 @@ Stage 5 module header parser checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `py -3 -B -m tools.v2_oracle run --fixture module-header-compatibility --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+Stage 5 module extension use_repo parser checkpoint:
+
+- Added `module-extension-use-repo`, a self-contained Bazel 9.1.1 oracle
+  fixture proving `use_extension` plus `use_repo` imports a repository generated
+  by a local `module_extension` and repository rule, with no network dependency.
+- Extended `slug_bzlmod_v2` parsing with assignment-aware `use_extension`
+  directives, `use_repo` directives, extension proxy names, `dev_dependency`,
+  and `isolate` flags. This records directive shape only; extension execution
+  remains owned by the later Stage 5 module-extension DICE slices.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `py -3 -B -m tools.v2_oracle run --fixture module-extension-use-repo --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

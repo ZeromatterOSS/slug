@@ -6,6 +6,8 @@ use slug_bzlmod_v2::LocalPathOverride;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::MultipleVersionOverride;
 use slug_bzlmod_v2::SingleVersionOverride;
+use slug_bzlmod_v2::UseExtension;
+use slug_bzlmod_v2::UseRepo;
 
 #[test]
 fn parses_module_directives_in_order() {
@@ -115,6 +117,35 @@ git_override(module_name = "git", remote = "https://example.invalid/repo.git", c
             shallow_since: Some("2026-06-01".to_owned()),
             patches: vec!["//:g.patch".to_owned()],
             patch_strip: 3,
+        })
+    );
+}
+
+#[test]
+fn parses_extension_usage_directives() {
+    let parsed = ModuleFile::parse(
+        r#"
+ext = use_extension("//:ext.bzl", "ext", dev_dependency = True, isolate = True)
+use_repo(ext, "generated", "tools")
+"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        parsed.directives[0],
+        Directive::UseExtension(UseExtension {
+            proxy_name: "ext".to_owned(),
+            bzl_label: "//:ext.bzl".to_owned(),
+            extension_name: "ext".to_owned(),
+            dev_dependency: true,
+            isolate: true,
+        })
+    );
+    assert_eq!(
+        parsed.directives[1],
+        Directive::UseRepo(UseRepo {
+            extension_proxy: "ext".to_owned(),
+            repos: vec!["generated".to_owned(), "tools".to_owned()],
         })
     );
 }
