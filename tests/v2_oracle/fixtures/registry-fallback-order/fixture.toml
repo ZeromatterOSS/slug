@@ -1,0 +1,13 @@
+[fixture]
+name = "registry-fallback-order"
+description = "Bazel 9 local-registry fallback fixture proving first registry wins per module and later registries fill misses."
+comparison = "message_shape"
+oracle_notes = "Self-contained local registries. The first registry contains aaa@1.0.0 with no bbb dependency; the second registry contains an alternate aaa@1.0.0 that depends on bbb plus ccc@1.0.0. Bazel 9.1.1 mod graph proves aaa comes from the first registry while ccc falls through to the second."
+
+[[commands]]
+name = "mod_graph_registry_fallback"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "ccc@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*bbb@1\\.0\\.0).*aaa@1\\.0\\.0.*ccc@1\\.0\\.0"]

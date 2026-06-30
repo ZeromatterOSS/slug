@@ -42,6 +42,35 @@ impl RegistryModule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistryCatalog {
+    pub registry_url: String,
+    pub modules: BTreeMap<ModuleKey, ModuleFile>,
+}
+
+impl RegistryCatalog {
+    pub fn new(registry_url: impl Into<String>, modules: BTreeMap<ModuleKey, ModuleFile>) -> Self {
+        Self {
+            registry_url: registry_url.into(),
+            modules,
+        }
+    }
+}
+
+pub fn select_ordered_registry_modules(
+    registries: &[RegistryCatalog],
+) -> BTreeMap<ModuleKey, RegistryModule> {
+    let mut selected = BTreeMap::new();
+    for registry in registries {
+        for (key, module_file) in &registry.modules {
+            selected.entry(key.clone()).or_insert_with(|| {
+                RegistryModule::new(registry.registry_url.clone(), module_file.clone())
+            });
+        }
+    }
+    selected
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistryMetadata {
     pub homepage: Option<String>,
     pub repository: Vec<String>,

@@ -4,9 +4,11 @@ use std::collections::BTreeSet;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ModuleSource;
+use slug_bzlmod_v2::RegistryCatalog;
 use slug_bzlmod_v2::RegistryModule;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::resolve_registry_mvs;
+use slug_bzlmod_v2::select_ordered_registry_modules;
 use slug_bzlmod_v2::validate_yanked_versions;
 
 fn module(source: &str) -> ModuleFile {
@@ -308,5 +310,58 @@ bazel_dep(name = "bbb", version = "1.0.0")
             .get("bbb")
             .map(String::as_str),
         Some("bbb+")
+    );
+}
+
+#[test]
+fn ordered_registry_selection_uses_first_hit_and_later_misses() {
+    let first = RegistryCatalog::new(
+        "file:///%workspace%/first",
+        BTreeMap::from([(
+            ModuleKey::new("aaa", "1.0.0"),
+            module(r#"module(name = "aaa", version = "1.0.0")"#),
+        )]),
+    );
+    let second = RegistryCatalog::new(
+        "file:///%workspace%/second",
+        BTreeMap::from([
+            (
+                ModuleKey::new("aaa", "1.0.0"),
+                module(
+                    r#"
+module(name = "aaa", version = "1.0.0")
+bazel_dep(name = "bbb", version = "1.0.0")
+"#,
+                ),
+            ),
+            (
+                ModuleKey::new("ccc", "1.0.0"),
+                module(r#"module(name = "ccc", version = "1.0.0")"#),
+            ),
+        ]),
+    );
+
+    let selected = select_ordered_registry_modules(&[first, second]);
+
+    assert_eq!(
+        selected
+            .get(&ModuleKey::new("aaa", "1.0.0"))
+            .map(|module| module.registry_url.as_str()),
+        Some("file:///%workspace%/first")
+    );
+    assert_eq!(
+        selected
+            .get(&ModuleKey::new("ccc", "1.0.0"))
+            .map(|module| module.registry_url.as_str()),
+        Some("file:///%workspace%/second")
+    );
+    assert!(
+        selected
+            .get(&ModuleKey::new("aaa", "1.0.0"))
+            .unwrap()
+            .module_file
+            .directives
+            .iter()
+            .all(|directive| !matches!(directive, slug_bzlmod_v2::Directive::BazelDep(_)))
     );
 }

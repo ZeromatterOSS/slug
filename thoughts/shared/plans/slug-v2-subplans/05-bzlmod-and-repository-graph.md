@@ -482,7 +482,7 @@ Stage 5 registry metadata parser checkpoint:
   `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
   scoped V2 rewrite from behavior using structured JSON parsing.
 - This checkpoint intentionally stops before registry HTTP/file clients,
-  registry fallback ordering, registry file hash enforcement, lockfile selected
+  registry file hash enforcement, lockfile selected
   yanked-version recording, environment-sourced allowlists, and DICE-owned
   registry metadata keys.
 - Validation passed: `cargo fmt -p slug_bzlmod_v2`;
@@ -532,6 +532,26 @@ Stage 5 single-version override resolver checkpoint:
 - Validation passed: `cargo fmt -p slug_bzlmod_v2`;
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registry-single-version-override --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
+
+Stage 5 ordered registry fallback checkpoint:
+
+- Added `registry-fallback-order`, a Bazel 9.1.1 oracle fixture using two
+  workspace-local registries where the first registry supplies `aaa@1.0.0`
+  and the second supplies an alternate `aaa@1.0.0` plus `ccc@1.0.0`. `bazel
+  mod graph` proves Bazel takes `aaa` from the first registry and falls
+  through to the second registry for `ccc`.
+- Added `slug_bzlmod_v2::registry` catalog selection that preserves ordered
+  registry fallback: earlier registries win per module key and later registries
+  fill missing module keys. V1 archive references inspected:
+  `app/slug_bzlmod/src/registry.rs` and
+  `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
+  scoped V2 rewrite from observed Bazel behavior.
+- This checkpoint intentionally stops before HTTP/file registry clients,
+  registry hash enforcement, refresh/error lockfile modes, DICE-owned metadata
+  keys, and same-daemon registry mutation replay.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture registry-fallback-order --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
 
 ## Exact Test Criteria
 

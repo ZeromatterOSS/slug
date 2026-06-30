@@ -1,0 +1,34 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "mod_graph_registry_fallback",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running",
+      "normalized_stdout": "<root> (registry_fallback_root@0.1.0)\n\u00e2\u201d\u0153\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acaaa@1.0.0 \n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acccc@1.0.0",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running\n",
+      "stdout": "<root> (registry_fallback_root@0.1.0)\n\u00e2\u201d\u0153\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acaaa@1.0.0 \n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acccc@1.0.0 \n\n"
+    }
+  ],
+  "fixture": "registry-fallback-order",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
