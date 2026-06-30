@@ -668,3 +668,28 @@ Stage 5 module-extension implementation lockfile error checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-error-bzl --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+
+Stage 5 module-extension recorded file lockfile error checkpoint:
+
+- Added `module-extension-lockfile-error-recorded-file`, a Bazel 9.1.1 oracle
+  fixture proving `--lockfile_mode=error` rejects stale module-extension
+  recorded file inputs. The fixture primes `MODULE.bazel.lock`, mutates only
+  `seed.txt` read through `module_ctx.read(module_ctx.path(Label("//:seed.txt")))`,
+  then observes Bazel query exit code 7 with the diagnostic that file info or
+  contents of `@@//seed.txt` changed for extension `@@//:ext.bzl%ext`.
+- Extended visible lockfile parsing with typed `recordedInputs` entries for
+  `FILE:<label> <digest>` while preserving unknown recorded input values as raw
+  JSON for later lockfile replay work.
+- Added `validate_module_extension_recorded_file_inputs` over parsed visible
+  lockfile data. The helper compares expected recorded file digests with
+  explicit observed digest input and emits the Bazel-shaped stale recorded-file
+  diagnostic; it does not hash files, execute extensions, read files, or
+  implement hidden lockfile/error-mode replay.
+- V1 lockfile source was inspected only to orient the lockfile surface; no V1
+  bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 oracle fixture.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-error-recorded-file --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.

@@ -1,0 +1,24 @@
+[fixture]
+name = "module-extension-lockfile-error-recorded-file"
+description = "Bazel 9 fixture proving --lockfile_mode=error rejects stale module_extension recorded file inputs."
+comparison = "message_shape"
+oracle_notes = "Self-contained module_extension fixture. The extension reads //:seed.txt through module_ctx.read, which records a FILE input in MODULE.bazel.lock. The second command edits only seed.txt and runs in error mode, proving Bazel rejects stale recorded input replay data instead of re-evaluating it silently."
+
+[[commands]]
+name = "prime_extension_lockfile"
+argv = ["query", "@generated//:one.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@generated//:one.txt"]
+
+[[commands]]
+name = "reject_stale_recorded_file_lockfile"
+argv = ["query", "@generated//:two.txt", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 7
+stderr_contains = ["MODULE.bazel.lock is no longer up-to-date", "input to the extension '@@//:ext.bzl%ext' changed", "file info or contents of @@//seed.txt changed", "bazel mod deps --lockfile_mode=update"]
+
+  [[commands.mutations]]
+  path = "seed.txt"
+  find = "one"
+  replace = "two"

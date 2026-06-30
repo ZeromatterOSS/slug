@@ -9,9 +9,11 @@
  */
 
 use serde_json::Value;
+use slug_bzlmod_v2::BazelLockfileRecordedInput;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::parse_bazel_lockfile;
 use slug_bzlmod_v2::validate_module_extension_bzl_transitive_digests;
+use slug_bzlmod_v2::validate_module_extension_recorded_file_inputs;
 use slug_bzlmod_v2::validate_module_extension_usage_digests;
 use slug_bzlmod_v2::validate_registry_file_hashes;
 
@@ -94,6 +96,86 @@ fn parses_module_extension_generated_repo_specs() {
         lockfile.facts_versions.get("//:ext.bzl%ext"),
         Some(&Value::from(1))
     );
+}
+
+#[test]
+fn parses_module_extension_recorded_file_inputs() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "recordedInputs": [
+          "FILE:@@//seed.txt 2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806"
+        ]
+      }
+    }
+  }
+}"#,
+    )
+    .unwrap();
+
+    let extension = lockfile.module_extensions.get("//:ext.bzl%ext").unwrap();
+    let general = extension.general.as_ref().unwrap();
+    assert_eq!(
+        general.recorded_inputs,
+        vec![BazelLockfileRecordedInput::File {
+            label: "@@//seed.txt".to_owned(),
+            digest: "2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806".to_owned(),
+        }]
+    );
+}
+
+#[test]
+fn validates_module_extension_recorded_file_inputs_against_observed_map() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "recordedInputs": ["FILE:@@//seed.txt old-file-digest"]
+      }
+    }
+  }
+}"#,
+    )
+    .unwrap();
+    let observed = std::collections::BTreeMap::from([(
+        "@@//seed.txt".to_owned(),
+        "old-file-digest".to_owned(),
+    )]);
+
+    validate_module_extension_recorded_file_inputs(&lockfile, &observed).unwrap();
+}
+
+#[test]
+fn rejects_stale_module_extension_recorded_file_input_like_bazel() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "recordedInputs": ["FILE:@@//seed.txt old-file-digest"]
+      }
+    }
+  }
+}"#,
+    )
+    .unwrap();
+    let observed = std::collections::BTreeMap::from([(
+        "@@//seed.txt".to_owned(),
+        "new-file-digest".to_owned(),
+    )]);
+
+    let err = validate_module_extension_recorded_file_inputs(&lockfile, &observed).unwrap_err();
+
+    assert!(err.contains("MODULE.bazel.lock is no longer up-to-date"));
+    assert!(err.contains("input to the extension '@@//:ext.bzl%ext' changed"));
+    assert!(err.contains("file info or contents of @@//seed.txt changed"));
+    assert!(err.contains("bazel mod deps --lockfile_mode=update"));
 }
 
 #[test]

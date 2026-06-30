@@ -33,7 +33,7 @@ pub struct BazelLockfileModuleExtension {
 pub struct BazelLockfileModuleExtensionGeneral {
     pub bzl_transitive_digest: Option<String>,
     pub usages_digest: Option<String>,
-    pub recorded_inputs: Vec<Value>,
+    pub recorded_inputs: Vec<BazelLockfileRecordedInput>,
     pub generated_repo_specs: BTreeMap<String, BazelLockfileRepoSpec>,
 }
 
@@ -41,6 +41,12 @@ pub struct BazelLockfileModuleExtensionGeneral {
 pub struct BazelLockfileRepoSpec {
     pub repo_rule_id: String,
     pub attributes: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BazelLockfileRecordedInput {
+    File { label: String, digest: String },
+    Raw(Value),
 }
 
 pub fn parse_bazel_lockfile(content: &str) -> Result<BazelLockfile, String> {
@@ -129,6 +135,32 @@ pub fn validate_module_extension_bzl_transitive_digests(
                     "MODULE.bazel.lock is no longer up-to-date because the implementation of the extension '{}' or one of its transitive .bzl files has changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
                     bazel_display_extension_id(extension_id)
                 ));
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_module_extension_recorded_file_inputs(
+    lockfile: &BazelLockfile,
+    observed_file_digests: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    for (extension_id, extension) in &lockfile.module_extensions {
+        let Some(general) = &extension.general else {
+            continue;
+        };
+        for input in &general.recorded_inputs {
+            let BazelLockfileRecordedInput::File { label, digest } = input else {
+                continue;
+            };
+            match observed_file_digests.get(label) {
+                Some(actual_digest) if actual_digest == digest => {}
+                Some(_) | None => {
+                    return Err(format!(
+                        "MODULE.bazel.lock is no longer up-to-date because an input to the extension '{}' changed: file info or contents of {label} changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+                        bazel_display_extension_id(extension_id)
+                    ));
+                }
             }
         }
     }
@@ -245,7 +277,7 @@ fn parse_module_extension_general(
     let bzl_transitive_digest = optional_string(general, "bzlTransitiveDigest")?;
     let usages_digest = optional_string(general, "usagesDigest")?;
     let recorded_inputs = match general.get("recordedInputs") {
-        Some(Value::Array(inputs)) => inputs.clone(),
+        Some(Value::Array(inputs)) => parse_recorded_inputs(extension_id, inputs)?,
         Some(_) => {
             return Err(format!(
                 "MODULE.bazel.lock moduleExtensions entry {extension_id}.general.recordedInputs must be an array"
@@ -273,6 +305,45 @@ fn optional_string(
         Some(_) => Err(format!("MODULE.bazel.lock field {field} must be a string")),
         None => Ok(None),
     }
+}
+
+fn parse_recorded_inputs(
+    extension_id: &str,
+    inputs: &[Value],
+) -> Result<Vec<BazelLockfileRecordedInput>, String> {
+    let mut result = Vec::with_capacity(inputs.len());
+    for input in inputs {
+        match input {
+            Value::String(text) if text.starts_with("FILE:") => {
+                result.push(parse_recorded_file_input(extension_id, text)?);
+            }
+            other => result.push(BazelLockfileRecordedInput::Raw(other.clone())),
+        }
+    }
+    Ok(result)
+}
+
+fn parse_recorded_file_input(
+    extension_id: &str,
+    text: &str,
+) -> Result<BazelLockfileRecordedInput, String> {
+    let body = text
+        .strip_prefix("FILE:")
+        .expect("caller checked FILE prefix");
+    let (label, digest) = body.rsplit_once(' ').ok_or_else(|| {
+        format!(
+            "MODULE.bazel.lock moduleExtensions entry {extension_id}.general.recordedInputs FILE entry must be 'FILE:<label> <digest>'"
+        )
+    })?;
+    if label.is_empty() || digest.is_empty() {
+        return Err(format!(
+            "MODULE.bazel.lock moduleExtensions entry {extension_id}.general.recordedInputs FILE entry must be 'FILE:<label> <digest>'"
+        ));
+    }
+    Ok(BazelLockfileRecordedInput::File {
+        label: label.to_owned(),
+        digest: digest.to_owned(),
+    })
 }
 
 fn parse_generated_repo_specs(
