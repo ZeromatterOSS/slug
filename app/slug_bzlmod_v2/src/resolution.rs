@@ -31,7 +31,7 @@ impl ModuleKey {
         }
     }
 
-    fn from_header(header: &ModuleHeader) -> Self {
+    pub(crate) fn from_header(header: &ModuleHeader) -> Self {
         Self::new(
             header.name.clone(),
             header.version.clone().unwrap_or_default(),
@@ -49,6 +49,7 @@ impl fmt::Display for ModuleKey {
 pub enum ModuleSource {
     Root,
     LocalPath { path: String },
+    Registry { registry_url: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -199,7 +200,7 @@ pub fn resolve_local_module_graph(
     })
 }
 
-fn bazel_deps(module_file: &ModuleFile) -> Vec<BazelDep> {
+pub(crate) fn bazel_deps(module_file: &ModuleFile) -> Vec<BazelDep> {
     module_file
         .directives
         .iter()

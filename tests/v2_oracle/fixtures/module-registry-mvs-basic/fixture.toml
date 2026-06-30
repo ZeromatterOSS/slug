@@ -1,0 +1,13 @@
+[fixture]
+name = "module-registry-mvs-basic"
+description = "Bazel 9 local-registry MVS fixture selecting the highest requested transitive version."
+comparison = "message_shape"
+oracle_notes = "Self-contained local registry for root modules plus BCR fallback for Bazel embedded modules. Bazel 9.1.1 mod graph proves aaa@1.0.0 requests bbb@1.0.0, ccc@1.0.0 requests bbb@2.0.0, and MVS selects bbb@2.0.0 for both edges."
+
+[[commands]]
+name = "mod_graph_mvs"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "ccc@1.0.0", "bbb@2.0.0 (*)"]
+stdout_patterns = ["(?s)\\A(?!.*bbb@1\\.0\\.0).*aaa@1\\.0\\.0.*bbb@2\\.0\\.0.*ccc@1\\.0\\.0.*bbb@2\\.0\\.0 \\(\\*\\).*"]

@@ -9,6 +9,7 @@
  */
 
 pub mod parser;
+pub mod registry;
 pub mod resolution;
 
 pub use parser::ArchiveOverride;
@@ -30,6 +31,8 @@ pub use parser::SingleVersionOverride;
 pub use parser::UseExtension;
 pub use parser::UseRepo;
 pub use parser::UseRepoRule;
+pub use registry::RegistryModule;
+pub use registry::resolve_registry_mvs;
 pub use resolution::ModuleKey;
 pub use resolution::ModuleSource;
 pub use resolution::ResolvedDependency;
