@@ -574,6 +574,27 @@ Stage 5 selected-yanked lockfile checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-selected-yanked-version --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
 
+Stage 5 registry-hash lockfile error checkpoint:
+
+- Added `lockfile-error-mode-registry-hash`, a Bazel 9.1.1 oracle fixture
+  with a BCR `rules_cc@0.2.17` dependency and an intentionally stale
+  `registryFileHashes` entry in `MODULE.bazel.lock`. `bazel mod graph
+  --lockfile_mode=error` rejects the graph with exit code 37 and a checksum
+  mismatch for the BCR `MODULE.bazel` file.
+- Added `slug_bzlmod_v2::lockfile` registry-hash validation against an explicit
+  observed digest map. The helper emits Bazel-shaped checksum diagnostics while
+  staying independent from registry fetching, file hashing, lockfile writing,
+  and DICE ownership. V1 archive references inspected:
+  `app/slug_bzlmod/src/lockfile.rs` and
+  `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
+  scoped V2 helper from observed Bazel 9.1.1 error behavior.
+- This checkpoint intentionally stops before computing registry file digests,
+  HTTP/file registry clients, lockfile write/update/refresh flows, hidden
+  lockfiles, same-daemon stale-registry replay, and DICE-owned registry inputs.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-error-mode-registry-hash --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

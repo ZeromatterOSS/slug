@@ -1,0 +1,12 @@
+[fixture]
+name = "lockfile-error-mode-registry-hash"
+description = "Bazel 9 lockfile fixture proving --lockfile_mode=error rejects stale BCR registry hashes."
+comparison = "message_shape"
+oracle_notes = "The workspace depends on rules_cc 0.2.17 and starts with a MODULE.bazel.lock containing an intentionally wrong registryFileHashes entry for the BCR MODULE.bazel file. Bazel 9.1.1 rejects it in --lockfile_mode=error."
+
+[[commands]]
+name = "reject_bad_bcr_registry_hash"
+argv = ["mod", "graph", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["Error accessing registry https://bcr.bazel.build", "rules_cc/0.2.17/MODULE.bazel", "Checksum was", "but wanted"]

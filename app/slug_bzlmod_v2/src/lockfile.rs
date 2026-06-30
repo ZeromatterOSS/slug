@@ -40,6 +40,27 @@ pub fn parse_bazel_lockfile(content: &str) -> Result<BazelLockfile, String> {
     })
 }
 
+pub fn validate_registry_file_hashes(
+    lockfile: &BazelLockfile,
+    observed_hashes: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    for (url, expected_hash) in &lockfile.registry_file_hashes {
+        match observed_hashes.get(url) {
+            Some(actual_hash) if actual_hash == expected_hash => {}
+            Some(actual_hash) => {
+                return Err(format!(
+                    "Failed to fetch registry file {url}: Checksum was {actual_hash} but wanted {expected_hash}"
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "Failed to fetch registry file {url}: missing observed registry file hash"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
 fn optional_string_map(
     object: &serde_json::Map<String, Value>,
     field: &str,

@@ -15,6 +15,7 @@ pub mod resolution;
 
 pub use lockfile::BazelLockfile;
 pub use lockfile::parse_bazel_lockfile;
+pub use lockfile::validate_registry_file_hashes;
 pub use parser::ArchiveOverride;
 pub use parser::BazelDep;
 pub use parser::Directive;

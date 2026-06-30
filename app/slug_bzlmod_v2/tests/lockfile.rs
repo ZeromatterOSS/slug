@@ -10,6 +10,7 @@
 
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::parse_bazel_lockfile;
+use slug_bzlmod_v2::validate_registry_file_hashes;
 
 #[test]
 fn parses_visible_lockfile_registry_and_yanked_fields() {
@@ -71,4 +72,46 @@ fn rejects_missing_lockfile_version() {
     let err = parse_bazel_lockfile(r#"{"selectedYankedVersions": {}}"#).unwrap_err();
 
     assert!(err.contains("missing numeric lockFileVersion"));
+}
+#[test]
+fn validates_registry_hashes_against_observed_digest_map() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "registryFileHashes": {
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "wanted"
+  }
+}"#,
+    )
+    .unwrap();
+    let observed = std::collections::BTreeMap::from([(
+        "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel".to_owned(),
+        "wanted".to_owned(),
+    )]);
+
+    validate_registry_file_hashes(&lockfile, &observed).unwrap();
+}
+
+#[test]
+fn rejects_mismatched_registry_hash_like_bazel() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "registryFileHashes": {
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "000000"
+  }
+}"#,
+    )
+    .unwrap();
+    let observed = std::collections::BTreeMap::from([(
+        "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel".to_owned(),
+        "184960".to_owned(),
+    )]);
+
+    let err = validate_registry_file_hashes(&lockfile, &observed).unwrap_err();
+
+    assert!(err.contains(
+        "Failed to fetch registry file https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel"
+    ));
+    assert!(err.contains("Checksum was 184960 but wanted 000000"));
 }

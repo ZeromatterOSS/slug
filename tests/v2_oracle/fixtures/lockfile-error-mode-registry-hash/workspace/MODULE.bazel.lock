@@ -1,0 +1,9 @@
+{
+  "lockFileVersion": 26,
+  "registryFileHashes": {
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "selectedYankedVersions": {},
+  "moduleExtensions": {},
+  "facts": {}
+}
