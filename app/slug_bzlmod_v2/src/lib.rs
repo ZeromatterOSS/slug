@@ -9,6 +9,7 @@
  */
 
 pub mod parser;
+pub mod resolution;
 
 pub use parser::ArchiveOverride;
 pub use parser::BazelDep;
@@ -29,3 +30,10 @@ pub use parser::SingleVersionOverride;
 pub use parser::UseExtension;
 pub use parser::UseRepo;
 pub use parser::UseRepoRule;
+pub use resolution::ModuleKey;
+pub use resolution::ModuleSource;
+pub use resolution::ResolvedDependency;
+pub use resolution::ResolvedGraph;
+pub use resolution::ResolvedModule;
+pub use resolution::bazel_canonical_module_repo_name;
+pub use resolution::resolve_local_module_graph;

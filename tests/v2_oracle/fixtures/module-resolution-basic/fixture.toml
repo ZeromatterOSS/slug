@@ -9,3 +9,11 @@ name = "build_transitive_dep"
 argv = ["build", "@aaa//:from_bbb"]
 compare = "semantic"
 expected_exit = 0
+
+[[commands]]
+name = "cquery_transitive_dep_label"
+argv = ["cquery", "@aaa//:from_bbb", "--output=label"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@aaa//:from_bbb"]
+stderr_contains = ["@@aaa+//:from_bbb"]

@@ -356,6 +356,23 @@ Stage 5 single-quoted MODULE string parser checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 local module graph substrate checkpoint:
+
+- Strengthened `module-resolution-basic` with a Bazel 9.1.1 `cquery` command
+  proving the apparent `@aaa//:from_bbb` label resolves while analysis reports
+  the canonical `@@aaa+//:from_bbb` local-module repo shape.
+- Added a `slug_bzlmod_v2::resolution` substrate with typed `ModuleKey`, root
+  and local-path module sources, Bazel-shaped canonical module repo names, and
+  deterministic repo mappings for a root plus transitive local override graph.
+  V1 archive reference inspected: `app/slug_bzlmod/src/resolution.rs`; the V2
+  implementation intentionally stops before registry MVS, yanked policy,
+  lockfile replay, or DICE ownership.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-resolution-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including
