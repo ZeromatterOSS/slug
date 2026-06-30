@@ -1,0 +1,19 @@
+[fixture]
+name = "module-multiline-directives"
+description = "MODULE.bazel multiline directive parsing for module(), use_repo_rule(), repo calls, and registrations under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9 oracle fixture: multiline MODULE.bazel calls must parse before repository-rule materialization and registration target query."
+
+[[commands]]
+name = "build_multiline_repo"
+argv = ["build", "@direct//:direct.txt"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+
+[[commands]]
+name = "query_registered_targets"
+argv = ["query", "//:all", "--output=label"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//:host_platform", "//:tc", "//:tc_type"]

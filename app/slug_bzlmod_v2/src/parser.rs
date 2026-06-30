@@ -171,15 +171,11 @@ impl ModuleFile {
         let mut directives = Vec::new();
         let mut extension_proxies = BTreeSet::new();
         let mut repo_rule_proxies = BTreeSet::new();
-        for (line_number, raw_line) in source.lines().enumerate() {
-            let line = raw_line.split('#').next().unwrap_or_default().trim();
-            if line.is_empty() {
-                continue;
-            }
-            let Some((assignment, name, args)) = parse_statement(line) else {
+        for (line_number, statement) in logical_statements(source)? {
+            let Some((assignment, name, args)) = parse_statement(&statement) else {
                 return Err(format!(
                     "line {} is not a supported MODULE.bazel directive",
-                    line_number + 1
+                    line_number
                 ));
             };
             match name {
@@ -262,6 +258,104 @@ impl ModuleFile {
     }
 }
 
+fn logical_statements(source: &str) -> Result<Vec<(usize, String)>, String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut start_line = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut paren_depth = 0i32;
+    let mut list_depth = 0i32;
+
+    for (line_index, raw_line) in source.lines().enumerate() {
+        let line = strip_comment(raw_line);
+        let trimmed = line.trim();
+        if current.is_empty() && trimmed.is_empty() {
+            continue;
+        }
+        if current.is_empty() {
+            start_line = line_index + 1;
+        } else {
+            current.push('\n');
+        }
+        current.push_str(trimmed);
+
+        for ch in line.chars() {
+            if in_string {
+                if escaped {
+                    escaped = false;
+                } else if ch == '\\' {
+                    escaped = true;
+                } else if ch == '"' {
+                    in_string = false;
+                }
+                continue;
+            }
+
+            match ch {
+                '"' => in_string = true,
+                '(' => paren_depth += 1,
+                ')' => {
+                    paren_depth -= 1;
+                    if paren_depth < 0 {
+                        return Err(format!(
+                            "line {} closes a directive before it opens",
+                            line_index + 1
+                        ));
+                    }
+                }
+                '[' => list_depth += 1,
+                ']' => {
+                    list_depth -= 1;
+                    if list_depth < 0 {
+                        return Err(format!(
+                            "line {} closes a list before it opens",
+                            line_index + 1
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if !current.trim().is_empty() && paren_depth == 0 && list_depth == 0 && !in_string {
+            result.push((start_line, current.trim().to_owned()));
+            current.clear();
+        }
+    }
+
+    if !current.trim().is_empty() {
+        return Err(format!(
+            "unterminated MODULE.bazel directive starting at line {start_line}"
+        ));
+    }
+
+    Ok(result)
+}
+
+fn strip_comment(line: &str) -> String {
+    let mut in_string = false;
+    let mut escaped = false;
+    for (index, ch) in line.char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+
+        match ch {
+            '"' => in_string = true,
+            '#' => return line[..index].to_owned(),
+            _ => {}
+        }
+    }
+    line.to_owned()
+}
 fn parse_statement(line: &str) -> Option<(Option<&str>, &str, &str)> {
     let (name, args) = parse_call(line)?;
     let Some((assignment, name)) = name.split_once('=') else {

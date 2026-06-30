@@ -1,0 +1,9 @@
+platform(name = "host_platform")
+
+toolchain_type(name = "tc_type")
+
+toolchain(
+    name = "tc",
+    toolchain = ":host_platform",
+    toolchain_type = ":tc_type",
+)

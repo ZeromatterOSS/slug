@@ -1,0 +1,26 @@
+module(
+    name = "module_multiline_directives",
+    version = "0.0.0",
+    repo_name = "root_alias",
+    bazel_compatibility = [
+        ">=9.0.0",
+    ],
+)
+
+repo = use_repo_rule(
+    "//:repo.bzl",
+    "simple_repo",
+)
+repo(
+    name = "direct",
+    filename = "direct.txt",
+)
+
+register_toolchains(
+    "//:tc",
+    dev_dependency = True,
+)
+register_execution_platforms(
+    "//:host_platform",
+    dev_dependency = True,
+)

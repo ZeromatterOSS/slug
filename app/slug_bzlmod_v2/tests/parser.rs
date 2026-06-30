@@ -266,6 +266,113 @@ override_repo(ext, generated = "replacement")
 }
 
 #[test]
+fn parses_multiline_directives() {
+    let parsed = ModuleFile::parse(
+        r#"
+module(
+    name = "root",
+    version = "0.0.0",
+    repo_name = "root_alias",
+    bazel_compatibility = [
+        ">=9.0.0",
+    ],
+)
+
+repo = use_repo_rule(
+    "//:repo.bzl",
+    "simple_repo",
+)
+repo(
+    name = "direct",
+    filename = "direct.txt",
+    dev_dependency = True,
+)
+register_toolchains(
+    "//:tc",
+    dev_dependency = True,
+)
+register_execution_platforms(
+    "//:host_platform",
+    dev_dependency = True,
+)
+"#,
+    )
+    .unwrap();
+
+    let module = parsed.module.unwrap();
+    assert_eq!(module.name, "root");
+    assert_eq!(module.version.as_deref(), Some("0.0.0"));
+    assert_eq!(module.repo_name.as_deref(), Some("root_alias"));
+    assert_eq!(module.bazel_compatibility, vec![">=9.0.0".to_owned()]);
+    assert_eq!(parsed.directives.len(), 4);
+    assert_eq!(
+        parsed.directives[0],
+        Directive::UseRepoRule(UseRepoRule {
+            proxy_name: "repo".to_owned(),
+            bzl_label: "//:repo.bzl".to_owned(),
+            rule_name: "simple_repo".to_owned(),
+        })
+    );
+
+    let mut attrs = BTreeMap::new();
+    attrs.insert(
+        "filename".to_owned(),
+        ModuleAttributeValue::String("direct.txt".to_owned()),
+    );
+    assert_eq!(
+        parsed.directives[1],
+        Directive::RepoRuleInvocation(RepoRuleInvocation {
+            rule_proxy: "repo".to_owned(),
+            repo_name: "direct".to_owned(),
+            dev_dependency: true,
+            attrs,
+        })
+    );
+    assert_eq!(
+        parsed.directives[2],
+        Directive::RegisterToolchains(Registration {
+            labels: vec!["//:tc".to_owned()],
+            dev_dependency: true,
+        })
+    );
+    assert_eq!(
+        parsed.directives[3],
+        Directive::RegisterExecutionPlatforms(Registration {
+            labels: vec!["//:host_platform".to_owned()],
+            dev_dependency: true,
+        })
+    );
+}
+
+#[test]
+fn strips_comments_outside_strings_across_multiline_directives() {
+    let parsed = ModuleFile::parse(
+        r#"
+module(
+    name = "root#not-comment",  # real comment
+    version = "0.0.0",
+)
+"#,
+    )
+    .unwrap();
+
+    let module = parsed.module.unwrap();
+    assert_eq!(module.name, "root#not-comment");
+}
+
+#[test]
+fn rejects_unterminated_multiline_directive() {
+    let err = ModuleFile::parse(
+        r#"
+module(
+    name = "root",
+"#,
+    )
+    .unwrap_err();
+    assert!(err.contains("unterminated MODULE.bazel directive"));
+    assert!(err.contains("line 2"));
+}
+#[test]
 fn rejects_use_repo_rule_factory_dev_dependency() {
     let err = ModuleFile::parse(
         r#"repo = use_repo_rule("//:repo.bzl", "simple_repo", dev_dependency = True)"#,

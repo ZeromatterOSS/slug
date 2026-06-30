@@ -321,6 +321,23 @@ Stage 5 use_repo_rule dev-dependency checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-use-repo-rule-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+Stage 5 multiline MODULE directive parser checkpoint:
+
+- Added `module-multiline-directives`, a self-contained Bazel 9.1.1 oracle
+  fixture proving multiline `module`, `use_repo_rule`, repository-rule
+  invocation, `register_toolchains`, and `register_execution_platforms`
+  calls parse before repository materialization and package query.
+- Updated `slug_bzlmod_v2` to collect Starlark-shaped logical statements across
+  physical lines before applying the existing directive parsers, including
+  comment stripping outside strings and unterminated-directive diagnostics. V1
+  archive reference inspected: `app/slug_bzlmod/src/parser.rs`; the V2 change
+  remains an independent lightweight parser slice, not a Starlark evaluator
+  port.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-multiline-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including
