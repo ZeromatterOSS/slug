@@ -1,0 +1,12 @@
+[fixture]
+name = "lockfile-selected-yanked-version"
+description = "Bazel 9 lockfile fixture proving selectedYankedVersions records allowed yanked modules."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 oracle uses a workspace-local registry with yyy@1.0.0 yanked. The generated target prints only the MODULE.bazel.lock selectedYankedVersions lines after --allow_yanked_versions permits the graph."
+
+[[commands]]
+name = "print_selected_yanked_lockfile_lines"
+argv = ["run", "--allow_yanked_versions=yyy@1.0.0", "//:print_lock_selection"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["selectedYankedVersions", "yyy@1.0.0", "bad release"]

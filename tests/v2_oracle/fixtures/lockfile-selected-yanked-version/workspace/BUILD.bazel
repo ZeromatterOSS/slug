@@ -1,0 +1,3 @@
+load(":lock_printer.bzl", "lock_printer")
+
+lock_printer(name = "print_lock_selection")

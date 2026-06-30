@@ -43,8 +43,9 @@ Each extraction needs an oracle fixture or direct Bazel source citation.
 - `SingleExtensionEvalFunction.java`, `SingleExtensionFunction.java`, and
   `ModuleExtensionRepoMappingEntriesFunction.java` own extension execution and
   repo-mapping behavior.
-- `BazelLockFileValue.java` is the schema source; local Bazel currently reports
-  `LOCK_FILE_VERSION` 28 and this must be checked before implementation.
+- `BazelLockFileValue.java` is the schema source; local Bazel 9.1.1 oracle
+  fixtures currently emit `lockFileVersion` 26 for visible lockfiles, and this
+  must be rechecked before broader replay/error-mode implementation.
 - Bazel lockfile tests under `src/test/py/bazel/bzlmod/` are the first oracle
   source for replay/error-mode behavior.
 
@@ -552,6 +553,26 @@ Stage 5 ordered registry fallback checkpoint:
 - Validation passed: `cargo fmt -p slug_bzlmod_v2`;
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture registry-fallback-order --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
+
+Stage 5 selected-yanked lockfile checkpoint:
+
+- Added `lockfile-selected-yanked-version`, a Bazel 9.1.1 oracle fixture using
+  a workspace-local registry with `yyy@1.0.0` yanked. A generated executable
+  prints only the `MODULE.bazel.lock` `selectedYankedVersions` lines after
+  `--allow_yanked_versions=yyy@1.0.0` permits the graph, proving Bazel records
+  `"yyy@1.0.0": "bad release"` in the visible lockfile.
+- Added `slug_bzlmod_v2::lockfile` visible-subset parsing for
+  `lockFileVersion`, `registryFileHashes`, and `selectedYankedVersions`, with
+  selected yanked keys converted to `ModuleKey`. V1 archive references
+  inspected: `app/slug_bzlmod/src/lockfile.rs` and
+  `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
+  scoped V2 parser from observed Bazel 9.1.1 lockfile shape.
+- This checkpoint intentionally stops before lockfile writing, refresh/error
+  modes, hidden lockfiles, module extension replay entries, facts/factsVersions,
+  environment-sourced allowlists, registry hash enforcement, and DICE ownership.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-selected-yanked-version --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
 
 ## Exact Test Criteria
 

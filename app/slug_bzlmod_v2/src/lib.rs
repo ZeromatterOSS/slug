@@ -8,10 +8,13 @@
  * above-listed licenses.
  */
 
+pub mod lockfile;
 pub mod parser;
 pub mod registry;
 pub mod resolution;
 
+pub use lockfile::BazelLockfile;
+pub use lockfile::parse_bazel_lockfile;
 pub use parser::ArchiveOverride;
 pub use parser::BazelDep;
 pub use parser::Directive;
