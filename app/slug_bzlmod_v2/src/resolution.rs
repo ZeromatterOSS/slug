@@ -123,7 +123,7 @@ pub fn resolve_local_module_graph(
     let mut queue: VecDeque<BazelDep> = bazel_deps(root).into_iter().collect();
     while let Some(dep) = queue.pop_front() {
         if let Some(existing) = discovered_by_name.get(&dep.name) {
-            if existing.version != dep.version {
+            if existing.version != dep.version && !local_overrides.contains_key(&dep.name) {
                 return Err(format!(
                     "multiple versions for module {} are not resolved by the local-only graph substrate",
                     dep.name

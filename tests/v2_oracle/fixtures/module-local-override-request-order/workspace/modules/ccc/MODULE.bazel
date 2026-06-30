@@ -1,0 +1,3 @@
+module(name = "ccc", version = "1.0.0")
+
+bazel_dep(name = "bbb", version = "2.0.0")

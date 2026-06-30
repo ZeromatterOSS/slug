@@ -389,6 +389,21 @@ Stage 5 local override declared-version checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 local override request-order checkpoint:
+
+- Added `module-local-override-request-order`, a Bazel 9.1.1 oracle fixture
+  proving repeated requests for the same locally overridden module are
+  order-independent: `ccc` requests `bbb@2.0.0` before `aaa` requests
+  `bbb@1.0.0`, and both targets analyze through the same local override module.
+- Updated `slug_bzlmod_v2::resolution` so once a local override module is
+  selected, later requests for that module name do not reject solely because the
+  requested version differs from the selected local module header version.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-local-override-request-order --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

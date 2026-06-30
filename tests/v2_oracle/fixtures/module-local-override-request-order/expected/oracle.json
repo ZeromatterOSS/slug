@@ -1,0 +1,36 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "deps(set(@ccc//:from_bbb @aaa//:from_bbb), 0)",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(set(@ccc//:from_bbb @aaa//:from_bbb), 0)",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cquery_higher_then_lower_requests",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (6 packages loaded, 6 targets configured)\nINFO: Analyzed 2 targets (7 packages loaded, 9 targets configured).\nINFO: Found 2 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@aaa//:from_bbb (19cc255)\n@ccc//:from_bbb (19cc255)",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-local-override-request-order\\20260630-133610-49868-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-local-override-request-order\\20260630-133640-81132-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (6 packages loaded, 6 targets configured)\nINFO: Analyzed 2 targets (7 packages loaded, 9 targets configured).\nINFO: Found 2 targets...\nINFO: Elapsed time: 3.776s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@aaa//:from_bbb (19cc255)\n@ccc//:from_bbb (19cc255)\n"
+    }
+  ],
+  "fixture": "module-local-override-request-order",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

@@ -1,0 +1,4 @@
+filegroup(
+    name = "from_bbb",
+    srcs = ["@bbb//:version.txt"],
+)

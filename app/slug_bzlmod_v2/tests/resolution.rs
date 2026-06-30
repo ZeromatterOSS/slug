@@ -108,6 +108,60 @@ bazel_dep(name = "bbb", version = "1.0.0")
     assert_eq!(aaa_mapping.get("bbb").map(String::as_str), Some("bbb+"));
 }
 #[test]
+fn local_override_version_selection_is_request_order_independent() {
+    let root = ModuleFile::parse(
+        r#"
+module(name = "root", version = "0.0.0")
+bazel_dep(name = "ccc", version = "1.0.0")
+bazel_dep(name = "aaa", version = "1.0.0")
+local_path_override(module_name = "aaa", path = "modules/aaa")
+local_path_override(module_name = "ccc", path = "modules/ccc")
+local_path_override(module_name = "bbb", path = "modules/bbb")
+"#,
+    )
+    .unwrap();
+    let ccc = ModuleFile::parse(
+        r#"
+module(name = "ccc", version = "1.0.0")
+bazel_dep(name = "bbb", version = "2.0.0")
+"#,
+    )
+    .unwrap();
+    let aaa = ModuleFile::parse(
+        r#"
+module(name = "aaa", version = "1.0.0")
+bazel_dep(name = "bbb", version = "1.0.0")
+"#,
+    )
+    .unwrap();
+    let bbb = ModuleFile::parse(r#"module(name = "bbb", version = "2.0.0")"#).unwrap();
+    let locals = BTreeMap::from([
+        ("aaa".to_owned(), aaa),
+        ("bbb".to_owned(), bbb),
+        ("ccc".to_owned(), ccc),
+    ]);
+
+    let graph = resolve_local_module_graph(&root, &locals).unwrap();
+    let bbb_key = ModuleKey::new("bbb", "2.0.0");
+    assert!(graph.module(&bbb_key).is_some());
+    assert_eq!(
+        graph
+            .repo_mapping_for("aaa+")
+            .unwrap()
+            .get("bbb")
+            .map(String::as_str),
+        Some("bbb+")
+    );
+    assert_eq!(
+        graph
+            .repo_mapping_for("ccc+")
+            .unwrap()
+            .get("bbb")
+            .map(String::as_str),
+        Some("bbb+")
+    );
+}
+#[test]
 fn reports_missing_local_override() {
     let root = ModuleFile::parse(
         r#"

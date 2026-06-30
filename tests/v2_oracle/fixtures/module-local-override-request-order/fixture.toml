@@ -1,0 +1,13 @@
+[fixture]
+name = "module-local-override-request-order"
+description = "Bazel 9 local_path_override selected module version is independent of request traversal order."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9.1.1 oracle fixture: ccc requests bbb@2.0.0 before aaa requests bbb@1.0.0, while local_path_override points at bbb declaring 2.0.0. Both @ccc and @aaa targets analyze."
+
+[[commands]]
+name = "cquery_higher_then_lower_requests"
+argv = ["cquery", "deps(set(@ccc//:from_bbb @aaa//:from_bbb), 0)", "--output=label"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@ccc//:from_bbb", "@aaa//:from_bbb"]
+stderr_contains = ["Analyzed 2 targets"]
