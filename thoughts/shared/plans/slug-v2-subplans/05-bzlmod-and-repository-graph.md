@@ -511,6 +511,28 @@ Stage 5 multiple-version override resolver checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registry-multiple-version-override --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
 
+Stage 5 single-version override resolver checkpoint:
+
+- Added `module-registry-single-version-override`, a Bazel 9.1.1 oracle fixture
+  using a workspace-local registry where `single_version_override(module_name =
+  "bbb", version = "2.0.0")` replaces a transitive `bbb@1.0.0` request with
+  `bbb@2.0.0`. `bazel mod dump_repo_mapping` proves the selected module still
+  uses the normal `bbb+` canonical repo name.
+- Updated `slug_bzlmod_v2::registry` resolution to apply root
+  `single_version_override` requested versions before registry module lookup,
+  while preserving ordinary MVS behavior and the already-landed
+  `multiple_version_override` selected-version set. V1 archive references
+  inspected: `app/slug_bzlmod/src/registry.rs`,
+  `app/slug_bzlmod/src/resolution.rs`, and
+  `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
+  scoped V2 rewrite from observed Bazel behavior.
+- This checkpoint intentionally stops before single-version override patches,
+  alternate override registry selection, lockfile data, registry client/fallback
+  integration, and DICE-owned graph keys.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registry-single-version-override --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

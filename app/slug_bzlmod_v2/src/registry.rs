@@ -357,36 +357,41 @@ pub fn resolve_registry_mvs(
         .as_ref()
         .ok_or_else(|| "root MODULE.bazel is missing module()".to_owned())?;
     let root_key = ModuleKey::from_header(root_header);
+    let single_overrides = single_version_overrides(root)?;
     let multiple_overrides = multiple_version_overrides(root)?;
 
     let mut selected_versions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut queue: VecDeque<BazelDep> = bazel_deps(root).into_iter().collect();
     while let Some(dep) = queue.pop_front() {
-        let requested_key = ModuleKey::new(dep.name.clone(), dep.version.clone());
+        let requested_version = single_overrides
+            .get(&dep.name)
+            .cloned()
+            .unwrap_or_else(|| dep.version.clone());
+        let requested_key = ModuleKey::new(dep.name.clone(), requested_version.clone());
         if !registry_modules.contains_key(&requested_key) {
             return Err(format!("registry module {requested_key} was not supplied"));
         }
 
         let changed = if let Some(allowed_versions) = multiple_overrides.get(&dep.name) {
-            if !allowed_versions.contains(&dep.version) {
+            if !allowed_versions.contains(&requested_version) {
                 return Err(format!(
                     "multiple_version_override for module {} does not allow requested version {}",
-                    dep.name, dep.version
+                    dep.name, requested_version
                 ));
             }
             selected_versions
                 .entry(dep.name.clone())
                 .or_default()
-                .insert(dep.version.clone())
+                .insert(requested_version.clone())
         } else {
             let versions = selected_versions.entry(dep.name.clone()).or_default();
             let selected = versions.iter().next().cloned();
             if selected
                 .as_deref()
-                .is_none_or(|selected| compare_versions(&dep.version, selected).is_gt())
+                .is_none_or(|selected| compare_versions(&requested_version, selected).is_gt())
             {
                 versions.clear();
-                versions.insert(dep.version.clone());
+                versions.insert(requested_version.clone());
                 true
             } else {
                 false
@@ -444,6 +449,25 @@ pub fn resolve_registry_mvs(
         root: root_key,
         modules,
     })
+}
+
+fn single_version_overrides(root: &ModuleFile) -> Result<BTreeMap<String, String>, String> {
+    let mut overrides = BTreeMap::new();
+    for directive in &root.directives {
+        let Directive::SingleVersionOverride(override_) = directive else {
+            continue;
+        };
+        if overrides
+            .insert(override_.module_name.clone(), override_.version.clone())
+            .is_some()
+        {
+            return Err(format!(
+                "duplicate single_version_override for module {}",
+                override_.module_name
+            ));
+        }
+    }
+    Ok(overrides)
 }
 
 fn multiple_version_overrides(

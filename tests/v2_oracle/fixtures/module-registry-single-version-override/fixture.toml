@@ -1,0 +1,20 @@
+[fixture]
+name = "module-registry-single-version-override"
+description = "Bazel 9 local-registry single_version_override fixture replacing a requested transitive version."
+comparison = "message_shape"
+oracle_notes = "Self-contained local registry. Bazel 9.1.1 mod graph shows single_version_override(module_name = \"bbb\", version = \"2.0.0\") replaces a transitive request for bbb@1.0.0 while keeping the normal bbb+ canonical repo name."
+
+[[commands]]
+name = "mod_graph_single_override"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "bbb@2.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*bbb@1\\.0\\.0).*aaa@1\\.0\\.0.*bbb@2\\.0\\.0"]
+
+[[commands]]
+name = "dump_single_override_repo_mapping"
+argv = ["mod", "dump_repo_mapping", "aaa+", "bbb+", "--output=json"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["\"bbb\":\"bbb+\"", "\"aaa\":\"aaa+\""]
