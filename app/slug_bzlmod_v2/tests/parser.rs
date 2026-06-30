@@ -3,14 +3,15 @@ use std::collections::BTreeMap;
 use slug_bzlmod_v2::ArchiveOverride;
 use slug_bzlmod_v2::BazelDep;
 use slug_bzlmod_v2::Directive;
+use slug_bzlmod_v2::ExtensionTag;
 use slug_bzlmod_v2::GitOverride;
 use slug_bzlmod_v2::InjectRepo;
 use slug_bzlmod_v2::LocalPathOverride;
+use slug_bzlmod_v2::ModuleAttributeValue;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::MultipleVersionOverride;
 use slug_bzlmod_v2::OverrideRepo;
 use slug_bzlmod_v2::RepoImport;
-use slug_bzlmod_v2::RepoRuleAttributeValue;
 use slug_bzlmod_v2::RepoRuleInvocation;
 use slug_bzlmod_v2::SingleVersionOverride;
 use slug_bzlmod_v2::UseExtension;
@@ -134,6 +135,7 @@ fn parses_extension_usage_directives() {
     let parsed = ModuleFile::parse(
         r#"
 ext = use_extension("//:ext.bzl", "ext", dev_dependency = True, isolate = True)
+ext.repo(name = "tagged", message = "hello")
 use_repo(ext, "generated", tools = "tools_repo")
 "#,
     )
@@ -149,8 +151,25 @@ use_repo(ext, "generated", tools = "tools_repo")
             isolate: true,
         })
     );
+    let mut tag_attrs = BTreeMap::new();
+    tag_attrs.insert(
+        "message".to_owned(),
+        ModuleAttributeValue::String("hello".to_owned()),
+    );
+    tag_attrs.insert(
+        "name".to_owned(),
+        ModuleAttributeValue::String("tagged".to_owned()),
+    );
     assert_eq!(
         parsed.directives[1],
+        Directive::ExtensionTag(ExtensionTag {
+            extension_proxy: "ext".to_owned(),
+            tag_class: "repo".to_owned(),
+            attrs: tag_attrs,
+        })
+    );
+    assert_eq!(
+        parsed.directives[2],
         Directive::UseRepo(UseRepo {
             extension_proxy: "ext".to_owned(),
             repos: vec![
@@ -193,14 +212,14 @@ override_repo(ext, generated = "replacement")
     let mut attrs = BTreeMap::new();
     attrs.insert(
         "filename".to_owned(),
-        RepoRuleAttributeValue::String("direct.txt".to_owned()),
+        ModuleAttributeValue::String("direct.txt".to_owned()),
     );
     attrs.insert(
         "patches".to_owned(),
-        RepoRuleAttributeValue::StringList(vec!["//:p.patch".to_owned()]),
+        ModuleAttributeValue::StringList(vec!["//:p.patch".to_owned()]),
     );
-    attrs.insert("executable".to_owned(), RepoRuleAttributeValue::Bool(false));
-    attrs.insert("strip".to_owned(), RepoRuleAttributeValue::Integer(1));
+    attrs.insert("executable".to_owned(), ModuleAttributeValue::Bool(false));
+    attrs.insert("strip".to_owned(), ModuleAttributeValue::Integer(1));
     assert_eq!(
         parsed.directives[1],
         Directive::RepoRuleInvocation(RepoRuleInvocation {

@@ -274,6 +274,22 @@ Stage 5 repo directive parser checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 module extension tag parser checkpoint:
+
+- Added `module-extension-tags`, a self-contained Bazel 9.1.1 oracle fixture
+  proving a `tag_class` call in `MODULE.bazel` can drive a generated repository
+  imported with `use_repo`.
+- Extended `slug_bzlmod_v2` parsing with typed `ExtensionTag` records and
+  shared `ModuleAttributeValue` storage for repository-rule proxy calls and
+  extension tag calls. This captures tag usage shape only; extension usage
+  aggregation, lockfile replay, facts, and recorded-input validation remain
+  owned by later Stage 5 DICE slices.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-tags --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

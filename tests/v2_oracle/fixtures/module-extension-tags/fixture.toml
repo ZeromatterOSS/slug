@@ -1,0 +1,12 @@
+[fixture]
+name = "module-extension-tags"
+description = "MODULE.bazel module_extension tag-class usage and generated repository smoke under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9 oracle fixture: a tag_class value drives a module_extension-generated repository imported with use_repo."
+
+[[commands]]
+name = "build_tag_generated_repo"
+argv = ["build", "@tagged//:tag.txt"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]

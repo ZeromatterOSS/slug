@@ -36,6 +36,7 @@ pub enum Directive {
     ArchiveOverride(ArchiveOverride),
     GitOverride(GitOverride),
     UseExtension(UseExtension),
+    ExtensionTag(ExtensionTag),
     UseRepo(UseRepo),
     OverrideRepo(OverrideRepo),
     InjectRepo(InjectRepo),
@@ -106,6 +107,13 @@ pub struct UseExtension {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionTag {
+    pub extension_proxy: String,
+    pub tag_class: String,
+    pub attrs: BTreeMap<String, ModuleAttributeValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UseRepo {
     pub extension_proxy: String,
     pub repos: Vec<RepoImport>,
@@ -141,11 +149,11 @@ pub struct UseRepoRule {
 pub struct RepoRuleInvocation {
     pub rule_proxy: String,
     pub repo_name: String,
-    pub attrs: BTreeMap<String, RepoRuleAttributeValue>,
+    pub attrs: BTreeMap<String, ModuleAttributeValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RepoRuleAttributeValue {
+pub enum ModuleAttributeValue {
     String(String),
     StringList(Vec<String>),
     Integer(u64),
@@ -156,6 +164,7 @@ impl ModuleFile {
     pub fn parse(source: &str) -> Result<Self, String> {
         let mut module = None;
         let mut directives = Vec::new();
+        let mut extension_proxies = BTreeSet::new();
         let mut repo_rule_proxies = BTreeSet::new();
         for (line_number, raw_line) in source.lines().enumerate() {
             let line = raw_line.split('#').next().unwrap_or_default().trim();
@@ -176,6 +185,7 @@ impl ModuleFile {
                     directives.push(Directive::UseExtension(parse_use_extension(
                         proxy_name, args,
                     )?));
+                    extension_proxies.insert(proxy_name.to_owned());
                 }
                 "use_repo_rule" => {
                     let Some(proxy_name) = assignment else {
@@ -231,6 +241,9 @@ impl ModuleFile {
                     directives.push(Directive::RegisterExecutionPlatforms(parse_label_args(
                         args,
                     )?));
+                }
+                other if is_extension_tag_call(other, &extension_proxies) => {
+                    directives.push(Directive::ExtensionTag(parse_extension_tag(other, args)?));
                 }
                 other if repo_rule_proxies.contains(other) => {
                     directives.push(Directive::RepoRuleInvocation(parse_repo_rule_invocation(
@@ -363,6 +376,29 @@ fn parse_use_extension(proxy_name: &str, args: &str) -> Result<UseExtension, Str
     })
 }
 
+fn is_extension_tag_call(name: &str, extension_proxies: &BTreeSet<String>) -> bool {
+    let Some((extension_proxy, tag_class)) = name.split_once('.') else {
+        return false;
+    };
+    extension_proxies.contains(extension_proxy) && parse_symbol_literal(tag_class).is_some()
+}
+
+fn parse_extension_tag(call_name: &str, args: &str) -> Result<ExtensionTag, String> {
+    let Some((extension_proxy, tag_class)) = call_name.split_once('.') else {
+        return Err(format!(
+            "extension tag call must use proxy.tag syntax: {call_name}"
+        ));
+    };
+    let attrs = parse_kwargs(args)?
+        .into_iter()
+        .map(|(key, value)| (key, value.into()))
+        .collect();
+    Ok(ExtensionTag {
+        extension_proxy: extension_proxy.to_owned(),
+        tag_class: tag_class.to_owned(),
+        attrs,
+    })
+}
 fn parse_use_repo(args: &str) -> Result<UseRepo, String> {
     let (extension_proxy, repos) = parse_extension_repo_imports("use_repo", args)?;
     Ok(UseRepo {
@@ -598,7 +634,7 @@ enum Value {
     Bool(bool),
 }
 
-impl From<Value> for RepoRuleAttributeValue {
+impl From<Value> for ModuleAttributeValue {
     fn from(value: Value) -> Self {
         match value {
             Value::String(value) => Self::String(value),

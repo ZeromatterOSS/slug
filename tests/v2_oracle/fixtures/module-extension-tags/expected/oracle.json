@@ -1,0 +1,34 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "@tagged//:tag.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "@tagged//:tag.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_tag_generated_repo",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@+ext+tagged//:tag.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@+ext+tagged//:tag.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@+ext+tagged//:tag.txt (5 packages loaded, 7 targets configured).\nWARNING: <output_base>/external/+ext+tagged/BUILD.bazel:1:14: @@+ext+tagged//:tag.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-extension-tags\\20260630-111448-78080-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-extension-tags\\20260630-111501-75472-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@+ext+tagged//:tag.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@+ext+tagged//:tag.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@+ext+tagged//:tag.txt (5 packages loaded, 7 targets configured).\nWARNING: C:/dev/kuro/target/v2o/ob/module-extension-tags/bazel/external/+ext+tagged/BUILD.bazel:1:14: @@+ext+tagged//:tag.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: 3.919s, Critical Path: 0.02s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "module-extension-tags",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

@@ -1,0 +1,5 @@
+module(name = "module_extension_tags", version = "0.0.0")
+
+ext = use_extension("//:ext.bzl", "ext")
+ext.repo(name = "tagged", message = "hello from tag")
+use_repo(ext, "tagged")
