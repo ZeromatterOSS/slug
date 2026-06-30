@@ -467,6 +467,28 @@ Stage 5 registry source.json policy checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture registry-source-json-policy --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
 
+Stage 5 registry metadata parser checkpoint:
+
+- Reused the Bazel 9.1.1 `yanked-version-policy` oracle fixture as the
+  registry `metadata.json` anchor: the local registry exposes
+  `versions = ["1.0.0"]` and `yanked_versions = {"1.0.0": "bad release"}`;
+  Bazel rejects the selected yanked version by default and accepts it with
+  `--allow_yanked_versions=yyy@1.0.0`.
+- Added `slug_bzlmod_v2::registry` metadata parsing for `metadata.json`:
+  required `versions`, optional `homepage`, optional `repository`, and
+  `yanked_versions`, plus conversion from yanked version strings into the
+  existing `ModuleKey -> reason` policy input. V1 archive references inspected:
+  `app/slug_bzlmod/src/registry.rs` and
+  `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
+  scoped V2 rewrite from behavior using structured JSON parsing.
+- This checkpoint intentionally stops before registry HTTP/file clients,
+  registry fallback ordering, registry file hash enforcement, lockfile selected
+  yanked-version recording, environment-sourced allowlists, and DICE-owned
+  registry metadata keys.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture yanked-version-policy --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

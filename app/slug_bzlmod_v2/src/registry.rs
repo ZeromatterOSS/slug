@@ -41,6 +41,135 @@ impl RegistryModule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistryMetadata {
+    pub homepage: Option<String>,
+    pub repository: Vec<String>,
+    pub versions: Vec<String>,
+    pub yanked_versions: BTreeMap<String, String>,
+}
+
+impl RegistryMetadata {
+    pub fn yanked_version_entries(&self, module_name: &str) -> BTreeMap<ModuleKey, String> {
+        self.yanked_versions
+            .iter()
+            .map(|(version, reason)| (ModuleKey::new(module_name, version), reason.clone()))
+            .collect()
+    }
+}
+
+pub fn parse_registry_metadata_json(
+    module_name: &str,
+    content: &str,
+) -> Result<RegistryMetadata, String> {
+    let value: Value = serde_json::from_str(content).map_err(|err| {
+        format!("Unable to parse json at url metadata.json for module {module_name}: {err}")
+    })?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("metadata.json for module {module_name} must be a JSON object"))?;
+
+    let versions = metadata_string_list_field(module_name, object, "versions")?
+        .ok_or_else(|| format!("metadata.json for module {module_name} is missing versions"))?;
+
+    Ok(RegistryMetadata {
+        homepage: metadata_optional_string_field(module_name, object, "homepage")?,
+        repository: metadata_string_or_list_field(module_name, object, "repository")?
+            .unwrap_or_default(),
+        versions,
+        yanked_versions: metadata_string_map_field(module_name, object, "yanked_versions")?
+            .unwrap_or_default(),
+    })
+}
+
+fn metadata_optional_string_field(
+    module_name: &str,
+    object: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Result<Option<String>, String> {
+    match object.get(name) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(format!(
+            "metadata.json field {name} for module {module_name} must be a string"
+        )),
+    }
+}
+
+fn metadata_string_or_list_field(
+    module_name: &str,
+    object: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Result<Option<Vec<String>>, String> {
+    match object.get(name) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(value)) => Ok(Some(vec![value.clone()])),
+        Some(Value::Array(items)) => Ok(Some(metadata_items_to_strings(module_name, name, items)?)),
+        Some(_) => Err(format!(
+            "metadata.json field {name} for module {module_name} must be a string or list of strings"
+        )),
+    }
+}
+
+fn metadata_string_list_field(
+    module_name: &str,
+    object: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Result<Option<Vec<String>>, String> {
+    let Some(value) = object.get(name) else {
+        return Ok(None);
+    };
+    let Value::Array(items) = value else {
+        return Err(format!(
+            "metadata.json field {name} for module {module_name} must be a list of strings"
+        ));
+    };
+    Ok(Some(metadata_items_to_strings(module_name, name, items)?))
+}
+
+fn metadata_items_to_strings(
+    module_name: &str,
+    name: &str,
+    items: &[Value],
+) -> Result<Vec<String>, String> {
+    let mut strings = Vec::with_capacity(items.len());
+    for item in items {
+        let Value::String(value) = item else {
+            return Err(format!(
+                "metadata.json field {name} for module {module_name} must be a list of strings"
+            ));
+        };
+        strings.push(value.clone());
+    }
+    Ok(strings)
+}
+
+fn metadata_string_map_field(
+    module_name: &str,
+    object: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Result<Option<BTreeMap<String, String>>, String> {
+    let Some(value) = object.get(name) else {
+        return Ok(None);
+    };
+    let Value::Object(entries) = value else {
+        return Err(format!(
+            "metadata.json field {name} for module {module_name} must be a string map"
+        ));
+    };
+
+    let mut map = BTreeMap::new();
+    for (key, value) in entries {
+        let Value::String(value) = value else {
+            return Err(format!(
+                "metadata.json field {name} for module {module_name} must be a string map"
+            ));
+        };
+        map.insert(key.clone(), value.clone());
+    }
+    Ok(Some(map))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistrySourceSpec {
     pub urls: Vec<String>,
     pub integrity: String,

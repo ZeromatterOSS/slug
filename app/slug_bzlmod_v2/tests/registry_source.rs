@@ -1,4 +1,5 @@
 use slug_bzlmod_v2::ModuleKey;
+use slug_bzlmod_v2::parse_registry_metadata_json;
 use slug_bzlmod_v2::parse_registry_source_json;
 
 fn key() -> ModuleKey {
@@ -59,4 +60,45 @@ fn rejects_missing_integrity_like_bazel() {
 fn rejects_invalid_json_with_bazel_shaped_prefix() {
     let err = parse_registry_source_json(&key(), "{not json}\n").unwrap_err();
     assert!(err.contains("Unable to parse json at url"));
+}
+
+#[test]
+fn parses_registry_metadata_yanked_versions() {
+    let metadata = parse_registry_metadata_json(
+        "yyy",
+        r#"{
+            "homepage": "https://example.invalid/yyy",
+            "repository": ["https://example.invalid/yyy.git"],
+            "versions": ["1.0.0", "2.0.0"],
+            "yanked_versions": {"1.0.0": "bad release"}
+        }"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        metadata.homepage.as_deref(),
+        Some("https://example.invalid/yyy")
+    );
+    assert_eq!(metadata.repository, ["https://example.invalid/yyy.git"]);
+    assert_eq!(metadata.versions, ["1.0.0", "2.0.0"]);
+    assert_eq!(
+        metadata
+            .yanked_version_entries("yyy")
+            .get(&ModuleKey::new("yyy", "1.0.0"))
+            .map(String::as_str),
+        Some("bad release")
+    );
+}
+
+#[test]
+fn rejects_registry_metadata_without_versions() {
+    let err =
+        parse_registry_metadata_json("yyy", r#"{"yanked_versions":{"1.0.0":"bad"}}"#).unwrap_err();
+    assert!(err.contains("metadata.json for module yyy is missing versions"));
+}
+
+#[test]
+fn rejects_invalid_registry_metadata_json() {
+    let err = parse_registry_metadata_json("yyy", "{not json}\n").unwrap_err();
+    assert!(err.contains("Unable to parse json at url metadata.json"));
 }
