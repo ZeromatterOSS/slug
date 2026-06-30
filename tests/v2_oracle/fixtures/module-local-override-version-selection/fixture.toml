@@ -1,0 +1,13 @@
+[fixture]
+name = "module-local-override-version-selection"
+description = "Bazel 9 local_path_override accepts the overridden module file's declared version even when a dependency requested a lower version."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9.1.1 oracle fixture: aaa requests bbb@1.0.0, while local_path_override points at bbb's MODULE.bazel declaring 2.0.0; Bazel still resolves and analyzes @aaa//:from_bbb."
+
+[[commands]]
+name = "cquery_lower_request_to_higher_local_override"
+argv = ["cquery", "@aaa//:from_bbb", "--output=label"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@aaa//:from_bbb"]
+stderr_contains = ["@@aaa+//:from_bbb"]

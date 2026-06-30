@@ -1,0 +1,5 @@
+module(name = "module_local_override_version_selection", version = "0.0.0")
+
+bazel_dep(name = "aaa", version = "1.0.0")
+local_path_override(module_name = "aaa", path = "modules/aaa")
+local_path_override(module_name = "bbb", path = "modules/bbb")

@@ -149,12 +149,6 @@ pub fn resolve_local_module_graph(
             ));
         }
         let key = ModuleKey::from_header(header);
-        if key.version != dep.version {
-            return Err(format!(
-                "local module {} declared version {}, but dependency requested {}",
-                dep.name, key.version, dep.version
-            ));
-        }
 
         discovered_by_name.insert(dep.name.clone(), key.clone());
         sources.insert(

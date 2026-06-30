@@ -81,6 +81,33 @@ local_path_override(module_name = "dep", path = "modules/dep")
 }
 
 #[test]
+fn local_override_uses_declared_module_version() {
+    let root = ModuleFile::parse(
+        r#"
+module(name = "root", version = "0.0.0")
+bazel_dep(name = "aaa", version = "1.0.0")
+local_path_override(module_name = "aaa", path = "modules/aaa")
+local_path_override(module_name = "bbb", path = "modules/bbb")
+"#,
+    )
+    .unwrap();
+    let aaa = ModuleFile::parse(
+        r#"
+module(name = "aaa", version = "1.0.0")
+bazel_dep(name = "bbb", version = "1.0.0")
+"#,
+    )
+    .unwrap();
+    let bbb = ModuleFile::parse(r#"module(name = "bbb", version = "2.0.0")"#).unwrap();
+    let locals = BTreeMap::from([("aaa".to_owned(), aaa), ("bbb".to_owned(), bbb)]);
+
+    let graph = resolve_local_module_graph(&root, &locals).unwrap();
+    let bbb_key = ModuleKey::new("bbb", "2.0.0");
+    assert!(graph.module(&bbb_key).is_some());
+    let aaa_mapping = graph.repo_mapping_for("aaa+").unwrap();
+    assert_eq!(aaa_mapping.get("bbb").map(String::as_str), Some("bbb+"));
+}
+#[test]
 fn reports_missing_local_override() {
     let root = ModuleFile::parse(
         r#"

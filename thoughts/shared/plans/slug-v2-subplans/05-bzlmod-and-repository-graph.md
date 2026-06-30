@@ -373,6 +373,22 @@ Stage 5 local module graph substrate checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 local override declared-version checkpoint:
+
+- Added `module-local-override-version-selection`, a Bazel 9.1.1 oracle
+  fixture proving `local_path_override` accepts the overridden module file's
+  declared version even when a dependency requested a lower version.
+- Updated `slug_bzlmod_v2::resolution` so local override resolution selects
+  the local module header's `module(version = ...)` for the `ModuleKey` instead
+  of rejecting version mismatches against individual `bazel_dep` requests. This
+  is deliberately narrower than registry MVS; registry version selection remains
+  owned by Stage 5.2.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-local-override-version-selection --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

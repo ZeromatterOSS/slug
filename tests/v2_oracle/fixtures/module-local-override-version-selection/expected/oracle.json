@@ -1,0 +1,36 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "@aaa//:from_bbb",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "@aaa//:from_bbb",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cquery_lower_request_to_higher_local_override",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@aaa+//:from_bbb (5 packages loaded, 6 targets configured)\nINFO: Analyzed target @@aaa+//:from_bbb (6 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@aaa//:from_bbb (19cc255)",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@aaa+//:from_bbb (5 packages loaded, 6 targets configured)\nINFO: Analyzed target @@aaa+//:from_bbb (6 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 3.611s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@aaa//:from_bbb (19cc255)\n"
+    }
+  ],
+  "fixture": "module-local-override-version-selection",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
