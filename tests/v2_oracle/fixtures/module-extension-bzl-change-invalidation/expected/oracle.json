@@ -1,0 +1,65 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "@generated//:impl_one.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@generated//:impl_one.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "query_generated_repo_before_bzl_edit",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "@generated//:impl_one.txt",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "@generated//:impl_one.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@generated//:impl_two.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@generated//:impl_two.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "_OUTPUT_NAME = \"impl_one\"",
+          "old_digest_hint": "378",
+          "path": "ext.bzl",
+          "replace": "_OUTPUT_NAME = \"impl_two\""
+        }
+      ],
+      "name": "query_generated_repo_after_bzl_edit",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nLoading: 0 packages loaded",
+      "normalized_stdout": "@generated//:impl_two.txt",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nLoading: 0 packages loaded\n",
+      "stdout": "@generated//:impl_two.txt\n"
+    }
+  ],
+  "fixture": "module-extension-bzl-change-invalidation",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

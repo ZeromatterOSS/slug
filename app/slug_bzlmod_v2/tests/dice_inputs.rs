@@ -11,6 +11,7 @@
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodDiceInputs;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::BzlmodExtensionDefinitionDigest;
 use slug_bzlmod_v2::BzlmodExtensionUsageDigest;
 use slug_bzlmod_v2::BzlmodModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
@@ -19,6 +20,7 @@ use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ResolvedBzlmodGraphDiceKey;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::digest_included_module_files;
+use slug_bzlmod_v2::digest_module_extension_definitions;
 use slug_bzlmod_v2::digest_module_extension_usages;
 use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_registry_policy;
@@ -31,6 +33,14 @@ fn registry_policy_digest() -> String {
     .unwrap()])
 }
 
+fn extension_definition_digest(content: impl AsRef<[u8]>) -> String {
+    digest_module_extension_definitions([BzlmodExtensionDefinitionDigest::new(
+        "//:ext.bzl%ext",
+        digest_module_file_content(content),
+    )
+    .unwrap()])
+    .unwrap()
+}
 fn extension_usage_digest(content: impl AsRef<[u8]>) -> String {
     digest_module_extension_usages([BzlmodExtensionUsageDigest::new(
         "//:ext.bzl%ext",
@@ -54,6 +64,7 @@ fn inputs(
         .unwrap()])
         .unwrap(),
         registry_policy_digest(),
+        extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",
         lockfile_mode,
@@ -206,7 +217,53 @@ fn extension_usage_digest_rejects_duplicate_or_unstable_ids() {
 }
 
 #[test]
-fn resolved_graph_key_changes_when_extension_usage_changes() {
+fn extension_definition_digest_is_order_stable_and_content_sensitive() {
+    let alpha = BzlmodExtensionDefinitionDigest::new(
+        "//:alpha.bzl%ext",
+        digest_module_file_content(b"alpha definition"),
+    )
+    .unwrap();
+    let beta = BzlmodExtensionDefinitionDigest::new(
+        "//:beta.bzl%ext",
+        digest_module_file_content(b"beta definition"),
+    )
+    .unwrap();
+
+    let forward = digest_module_extension_definitions([alpha.clone(), beta.clone()]).unwrap();
+    let reverse = digest_module_extension_definitions([beta, alpha]).unwrap();
+    let changed = digest_module_extension_definitions([BzlmodExtensionDefinitionDigest::new(
+        "//:alpha.bzl%ext",
+        digest_module_file_content(b"alpha definition changed"),
+    )
+    .unwrap()])
+    .unwrap();
+
+    assert_eq!(forward, reverse);
+    assert_ne!(forward, changed);
+}
+
+#[test]
+fn extension_definition_digest_rejects_duplicate_or_unstable_ids() {
+    let digest = digest_module_file_content(b"definition");
+    let duplicate = digest_module_extension_definitions([
+        BzlmodExtensionDefinitionDigest::new("//:ext.bzl%ext", digest.clone()).unwrap(),
+        BzlmodExtensionDefinitionDigest::new("//:ext.bzl%ext", digest).unwrap(),
+    ])
+    .unwrap_err();
+    assert!(duplicate.contains("duplicate module extension definition digest id"));
+
+    let empty_id =
+        BzlmodExtensionDefinitionDigest::new("", digest_module_file_content(b"definition"))
+            .unwrap_err();
+    assert!(empty_id.contains("definition id must not be empty"));
+
+    let bad_digest =
+        BzlmodExtensionDefinitionDigest::new("//:ext.bzl%ext", "bad/digest").unwrap_err();
+    assert!(bad_digest.contains("invalid extension_definition_digest"));
+}
+
+#[test]
+fn resolved_graph_key_changes_when_extension_definition_changes() {
     let root = ModuleKey::new("root", "0.1.0");
     let before = ResolvedBzlmodGraphDiceKey::new(
         root.clone(),
@@ -214,6 +271,7 @@ fn resolved_graph_key_changes_when_extension_usage_changes() {
             digest_module_file_content(b"module(name='root')"),
             digest_included_module_files([]).unwrap(),
             registry_policy_digest(),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
             "lockfileabc",
             LockfileMode::Update,
@@ -228,6 +286,45 @@ fn resolved_graph_key_changes_when_extension_usage_changes() {
             digest_module_file_content(b"module(name='root')"),
             digest_included_module_files([]).unwrap(),
             registry_policy_digest(),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_two'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            "lockfileabc",
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+
+    assert_ne!(before, after);
+    assert!(before.stable_serialize().contains("extension_defs="));
+}
+
+#[test]
+fn resolved_graph_key_changes_when_extension_usage_changes() {
+    let root = ModuleKey::new("root", "0.1.0");
+    let before = ResolvedBzlmodGraphDiceKey::new(
+        root.clone(),
+        BzlmodDiceInputs::new(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            "lockfileabc",
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+    let after = ResolvedBzlmodGraphDiceKey::new(
+        root,
+        BzlmodDiceInputs::new(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='two')"),
             "lockfileabc",
             LockfileMode::Update,
@@ -383,6 +480,7 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
         "",
         "includesabc",
         registry_policy_digest(),
+        extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",
         LockfileMode::Update,
@@ -396,6 +494,7 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
         "root/abc",
         "includesabc",
         registry_policy_digest(),
+        extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",
         LockfileMode::Update,

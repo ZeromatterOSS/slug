@@ -749,6 +749,32 @@ Stage 5 module-extension usage digest checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 module-extension definition digest checkpoint:
+
+- Added `module-extension-bzl-change-invalidation`, a Bazel 9.1.1 oracle
+  fixture proving extension `.bzl` implementation content is semantic
+  generated-repository state. The fixture queries `@generated//:impl_one.txt`,
+  edits only `ext.bzl` from `_OUTPUT_NAME = "impl_one"` to
+  `_OUTPUT_NAME = "impl_two"`, then queries `@generated//:impl_two.txt` in the
+  same output base.
+- Added pure V2 digest helpers for the module-extension definition portion of
+  `BzlmodDiceInputs`: `BzlmodExtensionDefinitionDigest` and
+  `digest_module_extension_definitions`. The helper sorts by extension id,
+  rejects duplicate ids, uses SHA-256 over supplied `.bzl`/definition digests,
+  and does not execute extensions, read files, or inspect generated repos.
+- Extended `BzlmodDiceInputs` equality/hash/stable serialization with the
+  extension definition digest, separate from extension usage/tag digests, so
+  implementation changes and usage changes can invalidate for distinct reasons.
+- This checkpoint intentionally stops before `.bzl` transitive digest
+  production, extension usage aggregation, module extension execution,
+  facts/factsVersions, generated-repository mappings, lockfile replay, or
+  extension isolation semantics.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-bzl-change-invalidation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

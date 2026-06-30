@@ -1,0 +1,24 @@
+[fixture]
+name = "module-extension-bzl-change-invalidation"
+description = "Bazel 9 fixture proving module_extension .bzl implementation content is semantic generated-repository state."
+comparison = "message_shape"
+oracle_notes = "Self-contained module_extension fixture. The generated repository exports a file named from a constant in ext.bzl. The second command edits only ext.bzl in the same output base; Bazel 9.1.1 then resolves the new generated source label."
+
+[[commands]]
+name = "query_generated_repo_before_bzl_edit"
+argv = ["query", "@generated//:impl_one.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@generated//:impl_one.txt"]
+
+[[commands]]
+name = "query_generated_repo_after_bzl_edit"
+argv = ["query", "@generated//:impl_two.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@generated//:impl_two.txt"]
+
+  [[commands.mutations]]
+  path = "ext.bzl"
+  find = "_OUTPUT_NAME = \"impl_one\""
+  replace = "_OUTPUT_NAME = \"impl_two\""

@@ -92,6 +92,63 @@ pub fn digest_included_module_files(
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BzlmodExtensionDefinitionDigest {
+    extension_id: String,
+    digest: String,
+}
+
+impl BzlmodExtensionDefinitionDigest {
+    pub fn new(extension_id: impl Into<String>, digest: impl Into<String>) -> Result<Self, String> {
+        let definition = Self {
+            extension_id: extension_id.into(),
+            digest: digest.into(),
+        };
+        definition.validate()?;
+        Ok(definition)
+    }
+
+    pub fn extension_id(&self) -> &str {
+        &self.extension_id
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.extension_id.is_empty() {
+            return Err("module extension definition id must not be empty".to_owned());
+        }
+        if self.extension_id.contains('\0') {
+            return Err("module extension definition id must not contain NUL bytes".to_owned());
+        }
+        validate_key_digest("extension_definition_digest", &self.digest)
+    }
+}
+
+pub fn digest_module_extension_definitions(
+    definitions: impl IntoIterator<Item = BzlmodExtensionDefinitionDigest>,
+) -> Result<String, String> {
+    let mut by_extension = BTreeMap::new();
+    for definition in definitions {
+        if by_extension
+            .insert(definition.extension_id, definition.digest)
+            .is_some()
+        {
+            return Err("duplicate module extension definition digest id".to_owned());
+        }
+    }
+
+    let mut hasher = Sha256::new();
+    for (extension_id, digest) in by_extension {
+        hasher.update(extension_id.as_bytes());
+        hasher.update([0]);
+        hasher.update(digest.as_bytes());
+        hasher.update([0]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BzlmodExtensionUsageDigest {
     extension_id: String,
     digest: String,
@@ -303,6 +360,7 @@ pub struct BzlmodDiceInputs {
     root_module_digest: String,
     included_module_digest: String,
     registry_policy_digest: String,
+    extension_definition_digest: String,
     extension_usage_digest: String,
     lockfile_digest: String,
     lockfile_mode: LockfileMode,
@@ -315,6 +373,7 @@ impl BzlmodDiceInputs {
         root_module_digest: impl Into<String>,
         included_module_digest: impl Into<String>,
         registry_policy_digest: impl Into<String>,
+        extension_definition_digest: impl Into<String>,
         extension_usage_digest: impl Into<String>,
         lockfile_digest: impl Into<String>,
         lockfile_mode: LockfileMode,
@@ -325,6 +384,7 @@ impl BzlmodDiceInputs {
             root_module_digest: root_module_digest.into(),
             included_module_digest: included_module_digest.into(),
             registry_policy_digest: registry_policy_digest.into(),
+            extension_definition_digest: extension_definition_digest.into(),
             extension_usage_digest: extension_usage_digest.into(),
             lockfile_digest: lockfile_digest.into(),
             lockfile_mode,
@@ -355,10 +415,11 @@ impl BzlmodDiceInputs {
 
     pub fn stable_serialize(&self) -> String {
         format!(
-            "root={};includes={};registries={};extensions={};lockfile={};mode={};command={};env={}",
+            "root={};includes={};registries={};extension_defs={};extensions={};lockfile={};mode={};command={};env={}",
             self.root_module_digest,
             self.included_module_digest,
             self.registry_policy_digest,
+            self.extension_definition_digest,
             self.extension_usage_digest,
             self.lockfile_digest,
             self.lockfile_mode,
@@ -372,6 +433,10 @@ impl BzlmodDiceInputs {
             ("root_module_digest", &self.root_module_digest),
             ("included_module_digest", &self.included_module_digest),
             ("registry_policy_digest", &self.registry_policy_digest),
+            (
+                "extension_definition_digest",
+                &self.extension_definition_digest,
+            ),
             ("extension_usage_digest", &self.extension_usage_digest),
             ("lockfile_digest", &self.lockfile_digest),
         ] {

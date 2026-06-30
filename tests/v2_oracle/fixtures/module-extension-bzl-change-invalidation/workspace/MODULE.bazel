@@ -1,0 +1,4 @@
+module(name = "module_extension_bzl_change", version = "0.0.0")
+
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "generated")
