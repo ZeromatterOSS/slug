@@ -87,6 +87,40 @@ pub fn validate_registry_file_hashes(
     Ok(())
 }
 
+pub fn validate_module_extension_usage_digests(
+    lockfile: &BazelLockfile,
+    observed_usage_digests: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    for (extension_id, extension) in &lockfile.module_extensions {
+        let Some(general) = &extension.general else {
+            continue;
+        };
+        let Some(expected_digest) = &general.usages_digest else {
+            continue;
+        };
+        match observed_usage_digests.get(extension_id) {
+            Some(actual_digest) if actual_digest == expected_digest => {}
+            Some(_) | None => {
+                return Err(format!(
+                    "MODULE.bazel.lock is no longer up-to-date because the usages of the extension '{}' have changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+                    bazel_display_extension_id(extension_id)
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn bazel_display_extension_id(extension_id: &str) -> String {
+    if extension_id.starts_with("@@") {
+        extension_id.to_owned()
+    } else if let Some(rest) = extension_id.strip_prefix('@') {
+        format!("@@{rest}")
+    } else {
+        format!("@@{extension_id}")
+    }
+}
+
 fn optional_string_map(
     object: &serde_json::Map<String, Value>,
     field: &str,

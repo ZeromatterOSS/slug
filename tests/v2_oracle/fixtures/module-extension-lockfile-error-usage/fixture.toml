@@ -1,0 +1,24 @@
+[fixture]
+name = "module-extension-lockfile-error-usage"
+description = "Bazel 9 fixture proving --lockfile_mode=error rejects stale module_extension usage digests."
+comparison = "message_shape"
+oracle_notes = "Self-contained module_extension fixture. The first command primes MODULE.bazel.lock with tag message one. The second command edits only the extension tag usage and runs in error mode, proving Bazel rejects stale usageDigest replay data instead of re-evaluating it silently."
+
+[[commands]]
+name = "prime_extension_lockfile"
+argv = ["query", "@tagged//:one.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@tagged//:one.txt"]
+
+[[commands]]
+name = "reject_stale_extension_usage_lockfile"
+argv = ["query", "@tagged//:two.txt", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 7
+stderr_contains = ["MODULE.bazel.lock is no longer up-to-date", "usages of the extension '@@//:ext.bzl%ext' have changed", "bazel mod deps --lockfile_mode=update"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "message = \"one\""
+  replace = "message = \"two\""

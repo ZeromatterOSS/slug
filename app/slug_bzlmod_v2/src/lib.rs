@@ -33,6 +33,7 @@ pub use lockfile::BazelLockfileModuleExtension;
 pub use lockfile::BazelLockfileModuleExtensionGeneral;
 pub use lockfile::BazelLockfileRepoSpec;
 pub use lockfile::parse_bazel_lockfile;
+pub use lockfile::validate_module_extension_usage_digests;
 pub use lockfile::validate_registry_file_hashes;
 pub use parser::ArchiveOverride;
 pub use parser::BazelDep;

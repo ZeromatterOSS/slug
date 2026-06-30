@@ -1,0 +1,67 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "@tagged//:one.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@tagged//:one.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "prime_extension_lockfile",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "@tagged//:one.txt",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "@tagged//:one.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@tagged//:two.txt",
+        "--lockfile_mode=error"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@tagged//:two.txt",
+        "--lockfile_mode=error"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "message = \"one\"",
+          "old_digest_hint": "182",
+          "path": "MODULE.bazel",
+          "replace": "message = \"two\""
+        }
+      ],
+      "name": "reject_stale_extension_usage_lockfile",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nLoading: 0 packages loaded\nERROR: Target parsing failed due to unexpected exception: MODULE.bazel.lock is no longer up-to-date because the usages of the extension '@@//:ext.bzl%ext' have changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nLoading: 0 packages loaded\nERROR: Target parsing failed due to unexpected exception: MODULE.bazel.lock is no longer up-to-date because the usages of the extension '@@//:ext.bzl%ext' have changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "module-extension-lockfile-error-usage",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

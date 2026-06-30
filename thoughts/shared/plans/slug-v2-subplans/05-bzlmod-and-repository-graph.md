@@ -793,6 +793,24 @@ Stage 5 module-extension visible lockfile checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-shape --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+Stage 5 module-extension usage lockfile error checkpoint:
+
+- Added `module-extension-lockfile-error-usage`, a Bazel 9.1.1 oracle fixture
+  proving `--lockfile_mode=error` rejects stale module-extension usage replay
+  data. The fixture primes `MODULE.bazel.lock`, mutates only the extension tag
+  value, then observes Bazel query exit code 7 with the diagnostic that the
+  usages of extension `@@//:ext.bzl%ext` changed.
+- Added `validate_module_extension_usage_digests` over parsed visible lockfile
+  data. The helper compares expected `usagesDigest` values with explicit
+  observed digest input and emits the Bazel-shaped stale-usage diagnostic;
+  it does not compute digests, execute extensions, read files, or implement
+  hidden lockfile/error-mode replay.
+- No V1 bzlmod implementation was extracted for this checkpoint; the behavior
+  is grounded in the Bazel 9.1.1 oracle fixture.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-error-usage --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

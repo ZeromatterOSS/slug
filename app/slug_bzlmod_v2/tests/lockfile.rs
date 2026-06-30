@@ -11,6 +11,7 @@
 use serde_json::Value;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::parse_bazel_lockfile;
+use slug_bzlmod_v2::validate_module_extension_usage_digests;
 use slug_bzlmod_v2::validate_registry_file_hashes;
 
 #[test]
@@ -145,6 +146,56 @@ fn rejects_missing_lockfile_version() {
     let err = parse_bazel_lockfile(r#"{"selectedYankedVersions": {}}"#).unwrap_err();
 
     assert!(err.contains("missing numeric lockFileVersion"));
+}
+
+#[test]
+fn validates_module_extension_usage_digests_against_observed_map() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "usagesDigest": "usage-digest"
+      }
+    }
+  }
+}"#,
+    )
+    .unwrap();
+    let observed = std::collections::BTreeMap::from([(
+        "//:ext.bzl%ext".to_owned(),
+        "usage-digest".to_owned(),
+    )]);
+
+    validate_module_extension_usage_digests(&lockfile, &observed).unwrap();
+}
+
+#[test]
+fn rejects_stale_module_extension_usage_digest_like_bazel() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "usagesDigest": "old-usage-digest"
+      }
+    }
+  }
+}"#,
+    )
+    .unwrap();
+    let observed = std::collections::BTreeMap::from([(
+        "//:ext.bzl%ext".to_owned(),
+        "new-usage-digest".to_owned(),
+    )]);
+
+    let err = validate_module_extension_usage_digests(&lockfile, &observed).unwrap_err();
+
+    assert!(err.contains("MODULE.bazel.lock is no longer up-to-date"));
+    assert!(err.contains("usages of the extension '@@//:ext.bzl%ext' have changed"));
+    assert!(err.contains("bazel mod deps --lockfile_mode=update"));
 }
 
 #[test]
