@@ -1,3 +1,0 @@
-load(":defs.bzl", "write_json")
-
-write_json(name = "write_json")

@@ -1,3 +1,0 @@
-load(":defs.bzl", "artifact_cycle")
-
-artifact_cycle(name = "artifact_cycle")

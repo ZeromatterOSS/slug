@@ -1,3 +1,0 @@
-load(":defs.bzl", "my_rule")
-
-my_rule(name = "my")

@@ -1,9 +1,0 @@
-load(":defs.bzl", "cargo_runfiles_param_file", "nested_param_file")
-
-nested_param_file(
-    name = "nested_param_file",
-)
-
-cargo_runfiles_param_file(
-    name = "cargo_runfiles_param_file",
-)

@@ -2,7 +2,7 @@
 
 # Slug
 
-**Bazel-compatible builds, powered by Buck2 and Rust**
+**Bazel-compatible build-tool restart in Rust**
 
 ![Status] ![License]
 
@@ -15,36 +15,21 @@
 
 </div>
 
-Slug is a Bazel-compatible build tool that uses
-[Buck2](https://github.com/facebook/buck2)'s high-performance Rust internals to
-run standard [Bazel](https://github.com/bazelbuild/bazel) 9.0 BUILD files and
-bzlmod modules.
-
-Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiella_kuroshimae)
-(the "leaf sheep" sea slug) &mdash; this slug absorbs the chloroplasts in the
-algae it eats via kleptoplasty, which seemed apt given the goal of absorbing
-Bazel into Buck2's codebase. Incidentally, the original author was a UC Santa
-Cruz alumnus, so a marine slug seemed like a nice homage.
+Slug is a Bazel 9+ compatibility project. The active repository root is the V2
+clean restart: a small Rust crate set, a Bazel oracle fixture harness, DICE and
+Starlark infrastructure, and stage-owned plans for rebuilding behavior from
+Bazel source and tests.
 
 ## Why Slug?
 
-Slug is a research project to answer two questions: how much can AI do when
-given a perfect reference spec, and how fast could Bazel be if it dropped the
-JVM and used Buck2's execution engine?
+Slug V2 is a research project to build a Bazel-shaped Rust implementation from
+the first architectural boundary. It uses:
 
-It aims to be a drop-in replacement for Bazel, making use of Buck2's internals.
-Specifically, it leverages:
-
-- **DICE** &mdash; Buck2's deterministic incremental computation engine for fast,
-  correct rebuilds
-- **starlark-rust** &mdash; a mature Starlark interpreter with optional type
-  annotation support (ahead of Bazel's upcoming type system)
-- **Rust throughout** &mdash; the entire build tool is native Rust, from the
-  Starlark evaluator to the action execution pipeline
-
-The result is a build tool that reads your existing Bazel BUILD files and
-MODULE.bazel configuration, fetches from the Bazel Central Registry, and runs
-your builds with less overhead.
+- **Bazel source and tests** as the compliance oracle.
+- **DICE** for semantic build state that must be cached, invalidated, replayed,
+  or shared across requests.
+- **starlark-rust** for the Starlark substrate.
+- **REAPI-first execution** for future local and remote execution paths.
 
 ## Status
 
@@ -54,67 +39,47 @@ The project is provided for educational and research purposes, and is in large
 part an exercise in experimenting with agentic programming on a substantial
 systems codebase.
 
-The current canonical roadmap is the V2 clean restart plan:
+The canonical roadmap is the V2 clean restart plan:
 [thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md](thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md).
-The existing implementation remains valuable V1 reference material, but new
-work should target the V2 plan: Bazel-shaped identity and layout from the root,
-Bazel source/tests as the oracle, DICE-owned semantic state, and REAPI-first
-execution.
+The V1 implementation is preserved by the `slug-v1-archive` tag and
+`v1-archive` branch recorded in [V1_ARCHIVE.md](V1_ARCHIVE.md). New work should
+target the V2 plan and the subplans under
+[thoughts/shared/plans/slug-v2-subplans](thoughts/shared/plans/slug-v2-subplans/).
 
-### What works today
+### Active Surface
 
-- **BUILD.bazel / MODULE.bazel** &mdash; Bazel 9.0 build files and bzlmod
-  dependency management
-- **Bazel Central Registry** &mdash; fetching and caching BCR modules with
-  lockfile support
-- **Rules ecosystem** &mdash; tested against:
-  - [rules_cc](https://github.com/bazelbuild/rules_cc) 0.2.16 (cc_library,
-    cc_binary, cc_test; static and dynamic linking)
-  - [rules_rust](https://github.com/hermeticbuild/rules_rust) 0.40.0
-    (rust_library, rust_binary)
-  - [rules_python](https://github.com/bazelbuild/rules_python) 1.8.0
-    (py_library, py_binary, py_test)
-  - [protobuf](https://github.com/protocolbuffers/protobuf) 33.4+
-    (proto_library, cc_proto_library)
-  - [rules_oci](https://github.com/bazel-contrib/rules_oci) (oci_image via
-    rules_pkg)
-  - [bazel_skylib](https://github.com/bazelbuild/bazel-skylib) 1.5.0
-- **Platforms** &mdash; Linux and Windows (macOS support is planned)
-- **Query** &mdash; `deps`, `rdeps`, `allpaths`, `somepath`, `kind`, `attr`,
-  `filter`, `buildfiles`, `tests`; `--output=label/json/build/graph`
-- **Local sandboxing** &mdash; namespace-based build isolation on Linux
-- **Remote execution** &mdash; RE API compatible (BuildBarn, BuildBuddy,
-  EngFlow, NativeLink)
+- Root orientation docs: `AGENTS.md`, this README, `V1_ARCHIVE.md`, and
+  repo-local skills under `.codex/skills/`.
+- V2 plans and prompts under `thoughts/shared/`.
+- Stage 1 oracle harness under `tools/v2_oracle*` and `tests/v2_oracle/`.
+- V2 Rust crates under `app/slug_*_v2/`.
+- Retained infrastructure crates: `dice`, `starlark-rust`, `superconsole`,
+  `allocative`, `gazebo`, `pagable`, and `shed`.
 
-### What's not supported
-
-- **Bazel versions before 9.0** &mdash; no WORKSPACE file support
-- **Android / iOS rules** &mdash; not a current priority
-- **macOS** &mdash; not yet tested
+V1 source, tests, root Bazel/Buck metadata, old CI, and old plans are archive
+material. Inspect them through the archive refs when a V2 subplan names an
+extraction target.
 
 ## Installing
 
-Slug is currently build-from-source only. You'll need a recent Rust nightly
-toolchain.
+Slug V2 is currently a development scaffold. Use the checked-in Rust toolchain
+and build the V2 CLI crate:
 
 ```bash
 git clone https://github.com/ZeromatterOSS/slug.git
 cd slug
-cargo build --release
+cargo build -p slug_cli_v2
 ```
 
-The binary will be at `./target/release/slug`.
+The debug binary is `target/debug/slug` unless `CARGO_TARGET_DIR` is set.
 
 ## Quick start
 
-Slug reads standard Bazel project layouts. If you have an existing Bazel 9.0
-project with `MODULE.bazel` and `BUILD.bazel` files, you can try:
+List oracle fixtures and run the CLI identity smoke:
 
 ```bash
-slug build //...
-slug test //...
-slug query "deps(//my:target)"
-slug run //:my_binary
+python3 -B -m tools.v2_oracle list
+cargo run -p slug_cli_v2 -- version
 ```
 
 ## Credits

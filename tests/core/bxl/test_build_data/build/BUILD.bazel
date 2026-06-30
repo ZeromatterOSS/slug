@@ -1,7 +1,0 @@
-trivial_build(
-    name = "pass",
-)
-
-fail_build(
-    name = "fail",
-)

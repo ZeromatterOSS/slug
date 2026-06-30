@@ -1,6 +1,0 @@
-load(":defs.bzl", "simple")
-
-simple(
-    name = "simple",
-    input = "input.txt",
-)

@@ -1,3 +1,0 @@
-load(":defs.bzl", "test_target")
-
-test_target(name = "test_target")

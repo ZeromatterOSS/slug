@@ -1,7 +1,0 @@
-load("defs.bzl", "cc_smoke_binary")
-
-cc_smoke_binary(
-    name = "hello",
-    src = "hello.c",
-    main = "main.c",
-)

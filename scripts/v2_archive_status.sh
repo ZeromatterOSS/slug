@@ -85,6 +85,87 @@ else
   ok "HEAD does not track a v1-archive directory"
 fi
 
+root_v1_paths=$(git ls-files -- \
+  .bazelignore .claude .github .vscode .watchmanconfig .envrc \
+  BUILD.bazel MODULE.bazel CHANGELOG.md Cross.toml HACKING.md \
+  buck_rust_binary.bzl ci.bzl defs.bzl lint_levels.bzl proto_defs.bzl \
+  action_error_handler agent app_dep_graph_rules assets bazel_tools benchmarks \
+  bootstrap buck2 build cfg examples explorer flake.lock flake.nix host_sharing \
+  integrations prelude remote_execution rust-project.sh shim slug.bat slug.py \
+  slug_builtins test.py website 2>/dev/null || true)
+if [ -n "$root_v1_paths" ]; then
+  fail "tracked V1-only root paths remain:"
+  printf '%s\n' "$root_v1_paths"
+else
+  ok "no tracked V1-only root paths"
+fi
+
+codex_v1_paths=$(git ls-files -- .codex \
+  ':!.codex/skills/slug-buck2-utility-reuse/**' 2>/dev/null || true)
+if [ -n "$codex_v1_paths" ]; then
+  fail "tracked non-V2 .codex paths remain:"
+  printf '%s\n' "$codex_v1_paths"
+else
+  ok "only V2 repo-local skills are tracked under .codex/"
+fi
+
+app_v1_paths=$(git ls-files -- app \
+  ':!app/slug_analysis_v2/**' \
+  ':!app/slug_bep_v2/**' \
+  ':!app/slug_build_api_v2/**' \
+  ':!app/slug_bzlmod_v2/**' \
+  ':!app/slug_cli_v2/**' \
+  ':!app/slug_commands_v2/**' \
+  ':!app/slug_core_v2/**' \
+  ':!app/slug_identity_v2/**' \
+  ':!app/slug_loading_v2/**' \
+  ':!app/slug_query_v2/**' \
+  ':!app/slug_reapi_v2/**' 2>/dev/null || true)
+if [ -n "$app_v1_paths" ]; then
+  fail "tracked non-V2 app paths remain:"
+  printf '%s\n' "$app_v1_paths"
+else
+  ok "only V2 app crates are tracked under app/"
+fi
+
+test_v1_paths=$(git ls-files -- tests ':!tests/v2_oracle/**' 2>/dev/null || true)
+if [ -n "$test_v1_paths" ]; then
+  fail "tracked non-oracle test paths remain:"
+  printf '%s\n' "$test_v1_paths"
+else
+  ok "only V2 oracle tests are tracked under tests/"
+fi
+
+tool_v1_paths=$(git ls-files -- tools \
+  ':!tools/v2_oracle/**' \
+  ':!tools/v2_oracle_lib/**' 2>/dev/null || true)
+if [ -n "$tool_v1_paths" ]; then
+  fail "tracked non-V2 tool paths remain:"
+  printf '%s\n' "$tool_v1_paths"
+else
+  ok "only V2 oracle tools are tracked under tools/"
+fi
+
+thought_v1_paths=$(git ls-files -- thoughts \
+  ':!thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md' \
+  ':!thoughts/shared/plans/slug-v2-subplans/**' \
+  ':!thoughts/shared/prompts/2026-06-29-slug-v2-generic-implementer.md' \
+  2>/dev/null || true)
+if [ -n "$thought_v1_paths" ]; then
+  fail "tracked non-V2 thoughts paths remain:"
+  printf '%s\n' "$thought_v1_paths"
+else
+  ok "only V2 plans and prompt are tracked under thoughts/"
+fi
+
+doc_v1_paths=$(git ls-files -- docs ':!docs/developers/dice.md' 2>/dev/null || true)
+if [ -n "$doc_v1_paths" ]; then
+  fail "tracked non-retained docs paths remain:"
+  printf '%s\n' "$doc_v1_paths"
+else
+  ok "only retained DICE docs are tracked under docs/"
+fi
+
 if command -v rg >/dev/null 2>&1; then
   plan_matches=$(rg -n "$canonical_plan" AGENTS.md README.md thoughts/shared/plans 2>/dev/null || true)
 else

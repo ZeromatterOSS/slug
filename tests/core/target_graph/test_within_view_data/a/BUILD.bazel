@@ -1,4 +1,0 @@
-test_within_view_rule(
-    name = "a",
-    deps = [],
-)

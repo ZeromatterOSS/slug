@@ -1,3 +1,0 @@
-load(":defs.bzl", "provider_test_rule")
-
-provider_test_rule(name = "target")

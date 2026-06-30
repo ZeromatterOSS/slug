@@ -1,2 +1,0 @@
-Command exited with non-zero status 3
-4.01

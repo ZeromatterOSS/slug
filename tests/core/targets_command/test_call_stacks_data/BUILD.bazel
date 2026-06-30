@@ -1,3 +1,0 @@
-load(":defs.bzl", "stub")
-
-stub(name = "test")

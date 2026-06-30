@@ -1,3 +1,0 @@
-load(":defs.bzl", "remote_text")
-
-remote_text(name = "remote_text", text = "text")

@@ -1,1 +1,0 @@
-module(name = "second_only_lib", version = "1.0")

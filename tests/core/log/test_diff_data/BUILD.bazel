@@ -1,8 +1,0 @@
-trivial_build(
-    name = "simple",
-)
-
-non_det_build(
-    name = "non_det",
-    slug_output = read_root_config("test", "buck2_output"),
-)

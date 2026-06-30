@@ -1,8 +1,0 @@
-load(":rules.bzl", "my_rule")
-
-platform(name = "p")
-
-my_rule(
-    name = "xx",
-    default_target_platform = ":p",
-)

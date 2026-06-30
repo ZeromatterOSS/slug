@@ -1,6 +1,0 @@
-load("//:defs.bzl", "stub")
-
-stub(
-    name = "b",
-    visibility = ["PUBLIC"],
-)

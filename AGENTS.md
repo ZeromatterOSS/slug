@@ -44,15 +44,21 @@ Start from the live checkout, not from memory.
   material.
 - If the user names a prompt or plan, read that prompt/plan before editing.
   Prompts live in `thoughts/shared/prompts/`; subplans live in
-  `thoughts/shared/plans/slug-bazel-subplans/`.
+  `thoughts/shared/plans/slug-v2-subplans/`. V1 plans are available through the
+  archive refs named in `V1_ARCHIVE.md`, not as active root plans.
+- Repo-local skills live in `.codex/skills/`. For V2 hot-path utilities,
+  Buck2-derived data structures, interning, hashing, compact collections, or
+  memory-accounting work, read
+  `.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing.
 - Check `git status --short` and inspect dirty diffs before making changes.
   Treat dirty files as active user/agent state unless the user says otherwise.
 - Prefer focused owning-abstraction tests before broad SDK or repo-wide smokes.
   Use broad smokes only after the local bug class is understood.
 - Do not run multiple `cargo build` or `cargo test` commands in parallel when
   they share the same target directory; Cargo lock contention obscures signal.
-- If a Rust change affects the `slug` binary path used by Python/e2e tests,
-  rebuild it with `cargo build -p slug` before invoking `target/debug/slug`.
+- If a Rust change affects the V2 `slug` binary path used by oracle tests,
+  rebuild it with `cargo build -p slug_cli_v2` before invoking the binary named
+  by `SLUG_V2_BIN`.
 - Clean stale `slugd` processes before and after Slug smokes or focused
   daemon-sensitive tests.
 

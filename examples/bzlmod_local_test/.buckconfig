@@ -1,3 +1,0 @@
-# Minimal configuration for bzlmod local path override testing.
-# This project tests local_path_override() functionality.
-# Cell registration is in MODULE.bazel.

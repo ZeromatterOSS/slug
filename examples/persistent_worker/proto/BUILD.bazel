@@ -1,8 +1,0 @@
-oncall("build_infra")
-
-python_binary(
-    name = "protoc",
-    main_module = "grpc_tools.protoc",
-    visibility = ["PUBLIC"],
-    deps = ["//python:grpcio-tools"],
-)

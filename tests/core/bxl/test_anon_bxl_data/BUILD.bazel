@@ -1,6 +1,0 @@
-load(":defs.bzl", "simple")
-
-simple(
-    name = "simple",
-    arg_attr = ["just_a_string"],
-)

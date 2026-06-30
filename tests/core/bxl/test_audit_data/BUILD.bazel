@@ -1,9 +1,0 @@
-load(":defs.bzl", "simple_rule")
-
-simple_rule(name = "with_output")
-
-simple_rule(name = "with_content_based_output", has_content_based_path = True)
-
-platform(
-    name = "someplat",
-)

@@ -1,5 +1,0 @@
-genrule(
-    name = "target",
-    outs = ["out.txt"],
-    cmd = "echo target > $@",
-)

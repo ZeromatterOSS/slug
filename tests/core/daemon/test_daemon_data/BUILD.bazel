@@ -1,5 +1,0 @@
-genrule(
-    name = "rule",
-    outs = ["out.txt"],
-    cmd = "echo rule > $@",
-)

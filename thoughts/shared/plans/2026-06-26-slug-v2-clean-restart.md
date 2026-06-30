@@ -71,11 +71,17 @@ for sessions that continue this remediation.
 `slug-v1-archive^{commit}` and `v1-archive` now both resolve to
 `e218054d4c796655939b968d90208b185decb352`. Cargo root metadata now exposes only
 V2 app crates as active `app/slug_*` workspace members/dependencies, with V1
-app crates removed from that surface. The branch still tracks V1 source/test
-paths, and `remote_execution` is only a Stage 7 source candidate until its V1
-crate dependencies are wrapped or ported away. The next Stage 0 task is
-physical source/test cleanup or codegraph/build exclusions before importing
-more prototype code.
+app crates removed from that surface.
+
+2026-06-29 clean-root remediation update: the active clean-root branch is
+`codex/slugv2-clean-root-remediation`. It removes tracked V1 source/test trees,
+root Bazel/Buck metadata, old CI, old docs, old V1 plans, and the unwrapped
+`remote_execution` source candidate from the active tree. The retained tracked
+root is orientation docs, V2 plans/prompt, Stage 1 oracle harness, V2 crates,
+repo-local V2 skills, `docs/developers/dice.md`, and the explicitly retained
+infrastructure crates listed in `V1_ARCHIVE.md`. V1 and rejected mixed-root
+surfaces remain available through `slug-v1-archive`, `v1-archive`, and
+`codex/slugv2` for staged extraction only.
 
 ## Non-Negotiables
 

@@ -1,5 +1,0 @@
-load(":success.bzl", "nop")
-
-nop(
-    name = "success",
-)

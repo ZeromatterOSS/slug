@@ -1,8 +1,0 @@
-# Bazel-compatible toolchain configuration
-# In Bazel mode, C/C++ toolchains are auto-detected via rules_cc's
-# cc_configure module extension. No manual toolchain setup needed here.
-
-# This file intentionally left mostly empty - the cc_configure extension
-# in rules_cc automatically creates @local_config_cc with the detected
-# C/C++ toolchain, which is registered via register_toolchains() in
-# MODULE.bazel or the extension itself.

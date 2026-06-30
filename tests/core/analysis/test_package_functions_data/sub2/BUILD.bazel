@@ -1,6 +1,0 @@
-load("//defs.bzl", "write_value")
-
-write_value(
-    name = "sub2_target",
-    value = "sub2",
-)

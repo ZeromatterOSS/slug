@@ -1,1 +1,0 @@
-soft_error("starlark_no_stack_soft_error", "Blah", stack = False)

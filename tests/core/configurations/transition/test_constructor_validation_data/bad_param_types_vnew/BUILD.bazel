@@ -1,5 +1,0 @@
-# @nolint
-
-load(":bad_param_types_vnew.bzl", "inf")
-
-_keep_import = inf

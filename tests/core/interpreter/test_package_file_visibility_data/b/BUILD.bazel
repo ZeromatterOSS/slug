@@ -1,3 +1,0 @@
-load("//:stub.bzl", "stub")
-
-stub(name = "top", deps = ["//a/nested_package:bottom"])

@@ -1,2 +1,0 @@
-# buildifier: disable=print
-print("print me")

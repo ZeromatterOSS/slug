@@ -1,7 +1,0 @@
-trivial_build(
-    name = "foo",
-)
-
-fail_build(
-    name = "fail",
-)

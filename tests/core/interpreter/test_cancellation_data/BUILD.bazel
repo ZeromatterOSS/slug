@@ -1,9 +1,0 @@
-# @nolint
-
-load(":defs.bzl", "loop_long", "noop")
-
-loop_long("load")
-
-noop(
-    name = "target",
-)

@@ -1,6 +1,0 @@
-load(
-    ":defs.bzl",
-    "defs",
-)
-
-defs()

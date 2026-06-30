@@ -1,5 +1,0 @@
-load(":make_target.bzl", "make_target")
-
-make_target("foo")
-
-make_target("foo")

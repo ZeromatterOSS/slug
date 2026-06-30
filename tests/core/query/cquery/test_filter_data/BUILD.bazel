@@ -1,3 +1,0 @@
-platform(name = "aaaaa")
-
-stub(name = "bbbbb", default_target_platform = ":aaaaa")

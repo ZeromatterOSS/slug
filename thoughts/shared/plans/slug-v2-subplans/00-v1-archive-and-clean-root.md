@@ -89,9 +89,9 @@ git branch v1-archive <v1-commit>
 ### 0.4 First V2 Skeleton Gate
 
 - Create a V2 root layout proposal before deleting V1 root files.
-- The proposal must say which existing directories are retained as vendored
-  infrastructure (`dice`, `starlark-rust`, selected `remote_execution`) and
-  which are V1 archive-only.
+- The proposal must say which existing directories are retained as infrastructure
+  (`dice`, `starlark-rust`, selected V2-owned REAPI wrappers) and which are V1
+  archive-only.
 - Add the retained/archive-only directory table to `V1_ARCHIVE.md` so agents do
   not infer ownership from old paths.
 - Do not remove V1 code until the tag and branch validation below pass.
@@ -113,8 +113,9 @@ Before any further V2 trunk work:
 3. Create a separate clean-root worktree or branch for V2 remediation. Do not
    keep iterating on the mixed-root tree as if it were the clean trunk.
 4. Remove V1-only workspace membership and build metadata from the active V2
-   root. Keep only root orientation docs, V2 plans, Stage 1 oracle harnesses,
-   V2 crates, and explicitly retained infrastructure.
+   root. Keep only root orientation docs, repo-local V2 skills, V2 plans,
+   Stage 1 oracle harnesses, V2 crates, and explicitly retained
+   infrastructure.
 5. Treat current `codex/slugv2` commits as a patch queue. Reapply them in stage
    order only after the owner subplan names the oracle and validation command.
 6. Update Stage 9 for any V1 or mixed-root code imported into the clean root.
@@ -124,19 +125,23 @@ Before any further V2 trunk work:
 Execution update on 2026-06-29: the local `slug-v1-archive` annotated tag and
 `v1-archive` branch were created at
 `e218054d4c796655939b968d90208b185decb352`, and
-`scripts/v2_archive_status.sh` now verifies the refs. Stage 0 is still not
-complete because the active branch still tracks V1 source/test paths.
+`scripts/v2_archive_status.sh` now verifies the refs.
 
 Root-metadata update on 2026-06-29: `Cargo.toml` now keeps only V2 app crates
 as active `app/slug_*` workspace members and `slug_*` workspace dependencies.
-The active retained infrastructure members are `allocative`, `dice`,
-`gazebo`, `pagable`, `shed`, `starlark-rust`, and `superconsole`.
-`remote_execution` remains a Stage 7 source candidate, but it is not an active
-workspace member because `remote_execution/oss/re_grpc*` still depends on V1
-`slug_data`, `slug_protoc_dev`, `slug_re_configuration`, and `slug_util`.
-Follow-up clean-root work should remove or exclude V1 source/test paths and
-Buck-shaped metadata without treating the mixed-root `codex/slugv2` commits as
-already accepted V2 trunk.
+The active retained infrastructure members are `allocative`, `dice`, `gazebo`,
+`pagable`, `shed`, `starlark-rust`, and `superconsole`.
+
+Clean-root update on 2026-06-29: branch
+`codex/slugv2-clean-root-remediation` physically removes tracked V1-only
+source/test paths, old docs, old V1 plans, root Bazel/Buck metadata, old CI,
+wrappers, shims, examples, website, and the unwrapped `remote_execution` source
+candidate from the active root. Future Stage 7 work must re-import REAPI client
+code through `app/slug_reapi_v2` or another V2 wrapper only after
+`07-reapi-native-execution.md` and Stage 9 name the oracle and validation
+command. V1 source remains available through `slug-v1-archive` and
+`v1-archive`; the mixed-root `codex/slugv2` branch remains a prototype patch
+queue, not an accepted trunk.
 
 ## Exact Test Criteria
 
@@ -156,9 +161,8 @@ already accepted V2 trunk.
 
 ## Archive Record
 
-This record was verified in the local `codex/slugv2` checkout on 2026-06-29.
-The archive refs exist, but the branch remains a mixed-root tree until the
-clean-root remediation lands.
+This record was verified in the local clean-root remediation checkout on
+2026-06-29.
 
 | Field | Value |
 |-------|-------|
@@ -167,7 +171,46 @@ clean-root remediation lands.
 | V1 archive branch | `v1-archive` created on 2026-06-29 |
 | Physical archive directory | none by default |
 | Dirty files intentionally excluded | archive action excluded active V2 remediation docs and prompt only; later root-metadata cleanup changed `Cargo.toml`; no V1 implementation files |
-| Current verification status | archive refs and Cargo root metadata verified; physical V1 source/test cleanup remains pending |
+| Current verification status | archive refs, Cargo root metadata, and tracked clean-root cleanup verified locally; final validation commands are recorded in this plan |
+
+## 2026-06-29 Clean-Root Evidence
+
+Branch: `codex/slugv2-clean-root-remediation`.
+
+- `scripts/v2_archive_status.sh` exits 0. It verifies the archive refs, no
+  physical `v1-archive/`, no tracked V1-only root paths, only V2 app crates
+  under `app/`, only V2 oracle tests/tools, only V2 plans/prompt, and only
+  retained DICE docs under `docs/`.
+- `git ls-files -- app` with exclusions for every `app/slug_*_v2/` crate emits
+  no V1 app paths.
+- `git ls-files -- tests ':!tests/v2_oracle/**'`,
+  `git ls-files -- tools ':!tools/v2_oracle/**' ':!tools/v2_oracle_lib/**'`,
+  `git ls-files -- thoughts` with V2 plan/prompt exclusions, and
+  `git ls-files -- docs ':!docs/developers/dice.md'` emit no paths.
+- `scripts/v2_archive_status.sh` allows only
+  `.codex/skills/slug-buck2-utility-reuse/**` under `.codex/`.
+- `cargo metadata --no-deps --format-version 1` succeeds and reports the V2
+  app crates plus retained infrastructure as workspace members.
+- Focused `cargo check` passes for all V2 app crates with
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1`.
+- The matching `cargo test` command passes for the same V2 crate set.
+- `python3 -B -m tools.v2_oracle list` lists the Stage 1 fixtures.
+- `python -m pytest -q tests/v2_oracle/test_v2_oracle.py` passes with 12 tests.
+  The local `python3` is Python 3.14 and does not have `pytest` installed.
+- `cargo tree -p slug_cli_v2` shows only `slug_commands_v2`, `slug_core_v2`,
+  and their V2 dependencies.
+- The grep for `buck`, `BUCK`, `TARGETS`, `CellResolver`, and `buck-out` across
+  `app/slug_cli_v2` and `app/slug_core_v2` emits no matches.
+- The grep for `remote_execution`, `buck2`, `prelude`, `host_sharing`,
+  `slug_data`, `slug_util`, `slug_execute`, `slug_server`, and `slug_client`
+  across `Cargo.toml` and V2 crate manifests emits no matches.
+- `git diff --check` passes for root orientation/config files,
+  `scripts/v2_archive_status.sh`, and `thoughts/shared/plans`.
+- `git diff --cached --check` passes for the staged deletions.
+
+Residual risk: upstream Bazel oracle regeneration was not rerun in this Linux
+checkout. That remains owned by the individual V2 stage plans that require
+Bazel-side expected output refreshes.
 
 ## Validation
 

@@ -1,4 +1,0 @@
-filegroup(
-    name = "sub_files",
-    srcs = [],
-)

@@ -1,6 +1,0 @@
-load("//:rules.bzl", "touch_file")
-
-touch_file(
-    name = "rule",
-    out = "out.txt",
-)

@@ -1,3 +1,0 @@
-load(":defs.bzl", "test_cleanup")
-
-test_cleanup(name = "cleanup")

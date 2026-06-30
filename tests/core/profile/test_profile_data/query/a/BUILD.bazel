@@ -1,9 +1,0 @@
-load("//:defs.bzl", "stub")
-
-stub(
-    name = "a",
-    deps = [
-        # Using a target in another package, to check then both targets appear in profile output.
-        "//query/b:b",
-    ],
-)

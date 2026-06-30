@@ -1,7 +1,0 @@
-name: build_bootstrap
-runs:
-  using: composite
-  steps:
-  - name: Build `slug` with `slug`
-    run: "$RUNNER_TEMP/artifacts/slug build :slug -v 2"
-    shell: bash

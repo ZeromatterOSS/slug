@@ -1,3 +1,0 @@
-load("defs.bzl", "all_defs")
-
-all_defs()

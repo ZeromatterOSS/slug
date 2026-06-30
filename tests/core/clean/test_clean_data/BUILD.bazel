@@ -1,5 +1,0 @@
-genrule(
-    name = "trivial_build",
-    outs = ["out.txt"],
-    cmd = "echo trivial > $@",
-)

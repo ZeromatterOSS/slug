@@ -1,3 +1,0 @@
-load(":defs.bzl", "gen_test_cases")
-
-gen_test_cases()

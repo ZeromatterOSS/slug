@@ -1,4 +1,0 @@
-platform(
-    name = "platform1",
-    visibility = ["PUBLIC"],
-)

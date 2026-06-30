@@ -1,1 +1,0 @@
-load(":b.bzl", _test = "test")

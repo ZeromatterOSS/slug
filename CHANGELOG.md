@@ -1,3 +1,0 @@
-# Slug
-
-- Initial version.

@@ -1,3 +1,0 @@
-trivial_build(
-    name = "with_build_artifact",
-)

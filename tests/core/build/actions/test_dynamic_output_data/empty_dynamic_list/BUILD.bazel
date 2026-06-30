@@ -1,5 +1,0 @@
-load(":empty_defs.bzl", "test_rule")
-
-test_rule(
-    name = "empty_test",
-)

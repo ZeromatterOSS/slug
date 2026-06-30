@@ -22,6 +22,12 @@ record whether the import is a direct cherry-pick, a port, a rewrite from
 behavior, or reference-only. Do not treat mixed-root commits as already accepted
 V2 trunk work merely because they compile in the old workspace.
 
+The clean-root remediation branch keeps the already-landed V2-only stage
+artifacts from `codex/slugv2` only where the owner subplan records the oracle
+fixture or Bazel source citation. V1-only source/test trees and the unwrapped
+`remote_execution` source candidate are reference material through archive refs,
+not active-root content.
+
 ## Workflow
 
 1. Open the V2 owner plan and identify the exact behavior needed.
@@ -71,6 +77,10 @@ Before moving an entry out of `Proposed`, answer:
 | Proposed | Reject by default | Direct-local executor success, copied-output bridge hits, Buck output-root spelling, and old compiled NativeLink/actiond adapter artifacts | Reject | Does not prove V2 Bazel REAPI parity |
 | Proposed | Reject by default | V1 Buck cell graph and fallback cell machinery | Reject unless Stage 5 proves a Bazel equivalent | Stage 3/5 identity and bzlmod tests |
 | Proposed | Reject by default | V1 BXL user surface | Defer as Slug extension | Not part of Bazel compliance |
+| Reference only | Stage 0 | Mixed-root `codex/slugv2` V1 source/test paths, old docs/plans, root Bazel/Buck metadata, shims, wrappers, and `remote_execution/` | Reject from active root; inspect through archive refs or prototype branch only | `scripts/v2_archive_status.sh`; clean-root tracked-file grep in Stage 0 |
+| Landed | Stage 1 | `codex/slugv2` Stage 1 oracle harness and fixtures | Retain as V2-only scaffold | Owner plan `01-compliance-oracle-harness.md`; `python3 -B -m tools.v2_oracle list`; `python3 -m pytest -q tests/v2_oracle/test_v2_oracle.py` |
+| Landed | Stage 2 | `codex/slugv2` Stage 2 CLI/core V2 crates | Retain as V2-only scaffold | Owner plan `02-rust-skeleton-and-runtime-substrate.md`; `cargo check -p slug_cli_v2 -p slug_core_v2`; `cargo test -p slug_cli_v2` |
+| Landed | Stages 3-8 | `codex/slugv2` V2 crate and fixture checkpoints under `app/slug_*_v2` and `tests/v2_oracle/` | Retain only where owner stage records fixture/citation evidence | Owner plans `03` through `08`; focused cargo tests and oracle fixture commands recorded per stage |
 
 ## Evidence Template
 

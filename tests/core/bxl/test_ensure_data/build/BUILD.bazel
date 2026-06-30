@@ -1,5 +1,0 @@
-load(":defs.bzl", "fail_build")
-
-fail_build(
-    name = "fail",
-)

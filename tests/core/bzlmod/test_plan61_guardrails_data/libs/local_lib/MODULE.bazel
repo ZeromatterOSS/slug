@@ -1,1 +1,0 @@
-module(name = "local_lib", version = "1.0")

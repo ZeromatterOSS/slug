@@ -1,6 +1,0 @@
-oncall("golang")
-
-go_binary(
-    name = "helloworld",
-    srcs = glob(["*.go"]),
-)

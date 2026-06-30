@@ -1,5 +1,0 @@
-load(":error_rule.bzl", "error_rule")
-
-error_rule(
-    name = "foo",
-)

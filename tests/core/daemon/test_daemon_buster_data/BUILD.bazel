@@ -1,3 +1,0 @@
-load(":defs.bzl", "noop")
-
-noop(name = "noop")

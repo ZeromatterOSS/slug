@@ -17,7 +17,7 @@ annotated tag and `v1-archive` branch both peel to
 | Tag type | annotated |
 | Physical archive directory | none by default |
 | Dirty files intentionally excluded | archive action excluded active V2 remediation docs and prompt only; later root-metadata cleanup changed `Cargo.toml`; no V1 implementation files |
-| Current verification status | verified locally on 2026-06-29; checker exits 0 with active V2 doc changes |
+| Current verification status | verified locally on 2026-06-29; checker exits 0 after the clean-root tracked-file cleanup |
 
 The archive tag and branch must both peel to the V1 commit above. Because the
 tag is annotated, use `git rev-parse slug-v1-archive^{commit}` when comparing it
@@ -71,28 +71,30 @@ git show slug-v1-archive:path/to/file
 
 ## V2 Root Layout Proposal
 
-This table records the Stage 0 ownership policy before any root cleanup or V1
-source movement.
+This table records the Stage 0 ownership policy after the clean-root tracked-file
+cleanup.
 
 | Path | V2 status | Notes |
 |------|-----------|-------|
 | `AGENTS.md`, `README.md`, `V1_ARCHIVE.md` | active V2 orientation | Root pointers for new agents. |
+| `.codex/skills/slug-buck2-utility-reuse/` | active V2 orientation | Repo-local skill for Buck2-derived hashing, interning, and compact collection reuse. |
 | `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` | canonical V2 plan | First roadmap entry for new work. |
 | `thoughts/shared/plans/slug-v2-subplans/` | active V2 plans | Stage owners and validation policy. |
 | `tools/v2_oracle*`, `tests/v2_oracle/` | active V2 scaffold | Stage 1 harness home. |
 | `app/slug_*_v2/` | active V2 scaffold | Stage 2+ Rust crates. |
-| `dice/`, `starlark-rust/`, `superconsole/`, `allocative/`, `gazebo/`, `shed/` | active retained infrastructure | Cargo workspace members after the 2026-06-29 root-metadata cleanup. |
-| `remote_execution/` | retained source candidate | Not an active Cargo workspace member until Stage 7 wraps or ports it without V1 `slug_*` crate dependencies. |
-| `app/slug`, `app/slug_*` without `_v2` | V1 reference/extraction | Do not treat as the V2 default implementation. |
-| `tests/core/`, `tests/e2e/`, `tests/plan31/`, `tests/plan34/` | V1 reference/extraction | Mine only when a V2 subplan names the surface. |
-| `thoughts/shared/plans/slug-bazel-subplans/` | archived/reference plans | V1 bug database unless a V2 plan explicitly asks for comparison. |
-| `buck2/`, `prelude/`, Buck-shaped root metadata | V1 or vendored reference | Do not expose Buck user semantics in V2. |
+| `docs/developers/dice.md` | active retained infrastructure docs | Required before editing DICE keys or lock ownership. |
+| `dice/`, `starlark-rust/`, `superconsole/`, `allocative/`, `gazebo/`, `pagable/`, `pagable_derive/`, `shed/` | active retained infrastructure | Cargo workspace members after the 2026-06-29 root-metadata cleanup. |
+| `remote_execution/` | V1 reference/extraction | Removed from the active root because its OSS crates still depend on V1 `slug_*` crates; Stage 7 must re-import behind V2 wrappers only. |
+| `app/slug`, `app/slug_*` without `_v2` | V1 reference/extraction | Removed from the active root; inspect through `slug-v1-archive` or `v1-archive`. |
+| `tests/core/`, `tests/e2e/`, `tests/plan31/`, `tests/plan34/` | V1 reference/extraction | Removed from the active root; port only when a V2 subplan names the surface. |
+| `thoughts/shared/plans/slug-bazel-subplans/` | V1 reference plans | Removed from the active root; inspect through archive refs unless a V2 plan explicitly asks for comparison. |
+| `buck2/`, `prelude/`, Buck-shaped root metadata | V1 or vendored reference | Removed from the active root. Do not expose Buck user semantics in V2. |
 
 The 2026-06-29 root-metadata cleanup removed V1-only app crates, integrations,
-`remote_execution`, and `host_sharing` from active Cargo workspace metadata.
-The current `codex/slugv2` branch still tracks V1 source/test paths beside V2
-crates, so treat those paths as reference material until a follow-up clean-root
-slice physically removes or excludes them.
+`remote_execution`, and `host_sharing` from active Cargo workspace metadata. The
+follow-up clean-root branch removes the tracked V1 source/test paths and
+Buck-shaped metadata from the active root rather than relying on codegraph or
+build exclusions.
 
 Validation for the metadata cleanup:
 
@@ -100,6 +102,10 @@ Validation for the metadata cleanup:
 - `CARGO_TARGET_DIR=.codex-cargo-target cargo check -p slug_cli_v2 -p slug_core_v2 -p slug_commands_v2 -p slug_identity_v2 -p slug_query_v2 -p slug_build_api_v2 -p slug_analysis_v2 -p slug_loading_v2 -p slug_bzlmod_v2 -p slug_reapi_v2 -p slug_bep_v2`
 - `CARGO_TARGET_DIR=.codex-cargo-target cargo test -p slug_cli_v2 -p slug_core_v2 -p slug_commands_v2 -p slug_identity_v2 -p slug_query_v2 -p slug_build_api_v2 -p slug_analysis_v2 -p slug_loading_v2 -p slug_bzlmod_v2 -p slug_reapi_v2 -p slug_bep_v2`
 - `python3 -B -m tools.v2_oracle list`
+- `scripts/v2_archive_status.sh`
+- `git ls-files -- app ':!app/slug_analysis_v2/**' ':!app/slug_bep_v2/**' ':!app/slug_build_api_v2/**' ':!app/slug_bzlmod_v2/**' ':!app/slug_cli_v2/**' ':!app/slug_commands_v2/**' ':!app/slug_core_v2/**' ':!app/slug_identity_v2/**' ':!app/slug_loading_v2/**' ':!app/slug_query_v2/**' ':!app/slug_reapi_v2/**'`
+- `git ls-files -- tests ':!tests/v2_oracle/**'`
+- `git diff --check -- AGENTS.md README.md V1_ARCHIVE.md scripts/v2_archive_status.sh thoughts/shared/plans`
 
 ## Validation
 

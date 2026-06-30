@@ -1,4 +1,0 @@
-load(":util.bzl", "write")
-
-write()
-write_package_value("aaa.bbb", "ccc")

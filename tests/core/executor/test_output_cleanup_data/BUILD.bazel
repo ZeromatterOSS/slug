@@ -1,3 +1,0 @@
-load(":defs.bzl", "declare_targets")
-
-declare_targets()

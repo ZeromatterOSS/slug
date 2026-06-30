@@ -1,7 +1,0 @@
-stub(
-    name = "buck2",
-)
-
-stub(
-    name = "symlinked_buck2_and_tpx",
-)

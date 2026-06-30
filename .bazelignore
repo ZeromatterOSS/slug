@@ -1,6 +1,0 @@
-# Paths excluded from slug's build-graph + file-watcher.
-# Bazel-compat: one path per line, project-relative, # introduces a comment.
-app/slug_explain
-app_dep_graph_rules
-examples
-integrations/rust-project/tests

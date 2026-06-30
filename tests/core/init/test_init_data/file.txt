@@ -1,1 +1,0 @@
-A file because sapling handles empty directories poorly

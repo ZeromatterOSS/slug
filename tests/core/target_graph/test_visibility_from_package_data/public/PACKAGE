@@ -1,4 +1,0 @@
-package(
-    visibility = ["PUBLIC"],
-    within_view = ["PUBLIC"],
-)
