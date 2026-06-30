@@ -92,6 +92,56 @@ pub fn digest_included_module_files(
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BzlmodRegistryPolicyEntry {
+    url: String,
+    digest: String,
+}
+
+impl BzlmodRegistryPolicyEntry {
+    pub fn new(url: impl Into<String>, digest: impl Into<String>) -> Result<Self, String> {
+        let entry = Self {
+            url: url.into(),
+            digest: digest.into(),
+        };
+        entry.validate()?;
+        Ok(entry)
+    }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.url.is_empty() {
+            return Err("registry policy entry URL must not be empty".to_owned());
+        }
+        if self.url.contains('\0') {
+            return Err("registry policy entry URL must not contain NUL bytes".to_owned());
+        }
+        validate_key_digest("registry_policy_entry_digest", &self.digest)
+    }
+}
+
+pub fn digest_registry_policy(
+    entries: impl IntoIterator<Item = BzlmodRegistryPolicyEntry>,
+) -> String {
+    let mut hasher = Sha256::new();
+    for (index, entry) in entries.into_iter().enumerate() {
+        hasher.update(index.to_string().as_bytes());
+        hasher.update([0]);
+        hasher.update(entry.url.as_bytes());
+        hasher.update([0]);
+        hasher.update(entry.digest.as_bytes());
+        hasher.update([0]);
+    }
+    hex::encode(hasher.finalize())
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum LockfileMode {
     Off,
     Update,

@@ -697,6 +697,33 @@ Stage 5 included-module digest checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 registry policy digest checkpoint:
+
+- Added `registry-order-change-invalidation`, a Bazel 9.1.1 oracle fixture
+  proving ordered registry policy changes selected module graph state across a
+  bzlmod resolution startup/replay boundary. The fixture starts with
+  `first, second` registry order where `bbb@1.0.0` is absent from `bazel mod
+  graph`, edits only `.bazelrc` to `second, first`, shuts down the warm Bazel
+  server, then reruns the same output base with `--lockfile_mode=off`; Bazel
+  reports `bbb@1.0.0` after restart.
+- The failed warm-server probe before adding the shutdown command showed Bazel
+  reusing the prior graph despite the `.bazelrc` mutation. Same-daemon registry
+  option replay remains a named residual for the later DICE wiring instead of
+  being claimed by this fixture.
+- Added pure V2 digest helpers for the registry-policy portion of
+  `BzlmodDiceInputs`: `BzlmodRegistryPolicyEntry` and
+  `digest_registry_policy`. The helper preserves caller order instead of
+  sorting, uses SHA-256 over supplied registry identity/digest tokens, and does
+  not fetch, read, or trust cache paths.
+- This checkpoint intentionally stops before HTTP/file registry clients,
+  registry metadata/source digest production, lockfile replay, refresh/error
+  registry behavior, or same-daemon registry option invalidation.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture registry-order-change-invalidation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

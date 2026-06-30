@@ -1,0 +1,31 @@
+[fixture]
+name = "registry-order-change-invalidation"
+description = "Bazel 9 fixture proving ordered registry policy is semantic state across bzlmod resolution startup/replay boundaries."
+comparison = "message_shape"
+oracle_notes = "The first command uses first,second registry order and therefore selects aaa from first without bbb. The second command edits only .bazelrc to second,first and shuts down the warm Bazel server. The third command disables lockfile replay and starts the same output base again; Bazel 9.1.1 then selects second's aaa and reports bbb@1.0.0."
+
+[[commands]]
+name = "graph_before_registry_order_edit"
+argv = ["mod", "graph", "--lockfile_mode=off"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "ccc@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*bbb@1\\.0\\.0).*aaa@1\\.0\\.0.*ccc@1\\.0\\.0"]
+
+[[commands]]
+name = "shutdown_after_registry_order_edit"
+argv = ["shutdown"]
+compare = "message_shape"
+expected_exit = 0
+
+  [[commands.mutations]]
+  path = ".bazelrc"
+  find = "common --registry=file:///%workspace%/first\ncommon --registry=file:///%workspace%/second"
+  replace = "common --registry=file:///%workspace%/second\ncommon --registry=file:///%workspace%/first"
+
+[[commands]]
+name = "graph_after_registry_order_edit"
+argv = ["mod", "graph", "--lockfile_mode=off"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "bbb@1.0.0", "ccc@1.0.0"]

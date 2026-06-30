@@ -12,12 +12,14 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodDiceInputs;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::BzlmodModuleFileDigest;
+use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ResolvedBzlmodGraphDiceKey;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::digest_included_module_files;
 use slug_bzlmod_v2::digest_module_file_content;
+use slug_bzlmod_v2::digest_registry_policy;
 
 fn inputs(
     flag_value: Option<&str>,
@@ -32,7 +34,11 @@ fn inputs(
         )
         .unwrap()])
         .unwrap(),
-        "registriesabc",
+        digest_registry_policy([BzlmodRegistryPolicyEntry::new(
+            "file:///registries/one",
+            digest_module_file_content(b"registry one"),
+        )
+        .unwrap()]),
         "lockfileabc",
         lockfile_mode,
         BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(flag_value).unwrap(),
@@ -91,6 +97,52 @@ fn included_module_digest_rejects_duplicate_or_unstable_paths() {
 
     let bad_path = BzlmodModuleFileDigest::new("../deps.MODULE.bazel", "abc").unwrap_err();
     assert!(bad_path.contains("normalized relative path"));
+}
+
+#[test]
+fn registry_policy_digest_is_order_sensitive() {
+    let first = BzlmodRegistryPolicyEntry::new(
+        "file:///registries/first",
+        digest_module_file_content(b"first registry"),
+    )
+    .unwrap();
+    let second = BzlmodRegistryPolicyEntry::new(
+        "file:///registries/second",
+        digest_module_file_content(b"second registry"),
+    )
+    .unwrap();
+
+    let first_then_second = digest_registry_policy([first.clone(), second.clone()]);
+    let second_then_first = digest_registry_policy([second, first]);
+
+    assert_ne!(first_then_second, second_then_first);
+}
+
+#[test]
+fn registry_policy_digest_changes_with_registry_content_digest() {
+    let before = digest_registry_policy([BzlmodRegistryPolicyEntry::new(
+        "file:///registries/first",
+        digest_module_file_content(b"registry before"),
+    )
+    .unwrap()]);
+    let after = digest_registry_policy([BzlmodRegistryPolicyEntry::new(
+        "file:///registries/first",
+        digest_module_file_content(b"registry after"),
+    )
+    .unwrap()]);
+
+    assert_ne!(before, after);
+}
+
+#[test]
+fn registry_policy_entry_rejects_empty_url_or_bad_digest() {
+    let empty_url =
+        BzlmodRegistryPolicyEntry::new("", digest_module_file_content(b"registry")).unwrap_err();
+    assert!(empty_url.contains("URL must not be empty"));
+
+    let bad_digest =
+        BzlmodRegistryPolicyEntry::new("file:///registries/first", "bad/digest").unwrap_err();
+    assert!(bad_digest.contains("invalid registry_policy_entry_digest"));
 }
 
 #[test]
@@ -234,7 +286,11 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
     let empty = BzlmodDiceInputs::new(
         "",
         "includesabc",
-        "registriesabc",
+        digest_registry_policy([BzlmodRegistryPolicyEntry::new(
+            "file:///registries/one",
+            digest_module_file_content(b"registry one"),
+        )
+        .unwrap()]),
         "lockfileabc",
         LockfileMode::Update,
         command.clone(),
@@ -246,7 +302,11 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
     let bad = BzlmodDiceInputs::new(
         "root/abc",
         "includesabc",
-        "registriesabc",
+        digest_registry_policy([BzlmodRegistryPolicyEntry::new(
+            "file:///registries/one",
+            digest_module_file_content(b"registry one"),
+        )
+        .unwrap()]),
         "lockfileabc",
         LockfileMode::Update,
         command,
