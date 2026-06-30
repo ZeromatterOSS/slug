@@ -45,6 +45,7 @@ pub struct BazelLockfileRepoSpec {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BazelLockfileRecordedInput {
+    Env { name: String, value: String },
     File { label: String, digest: String },
     Raw(Value),
 }
@@ -135,6 +136,38 @@ pub fn validate_module_extension_bzl_transitive_digests(
                     "MODULE.bazel.lock is no longer up-to-date because the implementation of the extension '{}' or one of its transitive .bzl files has changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
                     bazel_display_extension_id(extension_id)
                 ));
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_module_extension_recorded_env_inputs(
+    lockfile: &BazelLockfile,
+    observed_env_values: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    for (extension_id, extension) in &lockfile.module_extensions {
+        let Some(general) = &extension.general else {
+            continue;
+        };
+        for input in &general.recorded_inputs {
+            let BazelLockfileRecordedInput::Env { name, value } = input else {
+                continue;
+            };
+            match observed_env_values.get(name) {
+                Some(actual_value) if actual_value == value => {}
+                Some(actual_value) => {
+                    return Err(format!(
+                        "MODULE.bazel.lock is no longer up-to-date because an input to the extension '{}' changed: environment variable {name} changed: '{value}' -> '{actual_value}'. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+                        bazel_display_extension_id(extension_id)
+                    ));
+                }
+                None => {
+                    return Err(format!(
+                        "MODULE.bazel.lock is no longer up-to-date because an input to the extension '{}' changed: environment variable {name} changed: '{value}' -> '<unset>'. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+                        bazel_display_extension_id(extension_id)
+                    ));
+                }
             }
         }
     }
@@ -314,6 +347,9 @@ fn parse_recorded_inputs(
     let mut result = Vec::with_capacity(inputs.len());
     for input in inputs {
         match input {
+            Value::String(text) if text.starts_with("ENV:") => {
+                result.push(parse_recorded_env_input(extension_id, text)?);
+            }
             Value::String(text) if text.starts_with("FILE:") => {
                 result.push(parse_recorded_file_input(extension_id, text)?);
             }
@@ -321,6 +357,29 @@ fn parse_recorded_inputs(
         }
     }
     Ok(result)
+}
+
+fn parse_recorded_env_input(
+    extension_id: &str,
+    text: &str,
+) -> Result<BazelLockfileRecordedInput, String> {
+    let body = text
+        .strip_prefix("ENV:")
+        .expect("caller checked ENV prefix");
+    let (name, value) = body.split_once(' ').ok_or_else(|| {
+        format!(
+            "MODULE.bazel.lock moduleExtensions entry {extension_id}.general.recordedInputs ENV entry must be 'ENV:<name> <value>'"
+        )
+    })?;
+    if name.is_empty() {
+        return Err(format!(
+            "MODULE.bazel.lock moduleExtensions entry {extension_id}.general.recordedInputs ENV entry must be 'ENV:<name> <value>'"
+        ));
+    }
+    Ok(BazelLockfileRecordedInput::Env {
+        name: name.to_owned(),
+        value: value.to_owned(),
+    })
 }
 
 fn parse_recorded_file_input(

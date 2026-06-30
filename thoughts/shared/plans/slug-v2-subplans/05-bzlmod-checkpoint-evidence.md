@@ -693,3 +693,27 @@ Stage 5 module-extension recorded file lockfile error checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-error-recorded-file --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 module-extension recorded environment lockfile error checkpoint:
+
+- Added `module-extension-lockfile-error-recorded-env`, a Bazel 9.1.1 oracle
+  fixture proving `--lockfile_mode=error` rejects stale module-extension
+  recorded environment inputs. The fixture primes `MODULE.bazel.lock` with
+  `SLUG_STAGE5_ENV=one`, then runs the next query with `SLUG_STAGE5_ENV=two`
+  and observes Bazel query exit code 7 with the diagnostic that the environment
+  variable changed from `one` to `two` for extension `@@//:ext.bzl%ext`.
+- Extended visible lockfile parsing with typed `ENV:<name> <value>`
+  `recordedInputs` entries while preserving unknown recorded input values as
+  raw JSON for later replay work.
+- Added `validate_module_extension_recorded_env_inputs` over parsed visible
+  lockfile data. The helper compares expected recorded environment values with
+  explicit observed environment input and emits the Bazel-shaped stale-env
+  diagnostic; it does not read process environment, execute extensions, or
+  implement hidden lockfile/error-mode replay.
+- No V1 bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 oracle fixture and scratch probe.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-error-recorded-env --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.

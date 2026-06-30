@@ -1,0 +1,27 @@
+[fixture]
+name = "module-extension-lockfile-error-recorded-env"
+description = "Bazel 9 fixture proving --lockfile_mode=error rejects stale module_extension recorded environment inputs."
+comparison = "message_shape"
+oracle_notes = "Self-contained module_extension fixture. The extension reads SLUG_STAGE5_ENV through module_ctx.getenv, which records an ENV input in MODULE.bazel.lock. The second command changes only that command environment value and proves Bazel rejects stale recorded input replay data instead of re-evaluating it silently."
+
+[[commands]]
+name = "prime_extension_lockfile"
+argv = ["query", "@generated//:one.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@generated//:one.txt"]
+env_allowlist = ["SLUG_STAGE5_ENV"]
+
+[commands.env]
+SLUG_STAGE5_ENV = "one"
+
+[[commands]]
+name = "reject_stale_recorded_env_lockfile"
+argv = ["query", "@generated//:two.txt", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 7
+stderr_contains = ["MODULE.bazel.lock is no longer up-to-date", "input to the extension '@@//:ext.bzl%ext' changed", "environment variable SLUG_STAGE5_ENV changed: 'one' -> 'two'", "bazel mod deps --lockfile_mode=update"]
+env_allowlist = ["SLUG_STAGE5_ENV"]
+
+[commands.env]
+SLUG_STAGE5_ENV = "two"
