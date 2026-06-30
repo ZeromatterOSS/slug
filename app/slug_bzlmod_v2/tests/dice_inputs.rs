@@ -34,6 +34,31 @@ fn inputs(
 }
 
 #[test]
+fn lockfile_mode_parses_bazel_flag_values() {
+    assert_eq!(
+        LockfileMode::from_bazel_flag_value("off").unwrap(),
+        LockfileMode::Off
+    );
+    assert_eq!(
+        LockfileMode::from_bazel_flag_value("update").unwrap(),
+        LockfileMode::Update
+    );
+    assert_eq!(
+        LockfileMode::from_bazel_flag_value("refresh").unwrap(),
+        LockfileMode::Refresh
+    );
+    assert_eq!(
+        LockfileMode::from_bazel_flag_value("error").unwrap(),
+        LockfileMode::Error
+    );
+
+    let err = LockfileMode::from_bazel_flag_value("bad").unwrap_err();
+    assert_eq!(
+        err,
+        "Not a valid Lockfile mode: 'bad' (should be off, update, refresh or error)"
+    );
+}
+#[test]
 fn policy_keys_serialize_yanked_allowlists_stably() {
     let env_policy =
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("zzz@2.0.0,yyy@1.0.0"))

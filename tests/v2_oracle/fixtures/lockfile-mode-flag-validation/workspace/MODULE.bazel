@@ -1,0 +1,1 @@
+module(name = "lockfile_mode_flag_validation", version = "0.1.0")

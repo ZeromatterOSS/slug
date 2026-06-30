@@ -22,6 +22,18 @@ pub enum LockfileMode {
 }
 
 impl LockfileMode {
+    pub fn from_bazel_flag_value(value: &str) -> Result<Self, String> {
+        match value {
+            "off" => Ok(Self::Off),
+            "update" => Ok(Self::Update),
+            "refresh" => Ok(Self::Refresh),
+            "error" => Ok(Self::Error),
+            other => Err(format!(
+                "Not a valid Lockfile mode: '{other}' (should be off, update, refresh or error)"
+            )),
+        }
+    }
+
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Off => "off",

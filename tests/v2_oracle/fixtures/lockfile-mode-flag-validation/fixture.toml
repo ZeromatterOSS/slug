@@ -1,0 +1,40 @@
+[fixture]
+name = "lockfile-mode-flag-validation"
+description = "Bazel 9 fixture proving accepted --lockfile_mode values and invalid-value diagnostics."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 accepts off/update/refresh/error and rejects unknown lockfile modes before module graph resolution with exit code 2."
+
+[[commands]]
+name = "mode_off"
+argv = ["mod", "graph", "--lockfile_mode=off"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["<root> (lockfile_mode_flag_validation@0.1.0)"]
+
+[[commands]]
+name = "mode_update"
+argv = ["mod", "graph", "--lockfile_mode=update"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["<root> (lockfile_mode_flag_validation@0.1.0)"]
+
+[[commands]]
+name = "mode_refresh"
+argv = ["mod", "graph", "--lockfile_mode=refresh"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["<root> (lockfile_mode_flag_validation@0.1.0)"]
+
+[[commands]]
+name = "mode_error"
+argv = ["mod", "graph", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["<root> (lockfile_mode_flag_validation@0.1.0)"]
+
+[[commands]]
+name = "mode_invalid"
+argv = ["mod", "graph", "--lockfile_mode=bad"]
+compare = "message_shape"
+expected_exit = 2
+stderr_contains = ["Not a valid Lockfile mode: 'bad'", "should be off, update, refresh or error"]

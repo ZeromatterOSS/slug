@@ -658,6 +658,24 @@ Stage 5 yanked command/environment policy checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 lockfile-mode flag parser checkpoint:
+
+- Added `lockfile-mode-flag-validation`, a Bazel 9.1.1 oracle fixture proving
+  `--lockfile_mode=off|update|refresh|error` are accepted and an unknown value
+  fails before graph resolution with exit code 2 and Bazel's
+  `Not a valid Lockfile mode` diagnostic.
+- Added `LockfileMode::from_bazel_flag_value` so the V2 bzlmod DICE input
+  substrate can parse the command flag into the existing `LockfileMode` enum
+  without accepting unsupported values.
+- This checkpoint intentionally stops before implementing lockfile read/write
+  mode behavior, visible/hidden lockfile replay, refresh fetching, or
+  error-mode stale-data checks beyond the existing registry-hash fixture.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-flag-validation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including
