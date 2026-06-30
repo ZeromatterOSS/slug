@@ -595,6 +595,25 @@ Stage 5 registry-hash lockfile error checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-error-mode-registry-hash --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
 
+Stage 5 yanked-version environment allowlist checkpoint:
+
+- Added `yanked-version-env-allowlist`, a Bazel 9.1.1 oracle fixture using the
+  existing local yanked registry shape and `BZLMOD_ALLOW_YANKED_VERSIONS` set
+  through the Stage 1 per-command environment override support. Bazel accepts
+  `yyy@1.0.0` without the command-line `--allow_yanked_versions` flag.
+- Added `YankedVersionPolicy::from_env_value` for the Bazel env value shape:
+  empty or absent rejects, `all` allows all selected yanked modules, and
+  comma-separated `module@version` entries build an explicit allowlist.
+  V1 guardrail references inspected for env-specific behavior but none were
+  imported; implementation remains a scoped V2 parser from observed Bazel 9.1.1
+  behavior.
+- This checkpoint intentionally stops before wiring process environment into
+  DICE-owned bzlmod keys, same-daemon environment invalidation/replay, lockfile
+  selected-yanked write policy, and command-line/env precedence checks.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture yanked-version-env-allowlist --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

@@ -172,6 +172,16 @@ Stage 1 normalization checkpoint:
 - Validation passed: `py -3 -B -m tools.v2_oracle list`; bundled
   `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 
+Stage 1 command environment checkpoint:
+
+- Extended fixture command parsing with `[commands.env]` per-command overrides,
+  and runner output now records `env_overrides` alongside `env_allowlist`. This
+  lets oracle fixtures model Bazel client environment behavior without leaking
+  the host environment into comparisons.
+- Validation passed: bundled `python.exe -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py`; `yanked-version-env-allowlist` generated
+  and compared with `BZLMOD_ALLOW_YANKED_VERSIONS` set through the command
+  environment.
 ## Validation
 
 ```bash

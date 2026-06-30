@@ -120,10 +120,13 @@ manifest_roots = ["message.txt"]
 
 [[commands]]
 name = "print_message"
-argv = ["-c", "from pathlib import Path; print(Path('message.txt').read_text().strip())"]
+argv = ["-c", "import os; from pathlib import Path; print(Path('message.txt').read_text().strip()); print(os.environ['SLUG_ORACLE_ENV_SMOKE'])"]
 compare = "message_shape"
 expected_exit = 0
-stdout_patterns = ["two"]
+stdout_patterns = ["two", "env-set"]
+
+[commands.env]
+SLUG_ORACLE_ENV_SMOKE = "env-set"
 
 [[commands.mutations]]
 path = "message.txt"
@@ -141,6 +144,7 @@ replace = "two"
     failures = compare_result(fixture, result, expected=None)
     assert failures == []
     assert (workspace / "message.txt").read_text(encoding="utf-8") == "one\n"
+    assert result["commands"][0]["env_overrides"] == {"SLUG_ORACLE_ENV_SMOKE": "env-set"}
     assert result["commands"][0]["manifest"][0]["digest"]
 
 

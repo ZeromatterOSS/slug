@@ -368,6 +368,39 @@ pub fn validate_yanked_versions(
 }
 
 impl YankedVersionPolicy {
+    pub fn from_env_value(value: Option<&str>) -> Result<Self, String> {
+        let Some(raw) = value else {
+            return Ok(Self::Reject);
+        };
+        let raw = raw.trim();
+        if raw.is_empty() {
+            return Ok(Self::Reject);
+        }
+        if raw == "all" {
+            return Ok(Self::AllowAll);
+        }
+
+        let mut allowed = BTreeSet::new();
+        for entry in raw.split(',') {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                continue;
+            }
+            let (module_name, version) = entry.rsplit_once('@').ok_or_else(|| {
+                format!(
+                    "BZLMOD_ALLOW_YANKED_VERSIONS entry {entry} must be 'all' or module@version"
+                )
+            })?;
+            if module_name.is_empty() || version.is_empty() {
+                return Err(format!(
+                    "BZLMOD_ALLOW_YANKED_VERSIONS entry {entry} must be 'all' or module@version"
+                ));
+            }
+            allowed.insert(ModuleKey::new(module_name, version));
+        }
+        Ok(Self::AllowList(allowed))
+    }
+
     fn allows(&self, key: &ModuleKey) -> bool {
         match self {
             Self::Reject => false,

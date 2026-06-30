@@ -30,6 +30,7 @@ class FixtureCommand:
     compare: str
     expected_exit: int | None = None
     env_allowlist: tuple[str, ...] = ()
+    env: tuple[tuple[str, str], ...] = ()
     stdout_patterns: tuple[str, ...] = ()
     stderr_patterns: tuple[str, ...] = ()
     stdout_contains: tuple[str, ...] = ()
@@ -62,6 +63,21 @@ def _as_str_list(value: Any, field_name: str) -> tuple[str, ...]:
         raise ValueError(f"{field_name} must be a list of strings")
     return tuple(value)
 
+
+
+def _as_str_map(value: Any, field_name: str) -> tuple[tuple[str, str], ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, dict):
+        raise ValueError(f"{field_name} must be a table of string values")
+    items: list[tuple[str, str]] = []
+    for key, item in sorted(value.items()):
+        if not isinstance(key, str) or not key:
+            raise ValueError(f"{field_name} keys must be non-empty strings")
+        if not isinstance(item, str):
+            raise ValueError(f"{field_name}.{key} must be a string")
+        items.append((key, item))
+    return tuple(items)
 
 def _as_optional_int(value: Any, field_name: str) -> int | None:
     if value is None:
@@ -142,6 +158,7 @@ def load_fixture(path: Path) -> Fixture:
                 compare=_compare_mode(command.get("compare"), compare),
                 expected_exit=_as_optional_int(command.get("expected_exit"), "commands.expected_exit"),
                 env_allowlist=_as_str_list(command.get("env_allowlist"), "commands.env_allowlist"),
+                env=_as_str_map(command.get("env"), "commands.env"),
                 stdout_patterns=_as_str_list(command.get("stdout_patterns"), "commands.stdout_patterns"),
                 stderr_patterns=_as_str_list(command.get("stderr_patterns"), "commands.stderr_patterns"),
                 stdout_contains=_as_str_list(command.get("stdout_contains"), "commands.stdout_contains"),

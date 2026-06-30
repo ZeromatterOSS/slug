@@ -365,3 +365,28 @@ bazel_dep(name = "bbb", version = "1.0.0")
             .all(|directive| !matches!(directive, slug_bzlmod_v2::Directive::BazelDep(_)))
     );
 }
+#[test]
+fn yanked_policy_parses_environment_allowlist() {
+    assert_eq!(
+        YankedVersionPolicy::from_env_value(None).unwrap(),
+        YankedVersionPolicy::Reject
+    );
+    assert_eq!(
+        YankedVersionPolicy::from_env_value(Some("all")).unwrap(),
+        YankedVersionPolicy::AllowAll
+    );
+    assert_eq!(
+        YankedVersionPolicy::from_env_value(Some("yyy@1.0.0, zzz@2.0.0")).unwrap(),
+        YankedVersionPolicy::AllowList(BTreeSet::from([
+            ModuleKey::new("yyy", "1.0.0"),
+            ModuleKey::new("zzz", "2.0.0"),
+        ]))
+    );
+}
+
+#[test]
+fn yanked_policy_rejects_invalid_environment_entries() {
+    let err = YankedVersionPolicy::from_env_value(Some("yyy")).unwrap_err();
+
+    assert!(err.contains("BZLMOD_ALLOW_YANKED_VERSIONS entry yyy must be 'all' or module@version"));
+}

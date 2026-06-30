@@ -84,6 +84,8 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
         mutations = _apply_mutations(workspace, command)
         argv = _argv(tool, command, output_base)
         env = os.environ.copy()
+        env_overrides = dict(command.env)
+        env.update(env_overrides)
         start = time.monotonic()
         completed = subprocess.run(
             argv,
@@ -103,6 +105,7 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
                 "argv": command.argv,
                 "executed_argv": argv,
                 "env_allowlist": {key: env.get(key) for key in command.env_allowlist},
+                "env_overrides": env_overrides,
                 "cwd": str(workspace),
                 "exit_code": completed.returncode,
                 "stdout": completed.stdout,

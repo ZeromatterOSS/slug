@@ -1,0 +1,16 @@
+[fixture]
+name = "yanked-version-env-allowlist"
+description = "Bazel 9 local-registry yanked-version allowlist through BZLMOD_ALLOW_YANKED_VERSIONS."
+comparison = "message_shape"
+oracle_notes = "Self-contained local registry yanks yyy@1.0.0. Bazel 9.1.1 accepts the graph when BZLMOD_ALLOW_YANKED_VERSIONS=yyy@1.0.0 is supplied in the command environment."
+
+[[commands]]
+name = "allow_yanked_version_from_env"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0"]
+env_allowlist = ["BZLMOD_ALLOW_YANKED_VERSIONS"]
+
+[commands.env]
+BZLMOD_ALLOW_YANKED_VERSIONS = "yyy@1.0.0"
