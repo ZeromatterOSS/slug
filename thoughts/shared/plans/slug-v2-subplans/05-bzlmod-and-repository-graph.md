@@ -614,6 +614,30 @@ Stage 5 yanked-version environment allowlist checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture yanked-version-env-allowlist --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+
+Stage 5 bzlmod DICE environment key checkpoint:
+
+- Added `yanked-version-env-change`, a Bazel 9.1.1 oracle fixture proving
+  `BZLMOD_ALLOW_YANKED_VERSIONS` is command-environment semantic state: the
+  same workspace accepts `yyy@1.0.0` while the env value is set, then rejects
+  the same graph after the env value is absent.
+- Added `slug_bzlmod_v2::dice` key-shaped inputs for resolved bzlmod graphs:
+  root module digest, included-module digest, registry policy digest,
+  lockfile digest, lockfile mode, and environment policy. The environment
+  policy serializes the parsed yanked-version allowlist so env changes alter
+  key equality and stable serialization. V1 archive references inspected:
+  `app/slug_bzlmod/src/dice_graph.rs` and
+  `tests/core/bzlmod/test_plan61_guardrails.py`; implementation follows the
+  V2 Stage 6 DICE input pattern and does not import V1 compute code.
+- This checkpoint intentionally stops before actual DICE `Key` trait wiring,
+  filesystem/env digest production, registry clients, lockfile replay,
+  module-extension keys, or same-daemon materialization replay.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture yanked-version-env-change --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

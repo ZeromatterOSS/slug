@@ -8,11 +8,16 @@
  * above-listed licenses.
  */
 
+pub mod dice;
 pub mod lockfile;
 pub mod parser;
 pub mod registry;
 pub mod resolution;
 
+pub use dice::BzlmodDiceInputs;
+pub use dice::BzlmodEnvironmentPolicyKey;
+pub use dice::LockfileMode;
+pub use dice::ResolvedBzlmodGraphDiceKey;
 pub use lockfile::BazelLockfile;
 pub use lockfile::parse_bazel_lockfile;
 pub use lockfile::validate_registry_file_hashes;

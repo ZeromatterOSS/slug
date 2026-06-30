@@ -1,0 +1,23 @@
+[fixture]
+name = "yanked-version-env-change"
+description = "Bazel 9 fixture proving BZLMOD_ALLOW_YANKED_VERSIONS is command-environment semantic state."
+comparison = "message_shape"
+oracle_notes = "The same workspace first accepts yyy@1.0.0 with BZLMOD_ALLOW_YANKED_VERSIONS set, then rejects the same graph when the env value is absent on the next command."
+
+[[commands]]
+name = "allow_yanked_with_env"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0"]
+env_allowlist = ["BZLMOD_ALLOW_YANKED_VERSIONS"]
+
+[commands.env]
+BZLMOD_ALLOW_YANKED_VERSIONS = "yyy@1.0.0"
+
+[[commands]]
+name = "reject_yanked_after_env_removed"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["Yanked version detected in your resolved dependency graph: yyy@1.0.0", "bad release", "BZLMOD_ALLOW_YANKED_VERSIONS"]

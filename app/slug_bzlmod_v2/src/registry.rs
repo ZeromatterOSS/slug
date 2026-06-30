@@ -331,7 +331,7 @@ fn optional_u64_field(
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum YankedVersionPolicy {
     Reject,
     AllowAll,

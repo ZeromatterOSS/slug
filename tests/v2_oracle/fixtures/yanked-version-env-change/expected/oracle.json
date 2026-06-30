@@ -1,0 +1,62 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {
+        "BZLMOD_ALLOW_YANKED_VERSIONS": "yyy@1.0.0"
+      },
+      "env_overrides": {
+        "BZLMOD_ALLOW_YANKED_VERSIONS": "yyy@1.0.0"
+      },
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "allow_yanked_with_env",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running",
+      "normalized_stdout": "<root> (yanked_env_change_root@0.1.0)\n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acyyy@1.0.0",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running\n",
+      "stdout": "<root> (yanked_env_change_root@0.1.0)\n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acyyy@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [],
+      "name": "reject_yanked_after_env_removed",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nERROR: Yanked version detected in your resolved dependency graph: yyy@1.0.0, for the reason: bad release.\nYanked versions may contain serious vulnerabilities and should not be used. To fix this, use a bazel_dep on a newer version of this module. To continue using this version, allow it using the --allow_yanked_versions flag or the BZLMOD_ALLOW_YANKED_VERSIONS env variable.",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nERROR: Yanked version detected in your resolved dependency graph: yyy@1.0.0, for the reason: bad release.\nYanked versions may contain serious vulnerabilities and should not be used. To fix this, use a bazel_dep on a newer version of this module. To continue using this version, allow it using the --allow_yanked_versions flag or the BZLMOD_ALLOW_YANKED_VERSIONS env variable.\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "yanked-version-env-change",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
