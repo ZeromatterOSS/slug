@@ -1,0 +1,20 @@
+[fixture]
+name = "module-registry-multiple-version-override"
+description = "Bazel 9 local-registry multiple_version_override fixture preserving two selected versions and their repo mappings."
+comparison = "message_shape"
+oracle_notes = "Self-contained local registry. Bazel 9.1.1 mod graph keeps both bbb@1.0.0 and bbb@2.0.0 selected under multiple_version_override, and dump_repo_mapping proves canonical repos bbb+1.0.0 and bbb+2.0.0."
+
+[[commands]]
+name = "mod_graph_multiple_versions"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "ccc@1.0.0", "bbb@1.0.0", "bbb@2.0.0"]
+stdout_patterns = ["(?s)aaa@1\\.0\\.0.*bbb@1\\.0\\.0.*ccc@1\\.0\\.0.*bbb@2\\.0\\.0"]
+
+[[commands]]
+name = "dump_multiple_version_repo_mapping"
+argv = ["mod", "dump_repo_mapping", "aaa+", "ccc+", "bbb+1.0.0", "bbb+2.0.0", "--output=json"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["\"bbb\":\"bbb+1.0.0\"", "\"bbb\":\"bbb+2.0.0\"", "\"aaa\":\"aaa+\"", "\"ccc\":\"ccc+\""]

@@ -171,3 +171,94 @@ bazel_dep(name = "yyy", version = "1.0.0")
 
     assert!(validate_yanked_versions(&graph, &yanked, &YankedVersionPolicy::AllowAll).is_ok());
 }
+
+#[test]
+fn multiple_version_override_keeps_requested_versions_and_repo_mappings() {
+    let root = module(
+        r#"
+module(name = "root", version = "0.1.0")
+bazel_dep(name = "aaa", version = "1.0.0")
+bazel_dep(name = "ccc", version = "1.0.0")
+multiple_version_override(module_name = "bbb", versions = ["1.0.0", "2.0.0"])
+"#,
+    );
+    let registry_modules = BTreeMap::from([
+        (
+            ModuleKey::new("aaa", "1.0.0"),
+            registry_module(
+                r#"
+module(name = "aaa", version = "1.0.0")
+bazel_dep(name = "bbb", version = "1.0.0")
+"#,
+            ),
+        ),
+        (
+            ModuleKey::new("ccc", "1.0.0"),
+            registry_module(
+                r#"
+module(name = "ccc", version = "1.0.0")
+bazel_dep(name = "bbb", version = "2.0.0")
+"#,
+            ),
+        ),
+        (
+            ModuleKey::new("bbb", "1.0.0"),
+            registry_module(r#"module(name = "bbb", version = "1.0.0")"#),
+        ),
+        (
+            ModuleKey::new("bbb", "2.0.0"),
+            registry_module(r#"module(name = "bbb", version = "2.0.0")"#),
+        ),
+    ]);
+
+    let graph = resolve_registry_mvs(&root, &registry_modules).unwrap();
+
+    assert_eq!(
+        graph
+            .module(&ModuleKey::new("bbb", "1.0.0"))
+            .map(|module| module.canonical_repo.as_str()),
+        Some("bbb+1.0.0")
+    );
+    assert_eq!(
+        graph
+            .module(&ModuleKey::new("bbb", "2.0.0"))
+            .map(|module| module.canonical_repo.as_str()),
+        Some("bbb+2.0.0")
+    );
+    assert_eq!(
+        graph
+            .repo_mapping_for("aaa+")
+            .unwrap()
+            .get("bbb")
+            .map(String::as_str),
+        Some("bbb+1.0.0")
+    );
+    assert_eq!(
+        graph
+            .repo_mapping_for("ccc+")
+            .unwrap()
+            .get("bbb")
+            .map(String::as_str),
+        Some("bbb+2.0.0")
+    );
+}
+
+#[test]
+fn multiple_version_override_rejects_unlisted_requested_version() {
+    let root = module(
+        r#"
+module(name = "root", version = "0.1.0")
+bazel_dep(name = "bbb", version = "3.0.0")
+multiple_version_override(module_name = "bbb", versions = ["1.0.0", "2.0.0"])
+"#,
+    );
+    let registry_modules = BTreeMap::from([(
+        ModuleKey::new("bbb", "3.0.0"),
+        registry_module(r#"module(name = "bbb", version = "3.0.0")"#),
+    )]);
+
+    let err = resolve_registry_mvs(&root, &registry_modules).unwrap_err();
+    assert!(err.contains(
+        "multiple_version_override for module bbb does not allow requested version 3.0.0"
+    ));
+}

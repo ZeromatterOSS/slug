@@ -16,6 +16,7 @@ use std::collections::VecDeque;
 use serde_json::Value;
 
 use crate::BazelDep;
+use crate::Directive;
 use crate::ModuleFile;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
@@ -356,8 +357,9 @@ pub fn resolve_registry_mvs(
         .as_ref()
         .ok_or_else(|| "root MODULE.bazel is missing module()".to_owned())?;
     let root_key = ModuleKey::from_header(root_header);
+    let multiple_overrides = multiple_version_overrides(root)?;
 
-    let mut selected_versions: BTreeMap<String, String> = BTreeMap::new();
+    let mut selected_versions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     let mut queue: VecDeque<BazelDep> = bazel_deps(root).into_iter().collect();
     while let Some(dep) = queue.pop_front() {
         let requested_key = ModuleKey::new(dep.name.clone(), dep.version.clone());
@@ -365,20 +367,41 @@ pub fn resolve_registry_mvs(
             return Err(format!("registry module {requested_key} was not supplied"));
         }
 
-        let should_update = selected_versions
-            .get(&dep.name)
-            .is_none_or(|selected| compare_versions(&dep.version, selected).is_gt());
-        if !should_update {
-            continue;
-        }
+        let changed = if let Some(allowed_versions) = multiple_overrides.get(&dep.name) {
+            if !allowed_versions.contains(&dep.version) {
+                return Err(format!(
+                    "multiple_version_override for module {} does not allow requested version {}",
+                    dep.name, dep.version
+                ));
+            }
+            selected_versions
+                .entry(dep.name.clone())
+                .or_default()
+                .insert(dep.version.clone())
+        } else {
+            let versions = selected_versions.entry(dep.name.clone()).or_default();
+            let selected = versions.iter().next().cloned();
+            if selected
+                .as_deref()
+                .is_none_or(|selected| compare_versions(&dep.version, selected).is_gt())
+            {
+                versions.clear();
+                versions.insert(dep.version.clone());
+                true
+            } else {
+                false
+            }
+        };
 
-        selected_versions.insert(dep.name.clone(), dep.version.clone());
-        let selected = registry_modules
-            .get(&requested_key)
-            .ok_or_else(|| format!("registry module {requested_key} was not supplied"))?;
-        queue.extend(bazel_deps(&selected.module_file));
+        if changed {
+            let selected = registry_modules
+                .get(&requested_key)
+                .ok_or_else(|| format!("registry module {requested_key} was not supplied"))?;
+            queue.extend(bazel_deps(&selected.module_file));
+        }
     }
 
+    let canonical_repos = canonical_repos_for_selected_versions(&selected_versions);
     let mut modules = BTreeMap::new();
     modules.insert(
         root_key.clone(),
@@ -386,29 +409,35 @@ pub fn resolve_registry_mvs(
             key: root_key.clone(),
             canonical_repo: "_main".to_owned(),
             source: ModuleSource::Root,
-            dependencies: resolve_dependencies(root, &selected_versions)?,
+            dependencies: resolve_dependencies(root, &selected_versions, &canonical_repos)?,
         },
     );
 
-    for (name, version) in &selected_versions {
-        let key = ModuleKey::new(name.clone(), version.clone());
-        let registry_module = registry_modules
-            .get(&key)
-            .ok_or_else(|| format!("selected registry module {key} was not supplied"))?;
-        modules.insert(
-            key.clone(),
-            ResolvedModule {
-                key: key.clone(),
-                canonical_repo: bazel_canonical_module_repo_name(name),
-                source: ModuleSource::Registry {
-                    registry_url: registry_module.registry_url.clone(),
+    for (name, versions) in &selected_versions {
+        for version in versions {
+            let key = ModuleKey::new(name.clone(), version.clone());
+            let registry_module = registry_modules
+                .get(&key)
+                .ok_or_else(|| format!("selected registry module {key} was not supplied"))?;
+            modules.insert(
+                key.clone(),
+                ResolvedModule {
+                    key: key.clone(),
+                    canonical_repo: canonical_repos
+                        .get(&key)
+                        .ok_or_else(|| format!("canonical repo missing for {key}"))?
+                        .clone(),
+                    source: ModuleSource::Registry {
+                        registry_url: registry_module.registry_url.clone(),
+                    },
+                    dependencies: resolve_dependencies(
+                        &registry_module.module_file,
+                        &selected_versions,
+                        &canonical_repos,
+                    )?,
                 },
-                dependencies: resolve_dependencies(
-                    &registry_module.module_file,
-                    &selected_versions,
-                )?,
-            },
-        );
+            );
+        }
     }
 
     Ok(ResolvedGraph {
@@ -417,19 +446,86 @@ pub fn resolve_registry_mvs(
     })
 }
 
+fn multiple_version_overrides(
+    root: &ModuleFile,
+) -> Result<BTreeMap<String, BTreeSet<String>>, String> {
+    let mut overrides = BTreeMap::new();
+    for directive in &root.directives {
+        let Directive::MultipleVersionOverride(override_) = directive else {
+            continue;
+        };
+        if override_.versions.len() < 2 {
+            return Err(format!(
+                "multiple_version_override for module {} must specify at least two versions",
+                override_.module_name
+            ));
+        }
+        let versions: BTreeSet<String> = override_.versions.iter().cloned().collect();
+        if versions.len() != override_.versions.len() {
+            return Err(format!(
+                "multiple_version_override for module {} contains duplicate versions",
+                override_.module_name
+            ));
+        }
+        if overrides
+            .insert(override_.module_name.clone(), versions)
+            .is_some()
+        {
+            return Err(format!(
+                "duplicate multiple_version_override for module {}",
+                override_.module_name
+            ));
+        }
+    }
+    Ok(overrides)
+}
+
+fn canonical_repos_for_selected_versions(
+    selected_versions: &BTreeMap<String, BTreeSet<String>>,
+) -> BTreeMap<ModuleKey, String> {
+    let mut canonical_repos = BTreeMap::new();
+    for (name, versions) in selected_versions {
+        for version in versions {
+            let repo = if versions.len() > 1 {
+                format!("{name}+{version}")
+            } else {
+                bazel_canonical_module_repo_name(name)
+            };
+            canonical_repos.insert(ModuleKey::new(name.clone(), version.clone()), repo);
+        }
+    }
+    canonical_repos
+}
+
 fn resolve_dependencies(
     module_file: &ModuleFile,
-    selected_versions: &BTreeMap<String, String>,
+    selected_versions: &BTreeMap<String, BTreeSet<String>>,
+    canonical_repos: &BTreeMap<ModuleKey, String>,
 ) -> Result<Vec<ResolvedDependency>, String> {
     let mut dependencies = Vec::new();
     for dep in bazel_deps(module_file) {
-        let selected_version = selected_versions
+        let versions = selected_versions
             .get(&dep.name)
             .ok_or_else(|| format!("dependency {} was not resolved", dep.name))?;
+        let selected_version = if versions.contains(&dep.version) {
+            dep.version.clone()
+        } else if versions.len() == 1 {
+            versions.iter().next().unwrap().clone()
+        } else {
+            return Err(format!(
+                "dependency {}@{} was not selected by multiple_version_override",
+                dep.name, dep.version
+            ));
+        };
+        let module = ModuleKey::new(dep.name.clone(), selected_version);
+        let canonical_repo = canonical_repos
+            .get(&module)
+            .ok_or_else(|| format!("canonical repo missing for {module}"))?
+            .clone();
         dependencies.push(ResolvedDependency {
             apparent_repo_name: dep.repo_name.clone().unwrap_or_else(|| dep.name.clone()),
-            module: ModuleKey::new(dep.name.clone(), selected_version.clone()),
-            canonical_repo: bazel_canonical_module_repo_name(&dep.name),
+            module,
+            canonical_repo,
             dev_dependency: dep.dev_dependency,
         });
     }
