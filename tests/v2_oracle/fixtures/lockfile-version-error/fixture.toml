@@ -1,0 +1,24 @@
+[fixture]
+name = "lockfile-version-error"
+description = "Bazel 9 fixture proving --lockfile_mode=error rejects unsupported MODULE.bazel.lock versions."
+comparison = "message_shape"
+oracle_notes = "Self-contained root module fixture. The first command primes MODULE.bazel.lock with Bazel 9.1.1 lockFileVersion 26; the second command mutates only lockFileVersion to 25 and observes Bazel's unsupported-version diagnostic in error mode."
+
+[[commands]]
+name = "prime_lockfile"
+argv = ["query", "//:data.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//:data.txt"]
+
+[[commands]]
+name = "reject_unsupported_lockfile_version"
+argv = ["query", "//:data.txt", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["The version of MODULE.bazel.lock is not supported by this version of Bazel", "bazel mod deps --lockfile_mode=update"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  find = '"lockFileVersion": 26'
+  replace = '"lockFileVersion": 25'

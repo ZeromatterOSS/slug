@@ -717,3 +717,22 @@ Stage 5 module-extension recorded environment lockfile error checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-error-recorded-env --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 lockfile version error checkpoint:
+
+- Added `lockfile-version-error`, a Bazel 9.1.1 oracle fixture proving
+  `--lockfile_mode=error` rejects an unsupported visible `MODULE.bazel.lock`
+  version. The fixture primes a lockfile with Bazel 9.1.1 `lockFileVersion`
+  26, mutates only that field to 25, then observes query exit code 48 with
+  Bazel's unsupported-version diagnostic.
+- Added `BAZEL_9_LOCK_FILE_VERSION` and `validate_lockfile_version` to the V2
+  visible lockfile substrate. The validator emits the Bazel-shaped unsupported
+  lockfile-version diagnostic; it does not read or write lockfiles or implement
+  update/refresh/error lifecycle policy.
+- No V1 bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 oracle fixture and scratch probe.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-version-error --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.

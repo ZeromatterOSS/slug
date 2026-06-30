@@ -14,6 +14,8 @@ use serde_json::Value;
 
 use crate::ModuleKey;
 
+pub const BAZEL_9_LOCK_FILE_VERSION: u64 = 26;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BazelLockfile {
     pub lock_file_version: u64,
@@ -72,6 +74,18 @@ pub fn parse_bazel_lockfile(content: &str) -> Result<BazelLockfile, String> {
     })
 }
 
+pub fn validate_lockfile_version(
+    lockfile: &BazelLockfile,
+    supported_lock_file_version: u64,
+) -> Result<(), String> {
+    if lockfile.lock_file_version == supported_lock_file_version {
+        return Ok(());
+    }
+    Err(
+        "The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+            .to_owned(),
+    )
+}
 pub fn validate_registry_file_hashes(
     lockfile: &BazelLockfile,
     observed_hashes: &BTreeMap<String, String>,

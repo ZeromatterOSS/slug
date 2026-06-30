@@ -9,9 +9,11 @@
  */
 
 use serde_json::Value;
+use slug_bzlmod_v2::BAZEL_9_LOCK_FILE_VERSION;
 use slug_bzlmod_v2::BazelLockfileRecordedInput;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::parse_bazel_lockfile;
+use slug_bzlmod_v2::validate_lockfile_version;
 use slug_bzlmod_v2::validate_module_extension_bzl_transitive_digests;
 use slug_bzlmod_v2::validate_module_extension_recorded_env_inputs;
 use slug_bzlmod_v2::validate_module_extension_recorded_file_inputs;
@@ -265,6 +267,24 @@ fn accepts_absent_optional_visible_lockfile_fields() {
     assert!(lockfile.facts_versions.is_empty());
 }
 
+#[test]
+fn validates_supported_lockfile_version() {
+    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 26}"#).unwrap();
+
+    validate_lockfile_version(&lockfile, BAZEL_9_LOCK_FILE_VERSION).unwrap();
+}
+
+#[test]
+fn rejects_unsupported_lockfile_version_like_bazel() {
+    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 25}"#).unwrap();
+
+    let err = validate_lockfile_version(&lockfile, BAZEL_9_LOCK_FILE_VERSION).unwrap_err();
+
+    assert!(
+        err.contains("The version of MODULE.bazel.lock is not supported by this version of Bazel")
+    );
+    assert!(err.contains("bazel mod deps --lockfile_mode=update"));
+}
 #[test]
 fn rejects_malformed_selected_yanked_key() {
     let err = parse_bazel_lockfile(
