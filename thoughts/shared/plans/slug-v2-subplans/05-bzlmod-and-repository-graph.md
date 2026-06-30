@@ -447,6 +447,26 @@ Stage 5 yanked-version policy checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 registry source.json policy checkpoint:
+
+- Added `registry-source-json-policy`, a Bazel 9.1.1 oracle fixture using a
+  workspace-local registry where `bazel mod graph` accepts archive `source.json`
+  with `url` plus `integrity`, and rejects missing URL, missing integrity, and
+  invalid JSON with Bazel exit code 37.
+- Added `slug_bzlmod_v2::registry` source metadata parsing for archive
+  `source.json`: `url`/`urls`, `integrity`, `type`, `strip_prefix`, `patches`,
+  and `patch_strip`, with Bazel-shaped diagnostics for missing source URL,
+  missing integrity, and malformed JSON. V1 archive references inspected:
+  `app/slug_bzlmod/src/registry.rs` and
+  `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
+  scoped V2 rewrite from behavior using structured JSON parsing.
+- This checkpoint intentionally stops before archive download/extraction,
+  registry hash enforcement, patch application, repository materialization,
+  lockfile replay, and DICE-owned registry metadata keys.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture registry-source-json-policy --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

@@ -1,0 +1,121 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "valid_source_json",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running\n no actions running",
+      "normalized_stdout": "<root> (source_json_root@0.1.0)\n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acsrcmod@1.0.0",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\registry-source-json-policy\\20260630-140816-61568-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\registry-source-json-policy\\20260630-140855-6148-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running\n no actions running\n",
+      "stdout": "<root> (source_json_root@0.1.0)\n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acsrcmod@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "119",
+          "path": "registry/modules/srcmod/1.0.0/source.json",
+          "replace": null
+        }
+      ],
+      "name": "missing_source_url",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nERROR: Unable to get module repo spec for srcmod@1.0.0 from registry: Missing source URL for module srcmod@1.0.0",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nERROR: Unable to get module repo spec for srcmod@1.0.0 from registry: Missing source URL for module srcmod@1.0.0\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "68",
+          "path": "registry/modules/srcmod/1.0.0/source.json",
+          "replace": null
+        }
+      ],
+      "name": "missing_integrity",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nERROR: Unable to get module repo spec for srcmod@1.0.0 from registry: Missing integrity for module srcmod@1.0.0",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nERROR: Unable to get module repo spec for srcmod@1.0.0 from registry: Missing integrity for module srcmod@1.0.0\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "53",
+          "path": "registry/modules/srcmod/1.0.0/source.json",
+          "replace": null
+        }
+      ],
+      "name": "invalid_source_json",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nERROR: Unable to get module repo spec for srcmod@1.0.0 from registry: Unable to parse json at url file:///<workspace>/registry/modules/srcmod/1.0.0/source.json: com.google.gson.stream.MalformedJsonException: Expected ':' at line 1 column 7 path $.not\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#malformed-json",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nERROR: Unable to get module repo spec for srcmod@1.0.0 from registry: Unable to parse json at url file:///C:/dev/kuro/target/v2o/runs/registry-source-json-policy/20260630-140855-6148-bazel/workspace/registry/modules/srcmod/1.0.0/source.json: com.google.gson.stream.MalformedJsonException: Expected ':' at line 1 column 7 path $.not\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#malformed-json\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "registry-source-json-policy",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

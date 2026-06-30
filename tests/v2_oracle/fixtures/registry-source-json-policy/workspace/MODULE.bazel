@@ -1,0 +1,2 @@
+module(name = "source_json_root", version = "0.1.0")
+bazel_dep(name = "srcmod", version = "1.0.0")

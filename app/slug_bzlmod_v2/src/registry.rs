@@ -13,6 +13,8 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::VecDeque;
 
+use serde_json::Value;
+
 use crate::BazelDep;
 use crate::ModuleFile;
 use crate::resolution::ModuleKey;
@@ -35,6 +37,138 @@ impl RegistryModule {
             registry_url: registry_url.into(),
             module_file,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistrySourceSpec {
+    pub urls: Vec<String>,
+    pub integrity: String,
+    pub source_type: Option<String>,
+    pub strip_prefix: Option<String>,
+    pub patches: BTreeMap<String, String>,
+    pub patch_strip: Option<u64>,
+}
+
+pub fn parse_registry_source_json(
+    module: &ModuleKey,
+    content: &str,
+) -> Result<RegistrySourceSpec, String> {
+    let value: Value = serde_json::from_str(content).map_err(|err| {
+        format!("Unable to parse json at url source.json for module {module}: {err}")
+    })?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("source.json for module {module} must be a JSON object"))?;
+
+    let mut urls = Vec::new();
+    if let Some(url) = optional_string_field(module, object, "url")? {
+        urls.push(url);
+    }
+    if let Some(mut url_list) = optional_string_list_field(module, object, "urls")? {
+        urls.append(&mut url_list);
+    }
+    if urls.is_empty() {
+        return Err(format!("Missing source URL for module {module}"));
+    }
+
+    let integrity = optional_string_field(module, object, "integrity")?
+        .ok_or_else(|| format!("Missing integrity for module {module}"))?;
+
+    Ok(RegistrySourceSpec {
+        urls,
+        integrity,
+        source_type: optional_string_field(module, object, "type")?,
+        strip_prefix: optional_string_field(module, object, "strip_prefix")?,
+        patches: optional_string_map_field(module, object, "patches")?.unwrap_or_default(),
+        patch_strip: optional_u64_field(module, object, "patch_strip")?,
+    })
+}
+
+fn optional_string_field(
+    module: &ModuleKey,
+    object: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Result<Option<String>, String> {
+    match object.get(name) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(format!(
+            "source.json field {name} for module {module} must be a string"
+        )),
+    }
+}
+
+fn optional_string_list_field(
+    module: &ModuleKey,
+    object: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Result<Option<Vec<String>>, String> {
+    let Some(value) = object.get(name) else {
+        return Ok(None);
+    };
+    let Value::Array(items) = value else {
+        return Err(format!(
+            "source.json field {name} for module {module} must be a list of strings"
+        ));
+    };
+
+    let mut strings = Vec::with_capacity(items.len());
+    for item in items {
+        let Value::String(value) = item else {
+            return Err(format!(
+                "source.json field {name} for module {module} must be a list of strings"
+            ));
+        };
+        strings.push(value.clone());
+    }
+    Ok(Some(strings))
+}
+
+fn optional_string_map_field(
+    module: &ModuleKey,
+    object: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Result<Option<BTreeMap<String, String>>, String> {
+    let Some(value) = object.get(name) else {
+        return Ok(None);
+    };
+    let Value::Object(entries) = value else {
+        return Err(format!(
+            "source.json field {name} for module {module} must be a string map"
+        ));
+    };
+
+    let mut map = BTreeMap::new();
+    for (key, value) in entries {
+        let Value::String(value) = value else {
+            return Err(format!(
+                "source.json field {name} for module {module} must be a string map"
+            ));
+        };
+        map.insert(key.clone(), value.clone());
+    }
+    Ok(Some(map))
+}
+
+fn optional_u64_field(
+    module: &ModuleKey,
+    object: &serde_json::Map<String, Value>,
+    name: &str,
+) -> Result<Option<u64>, String> {
+    match object.get(name) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Number(value)) => value
+            .as_u64()
+            .ok_or_else(|| {
+                format!(
+                    "source.json field {name} for module {module} must be a non-negative integer"
+                )
+            })
+            .map(Some),
+        Some(_) => Err(format!(
+            "source.json field {name} for module {module} must be a non-negative integer"
+        )),
     }
 }
 

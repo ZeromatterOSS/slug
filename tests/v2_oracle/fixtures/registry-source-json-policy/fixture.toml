@@ -1,0 +1,45 @@
+[fixture]
+name = "registry-source-json-policy"
+description = "Bazel 9 local-registry source.json repo-spec validation for registry modules."
+comparison = "message_shape"
+oracle_notes = "Self-contained local registry. Bazel 9.1.1 mod graph accepts source.json with url and integrity, and rejects source.json missing url, missing integrity, or invalid JSON before fetching source archives."
+
+[[commands]]
+name = "valid_source_json"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["srcmod@1.0.0"]
+
+[[commands]]
+name = "missing_source_url"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["Missing source URL for module srcmod@1.0.0"]
+
+  [[commands.mutations]]
+  path = "registry/modules/srcmod/1.0.0/source.json"
+  content = "{\"integrity\":\"sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=\"}\n"
+
+[[commands]]
+name = "missing_integrity"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["Missing integrity for module srcmod@1.0.0"]
+
+  [[commands.mutations]]
+  path = "registry/modules/srcmod/1.0.0/source.json"
+  content = "{\"url\":\"file:///does/not/fetch/in/mod-graph.tar.gz\"}\n"
+
+[[commands]]
+name = "invalid_source_json"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["Unable to parse json at url", "MalformedJsonException"]
+
+  [[commands.mutations]]
+  path = "registry/modules/srcmod/1.0.0/source.json"
+  content = "{not json}\n"
