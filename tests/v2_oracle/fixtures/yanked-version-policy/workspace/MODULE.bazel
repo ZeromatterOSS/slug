@@ -1,0 +1,2 @@
+module(name = "yanked_root", version = "0.1.0")
+bazel_dep(name = "yyy", version = "1.0.0")

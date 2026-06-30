@@ -10,6 +10,7 @@
 
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::VecDeque;
 
 use crate::BazelDep;
@@ -33,6 +34,52 @@ impl RegistryModule {
         Self {
             registry_url: registry_url.into(),
             module_file,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum YankedVersionPolicy {
+    Reject,
+    AllowAll,
+    AllowList(BTreeSet<ModuleKey>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectedYankedVersion {
+    pub module: ModuleKey,
+    pub reason: String,
+}
+
+pub fn validate_yanked_versions(
+    graph: &ResolvedGraph,
+    yanked_versions: &BTreeMap<ModuleKey, String>,
+    policy: &YankedVersionPolicy,
+) -> Result<Vec<SelectedYankedVersion>, String> {
+    let mut selected = Vec::new();
+    for key in graph.modules.keys() {
+        let Some(reason) = yanked_versions.get(key) else {
+            continue;
+        };
+        if !policy.allows(key) {
+            return Err(format!(
+                "Yanked version detected in your resolved dependency graph: {key}, for the reason: {reason}"
+            ));
+        }
+        selected.push(SelectedYankedVersion {
+            module: key.clone(),
+            reason: reason.clone(),
+        });
+    }
+    Ok(selected)
+}
+
+impl YankedVersionPolicy {
+    fn allows(&self, key: &ModuleKey) -> bool {
+        match self {
+            Self::Reject => false,
+            Self::AllowAll => true,
+            Self::AllowList(allowed) => allowed.contains(key),
         }
     }
 }

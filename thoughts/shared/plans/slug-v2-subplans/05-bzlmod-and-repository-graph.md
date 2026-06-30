@@ -418,12 +418,30 @@ Stage 5 registry MVS substrate checkpoint:
   `app/slug_bzlmod/src/resolution.rs`, and
   `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
   scoped V2 rewrite from behavior.
-- This checkpoint intentionally stops before registry hash enforcement, yanked
-  versions, repo-spec fetching/materialization, multiple-version overrides,
-  lockfile replay, and DICE ownership.
+- This checkpoint intentionally stops before registry hash enforcement, repo-spec`r`n  fetching/materialization, multiple-version overrides, lockfile replay, and`r`n  DICE ownership.
 - Validation passed: `cargo fmt -p slug_bzlmod_v2`;
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registry-mvs-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 yanked-version policy checkpoint:
+
+- Added `yanked-version-policy`, a Bazel 9.1.1 oracle fixture using a
+  workspace-local registry where `yyy@1.0.0` is marked yanked with reason
+  `bad release`. Bazel rejects `bazel mod graph` with exit code 37 by default
+  and accepts the same graph with `--allow_yanked_versions=yyy@1.0.0`.
+- Added yanked-version policy validation to `slug_bzlmod_v2::registry`, with
+  default reject, explicit allowlist, and allow-all modes over the V2 resolved
+  graph. V1 archive references inspected: `app/slug_bzlmod/src/registry.rs`
+  and `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
+  scoped V2 rewrite from behavior.
+- This checkpoint intentionally stops before registry hash reuse/enforcement,
+  environment-sourced allowlists, lockfile selected-yanked-version recording,
+  and DICE-owned registry metadata keys.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture yanked-version-policy --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 

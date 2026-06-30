@@ -1,10 +1,13 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ModuleSource;
 use slug_bzlmod_v2::RegistryModule;
+use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::resolve_registry_mvs;
+use slug_bzlmod_v2::validate_yanked_versions;
 
 fn module(source: &str) -> ModuleFile {
     ModuleFile::parse(source).unwrap()
@@ -136,4 +139,35 @@ bazel_dep(name = "aaa", version = "1.0.0")
 
     let err = resolve_registry_mvs(&root, &BTreeMap::new()).unwrap_err();
     assert!(err.contains("registry module aaa@1.0.0 was not supplied"));
+}
+
+#[test]
+fn yanked_versions_are_rejected_unless_allowed() {
+    let root = module(
+        r#"
+module(name = "root", version = "0.1.0")
+bazel_dep(name = "yyy", version = "1.0.0")
+"#,
+    );
+    let registry_modules = BTreeMap::from([(
+        ModuleKey::new("yyy", "1.0.0"),
+        registry_module(r#"module(name = "yyy", version = "1.0.0")"#),
+    )]);
+    let graph = resolve_registry_mvs(&root, &registry_modules).unwrap();
+    let yanked = BTreeMap::from([(ModuleKey::new("yyy", "1.0.0"), "bad release".to_owned())]);
+
+    let err = validate_yanked_versions(&graph, &yanked, &YankedVersionPolicy::Reject).unwrap_err();
+    assert!(err.contains("Yanked version detected in your resolved dependency graph: yyy@1.0.0"));
+    assert!(err.contains("bad release"));
+
+    let allowed = validate_yanked_versions(
+        &graph,
+        &yanked,
+        &YankedVersionPolicy::AllowList(BTreeSet::from([ModuleKey::new("yyy", "1.0.0")])),
+    )
+    .unwrap();
+    assert_eq!(allowed.len(), 1);
+    assert_eq!(allowed[0].module, ModuleKey::new("yyy", "1.0.0"));
+
+    assert!(validate_yanked_versions(&graph, &yanked, &YankedVersionPolicy::AllowAll).is_ok());
 }

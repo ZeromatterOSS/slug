@@ -1,0 +1,19 @@
+[fixture]
+name = "yanked-version-policy"
+description = "Bazel 9 local-registry yanked-version rejection and allowlist behavior."
+comparison = "message_shape"
+oracle_notes = "Self-contained local registry yanks yyy@1.0.0. Bazel 9.1.1 rejects the resolved graph without allowlist and accepts it with --allow_yanked_versions=yyy@1.0.0."
+
+[[commands]]
+name = "reject_yanked_version"
+argv = ["mod", "graph"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["Yanked version detected in your resolved dependency graph: yyy@1.0.0", "bad release", "--allow_yanked_versions"]
+
+[[commands]]
+name = "allow_yanked_version"
+argv = ["mod", "graph", "--allow_yanked_versions=yyy@1.0.0"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0"]
