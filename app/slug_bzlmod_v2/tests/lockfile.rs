@@ -11,6 +11,7 @@
 use serde_json::Value;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::parse_bazel_lockfile;
+use slug_bzlmod_v2::validate_module_extension_bzl_transitive_digests;
 use slug_bzlmod_v2::validate_module_extension_usage_digests;
 use slug_bzlmod_v2::validate_registry_file_hashes;
 
@@ -195,6 +196,35 @@ fn rejects_stale_module_extension_usage_digest_like_bazel() {
 
     assert!(err.contains("MODULE.bazel.lock is no longer up-to-date"));
     assert!(err.contains("usages of the extension '@@//:ext.bzl%ext' have changed"));
+    assert!(err.contains("bazel mod deps --lockfile_mode=update"));
+}
+
+#[test]
+fn rejects_stale_module_extension_bzl_digest_like_bazel() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "bzlTransitiveDigest": "old-bzl-digest"
+      }
+    }
+  }
+}"#,
+    )
+    .unwrap();
+    let observed = std::collections::BTreeMap::from([(
+        "//:ext.bzl%ext".to_owned(),
+        "new-bzl-digest".to_owned(),
+    )]);
+
+    let err = validate_module_extension_bzl_transitive_digests(&lockfile, &observed).unwrap_err();
+
+    assert!(err.contains("MODULE.bazel.lock is no longer up-to-date"));
+    assert!(err.contains(
+        "implementation of the extension '@@//:ext.bzl%ext' or one of its transitive .bzl files has changed"
+    ));
     assert!(err.contains("bazel mod deps --lockfile_mode=update"));
 }
 

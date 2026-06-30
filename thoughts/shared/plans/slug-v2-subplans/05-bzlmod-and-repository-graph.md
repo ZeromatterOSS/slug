@@ -811,6 +811,24 @@ Stage 5 module-extension usage lockfile error checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-error-usage --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+Stage 5 module-extension implementation lockfile error checkpoint:
+
+- Added `module-extension-lockfile-error-bzl`, a Bazel 9.1.1 oracle fixture
+  proving `--lockfile_mode=error` rejects stale module-extension implementation
+  replay data. The fixture primes `MODULE.bazel.lock`, mutates only `ext.bzl`,
+  then observes Bazel query exit code 7 with the diagnostic that the
+  implementation of extension `@@//:ext.bzl%ext` or a transitive `.bzl` changed.
+- Added `validate_module_extension_bzl_transitive_digests` over parsed visible
+  lockfile data. The helper compares expected `bzlTransitiveDigest` values with
+  explicit observed digest input and emits the Bazel-shaped stale-implementation
+  diagnostic; it does not compute transitive digests, execute extensions, read
+  files, or implement hidden lockfile/error-mode replay.
+- No V1 bzlmod implementation was extracted for this checkpoint; the behavior
+  is grounded in the Bazel 9.1.1 oracle fixture.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-error-bzl --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

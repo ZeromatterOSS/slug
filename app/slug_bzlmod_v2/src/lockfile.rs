@@ -111,6 +111,30 @@ pub fn validate_module_extension_usage_digests(
     Ok(())
 }
 
+pub fn validate_module_extension_bzl_transitive_digests(
+    lockfile: &BazelLockfile,
+    observed_bzl_transitive_digests: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    for (extension_id, extension) in &lockfile.module_extensions {
+        let Some(general) = &extension.general else {
+            continue;
+        };
+        let Some(expected_digest) = &general.bzl_transitive_digest else {
+            continue;
+        };
+        match observed_bzl_transitive_digests.get(extension_id) {
+            Some(actual_digest) if actual_digest == expected_digest => {}
+            Some(_) | None => {
+                return Err(format!(
+                    "MODULE.bazel.lock is no longer up-to-date because the implementation of the extension '{}' or one of its transitive .bzl files has changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+                    bazel_display_extension_id(extension_id)
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn bazel_display_extension_id(extension_id: &str) -> String {
     if extension_id.starts_with("@@") {
         extension_id.to_owned()

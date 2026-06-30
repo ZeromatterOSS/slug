@@ -1,0 +1,24 @@
+[fixture]
+name = "module-extension-lockfile-error-bzl"
+description = "Bazel 9 fixture proving --lockfile_mode=error rejects stale module_extension implementation digests."
+comparison = "message_shape"
+oracle_notes = "Self-contained module_extension fixture. The first command primes MODULE.bazel.lock with ext.bzl generating impl_one. The second command edits only ext.bzl and runs in error mode, proving Bazel rejects stale bzlTransitiveDigest replay data instead of re-evaluating it silently."
+
+[[commands]]
+name = "prime_extension_lockfile"
+argv = ["query", "@generated//:impl_one.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@generated//:impl_one.txt"]
+
+[[commands]]
+name = "reject_stale_extension_bzl_lockfile"
+argv = ["query", "@generated//:impl_two.txt", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 7
+stderr_contains = ["MODULE.bazel.lock is no longer up-to-date", "implementation of the extension '@@//:ext.bzl%ext' or one of its transitive .bzl files has changed", "bazel mod deps --lockfile_mode=update"]
+
+  [[commands.mutations]]
+  path = "ext.bzl"
+  find = "_OUTPUT_NAME = \"impl_one\""
+  replace = "_OUTPUT_NAME = \"impl_two\""
