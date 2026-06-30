@@ -39,6 +39,37 @@ impl fmt::Display for LockfileMode {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BzlmodCommandPolicyKey {
+    yanked_versions_policy: YankedVersionPolicy,
+}
+
+impl BzlmodCommandPolicyKey {
+    pub fn new(yanked_versions_policy: YankedVersionPolicy) -> Self {
+        Self {
+            yanked_versions_policy,
+        }
+    }
+
+    pub fn from_allow_yanked_versions_flag(value: Option<&str>) -> Result<Self, String> {
+        Ok(Self::new(YankedVersionPolicy::from_flag_value(value)?))
+    }
+
+    pub fn yanked_versions_policy(&self) -> &YankedVersionPolicy {
+        &self.yanked_versions_policy
+    }
+
+    pub fn stable_serialize(&self) -> String {
+        serialize_yanked_policy(&self.yanked_versions_policy)
+    }
+}
+
+impl fmt::Display for BzlmodCommandPolicyKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.stable_serialize())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BzlmodEnvironmentPolicyKey {
     yanked_versions_policy: YankedVersionPolicy,
 }
@@ -59,18 +90,7 @@ impl BzlmodEnvironmentPolicyKey {
     }
 
     pub fn stable_serialize(&self) -> String {
-        match &self.yanked_versions_policy {
-            YankedVersionPolicy::Reject => "allow_yanked=reject".to_owned(),
-            YankedVersionPolicy::AllowAll => "allow_yanked=all".to_owned(),
-            YankedVersionPolicy::AllowList(allowed) => {
-                let entries = allowed
-                    .iter()
-                    .map(ModuleKey::to_string)
-                    .collect::<Vec<_>>()
-                    .join(",");
-                format!("allow_yanked=[{entries}]")
-            }
-        }
+        serialize_yanked_policy(&self.yanked_versions_policy)
     }
 }
 
@@ -87,6 +107,7 @@ pub struct BzlmodDiceInputs {
     registry_policy_digest: String,
     lockfile_digest: String,
     lockfile_mode: LockfileMode,
+    command_policy: BzlmodCommandPolicyKey,
     environment_policy: BzlmodEnvironmentPolicyKey,
 }
 
@@ -97,6 +118,7 @@ impl BzlmodDiceInputs {
         registry_policy_digest: impl Into<String>,
         lockfile_digest: impl Into<String>,
         lockfile_mode: LockfileMode,
+        command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
     ) -> Result<Self, String> {
         let inputs = Self {
@@ -105,6 +127,7 @@ impl BzlmodDiceInputs {
             registry_policy_digest: registry_policy_digest.into(),
             lockfile_digest: lockfile_digest.into(),
             lockfile_mode,
+            command_policy,
             environment_policy,
         };
         inputs.validate()?;
@@ -115,18 +138,29 @@ impl BzlmodDiceInputs {
         &self.lockfile_mode
     }
 
+    pub fn command_policy(&self) -> &BzlmodCommandPolicyKey {
+        &self.command_policy
+    }
+
     pub fn environment_policy(&self) -> &BzlmodEnvironmentPolicyKey {
         &self.environment_policy
     }
 
+    pub fn effective_yanked_versions_policy(&self) -> YankedVersionPolicy {
+        self.command_policy
+            .yanked_versions_policy()
+            .union(self.environment_policy.yanked_versions_policy())
+    }
+
     pub fn stable_serialize(&self) -> String {
         format!(
-            "root={};includes={};registries={};lockfile={};mode={};env={}",
+            "root={};includes={};registries={};lockfile={};mode={};command={};env={}",
             self.root_module_digest,
             self.included_module_digest,
             self.registry_policy_digest,
             self.lockfile_digest,
             self.lockfile_mode,
+            self.command_policy,
             self.environment_policy
         )
     }
@@ -188,5 +222,20 @@ impl ResolvedBzlmodGraphDiceKey {
 impl fmt::Display for ResolvedBzlmodGraphDiceKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.stable_serialize())
+    }
+}
+
+fn serialize_yanked_policy(policy: &YankedVersionPolicy) -> String {
+    match policy {
+        YankedVersionPolicy::Reject => "allow_yanked=reject".to_owned(),
+        YankedVersionPolicy::AllowAll => "allow_yanked=all".to_owned(),
+        YankedVersionPolicy::AllowList(allowed) => {
+            let entries = allowed
+                .iter()
+                .map(ModuleKey::to_string)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("allow_yanked=[{entries}]")
+        }
     }
 }

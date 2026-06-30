@@ -1,0 +1,70 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--allow_yanked_versions=yyy@1.0.0"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {
+        "BZLMOD_ALLOW_YANKED_VERSIONS": "zzz@2.0.0"
+      },
+      "env_overrides": {
+        "BZLMOD_ALLOW_YANKED_VERSIONS": "zzz@2.0.0"
+      },
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--allow_yanked_versions=yyy@1.0.0"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "flag_allows_when_env_does_not",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running",
+      "normalized_stdout": "<root> (yanked_env_change_root@0.1.0)\n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acyyy@1.0.0",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\n no actions running\n",
+      "stdout": "<root> (yanked_env_change_root@0.1.0)\n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acyyy@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--allow_yanked_versions=zzz@2.0.0"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {
+        "BZLMOD_ALLOW_YANKED_VERSIONS": "yyy@1.0.0"
+      },
+      "env_overrides": {
+        "BZLMOD_ALLOW_YANKED_VERSIONS": "yyy@1.0.0"
+      },
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--allow_yanked_versions=zzz@2.0.0"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "env_allows_when_flag_does_not",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running",
+      "normalized_stdout": "<root> (yanked_env_change_root@0.1.0)\n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acyyy@1.0.0",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\n",
+      "stdout": "<root> (yanked_env_change_root@0.1.0)\n\u00e2\u201d\u201d\u00e2\u201d\u20ac\u00e2\u201d\u20ac\u00e2\u201d\u20acyyy@1.0.0 \n\n"
+    }
+  ],
+  "fixture": "yanked-version-command-env-union",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

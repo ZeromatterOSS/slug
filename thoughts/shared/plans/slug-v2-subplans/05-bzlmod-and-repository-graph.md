@@ -638,6 +638,26 @@ Stage 5 bzlmod DICE environment key checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 yanked command/environment policy checkpoint:
+
+- Added `yanked-version-command-env-union`, a Bazel 9.1.1 oracle fixture
+  proving `--allow_yanked_versions` and `BZLMOD_ALLOW_YANKED_VERSIONS` combine
+  instead of overriding each other: either source can allow `yyy@1.0.0` while
+  the other names only `zzz@2.0.0`.
+- Added `BzlmodCommandPolicyKey` beside `BzlmodEnvironmentPolicyKey` and made
+  `BzlmodDiceInputs` include both policies in equality, hash, and stable
+  serialization. The effective yanked-version policy is the union of command
+  and environment allowlists, matching the Bazel oracle. This extends the prior
+  key-shaped DICE substrate without importing V1 compute code.
+- This checkpoint intentionally stops before actual DICE `Key` trait wiring,
+  CLI flag plumbing into bzlmod evaluation, lockfile selected-yanked writes,
+  or same-daemon command/env replay.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture yanked-version-command-env-union --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

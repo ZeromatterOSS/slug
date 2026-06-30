@@ -14,6 +14,7 @@ pub mod parser;
 pub mod registry;
 pub mod resolution;
 
+pub use dice::BzlmodCommandPolicyKey;
 pub use dice::BzlmodDiceInputs;
 pub use dice::BzlmodEnvironmentPolicyKey;
 pub use dice::LockfileMode;

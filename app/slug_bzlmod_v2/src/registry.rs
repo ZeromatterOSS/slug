@@ -369,6 +369,26 @@ pub fn validate_yanked_versions(
 
 impl YankedVersionPolicy {
     pub fn from_env_value(value: Option<&str>) -> Result<Self, String> {
+        Self::from_allow_yanked_versions_value(value, "BZLMOD_ALLOW_YANKED_VERSIONS")
+    }
+
+    pub fn from_flag_value(value: Option<&str>) -> Result<Self, String> {
+        Self::from_allow_yanked_versions_value(value, "--allow_yanked_versions")
+    }
+
+    pub fn union(&self, other: &Self) -> Self {
+        match (self, other) {
+            (Self::AllowAll, _) | (_, Self::AllowAll) => Self::AllowAll,
+            (Self::Reject, policy) | (policy, Self::Reject) => policy.clone(),
+            (Self::AllowList(left), Self::AllowList(right)) => {
+                let mut allowed = left.clone();
+                allowed.extend(right.iter().cloned());
+                Self::AllowList(allowed)
+            }
+        }
+    }
+
+    fn from_allow_yanked_versions_value(value: Option<&str>, source: &str) -> Result<Self, String> {
         let Some(raw) = value else {
             return Ok(Self::Reject);
         };
@@ -386,14 +406,12 @@ impl YankedVersionPolicy {
             if entry.is_empty() {
                 continue;
             }
-            let (module_name, version) = entry.rsplit_once('@').ok_or_else(|| {
-                format!(
-                    "BZLMOD_ALLOW_YANKED_VERSIONS entry {entry} must be 'all' or module@version"
-                )
-            })?;
+            let (module_name, version) = entry
+                .rsplit_once('@')
+                .ok_or_else(|| format!("{source} entry {entry} must be 'all' or module@version"))?;
             if module_name.is_empty() || version.is_empty() {
                 return Err(format!(
-                    "BZLMOD_ALLOW_YANKED_VERSIONS entry {entry} must be 'all' or module@version"
+                    "{source} entry {entry} must be 'all' or module@version"
                 ));
             }
             allowed.insert(ModuleKey::new(module_name, version));

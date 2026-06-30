@@ -1,0 +1,27 @@
+[fixture]
+name = "yanked-version-command-env-union"
+description = "Bazel 9 fixture proving --allow_yanked_versions and BZLMOD_ALLOW_YANKED_VERSIONS combine instead of overriding each other."
+comparison = "message_shape"
+oracle_notes = "The same local yanked registry accepts yyy@1.0.0 when either the command flag or the environment allowlist names it, even when the other source names zzz@2.0.0."
+
+[[commands]]
+name = "flag_allows_when_env_does_not"
+argv = ["mod", "graph", "--allow_yanked_versions=yyy@1.0.0"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0"]
+env_allowlist = ["BZLMOD_ALLOW_YANKED_VERSIONS"]
+
+[commands.env]
+BZLMOD_ALLOW_YANKED_VERSIONS = "zzz@2.0.0"
+
+[[commands]]
+name = "env_allows_when_flag_does_not"
+argv = ["mod", "graph", "--allow_yanked_versions=zzz@2.0.0"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0"]
+env_allowlist = ["BZLMOD_ALLOW_YANKED_VERSIONS"]
+
+[commands.env]
+BZLMOD_ALLOW_YANKED_VERSIONS = "yyy@1.0.0"
