@@ -1,0 +1,6 @@
+load(":lock_printer.bzl", "lock_printer")
+
+lock_printer(
+    name = "print_extension_lockfile",
+    data = ["@tagged//:tag.txt"],
+)

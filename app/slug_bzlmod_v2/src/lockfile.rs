@@ -19,6 +19,28 @@ pub struct BazelLockfile {
     pub lock_file_version: u64,
     pub registry_file_hashes: BTreeMap<String, String>,
     pub selected_yanked_versions: BTreeMap<ModuleKey, String>,
+    pub module_extensions: BTreeMap<String, BazelLockfileModuleExtension>,
+    pub facts: BTreeMap<String, Value>,
+    pub facts_versions: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BazelLockfileModuleExtension {
+    pub general: Option<BazelLockfileModuleExtensionGeneral>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BazelLockfileModuleExtensionGeneral {
+    pub bzl_transitive_digest: Option<String>,
+    pub usages_digest: Option<String>,
+    pub recorded_inputs: Vec<Value>,
+    pub generated_repo_specs: BTreeMap<String, BazelLockfileRepoSpec>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BazelLockfileRepoSpec {
+    pub repo_rule_id: String,
+    pub attributes: BTreeMap<String, Value>,
 }
 
 pub fn parse_bazel_lockfile(content: &str) -> Result<BazelLockfile, String> {
@@ -37,6 +59,9 @@ pub fn parse_bazel_lockfile(content: &str) -> Result<BazelLockfile, String> {
         lock_file_version,
         registry_file_hashes: optional_string_map(object, "registryFileHashes")?,
         selected_yanked_versions: parse_selected_yanked_versions(object)?,
+        module_extensions: parse_module_extensions(object)?,
+        facts: optional_value_map(object, "facts")?,
+        facts_versions: optional_value_map(object, "factsVersions")?,
     })
 }
 
@@ -61,6 +86,7 @@ pub fn validate_registry_file_hashes(
     }
     Ok(())
 }
+
 fn optional_string_map(
     object: &serde_json::Map<String, Value>,
     field: &str,
@@ -83,6 +109,22 @@ fn optional_string_map(
     Ok(result)
 }
 
+fn optional_value_map(
+    object: &serde_json::Map<String, Value>,
+    field: &str,
+) -> Result<BTreeMap<String, Value>, String> {
+    let Some(value) = object.get(field) else {
+        return Ok(BTreeMap::new());
+    };
+    let Value::Object(entries) = value else {
+        return Err(format!("MODULE.bazel.lock field {field} must be an object"));
+    };
+    Ok(entries
+        .iter()
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect())
+}
+
 fn parse_selected_yanked_versions(
     object: &serde_json::Map<String, Value>,
 ) -> Result<BTreeMap<ModuleKey, String>, String> {
@@ -100,6 +142,129 @@ fn parse_selected_yanked_versions(
             ));
         }
         result.insert(ModuleKey::new(module_name, version), reason);
+    }
+    Ok(result)
+}
+
+fn parse_module_extensions(
+    object: &serde_json::Map<String, Value>,
+) -> Result<BTreeMap<String, BazelLockfileModuleExtension>, String> {
+    let Some(value) = object.get("moduleExtensions") else {
+        return Ok(BTreeMap::new());
+    };
+    let Value::Object(entries) = value else {
+        return Err("MODULE.bazel.lock field moduleExtensions must be an object".to_owned());
+    };
+
+    let mut result = BTreeMap::new();
+    for (extension_id, value) in entries {
+        let Value::Object(extension) = value else {
+            return Err(format!(
+                "MODULE.bazel.lock moduleExtensions entry {extension_id} must be an object"
+            ));
+        };
+        let general = match extension.get("general") {
+            Some(value) => Some(parse_module_extension_general(extension_id, value)?),
+            None => None,
+        };
+        result.insert(
+            extension_id.clone(),
+            BazelLockfileModuleExtension { general },
+        );
+    }
+    Ok(result)
+}
+
+fn parse_module_extension_general(
+    extension_id: &str,
+    value: &Value,
+) -> Result<BazelLockfileModuleExtensionGeneral, String> {
+    let Value::Object(general) = value else {
+        return Err(format!(
+            "MODULE.bazel.lock moduleExtensions entry {extension_id}.general must be an object"
+        ));
+    };
+    let bzl_transitive_digest = optional_string(general, "bzlTransitiveDigest")?;
+    let usages_digest = optional_string(general, "usagesDigest")?;
+    let recorded_inputs = match general.get("recordedInputs") {
+        Some(Value::Array(inputs)) => inputs.clone(),
+        Some(_) => {
+            return Err(format!(
+                "MODULE.bazel.lock moduleExtensions entry {extension_id}.general.recordedInputs must be an array"
+            ));
+        }
+        None => Vec::new(),
+    };
+    let generated_repo_specs =
+        parse_generated_repo_specs(extension_id, general.get("generatedRepoSpecs"))?;
+
+    Ok(BazelLockfileModuleExtensionGeneral {
+        bzl_transitive_digest,
+        usages_digest,
+        recorded_inputs,
+        generated_repo_specs,
+    })
+}
+
+fn optional_string(
+    object: &serde_json::Map<String, Value>,
+    field: &str,
+) -> Result<Option<String>, String> {
+    match object.get(field) {
+        Some(Value::String(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(format!("MODULE.bazel.lock field {field} must be a string")),
+        None => Ok(None),
+    }
+}
+
+fn parse_generated_repo_specs(
+    extension_id: &str,
+    value: Option<&Value>,
+) -> Result<BTreeMap<String, BazelLockfileRepoSpec>, String> {
+    let Some(value) = value else {
+        return Ok(BTreeMap::new());
+    };
+    let Value::Object(entries) = value else {
+        return Err(format!(
+            "MODULE.bazel.lock moduleExtensions entry {extension_id}.general.generatedRepoSpecs must be an object"
+        ));
+    };
+
+    let mut result = BTreeMap::new();
+    for (repo_name, value) in entries {
+        let Value::Object(spec) = value else {
+            return Err(format!(
+                "MODULE.bazel.lock generatedRepoSpecs entry {repo_name} must be an object"
+            ));
+        };
+        let repo_rule_id = spec
+            .get("repoRuleId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                format!(
+                    "MODULE.bazel.lock generatedRepoSpecs entry {repo_name} is missing string repoRuleId"
+                )
+            })?
+            .to_owned();
+        let attributes = match spec.get("attributes") {
+            Some(Value::Object(attributes)) => attributes
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+            Some(_) => {
+                return Err(format!(
+                    "MODULE.bazel.lock generatedRepoSpecs entry {repo_name}.attributes must be an object"
+                ));
+            }
+            None => BTreeMap::new(),
+        };
+        result.insert(
+            repo_name.clone(),
+            BazelLockfileRepoSpec {
+                repo_rule_id,
+                attributes,
+            },
+        );
     }
     Ok(result)
 }

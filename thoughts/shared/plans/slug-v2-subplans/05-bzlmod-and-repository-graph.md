@@ -775,6 +775,24 @@ Stage 5 module-extension definition digest checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 module-extension visible lockfile checkpoint:
+
+- Added `module-extension-lockfile-shape`, a Bazel 9.1.1 oracle fixture
+  proving the visible `MODULE.bazel.lock` `moduleExtensions` shape for a
+  generated repository: extension id `//:ext.bzl%ext`, `bzlTransitiveDigest`,
+  `usagesDigest`, `generatedRepoSpecs`, `repoRuleId`, and serialized tag attrs.
+- Extended `slug_bzlmod_v2::lockfile` parsing with typed visible
+  module-extension entries plus raw `facts` and `factsVersions` maps. This is
+  still lockfile-schema parsing only; it does not replay extension results,
+  execute repository rules, compute AttributeValues, or implement hidden
+  lockfile/error-mode lifecycle.
+- No V1 bzlmod implementation was extracted for this checkpoint; the parser
+  shape is grounded in the generated Bazel 9.1.1 lockfile oracle.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-shape --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

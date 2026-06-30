@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use serde_json::Value;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::parse_bazel_lockfile;
 use slug_bzlmod_v2::validate_registry_file_hashes;
@@ -43,6 +44,54 @@ fn parses_visible_lockfile_registry_and_yanked_fields() {
             .get(&ModuleKey::new("yyy", "1.0.0")),
         Some(&"bad release".to_owned())
     );
+    assert!(lockfile.module_extensions.is_empty());
+    assert!(lockfile.facts.is_empty());
+}
+
+#[test]
+fn parses_module_extension_generated_repo_specs() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "bzlTransitiveDigest": "bzl-digest",
+        "usagesDigest": "usage-digest",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "tagged": {
+            "repoRuleId": "@@//:ext.bzl%tagged_repo",
+            "attributes": {
+              "message": "hello from tag"
+            }
+          }
+        }
+      }
+    }
+  },
+  "facts": {},
+  "factsVersions": {"//:ext.bzl%ext": 1}
+}"#,
+    )
+    .unwrap();
+
+    let extension = lockfile.module_extensions.get("//:ext.bzl%ext").unwrap();
+    let general = extension.general.as_ref().unwrap();
+    assert_eq!(general.bzl_transitive_digest.as_deref(), Some("bzl-digest"));
+    assert_eq!(general.usages_digest.as_deref(), Some("usage-digest"));
+    assert!(general.recorded_inputs.is_empty());
+
+    let tagged = general.generated_repo_specs.get("tagged").unwrap();
+    assert_eq!(tagged.repo_rule_id, "@@//:ext.bzl%tagged_repo");
+    assert_eq!(
+        tagged.attributes.get("message"),
+        Some(&Value::String("hello from tag".to_owned()))
+    );
+    assert_eq!(
+        lockfile.facts_versions.get("//:ext.bzl%ext"),
+        Some(&Value::from(1))
+    );
 }
 
 #[test]
@@ -52,6 +101,9 @@ fn accepts_absent_optional_visible_lockfile_fields() {
     assert_eq!(lockfile.lock_file_version, 26);
     assert!(lockfile.registry_file_hashes.is_empty());
     assert!(lockfile.selected_yanked_versions.is_empty());
+    assert!(lockfile.module_extensions.is_empty());
+    assert!(lockfile.facts.is_empty());
+    assert!(lockfile.facts_versions.is_empty());
 }
 
 #[test]
@@ -68,11 +120,33 @@ fn rejects_malformed_selected_yanked_key() {
 }
 
 #[test]
+fn rejects_malformed_module_extension_shape() {
+    let err = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "generatedRepoSpecs": {
+          "tagged": {"attributes": {}}
+        }
+      }
+    }
+  }
+}"#,
+    )
+    .unwrap_err();
+
+    assert!(err.contains("generatedRepoSpecs entry tagged is missing string repoRuleId"));
+}
+
+#[test]
 fn rejects_missing_lockfile_version() {
     let err = parse_bazel_lockfile(r#"{"selectedYankedVersions": {}}"#).unwrap_err();
 
     assert!(err.contains("missing numeric lockFileVersion"));
 }
+
 #[test]
 fn validates_registry_hashes_against_observed_digest_map() {
     let lockfile = parse_bazel_lockfile(

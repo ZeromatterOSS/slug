@@ -1,0 +1,12 @@
+[fixture]
+name = "module-extension-lockfile-shape"
+description = "Bazel 9 lockfile fixture proving visible moduleExtensions generated-repository replay shape."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 oracle uses a self-contained module_extension and prints only stable MODULE.bazel.lock extension replay fields after querying the generated repository."
+
+[[commands]]
+name = "print_extension_lockfile_lines"
+argv = ["run", "//:print_extension_lockfile"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["moduleExtensions", "//:ext.bzl%ext", "bzlTransitiveDigest", "usagesDigest", "generatedRepoSpecs", "tagged", "repoRuleId", "message", "hello from tag"]

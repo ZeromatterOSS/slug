@@ -1,0 +1,35 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "run",
+        "//:print_extension_lockfile"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "run",
+        "//:print_extension_lockfile"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "print_extension_lockfile_lines",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:print_extension_lockfile (5 packages loaded, 6 targets configured)\nAnalyzing: target //:print_extension_lockfile (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:print_extension_lockfile (6 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nTarget //:print_extension_lockfile up-to-date:\n  bazel-bin/print_extension_lockfile.bat\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/print_extension_lockfile.bat",
+      "normalized_stdout": "\"moduleExtensions\": {\n    \"//:ext.bzl%ext\": {\n        \"bzlTransitiveDigest\": \"5f0/FTy/fghVej7h87Rs0cR4Oyt3YnarIfPRsWm7w4Q=\",\n        \"usagesDigest\": \"9gBVgsXQIo8iatl74/RC1l/4s9xG9EYN+rmS8o2FJ3Q=\",\n        \"generatedRepoSpecs\": {\n          \"tagged\": {\n            \"repoRuleId\": \"@@//:ext.bzl%tagged_repo\",\n              \"message\": \"hello from tag\"",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:print_extension_lockfile (5 packages loaded, 6 targets configured)\nAnalyzing: target //:print_extension_lockfile (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:print_extension_lockfile (6 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nTarget //:print_extension_lockfile up-to-date:\n  bazel-bin/print_extension_lockfile.bat\nINFO: Elapsed time: 3.536s, Critical Path: 0.02s\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/print_extension_lockfile.bat\n",
+      "stdout": "  \"moduleExtensions\": {\n    \"//:ext.bzl%ext\": {\n        \"bzlTransitiveDigest\": \"5f0/FTy/fghVej7h87Rs0cR4Oyt3YnarIfPRsWm7w4Q=\",\n        \"usagesDigest\": \"9gBVgsXQIo8iatl74/RC1l/4s9xG9EYN+rmS8o2FJ3Q=\",\n        \"generatedRepoSpecs\": {\n          \"tagged\": {\n            \"repoRuleId\": \"@@//:ext.bzl%tagged_repo\",\n              \"message\": \"hello from tag\"\n"
+    }
+  ],
+  "fixture": "module-extension-lockfile-shape",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
