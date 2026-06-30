@@ -345,6 +345,47 @@ register_execution_platforms(
 }
 
 #[test]
+fn parses_single_quoted_directives() {
+    let parsed = ModuleFile::parse(
+        r#"
+module(name = 'root', version = '0.0.0', repo_name = 'root_alias', bazel_compatibility = ['>=9.0.0'])
+repo = use_repo_rule('//:repo.bzl', 'simple_repo')
+repo(name = 'direct', filename = 'direct.txt')
+register_toolchains('//:tc')
+"#,
+    )
+    .unwrap();
+
+    let module = parsed.module.unwrap();
+    assert_eq!(module.name, "root");
+    assert_eq!(module.version.as_deref(), Some("0.0.0"));
+    assert_eq!(module.repo_name.as_deref(), Some("root_alias"));
+    assert_eq!(module.bazel_compatibility, vec![">=9.0.0".to_owned()]);
+    assert_eq!(
+        parsed.directives[0],
+        Directive::UseRepoRule(UseRepoRule {
+            proxy_name: "repo".to_owned(),
+            bzl_label: "//:repo.bzl".to_owned(),
+            rule_name: "simple_repo".to_owned(),
+        })
+    );
+
+    let mut attrs = BTreeMap::new();
+    attrs.insert(
+        "filename".to_owned(),
+        ModuleAttributeValue::String("direct.txt".to_owned()),
+    );
+    assert_eq!(
+        parsed.directives[1],
+        Directive::RepoRuleInvocation(RepoRuleInvocation {
+            rule_proxy: "repo".to_owned(),
+            repo_name: "direct".to_owned(),
+            dev_dependency: false,
+            attrs,
+        })
+    );
+}
+#[test]
 fn strips_comments_outside_strings_across_multiline_directives() {
     let parsed = ModuleFile::parse(
         r#"

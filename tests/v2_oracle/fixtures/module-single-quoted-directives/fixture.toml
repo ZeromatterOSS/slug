@@ -1,0 +1,19 @@
+[fixture]
+name = "module-single-quoted-directives"
+description = "MODULE.bazel single-quoted string directive parsing under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9 oracle fixture: MODULE.bazel is Starlark and accepts single-quoted strings for module, use_repo_rule, repository-rule invocation, and registration arguments."
+
+[[commands]]
+name = "build_single_quoted_repo"
+argv = ["build", "@direct//:direct.txt"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+
+[[commands]]
+name = "query_single_quoted_targets"
+argv = ["query", "//:all", "--output=label"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//:host_platform", "//:tc", "//:tc_type"]

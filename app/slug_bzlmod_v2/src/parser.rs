@@ -262,7 +262,7 @@ fn logical_statements(source: &str) -> Result<Vec<(usize, String)>, String> {
     let mut result = Vec::new();
     let mut current = String::new();
     let mut start_line = 0usize;
-    let mut in_string = false;
+    let mut string_quote = None;
     let mut escaped = false;
     let mut paren_depth = 0i32;
     let mut list_depth = 0i32;
@@ -281,19 +281,19 @@ fn logical_statements(source: &str) -> Result<Vec<(usize, String)>, String> {
         current.push_str(trimmed);
 
         for ch in line.chars() {
-            if in_string {
+            if let Some(quote) = string_quote {
                 if escaped {
                     escaped = false;
                 } else if ch == '\\' {
                     escaped = true;
-                } else if ch == '"' {
-                    in_string = false;
+                } else if ch == quote {
+                    string_quote = None;
                 }
                 continue;
             }
 
             match ch {
-                '"' => in_string = true,
+                '"' | '\'' => string_quote = Some(ch),
                 '(' => paren_depth += 1,
                 ')' => {
                     paren_depth -= 1;
@@ -318,7 +318,11 @@ fn logical_statements(source: &str) -> Result<Vec<(usize, String)>, String> {
             }
         }
 
-        if !current.trim().is_empty() && paren_depth == 0 && list_depth == 0 && !in_string {
+        if !current.trim().is_empty()
+            && paren_depth == 0
+            && list_depth == 0
+            && string_quote.is_none()
+        {
             result.push((start_line, current.trim().to_owned()));
             current.clear();
         }
@@ -334,22 +338,22 @@ fn logical_statements(source: &str) -> Result<Vec<(usize, String)>, String> {
 }
 
 fn strip_comment(line: &str) -> String {
-    let mut in_string = false;
+    let mut string_quote = None;
     let mut escaped = false;
     for (index, ch) in line.char_indices() {
-        if in_string {
+        if let Some(quote) = string_quote {
             if escaped {
                 escaped = false;
             } else if ch == '\\' {
                 escaped = true;
-            } else if ch == '"' {
-                in_string = false;
+            } else if ch == quote {
+                string_quote = None;
             }
             continue;
         }
 
         match ch {
-            '"' => in_string = true,
+            '"' | '\'' => string_quote = Some(ch),
             '#' => return line[..index].to_owned(),
             _ => {}
         }
@@ -726,14 +730,26 @@ fn optional_u64(kwargs: &BTreeMap<String, Value>, key: &str) -> Result<Option<u6
 fn split_args(args: &str) -> Vec<&str> {
     let mut result = Vec::new();
     let mut start = 0;
-    let mut in_string = false;
+    let mut string_quote = None;
+    let mut escaped = false;
     let mut list_depth = 0u32;
     for (index, ch) in args.char_indices() {
+        if let Some(quote) = string_quote {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == quote {
+                string_quote = None;
+            }
+            continue;
+        }
+
         match ch {
-            '"' => in_string = !in_string,
-            '[' if !in_string => list_depth += 1,
-            ']' if !in_string && list_depth > 0 => list_depth -= 1,
-            ',' if !in_string && list_depth == 0 => {
+            '"' | '\'' => string_quote = Some(ch),
+            '[' => list_depth += 1,
+            ']' if list_depth > 0 => list_depth -= 1,
+            ',' if list_depth == 0 => {
                 let part = args[start..index].trim();
                 if !part.is_empty() {
                     result.push(part);
@@ -812,13 +828,15 @@ fn parse_symbol_literal(value: &str) -> Option<String> {
 }
 
 fn parse_string_literal(value: &str) -> Option<String> {
-    if let Some(value) = value
-        .strip_prefix('"')
-        .and_then(|value| value.strip_suffix('"'))
-    {
-        return Some(value.to_owned());
+    let quote = value.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
     }
-    None
+    if value.len() < 2 || !value.ends_with(quote) {
+        return None;
+    }
+    let quote_len = quote.len_utf8();
+    Some(value[quote_len..value.len() - quote_len].to_owned())
 }
 
 fn parse_value(value: &str) -> Option<Value> {
