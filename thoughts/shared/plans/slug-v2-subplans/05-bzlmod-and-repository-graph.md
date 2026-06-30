@@ -306,6 +306,21 @@ Stage 5 registration dev-dependency parser checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registration-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+Stage 5 use_repo_rule dev-dependency checkpoint:
+
+- Added `module-use-repo-rule-dev-dependency`, a self-contained Bazel 9.1.1
+  oracle fixture proving `dev_dependency` belongs on the repository-rule
+  invocation created by `use_repo_rule`, while the `use_repo_rule(...)` factory
+  call rejects that keyword.
+- Updated `slug_bzlmod_v2` so `RepoRuleInvocation` records
+  `dev_dependency` separately from repository-rule attrs, and `UseRepoRule`
+  rejects extra factory keywords. V1 archive worktree references inspected:
+  `app/slug_bzlmod/src/parser.rs`, especially the use_repo_rule parser tests.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-use-repo-rule-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

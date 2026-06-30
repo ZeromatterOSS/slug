@@ -147,13 +147,13 @@ pub struct UseRepoRule {
     pub proxy_name: String,
     pub bzl_label: String,
     pub rule_name: String,
-    pub dev_dependency: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepoRuleInvocation {
     pub rule_proxy: String,
     pub repo_name: String,
+    pub dev_dependency: bool,
     pub attrs: BTreeMap<String, ModuleAttributeValue>,
 }
 
@@ -478,26 +478,29 @@ fn parse_use_repo_rule(proxy_name: &str, args: &str) -> Result<UseRepoRule, Stri
         .ok_or_else(|| "use_repo_rule first argument must be a string label".to_owned())?;
     let rule_name = parse_string_literal(parts[1])
         .ok_or_else(|| "use_repo_rule second argument must be a string name".to_owned())?;
-    let kwargs = parse_kwargs_from_parts(&parts[2..])?;
+    if parts.len() > 2 {
+        return Err("use_repo_rule does not accept keyword arguments; put dev_dependency on the repository rule invocation".to_owned());
+    }
     Ok(UseRepoRule {
         proxy_name: proxy_name.to_owned(),
         bzl_label,
         rule_name,
-        dev_dependency: optional_bool(&kwargs, "dev_dependency")?.unwrap_or(false),
     })
 }
 
 fn parse_repo_rule_invocation(rule_proxy: &str, args: &str) -> Result<RepoRuleInvocation, String> {
     let kwargs = parse_kwargs(args)?;
     let repo_name = required_string(&kwargs, "name")?.to_owned();
+    let dev_dependency = optional_bool(&kwargs, "dev_dependency")?.unwrap_or(false);
     let attrs = kwargs
         .into_iter()
-        .filter(|(key, _)| key != "name")
+        .filter(|(key, _)| key != "name" && key != "dev_dependency")
         .map(|(key, value)| (key, value.into()))
         .collect();
     Ok(RepoRuleInvocation {
         rule_proxy: rule_proxy.to_owned(),
         repo_name,
+        dev_dependency,
         attrs,
     })
 }

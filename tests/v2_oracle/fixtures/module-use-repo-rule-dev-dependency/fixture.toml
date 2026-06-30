@@ -1,0 +1,24 @@
+[fixture]
+name = "module-use-repo-rule-dev-dependency"
+description = "MODULE.bazel use_repo_rule invocation dev_dependency semantics under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9 oracle fixture: dev_dependency belongs on the generated repository-rule invocation, while the use_repo_rule factory call rejects that keyword."
+
+[[commands]]
+name = "build_dev_dependency_invocation_repo"
+argv = ["build", "@direct//:direct.txt"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+
+[[commands]]
+name = "reject_factory_dev_dependency"
+argv = ["build", "@direct//:direct.txt"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["use_repo_rule", "dev_dependency"]
+
+[[commands.mutations]]
+path = "MODULE.bazel"
+find = "repo = use_repo_rule(\"//:repo.bzl\", \"simple_repo\")"
+replace = "repo = use_repo_rule(\"//:repo.bzl\", \"simple_repo\", dev_dependency = True)"

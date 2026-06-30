@@ -205,8 +205,8 @@ use_repo(ext, "generated", tools = "tools_repo")
 fn parses_repo_rule_and_extension_repo_directives() {
     let parsed = ModuleFile::parse(
         r#"
-repo = use_repo_rule("//:repo.bzl", "simple_repo", dev_dependency = True)
-repo(name = "direct", filename = "direct.txt", patches = ["//:p.patch"], executable = False, strip = 1)
+repo = use_repo_rule("//:repo.bzl", "simple_repo")
+repo(name = "direct", filename = "direct.txt", patches = ["//:p.patch"], executable = False, strip = 1, dev_dependency = True)
 ext = use_extension("//:ext.bzl", "ext")
 inject_repo(ext, "injected")
 override_repo(ext, generated = "replacement")
@@ -220,7 +220,6 @@ override_repo(ext, generated = "replacement")
             proxy_name: "repo".to_owned(),
             bzl_label: "//:repo.bzl".to_owned(),
             rule_name: "simple_repo".to_owned(),
-            dev_dependency: true,
         })
     );
 
@@ -240,6 +239,7 @@ override_repo(ext, generated = "replacement")
         Directive::RepoRuleInvocation(RepoRuleInvocation {
             rule_proxy: "repo".to_owned(),
             repo_name: "direct".to_owned(),
+            dev_dependency: true,
             attrs,
         })
     );
@@ -265,6 +265,15 @@ override_repo(ext, generated = "replacement")
     );
 }
 
+#[test]
+fn rejects_use_repo_rule_factory_dev_dependency() {
+    let err = ModuleFile::parse(
+        r#"repo = use_repo_rule("//:repo.bzl", "simple_repo", dev_dependency = True)"#,
+    )
+    .unwrap_err();
+    assert!(err.contains("use_repo_rule"));
+    assert!(err.contains("dev_dependency"));
+}
 #[test]
 fn rejects_unsupported_directives() {
     let err = ModuleFile::parse("workspace(name = \"old\")").unwrap_err();

@@ -1,0 +1,4 @@
+module(name = "use_repo_rule_dev_dependency", version = "0.0.0")
+
+repo = use_repo_rule("//:repo.bzl", "simple_repo")
+repo(name = "direct", filename = "direct.txt", dev_dependency = True)
