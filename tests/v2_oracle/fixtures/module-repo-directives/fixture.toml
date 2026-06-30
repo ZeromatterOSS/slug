@@ -1,0 +1,12 @@
+[fixture]
+name = "module-repo-directives"
+description = "MODULE.bazel use_repo_rule, override_repo, and inject_repo directive smoke under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9 oracle fixture: use_repo_rule creates root repositories, override_repo redirects an extension-generated repo to one of them, and inject_repo is accepted by the module-extension usage."
+
+[[commands]]
+name = "build_direct_and_overridden_repos"
+argv = ["build", "@direct//:direct.txt", "@generated//:generated.txt"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]

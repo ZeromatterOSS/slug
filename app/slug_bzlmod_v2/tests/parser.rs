@@ -1,13 +1,21 @@
+use std::collections::BTreeMap;
+
 use slug_bzlmod_v2::ArchiveOverride;
 use slug_bzlmod_v2::BazelDep;
 use slug_bzlmod_v2::Directive;
 use slug_bzlmod_v2::GitOverride;
+use slug_bzlmod_v2::InjectRepo;
 use slug_bzlmod_v2::LocalPathOverride;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::MultipleVersionOverride;
+use slug_bzlmod_v2::OverrideRepo;
+use slug_bzlmod_v2::RepoImport;
+use slug_bzlmod_v2::RepoRuleAttributeValue;
+use slug_bzlmod_v2::RepoRuleInvocation;
 use slug_bzlmod_v2::SingleVersionOverride;
 use slug_bzlmod_v2::UseExtension;
 use slug_bzlmod_v2::UseRepo;
+use slug_bzlmod_v2::UseRepoRule;
 
 #[test]
 fn parses_module_directives_in_order() {
@@ -126,7 +134,7 @@ fn parses_extension_usage_directives() {
     let parsed = ModuleFile::parse(
         r#"
 ext = use_extension("//:ext.bzl", "ext", dev_dependency = True, isolate = True)
-use_repo(ext, "generated", "tools")
+use_repo(ext, "generated", tools = "tools_repo")
 "#,
     )
     .unwrap();
@@ -145,7 +153,80 @@ use_repo(ext, "generated", "tools")
         parsed.directives[1],
         Directive::UseRepo(UseRepo {
             extension_proxy: "ext".to_owned(),
-            repos: vec!["generated".to_owned(), "tools".to_owned()],
+            repos: vec![
+                RepoImport {
+                    apparent_name: "generated".to_owned(),
+                    repo_name: "generated".to_owned(),
+                },
+                RepoImport {
+                    apparent_name: "tools".to_owned(),
+                    repo_name: "tools_repo".to_owned(),
+                },
+            ],
+        })
+    );
+}
+
+#[test]
+fn parses_repo_rule_and_extension_repo_directives() {
+    let parsed = ModuleFile::parse(
+        r#"
+repo = use_repo_rule("//:repo.bzl", "simple_repo", dev_dependency = True)
+repo(name = "direct", filename = "direct.txt", patches = ["//:p.patch"], executable = False, strip = 1)
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, "injected")
+override_repo(ext, generated = "replacement")
+"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        parsed.directives[0],
+        Directive::UseRepoRule(UseRepoRule {
+            proxy_name: "repo".to_owned(),
+            bzl_label: "//:repo.bzl".to_owned(),
+            rule_name: "simple_repo".to_owned(),
+            dev_dependency: true,
+        })
+    );
+
+    let mut attrs = BTreeMap::new();
+    attrs.insert(
+        "filename".to_owned(),
+        RepoRuleAttributeValue::String("direct.txt".to_owned()),
+    );
+    attrs.insert(
+        "patches".to_owned(),
+        RepoRuleAttributeValue::StringList(vec!["//:p.patch".to_owned()]),
+    );
+    attrs.insert("executable".to_owned(), RepoRuleAttributeValue::Bool(false));
+    attrs.insert("strip".to_owned(), RepoRuleAttributeValue::Integer(1));
+    assert_eq!(
+        parsed.directives[1],
+        Directive::RepoRuleInvocation(RepoRuleInvocation {
+            rule_proxy: "repo".to_owned(),
+            repo_name: "direct".to_owned(),
+            attrs,
+        })
+    );
+    assert_eq!(
+        parsed.directives[3],
+        Directive::InjectRepo(InjectRepo {
+            extension_proxy: "ext".to_owned(),
+            repos: vec![RepoImport {
+                apparent_name: "injected".to_owned(),
+                repo_name: "injected".to_owned(),
+            }],
+        })
+    );
+    assert_eq!(
+        parsed.directives[4],
+        Directive::OverrideRepo(OverrideRepo {
+            extension_proxy: "ext".to_owned(),
+            repos: vec![RepoImport {
+                apparent_name: "generated".to_owned(),
+                repo_name: "replacement".to_owned(),
+            }],
         })
     );
 }

@@ -1,0 +1,11 @@
+module(name = "module_repo_directives", version = "0.0.0")
+
+repo = use_repo_rule("//:repo.bzl", "simple_repo")
+repo(name = "direct", filename = "direct.txt")
+repo(name = "replacement", filename = "generated.txt")
+repo(name = "injected", filename = "injected.txt")
+
+ext = use_extension("//:ext.bzl", "ext")
+inject_repo(ext, "injected")
+use_repo(ext, "generated")
+override_repo(ext, generated = "replacement")

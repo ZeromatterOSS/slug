@@ -256,6 +256,24 @@ Stage 5 module extension use_repo parser checkpoint:
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `py -3 -B -m tools.v2_oracle run --fixture module-extension-use-repo --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+
+Stage 5 repo directive parser checkpoint:
+
+- Added `module-repo-directives`, a self-contained Bazel 9.1.1 oracle fixture
+  proving `use_repo_rule` root repository creation, `override_repo` redirecting
+  an extension-generated repo to a root repo, and `inject_repo` directive
+  acceptance without registry or network input.
+- Extended `slug_bzlmod_v2` parsing with typed `UseRepoRule`, repository-rule
+  proxy invocation, `OverrideRepo`, `InjectRepo`, and apparent-to-source repo
+  import records. This records directive shape only; repository-rule execution,
+  extension aggregation, repo mapping replay, and lockfile semantics remain
+  owned by later Stage 5 DICE slices.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-repo-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

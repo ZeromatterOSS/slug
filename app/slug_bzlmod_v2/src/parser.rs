@@ -9,6 +9,7 @@
  */
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModuleFile {
@@ -36,6 +37,10 @@ pub enum Directive {
     GitOverride(GitOverride),
     UseExtension(UseExtension),
     UseRepo(UseRepo),
+    OverrideRepo(OverrideRepo),
+    InjectRepo(InjectRepo),
+    UseRepoRule(UseRepoRule),
+    RepoRuleInvocation(RepoRuleInvocation),
     RegisterToolchains(Vec<String>),
     RegisterExecutionPlatforms(Vec<String>),
 }
@@ -103,13 +108,55 @@ pub struct UseExtension {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UseRepo {
     pub extension_proxy: String,
-    pub repos: Vec<String>,
+    pub repos: Vec<RepoImport>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OverrideRepo {
+    pub extension_proxy: String,
+    pub repos: Vec<RepoImport>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InjectRepo {
+    pub extension_proxy: String,
+    pub repos: Vec<RepoImport>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepoImport {
+    pub apparent_name: String,
+    pub repo_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UseRepoRule {
+    pub proxy_name: String,
+    pub bzl_label: String,
+    pub rule_name: String,
+    pub dev_dependency: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepoRuleInvocation {
+    pub rule_proxy: String,
+    pub repo_name: String,
+    pub attrs: BTreeMap<String, RepoRuleAttributeValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RepoRuleAttributeValue {
+    String(String),
+    StringList(Vec<String>),
+    Integer(u64),
+    Bool(bool),
 }
 
 impl ModuleFile {
     pub fn parse(source: &str) -> Result<Self, String> {
         let mut module = None;
         let mut directives = Vec::new();
+        let mut repo_rule_proxies = BTreeSet::new();
         for (line_number, raw_line) in source.lines().enumerate() {
             let line = raw_line.split('#').next().unwrap_or_default().trim();
             if line.is_empty() {
@@ -129,6 +176,15 @@ impl ModuleFile {
                     directives.push(Directive::UseExtension(parse_use_extension(
                         proxy_name, args,
                     )?));
+                }
+                "use_repo_rule" => {
+                    let Some(proxy_name) = assignment else {
+                        return Err("use_repo_rule requires assignment to a proxy".to_owned());
+                    };
+                    directives.push(Directive::UseRepoRule(parse_use_repo_rule(
+                        proxy_name, args,
+                    )?));
+                    repo_rule_proxies.insert(proxy_name.to_owned());
                 }
                 other if assignment.is_some() => {
                     return Err(format!("{other} does not support assignment"));
@@ -162,12 +218,23 @@ impl ModuleFile {
                 "use_repo" => {
                     directives.push(Directive::UseRepo(parse_use_repo(args)?));
                 }
+                "override_repo" => {
+                    directives.push(Directive::OverrideRepo(parse_override_repo(args)?));
+                }
+                "inject_repo" => {
+                    directives.push(Directive::InjectRepo(parse_inject_repo(args)?));
+                }
                 "register_toolchains" => {
                     directives.push(Directive::RegisterToolchains(parse_label_args(args)?));
                 }
                 "register_execution_platforms" => {
                     directives.push(Directive::RegisterExecutionPlatforms(parse_label_args(
                         args,
+                    )?));
+                }
+                other if repo_rule_proxies.contains(other) => {
+                    directives.push(Directive::RepoRuleInvocation(parse_repo_rule_invocation(
+                        other, args,
                     )?));
                 }
                 other => return Err(format!("unsupported MODULE.bazel directive: {other}")),
@@ -297,22 +364,100 @@ fn parse_use_extension(proxy_name: &str, args: &str) -> Result<UseExtension, Str
 }
 
 fn parse_use_repo(args: &str) -> Result<UseRepo, String> {
-    let parts = split_args(args);
-    let Some((first, repos)) = parts.split_first() else {
-        return Err("use_repo requires an extension proxy".to_owned());
-    };
-    let extension_proxy = parse_symbol_literal(first)
-        .ok_or_else(|| "use_repo first argument must be an extension proxy".to_owned())?;
-    let repos = repos
-        .iter()
-        .map(|repo| {
-            parse_string_literal(repo)
-                .ok_or_else(|| format!("use_repo repository argument must be a string: {repo}"))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let (extension_proxy, repos) = parse_extension_repo_imports("use_repo", args)?;
     Ok(UseRepo {
         extension_proxy,
         repos,
+    })
+}
+
+fn parse_override_repo(args: &str) -> Result<OverrideRepo, String> {
+    let (extension_proxy, repos) = parse_extension_repo_imports("override_repo", args)?;
+    Ok(OverrideRepo {
+        extension_proxy,
+        repos,
+    })
+}
+
+fn parse_inject_repo(args: &str) -> Result<InjectRepo, String> {
+    let (extension_proxy, repos) = parse_extension_repo_imports("inject_repo", args)?;
+    Ok(InjectRepo {
+        extension_proxy,
+        repos,
+    })
+}
+
+fn parse_extension_repo_imports(
+    kind: &str,
+    args: &str,
+) -> Result<(String, Vec<RepoImport>), String> {
+    let parts = split_args(args);
+    let Some((first, repos)) = parts.split_first() else {
+        return Err(format!("{kind} requires an extension proxy"));
+    };
+    let extension_proxy = parse_symbol_literal(first)
+        .ok_or_else(|| format!("{kind} first argument must be an extension proxy"))?;
+    let repos = parse_repo_imports(kind, repos)?;
+    Ok((extension_proxy, repos))
+}
+
+fn parse_repo_imports(kind: &str, repos: &[&str]) -> Result<Vec<RepoImport>, String> {
+    repos
+        .iter()
+        .map(|repo| {
+            if let Some((apparent_name, repo_name)) = repo.split_once('=') {
+                let apparent_name = apparent_name.trim();
+                let repo_name = parse_string_literal(repo_name.trim()).ok_or_else(|| {
+                    format!("{kind} repository mapping must point at a string: {repo}")
+                })?;
+                return Ok(RepoImport {
+                    apparent_name: apparent_name.to_owned(),
+                    repo_name,
+                });
+            }
+            let repo_name = parse_string_literal(repo)
+                .ok_or_else(|| format!("{kind} repository argument must be a string: {repo}"))?;
+            Ok(RepoImport {
+                apparent_name: repo_name.clone(),
+                repo_name,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()
+}
+
+fn parse_use_repo_rule(proxy_name: &str, args: &str) -> Result<UseRepoRule, String> {
+    if proxy_name.is_empty() {
+        return Err("use_repo_rule proxy name must not be empty".to_owned());
+    }
+    let parts = split_args(args);
+    if parts.len() < 2 {
+        return Err("use_repo_rule requires a .bzl label and repository rule name".to_owned());
+    }
+    let bzl_label = parse_string_literal(parts[0])
+        .ok_or_else(|| "use_repo_rule first argument must be a string label".to_owned())?;
+    let rule_name = parse_string_literal(parts[1])
+        .ok_or_else(|| "use_repo_rule second argument must be a string name".to_owned())?;
+    let kwargs = parse_kwargs_from_parts(&parts[2..])?;
+    Ok(UseRepoRule {
+        proxy_name: proxy_name.to_owned(),
+        bzl_label,
+        rule_name,
+        dev_dependency: optional_bool(&kwargs, "dev_dependency")?.unwrap_or(false),
+    })
+}
+
+fn parse_repo_rule_invocation(rule_proxy: &str, args: &str) -> Result<RepoRuleInvocation, String> {
+    let kwargs = parse_kwargs(args)?;
+    let repo_name = required_string(&kwargs, "name")?.to_owned();
+    let attrs = kwargs
+        .into_iter()
+        .filter(|(key, _)| key != "name")
+        .map(|(key, value)| (key, value.into()))
+        .collect();
+    Ok(RepoRuleInvocation {
+        rule_proxy: rule_proxy.to_owned(),
+        repo_name,
+        attrs,
     })
 }
 
@@ -451,6 +596,17 @@ enum Value {
     StringList(Vec<String>),
     Integer(u64),
     Bool(bool),
+}
+
+impl From<Value> for RepoRuleAttributeValue {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::String(value) => Self::String(value),
+            Value::StringList(value) => Self::StringList(value),
+            Value::Integer(value) => Self::Integer(value),
+            Value::Bool(value) => Self::Bool(value),
+        }
+    }
 }
 
 impl Value {

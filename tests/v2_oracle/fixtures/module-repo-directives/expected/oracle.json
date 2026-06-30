@@ -1,0 +1,36 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "@direct//:direct.txt",
+        "@generated//:generated.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "@direct//:direct.txt",
+        "@generated//:generated.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_direct_and_overridden_repos",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (6 packages loaded, 6 targets configured)\nAnalyzing: 2 targets (6 packages loaded, 8 targets configured)\n\nINFO: Analyzed 2 targets (6 packages loaded, 8 targets configured).\nWARNING: <output_base>/external/+simple_repo+replacement/BUILD.bazel:1:14: @@+simple_repo+replacement//:generated.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nWARNING: <output_base>/external/+simple_repo+direct/BUILD.bazel:1:14: @@+simple_repo+direct//:direct.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 2 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-repo-directives\\20260630-110647-45712-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-repo-directives\\20260630-110703-75916-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (6 packages loaded, 6 targets configured)\nAnalyzing: 2 targets (6 packages loaded, 8 targets configured)\n\nINFO: Analyzed 2 targets (6 packages loaded, 8 targets configured).\nWARNING: C:/dev/kuro/target/v2o/ob/module-repo-directives/bazel/external/+simple_repo+replacement/BUILD.bazel:1:14: @@+simple_repo+replacement//:generated.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nWARNING: C:/dev/kuro/target/v2o/ob/module-repo-directives/bazel/external/+simple_repo+direct/BUILD.bazel:1:14: @@+simple_repo+direct//:direct.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 2 targets...\nINFO: Elapsed time: 3.980s, Critical Path: 0.02s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "module-repo-directives",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
