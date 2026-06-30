@@ -11,6 +11,7 @@
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodDiceInputs;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::BzlmodExtensionUsageDigest;
 use slug_bzlmod_v2::BzlmodModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
 use slug_bzlmod_v2::LockfileMode;
@@ -18,8 +19,26 @@ use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ResolvedBzlmodGraphDiceKey;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::digest_included_module_files;
+use slug_bzlmod_v2::digest_module_extension_usages;
 use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_registry_policy;
+
+fn registry_policy_digest() -> String {
+    digest_registry_policy([BzlmodRegistryPolicyEntry::new(
+        "file:///registries/one",
+        digest_module_file_content(b"registry one"),
+    )
+    .unwrap()])
+}
+
+fn extension_usage_digest(content: impl AsRef<[u8]>) -> String {
+    digest_module_extension_usages([BzlmodExtensionUsageDigest::new(
+        "//:ext.bzl%ext",
+        digest_module_file_content(content),
+    )
+    .unwrap()])
+    .unwrap()
+}
 
 fn inputs(
     flag_value: Option<&str>,
@@ -34,11 +53,8 @@ fn inputs(
         )
         .unwrap()])
         .unwrap(),
-        digest_registry_policy([BzlmodRegistryPolicyEntry::new(
-            "file:///registries/one",
-            digest_module_file_content(b"registry one"),
-        )
-        .unwrap()]),
+        registry_policy_digest(),
+        extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",
         lockfile_mode,
         BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(flag_value).unwrap(),
@@ -143,6 +159,86 @@ fn registry_policy_entry_rejects_empty_url_or_bad_digest() {
     let bad_digest =
         BzlmodRegistryPolicyEntry::new("file:///registries/first", "bad/digest").unwrap_err();
     assert!(bad_digest.contains("invalid registry_policy_entry_digest"));
+}
+
+#[test]
+fn extension_usage_digest_is_order_stable_and_content_sensitive() {
+    let alpha = BzlmodExtensionUsageDigest::new(
+        "//:alpha.bzl%ext",
+        digest_module_file_content(b"alpha usage"),
+    )
+    .unwrap();
+    let beta = BzlmodExtensionUsageDigest::new(
+        "//:beta.bzl%ext",
+        digest_module_file_content(b"beta usage"),
+    )
+    .unwrap();
+
+    let forward = digest_module_extension_usages([alpha.clone(), beta.clone()]).unwrap();
+    let reverse = digest_module_extension_usages([beta, alpha]).unwrap();
+    let changed = digest_module_extension_usages([BzlmodExtensionUsageDigest::new(
+        "//:alpha.bzl%ext",
+        digest_module_file_content(b"alpha usage changed"),
+    )
+    .unwrap()])
+    .unwrap();
+
+    assert_eq!(forward, reverse);
+    assert_ne!(forward, changed);
+}
+
+#[test]
+fn extension_usage_digest_rejects_duplicate_or_unstable_ids() {
+    let digest = digest_module_file_content(b"usage");
+    let duplicate = digest_module_extension_usages([
+        BzlmodExtensionUsageDigest::new("//:ext.bzl%ext", digest.clone()).unwrap(),
+        BzlmodExtensionUsageDigest::new("//:ext.bzl%ext", digest).unwrap(),
+    ])
+    .unwrap_err();
+    assert!(duplicate.contains("duplicate module extension usage digest id"));
+
+    let empty_id =
+        BzlmodExtensionUsageDigest::new("", digest_module_file_content(b"usage")).unwrap_err();
+    assert!(empty_id.contains("usage id must not be empty"));
+
+    let bad_digest = BzlmodExtensionUsageDigest::new("//:ext.bzl%ext", "bad/digest").unwrap_err();
+    assert!(bad_digest.contains("invalid extension_usage_digest"));
+}
+
+#[test]
+fn resolved_graph_key_changes_when_extension_usage_changes() {
+    let root = ModuleKey::new("root", "0.1.0");
+    let before = ResolvedBzlmodGraphDiceKey::new(
+        root.clone(),
+        BzlmodDiceInputs::new(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            "lockfileabc",
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+    let after = ResolvedBzlmodGraphDiceKey::new(
+        root,
+        BzlmodDiceInputs::new(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            extension_usage_digest(b"ext.repo(name='tagged', message='two')"),
+            "lockfileabc",
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+
+    assert_ne!(before, after);
+    assert!(before.stable_serialize().contains("extensions="));
 }
 
 #[test]
@@ -286,11 +382,8 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
     let empty = BzlmodDiceInputs::new(
         "",
         "includesabc",
-        digest_registry_policy([BzlmodRegistryPolicyEntry::new(
-            "file:///registries/one",
-            digest_module_file_content(b"registry one"),
-        )
-        .unwrap()]),
+        registry_policy_digest(),
+        extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",
         LockfileMode::Update,
         command.clone(),
@@ -302,11 +395,8 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
     let bad = BzlmodDiceInputs::new(
         "root/abc",
         "includesabc",
-        digest_registry_policy([BzlmodRegistryPolicyEntry::new(
-            "file:///registries/one",
-            digest_module_file_content(b"registry one"),
-        )
-        .unwrap()]),
+        registry_policy_digest(),
+        extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",
         LockfileMode::Update,
         command,

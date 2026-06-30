@@ -1,0 +1,24 @@
+[fixture]
+name = "module-extension-tag-change-invalidation"
+description = "Bazel 9 fixture proving module_extension tag values are semantic generated-repository state."
+comparison = "message_shape"
+oracle_notes = "Self-contained module_extension fixture. The generated repository exports a file named from the tag value. The second command edits only MODULE.bazel tag content in the same output base; Bazel 9.1.1 then resolves the new generated source label."
+
+[[commands]]
+name = "query_generated_repo_before_tag_edit"
+argv = ["query", "@tagged//:one.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@tagged//:one.txt"]
+
+[[commands]]
+name = "query_generated_repo_after_tag_edit"
+argv = ["query", "@tagged//:two.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@tagged//:two.txt"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "message = \"one\""
+  replace = "message = \"two\""

@@ -724,6 +724,31 @@ Stage 5 registry policy digest checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 module-extension usage digest checkpoint:
+
+- Added `module-extension-tag-change-invalidation`, a Bazel 9.1.1 oracle
+  fixture proving extension tag values are semantic generated-repository state.
+  The fixture queries `@tagged//:one.txt`, edits only the root MODULE tag value
+  from `message = "one"` to `message = "two"`, then queries
+  `@tagged//:two.txt` in the same output base.
+- Added pure V2 digest helpers for the module-extension usage portion of
+  `BzlmodDiceInputs`: `BzlmodExtensionUsageDigest` and
+  `digest_module_extension_usages`. The helper sorts by extension id, rejects
+  duplicate ids, uses SHA-256 over supplied usage digests, and does not execute
+  extensions, read `.bzl` files, or inspect generated repositories.
+- Extended `BzlmodDiceInputs` equality/hash/stable serialization with the
+  extension usage digest so tag changes can invalidate resolved-graph keys for
+  a clear DICE-owned reason once actual key wiring lands.
+- This checkpoint intentionally stops before extension usage aggregation,
+  `.bzl` transitive digest production, module extension execution, facts and
+  factsVersions, generated-repository mappings, lockfile replay, or extension
+  isolation semantics.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-tag-change-invalidation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including
