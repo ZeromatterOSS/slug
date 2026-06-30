@@ -22,6 +22,7 @@ pub use parser::ModuleFile;
 pub use parser::ModuleHeader;
 pub use parser::MultipleVersionOverride;
 pub use parser::OverrideRepo;
+pub use parser::Registration;
 pub use parser::RepoImport;
 pub use parser::RepoRuleInvocation;
 pub use parser::SingleVersionOverride;

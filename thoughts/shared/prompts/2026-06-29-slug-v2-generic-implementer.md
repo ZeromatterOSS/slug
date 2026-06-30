@@ -20,7 +20,8 @@ refresh the Bazel oracle fixture first when applicable, then implement only the
 code needed for that slice.
 
 If importing code, fixtures, or behavior from V1 or the mixed-root codex/slugv2
-prototype, record the source, import mode, oracle, validation, and residual risk
+prototype, first make a local V1 archive worktree available outside the active
+V2 root when practical (for example `git worktree add C:\tmp\kuro-v1-archive slug-v1-archive` on Windows), then record the source, import mode, oracle, validation, and residual risk
 in the Stage 9 extraction ledger. Do not treat V1 smokes, direct-local execution,
 or mixed-root compilation as V2 acceptance evidence.
 

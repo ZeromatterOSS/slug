@@ -290,6 +290,22 @@ Stage 5 module extension tag parser checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 registration dev-dependency parser checkpoint:
+
+- Added `module-registration-dev-dependency`, a self-contained Bazel 9.1.1
+  oracle fixture proving `register_toolchains` and
+  `register_execution_platforms` accept `dev_dependency` keyword arguments while
+  normal package loading still succeeds.
+- Extended `slug_bzlmod_v2` parsing with typed `Registration` records that
+  preserve ordered registration labels and the `dev_dependency` flag. V1
+  archive worktree references inspected: `app/slug_bzlmod/src/parser.rs` and
+  `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a fresh
+  V2 parser change anchored by the Bazel oracle.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registration-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  and `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

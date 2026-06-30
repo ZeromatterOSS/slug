@@ -11,6 +11,7 @@ use slug_bzlmod_v2::ModuleAttributeValue;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::MultipleVersionOverride;
 use slug_bzlmod_v2::OverrideRepo;
+use slug_bzlmod_v2::Registration;
 use slug_bzlmod_v2::RepoImport;
 use slug_bzlmod_v2::RepoRuleInvocation;
 use slug_bzlmod_v2::SingleVersionOverride;
@@ -26,8 +27,8 @@ module(name = "root", version = "0.0.0", repo_name = "root_alias", compatibility
 include("//:deps.MODULE.bazel")
 bazel_dep(name = "dep", version = "1.0.0", repo_name = "dep_alias")
 local_path_override(module_name = "dep", path = "../dep")
-register_toolchains("//:toolchain")
-register_execution_platforms("//:platform")
+register_toolchains("//:toolchain", "//:extra_toolchain", dev_dependency = True)
+register_execution_platforms("//:platform", dev_dependency = False)
 "#,
     )
     .unwrap();
@@ -57,6 +58,20 @@ register_execution_platforms("//:platform")
         Directive::LocalPathOverride(LocalPathOverride {
             module_name: "dep".to_owned(),
             path: "../dep".to_owned(),
+        })
+    );
+    assert_eq!(
+        parsed.directives[3],
+        Directive::RegisterToolchains(Registration {
+            labels: vec!["//:toolchain".to_owned(), "//:extra_toolchain".to_owned()],
+            dev_dependency: true,
+        })
+    );
+    assert_eq!(
+        parsed.directives[4],
+        Directive::RegisterExecutionPlatforms(Registration {
+            labels: vec!["//:platform".to_owned()],
+            dev_dependency: false,
         })
     );
 }

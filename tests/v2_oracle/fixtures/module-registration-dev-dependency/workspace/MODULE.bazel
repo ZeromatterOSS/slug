@@ -1,0 +1,4 @@
+module(name = "registration_dev_dependency", version = "0.0.0")
+
+register_toolchains("//:tc", dev_dependency = True)
+register_execution_platforms("//:host_platform", dev_dependency = True)

@@ -42,10 +42,15 @@ pub enum Directive {
     InjectRepo(InjectRepo),
     UseRepoRule(UseRepoRule),
     RepoRuleInvocation(RepoRuleInvocation),
-    RegisterToolchains(Vec<String>),
-    RegisterExecutionPlatforms(Vec<String>),
+    RegisterToolchains(Registration),
+    RegisterExecutionPlatforms(Registration),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Registration {
+    pub labels: Vec<String>,
+    pub dev_dependency: bool,
+}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BazelDep {
     pub name: String,
@@ -235,10 +240,10 @@ impl ModuleFile {
                     directives.push(Directive::InjectRepo(parse_inject_repo(args)?));
                 }
                 "register_toolchains" => {
-                    directives.push(Directive::RegisterToolchains(parse_label_args(args)?));
+                    directives.push(Directive::RegisterToolchains(parse_registration(args)?));
                 }
                 "register_execution_platforms" => {
-                    directives.push(Directive::RegisterExecutionPlatforms(parse_label_args(
+                    directives.push(Directive::RegisterExecutionPlatforms(parse_registration(
                         args,
                     )?));
                 }
@@ -497,6 +502,28 @@ fn parse_repo_rule_invocation(rule_proxy: &str, args: &str) -> Result<RepoRuleIn
     })
 }
 
+fn parse_registration(args: &str) -> Result<Registration, String> {
+    let parts = split_args(args);
+    let mut labels = Vec::new();
+    let mut kwargs = BTreeMap::new();
+    for part in parts {
+        if part.contains('=') {
+            for (key, value) in parse_kwargs_from_parts(&[part])? {
+                kwargs.insert(key, value);
+            }
+        } else {
+            labels.push(
+                parse_string_literal(part).ok_or_else(|| {
+                    format!("registration argument must be a string label: {part}")
+                })?,
+            );
+        }
+    }
+    Ok(Registration {
+        labels,
+        dev_dependency: optional_bool(&kwargs, "dev_dependency")?.unwrap_or(false),
+    })
+}
 fn parse_single_label_arg(args: &str) -> Result<String, String> {
     let labels = parse_label_args(args)?;
     if labels.len() != 1 {

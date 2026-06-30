@@ -1,0 +1,12 @@
+[fixture]
+name = "module-registration-dev-dependency"
+description = "MODULE.bazel registration directives with dev_dependency flags under Bazel 9 bzlmod."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9 oracle fixture: register_toolchains and register_execution_platforms accept dev_dependency while preserving normal package loading."
+
+[[commands]]
+name = "query_registered_targets"
+argv = ["query", "//:all", "--output=label"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["//:host_platform", "//:tc", "//:tc_type"]
