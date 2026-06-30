@@ -1,0 +1,7 @@
+genrule(
+    name = "copy_version",
+    srcs = ["@dep_alias//:version.txt"],
+    outs = ["version.out"],
+    cmd = "cat $(location @dep_alias//:version.txt) > $@",
+    cmd_bat = "type $(location @dep_alias//:version.txt) > $@",
+)

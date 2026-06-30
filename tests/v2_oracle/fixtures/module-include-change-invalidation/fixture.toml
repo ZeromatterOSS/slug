@@ -1,0 +1,31 @@
+[fixture]
+name = "module-include-change-invalidation"
+description = "Bazel 9 fixture proving included MODULE.bazel fragments are semantic inputs in the same output base."
+comparison = "semantic"
+oracle_notes = "The root MODULE.bazel includes deps.MODULE.bazel. The second command edits only that included fragment from modules/dep_one to modules/dep_two, and Bazel 9.1.1 rebuilds the same output with the updated local repository content in the same fixture output base."
+
+[[commands]]
+name = "build_before_include_edit"
+argv = ["build", "//:copy_version"]
+compare = "semantic"
+expected_exit = 0
+stderr_contains = ["Target //:copy_version up-to-date"]
+manifest_roots = ["bazel-bin/version.out"]
+
+[[commands]]
+name = "build_after_include_edit"
+argv = ["build", "//:copy_version"]
+compare = "semantic"
+expected_exit = 0
+stderr_contains = ["Target //:copy_version up-to-date"]
+manifest_roots = ["bazel-bin/version.out"]
+
+  [[commands.mutations]]
+  path = "deps.MODULE.bazel"
+  find = "version = \"1.0.0\""
+  replace = "version = \"2.0.0\""
+
+  [[commands.mutations]]
+  path = "deps.MODULE.bazel"
+  find = "path = \"modules/dep_one\""
+  replace = "path = \"modules/dep_two\""

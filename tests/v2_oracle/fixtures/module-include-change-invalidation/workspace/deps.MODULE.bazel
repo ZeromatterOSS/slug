@@ -1,0 +1,2 @@
+bazel_dep(name = "dep", repo_name = "dep_alias", version = "1.0.0")
+local_path_override(module_name = "dep", path = "modules/dep_one")

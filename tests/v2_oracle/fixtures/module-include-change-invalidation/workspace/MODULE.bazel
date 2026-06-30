@@ -1,0 +1,3 @@
+module(name = "include_change_root", version = "0.1.0")
+
+include("//:deps.MODULE.bazel")

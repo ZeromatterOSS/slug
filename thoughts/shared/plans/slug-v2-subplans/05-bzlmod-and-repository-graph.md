@@ -676,6 +676,27 @@ Stage 5 lockfile-mode flag parser checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
 
+Stage 5 included-module digest checkpoint:
+
+- Added `module-include-change-invalidation`, a Bazel 9.1.1 oracle fixture
+  proving an included `deps.MODULE.bazel` fragment is semantic same-output-base
+  state. The fixture edits only the included fragment from `modules/dep_one` to
+  `modules/dep_two`; Bazel rebuilds the same `bazel-bin/version.out` output
+  with a different manifest digest in the next command.
+- Added pure V2 digest helpers for bzlmod DICE inputs:
+  `digest_module_file_content`, `BzlmodModuleFileDigest`, and
+  `digest_included_module_files`. The helpers use SHA-256 over supplied bytes
+  and normalized relative include paths; they do not read the filesystem, so
+  later DICE keys can own file-read dependencies explicitly.
+- This checkpoint intentionally stops before actual DICE `Key` trait wiring,
+  include discovery, file watching, root/included digest production from live
+  paths, lockfile replay, or same-daemon materialization replay.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-include-change-invalidation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 ## Exact Test Criteria
 
 - Unit tests cover parser round-trips for every directive above, including

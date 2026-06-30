@@ -8,10 +8,88 @@
  * above-listed licenses.
  */
 
+use std::collections::BTreeMap;
 use std::fmt;
+
+use sha2::Digest;
+use sha2::Sha256;
 
 use crate::ModuleKey;
 use crate::YankedVersionPolicy;
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BzlmodModuleFileDigest {
+    path: String,
+    digest: String,
+}
+
+impl BzlmodModuleFileDigest {
+    pub fn new(path: impl Into<String>, digest: impl Into<String>) -> Result<Self, String> {
+        let input = Self {
+            path: path.into(),
+            digest: digest.into(),
+        };
+        input.validate()?;
+        Ok(input)
+    }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.path.is_empty() {
+            return Err("module file digest path must not be empty".to_owned());
+        }
+        if self.path.starts_with('/') || self.path.contains('\\') {
+            return Err(format!(
+                "module file digest path must be a normalized relative path: {}",
+                self.path
+            ));
+        }
+        if self
+            .path
+            .split('/')
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+        {
+            return Err(format!(
+                "module file digest path must be a normalized relative path: {}",
+                self.path
+            ));
+        }
+        validate_key_digest("module_file_digest", &self.digest)
+    }
+}
+
+pub fn digest_module_file_content(content: impl AsRef<[u8]>) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_ref());
+    hex::encode(hasher.finalize())
+}
+
+pub fn digest_included_module_files(
+    files: impl IntoIterator<Item = BzlmodModuleFileDigest>,
+) -> Result<String, String> {
+    let mut by_path = BTreeMap::new();
+    for file in files {
+        if by_path.insert(file.path, file.digest).is_some() {
+            return Err("duplicate included module file digest path".to_owned());
+        }
+    }
+
+    let mut hasher = Sha256::new();
+    for (path, digest) in by_path {
+        hasher.update(path.as_bytes());
+        hasher.update([0]);
+        hasher.update(digest.as_bytes());
+        hasher.update([0]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum LockfileMode {
@@ -184,15 +262,7 @@ impl BzlmodDiceInputs {
             ("registry_policy_digest", &self.registry_policy_digest),
             ("lockfile_digest", &self.lockfile_digest),
         ] {
-            if value.is_empty() {
-                return Err(format!("{name} must not be empty"));
-            }
-            if !value
-                .chars()
-                .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
-            {
-                return Err(format!("invalid {name}: {value}"));
-            }
+            validate_key_digest(name, value)?;
         }
         Ok(())
     }
@@ -235,6 +305,19 @@ impl fmt::Display for ResolvedBzlmodGraphDiceKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.stable_serialize())
     }
+}
+
+fn validate_key_digest(name: &str, value: &str) -> Result<(), String> {
+    if value.is_empty() {
+        return Err(format!("{name} must not be empty"));
+    }
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
+    {
+        return Err(format!("invalid {name}: {value}"));
+    }
+    Ok(())
 }
 
 fn serialize_yanked_policy(policy: &YankedVersionPolicy) -> String {

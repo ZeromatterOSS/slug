@@ -11,10 +11,13 @@
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodDiceInputs;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::BzlmodModuleFileDigest;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ResolvedBzlmodGraphDiceKey;
 use slug_bzlmod_v2::YankedVersionPolicy;
+use slug_bzlmod_v2::digest_included_module_files;
+use slug_bzlmod_v2::digest_module_file_content;
 
 fn inputs(
     flag_value: Option<&str>,
@@ -22,8 +25,13 @@ fn inputs(
     lockfile_mode: LockfileMode,
 ) -> BzlmodDiceInputs {
     BzlmodDiceInputs::new(
-        "rootabc",
-        "includesabc",
+        digest_module_file_content(b"module(name='root')"),
+        digest_included_module_files([BzlmodModuleFileDigest::new(
+            "deps.MODULE.bazel",
+            digest_module_file_content(b"bazel_dep(name='dep', version='1.0.0')"),
+        )
+        .unwrap()])
+        .unwrap(),
         "registriesabc",
         "lockfileabc",
         lockfile_mode,
@@ -31,6 +39,58 @@ fn inputs(
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(env_value).unwrap(),
     )
     .unwrap()
+}
+
+#[test]
+fn module_file_content_digest_is_sha256_hex() {
+    assert_eq!(
+        digest_module_file_content(b"one\n"),
+        "2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806"
+    );
+    assert_ne!(
+        digest_module_file_content(b"one\n"),
+        digest_module_file_content(b"two\n")
+    );
+}
+
+#[test]
+fn included_module_digest_is_order_stable_and_content_sensitive() {
+    let dep_one = BzlmodModuleFileDigest::new(
+        "deps.MODULE.bazel",
+        digest_module_file_content(b"bazel_dep(name='dep', version='1.0.0')"),
+    )
+    .unwrap();
+    let root_extra = BzlmodModuleFileDigest::new(
+        "fragments/root.MODULE.bazel",
+        digest_module_file_content(b"register_toolchains('//:tc')"),
+    )
+    .unwrap();
+
+    let forward = digest_included_module_files([dep_one.clone(), root_extra.clone()]).unwrap();
+    let reverse = digest_included_module_files([root_extra, dep_one.clone()]).unwrap();
+    let changed = digest_included_module_files([BzlmodModuleFileDigest::new(
+        "deps.MODULE.bazel",
+        digest_module_file_content(b"bazel_dep(name='dep', version='2.0.0')"),
+    )
+    .unwrap()])
+    .unwrap();
+
+    assert_eq!(forward, reverse);
+    assert_ne!(forward, changed);
+}
+
+#[test]
+fn included_module_digest_rejects_duplicate_or_unstable_paths() {
+    let digest = digest_module_file_content(b"content");
+    let duplicate = digest_included_module_files([
+        BzlmodModuleFileDigest::new("deps.MODULE.bazel", digest.clone()).unwrap(),
+        BzlmodModuleFileDigest::new("deps.MODULE.bazel", digest).unwrap(),
+    ])
+    .unwrap_err();
+    assert!(duplicate.contains("duplicate included module file digest path"));
+
+    let bad_path = BzlmodModuleFileDigest::new("../deps.MODULE.bazel", "abc").unwrap_err();
+    assert!(bad_path.contains("normalized relative path"));
 }
 
 #[test]
@@ -58,6 +118,7 @@ fn lockfile_mode_parses_bazel_flag_values() {
         "Not a valid Lockfile mode: 'bad' (should be off, update, refresh or error)"
     );
 }
+
 #[test]
 fn policy_keys_serialize_yanked_allowlists_stably() {
     let env_policy =
