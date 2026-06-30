@@ -418,7 +418,9 @@ Stage 5 registry MVS substrate checkpoint:
   `app/slug_bzlmod/src/resolution.rs`, and
   `tests/core/bzlmod/test_plan61_guardrails.py`; implementation remains a
   scoped V2 rewrite from behavior.
-- This checkpoint intentionally stops before registry hash enforcement, repo-spec`r`n  fetching/materialization, multiple-version overrides, lockfile replay, and`r`n  DICE ownership.
+- This checkpoint intentionally stops before registry hash enforcement, repo-spec
+  fetching/materialization, multiple-version overrides, lockfile replay, and
+  DICE ownership.
 - Validation passed: `cargo fmt -p slug_bzlmod_v2`;
   `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registry-mvs-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
