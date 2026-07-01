@@ -1,5 +1,15 @@
 module(name = "module_file_directives", version = "0.0.0", compatibility_level = 1)
 
 include("//:deps.MODULE.bazel")
+
+repo = use_repo_rule("//:repo.bzl", "simple_repo")
+repo(name = "direct", filename = "direct.txt", message = "from direct", dev_dependency = True)
+
+ext = use_extension("//:ext.bzl", "ext", dev_dependency = True)
+ext.repo(name = "generated", message = "from generated")
+use_repo(ext, "generated")
+inject_repo(ext, "direct")
+override_repo(ext, generated = "direct")
+
 register_toolchains("//:toolchain")
 register_execution_platforms("//:platform")
