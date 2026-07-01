@@ -1,0 +1,82 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=update"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=update"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "21587df8a47a42952e5301f59f4809b23eba5f336780847d0c3bc02422275a03",
+          "mode": "0o666",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 25624,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "update_writes_lockfile",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:data.txt",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//:data.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=refresh"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=refresh"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "21587df8a47a42952e5301f59f4809b23eba5f336780847d0c3bc02422275a03",
+          "mode": "0o666",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 25624,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "refresh_preserves_lockfile",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:data.txt",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//:data.txt\n"
+    }
+  ],
+  "fixture": "lockfile-mode-update-refresh",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

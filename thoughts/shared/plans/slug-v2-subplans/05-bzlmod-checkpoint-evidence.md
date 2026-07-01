@@ -775,3 +775,22 @@ Stage 5 lockfile mode off policy checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-off --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 lockfile mode update/refresh oracle checkpoint:
+
+- Added `lockfile-mode-update-refresh`, a Bazel 9.1.1 oracle fixture proving
+  `--lockfile_mode=update` writes a visible `MODULE.bazel.lock` when absent and
+  a following `--lockfile_mode=refresh` query preserves the visible lockfile in
+  the same copied workspace. The generated manifest records the lockfile as a
+  file for both commands, complementing the earlier `lockfile-mode-off` empty
+  manifest oracle.
+- No V1 bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 oracle fixture; the existing V2 `LockfileMode`
+  helpers already model update/refresh as visible-lockfile write modes.
+- Validation passed: `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1
+  cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m
+  tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel
+  --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py`; `rg -n "process-global|fallback
+  scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.

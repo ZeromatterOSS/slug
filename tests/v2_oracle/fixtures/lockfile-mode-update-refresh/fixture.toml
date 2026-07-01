@@ -1,0 +1,22 @@
+[fixture]
+name = "lockfile-mode-update-refresh"
+description = "Bazel 9 fixture proving --lockfile_mode=update and refresh write or preserve MODULE.bazel.lock."
+comparison = "semantic"
+manifest_roots = ["MODULE.bazel.lock"]
+oracle_notes = "Self-contained root module fixture. The update command starts without a visible lockfile and records a non-empty MODULE.bazel.lock manifest; the refresh command runs after update in the same copied workspace and records the visible lockfile again."
+
+[[commands]]
+name = "update_writes_lockfile"
+argv = ["query", "//:data.txt", "--lockfile_mode=update"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["//:data.txt"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[[commands]]
+name = "refresh_preserves_lockfile"
+argv = ["query", "//:data.txt", "--lockfile_mode=refresh"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["//:data.txt"]
+manifest_roots = ["MODULE.bazel.lock"]
