@@ -249,6 +249,78 @@ pub fn parse_hidden_lockfile_fail_open(existing_content: Option<&str>) -> BazelL
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VisibleLockfileRead {
+    Ignored,
+    Parsed(BazelLockfile),
+}
+
+impl VisibleLockfileRead {
+    pub fn parsed(&self) -> Option<&BazelLockfile> {
+        match self {
+            Self::Ignored => None,
+            Self::Parsed(lockfile) => Some(lockfile),
+        }
+    }
+}
+
+pub fn parse_visible_lockfile_for_mode(
+    mode: &LockfileMode,
+    input: &VisibleLockfileInput,
+) -> Result<VisibleLockfileRead, String> {
+    if matches!(mode, LockfileMode::Off) {
+        return Ok(VisibleLockfileRead::Ignored);
+    }
+
+    let Some(existing_content) = input.existing_content() else {
+        return Ok(VisibleLockfileRead::Parsed(empty_bazel_lockfile()));
+    };
+
+    let lockfile = parse_bazel_lockfile(existing_content).map_err(|err| {
+        format!(
+            "Failed to read and parse the MODULE.bazel.lock file with error: {err}. Try deleting it and rerun the build."
+        )
+    })?;
+
+    if lockfile.lock_file_version == BAZEL_9_LOCK_FILE_VERSION {
+        return Ok(VisibleLockfileRead::Parsed(lockfile));
+    }
+
+    if matches!(mode, LockfileMode::Error) {
+        validate_lockfile_version(&lockfile, BAZEL_9_LOCK_FILE_VERSION)?;
+    }
+    Ok(VisibleLockfileRead::Parsed(empty_bazel_lockfile()))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LockfileReadInputs {
+    pub mode: LockfileMode,
+    pub visible: VisibleLockfileInput,
+    pub hidden: HiddenLockfileInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LockfileReadSnapshot {
+    pub visible: VisibleLockfileRead,
+    pub hidden: Option<BazelLockfile>,
+}
+
+impl LockfileReadInputs {
+    pub fn read(&self) -> Result<LockfileReadSnapshot, String> {
+        if matches!(self.mode, LockfileMode::Off) {
+            return Ok(LockfileReadSnapshot {
+                visible: VisibleLockfileRead::Ignored,
+                hidden: None,
+            });
+        }
+
+        Ok(LockfileReadSnapshot {
+            visible: parse_visible_lockfile_for_mode(&self.mode, &self.visible)?,
+            hidden: Some(self.hidden.parse_fail_open()),
+        })
+    }
+}
+
 pub fn plan_visible_lockfile(
     mode: &LockfileMode,
     existing_content: Option<&str>,

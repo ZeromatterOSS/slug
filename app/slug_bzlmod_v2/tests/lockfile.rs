@@ -17,15 +17,18 @@ use slug_bzlmod_v2::BzlmodHiddenLockfileDigest;
 use slug_bzlmod_v2::BzlmodVisibleLockfileDigest;
 use slug_bzlmod_v2::HiddenLockfileInput;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::LockfileReadInputs;
 use slug_bzlmod_v2::ModuleExtensionReplayInputs;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::VisibleLockfileApply;
 use slug_bzlmod_v2::VisibleLockfileInput;
 use slug_bzlmod_v2::VisibleLockfilePlan;
+use slug_bzlmod_v2::VisibleLockfileRead;
 use slug_bzlmod_v2::apply_visible_lockfile_plan;
 use slug_bzlmod_v2::empty_bazel_lockfile;
 use slug_bzlmod_v2::parse_bazel_lockfile;
 use slug_bzlmod_v2::parse_hidden_lockfile_fail_open;
+use slug_bzlmod_v2::parse_visible_lockfile_for_mode;
 use slug_bzlmod_v2::plan_visible_lockfile;
 use slug_bzlmod_v2::render_bazel_lockfile;
 use slug_bzlmod_v2::validate_lockfile_version;
@@ -892,6 +895,72 @@ fn hidden_lockfile_parse_fail_open_uses_empty_for_absent_malformed_or_old_versio
         parse_hidden_lockfile_fail_open(Some("not json")),
         empty_bazel_lockfile()
     );
+}
+
+#[test]
+fn visible_lockfile_read_honors_bazel_modes() {
+    let current = VisibleLockfileInput::from_optional_bytes(Some(
+        br#"{"lockFileVersion":26,"registryFileHashes":{"https://example.test/MODULE.bazel":"abc"}}"#,
+    ))
+    .unwrap();
+    let visible = parse_visible_lockfile_for_mode(&LockfileMode::Update, &current).unwrap();
+    let lockfile = visible.parsed().unwrap();
+    assert_eq!(
+        lockfile
+            .registry_file_hashes
+            .get("https://example.test/MODULE.bazel"),
+        Some(&"abc".to_owned())
+    );
+
+    let absent = VisibleLockfileInput::absent();
+    assert_eq!(
+        parse_visible_lockfile_for_mode(&LockfileMode::Error, &absent).unwrap(),
+        VisibleLockfileRead::Parsed(empty_bazel_lockfile())
+    );
+
+    let old_version =
+        VisibleLockfileInput::from_optional_bytes(Some(br#"{"lockFileVersion":24}"#)).unwrap();
+    assert_eq!(
+        parse_visible_lockfile_for_mode(&LockfileMode::Update, &old_version).unwrap(),
+        VisibleLockfileRead::Parsed(empty_bazel_lockfile())
+    );
+    let err = parse_visible_lockfile_for_mode(&LockfileMode::Error, &old_version).unwrap_err();
+    assert!(err.contains("version of MODULE.bazel.lock is not supported"));
+
+    let malformed = VisibleLockfileInput::from_optional_bytes(Some(b"{ nope")).unwrap();
+    let err = parse_visible_lockfile_for_mode(&LockfileMode::Refresh, &malformed).unwrap_err();
+    assert!(err.contains("Failed to read and parse the MODULE.bazel.lock file"));
+}
+
+#[test]
+fn lockfile_read_inputs_skip_all_reads_in_off_mode_and_parse_hidden_fail_open() {
+    let visible = VisibleLockfileInput::from_optional_bytes(Some(b"{ nope")).unwrap();
+    let hidden =
+        HiddenLockfileInput::from_optional_bytes(Some(br#"{"lockFileVersion":24}"#)).unwrap();
+    let off = LockfileReadInputs {
+        mode: LockfileMode::Off,
+        visible,
+        hidden,
+    }
+    .read()
+    .unwrap();
+    assert_eq!(off.visible, VisibleLockfileRead::Ignored);
+    assert_eq!(off.hidden, None);
+
+    let visible = VisibleLockfileInput::absent();
+    let hidden = HiddenLockfileInput::from_optional_bytes(Some(b"{ nope")).unwrap();
+    let update = LockfileReadInputs {
+        mode: LockfileMode::Update,
+        visible,
+        hidden,
+    }
+    .read()
+    .unwrap();
+    assert_eq!(
+        update.visible,
+        VisibleLockfileRead::Parsed(empty_bazel_lockfile())
+    );
+    assert_eq!(update.hidden, Some(empty_bazel_lockfile()));
 }
 
 fn module_extension_replay_lockfile() -> slug_bzlmod_v2::BazelLockfile {
