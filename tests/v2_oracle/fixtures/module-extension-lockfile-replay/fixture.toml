@@ -1,0 +1,33 @@
+[fixture]
+name = "module-extension-lockfile-replay"
+description = "Bazel 9 fixture proving module_extension lockfile replay avoids re-execution, then rejects stale usage data in error mode."
+comparison = "message_shape"
+oracle_notes = "Self-contained module_extension fixture. The extension prints a sentinel when it executes. The prime command observes that sentinel, the replay command runs with --lockfile_mode=error and asserts the sentinel is absent, and the final command edits only the extension tag usage and proves Bazel rejects stale usageDigest replay data."
+
+[[commands]]
+name = "prime_extension_lockfile"
+argv = ["query", "@tagged//:one.txt"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@tagged//:one.txt"]
+stderr_contains = ["SLUG_STAGE5_EXTENSION_EXECUTED"]
+
+[[commands]]
+name = "replay_extension_from_lockfile"
+argv = ["query", "@tagged//:one.txt", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["@tagged//:one.txt"]
+stderr_patterns = ["(?s)\\A(?!.*SLUG_STAGE5_EXTENSION_EXECUTED).*\\Z"]
+
+[[commands]]
+name = "reject_stale_extension_usage_lockfile"
+argv = ["query", "@tagged//:two.txt", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 7
+stderr_contains = ["MODULE.bazel.lock is no longer up-to-date", "usages of the extension '@@//:ext.bzl%ext' have changed", "bazel mod deps --lockfile_mode=update"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "message = \"one\""
+  replace = "message = \"two\""
