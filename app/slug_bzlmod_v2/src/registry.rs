@@ -19,6 +19,7 @@ use crate::BazelDep;
 use crate::Directive;
 use crate::ModuleFile;
 use crate::dice::BzlmodRegistryModuleFileDigest;
+use crate::dice::BzlmodRegistryPolicyEntry;
 use crate::dice::BzlmodRegistrySourceSpecDigest;
 use crate::dice::digest_registry_module_files;
 use crate::dice::digest_registry_source_specs;
@@ -443,6 +444,20 @@ pub fn observed_registry_file_hashes(
             &mut hashes,
             registry_source_json_url(&source.registry_url, module_key),
             digest,
+        )?;
+    }
+    Ok(hashes)
+}
+
+pub fn observed_registry_policy_file_hashes<'a>(
+    entries: impl IntoIterator<Item = &'a BzlmodRegistryPolicyEntry>,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut hashes = BTreeMap::new();
+    for entry in entries {
+        insert_observed_registry_hash(
+            &mut hashes,
+            registry_bazel_registry_json_url(entry.url()),
+            entry.digest(),
         )?;
     }
     Ok(hashes)

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
+use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ModuleSource;
@@ -10,6 +11,7 @@ use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_selected_registry_modules;
 use slug_bzlmod_v2::observed_registry_file_hashes;
+use slug_bzlmod_v2::observed_registry_policy_file_hashes;
 use slug_bzlmod_v2::registry_bazel_registry_json_url;
 use slug_bzlmod_v2::registry_module_file_url;
 use slug_bzlmod_v2::resolve_registry_mvs;
@@ -521,4 +523,37 @@ fn observed_registry_hashes_require_selected_module_digests() {
 
     let err = observed_registry_file_hashes(&selected, &BTreeMap::new()).unwrap_err();
     assert!(err.contains("selected registry module aaa@1.0.0 has no MODULE.bazel digest"));
+}
+
+#[test]
+fn observed_registry_policy_hashes_include_bazel_registry_json_digest() {
+    let digest = digest_module_file_content(b"bazel registry metadata");
+    let entry = BzlmodRegistryPolicyEntry::new("https://bcr.bazel.build/", digest.clone()).unwrap();
+
+    let hashes = observed_registry_policy_file_hashes([&entry]).unwrap();
+
+    assert_eq!(
+        hashes.get("https://bcr.bazel.build/bazel_registry.json"),
+        Some(&digest)
+    );
+}
+
+#[test]
+fn observed_registry_policy_hashes_reject_conflicting_registry_digests() {
+    let first = BzlmodRegistryPolicyEntry::new(
+        "https://bcr.bazel.build/",
+        digest_module_file_content(b"first registry metadata"),
+    )
+    .unwrap();
+    let second = BzlmodRegistryPolicyEntry::new(
+        "https://bcr.bazel.build",
+        digest_module_file_content(b"second registry metadata"),
+    )
+    .unwrap();
+
+    let err = observed_registry_policy_file_hashes([&first, &second]).unwrap_err();
+
+    assert!(err.contains(
+        "conflicting observed registry file hash for https://bcr.bazel.build/bazel_registry.json"
+    ));
 }
