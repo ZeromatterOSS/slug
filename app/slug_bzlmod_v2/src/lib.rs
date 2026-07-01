@@ -40,6 +40,7 @@ pub use lockfile::BazelLockfileModuleExtensionGeneral;
 pub use lockfile::BazelLockfileRecordedInput;
 pub use lockfile::BazelLockfileRepoSpec;
 pub use lockfile::VisibleLockfileApply;
+pub use lockfile::VisibleLockfileInput;
 pub use lockfile::VisibleLockfilePlan;
 pub use lockfile::apply_visible_lockfile_plan;
 pub use lockfile::parse_bazel_lockfile;

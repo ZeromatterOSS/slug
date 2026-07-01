@@ -14,6 +14,7 @@ use std::path::Path;
 
 use serde_json::Value;
 
+use crate::BzlmodVisibleLockfileDigest;
 use crate::ModuleKey;
 use crate::dice::LockfileMode;
 
@@ -136,6 +137,42 @@ pub enum VisibleLockfileApply {
     Ignored,
     Kept,
     Written { bytes: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VisibleLockfileInput {
+    digest: BzlmodVisibleLockfileDigest,
+    content: Option<String>,
+}
+
+impl VisibleLockfileInput {
+    pub fn absent() -> Self {
+        Self {
+            digest: BzlmodVisibleLockfileDigest::absent(),
+            content: None,
+        }
+    }
+
+    pub fn from_optional_bytes(content: Option<&[u8]>) -> Result<Self, String> {
+        let Some(content) = content else {
+            return Ok(Self::absent());
+        };
+        let content = std::str::from_utf8(content)
+            .map_err(|err| format!("MODULE.bazel.lock must be valid UTF-8: {err}"))?
+            .to_owned();
+        Ok(Self {
+            digest: BzlmodVisibleLockfileDigest::from_content(content.as_bytes()),
+            content: Some(content),
+        })
+    }
+
+    pub fn digest(&self) -> &BzlmodVisibleLockfileDigest {
+        &self.digest
+    }
+
+    pub fn existing_content(&self) -> Option<&str> {
+        self.content.as_deref()
+    }
 }
 
 pub fn plan_visible_lockfile(

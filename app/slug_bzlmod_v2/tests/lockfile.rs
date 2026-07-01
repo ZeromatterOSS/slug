@@ -13,9 +13,11 @@ use std::fs;
 use serde_json::Value;
 use slug_bzlmod_v2::BAZEL_9_LOCK_FILE_VERSION;
 use slug_bzlmod_v2::BazelLockfileRecordedInput;
+use slug_bzlmod_v2::BzlmodVisibleLockfileDigest;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::VisibleLockfileApply;
+use slug_bzlmod_v2::VisibleLockfileInput;
 use slug_bzlmod_v2::VisibleLockfilePlan;
 use slug_bzlmod_v2::apply_visible_lockfile_plan;
 use slug_bzlmod_v2::parse_bazel_lockfile;
@@ -735,6 +737,37 @@ fn apply_visible_lockfile_plan_returns_error_without_writing() {
 
     assert_eq!(err, "stale lockfile");
     assert!(!lockfile_path.exists());
+}
+
+#[test]
+fn visible_lockfile_input_bridges_dice_bytes_to_planner() {
+    let absent = VisibleLockfileInput::from_optional_bytes(None).unwrap();
+    assert_eq!(absent.digest(), &BzlmodVisibleLockfileDigest::absent());
+    assert_eq!(absent.existing_content(), None);
+
+    let existing = b"{\"lockFileVersion\":26}\n";
+    let present = VisibleLockfileInput::from_optional_bytes(Some(existing)).unwrap();
+    assert_eq!(
+        present.digest(),
+        &BzlmodVisibleLockfileDigest::from_content(existing)
+    );
+    assert_eq!(
+        present.existing_content(),
+        Some("{\"lockFileVersion\":26}\n")
+    );
+
+    let desired = simple_visible_lockfile();
+    let plan =
+        plan_visible_lockfile(&LockfileMode::Update, present.existing_content(), &desired).unwrap();
+    assert!(matches!(plan, VisibleLockfilePlan::Write { .. }));
+}
+
+#[test]
+fn visible_lockfile_input_rejects_invalid_utf8() {
+    let err = VisibleLockfileInput::from_optional_bytes(Some(&[0xff])).unwrap_err();
+
+    assert!(err.contains("MODULE.bazel.lock"));
+    assert!(err.contains("UTF-8"));
 }
 
 fn simple_visible_lockfile() -> slug_bzlmod_v2::BazelLockfile {
