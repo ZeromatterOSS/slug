@@ -13,6 +13,7 @@ use slug_bzlmod_v2::BzlmodDiceInputs;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::BzlmodExtensionDefinitionDigest;
 use slug_bzlmod_v2::BzlmodExtensionUsageDigest;
+use slug_bzlmod_v2::BzlmodHiddenLockfileDigest;
 use slug_bzlmod_v2::BzlmodModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
@@ -82,6 +83,12 @@ fn visible_lockfile_digest(content: impl AsRef<[u8]>) -> String {
         .to_owned()
 }
 
+fn hidden_lockfile_digest(content: impl AsRef<[u8]>) -> String {
+    BzlmodHiddenLockfileDigest::from_content(content)
+        .stable_serialize()
+        .to_owned()
+}
+
 fn inputs(
     flag_value: Option<&str>,
     env_value: Option<&str>,
@@ -114,6 +121,20 @@ fn visible_lockfile_digest_distinguishes_absent_empty_and_content() {
     let empty = BzlmodVisibleLockfileDigest::from_content(b"");
     let one = BzlmodVisibleLockfileDigest::from_content(b"{\"lockFileVersion\":26}\n");
     let two = BzlmodVisibleLockfileDigest::from_content(b"{\"lockFileVersion\":27}\n");
+
+    assert_eq!(absent.stable_serialize(), "absent");
+    assert!(empty.stable_serialize().starts_with("present_"));
+    assert_ne!(absent, empty);
+    assert_ne!(empty, one);
+    assert_ne!(one, two);
+}
+
+#[test]
+fn hidden_lockfile_digest_distinguishes_absent_empty_and_content() {
+    let absent = BzlmodHiddenLockfileDigest::absent();
+    let empty = BzlmodHiddenLockfileDigest::from_content(b"");
+    let one = BzlmodHiddenLockfileDigest::from_content(b"hidden-one");
+    let two = BzlmodHiddenLockfileDigest::from_content(b"hidden-two");
 
     assert_eq!(absent.stable_serialize(), "absent");
     assert!(empty.stable_serialize().starts_with("present_"));
@@ -815,6 +836,63 @@ fn resolved_graph_key_changes_when_visible_lockfile_digest_changes() {
     assert_ne!(old, new);
     assert!(old.stable_serialize().contains("lockfile=present_"));
     assert!(new.stable_serialize().contains("lockfile=present_"));
+}
+
+#[test]
+fn resolved_graph_key_changes_when_hidden_lockfile_digest_changes() {
+    let root = ModuleKey::new("root", "0.1.0");
+    let before = ResolvedBzlmodGraphDiceKey::new(
+        root.clone(),
+        BzlmodDiceInputs::new_with_hidden_lockfile(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
+            hidden_lockfile_digest(b"hidden-one"),
+            LockfileMode::Error,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+    let after = ResolvedBzlmodGraphDiceKey::new(
+        root,
+        BzlmodDiceInputs::new_with_hidden_lockfile(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
+            hidden_lockfile_digest(b"hidden-two"),
+            LockfileMode::Error,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+
+    assert_ne!(before, after);
+    assert!(
+        before
+            .stable_serialize()
+            .contains("hidden_lockfile=present_")
+    );
+    assert!(
+        after
+            .stable_serialize()
+            .contains("hidden_lockfile=present_")
+    );
 }
 
 #[test]

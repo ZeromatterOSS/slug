@@ -19,6 +19,7 @@ pub use dice::BzlmodDiceInputs;
 pub use dice::BzlmodEnvironmentPolicyKey;
 pub use dice::BzlmodExtensionDefinitionDigest;
 pub use dice::BzlmodExtensionUsageDigest;
+pub use dice::BzlmodHiddenLockfileDigest;
 pub use dice::BzlmodModuleFileDigest;
 pub use dice::BzlmodRegistryModuleFileDigest;
 pub use dice::BzlmodRegistryPolicyEntry;

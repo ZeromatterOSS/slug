@@ -100,6 +100,35 @@ impl fmt::Display for BzlmodVisibleLockfileDigest {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BzlmodHiddenLockfileDigest {
+    digest: String,
+}
+
+impl BzlmodHiddenLockfileDigest {
+    pub fn absent() -> Self {
+        Self {
+            digest: "absent".to_owned(),
+        }
+    }
+
+    pub fn from_content(content: impl AsRef<[u8]>) -> Self {
+        Self {
+            digest: format!("present_{}", digest_module_file_content(content)),
+        }
+    }
+
+    pub fn stable_serialize(&self) -> &str {
+        &self.digest
+    }
+}
+
+impl fmt::Display for BzlmodHiddenLockfileDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.stable_serialize())
+    }
+}
+
 pub fn digest_included_module_files(
     files: impl IntoIterator<Item = BzlmodModuleFileDigest>,
 ) -> Result<String, String> {
@@ -561,6 +590,7 @@ pub struct BzlmodDiceInputs {
     extension_definition_digest: String,
     extension_usage_digest: String,
     lockfile_digest: String,
+    hidden_lockfile_digest: String,
     lockfile_mode: LockfileMode,
     command_policy: BzlmodCommandPolicyKey,
     environment_policy: BzlmodEnvironmentPolicyKey,
@@ -580,6 +610,38 @@ impl BzlmodDiceInputs {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
     ) -> Result<Self, String> {
+        Self::new_with_hidden_lockfile(
+            root_module_digest,
+            included_module_digest,
+            registry_policy_digest,
+            registry_module_digest,
+            registry_source_digest,
+            extension_definition_digest,
+            extension_usage_digest,
+            lockfile_digest,
+            BzlmodHiddenLockfileDigest::absent()
+                .stable_serialize()
+                .to_owned(),
+            lockfile_mode,
+            command_policy,
+            environment_policy,
+        )
+    }
+
+    pub fn new_with_hidden_lockfile(
+        root_module_digest: impl Into<String>,
+        included_module_digest: impl Into<String>,
+        registry_policy_digest: impl Into<String>,
+        registry_module_digest: impl Into<String>,
+        registry_source_digest: impl Into<String>,
+        extension_definition_digest: impl Into<String>,
+        extension_usage_digest: impl Into<String>,
+        lockfile_digest: impl Into<String>,
+        hidden_lockfile_digest: impl Into<String>,
+        lockfile_mode: LockfileMode,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+    ) -> Result<Self, String> {
         let inputs = Self {
             root_module_digest: root_module_digest.into(),
             included_module_digest: included_module_digest.into(),
@@ -589,6 +651,7 @@ impl BzlmodDiceInputs {
             extension_definition_digest: extension_definition_digest.into(),
             extension_usage_digest: extension_usage_digest.into(),
             lockfile_digest: lockfile_digest.into(),
+            hidden_lockfile_digest: hidden_lockfile_digest.into(),
             lockfile_mode,
             command_policy,
             environment_policy,
@@ -617,7 +680,7 @@ impl BzlmodDiceInputs {
 
     pub fn stable_serialize(&self) -> String {
         format!(
-            "root={};includes={};registries={};registry_modules={};registry_sources={};extension_defs={};extensions={};lockfile={};mode={};command={};env={}",
+            "root={};includes={};registries={};registry_modules={};registry_sources={};extension_defs={};extensions={};lockfile={};hidden_lockfile={};mode={};command={};env={}",
             self.root_module_digest,
             self.included_module_digest,
             self.registry_policy_digest,
@@ -626,6 +689,7 @@ impl BzlmodDiceInputs {
             self.extension_definition_digest,
             self.extension_usage_digest,
             self.lockfile_digest,
+            self.hidden_lockfile_digest,
             self.lockfile_mode,
             self.command_policy,
             self.environment_policy
@@ -645,6 +709,7 @@ impl BzlmodDiceInputs {
             ),
             ("extension_usage_digest", &self.extension_usage_digest),
             ("lockfile_digest", &self.lockfile_digest),
+            ("hidden_lockfile_digest", &self.hidden_lockfile_digest),
         ] {
             validate_key_digest(name, value)?;
         }
