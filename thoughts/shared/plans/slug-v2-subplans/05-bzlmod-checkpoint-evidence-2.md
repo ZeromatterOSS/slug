@@ -321,3 +321,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving Bazel-shaped 
 Implementation summary: Added `ResolvedGraph::module_repo_mapping_digests`, `ResolvedGraph::module_repo_mapping_digest`, and `ResolvedGraph::extension_generated_repo_mapping_digest` so resolved module graphs can produce the explicit repo-mapping identity expected by `BzlmodDiceInputs`; extension-generated digests are still helper-only until actual module-extension execution produces generated repositories
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Resolver-produced module repo mappings can now feed DICE identity, but V2 still needs actual extension execution to produce generated repo mappings, visible/hidden lockfile replay validation for stale mappings, materialization, and same-daemon invalidation wiring.
+
+### Stage 5 module directive oracle expansion
+
+Status: Partially landed
+V2 commit: `dc2bf418 Stage 5 expand module directive oracle`
+Bazel source inspected: Existing Stage 5 module-file evaluation citations still apply; this is an oracle-only fixture expansion anchored by Bazel 9.1.1 behavior
+Bazel oracle: Bazel 9.1.1 `module-file-directives` fixture
+V2 fixture: `module-file-directives`
+Expected evidence artifact: Stage 1 oracle expected output now covers local override build, direct repository creation through `use_repo_rule`, and `override_repo` mapping `@generated` to the direct repo while the MODULE file also contains `include`, `use_extension`, `use_repo`, `inject_repo`, root dev-dependency flags, and registration directives
+Implementation summary: Expanded the local-only module directive fixture with `repo.bzl` and `ext.bzl`, regenerated Bazel expected output, and kept this checkpoint oracle-only; no parser, resolver, extension execution, repository rule execution, or materialization code changed
+Validation: `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-file-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120 --update-expected`; same command without `--update-expected`; `py -3 -B -m tools.v2_oracle list`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; diff checks before commit
+Residual risk: The fixture now names the directive surface more completely, but V2 still needs evaluator validation for root/non-root dev-dependency behavior, include restrictions, override/inject execution semantics, registration order feeding toolchain/platform resolution, and same-daemon invalidation.
