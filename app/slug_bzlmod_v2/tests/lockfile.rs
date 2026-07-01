@@ -19,6 +19,7 @@ use slug_bzlmod_v2::validate_module_extension_recorded_env_inputs;
 use slug_bzlmod_v2::validate_module_extension_recorded_file_inputs;
 use slug_bzlmod_v2::validate_module_extension_usage_digests;
 use slug_bzlmod_v2::validate_registry_file_hashes;
+use slug_bzlmod_v2::validate_required_registry_file_hashes;
 
 #[test]
 fn parses_visible_lockfile_registry_and_yanked_fields() {
@@ -405,6 +406,39 @@ fn rejects_stale_module_extension_bzl_digest_like_bazel() {
     assert!(err.contains("bazel mod deps --lockfile_mode=update"));
 }
 
+#[test]
+fn validates_required_registry_file_hash_entries() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "registryFileHashes": {
+    "https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel": "wanted"
+  }
+}"#,
+    )
+    .unwrap();
+
+    validate_required_registry_file_hashes(
+        &lockfile,
+        &["https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel"],
+    )
+    .unwrap();
+}
+
+#[test]
+fn rejects_missing_registry_file_hash_like_bazel_error_mode() {
+    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 26}"#).unwrap();
+
+    let err = validate_required_registry_file_hashes(
+        &lockfile,
+        &["https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel"],
+    )
+    .unwrap_err();
+
+    assert!(err.contains("Missing checksum for registry file https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel"));
+    assert!(err.contains("not permitted with --lockfile_mode=error"));
+    assert!(err.contains("bazel mod deps --lockfile_mode=update"));
+}
 #[test]
 fn validates_registry_hashes_against_observed_digest_map() {
     let lockfile = parse_bazel_lockfile(

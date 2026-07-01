@@ -86,6 +86,19 @@ pub fn validate_lockfile_version(
             .to_owned(),
     )
 }
+pub fn validate_required_registry_file_hashes(
+    lockfile: &BazelLockfile,
+    required_urls: &[&str],
+) -> Result<(), String> {
+    for url in required_urls {
+        if !lockfile.registry_file_hashes.contains_key(*url) {
+            return Err(format!(
+                "Missing checksum for registry file {url} not permitted with --lockfile_mode=error. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+            ));
+        }
+    }
+    Ok(())
+}
 pub fn validate_registry_file_hashes(
     lockfile: &BazelLockfile,
     observed_hashes: &BTreeMap<String, String>,

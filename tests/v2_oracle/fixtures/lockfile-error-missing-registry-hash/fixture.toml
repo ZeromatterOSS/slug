@@ -1,0 +1,12 @@
+[fixture]
+name = "lockfile-error-missing-registry-hash"
+description = "Bazel 9 fixture proving --lockfile_mode=error rejects missing registry file checksums."
+comparison = "message_shape"
+oracle_notes = "Self-contained root module fixture with no primed MODULE.bazel.lock. Querying in --lockfile_mode=error proves Bazel rejects missing registry file checksum entries instead of refreshing the lockfile silently."
+
+[[commands]]
+name = "reject_missing_registry_checksum"
+argv = ["query", "//:data.txt", "--lockfile_mode=error"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["Missing checksum for registry file", "not permitted with --lockfile_mode=error", "bazel mod deps --lockfile_mode=update"]

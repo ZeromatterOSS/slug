@@ -1,0 +1,37 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=error"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=error"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [],
+      "name": "reject_missing_registry_checksum",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nERROR: Error computing the main repository mapping: Missing checksum for registry file https://bcr.bazel.build/modules/buildozer/8.5.1/MODULE.bazel not permitted with --lockfile_mode=error. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nERROR: Error computing the main repository mapping: Missing checksum for registry file https://bcr.bazel.build/modules/buildozer/8.5.1/MODULE.bazel not permitted with --lockfile_mode=error. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "lockfile-error-missing-registry-hash",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

@@ -41,6 +41,7 @@ pub use lockfile::validate_module_extension_recorded_env_inputs;
 pub use lockfile::validate_module_extension_recorded_file_inputs;
 pub use lockfile::validate_module_extension_usage_digests;
 pub use lockfile::validate_registry_file_hashes;
+pub use lockfile::validate_required_registry_file_hashes;
 pub use parser::ArchiveOverride;
 pub use parser::BazelDep;
 pub use parser::Directive;

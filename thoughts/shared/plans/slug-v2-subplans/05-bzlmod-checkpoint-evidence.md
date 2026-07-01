@@ -736,3 +736,22 @@ Stage 5 lockfile version error checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-version-error --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 missing registry checksum lockfile error checkpoint:
+
+- Added `lockfile-error-missing-registry-hash`, a Bazel 9.1.1 oracle fixture
+  proving `--lockfile_mode=error` rejects missing visible lockfile registry
+  checksum entries instead of refreshing the lockfile silently. The single query
+  starts without a primed `MODULE.bazel.lock` and observes query exit code 48
+  with Bazel's `Missing checksum for registry file ... not permitted` diagnostic.
+- Added `validate_required_registry_file_hashes` to check that required registry
+  file URLs are present in parsed visible lockfile `registryFileHashes`. The
+  helper emits the Bazel-shaped missing-checksum diagnostic; it does not fetch
+  registries, compute hashes, or implement refresh/update/error-mode lifecycle.
+- No V1 bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 oracle fixture and scratch probe.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-error-missing-registry-hash --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
