@@ -674,25 +674,52 @@ impl fmt::Display for LockfileMode {
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BzlmodCommandPolicyKey {
     yanked_versions_policy: YankedVersionPolicy,
+    ignore_dev_dependency: bool,
 }
 
 impl BzlmodCommandPolicyKey {
     pub fn new(yanked_versions_policy: YankedVersionPolicy) -> Self {
+        Self::new_with_ignore_dev_dependency(yanked_versions_policy, false)
+    }
+
+    pub fn new_with_ignore_dev_dependency(
+        yanked_versions_policy: YankedVersionPolicy,
+        ignore_dev_dependency: bool,
+    ) -> Self {
         Self {
             yanked_versions_policy,
+            ignore_dev_dependency,
         }
     }
 
     pub fn from_allow_yanked_versions_flag(value: Option<&str>) -> Result<Self, String> {
-        Ok(Self::new(YankedVersionPolicy::from_flag_value(value)?))
+        Self::from_flags(value, false)
+    }
+
+    pub fn from_flags(
+        allow_yanked_versions: Option<&str>,
+        ignore_dev_dependency: bool,
+    ) -> Result<Self, String> {
+        Ok(Self::new_with_ignore_dev_dependency(
+            YankedVersionPolicy::from_flag_value(allow_yanked_versions)?,
+            ignore_dev_dependency,
+        ))
     }
 
     pub fn yanked_versions_policy(&self) -> &YankedVersionPolicy {
         &self.yanked_versions_policy
     }
 
+    pub fn ignore_dev_dependency(&self) -> bool {
+        self.ignore_dev_dependency
+    }
+
     pub fn stable_serialize(&self) -> String {
-        serialize_yanked_policy(&self.yanked_versions_policy)
+        format!(
+            "{};ignore_dev_dependency={}",
+            serialize_yanked_policy(&self.yanked_versions_policy),
+            self.ignore_dev_dependency
+        )
     }
 }
 

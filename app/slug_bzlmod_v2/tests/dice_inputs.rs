@@ -952,6 +952,8 @@ fn policy_keys_serialize_yanked_allowlists_stably() {
     let command_policy =
         BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(Some("zzz@2.0.0,yyy@1.0.0"))
             .unwrap();
+    let ignored_dev_policy =
+        BzlmodCommandPolicyKey::from_flags(Some("zzz@2.0.0,yyy@1.0.0"), true).unwrap();
 
     assert_eq!(
         env_policy.stable_serialize(),
@@ -959,8 +961,14 @@ fn policy_keys_serialize_yanked_allowlists_stably() {
     );
     assert_eq!(
         command_policy.stable_serialize(),
-        env_policy.stable_serialize()
+        "allow_yanked=[yyy@1.0.0,zzz@2.0.0];ignore_dev_dependency=false"
     );
+    assert_eq!(
+        ignored_dev_policy.stable_serialize(),
+        "allow_yanked=[yyy@1.0.0,zzz@2.0.0];ignore_dev_dependency=true"
+    );
+    assert!(!command_policy.ignore_dev_dependency());
+    assert!(ignored_dev_policy.ignore_dev_dependency());
     assert_eq!(
         env_policy.yanked_versions_policy(),
         &YankedVersionPolicy::AllowList(std::collections::BTreeSet::from([
@@ -984,7 +992,7 @@ fn effective_yanked_policy_unions_command_and_environment() {
     assert!(
         inputs
             .stable_serialize()
-            .contains("command=allow_yanked=[zzz@2.0.0]")
+            .contains("command=allow_yanked=[zzz@2.0.0];ignore_dev_dependency=false")
     );
     assert!(
         inputs
@@ -1030,15 +1038,71 @@ fn resolved_graph_key_changes_when_command_policy_changes() {
     assert!(
         reject
             .stable_serialize()
-            .contains("command=allow_yanked=reject")
+            .contains("command=allow_yanked=reject;ignore_dev_dependency=false")
     );
     assert!(
         allow
             .stable_serialize()
-            .contains("command=allow_yanked=[yyy@1.0.0]")
+            .contains("command=allow_yanked=[yyy@1.0.0];ignore_dev_dependency=false")
     );
 }
 
+#[test]
+fn resolved_graph_key_changes_when_ignore_dev_dependency_flag_changes() {
+    let root = ModuleKey::new("root", "0.1.0");
+    let include = ResolvedBzlmodGraphDiceKey::new(
+        root.clone(),
+        BzlmodDiceInputs::new(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+    let ignore = ResolvedBzlmodGraphDiceKey::new(
+        root,
+        BzlmodDiceInputs::new(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_flags(None, true).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+
+    assert_ne!(include, ignore);
+    assert!(!include.inputs().command_policy().ignore_dev_dependency());
+    assert!(ignore.inputs().command_policy().ignore_dev_dependency());
+    assert!(
+        include
+            .stable_serialize()
+            .contains("command=allow_yanked=reject;ignore_dev_dependency=false")
+    );
+    assert!(
+        ignore
+            .stable_serialize()
+            .contains("command=allow_yanked=reject;ignore_dev_dependency=true")
+    );
+}
 #[test]
 fn resolved_graph_key_changes_when_visible_lockfile_digest_changes() {
     let root = ModuleKey::new("root", "0.1.0");
