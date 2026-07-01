@@ -816,3 +816,24 @@ Stage 5 lockfile refresh local-registry mutation checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider
   tests/v2_oracle/test_v2_oracle.py`; `rg -n "process-global|fallback
   scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+Stage 5 registry module-file DICE input checkpoint:
+
+- Added `BzlmodRegistryModuleFileDigest` and `digest_registry_module_files` to
+  model selected registry `MODULE.bazel` file content as explicit semantic
+  input keyed by `(registry URL, module key)`. The aggregate digest is
+  order-stable, content-sensitive, and rejects duplicate or malformed
+  identities.
+- Added the registry-module digest to `BzlmodDiceInputs` and stable resolved
+  graph key serialization as `registry_modules=...`, so registry module-file
+  edits like the `lockfile-refresh-registry-mutation` oracle have a named V2
+  invalidation edge for later DICE wiring.
+- DICE guidance was reread before touching `dice.rs`. No file reads, registry
+  fetches, process globals, hidden fallback scanners, lockfile writes, or
+  resolver cache were introduced.
+- No V1 bzlmod implementation was imported for this checkpoint. The owning
+  Bazel behavior is the Bazel 9.1.1 `lockfile-refresh-registry-mutation` oracle.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-refresh-registry-mutation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
