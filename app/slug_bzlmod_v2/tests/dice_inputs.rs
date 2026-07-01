@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::collections::BTreeMap;
+
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodDiceInputs;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
@@ -19,6 +21,7 @@ use slug_bzlmod_v2::BzlmodModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
 use slug_bzlmod_v2::BzlmodRegistrySourceSpecDigest;
+use slug_bzlmod_v2::BzlmodRepoMappingDigest;
 use slug_bzlmod_v2::BzlmodVisibleLockfileDigest;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
@@ -32,6 +35,8 @@ use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_registry_module_files;
 use slug_bzlmod_v2::digest_registry_policy;
 use slug_bzlmod_v2::digest_registry_source_specs;
+use slug_bzlmod_v2::digest_repo_mapping_entries;
+use slug_bzlmod_v2::digest_repo_mappings;
 
 fn registry_policy_digest() -> String {
     digest_registry_policy([BzlmodRegistryPolicyEntry::new(
@@ -89,6 +94,13 @@ fn generated_repo_spec_digest(content: impl AsRef<[u8]>) -> String {
     .unwrap()
 }
 
+fn repo_mapping_digest(entries: &[(&str, &str)]) -> String {
+    let entries = entries
+        .iter()
+        .map(|(apparent, canonical)| ((*apparent).to_owned(), (*canonical).to_owned()))
+        .collect::<BTreeMap<_, _>>();
+    digest_repo_mappings([digest_repo_mapping_entries("aaa+", &entries).unwrap()]).unwrap()
+}
 fn visible_lockfile_digest(content: impl AsRef<[u8]>) -> String {
     BzlmodVisibleLockfileDigest::from_content(content)
         .stable_serialize()
@@ -548,6 +560,57 @@ fn extension_usage_digest_rejects_duplicate_or_unstable_ids() {
 }
 
 #[test]
+fn repo_mapping_digest_is_order_stable_and_content_sensitive() {
+    let alpha = BTreeMap::from([
+        ("".to_owned(), "".to_owned()),
+        ("aaa".to_owned(), "aaa+".to_owned()),
+        ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
+    ]);
+    let beta = BTreeMap::from([
+        ("bbb".to_owned(), "bbb+".to_owned()),
+        ("ccc".to_owned(), "ccc+".to_owned()),
+    ]);
+
+    let alpha_digest = digest_repo_mapping_entries("aaa+", &alpha).unwrap();
+    let beta_digest = digest_repo_mapping_entries("bbb+", &beta).unwrap();
+    let forward = digest_repo_mappings([alpha_digest.clone(), beta_digest.clone()]).unwrap();
+    let reverse = digest_repo_mappings([beta_digest, alpha_digest]).unwrap();
+
+    let changed = BTreeMap::from([
+        ("".to_owned(), "".to_owned()),
+        ("aaa".to_owned(), "aaa+".to_owned()),
+        ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
+        ("extra".to_owned(), "extra+".to_owned()),
+    ]);
+    let changed =
+        digest_repo_mappings([digest_repo_mapping_entries("aaa+", &changed).unwrap()]).unwrap();
+
+    assert_eq!(forward, reverse);
+    assert_ne!(forward, changed);
+}
+
+#[test]
+fn repo_mapping_digest_rejects_duplicate_or_unstable_ids() {
+    let digest = digest_module_file_content(b"repo mapping");
+    let duplicate = digest_repo_mappings([
+        BzlmodRepoMappingDigest::new("aaa+", digest.clone()).unwrap(),
+        BzlmodRepoMappingDigest::new("aaa+", digest).unwrap(),
+    ])
+    .unwrap_err();
+    assert!(duplicate.contains("duplicate repo mapping digest id"));
+
+    let empty_repo =
+        BzlmodRepoMappingDigest::new("", digest_module_file_content(b"repo mapping")).unwrap_err();
+    assert!(empty_repo.contains("canonical repository must not be empty"));
+
+    let bad_digest = BzlmodRepoMappingDigest::new("aaa+", "bad/digest").unwrap_err();
+    assert!(bad_digest.contains("invalid repo_mapping_digest"));
+
+    let bad_entry = BTreeMap::from([("bad\0entry".to_owned(), "aaa+".to_owned())]);
+    let bad_entry = digest_repo_mapping_entries("aaa+", &bad_entry).unwrap_err();
+    assert!(bad_entry.contains("must not contain NUL bytes"));
+}
+#[test]
 fn generated_repo_spec_digest_is_order_stable_and_content_sensitive() {
     let alpha = BzlmodGeneratedRepoSpecDigest::new(
         "//:alpha.bzl%ext",
@@ -742,6 +805,57 @@ fn resolved_graph_key_changes_when_extension_usage_changes() {
     assert!(before.stable_serialize().contains("extensions="));
 }
 
+#[test]
+fn resolved_graph_key_changes_when_repo_mappings_change() {
+    let root = ModuleKey::new("root", "0.1.0");
+    let before = ResolvedBzlmodGraphDiceKey::new(
+        root.clone(),
+        BzlmodDiceInputs::new_with_repo_mappings(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            repo_mapping_digest(&[("aaa", "aaa+"), ("bazel_tools", "bazel_tools")]),
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+    let after = ResolvedBzlmodGraphDiceKey::new(
+        root,
+        BzlmodDiceInputs::new_with_repo_mappings(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            repo_mapping_digest(&[
+                ("aaa", "aaa+"),
+                ("bazel_tools", "bazel_tools"),
+                ("generated", "+ext+generated"),
+            ]),
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+
+    assert_ne!(before, after);
+    assert!(before.stable_serialize().contains("repo_mappings="));
+}
 #[test]
 fn resolved_graph_key_changes_when_generated_repo_specs_change() {
     let root = ModuleKey::new("root", "0.1.0");
