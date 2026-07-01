@@ -13,7 +13,9 @@ use std::fs;
 use serde_json::Value;
 use slug_bzlmod_v2::BAZEL_9_LOCK_FILE_VERSION;
 use slug_bzlmod_v2::BazelLockfileRecordedInput;
+use slug_bzlmod_v2::BzlmodHiddenLockfileDigest;
 use slug_bzlmod_v2::BzlmodVisibleLockfileDigest;
+use slug_bzlmod_v2::HiddenLockfileInput;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleExtensionReplayInputs;
 use slug_bzlmod_v2::ModuleKey;
@@ -823,6 +825,34 @@ fn visible_lockfile_input_rejects_invalid_utf8() {
     let err = VisibleLockfileInput::from_optional_bytes(Some(&[0xff])).unwrap_err();
 
     assert!(err.contains("MODULE.bazel.lock"));
+    assert!(err.contains("UTF-8"));
+}
+
+#[test]
+fn hidden_lockfile_input_bridges_dice_bytes_to_replay_parser() {
+    let absent = HiddenLockfileInput::from_optional_bytes(None).unwrap();
+    assert_eq!(absent.digest(), &BzlmodHiddenLockfileDigest::absent());
+    assert_eq!(absent.existing_content(), None);
+
+    let existing = br#"{"lockFileVersion":26,"moduleExtensions":{}}"#;
+    let present = HiddenLockfileInput::from_optional_bytes(Some(existing)).unwrap();
+    assert_eq!(
+        present.digest(),
+        &BzlmodHiddenLockfileDigest::from_content(existing)
+    );
+    assert_eq!(
+        parse_bazel_lockfile(present.existing_content().unwrap())
+            .unwrap()
+            .lock_file_version,
+        BAZEL_9_LOCK_FILE_VERSION
+    );
+}
+
+#[test]
+fn hidden_lockfile_input_rejects_invalid_utf8() {
+    let err = HiddenLockfileInput::from_optional_bytes(Some(&[0xff])).unwrap_err();
+
+    assert!(err.contains("hidden MODULE.bazel.lock"));
     assert!(err.contains("UTF-8"));
 }
 
