@@ -15,9 +15,12 @@ use std::fmt;
 use serde_json::Value;
 
 use crate::BazelDep;
+use crate::BzlmodRepoMappingDigest;
 use crate::Directive;
 use crate::ModuleFile;
 use crate::ModuleHeader;
+use crate::digest_repo_mapping_entries;
+use crate::digest_repo_mappings;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModuleKey {
@@ -91,6 +94,22 @@ impl ResolvedGraph {
         Some(bazel_module_repo_mapping(module))
     }
 
+    pub fn module_repo_mapping_digests(&self) -> Result<Vec<BzlmodRepoMappingDigest>, String> {
+        let mut digests = Vec::new();
+        for module in self.modules.values() {
+            digests.push(digest_repo_mapping_entries(
+                module.canonical_repo.clone(),
+                &bazel_module_repo_mapping(module),
+            )?);
+        }
+        digests.sort();
+        Ok(digests)
+    }
+
+    pub fn module_repo_mapping_digest(&self) -> Result<String, String> {
+        digest_repo_mappings(self.module_repo_mapping_digests()?)
+    }
+
     pub fn extension_generated_repo_mapping(
         &self,
         generated_repo_canonical: impl Into<String>,
@@ -110,6 +129,19 @@ impl ResolvedGraph {
         mapping.extend(module_dependency_mapping(root));
         mapping.insert("bazel_tools".to_owned(), "bazel_tools".to_owned());
         Ok(mapping)
+    }
+
+    pub fn extension_generated_repo_mapping_digest(
+        &self,
+        generated_repo_canonical: impl Into<String>,
+        generated_repo_apparent: impl Into<String>,
+    ) -> Result<BzlmodRepoMappingDigest, String> {
+        let generated_repo_canonical = generated_repo_canonical.into();
+        let mapping = self.extension_generated_repo_mapping(
+            generated_repo_canonical.clone(),
+            generated_repo_apparent,
+        )?;
+        digest_repo_mapping_entries(generated_repo_canonical, &mapping)
     }
 
     fn module_by_canonical_repo(&self, canonical_repo: &str) -> Option<&ResolvedModule> {

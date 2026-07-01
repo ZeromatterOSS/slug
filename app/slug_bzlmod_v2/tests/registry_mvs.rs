@@ -9,6 +9,8 @@ use slug_bzlmod_v2::RegistryCatalog;
 use slug_bzlmod_v2::RegistryModule;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::digest_module_file_content;
+use slug_bzlmod_v2::digest_repo_mapping_entries;
+use slug_bzlmod_v2::digest_repo_mappings;
 use slug_bzlmod_v2::digest_selected_registry_modules;
 use slug_bzlmod_v2::observed_registry_file_hashes;
 use slug_bzlmod_v2::observed_registry_policy_file_hashes;
@@ -324,6 +326,35 @@ bazel_dep(name = "bbb", version = "2.0.0")
     assert_eq!(
         v2_mappings[4].get("generated").map(String::as_str),
         Some("+ext+generated")
+    );
+
+    let root_mapping = BTreeMap::from([
+        (String::new(), String::new()),
+        ("repo_mapping_root".to_owned(), String::new()),
+        ("aaa".to_owned(), "aaa+".to_owned()),
+        ("ccc".to_owned(), "ccc+".to_owned()),
+        ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
+    ]);
+    let mut expected_module_digests = vec![
+        digest_repo_mapping_entries("_main", &root_mapping).unwrap(),
+        digest_repo_mapping_entries("aaa+", &v2_mappings[0]).unwrap(),
+        digest_repo_mapping_entries("ccc+", &v2_mappings[1]).unwrap(),
+        digest_repo_mapping_entries("bbb+1.0.0", &v2_mappings[2]).unwrap(),
+        digest_repo_mapping_entries("bbb+2.0.0", &v2_mappings[3]).unwrap(),
+    ];
+    expected_module_digests.sort();
+
+    let module_digests = graph.module_repo_mapping_digests().unwrap();
+    assert_eq!(module_digests, expected_module_digests);
+    assert_eq!(
+        graph.module_repo_mapping_digest().unwrap(),
+        digest_repo_mappings(expected_module_digests).unwrap()
+    );
+    assert_eq!(
+        graph
+            .extension_generated_repo_mapping_digest("+ext+generated", "generated")
+            .unwrap(),
+        digest_repo_mapping_entries("+ext+generated", &v2_mappings[4]).unwrap()
     );
 }
 
