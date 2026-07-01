@@ -12,6 +12,7 @@ use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_selected_registry_modules;
 use slug_bzlmod_v2::observed_registry_file_hashes;
 use slug_bzlmod_v2::observed_registry_policy_file_hashes;
+use slug_bzlmod_v2::parse_bazel_dump_repo_mapping_json_lines;
 use slug_bzlmod_v2::registry_bazel_registry_json_url;
 use slug_bzlmod_v2::registry_module_file_url;
 use slug_bzlmod_v2::resolve_registry_mvs;
@@ -293,44 +294,39 @@ bazel_dep(name = "bbb", version = "2.0.0")
 
     let graph = resolve_registry_mvs(&root, &registry_modules).unwrap();
 
-    assert_eq!(
+    let v2_mappings = vec![
         graph.bazel_repo_mapping_for("aaa+").unwrap(),
-        BTreeMap::from([
-            ("aaa".to_owned(), "aaa+".to_owned()),
-            ("bbb".to_owned(), "bbb+1.0.0".to_owned()),
-            ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
-        ])
-    );
-    assert_eq!(
         graph.bazel_repo_mapping_for("ccc+").unwrap(),
-        BTreeMap::from([
-            ("ccc".to_owned(), "ccc+".to_owned()),
-            ("bbb".to_owned(), "bbb+2.0.0".to_owned()),
-            ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
-        ])
-    );
-    assert_eq!(
         graph.bazel_repo_mapping_for("bbb+1.0.0").unwrap(),
-        BTreeMap::from([
-            ("bbb".to_owned(), "bbb+1.0.0".to_owned()),
-            ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
-        ])
-    );
-
-    assert_eq!(
+        graph.bazel_repo_mapping_for("bbb+2.0.0").unwrap(),
         graph
             .extension_generated_repo_mapping("+ext+generated", "generated")
             .unwrap(),
-        BTreeMap::from([
-            ("".to_owned(), "".to_owned()),
-            ("repo_mapping_root".to_owned(), "".to_owned()),
-            ("generated".to_owned(), "+ext+generated".to_owned()),
-            ("aaa".to_owned(), "aaa+".to_owned()),
-            ("ccc".to_owned(), "ccc+".to_owned()),
-            ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
-        ])
+    ];
+    let bazel_mappings = parse_bazel_dump_repo_mapping_json_lines(
+        r#"{"aaa":"aaa+","bbb":"bbb+1.0.0","bazel_tools":"bazel_tools"}
+{"ccc":"ccc+","bbb":"bbb+2.0.0","bazel_tools":"bazel_tools"}
+{"bbb":"bbb+1.0.0","bazel_tools":"bazel_tools"}
+{"bbb":"bbb+2.0.0","bazel_tools":"bazel_tools"}
+{"generated":"+ext+generated","":"","repo_mapping_root":"","aaa":"aaa+","ccc":"ccc+","bazel_tools":"bazel_tools"}"#,
+    )
+    .unwrap();
+
+    assert_eq!(v2_mappings, bazel_mappings);
+    assert_eq!(
+        v2_mappings[0].get("bbb").map(String::as_str),
+        Some("bbb+1.0.0")
+    );
+    assert_eq!(
+        v2_mappings[1].get("bbb").map(String::as_str),
+        Some("bbb+2.0.0")
+    );
+    assert_eq!(
+        v2_mappings[4].get("generated").map(String::as_str),
+        Some("+ext+generated")
     );
 }
+
 #[test]
 fn multiple_version_override_rejects_unlisted_requested_version() {
     let root = module(

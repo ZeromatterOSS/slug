@@ -12,6 +12,8 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::fmt;
 
+use serde_json::Value;
+
 use crate::BazelDep;
 use crate::Directive;
 use crate::ModuleFile;
@@ -137,6 +139,43 @@ fn bazel_module_repo_mapping(module: &ResolvedModule) -> BTreeMap<String, String
     mapping
 }
 
+pub fn parse_bazel_dump_repo_mapping_json_lines(
+    output: &str,
+) -> Result<Vec<BTreeMap<String, String>>, String> {
+    let mut mappings = Vec::new();
+    for (line_number, line) in output.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let value: Value = serde_json::from_str(line).map_err(|err| {
+            format!(
+                "unable to parse dump_repo_mapping JSON line {}: {}",
+                line_number + 1,
+                err
+            )
+        })?;
+        let object = value.as_object().ok_or_else(|| {
+            format!(
+                "dump_repo_mapping JSON line {} must be an object",
+                line_number + 1
+            )
+        })?;
+        let mut mapping = BTreeMap::new();
+        for (key, value) in object {
+            let Some(value) = value.as_str() else {
+                return Err(format!(
+                    "dump_repo_mapping JSON line {} entry {} must be a string",
+                    line_number + 1,
+                    key
+                ));
+            };
+            mapping.insert(key.clone(), value.to_owned());
+        }
+        mappings.push(mapping);
+    }
+    Ok(mappings)
+}
 pub fn bazel_canonical_module_repo_name(module_name: &str) -> String {
     if module_name == "_main" {
         "_main".to_owned()

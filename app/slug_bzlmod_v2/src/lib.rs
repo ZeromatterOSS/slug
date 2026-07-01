@@ -99,4 +99,5 @@ pub use resolution::ResolvedDependency;
 pub use resolution::ResolvedGraph;
 pub use resolution::ResolvedModule;
 pub use resolution::bazel_canonical_module_repo_name;
+pub use resolution::parse_bazel_dump_repo_mapping_json_lines;
 pub use resolution::resolve_local_module_graph;
