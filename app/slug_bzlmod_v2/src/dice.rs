@@ -71,6 +71,35 @@ pub fn digest_module_file_content(content: impl AsRef<[u8]>) -> String {
     hex::encode(hasher.finalize())
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BzlmodVisibleLockfileDigest {
+    digest: String,
+}
+
+impl BzlmodVisibleLockfileDigest {
+    pub fn absent() -> Self {
+        Self {
+            digest: "absent".to_owned(),
+        }
+    }
+
+    pub fn from_content(content: impl AsRef<[u8]>) -> Self {
+        Self {
+            digest: format!("present_{}", digest_module_file_content(content)),
+        }
+    }
+
+    pub fn stable_serialize(&self) -> &str {
+        &self.digest
+    }
+}
+
+impl fmt::Display for BzlmodVisibleLockfileDigest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.stable_serialize())
+    }
+}
+
 pub fn digest_included_module_files(
     files: impl IntoIterator<Item = BzlmodModuleFileDigest>,
 ) -> Result<String, String> {

@@ -17,6 +17,7 @@ use slug_bzlmod_v2::BzlmodModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
 use slug_bzlmod_v2::BzlmodRegistrySourceSpecDigest;
+use slug_bzlmod_v2::BzlmodVisibleLockfileDigest;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ResolvedBzlmodGraphDiceKey;
@@ -75,6 +76,12 @@ fn extension_usage_digest(content: impl AsRef<[u8]>) -> String {
     .unwrap()
 }
 
+fn visible_lockfile_digest(content: impl AsRef<[u8]>) -> String {
+    BzlmodVisibleLockfileDigest::from_content(content)
+        .stable_serialize()
+        .to_owned()
+}
+
 fn inputs(
     flag_value: Option<&str>,
     env_value: Option<&str>,
@@ -93,12 +100,26 @@ fn inputs(
         registry_source_digest(br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#),
         extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-        "lockfileabc",
+        visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
         lockfile_mode,
         BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(flag_value).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(env_value).unwrap(),
     )
     .unwrap()
+}
+
+#[test]
+fn visible_lockfile_digest_distinguishes_absent_empty_and_content() {
+    let absent = BzlmodVisibleLockfileDigest::absent();
+    let empty = BzlmodVisibleLockfileDigest::from_content(b"");
+    let one = BzlmodVisibleLockfileDigest::from_content(b"{\"lockFileVersion\":26}\n");
+    let two = BzlmodVisibleLockfileDigest::from_content(b"{\"lockFileVersion\":27}\n");
+
+    assert_eq!(absent.stable_serialize(), "absent");
+    assert!(empty.stable_serialize().starts_with("present_"));
+    assert_ne!(absent, empty);
+    assert_ne!(empty, one);
+    assert_ne!(one, two);
 }
 
 #[test]
@@ -370,7 +391,7 @@ fn resolved_graph_key_changes_when_registry_module_digest_changes() {
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-            "lockfileabc",
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
             LockfileMode::Refresh,
             BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -391,7 +412,7 @@ fn resolved_graph_key_changes_when_registry_module_digest_changes() {
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-            "lockfileabc",
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
             LockfileMode::Refresh,
             BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -418,7 +439,7 @@ fn resolved_graph_key_changes_when_registry_source_digest_changes() {
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-            "lockfileabc",
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
             LockfileMode::Refresh,
             BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -437,7 +458,7 @@ fn resolved_graph_key_changes_when_registry_source_digest_changes() {
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-            "lockfileabc",
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
             LockfileMode::Refresh,
             BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -554,7 +575,7 @@ fn resolved_graph_key_changes_when_extension_definition_changes() {
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-            "lockfileabc",
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
             LockfileMode::Update,
             BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -573,7 +594,7 @@ fn resolved_graph_key_changes_when_extension_definition_changes() {
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_two'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-            "lockfileabc",
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
             LockfileMode::Update,
             BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -600,7 +621,7 @@ fn resolved_graph_key_changes_when_extension_usage_changes() {
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-            "lockfileabc",
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
             LockfileMode::Update,
             BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -619,7 +640,7 @@ fn resolved_graph_key_changes_when_extension_usage_changes() {
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='two')"),
-            "lockfileabc",
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
             LockfileMode::Update,
             BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -767,6 +788,36 @@ fn resolved_graph_key_changes_when_command_policy_changes() {
 }
 
 #[test]
+fn resolved_graph_key_changes_when_visible_lockfile_digest_changes() {
+    let root = ModuleKey::new("root", "0.1.0");
+    let old_inputs = BzlmodDiceInputs::new(
+        digest_module_file_content(b"module(name='root')"),
+        digest_included_module_files([BzlmodModuleFileDigest::new(
+            "deps.MODULE.bazel",
+            digest_module_file_content(b"bazel_dep(name='dep', version='1.0.0')"),
+        )
+        .unwrap()])
+        .unwrap(),
+        registry_policy_digest(),
+        registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+        registry_source_digest(br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#),
+        extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+        extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+        visible_lockfile_digest(b"{\"lockFileVersion\":25}\n"),
+        LockfileMode::Update,
+        BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+    )
+    .unwrap();
+    let old = ResolvedBzlmodGraphDiceKey::new(root.clone(), old_inputs);
+    let new = ResolvedBzlmodGraphDiceKey::new(root, inputs(None, None, LockfileMode::Update));
+
+    assert_ne!(old, new);
+    assert!(old.stable_serialize().contains("lockfile=present_"));
+    assert!(new.stable_serialize().contains("lockfile=present_"));
+}
+
+#[test]
 fn resolved_graph_key_changes_when_lockfile_mode_changes() {
     let root = ModuleKey::new("root", "0.1.0");
     let update =
@@ -791,7 +842,7 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
         registry_source_digest(br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#),
         extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-        "lockfileabc",
+        visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
         LockfileMode::Update,
         command.clone(),
         env.clone(),
@@ -807,7 +858,7 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
         registry_source_digest(br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#),
         extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
-        "lockfileabc",
+        visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
         LockfileMode::Update,
         command,
         env,

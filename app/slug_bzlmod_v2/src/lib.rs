@@ -23,6 +23,7 @@ pub use dice::BzlmodModuleFileDigest;
 pub use dice::BzlmodRegistryModuleFileDigest;
 pub use dice::BzlmodRegistryPolicyEntry;
 pub use dice::BzlmodRegistrySourceSpecDigest;
+pub use dice::BzlmodVisibleLockfileDigest;
 pub use dice::LockfileMode;
 pub use dice::ResolvedBzlmodGraphDiceKey;
 pub use dice::digest_included_module_files;
