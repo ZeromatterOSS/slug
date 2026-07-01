@@ -129,3 +129,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving module repo m
 Implementation summary: Added `ResolvedGraph::bazel_repo_mapping_for` and `ResolvedGraph::extension_generated_repo_mapping` to derive Bazel-shaped mapping content from the V2 resolved graph; the older dependency-only `repo_mapping_for` remains available, and this slice adds no extension execution, repository materialization, V1 repo mapping code, process-global registry, or hidden state
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Generated repository mapping still needs real module-extension execution ownership, root mapping coverage is currently inferred from generated-repo mappings because `dump_repo_mapping` rejects root repo arguments, and same-daemon mapping invalidation remains later Stage 5.4/5.8 work
+
+### Stage 5 repo mapping oracle normalization substrate
+
+Status: Partially landed
+V2 commit: `60eb87b3 Stage 5 normalize repo mapping oracle output`
+V1 source inspected: None for implementation; derived from the Bazel 9 `repo-mapping-canonical-names` oracle output shape and the V2 resolver mapping substrate
+Bazel oracle: Bazel 9.1.1 `repo-mapping-canonical-names` fixture using `bazel mod dump_repo_mapping --output=json`
+V2 fixture: `repo-mapping-canonical-names`
+Expected evidence artifact: Stage 1 oracle expected JSON lines for dependency, multiple-version, and extension-generated repo mappings
+Implementation summary: Added `parse_bazel_dump_repo_mapping_json_lines` to normalize Bazel `dump_repo_mapping` JSON-line output into deterministic string maps, and updated the registry MVS repo-mapping test to compare V2-derived mappings against the normalized Bazel oracle shape; this remains a comparison substrate and does not execute module extensions, materialize repositories, or import V1 repo mapping code
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: Full byte-for-byte repo mapping comparison still needs integration into an executable V2 command/oracle path, generated repo mapping still needs real extension execution ownership, and same-daemon mapping invalidation remains later Stage 5.4/5.8 work
