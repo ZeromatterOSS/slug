@@ -1,0 +1,2 @@
+module(name = "lockfile_refresh_registry_mutation", version = "0.1.0")
+bazel_dep(name = "aaa", version = "1.0.0")

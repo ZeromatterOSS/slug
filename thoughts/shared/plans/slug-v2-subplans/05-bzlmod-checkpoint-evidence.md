@@ -794,3 +794,25 @@ Stage 5 lockfile mode update/refresh oracle checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider
   tests/v2_oracle/test_v2_oracle.py`; `rg -n "process-global|fallback
   scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 lockfile refresh local-registry mutation checkpoint:
+
+- Added `lockfile-refresh-registry-mutation`, a Bazel 9.1.1 oracle fixture
+  proving `--lockfile_mode=refresh` rereads mutable local registry module data
+  in the same fixture workspace. The fixture primes `MODULE.bazel.lock` with
+  `aaa@1.0.0 -> bbb@1.0.0`, mutates only
+  `registry/modules/aaa/1.0.0/MODULE.bazel` to request `bbb@2.0.0`, then
+  observes `mod graph --lockfile_mode=refresh` report `bbb@2.0.0`.
+- The generated oracle also captures the Bazel nuance that this local-registry
+  module-data edit does not change the visible `MODULE.bazel.lock` manifest
+  digest in this fixture. That keeps later V2 refresh work honest about graph
+  refresh versus visible-lockfile persistence.
+- No V1 bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 oracle fixture.
+- Validation passed: `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1
+  cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m
+  tools.v2_oracle run --fixture lockfile-refresh-registry-mutation --tool bazel
+  --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py`; `rg -n "process-global|fallback
+  scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.

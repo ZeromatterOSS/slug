@@ -1,0 +1,29 @@
+[fixture]
+name = "lockfile-refresh-registry-mutation"
+description = "Bazel 9 fixture proving --lockfile_mode=refresh rereads mutable local registry module data."
+comparison = "semantic"
+manifest_roots = ["MODULE.bazel.lock"]
+oracle_notes = "Self-contained local registry fixture. The first command primes the visible lockfile with aaa@1.0.0 depending on bbb@1.0.0. The second command mutates only the registry MODULE.bazel for aaa@1.0.0 so it depends on bbb@2.0.0, then runs --lockfile_mode=refresh and observes the refreshed graph. Bazel 9.1.1 leaves the visible lockfile manifest digest unchanged for this local-registry module-data edit."
+
+[[commands]]
+name = "prime_update_lockfile"
+argv = ["mod", "graph", "--lockfile_mode=update"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "bbb@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*bbb@2\\.0\\.0).*aaa@1\\.0\\.0.*bbb@1\\.0\\.0"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[[commands]]
+name = "refresh_after_registry_module_edit"
+argv = ["mod", "graph", "--lockfile_mode=refresh"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "bbb@2.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*bbb@1\\.0\\.0).*aaa@1\\.0\\.0.*bbb@2\\.0\\.0"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  path = "registry/modules/aaa/1.0.0/MODULE.bazel"
+  find = "bazel_dep(name = \"bbb\", version = \"1.0.0\")"
+  replace = "bazel_dep(name = \"bbb\", version = \"2.0.0\")"
