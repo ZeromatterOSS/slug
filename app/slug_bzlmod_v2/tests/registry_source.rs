@@ -7,6 +7,8 @@ use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_selected_registry_sources;
 use slug_bzlmod_v2::parse_registry_metadata_json;
 use slug_bzlmod_v2::parse_registry_source_json;
+use slug_bzlmod_v2::registry_source_json_url;
+use slug_bzlmod_v2::selected_registry_file_hash_urls;
 
 fn key() -> ModuleKey {
     ModuleKey::new("srcmod", "1.0.0")
@@ -180,4 +182,40 @@ fn selected_registry_source_digest_requires_explicit_digests() {
 
     let err = digest_selected_registry_sources(&BTreeMap::from([(key(), source)])).unwrap_err();
     assert!(err.contains("selected registry source srcmod@1.0.0 has no source.json digest"));
+}
+#[test]
+fn registry_source_hash_urls_match_bazel_lockfile_shape() {
+    assert_eq!(
+        registry_source_json_url(
+            "https://bcr.bazel.build/",
+            &ModuleKey::new("rules_cc", "0.2.17")
+        ),
+        "https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json"
+    );
+}
+
+#[test]
+fn selected_registry_file_hash_urls_include_modules_and_sources() {
+    let module_file =
+        slug_bzlmod_v2::ModuleFile::parse(r#"module(name = "srcmod", version = "1.0.0")"#).unwrap();
+    let modules = BTreeMap::from([(
+        key(),
+        slug_bzlmod_v2::RegistryModule::new("https://bcr.bazel.build/", module_file),
+    )]);
+    let source = RegistrySource::new(
+        "https://bcr.bazel.build/",
+        parse_registry_source_json(
+            &key(),
+            r#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+        )
+        .unwrap(),
+    );
+
+    assert_eq!(
+        selected_registry_file_hash_urls(&modules, &BTreeMap::from([(key(), source)])),
+        [
+            "https://bcr.bazel.build/modules/srcmod/1.0.0/MODULE.bazel".to_owned(),
+            "https://bcr.bazel.build/modules/srcmod/1.0.0/source.json".to_owned(),
+        ]
+    );
 }

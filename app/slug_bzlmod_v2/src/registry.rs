@@ -388,6 +388,41 @@ pub fn digest_selected_registry_sources(
     digest_registry_source_specs(digests)
 }
 
+pub fn registry_module_file_url(registry_url: &str, module: &ModuleKey) -> String {
+    registry_file_url(
+        registry_url,
+        &format!("modules/{}/{}/MODULE.bazel", module.name, module.version),
+    )
+}
+
+pub fn registry_source_json_url(registry_url: &str, module: &ModuleKey) -> String {
+    registry_file_url(
+        registry_url,
+        &format!("modules/{}/{}/source.json", module.name, module.version),
+    )
+}
+
+pub fn registry_bazel_registry_json_url(registry_url: &str) -> String {
+    registry_file_url(registry_url, "bazel_registry.json")
+}
+
+pub fn selected_registry_file_hash_urls(
+    modules: &BTreeMap<ModuleKey, RegistryModule>,
+    sources: &BTreeMap<ModuleKey, RegistrySource>,
+) -> Vec<String> {
+    let mut urls = BTreeSet::new();
+    for (module_key, module) in modules {
+        urls.insert(registry_module_file_url(&module.registry_url, module_key));
+    }
+    for (module_key, source) in sources {
+        urls.insert(registry_source_json_url(&source.registry_url, module_key));
+    }
+    urls.into_iter().collect()
+}
+
+fn registry_file_url(registry_url: &str, relative_path: &str) -> String {
+    format!("{}/{}", registry_url.trim_end_matches('/'), relative_path)
+}
 pub fn parse_registry_source_json(
     module: &ModuleKey,
     content: &str,

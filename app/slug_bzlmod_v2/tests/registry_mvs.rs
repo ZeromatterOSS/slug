@@ -9,6 +9,8 @@ use slug_bzlmod_v2::RegistryModule;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_selected_registry_modules;
+use slug_bzlmod_v2::registry_bazel_registry_json_url;
+use slug_bzlmod_v2::registry_module_file_url;
 use slug_bzlmod_v2::resolve_registry_mvs;
 use slug_bzlmod_v2::select_ordered_registry_modules;
 use slug_bzlmod_v2::validate_yanked_versions;
@@ -468,4 +470,17 @@ fn yanked_policy_rejects_invalid_environment_entries() {
     let err = YankedVersionPolicy::from_env_value(Some("yyy")).unwrap_err();
 
     assert!(err.contains("BZLMOD_ALLOW_YANKED_VERSIONS entry yyy must be 'all' or module@version"));
+}
+#[test]
+fn registry_module_hash_urls_match_bazel_lockfile_shape() {
+    let module = ModuleKey::new("rules_cc", "0.2.17");
+
+    assert_eq!(
+        registry_module_file_url("https://bcr.bazel.build/", &module),
+        "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel"
+    );
+    assert_eq!(
+        registry_bazel_registry_json_url("https://bcr.bazel.build/"),
+        "https://bcr.bazel.build/bazel_registry.json"
+    );
 }
