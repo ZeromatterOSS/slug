@@ -237,3 +237,15 @@ Expected evidence artifact: Stage 1 oracle expected output shows the prime comma
 Implementation summary: Added the missing exact-criteria oracle fixture for module-extension lockfile replay; this is an oracle-only checkpoint and does not add V2 extension execution, lockfile replay integration, or generated repository materialization
 Validation: `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-replay --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120 --update-expected`; same command without `--update-expected`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; `py -3 -B -m tools.v2_oracle list`; diff checks before commit
 Residual risk: The oracle now pins Bazel replay behavior, but V2 still needs actual module-extension execution, visible/hidden lockfile replay selection, repository-rule attr and repo-mapping replay validation, hidden persistence, and same-daemon stale rejection wiring
+
+### Stage 5 lockfile error-mode stale oracle
+
+Status: Partially landed
+V2 commit: `231add4a Stage 5 add lockfile error-mode stale oracle`
+Bazel source inspected: Existing Stage 5 lockfile source citations still apply: `C:\dev\bazel\src\main\java\com\google\devtools\build\lib\bazel\bzlmod\BazelLockFileFunction.java` reads visible lockfile data according to lockfile mode, and registry hash enforcement remains grounded by Bazel 9.1.1 oracle behavior
+Bazel oracle: Bazel 9.1.1 `lockfile-error-mode-stale` fixture
+V2 fixture: `lockfile-error-mode-stale`
+Expected evidence artifact: Stage 1 oracle expected output proves `--lockfile_mode=error` rejects a visible `MODULE.bazel.lock` with a stale BCR registry file checksum instead of refreshing it
+Implementation summary: Added the missing exact-criteria fixture name for error-mode stale lockfiles, using the Bazel-observed registry checksum rejection; a local-registry module edit was probed first and Bazel 9 did not reject it in error mode, so that non-error behavior was not committed as a stale fixture
+Validation: `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-error-mode-stale --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120 --update-expected`; same command without `--update-expected`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; `py -3 -B -m tools.v2_oracle list`; diff checks before commit
+Residual risk: The exact stale fixture is now present, but V2 still needs actual error-mode integration across visible/hidden lockfile reads, registry fetch policy, extension replay data, repository-rule attr/repo-mapping replay, and same-daemon invalidation
