@@ -297,3 +297,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving generated rep
 Implementation summary: Added `BzlmodGeneratedRepoSpecDigest`, `digest_generated_repo_specs`, and an explicit generated-repo-spec digest field in `BzlmodDiceInputs`; existing constructors default this input to the deterministic empty digest, while `new_with_generated_repo_specs` and `new_with_hidden_lockfile_and_generated_repo_specs` let later extension/repository-rule execution wire real generated repo spec identity without process-global state
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-replay --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; same command for `module-extension-lockfile-error-usage`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Generated repo spec identity is now keyable, but V2 still needs actual extension execution to produce those digests, repository-rule attr and repo-mapping digest production, hidden lockfile persistence, materialization, registry refresh policy, and same-daemon invalidation
+
+### Stage 5 repo mapping DICE identity
+
+Status: Partially landed
+V2 commit: `a81881eb Stage 5 key repo mappings`
+Bazel source inspected: Existing Stage 5 repo-mapping citations still apply; `docs/developers/dice.md` was reread before editing DICE-owned key state so repo-mapping identity stays explicit in the key instead of process-global state
+Bazel oracle: Bazel 9.1.1 `repo-mapping-canonical-names` fixture using `bazel mod dump_repo_mapping --output=json`
+V2 fixture: `repo-mapping-canonical-names`
+Expected evidence artifact: Stage 1 oracle expected output proving root, dependency, generated repository, and multiple-version repository mappings after normalization
+Implementation summary: Added `BzlmodRepoMappingDigest`, deterministic repo-mapping digest helpers, and an explicit `repo_mapping_digest` field in `BzlmodDiceInputs`; existing constructors default to the deterministic empty mapping digest while `new_with_repo_mappings` and the combined hidden/generated/repo constructor let later resolver and extension execution wire real mapping identity without process-global state
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: Repo mapping identity is now keyable, but V2 still needs actual DICE producers from resolver and extension execution, stale lockfile repo-mapping rejection, materialization, and same-daemon mapping invalidation.
