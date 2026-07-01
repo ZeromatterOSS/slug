@@ -381,3 +381,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving root `bazel_d
 Implementation summary: Added `DevDependencyMode` and mode-aware local/registry graph entrypoints; default graph resolution includes root dev dependencies while `IgnoreRoot` drops them, and both local and registry substrates ignore non-root dev dependencies before module discovery and repo-mapping construction
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-root-dev-dependency-visibility --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; same command for `module-nonroot-dev-dependency-visibility`; `py -3 -B -m tools.v2_oracle list`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Dev-dependency visibility now matches the observed graph-selection cases, but V2 still needs command-line flag plumbing from the CLI into bzlmod graph keys, exact diagnostics for override-on-nonexistent-module cases, actual DICE file reads/watch edges, and same-daemon invalidation for dev-dependency edits.
+
+### Stage 5 root override target validation
+
+Status: Partially landed
+V2 commit: `c8cc47d3 Stage 5 validate root override targets`
+Bazel source inspected: Existing Stage 5 override directive citations still apply; this checkpoint is anchored by observed Bazel 9.1.1 behavior for missing root override targets
+Bazel oracle: Bazel 9.1.1 `module-override-validation` fixture
+V2 fixture: `module-override-validation`
+Expected evidence artifact: Stage 1 oracle expected output proving Bazel reports missing `local_path_override`, `single_version_override`, `multiple_version_override`, `archive_override`, and `git_override` targets in directive order before any fetch/materialization
+Implementation summary: Added shared root-override target validation after local/registry module discovery so valid transitive overrides remain accepted while overrides for names absent from the discovered module graph produce the Bazel-shaped missing-module diagnostic; known target names include declared deps from discovered module files so ignored dev-dependency edges do not become false missing-override errors
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-override-validation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; `py -3 -B -m tools.v2_oracle list`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: V2 still needs exact root/non-root override placement diagnostics, registry archive/git override fetching and source verification, CLI flag plumbing for dev-dependency modes, DICE-owned module file reads, and same-daemon invalidation for override edits.
