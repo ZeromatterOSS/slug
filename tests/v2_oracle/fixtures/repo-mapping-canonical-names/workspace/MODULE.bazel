@@ -1,0 +1,7 @@
+module(name = "repo_mapping_root", version = "0.1.0")
+bazel_dep(name = "aaa", version = "1.0.0")
+bazel_dep(name = "ccc", version = "1.0.0")
+multiple_version_override(module_name = "bbb", versions = ["1.0.0", "2.0.0"])
+
+ext = use_extension("//:ext.bzl", "ext")
+use_repo(ext, "generated")

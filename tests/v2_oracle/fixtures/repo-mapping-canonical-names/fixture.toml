@@ -1,0 +1,12 @@
+[fixture]
+name = "repo-mapping-canonical-names"
+description = "Stage 5 Bazel 9 repo mapping fixture covering root, registry deps, extension-generated repos, and multiple-version canonical repos."
+comparison = "message_shape"
+oracle_notes = "Self-contained local registry plus local module extension. Bazel 9.1.1 dump_repo_mapping records root apparent mappings, dependency mappings, extension-generated canonical repo names, and bbb+<version> multiple-version canonical repos."
+
+[[commands]]
+name = "dump_repo_mappings"
+argv = ["mod", "dump_repo_mapping", "aaa+", "ccc+", "bbb+1.0.0", "bbb+2.0.0", "+ext+generated", "--output=json"]
+compare = "message_shape"
+expected_exit = 0
+stdout_contains = ["\"aaa\":\"aaa+\"", "\"ccc\":\"ccc+\"", "\"bbb\":\"bbb+1.0.0\"", "\"bbb\":\"bbb+2.0.0\"", "\"generated\":\"+ext+generated\"", "\"repo_mapping_root\":\"\""]
