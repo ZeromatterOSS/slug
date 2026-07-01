@@ -73,7 +73,7 @@ Residual risk: V2 can now decide visible lockfile content actions without touchi
 ### Stage 5 registry index observed hash substrate
 
 Status: Partially landed
-V2 commit: Pending checkpoint on `codex/slugv2-clean-root-remediation`
+V2 commit: `ed7ebb23 Stage 5 map registry index hashes`
 V1 source inspected: None for implementation; derived from existing V2 registry policy digest identity and Bazel 9 visible lockfile registry hash artifacts
 Bazel oracle: Bazel 9.1.1 `lockfile-mode-update-refresh` and `lockfile-error-mode-registry-hash` fixtures
 V2 fixture: `lockfile-mode-update-refresh`, `lockfile-error-mode-registry-hash`
@@ -81,3 +81,15 @@ Expected evidence artifact: Stage 1 oracle run artifacts showing `registryFileHa
 Implementation summary: Added `observed_registry_policy_file_hashes` to convert ordered registry policy content digests into observed `bazel_registry.json` URL-to-digest entries for visible lockfile validators; the helper reuses the existing registry URL canonicalization and conflict checks without adding network fetching, registry cache lookup, or lockfile writes
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-error-mode-registry-hash --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Observed registry index hashes can now feed validation, but producing the policy digest from actual fetched `bazel_registry.json`, local-registry refresh semantics, hidden lockfile persistence, and same-daemon stale rejection remain later Stage 5.2/5.6 work
+
+### Stage 5 fetched registry content snapshot substrate
+
+Status: Partially landed
+V2 commit: Pending checkpoint on `codex/slugv2-clean-root-remediation`
+V1 source inspected: None for implementation; derived from existing V2 registry parsing/digest substrates and Bazel 9 local-registry fixtures
+Bazel oracle: Bazel 9.1.1 `registry-source-json-policy`, `module-registry-mvs-basic`, and `lockfile-mode-update-refresh` fixtures
+V2 fixture: `registry-source-json-policy`, `module-registry-mvs-basic`, `lockfile-mode-update-refresh`
+Expected evidence artifact: Stage 1 oracle expected output proving registry MODULE/source parsing, local registry MVS, and visible lockfile registryFileHashes including `bazel_registry.json`
+Implementation summary: Added `RegistryContentSnapshot` and `snapshot_registry_contents` to turn already-fetched registry index, MODULE.bazel, and source.json contents into parsed catalogs plus observed lockfile hashes; it validates registry index JSON and MODULE path/header agreement without adding filesystem IO, network fetching, cache lookup, hidden lockfile state, or repository materialization
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture registry-source-json-policy --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture module-registry-mvs-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: Actual registry client IO, watched input production, refresh re-fetch policy, hidden lockfile persistence, and same-daemon invalidation remain later Stage 5.2/5.6 work

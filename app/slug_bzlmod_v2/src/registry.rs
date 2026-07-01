@@ -353,6 +353,110 @@ impl RegistrySourceCatalog {
         })
     }
 }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistryContentSnapshot {
+    pub registry_policy_entry: BzlmodRegistryPolicyEntry,
+    pub module_catalog: RegistryCatalog,
+    pub source_catalog: RegistrySourceCatalog,
+}
+
+impl RegistryContentSnapshot {
+    pub fn observed_file_hashes(&self) -> Result<BTreeMap<String, String>, String> {
+        let mut hashes = observed_registry_policy_file_hashes([&self.registry_policy_entry])?;
+        let selected_modules =
+            select_ordered_registry_modules(std::slice::from_ref(&self.module_catalog));
+        let selected_sources =
+            select_ordered_registry_sources(std::slice::from_ref(&self.source_catalog));
+        for (url, digest) in observed_registry_file_hashes(&selected_modules, &selected_sources)? {
+            insert_observed_registry_hash(&mut hashes, url, &digest)?;
+        }
+        Ok(hashes)
+    }
+}
+
+pub fn snapshot_registry_contents(
+    registry_url: impl Into<String>,
+    bazel_registry_json: &str,
+    module_files: BTreeMap<ModuleKey, String>,
+    source_jsons: BTreeMap<ModuleKey, String>,
+) -> Result<RegistryContentSnapshot, String> {
+    let registry_url = registry_url.into();
+    validate_bazel_registry_json(&registry_url, bazel_registry_json)?;
+    let registry_policy_entry = BzlmodRegistryPolicyEntry::new(
+        registry_url.clone(),
+        crate::dice::digest_module_file_content(bazel_registry_json),
+    )?;
+
+    let mut parsed_modules = BTreeMap::new();
+    for (module_key, content) in module_files {
+        let module_file = ModuleFile::parse(&content).map_err(|err| {
+            format!("Unable to parse registry MODULE.bazel for module {module_key}: {err}")
+        })?;
+        validate_registry_module_header(&module_key, &module_file)?;
+        parsed_modules.insert(
+            module_key,
+            (
+                module_file,
+                crate::dice::digest_module_file_content(content),
+            ),
+        );
+    }
+
+    let mut parsed_sources = BTreeMap::new();
+    for (module_key, content) in source_jsons {
+        let source_spec = parse_registry_source_json(&module_key, &content)?;
+        parsed_sources.insert(
+            module_key,
+            (
+                source_spec,
+                crate::dice::digest_module_file_content(content),
+            ),
+        );
+    }
+
+    Ok(RegistryContentSnapshot {
+        registry_policy_entry,
+        module_catalog: RegistryCatalog::with_module_file_digests(
+            registry_url.clone(),
+            parsed_modules,
+        )?,
+        source_catalog: RegistrySourceCatalog::with_source_json_digests(
+            registry_url,
+            parsed_sources,
+        )?,
+    })
+}
+
+fn validate_bazel_registry_json(registry_url: &str, content: &str) -> Result<(), String> {
+    let value: Value = serde_json::from_str(content).map_err(|err| {
+        format!("Unable to parse bazel_registry.json for registry {registry_url}: {err}")
+    })?;
+    if value.as_object().is_none() {
+        return Err(format!(
+            "bazel_registry.json for registry {registry_url} must be a JSON object"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_registry_module_header(
+    module_key: &ModuleKey,
+    module_file: &ModuleFile,
+) -> Result<(), String> {
+    let header = module_file.module.as_ref().ok_or_else(|| {
+        format!("registry MODULE.bazel for module {module_key} is missing module() directive")
+    })?;
+    if header.name != module_key.name
+        || header.version.as_deref() != Some(module_key.version.as_str())
+    {
+        return Err(format!(
+            "registry MODULE.bazel for module {module_key} declares {}@{}",
+            header.name,
+            header.version.as_deref().unwrap_or("<none>")
+        ));
+    }
+    Ok(())
+}
 
 pub fn select_ordered_registry_sources(
     registries: &[RegistrySourceCatalog],
