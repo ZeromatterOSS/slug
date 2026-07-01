@@ -393,3 +393,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving Bazel reports
 Implementation summary: Added shared root-override target validation after local/registry module discovery so valid transitive overrides remain accepted while overrides for names absent from the discovered module graph produce the Bazel-shaped missing-module diagnostic; known target names include declared deps from discovered module files so ignored dev-dependency edges do not become false missing-override errors
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-override-validation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; `py -3 -B -m tools.v2_oracle list`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: V2 still needs exact root/non-root override placement diagnostics, registry archive/git override fetching and source verification, CLI flag plumbing for dev-dependency modes, DICE-owned module file reads, and same-daemon invalidation for override edits.
+
+### Stage 5 registration dev-dependency filtering
+
+Status: Partially landed
+V2 commit: `da16ebcc Stage 5 filter module registrations by dev dependency`
+Bazel source inspected: Existing Stage 5 module-file directive citations still apply; this checkpoint is anchored by observed Bazel 9.1.1 `--ignore_dev_dependency` behavior for root `register_toolchains`
+Bazel oracle: Bazel 9.1.1 `module-registration-dev-dependency` fixture
+V2 fixture: `module-registration-dev-dependency`
+Expected evidence artifact: Stage 1 oracle expected output proving a root `register_toolchains(..., dev_dependency = True)` toolchain is available by default and removed under `--ignore_dev_dependency`, producing Bazel's toolchain-resolution failure for `//:tc_type`
+Implementation summary: Added `ModuleDirectiveOwner` and `active_module_registration_directives` so parsed registration directives can be filtered by root/non-root ownership and `DevDependencyMode`; root dev registrations are included only in `IncludeRoot`, while non-root dev registrations are filtered out even when root dev dependencies are included
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registration-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; `py -3 -B -m tools.v2_oracle list`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: Registration filtering is now explicit substrate only; V2 still needs command-line flag plumbing into bzlmod graph keys, DICE-owned module reads, registration ordering integration with Stage 6 toolchain/platform resolution, and same-daemon invalidation for registration edits.
