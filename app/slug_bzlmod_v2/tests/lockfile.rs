@@ -670,6 +670,100 @@ fn renders_module_extension_lockfile_replay_shape() {
 }
 
 #[test]
+fn render_bazel_lockfile_is_deterministic_across_input_order() {
+    let first = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "registryFileHashes": {
+    "https://z.example.test/MODULE.bazel": "z-digest",
+    "https://a.example.test/MODULE.bazel": "a-digest"
+  },
+  "selectedYankedVersions": {
+    "zzz@1.0.0": "z reason",
+    "aaa@1.0.0": "a reason"
+  },
+  "moduleExtensions": {
+    "//:z_ext.bzl%ext": {
+      "general": {
+        "generatedRepoSpecs": {
+          "z_repo": {
+            "repoRuleId": "@@//:z_ext.bzl%z_repo",
+            "attributes": {"z": true, "a": false}
+          }
+        }
+      }
+    },
+    "//:a_ext.bzl%ext": {
+      "general": {
+        "generatedRepoSpecs": {
+          "a_repo": {
+            "repoRuleId": "@@//:a_ext.bzl%a_repo",
+            "attributes": {"z": 2, "a": 1}
+          }
+        }
+      }
+    }
+  },
+  "facts": {}
+}"#,
+    )
+    .unwrap();
+    let second = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "registryFileHashes": {
+    "https://a.example.test/MODULE.bazel": "a-digest",
+    "https://z.example.test/MODULE.bazel": "z-digest"
+  },
+  "selectedYankedVersions": {
+    "aaa@1.0.0": "a reason",
+    "zzz@1.0.0": "z reason"
+  },
+  "moduleExtensions": {
+    "//:a_ext.bzl%ext": {
+      "general": {
+        "generatedRepoSpecs": {
+          "a_repo": {
+            "repoRuleId": "@@//:a_ext.bzl%a_repo",
+            "attributes": {"a": 1, "z": 2}
+          }
+        }
+      }
+    },
+    "//:z_ext.bzl%ext": {
+      "general": {
+        "generatedRepoSpecs": {
+          "z_repo": {
+            "repoRuleId": "@@//:z_ext.bzl%z_repo",
+            "attributes": {"a": false, "z": true}
+          }
+        }
+      }
+    }
+  },
+  "facts": {}
+}"#,
+    )
+    .unwrap();
+
+    let rendered_first = render_bazel_lockfile(&first).unwrap();
+    let rendered_second = render_bazel_lockfile(&second).unwrap();
+
+    assert_eq!(rendered_first, rendered_second);
+    assert!(
+        rendered_first.find("https://a.example.test").unwrap()
+            < rendered_first.find("https://z.example.test").unwrap()
+    );
+    assert!(rendered_first.find("aaa@1.0.0").unwrap() < rendered_first.find("zzz@1.0.0").unwrap());
+    assert!(
+        rendered_first.find("//:a_ext.bzl%ext").unwrap()
+            < rendered_first.find("//:z_ext.bzl%ext").unwrap()
+    );
+    assert!(
+        rendered_first.find("\"a_repo\"").unwrap() < rendered_first.find("\"z_repo\"").unwrap()
+    );
+}
+#[test]
 fn visible_lockfile_plan_honors_bazel_modes() {
     let desired = simple_visible_lockfile();
     let rendered = render_bazel_lockfile(&desired).unwrap();
