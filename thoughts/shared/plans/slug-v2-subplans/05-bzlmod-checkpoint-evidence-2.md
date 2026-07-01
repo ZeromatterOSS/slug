@@ -85,7 +85,7 @@ Residual risk: Observed registry index hashes can now feed validation, but produ
 ### Stage 5 fetched registry content snapshot substrate
 
 Status: Partially landed
-V2 commit: Pending checkpoint on `codex/slugv2-clean-root-remediation`
+V2 commit: `f0483107 Stage 5 snapshot fetched registry contents`
 V1 source inspected: None for implementation; derived from existing V2 registry parsing/digest substrates and Bazel 9 local-registry fixtures
 Bazel oracle: Bazel 9.1.1 `registry-source-json-policy`, `module-registry-mvs-basic`, and `lockfile-mode-update-refresh` fixtures
 V2 fixture: `registry-source-json-policy`, `module-registry-mvs-basic`, `lockfile-mode-update-refresh`
