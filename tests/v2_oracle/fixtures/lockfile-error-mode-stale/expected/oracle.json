@@ -1,0 +1,37 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=error"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=error"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [],
+      "name": "reject_stale_registry_hash_lockfile",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\nERROR: Error accessing registry https://bcr.bazel.build: Failed to fetch registry file https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel: Checksum was 1849602c86cb60da8613d2de887f9566a6d354a6df6d7009f9d04a14402f9a84 but wanted 0000000000000000000000000000000000000000000000000000000000000000",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\lockfile-error-mode-stale\\20260630-202004-83292-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\lockfile-error-mode-stale\\20260630-202130-61712-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\nERROR: Error accessing registry https://bcr.bazel.build: Failed to fetch registry file https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel: Checksum was 1849602c86cb60da8613d2de887f9566a6d354a6df6d7009f9d04a14402f9a84 but wanted 0000000000000000000000000000000000000000000000000000000000000000\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "lockfile-error-mode-stale",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
