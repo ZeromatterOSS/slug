@@ -33,6 +33,7 @@ use slug_bzlmod_v2::plan_visible_lockfile;
 use slug_bzlmod_v2::render_bazel_lockfile;
 use slug_bzlmod_v2::validate_lockfile_version;
 use slug_bzlmod_v2::validate_module_extension_bzl_transitive_digests;
+use slug_bzlmod_v2::validate_module_extension_generated_repo_specs;
 use slug_bzlmod_v2::validate_module_extension_recorded_env_inputs;
 use slug_bzlmod_v2::validate_module_extension_recorded_file_inputs;
 use slug_bzlmod_v2::validate_module_extension_replay_inputs;
@@ -276,6 +277,35 @@ fn rejects_stale_module_extension_recorded_file_input_like_bazel() {
 }
 
 #[test]
+fn validates_module_extension_generated_repo_specs_against_observed_map() {
+    let lockfile = module_extension_replay_lockfile();
+    let observed = observed_generated_repo_specs(&lockfile);
+
+    validate_module_extension_generated_repo_specs(&lockfile, &observed).unwrap();
+}
+
+#[test]
+fn rejects_stale_module_extension_generated_repo_spec_like_bazel() {
+    let lockfile = module_extension_replay_lockfile();
+    let mut observed = observed_generated_repo_specs(&lockfile);
+    observed
+        .get_mut("//:ext.bzl%ext")
+        .unwrap()
+        .get_mut("tagged")
+        .unwrap()
+        .attributes
+        .insert("message".to_owned(), Value::String("changed".to_owned()));
+
+    let err = validate_module_extension_generated_repo_specs(&lockfile, &observed).unwrap_err();
+
+    assert!(err.contains("MODULE.bazel.lock is no longer up-to-date"));
+    assert!(
+        err.contains("generated repository tagged from extension '@@//:ext.bzl%ext' has changed")
+    );
+    assert!(err.contains("bazel mod deps --lockfile_mode=update"));
+}
+
+#[test]
 fn validates_module_extension_replay_inputs_together() {
     let lockfile = module_extension_replay_lockfile();
     let observed = ModuleExtensionReplayInputs {
@@ -295,6 +325,7 @@ fn validates_module_extension_replay_inputs_together() {
             "@@//seed.txt".to_owned(),
             "file-digest".to_owned(),
         )]),
+        generated_repo_specs: observed_generated_repo_specs(&lockfile),
     };
 
     validate_module_extension_replay_inputs(&lockfile, &observed).unwrap();
@@ -320,6 +351,7 @@ fn replay_inputs_propagate_bazel_shaped_stale_usage_error() {
             "@@//seed.txt".to_owned(),
             "file-digest".to_owned(),
         )]),
+        generated_repo_specs: observed_generated_repo_specs(&lockfile),
     };
 
     let err = validate_module_extension_replay_inputs(&lockfile, &observed).unwrap_err();
@@ -1069,13 +1101,40 @@ fn module_extension_replay_lockfile() -> slug_bzlmod_v2::BazelLockfile {
         "recordedInputs": [
           "ENV:SLUG_STAGE5_ENV one",
           "FILE:@@//seed.txt file-digest"
-        ]
+        ],
+        "generatedRepoSpecs": {
+          "tagged": {
+            "repoRuleId": "@@//:ext.bzl%tagged_repo",
+            "attributes": {
+              "message": "hello from tag"
+            }
+          }
+        }
       }
     }
   }
 }"#,
     )
     .unwrap()
+}
+
+fn observed_generated_repo_specs(
+    lockfile: &slug_bzlmod_v2::BazelLockfile,
+) -> std::collections::BTreeMap<
+    String,
+    std::collections::BTreeMap<String, slug_bzlmod_v2::BazelLockfileRepoSpec>,
+> {
+    let general = lockfile
+        .module_extensions
+        .get("//:ext.bzl%ext")
+        .unwrap()
+        .general
+        .as_ref()
+        .unwrap();
+    std::collections::BTreeMap::from([(
+        "//:ext.bzl%ext".to_owned(),
+        general.generated_repo_specs.clone(),
+    )])
 }
 
 fn simple_visible_lockfile() -> slug_bzlmod_v2::BazelLockfile {

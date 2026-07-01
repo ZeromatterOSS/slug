@@ -63,6 +63,7 @@ pub struct ModuleExtensionReplayInputs {
     pub bzl_transitive_digests: BTreeMap<String, String>,
     pub recorded_env_values: BTreeMap<String, String>,
     pub recorded_file_digests: BTreeMap<String, String>,
+    pub generated_repo_specs: BTreeMap<String, BTreeMap<String, BazelLockfileRepoSpec>>,
 }
 
 pub fn empty_bazel_lockfile() -> BazelLockfile {
@@ -676,6 +677,7 @@ pub fn validate_module_extension_replay_inputs(
     validate_module_extension_bzl_transitive_digests(lockfile, &observed.bzl_transitive_digests)?;
     validate_module_extension_recorded_env_inputs(lockfile, &observed.recorded_env_values)?;
     validate_module_extension_recorded_file_inputs(lockfile, &observed.recorded_file_digests)?;
+    validate_module_extension_generated_repo_specs(lockfile, &observed.generated_repo_specs)?;
     Ok(())
 }
 
@@ -776,6 +778,32 @@ pub fn validate_module_extension_recorded_file_inputs(
                 Some(_) | None => {
                     return Err(format!(
                         "MODULE.bazel.lock is no longer up-to-date because an input to the extension '{}' changed: file info or contents of {label} changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+                        bazel_display_extension_id(extension_id)
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_module_extension_generated_repo_specs(
+    lockfile: &BazelLockfile,
+    observed_generated_repo_specs: &BTreeMap<String, BTreeMap<String, BazelLockfileRepoSpec>>,
+) -> Result<(), String> {
+    for (extension_id, extension) in &lockfile.module_extensions {
+        let Some(general) = &extension.general else {
+            continue;
+        };
+        for (repo_name, expected_spec) in &general.generated_repo_specs {
+            match observed_generated_repo_specs
+                .get(extension_id)
+                .and_then(|repos| repos.get(repo_name))
+            {
+                Some(actual_spec) if actual_spec == expected_spec => {}
+                Some(_) | None => {
+                    return Err(format!(
+                        "MODULE.bazel.lock is no longer up-to-date because the generated repository {repo_name} from extension '{}' has changed. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
                         bazel_display_extension_id(extension_id)
                     ));
                 }

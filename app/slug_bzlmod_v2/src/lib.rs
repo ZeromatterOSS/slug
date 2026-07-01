@@ -57,6 +57,7 @@ pub use lockfile::plan_visible_lockfile;
 pub use lockfile::render_bazel_lockfile;
 pub use lockfile::validate_lockfile_version;
 pub use lockfile::validate_module_extension_bzl_transitive_digests;
+pub use lockfile::validate_module_extension_generated_repo_specs;
 pub use lockfile::validate_module_extension_recorded_env_inputs;
 pub use lockfile::validate_module_extension_recorded_file_inputs;
 pub use lockfile::validate_module_extension_replay_inputs;
