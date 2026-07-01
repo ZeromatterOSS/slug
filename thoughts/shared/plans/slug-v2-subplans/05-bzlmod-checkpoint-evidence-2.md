@@ -49,7 +49,7 @@ Residual risk: Observed registry digests are now shaped for lockfile validators,
 ### Stage 5 visible lockfile renderer substrate
 
 Status: Partially landed
-V2 commit: Pending checkpoint on `codex/slugv2-clean-root-remediation`
+V2 commit: `c388e402 Stage 5 render visible lockfiles`
 V1 source inspected: None for implementation; renderer shape is grounded by Bazel 9 visible lockfile oracle fixtures and existing V2 lockfile parser structs
 Bazel oracle: Bazel 9.1.1 `lockfile-mode-update-refresh`, `lockfile-selected-yanked-version`, and `module-extension-lockfile-shape` fixtures
 V2 fixture: `lockfile-mode-update-refresh`, `lockfile-selected-yanked-version`, `module-extension-lockfile-shape`
@@ -57,3 +57,15 @@ Expected evidence artifact: Stage 1 oracle expected output and run artifacts pro
 Implementation summary: Added `render_bazel_lockfile` for deterministic Bazel-shaped visible lockfile JSON over the fields V2 already parses and validates: registry file hashes, selected yanked versions, module extension replay data, facts, and factsVersions; this is a pure renderer and does not add filesystem write policy, hidden lockfile caching, registry refresh, repository materialization, or same-daemon invalidation behavior
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-shape --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-selected-yanked-version --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: V2 can now render parsed lockfile data deterministically, but deciding when to read/write visible or hidden lockfiles, updating registry hashes from fetches, replaying stale entries in error mode, and preserving same-daemon invalidation semantics remain later Stage 5.5/5.6 work
+
+### Stage 5 visible lockfile mode planner substrate
+
+Status: Partially landed
+V2 commit: Pending checkpoint on `codex/slugv2-clean-root-remediation`
+V1 source inspected: None for implementation; planner behavior is grounded by Bazel 9 lockfile-mode oracle fixtures and existing V2 `LockfileMode` policy methods
+Bazel oracle: Bazel 9.1.1 `lockfile-mode-off`, `lockfile-mode-update-refresh`, `lockfile-mode-flag-validation`, and `lockfile-version-error` fixtures
+V2 fixture: `lockfile-mode-off`, `lockfile-mode-update-refresh`, `lockfile-mode-flag-validation`, `lockfile-version-error`
+Expected evidence artifact: Stage 1 oracle expected output proving `off` does not write, `update`/`refresh` write or preserve visible lockfiles, accepted mode names and invalid-mode diagnostics, and unsupported lockfile-version diagnostics in error mode
+Implementation summary: Added `VisibleLockfilePlan` and `plan_visible_lockfile` to choose ignore/keep/write/error for visible lockfile content using the deterministic renderer and parsed-lockfile equality; the planner is pure data flow and does not perform filesystem IO, hidden lockfile cache updates, registry refresh, or same-daemon invalidation
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-off --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-flag-validation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-version-error --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: V2 can now decide visible lockfile content actions without touching the filesystem, but actual read/write integration, hidden lockfile persistence, registry refresh/re-fetch policy, action on stale registry hashes, and same-daemon invalidation remain later Stage 5.5/5.6 work

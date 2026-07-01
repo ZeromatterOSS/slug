@@ -11,8 +11,11 @@
 use serde_json::Value;
 use slug_bzlmod_v2::BAZEL_9_LOCK_FILE_VERSION;
 use slug_bzlmod_v2::BazelLockfileRecordedInput;
+use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
+use slug_bzlmod_v2::VisibleLockfilePlan;
 use slug_bzlmod_v2::parse_bazel_lockfile;
+use slug_bzlmod_v2::plan_visible_lockfile;
 use slug_bzlmod_v2::render_bazel_lockfile;
 use slug_bzlmod_v2::validate_lockfile_version;
 use slug_bzlmod_v2::validate_module_extension_bzl_transitive_digests;
@@ -595,4 +598,86 @@ fn renders_module_extension_lockfile_replay_shape() {
         )
     );
     assert_eq!(parse_bazel_lockfile(&rendered).unwrap(), lockfile);
+}
+
+#[test]
+fn visible_lockfile_plan_honors_bazel_modes() {
+    let desired = simple_visible_lockfile();
+    let rendered = render_bazel_lockfile(&desired).unwrap();
+
+    assert_eq!(
+        plan_visible_lockfile(&LockfileMode::Off, None, &desired).unwrap(),
+        VisibleLockfilePlan::Ignore
+    );
+    assert_eq!(
+        plan_visible_lockfile(&LockfileMode::Update, Some(&rendered), &desired).unwrap(),
+        VisibleLockfilePlan::Keep
+    );
+    assert_eq!(
+        plan_visible_lockfile(&LockfileMode::Refresh, Some(&rendered), &desired).unwrap(),
+        VisibleLockfilePlan::Keep
+    );
+    assert_eq!(
+        plan_visible_lockfile(&LockfileMode::Update, None, &desired).unwrap(),
+        VisibleLockfilePlan::Write {
+            content: rendered.clone()
+        }
+    );
+    assert_eq!(
+        plan_visible_lockfile(&LockfileMode::Refresh, Some("{}\n"), &desired).unwrap(),
+        VisibleLockfilePlan::Write { content: rendered }
+    );
+}
+
+#[test]
+fn visible_lockfile_error_mode_rejects_missing_stale_and_bad_versions() {
+    let desired = simple_visible_lockfile();
+    let rendered = render_bazel_lockfile(&desired).unwrap();
+
+    assert_eq!(
+        plan_visible_lockfile(&LockfileMode::Error, Some(&rendered), &desired).unwrap(),
+        VisibleLockfilePlan::Keep
+    );
+
+    let missing = plan_visible_lockfile(&LockfileMode::Error, None, &desired).unwrap();
+    assert!(matches!(missing, VisibleLockfilePlan::Error { .. }));
+    if let VisibleLockfilePlan::Error { message } = missing {
+        assert!(message.contains("MODULE.bazel.lock is missing"));
+        assert!(message.contains("--lockfile_mode=update"));
+    }
+
+    let stale = rendered.replace("module-digest", "old-digest");
+    let stale_plan = plan_visible_lockfile(&LockfileMode::Error, Some(&stale), &desired).unwrap();
+    assert!(matches!(stale_plan, VisibleLockfilePlan::Error { .. }));
+    if let VisibleLockfilePlan::Error { message } = stale_plan {
+        assert!(message.contains("MODULE.bazel.lock is no longer up-to-date"));
+        assert!(message.contains("--lockfile_mode=update"));
+    }
+
+    let unsupported = rendered.replace("\"lockFileVersion\": 26", "\"lockFileVersion\": 25");
+    let unsupported_plan =
+        plan_visible_lockfile(&LockfileMode::Error, Some(&unsupported), &desired).unwrap();
+    assert!(matches!(
+        unsupported_plan,
+        VisibleLockfilePlan::Error { .. }
+    ));
+    if let VisibleLockfilePlan::Error { message } = unsupported_plan {
+        assert!(message.contains("The version of MODULE.bazel.lock is not supported"));
+        assert!(message.contains("--lockfile_mode=update"));
+    }
+}
+
+fn simple_visible_lockfile() -> slug_bzlmod_v2::BazelLockfile {
+    parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "registryFileHashes": {
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "module-digest"
+  },
+  "selectedYankedVersions": {},
+  "moduleExtensions": {},
+  "facts": {}
+}"#,
+    )
+    .unwrap()
 }

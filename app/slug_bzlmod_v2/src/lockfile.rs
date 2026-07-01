@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use crate::ModuleKey;
+use crate::dice::LockfileMode;
 
 pub const BAZEL_9_LOCK_FILE_VERSION: u64 = 26;
 
@@ -118,6 +119,60 @@ pub fn render_bazel_lockfile(lockfile: &BazelLockfile) -> Result<String, String>
     }
     rendered.push_str("}\n");
     Ok(rendered)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VisibleLockfilePlan {
+    Ignore,
+    Keep,
+    Write { content: String },
+    Error { message: String },
+}
+
+pub fn plan_visible_lockfile(
+    mode: &LockfileMode,
+    existing_content: Option<&str>,
+    desired: &BazelLockfile,
+) -> Result<VisibleLockfilePlan, String> {
+    match mode {
+        LockfileMode::Off => Ok(VisibleLockfilePlan::Ignore),
+        LockfileMode::Update | LockfileMode::Refresh => {
+            let rendered = render_bazel_lockfile(desired)?;
+            if existing_content == Some(rendered.as_str()) {
+                Ok(VisibleLockfilePlan::Keep)
+            } else {
+                Ok(VisibleLockfilePlan::Write { content: rendered })
+            }
+        }
+        LockfileMode::Error => plan_error_mode_visible_lockfile(existing_content, desired),
+    }
+}
+
+fn plan_error_mode_visible_lockfile(
+    existing_content: Option<&str>,
+    desired: &BazelLockfile,
+) -> Result<VisibleLockfilePlan, String> {
+    let Some(existing_content) = existing_content else {
+        return Ok(VisibleLockfilePlan::Error {
+            message: "MODULE.bazel.lock is missing and --lockfile_mode=error does not permit updating it. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+                .to_owned(),
+        });
+    };
+    let existing = match parse_bazel_lockfile(existing_content) {
+        Ok(lockfile) => lockfile,
+        Err(err) => return Ok(VisibleLockfilePlan::Error { message: err }),
+    };
+    if let Err(err) = validate_lockfile_version(&existing, BAZEL_9_LOCK_FILE_VERSION) {
+        return Ok(VisibleLockfilePlan::Error { message: err });
+    }
+    if existing == *desired {
+        Ok(VisibleLockfilePlan::Keep)
+    } else {
+        Ok(VisibleLockfilePlan::Error {
+            message: "MODULE.bazel.lock is no longer up-to-date. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+                .to_owned(),
+        })
+    }
 }
 
 fn render_selected_yanked_versions_field(lockfile: &BazelLockfile) -> Result<String, String> {
