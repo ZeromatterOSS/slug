@@ -49,6 +49,57 @@ fn snapshot_registry_contents_parses_and_hashes_fetched_files() {
 }
 
 #[test]
+fn snapshot_registry_contents_produces_aggregate_dice_digests() {
+    let registry_json = r#"{"mirrors":[],"module_base_path":"modules"}"#;
+    let module_file = r#"module(name = "srcmod", version = "1.0.0")"#;
+    let source_json = r#"{"url":"file:///srcmod.tar.gz","integrity":"sha256-archive"}"#;
+
+    let snapshot = snapshot_registry_contents(
+        "https://bcr.bazel.build/",
+        registry_json,
+        BTreeMap::from([(key(), module_file.to_owned())]),
+        BTreeMap::from([(key(), source_json.to_owned())]),
+    )
+    .unwrap();
+    let digests = snapshot.dice_input_digests().unwrap();
+
+    assert_eq!(
+        digests.registry_policy_digest,
+        slug_bzlmod_v2::digest_registry_policy([snapshot.registry_policy_entry.clone()])
+    );
+    assert_ne!(
+        digests.registry_module_digest,
+        digests.registry_source_digest
+    );
+
+    let changed_source = snapshot_registry_contents(
+        "https://bcr.bazel.build/",
+        registry_json,
+        BTreeMap::from([(key(), module_file.to_owned())]),
+        BTreeMap::from([(
+            key(),
+            r#"{"url":"file:///srcmod.tar.gz","integrity":"sha256-other"}"#.to_owned(),
+        )]),
+    )
+    .unwrap()
+    .dice_input_digests()
+    .unwrap();
+
+    assert_eq!(
+        digests.registry_policy_digest,
+        changed_source.registry_policy_digest
+    );
+    assert_eq!(
+        digests.registry_module_digest,
+        changed_source.registry_module_digest
+    );
+    assert_ne!(
+        digests.registry_source_digest,
+        changed_source.registry_source_digest
+    );
+}
+
+#[test]
 fn snapshot_registry_contents_rejects_mismatched_module_path_and_header() {
     let err = snapshot_registry_contents(
         "https://bcr.bazel.build/",

@@ -22,6 +22,7 @@ use crate::dice::BzlmodRegistryModuleFileDigest;
 use crate::dice::BzlmodRegistryPolicyEntry;
 use crate::dice::BzlmodRegistrySourceSpecDigest;
 use crate::dice::digest_registry_module_files;
+use crate::dice::digest_registry_policy;
 use crate::dice::digest_registry_source_specs;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
@@ -360,6 +361,13 @@ pub struct RegistryContentSnapshot {
     pub source_catalog: RegistrySourceCatalog,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistryContentDigests {
+    pub registry_policy_digest: String,
+    pub registry_module_digest: String,
+    pub registry_source_digest: String,
+}
+
 impl RegistryContentSnapshot {
     pub fn observed_file_hashes(&self) -> Result<BTreeMap<String, String>, String> {
         let mut hashes = observed_registry_policy_file_hashes([&self.registry_policy_entry])?;
@@ -371,6 +379,18 @@ impl RegistryContentSnapshot {
             insert_observed_registry_hash(&mut hashes, url, &digest)?;
         }
         Ok(hashes)
+    }
+
+    pub fn dice_input_digests(&self) -> Result<RegistryContentDigests, String> {
+        let selected_modules =
+            select_ordered_registry_modules(std::slice::from_ref(&self.module_catalog));
+        let selected_sources =
+            select_ordered_registry_sources(std::slice::from_ref(&self.source_catalog));
+        Ok(RegistryContentDigests {
+            registry_policy_digest: digest_registry_policy([self.registry_policy_entry.clone()]),
+            registry_module_digest: digest_selected_registry_modules(&selected_modules)?,
+            registry_source_digest: digest_selected_registry_sources(&selected_sources)?,
+        })
     }
 }
 
