@@ -56,6 +56,14 @@ pub enum BazelLockfileRecordedInput {
     Raw(Value),
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ModuleExtensionReplayInputs {
+    pub usage_digests: BTreeMap<String, String>,
+    pub bzl_transitive_digests: BTreeMap<String, String>,
+    pub recorded_env_values: BTreeMap<String, String>,
+    pub recorded_file_digests: BTreeMap<String, String>,
+}
+
 pub fn parse_bazel_lockfile(content: &str) -> Result<BazelLockfile, String> {
     let value: Value = serde_json::from_str(content)
         .map_err(|err| format!("Unable to parse MODULE.bazel.lock: {err}"))?;
@@ -519,6 +527,17 @@ pub fn validate_registry_file_hashes(
             }
         }
     }
+    Ok(())
+}
+
+pub fn validate_module_extension_replay_inputs(
+    lockfile: &BazelLockfile,
+    observed: &ModuleExtensionReplayInputs,
+) -> Result<(), String> {
+    validate_module_extension_usage_digests(lockfile, &observed.usage_digests)?;
+    validate_module_extension_bzl_transitive_digests(lockfile, &observed.bzl_transitive_digests)?;
+    validate_module_extension_recorded_env_inputs(lockfile, &observed.recorded_env_values)?;
+    validate_module_extension_recorded_file_inputs(lockfile, &observed.recorded_file_digests)?;
     Ok(())
 }
 

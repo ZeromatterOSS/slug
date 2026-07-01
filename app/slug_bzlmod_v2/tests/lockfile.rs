@@ -15,6 +15,7 @@ use slug_bzlmod_v2::BAZEL_9_LOCK_FILE_VERSION;
 use slug_bzlmod_v2::BazelLockfileRecordedInput;
 use slug_bzlmod_v2::BzlmodVisibleLockfileDigest;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::ModuleExtensionReplayInputs;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::VisibleLockfileApply;
 use slug_bzlmod_v2::VisibleLockfileInput;
@@ -27,6 +28,7 @@ use slug_bzlmod_v2::validate_lockfile_version;
 use slug_bzlmod_v2::validate_module_extension_bzl_transitive_digests;
 use slug_bzlmod_v2::validate_module_extension_recorded_env_inputs;
 use slug_bzlmod_v2::validate_module_extension_recorded_file_inputs;
+use slug_bzlmod_v2::validate_module_extension_replay_inputs;
 use slug_bzlmod_v2::validate_module_extension_usage_digests;
 use slug_bzlmod_v2::validate_registry_file_hashes;
 use slug_bzlmod_v2::validate_required_registry_file_hashes;
@@ -263,6 +265,60 @@ fn rejects_stale_module_extension_recorded_file_input_like_bazel() {
     assert!(err.contains("MODULE.bazel.lock is no longer up-to-date"));
     assert!(err.contains("input to the extension '@@//:ext.bzl%ext' changed"));
     assert!(err.contains("file info or contents of @@//seed.txt changed"));
+    assert!(err.contains("bazel mod deps --lockfile_mode=update"));
+}
+
+#[test]
+fn validates_module_extension_replay_inputs_together() {
+    let lockfile = module_extension_replay_lockfile();
+    let observed = ModuleExtensionReplayInputs {
+        usage_digests: std::collections::BTreeMap::from([(
+            "//:ext.bzl%ext".to_owned(),
+            "usage-digest".to_owned(),
+        )]),
+        bzl_transitive_digests: std::collections::BTreeMap::from([(
+            "//:ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+        )]),
+        recorded_env_values: std::collections::BTreeMap::from([(
+            "SLUG_STAGE5_ENV".to_owned(),
+            "one".to_owned(),
+        )]),
+        recorded_file_digests: std::collections::BTreeMap::from([(
+            "@@//seed.txt".to_owned(),
+            "file-digest".to_owned(),
+        )]),
+    };
+
+    validate_module_extension_replay_inputs(&lockfile, &observed).unwrap();
+}
+
+#[test]
+fn replay_inputs_propagate_bazel_shaped_stale_usage_error() {
+    let lockfile = module_extension_replay_lockfile();
+    let observed = ModuleExtensionReplayInputs {
+        usage_digests: std::collections::BTreeMap::from([(
+            "//:ext.bzl%ext".to_owned(),
+            "new-usage-digest".to_owned(),
+        )]),
+        bzl_transitive_digests: std::collections::BTreeMap::from([(
+            "//:ext.bzl%ext".to_owned(),
+            "bzl-digest".to_owned(),
+        )]),
+        recorded_env_values: std::collections::BTreeMap::from([(
+            "SLUG_STAGE5_ENV".to_owned(),
+            "one".to_owned(),
+        )]),
+        recorded_file_digests: std::collections::BTreeMap::from([(
+            "@@//seed.txt".to_owned(),
+            "file-digest".to_owned(),
+        )]),
+    };
+
+    let err = validate_module_extension_replay_inputs(&lockfile, &observed).unwrap_err();
+
+    assert!(err.contains("MODULE.bazel.lock is no longer up-to-date"));
+    assert!(err.contains("usages of the extension '@@//:ext.bzl%ext' have changed"));
     assert!(err.contains("bazel mod deps --lockfile_mode=update"));
 }
 
@@ -768,6 +824,27 @@ fn visible_lockfile_input_rejects_invalid_utf8() {
 
     assert!(err.contains("MODULE.bazel.lock"));
     assert!(err.contains("UTF-8"));
+}
+
+fn module_extension_replay_lockfile() -> slug_bzlmod_v2::BazelLockfile {
+    parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "bzlTransitiveDigest": "bzl-digest",
+        "usagesDigest": "usage-digest",
+        "recordedInputs": [
+          "ENV:SLUG_STAGE5_ENV one",
+          "FILE:@@//seed.txt file-digest"
+        ]
+      }
+    }
+  }
+}"#,
+    )
+    .unwrap()
 }
 
 fn simple_visible_lockfile() -> slug_bzlmod_v2::BazelLockfile {
