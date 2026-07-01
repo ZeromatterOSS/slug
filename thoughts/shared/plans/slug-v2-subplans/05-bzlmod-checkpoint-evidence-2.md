@@ -405,3 +405,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving a root `regis
 Implementation summary: Added `ModuleDirectiveOwner` and `active_module_registration_directives` so parsed registration directives can be filtered by root/non-root ownership and `DevDependencyMode`; root dev registrations are included only in `IncludeRoot`, while non-root dev registrations are filtered out even when root dev dependencies are included
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registration-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; `py -3 -B -m tools.v2_oracle list`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Registration filtering is now explicit substrate only; V2 still needs command-line flag plumbing into bzlmod graph keys, DICE-owned module reads, registration ordering integration with Stage 6 toolchain/platform resolution, and same-daemon invalidation for registration edits.
+
+### Stage 5 ignore-dev-dependency command policy key
+
+Status: Partially landed
+V2 commit: `6b323e86 Stage 5 key ignore dev dependency policy`
+Bazel source inspected: Existing Stage 5 module-file directive citations still apply; `docs/developers/dice.md` was reread before editing DICE-owned command policy identity
+Bazel oracle: Bazel 9.1.1 `module-root-dev-dependency-visibility` and `module-registration-dev-dependency` fixtures
+V2 fixture: `module-root-dev-dependency-visibility`, `module-registration-dev-dependency`
+Expected evidence artifact: Stage 1 oracle expected output proving `--ignore_dev_dependency` changes root dev-dependency visibility and root dev-only toolchain registration availability
+Implementation summary: Extended `BzlmodCommandPolicyKey` with an explicit `ignore_dev_dependency` bit, a `from_flags` constructor, accessor, and stable serialization so resolved bzlmod graph keys can distinguish default root-dev behavior from `--ignore_dev_dependency` runs without process-global command state
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-root-dev-dependency-visibility --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; same command for `module-registration-dev-dependency`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: The key identity is ready, but V2 still needs CLI flag parsing and command plumbing into bzlmod graph construction, DICE compute producers for resolved graphs, and same-daemon invalidation proving flag flips replay the affected graph and registrations.
