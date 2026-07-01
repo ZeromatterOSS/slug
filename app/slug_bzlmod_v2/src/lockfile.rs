@@ -9,6 +9,8 @@
  */
 
 use std::collections::BTreeMap;
+use std::io::Write;
+use std::path::Path;
 
 use serde_json::Value;
 
@@ -129,6 +131,13 @@ pub enum VisibleLockfilePlan {
     Error { message: String },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VisibleLockfileApply {
+    Ignored,
+    Kept,
+    Written { bytes: usize },
+}
+
 pub fn plan_visible_lockfile(
     mode: &LockfileMode,
     existing_content: Option<&str>,
@@ -146,6 +155,63 @@ pub fn plan_visible_lockfile(
         }
         LockfileMode::Error => plan_error_mode_visible_lockfile(existing_content, desired),
     }
+}
+
+pub fn apply_visible_lockfile_plan(
+    lockfile_path: impl AsRef<Path>,
+    plan: &VisibleLockfilePlan,
+) -> Result<VisibleLockfileApply, String> {
+    match plan {
+        VisibleLockfilePlan::Ignore => Ok(VisibleLockfileApply::Ignored),
+        VisibleLockfilePlan::Keep => Ok(VisibleLockfileApply::Kept),
+        VisibleLockfilePlan::Error { message } => Err(message.clone()),
+        VisibleLockfilePlan::Write { content } => {
+            write_visible_lockfile_atomically(lockfile_path.as_ref(), content)
+        }
+    }
+}
+
+fn write_visible_lockfile_atomically(
+    lockfile_path: &Path,
+    content: &str,
+) -> Result<VisibleLockfileApply, String> {
+    let parent = lockfile_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .ok_or_else(|| {
+            format!(
+                "Unable to write MODULE.bazel.lock at {}: path has no parent directory",
+                lockfile_path.display()
+            )
+        })?;
+    let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|err| {
+        format!(
+            "Unable to create temporary MODULE.bazel.lock beside {}: {err}",
+            lockfile_path.display()
+        )
+    })?;
+    temp.write_all(content.as_bytes()).map_err(|err| {
+        format!(
+            "Unable to write temporary MODULE.bazel.lock for {}: {err}",
+            lockfile_path.display()
+        )
+    })?;
+    temp.as_file_mut().sync_all().map_err(|err| {
+        format!(
+            "Unable to flush temporary MODULE.bazel.lock for {}: {err}",
+            lockfile_path.display()
+        )
+    })?;
+    temp.persist(lockfile_path).map_err(|err| {
+        format!(
+            "Unable to publish MODULE.bazel.lock at {}: {}",
+            lockfile_path.display(),
+            err.error
+        )
+    })?;
+    Ok(VisibleLockfileApply::Written {
+        bytes: content.len(),
+    })
 }
 
 fn plan_error_mode_visible_lockfile(

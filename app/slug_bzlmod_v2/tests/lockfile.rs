@@ -8,12 +8,16 @@
  * above-listed licenses.
  */
 
+use std::fs;
+
 use serde_json::Value;
 use slug_bzlmod_v2::BAZEL_9_LOCK_FILE_VERSION;
 use slug_bzlmod_v2::BazelLockfileRecordedInput;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
+use slug_bzlmod_v2::VisibleLockfileApply;
 use slug_bzlmod_v2::VisibleLockfilePlan;
+use slug_bzlmod_v2::apply_visible_lockfile_plan;
 use slug_bzlmod_v2::parse_bazel_lockfile;
 use slug_bzlmod_v2::plan_visible_lockfile;
 use slug_bzlmod_v2::render_bazel_lockfile;
@@ -667,6 +671,72 @@ fn visible_lockfile_error_mode_rejects_missing_stale_and_bad_versions() {
     }
 }
 
+#[test]
+fn applies_visible_lockfile_plan_with_atomic_write_boundary() {
+    let dir = scratch_dir("visible-lockfile-apply");
+    let lockfile_path = dir.join("MODULE.bazel.lock");
+    let desired = simple_visible_lockfile();
+    let rendered = render_bazel_lockfile(&desired).unwrap();
+
+    assert_eq!(
+        apply_visible_lockfile_plan(&lockfile_path, &VisibleLockfilePlan::Ignore).unwrap(),
+        VisibleLockfileApply::Ignored
+    );
+    assert!(!lockfile_path.exists());
+    assert_eq!(
+        apply_visible_lockfile_plan(&lockfile_path, &VisibleLockfilePlan::Keep).unwrap(),
+        VisibleLockfileApply::Kept
+    );
+    assert!(!lockfile_path.exists());
+
+    assert_eq!(
+        apply_visible_lockfile_plan(
+            &lockfile_path,
+            &VisibleLockfilePlan::Write {
+                content: rendered.clone(),
+            },
+        )
+        .unwrap(),
+        VisibleLockfileApply::Written {
+            bytes: rendered.len(),
+        }
+    );
+    assert_eq!(fs::read_to_string(&lockfile_path).unwrap(), rendered);
+
+    let updated = rendered.replace("module-digest", "updated-digest");
+    apply_visible_lockfile_plan(
+        &lockfile_path,
+        &VisibleLockfilePlan::Write {
+            content: updated.clone(),
+        },
+    )
+    .unwrap();
+    assert_eq!(fs::read_to_string(&lockfile_path).unwrap(), updated);
+
+    let entries = fs::read_dir(&dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect::<Vec<_>>();
+    assert_eq!(entries, vec![std::ffi::OsString::from("MODULE.bazel.lock")]);
+}
+
+#[test]
+fn apply_visible_lockfile_plan_returns_error_without_writing() {
+    let dir = scratch_dir("visible-lockfile-error");
+    let lockfile_path = dir.join("MODULE.bazel.lock");
+
+    let err = apply_visible_lockfile_plan(
+        &lockfile_path,
+        &VisibleLockfilePlan::Error {
+            message: "stale lockfile".to_owned(),
+        },
+    )
+    .unwrap_err();
+
+    assert_eq!(err, "stale lockfile");
+    assert!(!lockfile_path.exists());
+}
+
 fn simple_visible_lockfile() -> slug_bzlmod_v2::BazelLockfile {
     parse_bazel_lockfile(
         r#"{
@@ -680,4 +750,16 @@ fn simple_visible_lockfile() -> slug_bzlmod_v2::BazelLockfile {
 }"#,
     )
     .unwrap()
+}
+
+fn scratch_dir(name: &str) -> std::path::PathBuf {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join(".codex-cargo-target")
+        .join("slug_bzlmod_v2_tests")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    dir
 }
