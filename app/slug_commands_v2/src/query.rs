@@ -9,6 +9,7 @@
  */
 
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
 use slug_query_v2::QueryExpression;
 
 use crate::common::CommandKind;
@@ -17,6 +18,7 @@ use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
 use crate::common::QueryOutputFormat;
 use crate::common::bzlmod_command_policy;
+use crate::common::bzlmod_lockfile_mode;
 use crate::common::output_format;
 use crate::common::parse_query_expression_for;
 use crate::common::split_args;
@@ -27,6 +29,7 @@ pub struct QueryRequest {
     pub output: QueryOutputFormat,
     pub flags: Vec<ParsedFlag>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
+    pub lockfile_mode: LockfileMode,
 }
 
 impl QueryRequest {
@@ -51,10 +54,12 @@ pub(crate) fn parse_query_like(
     let expression = parse_query_expression_for(command, &parsed.positionals)?;
     let output = output_format(&parsed.flags);
     let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
+    let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
     Ok(QueryRequest {
         expression,
         output,
         flags: parsed.flags,
         bzlmod_policy,
+        lockfile_mode,
     })
 }

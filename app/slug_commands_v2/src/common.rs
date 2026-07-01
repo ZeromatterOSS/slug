@@ -11,6 +11,7 @@
 use std::fmt;
 
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::QueryExpression;
 use slug_query_v2::QueryParseError;
@@ -266,6 +267,27 @@ pub(crate) fn bzlmod_command_policy(
     )
 }
 
+pub(crate) fn bzlmod_lockfile_mode(
+    flags: &[ParsedFlag],
+) -> Result<LockfileMode, CommandParseError> {
+    let Some(flag) = flags.iter().rev().find(|flag| flag.name == "lockfile_mode") else {
+        return Ok(LockfileMode::Update);
+    };
+    let value = flag
+        .value
+        .as_deref()
+        .ok_or_else(|| CommandParseError::InvalidFlagValue {
+            flag: flag.raw.clone(),
+            message: "expected one of off, update, refresh, or error".to_owned(),
+        })?;
+    LockfileMode::from_bazel_flag_value(value).map_err(|message| {
+        CommandParseError::InvalidFlagValue {
+            flag: flag.raw.clone(),
+            message,
+        }
+    })
+}
+
 pub(crate) fn output_format(flags: &[ParsedFlag]) -> QueryOutputFormat {
     let Some(value) = flags
         .iter()
@@ -324,7 +346,8 @@ fn classify_flag(name: &str) -> FlagDisposition {
         | "config"
         | "allow_yanked_versions"
         | "ignore_dev_dependency"
-        | "noignore_dev_dependency" => FlagDisposition::ParseOnly,
+        | "noignore_dev_dependency"
+        | "lockfile_mode" => FlagDisposition::ParseOnly,
         "color" | "show_progress" | "noshow_progress" | "keep_going" => {
             FlagDisposition::IgnoredCompatible
         }

@@ -234,6 +234,24 @@ USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registr
 python -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py
 ```
 
+### Command Lockfile Mode Bridge
+
+- Added command-surface extraction for `--lockfile_mode` in
+  `slug_commands_v2`. Build, run, test, query, cquery, and aquery request
+  parsing now carries the Stage 5 `LockfileMode`, defaulting to `update` and
+  rejecting invalid values with Bazel-shaped diagnostics while actual lockfile
+  read/write behavior remains owned by the bzlmod graph and lockfile planner.
+
+Validation run:
+
+```bash
+cargo fmt -p slug_commands_v2 -p slug_cli_v2
+CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_commands_v2
+CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_cli_v2
+USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-flag-validation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120
+USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120
+```
+
 ### Public Ruleset Fixture Start
 
 - Added Bazel 9 oracle fixtures for `rules-cc-basic`, `rules-cc-run-env`,

@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use slug_bzlmod_v2::LockfileMode;
 use slug_commands_v2::FlagDisposition;
 use slug_commands_v2::HELP_SUMMARY;
 use slug_commands_v2::QueryOutputFormat;
@@ -25,6 +26,7 @@ fn build_request_parses_target_patterns_and_classifies_flags() {
         "--keep_going",
         "--allow_yanked_versions=zzz@2.0.0,yyy@1.0.0",
         "--ignore_dev_dependency",
+        "--lockfile_mode=refresh",
         "//pkg:bin",
         "//pkg:all",
     ])
@@ -68,15 +70,26 @@ fn build_request_parses_target_patterns_and_classifies_flags() {
         FlagDisposition::ParseOnly
     );
     assert_eq!(
+        request
+            .flags
+            .iter()
+            .find(|flag| flag.name == "lockfile_mode")
+            .unwrap()
+            .disposition,
+        FlagDisposition::ParseOnly
+    );
+    assert_eq!(
         request.bzlmod_policy.stable_serialize(),
         "allow_yanked=[yyy@1.0.0,zzz@2.0.0];ignore_dev_dependency=true"
     );
+    assert_eq!(request.lockfile_mode, LockfileMode::Refresh);
 }
 
 #[test]
 fn command_requests_extract_bzlmod_policy_flags() {
     let query = QueryRequest::parse(&[
         "--ignore_dev_dependency=false",
+        "--lockfile_mode=error",
         "--output=streamed_jsonproto",
         "deps(//pkg:bin)",
     ])
@@ -88,13 +101,16 @@ fn command_requests_extract_bzlmod_policy_flags() {
 
     assert_eq!(query.output, QueryOutputFormat::StreamedJsonProto);
     assert!(!query.bzlmod_policy.ignore_dev_dependency());
+    assert_eq!(query.lockfile_mode, LockfileMode::Error);
     assert_eq!(
         cquery.query.bzlmod_policy.stable_serialize(),
         "allow_yanked=all;ignore_dev_dependency=false"
     );
+    assert_eq!(cquery.query.lockfile_mode, LockfileMode::Update);
     assert!(aquery.query.bzlmod_policy.ignore_dev_dependency());
     assert!(run.bzlmod_policy.ignore_dev_dependency());
     assert!(!test.bzlmod_policy.ignore_dev_dependency());
+    assert_eq!(test.lockfile_mode, LockfileMode::Update);
 }
 
 #[test]
@@ -105,9 +121,13 @@ fn bzlmod_policy_flags_report_structured_parse_errors() {
     let bool_error = QueryRequest::parse(&["--ignore_dev_dependency=maybe", "//pkg:bin"])
         .unwrap_err()
         .to_string();
+    let lockfile_error = BuildRequest::parse(&["--lockfile_mode=bad", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
 
     assert!(allow_error.contains("module@version"));
     assert!(bool_error.contains("expected a boolean value"));
+    assert!(lockfile_error.contains("Not a valid Lockfile mode"));
 }
 
 #[test]

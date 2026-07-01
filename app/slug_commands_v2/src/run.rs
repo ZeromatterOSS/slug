@@ -9,6 +9,7 @@
  */
 
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
 
 use crate::common::CommandKind;
@@ -16,6 +17,7 @@ use crate::common::CommandParseError;
 use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
 use crate::common::bzlmod_command_policy;
+use crate::common::bzlmod_lockfile_mode;
 use crate::common::parse_single_target;
 use crate::common::split_args;
 
@@ -25,6 +27,7 @@ pub struct RunRequest {
     pub program_args: Vec<String>,
     pub flags: Vec<ParsedFlag>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
+    pub lockfile_mode: LockfileMode,
 }
 
 impl RunRequest {
@@ -34,11 +37,13 @@ impl RunRequest {
         let mut program_args = parsed.positionals.into_iter().skip(1).collect::<Vec<_>>();
         program_args.extend(parsed.passthrough);
         let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
+        let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         Ok(Self {
             target,
             program_args,
             flags: parsed.flags,
             bzlmod_policy,
+            lockfile_mode,
         })
     }
 
