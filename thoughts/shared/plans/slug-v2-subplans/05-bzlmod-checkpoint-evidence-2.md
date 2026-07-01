@@ -309,3 +309,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving root, depende
 Implementation summary: Added `BzlmodRepoMappingDigest`, deterministic repo-mapping digest helpers, and an explicit `repo_mapping_digest` field in `BzlmodDiceInputs`; existing constructors default to the deterministic empty mapping digest while `new_with_repo_mappings` and the combined hidden/generated/repo constructor let later resolver and extension execution wire real mapping identity without process-global state
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Repo mapping identity is now keyable, but V2 still needs actual DICE producers from resolver and extension execution, stale lockfile repo-mapping rejection, materialization, and same-daemon mapping invalidation.
+
+### Stage 5 repo mapping digest producer bridge
+
+Status: Partially landed
+V2 commit: `1b3ed5a6 Stage 5 produce repo mapping digests`
+Bazel source inspected: Existing Stage 5 repo-mapping citations still apply; this checkpoint wires the V2 resolver-side mapping substrate to the DICE digest helpers landed in `a81881eb`
+Bazel oracle: Bazel 9.1.1 `repo-mapping-canonical-names` fixture using `bazel mod dump_repo_mapping --output=json`
+V2 fixture: `repo-mapping-canonical-names`
+Expected evidence artifact: Stage 1 oracle expected output proving Bazel-shaped root, dependency, multiple-version, and extension-generated repo mapping content
+Implementation summary: Added `ResolvedGraph::module_repo_mapping_digests`, `ResolvedGraph::module_repo_mapping_digest`, and `ResolvedGraph::extension_generated_repo_mapping_digest` so resolved module graphs can produce the explicit repo-mapping identity expected by `BzlmodDiceInputs`; extension-generated digests are still helper-only until actual module-extension execution produces generated repositories
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: Resolver-produced module repo mappings can now feed DICE identity, but V2 still needs actual extension execution to produce generated repo mappings, visible/hidden lockfile replay validation for stale mappings, materialization, and same-daemon invalidation wiring.
