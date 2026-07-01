@@ -23,7 +23,9 @@ use slug_bzlmod_v2::VisibleLockfileApply;
 use slug_bzlmod_v2::VisibleLockfileInput;
 use slug_bzlmod_v2::VisibleLockfilePlan;
 use slug_bzlmod_v2::apply_visible_lockfile_plan;
+use slug_bzlmod_v2::empty_bazel_lockfile;
 use slug_bzlmod_v2::parse_bazel_lockfile;
+use slug_bzlmod_v2::parse_hidden_lockfile_fail_open;
 use slug_bzlmod_v2::plan_visible_lockfile;
 use slug_bzlmod_v2::render_bazel_lockfile;
 use slug_bzlmod_v2::validate_lockfile_version;
@@ -854,6 +856,42 @@ fn hidden_lockfile_input_rejects_invalid_utf8() {
 
     assert!(err.contains("hidden MODULE.bazel.lock"));
     assert!(err.contains("UTF-8"));
+}
+
+#[test]
+fn hidden_lockfile_parse_fail_open_keeps_current_valid_content() {
+    let input = HiddenLockfileInput::from_optional_bytes(Some(
+        br#"{"lockFileVersion":26,"registryFileHashes":{"https://example.test/MODULE.bazel":"abc"}}"#,
+    ))
+    .unwrap();
+
+    let parsed = input.parse_fail_open();
+
+    assert_eq!(parsed.lock_file_version, BAZEL_9_LOCK_FILE_VERSION);
+    assert_eq!(
+        parsed
+            .registry_file_hashes
+            .get("https://example.test/MODULE.bazel"),
+        Some(&"abc".to_owned())
+    );
+}
+
+#[test]
+fn hidden_lockfile_parse_fail_open_uses_empty_for_absent_malformed_or_old_version() {
+    let absent = HiddenLockfileInput::absent();
+    assert_eq!(absent.parse_fail_open(), empty_bazel_lockfile());
+
+    let malformed = HiddenLockfileInput::from_optional_bytes(Some(b"{ nope")).unwrap();
+    assert_eq!(malformed.parse_fail_open(), empty_bazel_lockfile());
+
+    let old_version =
+        HiddenLockfileInput::from_optional_bytes(Some(br#"{"lockFileVersion":24}"#)).unwrap();
+    assert_eq!(old_version.parse_fail_open(), empty_bazel_lockfile());
+
+    assert_eq!(
+        parse_hidden_lockfile_fail_open(Some("not json")),
+        empty_bazel_lockfile()
+    );
 }
 
 fn module_extension_replay_lockfile() -> slug_bzlmod_v2::BazelLockfile {

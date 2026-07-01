@@ -65,6 +65,17 @@ pub struct ModuleExtensionReplayInputs {
     pub recorded_file_digests: BTreeMap<String, String>,
 }
 
+pub fn empty_bazel_lockfile() -> BazelLockfile {
+    BazelLockfile {
+        lock_file_version: BAZEL_9_LOCK_FILE_VERSION,
+        registry_file_hashes: BTreeMap::new(),
+        selected_yanked_versions: BTreeMap::new(),
+        module_extensions: BTreeMap::new(),
+        facts: BTreeMap::new(),
+        facts_versions: BTreeMap::new(),
+    }
+}
+
 pub fn parse_bazel_lockfile(content: &str) -> Result<BazelLockfile, String> {
     let value: Value = serde_json::from_str(content)
         .map_err(|err| format!("Unable to parse MODULE.bazel.lock: {err}"))?;
@@ -217,6 +228,24 @@ impl HiddenLockfileInput {
 
     pub fn existing_content(&self) -> Option<&str> {
         self.content.as_deref()
+    }
+
+    pub fn parse_fail_open(&self) -> BazelLockfile {
+        parse_hidden_lockfile_fail_open(self.existing_content())
+    }
+}
+
+pub fn parse_hidden_lockfile_fail_open(existing_content: Option<&str>) -> BazelLockfile {
+    let Some(existing_content) = existing_content else {
+        return empty_bazel_lockfile();
+    };
+    let Ok(lockfile) = parse_bazel_lockfile(existing_content) else {
+        return empty_bazel_lockfile();
+    };
+    if lockfile.lock_file_version == BAZEL_9_LOCK_FILE_VERSION {
+        lockfile
+    } else {
+        empty_bazel_lockfile()
     }
 }
 
