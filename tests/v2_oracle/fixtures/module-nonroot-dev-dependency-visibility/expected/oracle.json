@@ -1,0 +1,35 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "@parent//:uses_child"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "@parent//:uses_child"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [],
+      "name": "non_root_dev_dependency_not_visible",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@parent+//:uses_child (5 packages loaded, 6 targets configured)\nAnalyzing: target @@parent+//:uses_child (5 packages loaded, 6 targets configured)\n\nERROR: no such package '@@[unknown repo 'child' requested from @@parent+]//': The repository '@@[unknown repo 'child' requested from @@parent+]' could not be resolved: No repository visible as '@child' from repository '@@parent+'\nERROR: <output_base>/external/parent+/BUILD.bazel:1:10: no such package '@@[unknown repo 'child' requested from @@parent+]//': The repository '@@[unknown repo 'child' requested from @@parent+]' could not be resolved: No repository visible as '@child' from repository '@@parent+' and referenced by '@@parent+//:uses_child'\nERROR: Analysis of target '@@parent+//:uses_child' failed; build aborted: Analysis failed\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@parent+//:uses_child (5 packages loaded, 6 targets configured)\nAnalyzing: target @@parent+//:uses_child (5 packages loaded, 6 targets configured)\n\nERROR: no such package '@@[unknown repo 'child' requested from @@parent+]//': The repository '@@[unknown repo 'child' requested from @@parent+]' could not be resolved: No repository visible as '@child' from repository '@@parent+'\nERROR: C:/dev/kuro/target/v2o/ob/module-nonroot-dev-dependency-visibility/bazel/external/parent+/BUILD.bazel:1:10: no such package '@@[unknown repo 'child' requested from @@parent+]//': The repository '@@[unknown repo 'child' requested from @@parent+]' could not be resolved: No repository visible as '@child' from repository '@@parent+' and referenced by '@@parent+//:uses_child'\nERROR: Analysis of target '@@parent+//:uses_child' failed; build aborted: Analysis failed\nINFO: Elapsed time: 3.482s, Critical Path: 0.02s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "module-nonroot-dev-dependency-visibility",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

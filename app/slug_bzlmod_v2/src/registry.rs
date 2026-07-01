@@ -24,13 +24,15 @@ use crate::dice::BzlmodRegistrySourceSpecDigest;
 use crate::dice::digest_registry_module_files;
 use crate::dice::digest_registry_policy;
 use crate::dice::digest_registry_source_specs;
+use crate::resolution::DependencyOwner;
+use crate::resolution::DevDependencyMode;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
 use crate::resolution::ResolvedDependency;
 use crate::resolution::ResolvedGraph;
 use crate::resolution::ResolvedModule;
+use crate::resolution::active_bazel_deps;
 use crate::resolution::bazel_canonical_module_repo_name;
-use crate::resolution::bazel_deps;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistryModule {
@@ -825,6 +827,18 @@ pub fn resolve_registry_mvs(
     root: &ModuleFile,
     registry_modules: &BTreeMap<ModuleKey, RegistryModule>,
 ) -> Result<ResolvedGraph, String> {
+    resolve_registry_mvs_with_dev_dependency_mode(
+        root,
+        registry_modules,
+        DevDependencyMode::IncludeRoot,
+    )
+}
+
+pub fn resolve_registry_mvs_with_dev_dependency_mode(
+    root: &ModuleFile,
+    registry_modules: &BTreeMap<ModuleKey, RegistryModule>,
+    dev_dependency_mode: DevDependencyMode,
+) -> Result<ResolvedGraph, String> {
     let root_header = root
         .module
         .as_ref()
@@ -834,7 +848,10 @@ pub fn resolve_registry_mvs(
     let multiple_overrides = multiple_version_overrides(root)?;
 
     let mut selected_versions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let mut queue: VecDeque<BazelDep> = bazel_deps(root).into_iter().collect();
+    let mut queue: VecDeque<BazelDep> =
+        active_bazel_deps(root, DependencyOwner::Root, dev_dependency_mode)
+            .into_iter()
+            .collect();
     while let Some(dep) = queue.pop_front() {
         let requested_version = single_overrides
             .get(&dep.name)
@@ -875,7 +892,11 @@ pub fn resolve_registry_mvs(
             let selected = registry_modules
                 .get(&requested_key)
                 .ok_or_else(|| format!("registry module {requested_key} was not supplied"))?;
-            queue.extend(bazel_deps(&selected.module_file));
+            queue.extend(active_bazel_deps(
+                &selected.module_file,
+                DependencyOwner::NonRoot,
+                dev_dependency_mode,
+            ));
         }
     }
 
@@ -887,7 +908,13 @@ pub fn resolve_registry_mvs(
             key: root_key.clone(),
             canonical_repo: "_main".to_owned(),
             source: ModuleSource::Root,
-            dependencies: resolve_dependencies(root, &selected_versions, &canonical_repos)?,
+            dependencies: resolve_dependencies(
+                root,
+                DependencyOwner::Root,
+                dev_dependency_mode,
+                &selected_versions,
+                &canonical_repos,
+            )?,
         },
     );
 
@@ -910,6 +937,8 @@ pub fn resolve_registry_mvs(
                     },
                     dependencies: resolve_dependencies(
                         &registry_module.module_file,
+                        DependencyOwner::NonRoot,
+                        dev_dependency_mode,
                         &selected_versions,
                         &canonical_repos,
                     )?,
@@ -996,11 +1025,13 @@ fn canonical_repos_for_selected_versions(
 
 fn resolve_dependencies(
     module_file: &ModuleFile,
+    owner: DependencyOwner,
+    dev_dependency_mode: DevDependencyMode,
     selected_versions: &BTreeMap<String, BTreeSet<String>>,
     canonical_repos: &BTreeMap<ModuleKey, String>,
 ) -> Result<Vec<ResolvedDependency>, String> {
     let mut dependencies = Vec::new();
-    for dep in bazel_deps(module_file) {
+    for dep in active_bazel_deps(module_file, owner, dev_dependency_mode) {
         let versions = selected_versions
             .get(&dep.name)
             .ok_or_else(|| format!("dependency {} was not resolved", dep.name))?;

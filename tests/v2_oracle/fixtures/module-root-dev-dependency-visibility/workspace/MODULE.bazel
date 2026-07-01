@@ -1,0 +1,4 @@
+module(name = "root_dev_dependency_visibility", version = "0.0.0")
+
+bazel_dep(name = "root_dev", version = "1.0.0", dev_dependency = True)
+local_path_override(module_name = "root_dev", path = "modules/root_dev")

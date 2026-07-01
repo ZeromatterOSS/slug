@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
+use slug_bzlmod_v2::DevDependencyMode;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ModuleSource;
@@ -18,6 +19,7 @@ use slug_bzlmod_v2::parse_bazel_dump_repo_mapping_json_lines;
 use slug_bzlmod_v2::registry_bazel_registry_json_url;
 use slug_bzlmod_v2::registry_module_file_url;
 use slug_bzlmod_v2::resolve_registry_mvs;
+use slug_bzlmod_v2::resolve_registry_mvs_with_dev_dependency_mode;
 use slug_bzlmod_v2::select_ordered_registry_modules;
 use slug_bzlmod_v2::validate_yanked_versions;
 
@@ -662,4 +664,78 @@ fn observed_registry_policy_hashes_reject_conflicting_registry_digests() {
     assert!(err.contains(
         "conflicting observed registry file hash for https://bcr.bazel.build/bazel_registry.json"
     ));
+}
+#[test]
+fn registry_mvs_root_dev_dependencies_follow_mode() {
+    let root = module(
+        r#"
+module(name = "root", version = "0.1.0")
+bazel_dep(name = "dep", version = "1.0.0", dev_dependency = True)
+"#,
+    );
+    let registry_modules = BTreeMap::from([(
+        ModuleKey::new("dep", "1.0.0"),
+        registry_module(r#"module(name = "dep", version = "1.0.0")"#),
+    )]);
+
+    let default_graph = resolve_registry_mvs(&root, &registry_modules).unwrap();
+    assert!(
+        default_graph
+            .module(&ModuleKey::new("dep", "1.0.0"))
+            .is_some()
+    );
+
+    let ignored_graph = resolve_registry_mvs_with_dev_dependency_mode(
+        &root,
+        &registry_modules,
+        DevDependencyMode::IgnoreRoot,
+    )
+    .unwrap();
+    assert!(
+        ignored_graph
+            .module(&ModuleKey::new("dep", "1.0.0"))
+            .is_none()
+    );
+    assert!(
+        !ignored_graph
+            .repo_mapping_for("_main")
+            .unwrap()
+            .contains_key("dep")
+    );
+}
+
+#[test]
+fn registry_mvs_ignores_non_root_dev_dependencies() {
+    let root = module(
+        r#"
+module(name = "root", version = "0.1.0")
+bazel_dep(name = "parent", version = "1.0.0")
+"#,
+    );
+    let registry_modules = BTreeMap::from([
+        (
+            ModuleKey::new("parent", "1.0.0"),
+            registry_module(
+                r#"
+module(name = "parent", version = "1.0.0")
+bazel_dep(name = "child", version = "1.0.0", dev_dependency = True)
+"#,
+            ),
+        ),
+        (
+            ModuleKey::new("child", "1.0.0"),
+            registry_module(r#"module(name = "child", version = "1.0.0")"#),
+        ),
+    ]);
+
+    let graph = resolve_registry_mvs(&root, &registry_modules).unwrap();
+
+    assert!(graph.module(&ModuleKey::new("parent", "1.0.0")).is_some());
+    assert!(graph.module(&ModuleKey::new("child", "1.0.0")).is_none());
+    assert!(
+        !graph
+            .repo_mapping_for("parent+")
+            .unwrap()
+            .contains_key("child")
+    );
 }

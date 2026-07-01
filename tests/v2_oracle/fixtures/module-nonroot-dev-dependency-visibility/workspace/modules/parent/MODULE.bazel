@@ -1,0 +1,3 @@
+module(name = "parent", version = "1.0.0")
+
+bazel_dep(name = "child", version = "1.0.0", dev_dependency = True)

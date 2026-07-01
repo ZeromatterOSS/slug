@@ -58,6 +58,18 @@ pub enum ModuleSource {
     Registry { registry_url: String },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DevDependencyMode {
+    IncludeRoot,
+    IgnoreRoot,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DependencyOwner {
+    Root,
+    NonRoot,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedDependency {
     pub apparent_repo_name: String,
@@ -222,13 +234,43 @@ pub fn resolve_local_module_graph_with_includes(
     included_modules: &BTreeMap<String, ModuleFile>,
     local_modules: &BTreeMap<String, ModuleFile>,
 ) -> Result<ResolvedGraph, String> {
+    resolve_local_module_graph_with_includes_and_dev_dependency_mode(
+        root,
+        included_modules,
+        local_modules,
+        DevDependencyMode::IncludeRoot,
+    )
+}
+
+pub fn resolve_local_module_graph_with_includes_and_dev_dependency_mode(
+    root: &ModuleFile,
+    included_modules: &BTreeMap<String, ModuleFile>,
+    local_modules: &BTreeMap<String, ModuleFile>,
+    dev_dependency_mode: DevDependencyMode,
+) -> Result<ResolvedGraph, String> {
     let expanded = expand_included_module_files(root, included_modules)?;
-    resolve_local_module_graph(&expanded, local_modules)
+    resolve_local_module_graph_with_dev_dependency_mode(
+        &expanded,
+        local_modules,
+        dev_dependency_mode,
+    )
 }
 
 pub fn resolve_local_module_graph(
     root: &ModuleFile,
     local_modules: &BTreeMap<String, ModuleFile>,
+) -> Result<ResolvedGraph, String> {
+    resolve_local_module_graph_with_dev_dependency_mode(
+        root,
+        local_modules,
+        DevDependencyMode::IncludeRoot,
+    )
+}
+
+pub fn resolve_local_module_graph_with_dev_dependency_mode(
+    root: &ModuleFile,
+    local_modules: &BTreeMap<String, ModuleFile>,
+    dev_dependency_mode: DevDependencyMode,
 ) -> Result<ResolvedGraph, String> {
     let root_header = root
         .module
@@ -245,7 +287,10 @@ pub fn resolve_local_module_graph(
     let mut sources = BTreeMap::new();
     sources.insert(root_key.clone(), ModuleSource::Root);
 
-    let mut queue: VecDeque<BazelDep> = bazel_deps(root).into_iter().collect();
+    let mut queue: VecDeque<BazelDep> =
+        active_bazel_deps(root, DependencyOwner::Root, dev_dependency_mode)
+            .into_iter()
+            .collect();
     while let Some(dep) = queue.pop_front() {
         if let Some(existing) = discovered_by_name.get(&dep.name) {
             if existing.version != dep.version && !local_overrides.contains_key(&dep.name) {
@@ -283,7 +328,11 @@ pub fn resolve_local_module_graph(
             },
         );
         module_files.insert(key.clone(), module_file);
-        queue.extend(bazel_deps(module_file));
+        queue.extend(active_bazel_deps(
+            module_file,
+            DependencyOwner::NonRoot,
+            dev_dependency_mode,
+        ));
     }
 
     let mut modules = BTreeMap::new();
@@ -294,7 +343,12 @@ pub fn resolve_local_module_graph(
             bazel_canonical_module_repo_name(&key.name)
         };
         let mut dependencies = Vec::new();
-        for dep in bazel_deps(module_file) {
+        let dependency_owner = if key == root_key {
+            DependencyOwner::Root
+        } else {
+            DependencyOwner::NonRoot
+        };
+        for dep in active_bazel_deps(module_file, dependency_owner, dev_dependency_mode) {
             let dep_key = discovered_by_name
                 .get(&dep.name)
                 .ok_or_else(|| format!("dependency {} was not resolved", dep.name))?;
@@ -333,6 +387,27 @@ pub(crate) fn bazel_deps(module_file: &ModuleFile) -> Vec<BazelDep> {
             _ => None,
         })
         .collect()
+}
+
+pub(crate) fn active_bazel_deps(
+    module_file: &ModuleFile,
+    owner: DependencyOwner,
+    dev_dependency_mode: DevDependencyMode,
+) -> Vec<BazelDep> {
+    bazel_deps(module_file)
+        .into_iter()
+        .filter(|dep| active_bazel_dep(dep, owner, dev_dependency_mode))
+        .collect()
+}
+
+fn active_bazel_dep(
+    dep: &BazelDep,
+    owner: DependencyOwner,
+    dev_dependency_mode: DevDependencyMode,
+) -> bool {
+    !dep.dev_dependency
+        || (matches!(owner, DependencyOwner::Root)
+            && matches!(dev_dependency_mode, DevDependencyMode::IncludeRoot))
 }
 
 fn local_path_overrides(module_file: &ModuleFile) -> Result<BTreeMap<String, String>, String> {

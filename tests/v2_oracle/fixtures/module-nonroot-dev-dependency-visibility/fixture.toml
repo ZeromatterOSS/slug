@@ -1,0 +1,12 @@
+[fixture]
+name = "module-nonroot-dev-dependency-visibility"
+description = "Stage 5 Bazel 9 oracle for non-root MODULE.bazel dev_dependency repository visibility."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9 oracle fixture: a non-root module's dev dependency is not visible from that module's repository mapping."
+
+[[commands]]
+name = "non_root_dev_dependency_not_visible"
+argv = ["build", "@parent//:uses_child"]
+compare = "message_shape"
+expected_exit = 1
+stderr_contains = ["No repository visible as '@child' from repository '@@parent+'"]

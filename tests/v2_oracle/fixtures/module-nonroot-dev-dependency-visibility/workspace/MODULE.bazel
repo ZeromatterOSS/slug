@@ -1,0 +1,4 @@
+module(name = "nonroot_dev_dependency_visibility", version = "0.0.0")
+
+bazel_dep(name = "parent", version = "1.0.0")
+local_path_override(module_name = "parent", path = "modules/parent")

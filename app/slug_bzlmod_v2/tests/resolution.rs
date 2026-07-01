@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 
+use slug_bzlmod_v2::DevDependencyMode;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ModuleSource;
 use slug_bzlmod_v2::bazel_canonical_module_repo_name;
 use slug_bzlmod_v2::resolve_local_module_graph;
+use slug_bzlmod_v2::resolve_local_module_graph_with_dev_dependency_mode;
 use slug_bzlmod_v2::resolve_local_module_graph_with_includes;
 
 #[test]
@@ -242,4 +244,83 @@ local_path_override(module_name = "dep", path = "modules/dep")
 fn canonical_module_repo_name_matches_bazel_local_graph_shape() {
     assert_eq!(bazel_canonical_module_repo_name("aaa"), "aaa+");
     assert_eq!(bazel_canonical_module_repo_name("_main"), "_main");
+}
+#[test]
+fn local_graph_root_dev_dependencies_follow_mode() {
+    let root = ModuleFile::parse(
+        r#"
+module(name = "root", version = "0.0.0")
+bazel_dep(name = "dep", version = "1.0.0", dev_dependency = True)
+local_path_override(module_name = "dep", path = "modules/dep")
+"#,
+    )
+    .unwrap();
+    let dep = ModuleFile::parse(r#"module(name = "dep", version = "1.0.0")"#).unwrap();
+    let locals = BTreeMap::from([("dep".to_owned(), dep)]);
+
+    let default_graph = resolve_local_module_graph(&root, &locals).unwrap();
+    assert!(
+        default_graph
+            .module(&ModuleKey::new("dep", "1.0.0"))
+            .is_some()
+    );
+    assert_eq!(
+        default_graph
+            .repo_mapping_for("_main")
+            .unwrap()
+            .get("dep")
+            .map(String::as_str),
+        Some("dep+")
+    );
+
+    let ignored_graph = resolve_local_module_graph_with_dev_dependency_mode(
+        &root,
+        &locals,
+        DevDependencyMode::IgnoreRoot,
+    )
+    .unwrap();
+    assert!(
+        ignored_graph
+            .module(&ModuleKey::new("dep", "1.0.0"))
+            .is_none()
+    );
+    assert!(
+        !ignored_graph
+            .repo_mapping_for("_main")
+            .unwrap()
+            .contains_key("dep")
+    );
+}
+
+#[test]
+fn local_graph_ignores_non_root_dev_dependencies() {
+    let root = ModuleFile::parse(
+        r#"
+module(name = "root", version = "0.0.0")
+bazel_dep(name = "parent", version = "1.0.0")
+local_path_override(module_name = "parent", path = "modules/parent")
+local_path_override(module_name = "child", path = "modules/child")
+"#,
+    )
+    .unwrap();
+    let parent = ModuleFile::parse(
+        r#"
+module(name = "parent", version = "1.0.0")
+bazel_dep(name = "child", version = "1.0.0", dev_dependency = True)
+"#,
+    )
+    .unwrap();
+    let child = ModuleFile::parse(r#"module(name = "child", version = "1.0.0")"#).unwrap();
+    let locals = BTreeMap::from([("parent".to_owned(), parent), ("child".to_owned(), child)]);
+
+    let graph = resolve_local_module_graph(&root, &locals).unwrap();
+
+    assert!(graph.module(&ModuleKey::new("parent", "1.0.0")).is_some());
+    assert!(graph.module(&ModuleKey::new("child", "1.0.0")).is_none());
+    assert!(
+        !graph
+            .repo_mapping_for("parent+")
+            .unwrap()
+            .contains_key("child")
+    );
 }

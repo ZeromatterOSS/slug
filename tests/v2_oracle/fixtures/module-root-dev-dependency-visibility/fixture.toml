@@ -1,0 +1,19 @@
+[fixture]
+name = "module-root-dev-dependency-visibility"
+description = "Stage 5 Bazel 9 oracle for root MODULE.bazel dev_dependency visibility and --ignore_dev_dependency."
+comparison = "message_shape"
+oracle_notes = "Self-contained Bazel 9 oracle fixture: root dev dependencies are visible by default and hidden when --ignore_dev_dependency is set."
+
+[[commands]]
+name = "root_dev_dependency_visible_by_default"
+argv = ["build", "@root_dev//:target.txt"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+
+[[commands]]
+name = "root_dev_dependency_hidden_when_ignored"
+argv = ["build", "--ignore_dev_dependency", "@root_dev//:target.txt"]
+compare = "message_shape"
+expected_exit = 1
+stderr_contains = ["No repository visible as '@root_dev'"]

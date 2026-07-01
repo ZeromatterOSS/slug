@@ -1,0 +1,1 @@
+module(name = "child", version = "1.0.0")
