@@ -225,3 +225,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving lockfile mode
 Implementation summary: Added `empty_bazel_lockfile` and `parse_hidden_lockfile_fail_open`, with `HiddenLockfileInput::parse_fail_open`, so absent, malformed, or stale-version hidden content resolves to an empty Bazel 9 lockfile while current-version hidden content is preserved; this still performs no filesystem read, output-base path discovery, write, or extension execution
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; same command for `lockfile-mode-off` and `module-extension-lockfile-error-usage`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: V2 can now model Bazel's hidden parse fail-open boundary once bytes are supplied, but actual DICE output-base reads, IO-error fail-open integration, hidden lockfile persistence, repository-rule attr/repo-mapping replay, and same-daemon stale rejection remain later Stage 5.5/5.6/5.8 work
+
+### Stage 5 module extension lockfile replay oracle
+
+Status: Partially landed
+V2 commit: `869795c1 Stage 5 add module extension lockfile replay oracle`
+Bazel source inspected: Existing Stage 5 lockfile source citations still apply: `C:\dev\bazel\src\main\java\com\google\devtools\build\lib\bazel\bzlmod\BazelLockFileFunction.java` reads lockfile values, and `C:\dev\bazel\src\main\java\com\google\devtools\build\lib\bazel\bzlmod\BazelLockFileModule.java` combines module-extension results into visible/hidden lockfiles after command execution
+Bazel oracle: Bazel 9.1.1 `module-extension-lockfile-replay` fixture
+V2 fixture: `module-extension-lockfile-replay`
+Expected evidence artifact: Stage 1 oracle expected output shows the prime command executing the extension sentinel, replay in `--lockfile_mode=error` succeeding without the sentinel, then a tag mutation rejected as stale usageDigest data
+Implementation summary: Added the missing exact-criteria oracle fixture for module-extension lockfile replay; this is an oracle-only checkpoint and does not add V2 extension execution, lockfile replay integration, or generated repository materialization
+Validation: `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-replay --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120 --update-expected`; same command without `--update-expected`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; `py -3 -B -m tools.v2_oracle list`; diff checks before commit
+Residual risk: The oracle now pins Bazel replay behavior, but V2 still needs actual module-extension execution, visible/hidden lockfile replay selection, repository-rule attr and repo-mapping replay validation, hidden persistence, and same-daemon stale rejection wiring
