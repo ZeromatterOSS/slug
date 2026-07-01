@@ -69,6 +69,7 @@ pub use registry::RegistryModule;
 pub use registry::RegistrySourceSpec;
 pub use registry::SelectedYankedVersion;
 pub use registry::YankedVersionPolicy;
+pub use registry::digest_selected_registry_modules;
 pub use registry::parse_registry_metadata_json;
 pub use registry::parse_registry_source_json;
 pub use registry::resolve_registry_mvs;

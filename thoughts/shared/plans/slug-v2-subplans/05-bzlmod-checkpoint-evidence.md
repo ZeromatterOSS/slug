@@ -816,6 +816,7 @@ Stage 5 lockfile refresh local-registry mutation checkpoint:
   bundled `python.exe -B -m pytest -q -p no:cacheprovider
   tests/v2_oracle/test_v2_oracle.py`; `rg -n "process-global|fallback
   scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
 Stage 5 registry module-file DICE input checkpoint:
 
 - Added `BzlmodRegistryModuleFileDigest` and `digest_registry_module_files` to
@@ -858,3 +859,22 @@ Stage 5 lockfile error local-registry mutation checkpoint:
   `python.exe -B -m pytest -q -p no:cacheprovider
   tests/v2_oracle/test_v2_oracle.py`; `rg -n "process-global|fallback
   scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 registry catalog digest preservation checkpoint:
+
+- Added digest-aware `RegistryCatalog::with_module_file_digests`, preserved the
+  selected module-file digest through `select_ordered_registry_modules`, and
+  exposed `digest_selected_registry_modules` for building the DICE registry
+  module-file input from the selected registry graph.
+- The helper requires explicit content digests for every selected registry
+  module before it produces a DICE digest. This keeps local/BCR registry
+  module-file edits auditable and avoids reintroducing a process-global or
+  fallback scanner as semantic state.
+- No V1 bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 `lockfile-refresh-registry-mutation` oracle and
+  the prior registry module-file DICE input checkpoint.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-refresh-registry-mutation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.

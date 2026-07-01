@@ -7,6 +7,8 @@ use slug_bzlmod_v2::ModuleSource;
 use slug_bzlmod_v2::RegistryCatalog;
 use slug_bzlmod_v2::RegistryModule;
 use slug_bzlmod_v2::YankedVersionPolicy;
+use slug_bzlmod_v2::digest_module_file_content;
+use slug_bzlmod_v2::digest_selected_registry_modules;
 use slug_bzlmod_v2::resolve_registry_mvs;
 use slug_bzlmod_v2::select_ordered_registry_modules;
 use slug_bzlmod_v2::validate_yanked_versions;
@@ -365,6 +367,83 @@ bazel_dep(name = "bbb", version = "1.0.0")
             .all(|directive| !matches!(directive, slug_bzlmod_v2::Directive::BazelDep(_)))
     );
 }
+
+#[test]
+fn ordered_registry_selection_preserves_module_file_digests() {
+    let first_aaa = r#"module(name = "aaa", version = "1.0.0")"#;
+    let second_aaa = r#"
+module(name = "aaa", version = "1.0.0")
+bazel_dep(name = "bbb", version = "1.0.0")
+"#;
+    let second_ccc = r#"module(name = "ccc", version = "1.0.0")"#;
+    let first = RegistryCatalog::with_module_file_digests(
+        "file:///%workspace%/first",
+        BTreeMap::from([(
+            ModuleKey::new("aaa", "1.0.0"),
+            (module(first_aaa), digest_module_file_content(first_aaa)),
+        )]),
+    )
+    .unwrap();
+    let second = RegistryCatalog::with_module_file_digests(
+        "file:///%workspace%/second",
+        BTreeMap::from([
+            (
+                ModuleKey::new("aaa", "1.0.0"),
+                (module(second_aaa), digest_module_file_content(second_aaa)),
+            ),
+            (
+                ModuleKey::new("ccc", "1.0.0"),
+                (module(second_ccc), digest_module_file_content(second_ccc)),
+            ),
+        ]),
+    )
+    .unwrap();
+
+    let selected = select_ordered_registry_modules(&[first, second]);
+
+    assert_eq!(
+        selected
+            .get(&ModuleKey::new("aaa", "1.0.0"))
+            .and_then(RegistryModule::module_file_digest),
+        Some(digest_module_file_content(first_aaa).as_str())
+    );
+    assert_eq!(
+        selected
+            .get(&ModuleKey::new("ccc", "1.0.0"))
+            .and_then(RegistryModule::module_file_digest),
+        Some(digest_module_file_content(second_ccc).as_str())
+    );
+
+    let digest = digest_selected_registry_modules(&selected).unwrap();
+    let first_changed = RegistryCatalog::with_module_file_digests(
+        "file:///%workspace%/first",
+        BTreeMap::from([(
+            ModuleKey::new("aaa", "1.0.0"),
+            (module(second_aaa), digest_module_file_content(second_aaa)),
+        )]),
+    )
+    .unwrap();
+    let changed =
+        digest_selected_registry_modules(&select_ordered_registry_modules(&[first_changed]))
+            .unwrap();
+
+    assert_ne!(digest, changed);
+}
+
+#[test]
+fn selected_registry_module_digest_requires_explicit_digests() {
+    let selected = select_ordered_registry_modules(&[RegistryCatalog::new(
+        "file:///%workspace%/registry",
+        BTreeMap::from([(
+            ModuleKey::new("aaa", "1.0.0"),
+            module(r#"module(name = "aaa", version = "1.0.0")"#),
+        )]),
+    )]);
+
+    let err = digest_selected_registry_modules(&selected).unwrap_err();
+    assert!(err.contains("selected registry module aaa@1.0.0 has no module file digest"));
+}
+
 #[test]
 fn yanked_policy_parses_environment_allowlist() {
     assert_eq!(

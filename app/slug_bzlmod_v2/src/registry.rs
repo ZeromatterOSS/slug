@@ -18,6 +18,8 @@ use serde_json::Value;
 use crate::BazelDep;
 use crate::Directive;
 use crate::ModuleFile;
+use crate::dice::BzlmodRegistryModuleFileDigest;
+use crate::dice::digest_registry_module_files;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
 use crate::resolution::ResolvedDependency;
@@ -30,6 +32,7 @@ use crate::resolution::bazel_deps;
 pub struct RegistryModule {
     pub registry_url: String,
     pub module_file: ModuleFile,
+    module_file_digest: Option<String>,
 }
 
 impl RegistryModule {
@@ -37,7 +40,24 @@ impl RegistryModule {
         Self {
             registry_url: registry_url.into(),
             module_file,
+            module_file_digest: None,
         }
+    }
+
+    fn with_module_file_digest(
+        registry_url: impl Into<String>,
+        module_file: ModuleFile,
+        module_file_digest: Option<String>,
+    ) -> Self {
+        Self {
+            registry_url: registry_url.into(),
+            module_file,
+            module_file_digest,
+        }
+    }
+
+    pub fn module_file_digest(&self) -> Option<&str> {
+        self.module_file_digest.as_deref()
     }
 }
 
@@ -45,6 +65,7 @@ impl RegistryModule {
 pub struct RegistryCatalog {
     pub registry_url: String,
     pub modules: BTreeMap<ModuleKey, ModuleFile>,
+    module_file_digests: BTreeMap<ModuleKey, String>,
 }
 
 impl RegistryCatalog {
@@ -52,7 +73,31 @@ impl RegistryCatalog {
         Self {
             registry_url: registry_url.into(),
             modules,
+            module_file_digests: BTreeMap::new(),
         }
+    }
+
+    pub fn with_module_file_digests(
+        registry_url: impl Into<String>,
+        modules: BTreeMap<ModuleKey, (ModuleFile, String)>,
+    ) -> Result<Self, String> {
+        let registry_url = registry_url.into();
+        let mut module_files = BTreeMap::new();
+        let mut module_file_digests = BTreeMap::new();
+        for (module, (module_file, digest)) in modules {
+            BzlmodRegistryModuleFileDigest::new(
+                registry_url.clone(),
+                module.clone(),
+                digest.clone(),
+            )?;
+            module_files.insert(module.clone(), module_file);
+            module_file_digests.insert(module, digest);
+        }
+        Ok(Self {
+            registry_url,
+            modules: module_files,
+            module_file_digests,
+        })
     }
 }
 
@@ -63,11 +108,32 @@ pub fn select_ordered_registry_modules(
     for registry in registries {
         for (key, module_file) in &registry.modules {
             selected.entry(key.clone()).or_insert_with(|| {
-                RegistryModule::new(registry.registry_url.clone(), module_file.clone())
+                RegistryModule::with_module_file_digest(
+                    registry.registry_url.clone(),
+                    module_file.clone(),
+                    registry.module_file_digests.get(key).cloned(),
+                )
             });
         }
     }
     selected
+}
+
+pub fn digest_selected_registry_modules(
+    modules: &BTreeMap<ModuleKey, RegistryModule>,
+) -> Result<String, String> {
+    let mut digests = Vec::with_capacity(modules.len());
+    for (module_key, module) in modules {
+        let digest = module.module_file_digest().ok_or_else(|| {
+            format!("selected registry module {module_key} has no module file digest")
+        })?;
+        digests.push(BzlmodRegistryModuleFileDigest::new(
+            module.registry_url.clone(),
+            module_key.clone(),
+            digest.to_owned(),
+        )?);
+    }
+    digest_registry_module_files(digests)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
