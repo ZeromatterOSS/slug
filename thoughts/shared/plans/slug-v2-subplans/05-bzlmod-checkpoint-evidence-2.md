@@ -141,3 +141,15 @@ Expected evidence artifact: Stage 1 oracle expected JSON lines for dependency, m
 Implementation summary: Added `parse_bazel_dump_repo_mapping_json_lines` to normalize Bazel `dump_repo_mapping` JSON-line output into deterministic string maps, and updated the registry MVS repo-mapping test to compare V2-derived mappings against the normalized Bazel oracle shape; this remains a comparison substrate and does not execute module extensions, materialize repositories, or import V1 repo mapping code
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Full byte-for-byte repo mapping comparison still needs integration into an executable V2 command/oracle path, generated repo mapping still needs real extension execution ownership, and same-daemon mapping invalidation remains later Stage 5.4/5.8 work
+
+### Stage 5 visible lockfile apply substrate
+
+Status: Partially landed
+V2 commit: `210216f1 Stage 5 apply visible lockfile plans`
+V1 source inspected: None for implementation; the write boundary is derived from the existing V2 visible lockfile planner and Bazel 9 lockfile-mode oracle fixtures
+Bazel oracle: Bazel 9.1.1 `lockfile-mode-update-refresh` and `lockfile-mode-off` fixtures
+V2 fixture: `lockfile-mode-update-refresh`, `lockfile-mode-off`
+Expected evidence artifact: Stage 1 oracle expected output proving `update`/`refresh` visible lockfile writes and `off` leaves `MODULE.bazel.lock` absent
+Implementation summary: Added `apply_visible_lockfile_plan` to apply an already-computed `VisibleLockfilePlan`: ignore/keep/error plans perform no filesystem writes, and write plans publish content through a same-directory temporary file before persisting to `MODULE.bazel.lock`; the helper does not read lockfile content, select policy, compute digests, update hidden lockfiles, or discover semantic inputs
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-off --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: V2 now has a narrow visible-lockfile apply boundary, but actual lockfile read integration, DICE-owned lockfile digest production, hidden lockfile persistence, registry refresh re-fetches, directory durability policy, and same-daemon stale rejection remain later Stage 5.5/5.6 work
