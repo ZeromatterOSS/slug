@@ -153,3 +153,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving `update`/`ref
 Implementation summary: Added `apply_visible_lockfile_plan` to apply an already-computed `VisibleLockfilePlan`: ignore/keep/error plans perform no filesystem writes, and write plans publish content through a same-directory temporary file before persisting to `MODULE.bazel.lock`; the helper does not read lockfile content, select policy, compute digests, update hidden lockfiles, or discover semantic inputs
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-off --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: V2 now has a narrow visible-lockfile apply boundary, but actual lockfile read integration, DICE-owned lockfile digest production, hidden lockfile persistence, registry refresh re-fetches, directory durability policy, and same-daemon stale rejection remain later Stage 5.5/5.6 work
+
+### Stage 5 visible lockfile digest substrate
+
+Status: Partially landed
+V2 commit: `9046145d Stage 5 model visible lockfile digests`
+V1 source inspected: None for implementation; this is V2-owned DICE key plumbing derived from the existing visible-lockfile mode/update/error fixtures
+Bazel oracle: Bazel 9.1.1 `lockfile-mode-update-refresh` and `lockfile-mode-off` fixtures
+V2 fixture: `lockfile-mode-update-refresh`, `lockfile-mode-off`
+Expected evidence artifact: Stage 1 oracle expected output proving visible lockfile presence/absence under Bazel lockfile modes
+Implementation summary: Added `BzlmodVisibleLockfileDigest` so resolved-graph DICE inputs can distinguish absent visible lockfiles from present lockfile content digests, and updated DICE-input tests to prove lockfile content changes affect key identity; this does not read the filesystem, compute hidden lockfile state, write lockfiles, or decide mode policy
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-off --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: The digest token is ready for DICE keys, but actual visible lockfile reads, hidden lockfile persistence, refresh/error lifecycle integration, registry re-fetch policy, and same-daemon stale rejection remain later Stage 5.5/5.6 work
