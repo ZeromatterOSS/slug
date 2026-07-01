@@ -51,6 +51,20 @@ pub struct Registration {
     pub labels: Vec<String>,
     pub dev_dependency: bool,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistrationKind {
+    Toolchain,
+    ExecutionPlatform,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleRegistrationDirective {
+    pub kind: RegistrationKind,
+    pub labels: Vec<String>,
+    pub dev_dependency: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BazelDep {
     pub name: String,
@@ -315,6 +329,30 @@ fn include_label_to_path(label: &str) -> Result<String, String> {
         ));
     }
     Ok(path.to_owned())
+}
+
+pub fn module_registration_directives(
+    module_file: &ModuleFile,
+) -> Vec<ModuleRegistrationDirective> {
+    module_file
+        .directives
+        .iter()
+        .filter_map(|directive| match directive {
+            Directive::RegisterToolchains(registration) => Some(ModuleRegistrationDirective {
+                kind: RegistrationKind::Toolchain,
+                labels: registration.labels.clone(),
+                dev_dependency: registration.dev_dependency,
+            }),
+            Directive::RegisterExecutionPlatforms(registration) => {
+                Some(ModuleRegistrationDirective {
+                    kind: RegistrationKind::ExecutionPlatform,
+                    labels: registration.labels.clone(),
+                    dev_dependency: registration.dev_dependency,
+                })
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 fn logical_statements(source: &str) -> Result<Vec<(usize, String)>, String> {

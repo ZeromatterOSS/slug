@@ -9,9 +9,11 @@ use slug_bzlmod_v2::InjectRepo;
 use slug_bzlmod_v2::LocalPathOverride;
 use slug_bzlmod_v2::ModuleAttributeValue;
 use slug_bzlmod_v2::ModuleFile;
+use slug_bzlmod_v2::ModuleRegistrationDirective;
 use slug_bzlmod_v2::MultipleVersionOverride;
 use slug_bzlmod_v2::OverrideRepo;
 use slug_bzlmod_v2::Registration;
+use slug_bzlmod_v2::RegistrationKind;
 use slug_bzlmod_v2::RepoImport;
 use slug_bzlmod_v2::RepoRuleInvocation;
 use slug_bzlmod_v2::SingleVersionOverride;
@@ -19,6 +21,7 @@ use slug_bzlmod_v2::UseExtension;
 use slug_bzlmod_v2::UseRepo;
 use slug_bzlmod_v2::UseRepoRule;
 use slug_bzlmod_v2::expand_included_module_files;
+use slug_bzlmod_v2::module_registration_directives;
 
 #[test]
 fn parses_module_directives_in_order() {
@@ -119,6 +122,42 @@ local_path_override(module_name = "dep", path = "dep")
     ));
 }
 
+#[test]
+fn extracts_registration_directives_in_module_order() {
+    let parsed = ModuleFile::parse(
+        r#"
+module(name = "root", version = "0.0.0")
+register_toolchains("//:tc", dev_dependency = True)
+bazel_dep(name = "dep", version = "1.0.0")
+register_execution_platforms("//:host", "//:remote", dev_dependency = False)
+register_toolchains("//:extra")
+"#,
+    )
+    .unwrap();
+
+    let registrations = module_registration_directives(&parsed);
+
+    assert_eq!(
+        registrations,
+        vec![
+            ModuleRegistrationDirective {
+                kind: RegistrationKind::Toolchain,
+                labels: vec!["//:tc".to_owned()],
+                dev_dependency: true,
+            },
+            ModuleRegistrationDirective {
+                kind: RegistrationKind::ExecutionPlatform,
+                labels: vec!["//:host".to_owned(), "//:remote".to_owned()],
+                dev_dependency: false,
+            },
+            ModuleRegistrationDirective {
+                kind: RegistrationKind::Toolchain,
+                labels: vec!["//:extra".to_owned()],
+                dev_dependency: false,
+            },
+        ]
+    );
+}
 #[test]
 fn include_expansion_rejects_missing_or_invalid_fragments() {
     let root = ModuleFile::parse(r#"include("//:missing.MODULE.bazel")"#).unwrap();
