@@ -369,3 +369,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving `register_too
 Implementation summary: Added `RegistrationKind`, `ModuleRegistrationDirective`, and `module_registration_directives` so parsed MODULE files can produce an order-preserving registration list with labels and `dev_dependency` state intact; this remains parser-side substrate and adds no toolchain resolution, repository materialization, process-global state, or V1 resolver behavior
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registration-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Registration directives can now be extracted in Bazel-observed order, but V2 still needs root/non-root dev-dependency filtering, DICE-owned module file reads, wiring into Stage 6 toolchain/platform resolution, and same-daemon invalidation for registration edits.
+
+### Stage 5 dev dependency visibility substrate
+
+Status: Partially landed
+V2 commit: `edab8efd Stage 5 model dev dependency visibility`
+Bazel source inspected: Existing Stage 5 module-file directive citations still apply; this checkpoint is anchored by local Bazel 9 dev-dependency visibility fixtures
+Bazel oracle: Bazel 9.1.1 `module-root-dev-dependency-visibility` and `module-nonroot-dev-dependency-visibility` fixtures
+V2 fixture: `module-root-dev-dependency-visibility`, `module-nonroot-dev-dependency-visibility`
+Expected evidence artifact: Stage 1 oracle expected output proving root `bazel_dep(dev_dependency = True)` is visible by default, hidden under `--ignore_dev_dependency`, and non-root dev dependencies are absent from the dependent module's repository mapping
+Implementation summary: Added `DevDependencyMode` and mode-aware local/registry graph entrypoints; default graph resolution includes root dev dependencies while `IgnoreRoot` drops them, and both local and registry substrates ignore non-root dev dependencies before module discovery and repo-mapping construction
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-root-dev-dependency-visibility --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; same command for `module-nonroot-dev-dependency-visibility`; `py -3 -B -m tools.v2_oracle list`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: Dev-dependency visibility now matches the observed graph-selection cases, but V2 still needs command-line flag plumbing from the CLI into bzlmod graph keys, exact diagnostics for override-on-nonexistent-module cases, actual DICE file reads/watch edges, and same-daemon invalidation for dev-dependency edits.
