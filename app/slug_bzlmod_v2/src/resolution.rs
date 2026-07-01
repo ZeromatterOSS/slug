@@ -21,6 +21,7 @@ use crate::ModuleFile;
 use crate::ModuleHeader;
 use crate::digest_repo_mapping_entries;
 use crate::digest_repo_mappings;
+use crate::expand_included_module_files;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModuleKey {
@@ -214,6 +215,15 @@ pub fn bazel_canonical_module_repo_name(module_name: &str) -> String {
     } else {
         format!("{module_name}+")
     }
+}
+
+pub fn resolve_local_module_graph_with_includes(
+    root: &ModuleFile,
+    included_modules: &BTreeMap<String, ModuleFile>,
+    local_modules: &BTreeMap<String, ModuleFile>,
+) -> Result<ResolvedGraph, String> {
+    let expanded = expand_included_module_files(root, included_modules)?;
+    resolve_local_module_graph(&expanded, local_modules)
 }
 
 pub fn resolve_local_module_graph(

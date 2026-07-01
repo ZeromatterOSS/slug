@@ -5,6 +5,7 @@ use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ModuleSource;
 use slug_bzlmod_v2::bazel_canonical_module_repo_name;
 use slug_bzlmod_v2::resolve_local_module_graph;
+use slug_bzlmod_v2::resolve_local_module_graph_with_includes;
 
 #[test]
 fn resolves_transitive_local_path_overrides() {
@@ -56,6 +57,51 @@ bazel_dep(name = "bbb", version = "2.0.0")
     assert_eq!(root_mapping.get("aaa").map(String::as_str), Some("aaa+"));
     let aaa_mapping = graph.repo_mapping_for("aaa+").unwrap();
     assert_eq!(aaa_mapping.get("bbb").map(String::as_str), Some("bbb+"));
+}
+
+#[test]
+fn resolves_local_graph_through_included_module_fragment() {
+    let root = ModuleFile::parse(
+        r#"
+module(name = "include_change_root", version = "0.1.0")
+include("//:deps.MODULE.bazel")
+"#,
+    )
+    .unwrap();
+    let included = ModuleFile::parse(
+        r#"
+bazel_dep(name = "dep", repo_name = "dep_alias", version = "1.0.0")
+local_path_override(module_name = "dep", path = "modules/dep_one")
+"#,
+    )
+    .unwrap();
+    let dep = ModuleFile::parse(r#"module(name = "dep", version = "1.0.0")"#).unwrap();
+
+    let graph = resolve_local_module_graph_with_includes(
+        &root,
+        &BTreeMap::from([("deps.MODULE.bazel".to_owned(), included)]),
+        &BTreeMap::from([("dep".to_owned(), dep)]),
+    )
+    .unwrap();
+
+    assert!(graph.module(&ModuleKey::new("dep", "1.0.0")).is_some());
+    assert_eq!(
+        graph
+            .repo_mapping_for("_main")
+            .unwrap()
+            .get("dep_alias")
+            .map(String::as_str),
+        Some("dep+")
+    );
+    assert_eq!(
+        graph
+            .module(&ModuleKey::new("dep", "1.0.0"))
+            .unwrap()
+            .source,
+        ModuleSource::LocalPath {
+            path: "modules/dep_one".to_owned(),
+        }
+    );
 }
 
 #[test]
