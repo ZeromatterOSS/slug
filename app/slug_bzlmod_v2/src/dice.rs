@@ -424,6 +424,82 @@ pub fn digest_module_extension_usages(
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BzlmodGeneratedRepoSpecDigest {
+    extension_id: String,
+    repo_name: String,
+    digest: String,
+}
+
+impl BzlmodGeneratedRepoSpecDigest {
+    pub fn new(
+        extension_id: impl Into<String>,
+        repo_name: impl Into<String>,
+        digest: impl Into<String>,
+    ) -> Result<Self, String> {
+        let spec = Self {
+            extension_id: extension_id.into(),
+            repo_name: repo_name.into(),
+            digest: digest.into(),
+        };
+        spec.validate()?;
+        Ok(spec)
+    }
+
+    pub fn extension_id(&self) -> &str {
+        &self.extension_id
+    }
+
+    pub fn repo_name(&self) -> &str {
+        &self.repo_name
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.extension_id.is_empty() {
+            return Err("generated repo spec extension id must not be empty".to_owned());
+        }
+        if self.extension_id.contains('\0') {
+            return Err("generated repo spec extension id must not contain NUL bytes".to_owned());
+        }
+        if self.repo_name.is_empty() {
+            return Err("generated repo spec name must not be empty".to_owned());
+        }
+        if self.repo_name.contains('\0') {
+            return Err("generated repo spec name must not contain NUL bytes".to_owned());
+        }
+        validate_key_digest("generated_repo_spec_digest", &self.digest)
+    }
+}
+
+pub fn digest_generated_repo_specs(
+    specs: impl IntoIterator<Item = BzlmodGeneratedRepoSpecDigest>,
+) -> Result<String, String> {
+    let mut by_repo = BTreeMap::new();
+    for spec in specs {
+        if by_repo
+            .insert((spec.extension_id, spec.repo_name), spec.digest)
+            .is_some()
+        {
+            return Err("duplicate generated repo spec digest id".to_owned());
+        }
+    }
+
+    let mut hasher = Sha256::new();
+    for ((extension_id, repo_name), digest) in by_repo {
+        hasher.update(extension_id.as_bytes());
+        hasher.update([0]);
+        hasher.update(repo_name.as_bytes());
+        hasher.update([0]);
+        hasher.update(digest.as_bytes());
+        hasher.update([0]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BzlmodRegistryPolicyEntry {
     url: String,
     digest: String,
@@ -589,6 +665,7 @@ pub struct BzlmodDiceInputs {
     registry_source_digest: String,
     extension_definition_digest: String,
     extension_usage_digest: String,
+    generated_repo_spec_digest: String,
     lockfile_digest: String,
     hidden_lockfile_digest: String,
     lockfile_mode: LockfileMode,
@@ -610,7 +687,7 @@ impl BzlmodDiceInputs {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
     ) -> Result<Self, String> {
-        Self::new_with_hidden_lockfile(
+        Self::new_with_generated_repo_specs(
             root_module_digest,
             included_module_digest,
             registry_policy_digest,
@@ -618,10 +695,8 @@ impl BzlmodDiceInputs {
             registry_source_digest,
             extension_definition_digest,
             extension_usage_digest,
+            digest_generated_repo_specs(std::iter::empty::<BzlmodGeneratedRepoSpecDigest>())?,
             lockfile_digest,
-            BzlmodHiddenLockfileDigest::absent()
-                .stable_serialize()
-                .to_owned(),
             lockfile_mode,
             command_policy,
             environment_policy,
@@ -642,6 +717,71 @@ impl BzlmodDiceInputs {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
     ) -> Result<Self, String> {
+        Self::new_with_hidden_lockfile_and_generated_repo_specs(
+            root_module_digest,
+            included_module_digest,
+            registry_policy_digest,
+            registry_module_digest,
+            registry_source_digest,
+            extension_definition_digest,
+            extension_usage_digest,
+            digest_generated_repo_specs(std::iter::empty::<BzlmodGeneratedRepoSpecDigest>())?,
+            lockfile_digest,
+            hidden_lockfile_digest,
+            lockfile_mode,
+            command_policy,
+            environment_policy,
+        )
+    }
+
+    pub fn new_with_generated_repo_specs(
+        root_module_digest: impl Into<String>,
+        included_module_digest: impl Into<String>,
+        registry_policy_digest: impl Into<String>,
+        registry_module_digest: impl Into<String>,
+        registry_source_digest: impl Into<String>,
+        extension_definition_digest: impl Into<String>,
+        extension_usage_digest: impl Into<String>,
+        generated_repo_spec_digest: impl Into<String>,
+        lockfile_digest: impl Into<String>,
+        lockfile_mode: LockfileMode,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+    ) -> Result<Self, String> {
+        Self::new_with_hidden_lockfile_and_generated_repo_specs(
+            root_module_digest,
+            included_module_digest,
+            registry_policy_digest,
+            registry_module_digest,
+            registry_source_digest,
+            extension_definition_digest,
+            extension_usage_digest,
+            generated_repo_spec_digest,
+            lockfile_digest,
+            BzlmodHiddenLockfileDigest::absent()
+                .stable_serialize()
+                .to_owned(),
+            lockfile_mode,
+            command_policy,
+            environment_policy,
+        )
+    }
+
+    pub fn new_with_hidden_lockfile_and_generated_repo_specs(
+        root_module_digest: impl Into<String>,
+        included_module_digest: impl Into<String>,
+        registry_policy_digest: impl Into<String>,
+        registry_module_digest: impl Into<String>,
+        registry_source_digest: impl Into<String>,
+        extension_definition_digest: impl Into<String>,
+        extension_usage_digest: impl Into<String>,
+        generated_repo_spec_digest: impl Into<String>,
+        lockfile_digest: impl Into<String>,
+        hidden_lockfile_digest: impl Into<String>,
+        lockfile_mode: LockfileMode,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+    ) -> Result<Self, String> {
         let inputs = Self {
             root_module_digest: root_module_digest.into(),
             included_module_digest: included_module_digest.into(),
@@ -650,6 +790,7 @@ impl BzlmodDiceInputs {
             registry_source_digest: registry_source_digest.into(),
             extension_definition_digest: extension_definition_digest.into(),
             extension_usage_digest: extension_usage_digest.into(),
+            generated_repo_spec_digest: generated_repo_spec_digest.into(),
             lockfile_digest: lockfile_digest.into(),
             hidden_lockfile_digest: hidden_lockfile_digest.into(),
             lockfile_mode,
@@ -680,7 +821,7 @@ impl BzlmodDiceInputs {
 
     pub fn stable_serialize(&self) -> String {
         format!(
-            "root={};includes={};registries={};registry_modules={};registry_sources={};extension_defs={};extensions={};lockfile={};hidden_lockfile={};mode={};command={};env={}",
+            "root={};includes={};registries={};registry_modules={};registry_sources={};extension_defs={};extensions={};generated_repos={};lockfile={};hidden_lockfile={};mode={};command={};env={}",
             self.root_module_digest,
             self.included_module_digest,
             self.registry_policy_digest,
@@ -688,6 +829,7 @@ impl BzlmodDiceInputs {
             self.registry_source_digest,
             self.extension_definition_digest,
             self.extension_usage_digest,
+            self.generated_repo_spec_digest,
             self.lockfile_digest,
             self.hidden_lockfile_digest,
             self.lockfile_mode,
@@ -708,6 +850,10 @@ impl BzlmodDiceInputs {
                 &self.extension_definition_digest,
             ),
             ("extension_usage_digest", &self.extension_usage_digest),
+            (
+                "generated_repo_spec_digest",
+                &self.generated_repo_spec_digest,
+            ),
             ("lockfile_digest", &self.lockfile_digest),
             ("hidden_lockfile_digest", &self.hidden_lockfile_digest),
         ] {

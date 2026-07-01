@@ -13,6 +13,7 @@ use slug_bzlmod_v2::BzlmodDiceInputs;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::BzlmodExtensionDefinitionDigest;
 use slug_bzlmod_v2::BzlmodExtensionUsageDigest;
+use slug_bzlmod_v2::BzlmodGeneratedRepoSpecDigest;
 use slug_bzlmod_v2::BzlmodHiddenLockfileDigest;
 use slug_bzlmod_v2::BzlmodModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryModuleFileDigest;
@@ -23,6 +24,7 @@ use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ResolvedBzlmodGraphDiceKey;
 use slug_bzlmod_v2::YankedVersionPolicy;
+use slug_bzlmod_v2::digest_generated_repo_specs;
 use slug_bzlmod_v2::digest_included_module_files;
 use slug_bzlmod_v2::digest_module_extension_definitions;
 use slug_bzlmod_v2::digest_module_extension_usages;
@@ -71,6 +73,16 @@ fn extension_definition_digest(content: impl AsRef<[u8]>) -> String {
 fn extension_usage_digest(content: impl AsRef<[u8]>) -> String {
     digest_module_extension_usages([BzlmodExtensionUsageDigest::new(
         "//:ext.bzl%ext",
+        digest_module_file_content(content),
+    )
+    .unwrap()])
+    .unwrap()
+}
+
+fn generated_repo_spec_digest(content: impl AsRef<[u8]>) -> String {
+    digest_generated_repo_specs([BzlmodGeneratedRepoSpecDigest::new(
+        "//:ext.bzl%ext",
+        "tagged",
         digest_module_file_content(content),
     )
     .unwrap()])
@@ -536,6 +548,63 @@ fn extension_usage_digest_rejects_duplicate_or_unstable_ids() {
 }
 
 #[test]
+fn generated_repo_spec_digest_is_order_stable_and_content_sensitive() {
+    let alpha = BzlmodGeneratedRepoSpecDigest::new(
+        "//:alpha.bzl%ext",
+        "aaa",
+        digest_module_file_content(b"alpha repo spec"),
+    )
+    .unwrap();
+    let beta = BzlmodGeneratedRepoSpecDigest::new(
+        "//:beta.bzl%ext",
+        "bbb",
+        digest_module_file_content(b"beta repo spec"),
+    )
+    .unwrap();
+
+    let forward = digest_generated_repo_specs([alpha.clone(), beta.clone()]).unwrap();
+    let reverse = digest_generated_repo_specs([beta, alpha]).unwrap();
+    let changed = digest_generated_repo_specs([BzlmodGeneratedRepoSpecDigest::new(
+        "//:alpha.bzl%ext",
+        "aaa",
+        digest_module_file_content(b"alpha repo spec changed"),
+    )
+    .unwrap()])
+    .unwrap();
+
+    assert_eq!(forward, reverse);
+    assert_ne!(forward, changed);
+}
+
+#[test]
+fn generated_repo_spec_digest_rejects_duplicate_or_unstable_ids() {
+    let digest = digest_module_file_content(b"repo spec");
+    let duplicate = digest_generated_repo_specs([
+        BzlmodGeneratedRepoSpecDigest::new("//:ext.bzl%ext", "tagged", digest.clone()).unwrap(),
+        BzlmodGeneratedRepoSpecDigest::new("//:ext.bzl%ext", "tagged", digest).unwrap(),
+    ])
+    .unwrap_err();
+    assert!(duplicate.contains("duplicate generated repo spec digest id"));
+
+    let empty_extension =
+        BzlmodGeneratedRepoSpecDigest::new("", "tagged", digest_module_file_content(b"repo spec"))
+            .unwrap_err();
+    assert!(empty_extension.contains("extension id must not be empty"));
+
+    let empty_repo = BzlmodGeneratedRepoSpecDigest::new(
+        "//:ext.bzl%ext",
+        "",
+        digest_module_file_content(b"repo spec"),
+    )
+    .unwrap_err();
+    assert!(empty_repo.contains("spec name must not be empty"));
+
+    let bad_digest =
+        BzlmodGeneratedRepoSpecDigest::new("//:ext.bzl%ext", "tagged", "bad/digest").unwrap_err();
+    assert!(bad_digest.contains("invalid generated_repo_spec_digest"));
+}
+
+#[test]
 fn extension_definition_digest_is_order_stable_and_content_sensitive() {
     let alpha = BzlmodExtensionDefinitionDigest::new(
         "//:alpha.bzl%ext",
@@ -671,6 +740,54 @@ fn resolved_graph_key_changes_when_extension_usage_changes() {
 
     assert_ne!(before, after);
     assert!(before.stable_serialize().contains("extensions="));
+}
+
+#[test]
+fn resolved_graph_key_changes_when_generated_repo_specs_change() {
+    let root = ModuleKey::new("root", "0.1.0");
+    let before = ResolvedBzlmodGraphDiceKey::new(
+        root.clone(),
+        BzlmodDiceInputs::new_with_generated_repo_specs(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            generated_repo_spec_digest(b"repo_rule=tagged_repo;message=one"),
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+    let after = ResolvedBzlmodGraphDiceKey::new(
+        root,
+        BzlmodDiceInputs::new_with_generated_repo_specs(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            generated_repo_spec_digest(b"repo_rule=tagged_repo;message=two"),
+            visible_lockfile_digest(b"{\"lockFileVersion\":26}\n"),
+            LockfileMode::Update,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+
+    assert_ne!(before, after);
+    assert!(before.stable_serialize().contains("generated_repos="));
 }
 
 #[test]
