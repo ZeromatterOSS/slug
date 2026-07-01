@@ -167,10 +167,16 @@ Add oracle fixtures for:
 
 ## Checkpoint Evidence
 
-Detailed checkpoint evidence for this stage lives in
-[05-bzlmod-checkpoint-evidence.md](./05-bzlmod-checkpoint-evidence.md).
-Keep new entries there after each Stage 5 checkpoint so this owner plan remains
-below the 1000-line cap.
+Detailed checkpoint evidence for this stage lives in these companion files:
+
+- [05-bzlmod-checkpoint-evidence.md](./05-bzlmod-checkpoint-evidence.md)
+  records checkpoints through `c65dedee Stage 5 preserve registry module
+  digests`.
+- [05-bzlmod-checkpoint-evidence-2.md](./05-bzlmod-checkpoint-evidence-2.md)
+  is the active destination for new Stage 5 checkpoint entries.
+
+Keep new entries in the active evidence file so this owner plan and every
+companion evidence file remain below the 1000-line cap.
 
 ## Exact Test Criteria
 

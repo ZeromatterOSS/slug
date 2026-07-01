@@ -5,6 +5,11 @@ This companion file holds detailed landed evidence for
 Keep the owner plan focused on goals, slices, exact criteria, acceptance, and
 validation while recording checkpoint details here.
 
+This shard records Stage 5 evidence through
+`c65dedee Stage 5 preserve registry module digests`. Add future entries to
+[05-bzlmod-checkpoint-evidence-2.md](./05-bzlmod-checkpoint-evidence-2.md)
+so each plan/evidence file stays below the 1000-line cap.
+
 ## Checkpoint Evidence
 
 Stage 5 initial bzlmod parser checkpoint:
