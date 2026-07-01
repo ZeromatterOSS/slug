@@ -171,6 +171,85 @@ pub fn digest_registry_module_files(
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct BzlmodRegistrySourceSpecDigest {
+    registry_url: String,
+    module: ModuleKey,
+    digest: String,
+}
+
+impl BzlmodRegistrySourceSpecDigest {
+    pub fn new(
+        registry_url: impl Into<String>,
+        module: ModuleKey,
+        digest: impl Into<String>,
+    ) -> Result<Self, String> {
+        let input = Self {
+            registry_url: registry_url.into(),
+            module,
+            digest: digest.into(),
+        };
+        input.validate()?;
+        Ok(input)
+    }
+
+    pub fn registry_url(&self) -> &str {
+        &self.registry_url
+    }
+
+    pub fn module(&self) -> &ModuleKey {
+        &self.module
+    }
+
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.registry_url.is_empty() {
+            return Err("registry source spec digest URL must not be empty".to_owned());
+        }
+        if self.registry_url.contains('\0') {
+            return Err("registry source spec digest URL must not contain NUL bytes".to_owned());
+        }
+        if self.module.name.is_empty() {
+            return Err("registry source spec digest module name must not be empty".to_owned());
+        }
+        if self.module.version.is_empty() {
+            return Err("registry source spec digest module version must not be empty".to_owned());
+        }
+        if self.module.name.contains('\0') || self.module.version.contains('\0') {
+            return Err(
+                "registry source spec digest module key must not contain NUL bytes".to_owned(),
+            );
+        }
+        validate_key_digest("registry_source_spec_digest", &self.digest)
+    }
+}
+
+pub fn digest_registry_source_specs(
+    files: impl IntoIterator<Item = BzlmodRegistrySourceSpecDigest>,
+) -> Result<String, String> {
+    let mut by_identity = BTreeMap::new();
+    for file in files {
+        let identity = (file.registry_url, file.module);
+        if by_identity.insert(identity, file.digest).is_some() {
+            return Err("duplicate registry source spec digest identity".to_owned());
+        }
+    }
+
+    let mut hasher = Sha256::new();
+    for ((registry_url, module), digest) in by_identity {
+        hasher.update(registry_url.as_bytes());
+        hasher.update([0]);
+        hasher.update(module.to_string().as_bytes());
+        hasher.update([0]);
+        hasher.update(digest.as_bytes());
+        hasher.update([0]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BzlmodExtensionDefinitionDigest {
     extension_id: String,
     digest: String,
@@ -227,6 +306,7 @@ pub fn digest_module_extension_definitions(
     }
     Ok(hex::encode(hasher.finalize()))
 }
+
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BzlmodExtensionUsageDigest {
     extension_id: String,
@@ -448,6 +528,7 @@ pub struct BzlmodDiceInputs {
     included_module_digest: String,
     registry_policy_digest: String,
     registry_module_digest: String,
+    registry_source_digest: String,
     extension_definition_digest: String,
     extension_usage_digest: String,
     lockfile_digest: String,
@@ -462,6 +543,7 @@ impl BzlmodDiceInputs {
         included_module_digest: impl Into<String>,
         registry_policy_digest: impl Into<String>,
         registry_module_digest: impl Into<String>,
+        registry_source_digest: impl Into<String>,
         extension_definition_digest: impl Into<String>,
         extension_usage_digest: impl Into<String>,
         lockfile_digest: impl Into<String>,
@@ -474,6 +556,7 @@ impl BzlmodDiceInputs {
             included_module_digest: included_module_digest.into(),
             registry_policy_digest: registry_policy_digest.into(),
             registry_module_digest: registry_module_digest.into(),
+            registry_source_digest: registry_source_digest.into(),
             extension_definition_digest: extension_definition_digest.into(),
             extension_usage_digest: extension_usage_digest.into(),
             lockfile_digest: lockfile_digest.into(),
@@ -505,11 +588,12 @@ impl BzlmodDiceInputs {
 
     pub fn stable_serialize(&self) -> String {
         format!(
-            "root={};includes={};registries={};registry_modules={};extension_defs={};extensions={};lockfile={};mode={};command={};env={}",
+            "root={};includes={};registries={};registry_modules={};registry_sources={};extension_defs={};extensions={};lockfile={};mode={};command={};env={}",
             self.root_module_digest,
             self.included_module_digest,
             self.registry_policy_digest,
             self.registry_module_digest,
+            self.registry_source_digest,
             self.extension_definition_digest,
             self.extension_usage_digest,
             self.lockfile_digest,
@@ -525,6 +609,7 @@ impl BzlmodDiceInputs {
             ("included_module_digest", &self.included_module_digest),
             ("registry_policy_digest", &self.registry_policy_digest),
             ("registry_module_digest", &self.registry_module_digest),
+            ("registry_source_digest", &self.registry_source_digest),
             (
                 "extension_definition_digest",
                 &self.extension_definition_digest,

@@ -16,6 +16,7 @@ use slug_bzlmod_v2::BzlmodExtensionUsageDigest;
 use slug_bzlmod_v2::BzlmodModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryModuleFileDigest;
 use slug_bzlmod_v2::BzlmodRegistryPolicyEntry;
+use slug_bzlmod_v2::BzlmodRegistrySourceSpecDigest;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ResolvedBzlmodGraphDiceKey;
@@ -26,6 +27,7 @@ use slug_bzlmod_v2::digest_module_extension_usages;
 use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_registry_module_files;
 use slug_bzlmod_v2::digest_registry_policy;
+use slug_bzlmod_v2::digest_registry_source_specs;
 
 fn registry_policy_digest() -> String {
     digest_registry_policy([BzlmodRegistryPolicyEntry::new(
@@ -37,6 +39,16 @@ fn registry_policy_digest() -> String {
 
 fn registry_module_digest(content: impl AsRef<[u8]>) -> String {
     digest_registry_module_files([BzlmodRegistryModuleFileDigest::new(
+        "file:///%workspace%/registry",
+        ModuleKey::new("aaa", "1.0.0"),
+        digest_module_file_content(content),
+    )
+    .unwrap()])
+    .unwrap()
+}
+
+fn registry_source_digest(content: impl AsRef<[u8]>) -> String {
+    digest_registry_source_specs([BzlmodRegistrySourceSpecDigest::new(
         "file:///%workspace%/registry",
         ModuleKey::new("aaa", "1.0.0"),
         digest_module_file_content(content),
@@ -78,6 +90,7 @@ fn inputs(
         .unwrap(),
         registry_policy_digest(),
         registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+        registry_source_digest(br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#),
         extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",
@@ -262,6 +275,85 @@ fn registry_module_digest_rejects_duplicate_or_unstable_identity() {
 }
 
 #[test]
+fn registry_source_digest_is_order_stable_and_content_sensitive() {
+    let aaa = BzlmodRegistrySourceSpecDigest::new(
+        "file:///%workspace%/registry",
+        ModuleKey::new("aaa", "1.0.0"),
+        digest_module_file_content(
+            b"{\"url\":\"file:///aaa.tar.gz\",\"integrity\":\"sha256-aaa\"}",
+        ),
+    )
+    .unwrap();
+    let bbb = BzlmodRegistrySourceSpecDigest::new(
+        "file:///%workspace%/registry",
+        ModuleKey::new("bbb", "1.0.0"),
+        digest_module_file_content(
+            b"{\"url\":\"file:///bbb.tar.gz\",\"integrity\":\"sha256-bbb\"}",
+        ),
+    )
+    .unwrap();
+    let aaa_changed = BzlmodRegistrySourceSpecDigest::new(
+        "file:///%workspace%/registry",
+        ModuleKey::new("aaa", "1.0.0"),
+        digest_module_file_content(
+            b"{\"url\":\"file:///aaa-v2.tar.gz\",\"integrity\":\"sha256-aaa\"}",
+        ),
+    )
+    .unwrap();
+
+    let forward = digest_registry_source_specs([aaa.clone(), bbb.clone()]).unwrap();
+    let reverse = digest_registry_source_specs([bbb.clone(), aaa.clone()]).unwrap();
+    let changed = digest_registry_source_specs([aaa_changed, bbb]).unwrap();
+
+    assert_eq!(forward, reverse);
+    assert_ne!(forward, changed);
+}
+
+#[test]
+fn registry_source_digest_rejects_duplicate_or_unstable_identity() {
+    let digest = digest_module_file_content(
+        b"{\"url\":\"file:///aaa.tar.gz\",\"integrity\":\"sha256-aaa\"}",
+    );
+    let duplicate = digest_registry_source_specs([
+        BzlmodRegistrySourceSpecDigest::new(
+            "file:///%workspace%/registry",
+            ModuleKey::new("aaa", "1.0.0"),
+            digest.clone(),
+        )
+        .unwrap(),
+        BzlmodRegistrySourceSpecDigest::new(
+            "file:///%workspace%/registry",
+            ModuleKey::new("aaa", "1.0.0"),
+            digest.clone(),
+        )
+        .unwrap(),
+    ])
+    .unwrap_err();
+    assert!(duplicate.contains("duplicate registry source spec digest identity"));
+
+    let empty_url =
+        BzlmodRegistrySourceSpecDigest::new("", ModuleKey::new("aaa", "1.0.0"), digest.clone())
+            .unwrap_err();
+    assert!(empty_url.contains("URL must not be empty"));
+
+    let empty_name = BzlmodRegistrySourceSpecDigest::new(
+        "file:///%workspace%/registry",
+        ModuleKey::new("", "1.0.0"),
+        digest.clone(),
+    )
+    .unwrap_err();
+    assert!(empty_name.contains("module name must not be empty"));
+
+    let bad_digest = BzlmodRegistrySourceSpecDigest::new(
+        "file:///%workspace%/registry",
+        ModuleKey::new("aaa", "1.0.0"),
+        "bad/digest",
+    )
+    .unwrap_err();
+    assert!(bad_digest.contains("invalid registry_source_spec_digest"));
+}
+
+#[test]
 fn resolved_graph_key_changes_when_registry_module_digest_changes() {
     let root = ModuleKey::new("root", "0.1.0");
     let before = ResolvedBzlmodGraphDiceKey::new(
@@ -272,6 +364,9 @@ fn resolved_graph_key_changes_when_registry_module_digest_changes() {
             registry_policy_digest(),
             registry_module_digest(
                 b"module(name='aaa', version='1.0.0')\nbazel_dep(name='bbb', version='1.0.0')",
+            ),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
             ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
@@ -291,6 +386,9 @@ fn resolved_graph_key_changes_when_registry_module_digest_changes() {
             registry_module_digest(
                 b"module(name='aaa', version='1.0.0')\nbazel_dep(name='bbb', version='2.0.0')",
             ),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
             "lockfileabc",
@@ -303,6 +401,52 @@ fn resolved_graph_key_changes_when_registry_module_digest_changes() {
 
     assert_ne!(before, after);
     assert!(before.stable_serialize().contains("registry_modules="));
+}
+
+#[test]
+fn resolved_graph_key_changes_when_registry_source_digest_changes() {
+    let root = ModuleKey::new("root", "0.1.0");
+    let before = ResolvedBzlmodGraphDiceKey::new(
+        root.clone(),
+        BzlmodDiceInputs::new(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                b"{\"url\":\"file:///archive.tar.gz\",\"integrity\":\"sha256-archive\"}",
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            "lockfileabc",
+            LockfileMode::Refresh,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+    let after = ResolvedBzlmodGraphDiceKey::new(
+        root,
+        BzlmodDiceInputs::new(
+            digest_module_file_content(b"module(name='root')"),
+            digest_included_module_files([]).unwrap(),
+            registry_policy_digest(),
+            registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                b"{\"url\":\"file:///archive-v2.tar.gz\",\"integrity\":\"sha256-archive\"}",
+            ),
+            extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
+            extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
+            "lockfileabc",
+            LockfileMode::Refresh,
+            BzlmodCommandPolicyKey::from_allow_yanked_versions_flag(None).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        )
+        .unwrap(),
+    );
+
+    assert_ne!(before, after);
+    assert!(before.stable_serialize().contains("registry_sources="));
 }
 
 #[test]
@@ -405,6 +549,9 @@ fn resolved_graph_key_changes_when_extension_definition_changes() {
             digest_included_module_files([]).unwrap(),
             registry_policy_digest(),
             registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
             "lockfileabc",
@@ -421,6 +568,9 @@ fn resolved_graph_key_changes_when_extension_definition_changes() {
             digest_included_module_files([]).unwrap(),
             registry_policy_digest(),
             registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_two'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
             "lockfileabc",
@@ -445,6 +595,9 @@ fn resolved_graph_key_changes_when_extension_usage_changes() {
             digest_included_module_files([]).unwrap(),
             registry_policy_digest(),
             registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
             "lockfileabc",
@@ -461,6 +614,9 @@ fn resolved_graph_key_changes_when_extension_usage_changes() {
             digest_included_module_files([]).unwrap(),
             registry_policy_digest(),
             registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+            registry_source_digest(
+                br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+            ),
             extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
             extension_usage_digest(b"ext.repo(name='tagged', message='two')"),
             "lockfileabc",
@@ -632,6 +788,7 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
         "includesabc",
         registry_policy_digest(),
         registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+        registry_source_digest(br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#),
         extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",
@@ -647,6 +804,7 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
         "includesabc",
         registry_policy_digest(),
         registry_module_digest(b"module(name = 'aaa', version = '1.0.0')"),
+        registry_source_digest(br#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#),
         extension_definition_digest(b"_OUTPUT_NAME = 'impl_one'"),
         extension_usage_digest(b"ext.repo(name='tagged', message='one')"),
         "lockfileabc",

@@ -19,7 +19,9 @@ use crate::BazelDep;
 use crate::Directive;
 use crate::ModuleFile;
 use crate::dice::BzlmodRegistryModuleFileDigest;
+use crate::dice::BzlmodRegistrySourceSpecDigest;
 use crate::dice::digest_registry_module_files;
+use crate::dice::digest_registry_source_specs;
 use crate::resolution::ModuleKey;
 use crate::resolution::ModuleSource;
 use crate::resolution::ResolvedDependency;
@@ -273,6 +275,117 @@ pub struct RegistrySourceSpec {
     pub strip_prefix: Option<String>,
     pub patches: BTreeMap<String, String>,
     pub patch_strip: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistrySource {
+    pub registry_url: String,
+    pub spec: RegistrySourceSpec,
+    source_json_digest: Option<String>,
+}
+
+impl RegistrySource {
+    pub fn new(registry_url: impl Into<String>, spec: RegistrySourceSpec) -> Self {
+        Self {
+            registry_url: registry_url.into(),
+            spec,
+            source_json_digest: None,
+        }
+    }
+
+    fn with_source_json_digest(
+        registry_url: impl Into<String>,
+        spec: RegistrySourceSpec,
+        source_json_digest: Option<String>,
+    ) -> Self {
+        Self {
+            registry_url: registry_url.into(),
+            spec,
+            source_json_digest,
+        }
+    }
+
+    pub fn source_json_digest(&self) -> Option<&str> {
+        self.source_json_digest.as_deref()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistrySourceCatalog {
+    pub registry_url: String,
+    pub sources: BTreeMap<ModuleKey, RegistrySourceSpec>,
+    source_json_digests: BTreeMap<ModuleKey, String>,
+}
+
+impl RegistrySourceCatalog {
+    pub fn new(
+        registry_url: impl Into<String>,
+        sources: BTreeMap<ModuleKey, RegistrySourceSpec>,
+    ) -> Self {
+        Self {
+            registry_url: registry_url.into(),
+            sources,
+            source_json_digests: BTreeMap::new(),
+        }
+    }
+
+    pub fn with_source_json_digests(
+        registry_url: impl Into<String>,
+        sources: BTreeMap<ModuleKey, (RegistrySourceSpec, String)>,
+    ) -> Result<Self, String> {
+        let registry_url = registry_url.into();
+        let mut source_specs = BTreeMap::new();
+        let mut source_json_digests = BTreeMap::new();
+        for (module, (source_spec, digest)) in sources {
+            BzlmodRegistrySourceSpecDigest::new(
+                registry_url.clone(),
+                module.clone(),
+                digest.clone(),
+            )?;
+            source_specs.insert(module.clone(), source_spec);
+            source_json_digests.insert(module, digest);
+        }
+        Ok(Self {
+            registry_url,
+            sources: source_specs,
+            source_json_digests,
+        })
+    }
+}
+
+pub fn select_ordered_registry_sources(
+    registries: &[RegistrySourceCatalog],
+) -> BTreeMap<ModuleKey, RegistrySource> {
+    let mut selected = BTreeMap::new();
+    for registry in registries {
+        for (key, source_spec) in &registry.sources {
+            selected.entry(key.clone()).or_insert_with(|| {
+                RegistrySource::with_source_json_digest(
+                    registry.registry_url.clone(),
+                    source_spec.clone(),
+                    registry.source_json_digests.get(key).cloned(),
+                )
+            });
+        }
+    }
+    selected
+}
+
+pub fn digest_selected_registry_sources(
+    sources: &BTreeMap<ModuleKey, RegistrySource>,
+) -> Result<String, String> {
+    let mut digests = Vec::with_capacity(sources.len());
+    for (module_key, source) in sources {
+        let digest = source.source_json_digest().ok_or_else(|| {
+            format!("selected registry source {module_key} has no source.json digest")
+        })?;
+        digests.push(BzlmodRegistrySourceSpecDigest::new(
+            source.registry_url.clone(),
+            module_key.clone(),
+            digest.to_owned(),
+        )?);
+    }
+    digest_registry_source_specs(digests)
 }
 
 pub fn parse_registry_source_json(

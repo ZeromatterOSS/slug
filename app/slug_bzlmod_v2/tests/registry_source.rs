@@ -1,4 +1,10 @@
+use std::collections::BTreeMap;
+
 use slug_bzlmod_v2::ModuleKey;
+use slug_bzlmod_v2::RegistrySource;
+use slug_bzlmod_v2::RegistrySourceCatalog;
+use slug_bzlmod_v2::digest_module_file_content;
+use slug_bzlmod_v2::digest_selected_registry_sources;
 use slug_bzlmod_v2::parse_registry_metadata_json;
 use slug_bzlmod_v2::parse_registry_source_json;
 
@@ -101,4 +107,77 @@ fn rejects_registry_metadata_without_versions() {
 fn rejects_invalid_registry_metadata_json() {
     let err = parse_registry_metadata_json("yyy", "{not json}\n").unwrap_err();
     assert!(err.contains("Unable to parse json at url metadata.json"));
+}
+
+#[test]
+fn ordered_registry_source_selection_preserves_source_json_digests() {
+    let first_json = r#"{"url":"file:///first.tar.gz","integrity":"sha256-first"}"#;
+    let second_json = r#"{"url":"file:///second.tar.gz","integrity":"sha256-second"}"#;
+    let first = RegistrySourceCatalog::with_source_json_digests(
+        "file:///%workspace%/first",
+        BTreeMap::from([(
+            key(),
+            (
+                parse_registry_source_json(&key(), first_json).unwrap(),
+                digest_module_file_content(first_json),
+            ),
+        )]),
+    )
+    .unwrap();
+    let second = RegistrySourceCatalog::with_source_json_digests(
+        "file:///%workspace%/second",
+        BTreeMap::from([(
+            key(),
+            (
+                parse_registry_source_json(&key(), second_json).unwrap(),
+                digest_module_file_content(second_json),
+            ),
+        )]),
+    )
+    .unwrap();
+
+    let selected = slug_bzlmod_v2::select_ordered_registry_sources(&[first, second]);
+
+    let selected_source = selected.get(&key()).unwrap();
+    assert_eq!(selected_source.registry_url, "file:///%workspace%/first");
+    assert_eq!(selected_source.spec.integrity, "sha256-first");
+    assert_eq!(
+        selected_source.source_json_digest(),
+        Some(digest_module_file_content(first_json).as_str())
+    );
+
+    let digest = digest_selected_registry_sources(&selected).unwrap();
+    let changed = RegistrySourceCatalog::with_source_json_digests(
+        "file:///%workspace%/first",
+        BTreeMap::from([(
+            key(),
+            (
+                parse_registry_source_json(&key(), second_json).unwrap(),
+                digest_module_file_content(second_json),
+            ),
+        )]),
+    )
+    .unwrap();
+    let changed_digest =
+        digest_selected_registry_sources(&slug_bzlmod_v2::select_ordered_registry_sources(&[
+            changed,
+        ]))
+        .unwrap();
+
+    assert_ne!(digest, changed_digest);
+}
+
+#[test]
+fn selected_registry_source_digest_requires_explicit_digests() {
+    let source = RegistrySource::new(
+        "file:///%workspace%/registry",
+        parse_registry_source_json(
+            &key(),
+            r#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+        )
+        .unwrap(),
+    );
+
+    let err = digest_selected_registry_sources(&BTreeMap::from([(key(), source)])).unwrap_err();
+    assert!(err.contains("selected registry source srcmod@1.0.0 has no source.json digest"));
 }
