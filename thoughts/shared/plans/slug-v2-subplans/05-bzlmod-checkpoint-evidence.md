@@ -837,3 +837,24 @@ Stage 5 registry module-file DICE input checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-refresh-registry-mutation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 lockfile error local-registry mutation checkpoint:
+
+- Added `lockfile-error-registry-mutation`, a Bazel 9.1.1 oracle fixture
+  pinning `--lockfile_mode=error` after a local registry module-file edit. The
+  fixture primes `MODULE.bazel.lock` with `aaa@1.0.0 -> bbb@1.0.0`, mutates only
+  `registry/modules/aaa/1.0.0/MODULE.bazel` to request `bbb@2.0.0`, then
+  observes `mod graph --lockfile_mode=error` report `bbb@2.0.0` with exit 0.
+- This proves Bazel 9 does not reject this local-registry module-data edit as a
+  stale visible-lockfile entry; it rereads the changed registry data and leaves
+  the visible lockfile manifest digest unchanged in the fixture. Later V2
+  error-mode replay must distinguish this case from stale extension/registry
+  checksum entries that Bazel does reject.
+- No V1 bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 oracle fixture.
+- Validation passed: `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run
+  --fixture lockfile-error-registry-mutation --tool bazel --bazel
+  C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled
+  `python.exe -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py`; `rg -n "process-global|fallback
+  scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
