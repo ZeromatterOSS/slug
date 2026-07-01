@@ -18,6 +18,7 @@ use slug_bzlmod_v2::SingleVersionOverride;
 use slug_bzlmod_v2::UseExtension;
 use slug_bzlmod_v2::UseRepo;
 use slug_bzlmod_v2::UseRepoRule;
+use slug_bzlmod_v2::expand_included_module_files;
 
 #[test]
 fn parses_module_directives_in_order() {
@@ -74,6 +75,85 @@ register_execution_platforms("//:platform", dev_dependency = False)
             dev_dependency: false,
         })
     );
+}
+
+#[test]
+fn expands_included_module_files_in_directive_order() {
+    let root = ModuleFile::parse(
+        r#"
+module(name = "root", version = "0.0.0")
+register_toolchains("//:before")
+include("//:deps.MODULE.bazel")
+register_execution_platforms("//:after")
+"#,
+    )
+    .unwrap();
+    let included = ModuleFile::parse(
+        r#"
+bazel_dep(name = "dep", version = "1.0.0", repo_name = "dep_alias")
+local_path_override(module_name = "dep", path = "dep")
+"#,
+    )
+    .unwrap();
+
+    let expanded = expand_included_module_files(
+        &root,
+        &BTreeMap::from([("deps.MODULE.bazel".to_owned(), included)]),
+    )
+    .unwrap();
+
+    assert_eq!(expanded.module, root.module);
+    assert_eq!(expanded.directives.len(), 4);
+    assert!(matches!(
+        expanded.directives[0],
+        Directive::RegisterToolchains(_)
+    ));
+    assert!(matches!(expanded.directives[1], Directive::BazelDep(_)));
+    assert!(matches!(
+        expanded.directives[2],
+        Directive::LocalPathOverride(_)
+    ));
+    assert!(matches!(
+        expanded.directives[3],
+        Directive::RegisterExecutionPlatforms(_)
+    ));
+}
+
+#[test]
+fn include_expansion_rejects_missing_or_invalid_fragments() {
+    let root = ModuleFile::parse(r#"include("//:missing.MODULE.bazel")"#).unwrap();
+    let missing = expand_included_module_files(&root, &BTreeMap::new()).unwrap_err();
+    assert!(missing.contains("include //:missing.MODULE.bazel was not supplied"));
+
+    let root = ModuleFile::parse(r#"include("//pkg:deps.MODULE.bazel")"#).unwrap();
+    let unsupported = expand_included_module_files(&root, &BTreeMap::new()).unwrap_err();
+    assert!(unsupported.contains("must be a root-package label"));
+
+    let root = ModuleFile::parse(r#"include("//:deps.MODULE.bazel")"#).unwrap();
+    let included = ModuleFile::parse(r#"module(name = "bad", version = "0.0.0")"#).unwrap();
+    let err = expand_included_module_files(
+        &root,
+        &BTreeMap::from([("deps.MODULE.bazel".to_owned(), included)]),
+    )
+    .unwrap_err();
+    assert!(err.contains("must not contain a module() directive"));
+}
+
+#[test]
+fn include_expansion_rejects_cycles() {
+    let root = ModuleFile::parse(r#"include("//:a.MODULE.bazel")"#).unwrap();
+    let a = ModuleFile::parse(r#"include("//:b.MODULE.bazel")"#).unwrap();
+    let b = ModuleFile::parse(r#"include("//:a.MODULE.bazel")"#).unwrap();
+
+    let err = expand_included_module_files(
+        &root,
+        &BTreeMap::from([
+            ("a.MODULE.bazel".to_owned(), a),
+            ("b.MODULE.bazel".to_owned(), b),
+        ]),
+    )
+    .unwrap_err();
+    assert!(err.contains("cyclic MODULE.bazel include"));
 }
 
 #[test]

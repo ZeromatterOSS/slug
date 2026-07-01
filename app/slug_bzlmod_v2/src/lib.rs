@@ -88,6 +88,7 @@ pub use parser::SingleVersionOverride;
 pub use parser::UseExtension;
 pub use parser::UseRepo;
 pub use parser::UseRepoRule;
+pub use parser::expand_included_module_files;
 pub use registry::RegistryCatalog;
 pub use registry::RegistryContentDigests;
 pub use registry::RegistryContentSnapshot;

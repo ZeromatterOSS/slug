@@ -258,6 +258,65 @@ impl ModuleFile {
     }
 }
 
+pub fn expand_included_module_files(
+    root: &ModuleFile,
+    included: &BTreeMap<String, ModuleFile>,
+) -> Result<ModuleFile, String> {
+    let mut active = BTreeSet::new();
+    Ok(ModuleFile {
+        module: root.module.clone(),
+        directives: expand_include_directives(&root.directives, included, &mut active)?,
+    })
+}
+
+fn expand_include_directives(
+    directives: &[Directive],
+    included: &BTreeMap<String, ModuleFile>,
+    active: &mut BTreeSet<String>,
+) -> Result<Vec<Directive>, String> {
+    let mut expanded = Vec::new();
+    for directive in directives {
+        let Directive::Include(label) = directive else {
+            expanded.push(directive.clone());
+            continue;
+        };
+        let path = include_label_to_path(label)?;
+        if !active.insert(path.clone()) {
+            return Err(format!("cyclic MODULE.bazel include detected for {label}"));
+        }
+        let include = included
+            .get(&path)
+            .or_else(|| included.get(label))
+            .ok_or_else(|| format!("MODULE.bazel include {label} was not supplied"))?;
+        if include.module.is_some() {
+            return Err(format!(
+                "MODULE.bazel include {label} must not contain a module() directive"
+            ));
+        }
+        expanded.extend(expand_include_directives(
+            &include.directives,
+            included,
+            active,
+        )?);
+        active.remove(&path);
+    }
+    Ok(expanded)
+}
+
+fn include_label_to_path(label: &str) -> Result<String, String> {
+    let Some(path) = label.strip_prefix("//:") else {
+        return Err(format!(
+            "MODULE.bazel include label {label} must be a root-package label like //:deps.MODULE.bazel"
+        ));
+    };
+    if path.is_empty() || path.contains('/') || path.contains('\\') {
+        return Err(format!(
+            "MODULE.bazel include label {label} must name a file in the root package"
+        ));
+    }
+    Ok(path.to_owned())
+}
+
 fn logical_statements(source: &str) -> Result<Vec<(usize, String)>, String> {
     let mut result = Vec::new();
     let mut current = String::new();
