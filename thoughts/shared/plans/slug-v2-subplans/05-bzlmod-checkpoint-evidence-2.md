@@ -357,3 +357,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving included frag
 Implementation summary: Added `resolve_local_module_graph_with_includes` so already-parsed include fragments can be spliced before local graph resolution; the original `resolve_local_module_graph` remains available for pre-expanded/no-include callers
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-include-change-invalidation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Local graph resolution can now consume supplied include fragments, but V2 still needs actual DICE file reads/watch edges, Bazel-exact include diagnostics, non-root module/include validation, and same-daemon create/edit/delete invalidation wiring.
+
+### Stage 5 module registration extraction substrate
+
+Status: Partially landed
+V2 commit: `94319719 Stage 5 extract module registrations`
+Bazel source inspected: Existing Stage 5 module-file directive citations still apply; this checkpoint is anchored by the Bazel 9 registration fixture and does not execute toolchain or platform resolution
+Bazel oracle: Bazel 9.1.1 `module-registration-dev-dependency` fixture
+V2 fixture: `module-registration-dev-dependency`
+Expected evidence artifact: Stage 1 oracle expected output proving `register_toolchains` and `register_execution_platforms` accept `dev_dependency` flags while preserving normal package loading for the registered labels
+Implementation summary: Added `RegistrationKind`, `ModuleRegistrationDirective`, and `module_registration_directives` so parsed MODULE files can produce an order-preserving registration list with labels and `dev_dependency` state intact; this remains parser-side substrate and adds no toolchain resolution, repository materialization, process-global state, or V1 resolver behavior
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registration-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: Registration directives can now be extracted in Bazel-observed order, but V2 still needs root/non-root dev-dependency filtering, DICE-owned module file reads, wiring into Stage 6 toolchain/platform resolution, and same-daemon invalidation for registration edits.
