@@ -5,6 +5,7 @@ use slug_bzlmod_v2::RegistrySource;
 use slug_bzlmod_v2::RegistrySourceCatalog;
 use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_selected_registry_sources;
+use slug_bzlmod_v2::observed_registry_file_hashes;
 use slug_bzlmod_v2::parse_registry_metadata_json;
 use slug_bzlmod_v2::parse_registry_source_json;
 use slug_bzlmod_v2::registry_source_json_url;
@@ -218,4 +219,45 @@ fn selected_registry_file_hash_urls_include_modules_and_sources() {
             "https://bcr.bazel.build/modules/srcmod/1.0.0/source.json".to_owned(),
         ]
     );
+}
+
+#[test]
+fn observed_registry_hashes_include_selected_source_digests() {
+    let source_json = r#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#;
+    let selected = slug_bzlmod_v2::select_ordered_registry_sources(&[
+        RegistrySourceCatalog::with_source_json_digests(
+            "https://bcr.bazel.build/",
+            BTreeMap::from([(
+                key(),
+                (
+                    parse_registry_source_json(&key(), source_json).unwrap(),
+                    digest_module_file_content(source_json),
+                ),
+            )]),
+        )
+        .unwrap(),
+    ]);
+
+    let hashes = observed_registry_file_hashes(&BTreeMap::new(), &selected).unwrap();
+
+    assert_eq!(
+        hashes.get("https://bcr.bazel.build/modules/srcmod/1.0.0/source.json"),
+        Some(&digest_module_file_content(source_json))
+    );
+}
+
+#[test]
+fn observed_registry_hashes_require_selected_source_digests() {
+    let source = RegistrySource::new(
+        "https://bcr.bazel.build/",
+        parse_registry_source_json(
+            &key(),
+            r#"{"url":"file:///archive.tar.gz","integrity":"sha256-archive"}"#,
+        )
+        .unwrap(),
+    );
+
+    let err = observed_registry_file_hashes(&BTreeMap::new(), &BTreeMap::from([(key(), source)]))
+        .unwrap_err();
+    assert!(err.contains("selected registry source srcmod@1.0.0 has no source.json digest"));
 }

@@ -75,6 +75,7 @@ pub use registry::SelectedYankedVersion;
 pub use registry::YankedVersionPolicy;
 pub use registry::digest_selected_registry_modules;
 pub use registry::digest_selected_registry_sources;
+pub use registry::observed_registry_file_hashes;
 pub use registry::parse_registry_metadata_json;
 pub use registry::parse_registry_source_json;
 pub use registry::registry_bazel_registry_json_url;

@@ -420,6 +420,46 @@ pub fn selected_registry_file_hash_urls(
     urls.into_iter().collect()
 }
 
+pub fn observed_registry_file_hashes(
+    modules: &BTreeMap<ModuleKey, RegistryModule>,
+    sources: &BTreeMap<ModuleKey, RegistrySource>,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut hashes = BTreeMap::new();
+    for (module_key, module) in modules {
+        let digest = module.module_file_digest().ok_or_else(|| {
+            format!("selected registry module {module_key} has no MODULE.bazel digest")
+        })?;
+        insert_observed_registry_hash(
+            &mut hashes,
+            registry_module_file_url(&module.registry_url, module_key),
+            digest,
+        )?;
+    }
+    for (module_key, source) in sources {
+        let digest = source.source_json_digest().ok_or_else(|| {
+            format!("selected registry source {module_key} has no source.json digest")
+        })?;
+        insert_observed_registry_hash(
+            &mut hashes,
+            registry_source_json_url(&source.registry_url, module_key),
+            digest,
+        )?;
+    }
+    Ok(hashes)
+}
+
+fn insert_observed_registry_hash(
+    hashes: &mut BTreeMap<String, String>,
+    url: String,
+    digest: &str,
+) -> Result<(), String> {
+    match hashes.insert(url.clone(), digest.to_owned()) {
+        Some(previous) if previous != digest => Err(format!(
+            "conflicting observed registry file hash for {url}: {previous} vs {digest}"
+        )),
+        _ => Ok(()),
+    }
+}
 fn registry_file_url(registry_url: &str, relative_path: &str) -> String {
     format!("{}/{}", registry_url.trim_end_matches('/'), relative_path)
 }

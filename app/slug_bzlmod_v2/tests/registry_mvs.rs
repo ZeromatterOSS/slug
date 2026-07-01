@@ -9,6 +9,7 @@ use slug_bzlmod_v2::RegistryModule;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::digest_module_file_content;
 use slug_bzlmod_v2::digest_selected_registry_modules;
+use slug_bzlmod_v2::observed_registry_file_hashes;
 use slug_bzlmod_v2::registry_bazel_registry_json_url;
 use slug_bzlmod_v2::registry_module_file_url;
 use slug_bzlmod_v2::resolve_registry_mvs;
@@ -483,4 +484,41 @@ fn registry_module_hash_urls_match_bazel_lockfile_shape() {
         registry_bazel_registry_json_url("https://bcr.bazel.build/"),
         "https://bcr.bazel.build/bazel_registry.json"
     );
+}
+
+#[test]
+fn observed_registry_hashes_include_selected_module_digests() {
+    let module_source = r#"module(name = "aaa", version = "1.0.0")"#;
+    let selected = select_ordered_registry_modules(&[RegistryCatalog::with_module_file_digests(
+        "https://bcr.bazel.build/",
+        BTreeMap::from([(
+            ModuleKey::new("aaa", "1.0.0"),
+            (
+                module(module_source),
+                digest_module_file_content(module_source),
+            ),
+        )]),
+    )
+    .unwrap()]);
+
+    let hashes = observed_registry_file_hashes(&selected, &BTreeMap::new()).unwrap();
+
+    assert_eq!(
+        hashes.get("https://bcr.bazel.build/modules/aaa/1.0.0/MODULE.bazel"),
+        Some(&digest_module_file_content(module_source))
+    );
+}
+
+#[test]
+fn observed_registry_hashes_require_selected_module_digests() {
+    let selected = select_ordered_registry_modules(&[RegistryCatalog::new(
+        "https://bcr.bazel.build/",
+        BTreeMap::from([(
+            ModuleKey::new("aaa", "1.0.0"),
+            module(r#"module(name = "aaa", version = "1.0.0")"#),
+        )]),
+    )]);
+
+    let err = observed_registry_file_hashes(&selected, &BTreeMap::new()).unwrap_err();
+    assert!(err.contains("selected registry module aaa@1.0.0 has no MODULE.bazel digest"));
 }
