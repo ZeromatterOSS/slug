@@ -345,3 +345,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving included MODU
 Implementation summary: Added `expand_included_module_files` to splice already-parsed root-package include fragments into directive order, with missing include, unsupported label shape, module-header-in-fragment, and cycle diagnostics; this performs no filesystem IO and expects later DICE-owned readers to supply included module contents and digests
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-file-directives --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; same command for `module-include-change-invalidation`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Include fragments can now be expanded once supplied, but V2 still needs DICE file-dependency reads, Bazel-exact include restriction diagnostics, root/non-root directive validation, same-daemon create/edit/delete invalidation wiring, and integration into registry/local resolution.
+
+### Stage 5 include-aware local graph resolution
+
+Status: Partially landed
+V2 commit: `6fd68e2d Stage 5 resolve local graph includes`
+Bazel source inspected: Existing Stage 5 include/module-file citations still apply; this checkpoint composes the V2 include-expansion helper with the existing local-resolution substrate without adding filesystem IO
+Bazel oracle: Bazel 9.1.1 `module-include-change-invalidation` fixture
+V2 fixture: `module-include-change-invalidation`
+Expected evidence artifact: Stage 1 oracle expected output proving included fragment edits change the selected local override in the same output base
+Implementation summary: Added `resolve_local_module_graph_with_includes` so already-parsed include fragments can be spliced before local graph resolution; the original `resolve_local_module_graph` remains available for pre-expanded/no-include callers
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-include-change-invalidation --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: Local graph resolution can now consume supplied include fragments, but V2 still needs actual DICE file reads/watch edges, Bazel-exact include diagnostics, non-root module/include validation, and same-daemon create/edit/delete invalidation wiring.
