@@ -582,6 +582,7 @@ fn yanked_policy_rejects_invalid_environment_entries() {
 
     assert!(err.contains("BZLMOD_ALLOW_YANKED_VERSIONS entry yyy must be 'all' or module@version"));
 }
+
 #[test]
 fn registry_module_hash_urls_match_bazel_lockfile_shape() {
     let module = ModuleKey::new("rules_cc", "0.2.17");
@@ -665,6 +666,7 @@ fn observed_registry_policy_hashes_reject_conflicting_registry_digests() {
         "conflicting observed registry file hash for https://bcr.bazel.build/bazel_registry.json"
     ));
 }
+
 #[test]
 fn registry_mvs_root_dev_dependencies_follow_mode() {
     let root = module(
@@ -738,4 +740,28 @@ bazel_dep(name = "child", version = "1.0.0", dev_dependency = True)
             .unwrap()
             .contains_key("child")
     );
+}
+
+#[test]
+fn registry_mvs_rejects_root_overrides_for_nonexistent_modules() {
+    let root = module(
+        r#"
+module(name = "root", version = "0.1.0")
+bazel_dep(name = "dep", version = "1.0.0")
+local_path_override(module_name = "local_missing", path = "missing")
+single_version_override(module_name = "single_missing", version = "1.0.0")
+multiple_version_override(module_name = "multi_missing", versions = ["1.0.0", "2.0.0"])
+archive_override(module_name = "archive_missing", urls = ["file:///archive.zip"])
+git_override(module_name = "git_missing", remote = "https://example.invalid/repo.git", commit = "0123456789012345678901234567890123456789")
+"#,
+    );
+    let registry_modules = BTreeMap::from([(
+        ModuleKey::new("dep", "1.0.0"),
+        registry_module(r#"module(name = "dep", version = "1.0.0")"#),
+    )]);
+
+    let err = resolve_registry_mvs(&root, &registry_modules).unwrap_err();
+    assert!(err.contains(
+        "root module specifies overrides on nonexistent module(s): local_missing, single_missing, multi_missing, archive_missing, git_missing"
+    ));
 }

@@ -1,5 +1,6 @@
 module(name = "override_validation", version = "0.0.0")
 
+local_path_override(module_name = "local_missing", path = "missing")
 single_version_override(module_name = "single_missing", version = "1.0.0")
 multiple_version_override(module_name = "multi_missing", versions = ["1.0.0", "2.0.0"])
 archive_override(module_name = "archive_missing", urls = ["file:///does/not/matter.zip"])

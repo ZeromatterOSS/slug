@@ -155,6 +155,7 @@ bazel_dep(name = "bbb", version = "1.0.0")
     let aaa_mapping = graph.repo_mapping_for("aaa+").unwrap();
     assert_eq!(aaa_mapping.get("bbb").map(String::as_str), Some("bbb+"));
 }
+
 #[test]
 fn local_override_version_selection_is_request_order_independent() {
     let root = ModuleFile::parse(
@@ -209,6 +210,7 @@ bazel_dep(name = "bbb", version = "1.0.0")
         Some("bbb+")
     );
 }
+
 #[test]
 fn reports_missing_local_override() {
     let root = ModuleFile::parse(
@@ -245,6 +247,7 @@ fn canonical_module_repo_name_matches_bazel_local_graph_shape() {
     assert_eq!(bazel_canonical_module_repo_name("aaa"), "aaa+");
     assert_eq!(bazel_canonical_module_repo_name("_main"), "_main");
 }
+
 #[test]
 fn local_graph_root_dev_dependencies_follow_mode() {
     let root = ModuleFile::parse(
@@ -323,4 +326,28 @@ bazel_dep(name = "child", version = "1.0.0", dev_dependency = True)
             .unwrap()
             .contains_key("child")
     );
+}
+
+#[test]
+fn local_graph_rejects_root_overrides_for_nonexistent_modules() {
+    let root = ModuleFile::parse(
+        r#"
+module(name = "root", version = "0.0.0")
+bazel_dep(name = "dep", version = "1.0.0")
+local_path_override(module_name = "dep", path = "modules/dep")
+local_path_override(module_name = "local_missing", path = "missing")
+single_version_override(module_name = "single_missing", version = "1.0.0")
+multiple_version_override(module_name = "multi_missing", versions = ["1.0.0", "2.0.0"])
+archive_override(module_name = "archive_missing", urls = ["file:///archive.zip"])
+git_override(module_name = "git_missing", remote = "https://example.invalid/repo.git", commit = "0123456789012345678901234567890123456789")
+"#,
+    )
+    .unwrap();
+    let dep = ModuleFile::parse(r#"module(name = "dep", version = "1.0.0")"#).unwrap();
+    let locals = BTreeMap::from([("dep".to_owned(), dep)]);
+
+    let err = resolve_local_module_graph(&root, &locals).unwrap_err();
+    assert!(err.contains(
+        "root module specifies overrides on nonexistent module(s): local_missing, single_missing, multi_missing, archive_missing, git_missing"
+    ));
 }

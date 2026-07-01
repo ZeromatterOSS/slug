@@ -9,4 +9,4 @@ name = "query_rejects_missing_override_targets"
 argv = ["query", "//:all"]
 compare = "message_shape"
 expected_exit = 48
-stderr_contains = ["root module specifies overrides on nonexistent module(s): single_missing, multi_missing, archive_missing, git_missing"]
+stderr_contains = ["root module specifies overrides on nonexistent module(s): local_missing, single_missing, multi_missing, archive_missing, git_missing"]

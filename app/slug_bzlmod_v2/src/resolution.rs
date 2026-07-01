@@ -9,6 +9,7 @@
  */
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::VecDeque;
 use std::fmt;
 
@@ -335,6 +336,12 @@ pub fn resolve_local_module_graph_with_dev_dependency_mode(
         ));
     }
 
+    let mut known_module_names: BTreeSet<String> = discovered_by_name.keys().cloned().collect();
+    for module_file in module_files.values() {
+        known_module_names.extend(bazel_deps(module_file).into_iter().map(|dep| dep.name));
+    }
+    validate_root_overrides_have_targets(root, &known_module_names)?;
+
     let mut modules = BTreeMap::new();
     for (key, module_file) in module_files {
         let canonical_repo = if key == root_key {
@@ -387,6 +394,40 @@ pub(crate) fn bazel_deps(module_file: &ModuleFile) -> Vec<BazelDep> {
             _ => None,
         })
         .collect()
+}
+
+pub(crate) fn validate_root_overrides_have_targets(
+    root: &ModuleFile,
+    known_module_names: &BTreeSet<String>,
+) -> Result<(), String> {
+    let mut missing = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for directive in &root.directives {
+        let override_module = match directive {
+            Directive::LocalPathOverride(override_) => Some(&override_.module_name),
+            Directive::SingleVersionOverride(override_) => Some(&override_.module_name),
+            Directive::MultipleVersionOverride(override_) => Some(&override_.module_name),
+            Directive::ArchiveOverride(override_) => Some(&override_.module_name),
+            Directive::GitOverride(override_) => Some(&override_.module_name),
+            _ => None,
+        };
+        let Some(override_module) = override_module else {
+            continue;
+        };
+        if !known_module_names.contains(override_module) && seen.insert(override_module.clone()) {
+            missing.push(override_module.clone());
+        }
+    }
+
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "root module specifies overrides on nonexistent module(s): {}",
+            missing.join(", ")
+        ))
+    }
 }
 
 pub(crate) fn active_bazel_deps(

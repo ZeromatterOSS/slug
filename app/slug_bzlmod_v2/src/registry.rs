@@ -33,6 +33,8 @@ use crate::resolution::ResolvedGraph;
 use crate::resolution::ResolvedModule;
 use crate::resolution::active_bazel_deps;
 use crate::resolution::bazel_canonical_module_repo_name;
+use crate::resolution::bazel_deps;
+use crate::resolution::validate_root_overrides_have_targets;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistryModule {
@@ -899,6 +901,23 @@ pub fn resolve_registry_mvs_with_dev_dependency_mode(
             ));
         }
     }
+
+    let mut known_module_names: BTreeSet<String> = selected_versions.keys().cloned().collect();
+    known_module_names.extend(bazel_deps(root).into_iter().map(|dep| dep.name));
+    for (name, versions) in &selected_versions {
+        for version in versions {
+            let key = ModuleKey::new(name.clone(), version.clone());
+            let registry_module = registry_modules
+                .get(&key)
+                .ok_or_else(|| format!("selected registry module {key} was not supplied"))?;
+            known_module_names.extend(
+                bazel_deps(&registry_module.module_file)
+                    .into_iter()
+                    .map(|dep| dep.name),
+            );
+        }
+    }
+    validate_root_overrides_have_targets(root, &known_module_names)?;
 
     let canonical_repos = canonical_repos_for_selected_versions(&selected_versions);
     let mut modules = BTreeMap::new();
