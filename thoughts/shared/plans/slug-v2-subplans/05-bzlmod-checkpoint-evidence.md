@@ -755,3 +755,23 @@ Stage 5 missing registry checksum lockfile error checkpoint:
   `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-error-missing-registry-hash --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
   bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
   `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.
+
+Stage 5 lockfile mode off policy checkpoint:
+
+- Added `lockfile-mode-off`, a Bazel 9.1.1 oracle fixture proving
+  `--lockfile_mode=off` does not write visible `MODULE.bazel.lock`. The fixture
+  queries a source-file target with `MODULE.bazel.lock` as a manifest root; the
+  generated expected oracle records an empty manifest.
+- Added explicit `LockfileMode::reads_visible_lockfile` and
+  `LockfileMode::writes_visible_lockfile` helpers. The helpers encode only the
+  visible-lockfile policy surface: `off` reads/writes neither, `update` and
+  `refresh` read/write, and `error` reads but does not write.
+- DICE guidance was reread before touching `dice.rs`; no lock, process-global,
+  file I/O, or hidden session state was introduced.
+- No V1 bzlmod implementation was imported for this checkpoint. The behavior is
+  grounded in the Bazel 9.1.1 oracle fixture.
+- Validation passed: `cargo fmt -p slug_bzlmod_v2`;
+  `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`;
+  `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-off --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`;
+  bundled `python.exe -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`;
+  `rg -n "process-global|fallback scanner|marker trust|std::fs::read" app/slug_bzlmod_v2` returned no matches.

@@ -1,0 +1,14 @@
+[fixture]
+name = "lockfile-mode-off"
+description = "Bazel 9 fixture proving --lockfile_mode=off does not write MODULE.bazel.lock."
+comparison = "semantic"
+manifest_roots = ["MODULE.bazel.lock"]
+oracle_notes = "Self-contained root module fixture. The command queries a source-file target with --lockfile_mode=off and records MODULE.bazel.lock as a manifest root; the generated oracle manifest is empty, proving Bazel did not write the visible lockfile."
+
+[[commands]]
+name = "query_without_lockfile_write"
+argv = ["query", "//:data.txt", "--lockfile_mode=off"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["//:data.txt"]
+manifest_roots = ["MODULE.bazel.lock"]

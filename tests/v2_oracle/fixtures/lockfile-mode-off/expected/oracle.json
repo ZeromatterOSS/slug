@@ -1,0 +1,37 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "query_without_lockfile_write",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:data.txt",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//:data.txt\n"
+    }
+  ],
+  "fixture": "lockfile-mode-off",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

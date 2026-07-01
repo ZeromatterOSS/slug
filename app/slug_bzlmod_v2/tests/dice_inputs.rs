@@ -365,6 +365,20 @@ fn lockfile_mode_parses_bazel_flag_values() {
 }
 
 #[test]
+fn lockfile_mode_controls_visible_lockfile_read_write_policy() {
+    assert!(!LockfileMode::Off.reads_visible_lockfile());
+    assert!(!LockfileMode::Off.writes_visible_lockfile());
+
+    assert!(LockfileMode::Update.reads_visible_lockfile());
+    assert!(LockfileMode::Update.writes_visible_lockfile());
+
+    assert!(LockfileMode::Refresh.reads_visible_lockfile());
+    assert!(LockfileMode::Refresh.writes_visible_lockfile());
+
+    assert!(LockfileMode::Error.reads_visible_lockfile());
+    assert!(!LockfileMode::Error.writes_visible_lockfile());
+}
+#[test]
 fn policy_keys_serialize_yanked_allowlists_stably() {
     let env_policy =
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("zzz@2.0.0,yyy@1.0.0"))

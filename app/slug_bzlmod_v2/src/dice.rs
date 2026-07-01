@@ -285,6 +285,14 @@ impl LockfileMode {
             Self::Error => "error",
         }
     }
+
+    pub fn reads_visible_lockfile(&self) -> bool {
+        matches!(self, Self::Update | Self::Refresh | Self::Error)
+    }
+
+    pub fn writes_visible_lockfile(&self) -> bool {
+        matches!(self, Self::Update | Self::Refresh)
+    }
 }
 
 impl fmt::Display for LockfileMode {
