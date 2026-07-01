@@ -86,6 +86,249 @@ pub fn validate_lockfile_version(
             .to_owned(),
     )
 }
+
+pub fn render_bazel_lockfile(lockfile: &BazelLockfile) -> Result<String, String> {
+    let mut fields = Vec::new();
+    fields.push(format!(
+        "  {}: {}",
+        json_string("lockFileVersion")?,
+        lockfile.lock_file_version
+    ));
+    fields.push(render_string_map_field(
+        "registryFileHashes",
+        &lockfile.registry_file_hashes,
+    )?);
+    fields.push(render_selected_yanked_versions_field(lockfile)?);
+    fields.push(render_module_extensions_field(lockfile)?);
+    fields.push(render_value_map_field("facts", &lockfile.facts)?);
+    if !lockfile.facts_versions.is_empty() {
+        fields.push(render_value_map_field(
+            "factsVersions",
+            &lockfile.facts_versions,
+        )?);
+    }
+
+    let mut rendered = String::from("{\n");
+    for (index, field) in fields.iter().enumerate() {
+        rendered.push_str(field);
+        if index + 1 != fields.len() {
+            rendered.push(',');
+        }
+        rendered.push('\n');
+    }
+    rendered.push_str("}\n");
+    Ok(rendered)
+}
+
+fn render_selected_yanked_versions_field(lockfile: &BazelLockfile) -> Result<String, String> {
+    let selected = lockfile
+        .selected_yanked_versions
+        .iter()
+        .map(|(module, reason)| (module.to_string(), reason.clone()))
+        .collect::<BTreeMap<_, _>>();
+    render_string_map_field("selectedYankedVersions", &selected)
+}
+
+fn render_string_map_field(field: &str, map: &BTreeMap<String, String>) -> Result<String, String> {
+    let mut rendered = format!("  {}: {{", json_string(field)?);
+    if map.is_empty() {
+        rendered.push('}');
+        return Ok(rendered);
+    }
+    rendered.push('\n');
+    for (index, (key, value)) in map.iter().enumerate() {
+        rendered.push_str("    ");
+        rendered.push_str(&json_string(key)?);
+        rendered.push_str(": ");
+        rendered.push_str(&json_string(value)?);
+        if index + 1 != map.len() {
+            rendered.push(',');
+        }
+        rendered.push('\n');
+    }
+    rendered.push_str("  }");
+    Ok(rendered)
+}
+
+fn render_value_map_field(field: &str, map: &BTreeMap<String, Value>) -> Result<String, String> {
+    let mut rendered = format!("  {}: {{", json_string(field)?);
+    if map.is_empty() {
+        rendered.push('}');
+        return Ok(rendered);
+    }
+    rendered.push('\n');
+    for (index, (key, value)) in map.iter().enumerate() {
+        rendered.push_str("    ");
+        rendered.push_str(&json_string(key)?);
+        rendered.push_str(": ");
+        rendered.push_str(&render_json_value(value, "    ")?);
+        if index + 1 != map.len() {
+            rendered.push(',');
+        }
+        rendered.push('\n');
+    }
+    rendered.push_str("  }");
+    Ok(rendered)
+}
+
+fn render_module_extensions_field(lockfile: &BazelLockfile) -> Result<String, String> {
+    let mut rendered = format!("  {}: {{", json_string("moduleExtensions")?);
+    if lockfile.module_extensions.is_empty() {
+        rendered.push('}');
+        return Ok(rendered);
+    }
+    rendered.push('\n');
+    for (index, (extension_id, extension)) in lockfile.module_extensions.iter().enumerate() {
+        rendered.push_str("    ");
+        rendered.push_str(&json_string(extension_id)?);
+        rendered.push_str(": ");
+        rendered.push_str(&render_module_extension(extension)?);
+        if index + 1 != lockfile.module_extensions.len() {
+            rendered.push(',');
+        }
+        rendered.push('\n');
+    }
+    rendered.push_str("  }");
+    Ok(rendered)
+}
+
+fn render_module_extension(extension: &BazelLockfileModuleExtension) -> Result<String, String> {
+    let Some(general) = &extension.general else {
+        return Ok("{}".to_owned());
+    };
+    let mut rendered = String::from("{\n");
+    rendered.push_str("      ");
+    rendered.push_str(&json_string("general")?);
+    rendered.push_str(": ");
+    rendered.push_str(&render_module_extension_general(general)?);
+    rendered.push('\n');
+    rendered.push_str("    }");
+    Ok(rendered)
+}
+
+fn render_module_extension_general(
+    general: &BazelLockfileModuleExtensionGeneral,
+) -> Result<String, String> {
+    let mut fields = Vec::new();
+    if let Some(digest) = &general.bzl_transitive_digest {
+        fields.push(format!(
+            "        {}: {}",
+            json_string("bzlTransitiveDigest")?,
+            json_string(digest)?
+        ));
+    }
+    if let Some(digest) = &general.usages_digest {
+        fields.push(format!(
+            "        {}: {}",
+            json_string("usagesDigest")?,
+            json_string(digest)?
+        ));
+    }
+    fields.push(format!(
+        "        {}: {}",
+        json_string("recordedInputs")?,
+        render_recorded_inputs(&general.recorded_inputs)?
+    ));
+    fields.push(format!(
+        "        {}: {}",
+        json_string("generatedRepoSpecs")?,
+        render_generated_repo_specs(&general.generated_repo_specs)?
+    ));
+
+    let mut rendered = String::from("{\n");
+    for (index, field) in fields.iter().enumerate() {
+        rendered.push_str(field);
+        if index + 1 != fields.len() {
+            rendered.push(',');
+        }
+        rendered.push('\n');
+    }
+    rendered.push_str("      }");
+    Ok(rendered)
+}
+
+fn render_recorded_inputs(inputs: &[BazelLockfileRecordedInput]) -> Result<String, String> {
+    if inputs.is_empty() {
+        return Ok("[]".to_owned());
+    }
+    let values = inputs
+        .iter()
+        .map(|input| match input {
+            BazelLockfileRecordedInput::Env { name, value } => {
+                Value::String(format!("ENV:{name} {value}"))
+            }
+            BazelLockfileRecordedInput::File { label, digest } => {
+                Value::String(format!("FILE:{label} {digest}"))
+            }
+            BazelLockfileRecordedInput::Raw(value) => value.clone(),
+        })
+        .collect::<Vec<_>>();
+    render_json_value(&Value::Array(values), "        ")
+}
+
+fn render_generated_repo_specs(
+    specs: &BTreeMap<String, BazelLockfileRepoSpec>,
+) -> Result<String, String> {
+    let mut rendered = String::from("{");
+    if specs.is_empty() {
+        rendered.push('}');
+        return Ok(rendered);
+    }
+    rendered.push('\n');
+    for (index, (repo_name, spec)) in specs.iter().enumerate() {
+        rendered.push_str("          ");
+        rendered.push_str(&json_string(repo_name)?);
+        rendered.push_str(": {\n");
+        rendered.push_str("            ");
+        rendered.push_str(&json_string("repoRuleId")?);
+        rendered.push_str(": ");
+        rendered.push_str(&json_string(&spec.repo_rule_id)?);
+        rendered.push_str(",\n");
+        rendered.push_str("            ");
+        rendered.push_str(&json_string("attributes")?);
+        rendered.push_str(": ");
+        rendered.push_str(&render_json_object(&spec.attributes, "            ")?);
+        rendered.push('\n');
+        rendered.push_str("          }");
+        if index + 1 != specs.len() {
+            rendered.push(',');
+        }
+        rendered.push('\n');
+    }
+    rendered.push_str("        }");
+    Ok(rendered)
+}
+
+fn render_json_object(
+    map: &BTreeMap<String, Value>,
+    continuation_indent: &str,
+) -> Result<String, String> {
+    let value = Value::Object(
+        map.iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect(),
+    );
+    render_json_value(&value, continuation_indent)
+}
+
+fn render_json_value(value: &Value, continuation_indent: &str) -> Result<String, String> {
+    let pretty = serde_json::to_string_pretty(value)
+        .map_err(|err| format!("Unable to render MODULE.bazel.lock JSON value: {err}"))?;
+    let mut lines = pretty.lines();
+    let first = lines.next().unwrap_or("null").to_owned();
+    let mut rendered = first;
+    for line in lines {
+        rendered.push('\n');
+        rendered.push_str(continuation_indent);
+        rendered.push_str(line);
+    }
+    Ok(rendered)
+}
+
+fn json_string(value: &str) -> Result<String, String> {
+    serde_json::to_string(value)
+        .map_err(|err| format!("Unable to render MODULE.bazel.lock JSON string: {err}"))
+}
 pub fn validate_required_registry_file_hashes(
     lockfile: &BazelLockfile,
     required_urls: &[&str],

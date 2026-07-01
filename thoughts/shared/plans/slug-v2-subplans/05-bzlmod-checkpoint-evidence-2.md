@@ -37,7 +37,7 @@ Residual risk: The helper derives the registry file identities that error-mode v
 ### Stage 5 observed registry hash map substrate
 
 Status: Partially landed
-V2 commit: Pending checkpoint on `codex/slugv2-clean-root-remediation`
+V2 commit: `c2dbdce4 Stage 5 map observed registry hashes`
 V1 source inspected: None for implementation; derived from existing V2 registry digest substrates and Bazel 9 lockfile registry-hash oracle fixtures
 Bazel oracle: Bazel 9.1.1 `lockfile-error-mode-registry-hash` and `lockfile-error-missing-registry-hash` fixtures
 V2 fixture: `lockfile-error-mode-registry-hash`, `lockfile-error-missing-registry-hash`
@@ -45,3 +45,15 @@ Expected evidence artifact: Stage 1 oracle expected output for lockfile error-mo
 Implementation summary: Added `observed_registry_file_hashes` to convert selected registry MODULE.bazel and source.json content digests into the URL-to-digest map consumed by visible lockfile registry-hash validators; the helper requires explicit observed digests and does not add network fetching, filesystem registry scans, cache lookup, lockfile writes, or repository materialization
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-error-mode-registry-hash --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-error-missing-registry-hash --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: Observed registry digests are now shaped for lockfile validators, but producing those digests from actual registry fetches or local-registry reads, visible lockfile updating, refresh/error mode lifecycle, and same-daemon stale rejection remain later Stage 5.2/5.6 work
+
+### Stage 5 visible lockfile renderer substrate
+
+Status: Partially landed
+V2 commit: Pending checkpoint on `codex/slugv2-clean-root-remediation`
+V1 source inspected: None for implementation; renderer shape is grounded by Bazel 9 visible lockfile oracle fixtures and existing V2 lockfile parser structs
+Bazel oracle: Bazel 9.1.1 `lockfile-mode-update-refresh`, `lockfile-selected-yanked-version`, and `module-extension-lockfile-shape` fixtures
+V2 fixture: `lockfile-mode-update-refresh`, `lockfile-selected-yanked-version`, `module-extension-lockfile-shape`
+Expected evidence artifact: Stage 1 oracle expected output and run artifacts proving top-level visible lockfile field order, selected yanked version entries, and module extension replay fields (`bzlTransitiveDigest`, `usagesDigest`, `recordedInputs`, `generatedRepoSpecs`)
+Implementation summary: Added `render_bazel_lockfile` for deterministic Bazel-shaped visible lockfile JSON over the fields V2 already parses and validates: registry file hashes, selected yanked versions, module extension replay data, facts, and factsVersions; this is a pure renderer and does not add filesystem write policy, hidden lockfile caching, registry refresh, repository materialization, or same-daemon invalidation behavior
+Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture module-extension-lockfile-shape --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; `py -3 -B -m tools.v2_oracle run --fixture lockfile-selected-yanked-version --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
+Residual risk: V2 can now render parsed lockfile data deterministically, but deciding when to read/write visible or hidden lockfiles, updating registry hashes from fetches, replaying stale entries in error mode, and preserving same-daemon invalidation semantics remain later Stage 5.5/5.6 work

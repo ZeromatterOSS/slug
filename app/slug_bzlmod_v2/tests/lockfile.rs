@@ -13,6 +13,7 @@ use slug_bzlmod_v2::BAZEL_9_LOCK_FILE_VERSION;
 use slug_bzlmod_v2::BazelLockfileRecordedInput;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::parse_bazel_lockfile;
+use slug_bzlmod_v2::render_bazel_lockfile;
 use slug_bzlmod_v2::validate_lockfile_version;
 use slug_bzlmod_v2::validate_module_extension_bzl_transitive_digests;
 use slug_bzlmod_v2::validate_module_extension_recorded_env_inputs;
@@ -480,4 +481,118 @@ fn rejects_mismatched_registry_hash_like_bazel() {
         "Failed to fetch registry file https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel"
     ));
     assert!(err.contains("Checksum was 184960 but wanted 000000"));
+}
+
+#[test]
+fn renders_visible_lockfile_with_bazel_top_level_shape() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "registryFileHashes": {
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "module-digest",
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json": "source-digest"
+  },
+  "selectedYankedVersions": {
+    "rules_cc@0.2.17": "test yanked reason"
+  },
+  "moduleExtensions": {},
+  "facts": {}
+}"#,
+    )
+    .unwrap();
+
+    let rendered = render_bazel_lockfile(&lockfile).unwrap();
+
+    assert_eq!(
+        rendered,
+        concat!(
+            "{\n",
+            "  \"lockFileVersion\": 26,\n",
+            "  \"registryFileHashes\": {\n",
+            "    \"https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel\": \"module-digest\",\n",
+            "    \"https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json\": \"source-digest\"\n",
+            "  },\n",
+            "  \"selectedYankedVersions\": {\n",
+            "    \"rules_cc@0.2.17\": \"test yanked reason\"\n",
+            "  },\n",
+            "  \"moduleExtensions\": {},\n",
+            "  \"facts\": {}\n",
+            "}\n",
+        )
+    );
+    assert_eq!(parse_bazel_lockfile(&rendered).unwrap(), lockfile);
+}
+
+#[test]
+fn renders_module_extension_lockfile_replay_shape() {
+    let lockfile = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 26,
+  "registryFileHashes": {},
+  "selectedYankedVersions": {},
+  "moduleExtensions": {
+    "//:ext.bzl%ext": {
+      "general": {
+        "bzlTransitiveDigest": "bzl-digest",
+        "usagesDigest": "usage-digest",
+        "recordedInputs": [
+          "ENV:FOO bar",
+          "FILE://:input.txt abc123"
+        ],
+        "generatedRepoSpecs": {
+          "tagged": {
+            "repoRuleId": "@@//:ext.bzl%tagged_repo",
+            "attributes": {
+              "message": "hello from tag"
+            }
+          }
+        }
+      }
+    }
+  },
+  "facts": {},
+  "factsVersions": {
+    "//:ext.bzl%ext": 1
+  }
+}"#,
+    )
+    .unwrap();
+
+    let rendered = render_bazel_lockfile(&lockfile).unwrap();
+
+    assert_eq!(
+        rendered,
+        concat!(
+            "{\n",
+            "  \"lockFileVersion\": 26,\n",
+            "  \"registryFileHashes\": {},\n",
+            "  \"selectedYankedVersions\": {},\n",
+            "  \"moduleExtensions\": {\n",
+            "    \"//:ext.bzl%ext\": {\n",
+            "      \"general\": {\n",
+            "        \"bzlTransitiveDigest\": \"bzl-digest\",\n",
+            "        \"usagesDigest\": \"usage-digest\",\n",
+            "        \"recordedInputs\": [\n",
+            "          \"ENV:FOO bar\",\n",
+            "          \"FILE://:input.txt abc123\"\n",
+            "        ],\n",
+            "        \"generatedRepoSpecs\": {\n",
+            "          \"tagged\": {\n",
+            "            \"repoRuleId\": \"@@//:ext.bzl%tagged_repo\",\n",
+            "            \"attributes\": {\n",
+            "              \"message\": \"hello from tag\"\n",
+            "            }\n",
+            "          }\n",
+            "        }\n",
+            "      }\n",
+            "    }\n",
+            "  },\n",
+            "  \"facts\": {},\n",
+            "  \"factsVersions\": {\n",
+            "    \"//:ext.bzl%ext\": 1\n",
+            "  }\n",
+            "}\n",
+        )
+    );
+    assert_eq!(parse_bazel_lockfile(&rendered).unwrap(), lockfile);
 }

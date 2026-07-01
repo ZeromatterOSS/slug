@@ -39,6 +39,7 @@ pub use lockfile::BazelLockfileModuleExtensionGeneral;
 pub use lockfile::BazelLockfileRecordedInput;
 pub use lockfile::BazelLockfileRepoSpec;
 pub use lockfile::parse_bazel_lockfile;
+pub use lockfile::render_bazel_lockfile;
 pub use lockfile::validate_lockfile_version;
 pub use lockfile::validate_module_extension_bzl_transitive_digests;
 pub use lockfile::validate_module_extension_recorded_env_inputs;
