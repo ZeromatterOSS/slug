@@ -253,6 +253,85 @@ bazel_dep(name = "bbb", version = "2.0.0")
 }
 
 #[test]
+fn bazel_repo_mappings_match_canonical_names_oracle_shape() {
+    let root = module(
+        r#"
+module(name = "repo_mapping_root", version = "0.1.0")
+bazel_dep(name = "aaa", version = "1.0.0")
+bazel_dep(name = "ccc", version = "1.0.0")
+multiple_version_override(module_name = "bbb", versions = ["1.0.0", "2.0.0"])
+"#,
+    );
+    let registry_modules = BTreeMap::from([
+        (
+            ModuleKey::new("aaa", "1.0.0"),
+            registry_module(
+                r#"
+module(name = "aaa", version = "1.0.0")
+bazel_dep(name = "bbb", version = "1.0.0")
+"#,
+            ),
+        ),
+        (
+            ModuleKey::new("ccc", "1.0.0"),
+            registry_module(
+                r#"
+module(name = "ccc", version = "1.0.0")
+bazel_dep(name = "bbb", version = "2.0.0")
+"#,
+            ),
+        ),
+        (
+            ModuleKey::new("bbb", "1.0.0"),
+            registry_module(r#"module(name = "bbb", version = "1.0.0")"#),
+        ),
+        (
+            ModuleKey::new("bbb", "2.0.0"),
+            registry_module(r#"module(name = "bbb", version = "2.0.0")"#),
+        ),
+    ]);
+
+    let graph = resolve_registry_mvs(&root, &registry_modules).unwrap();
+
+    assert_eq!(
+        graph.bazel_repo_mapping_for("aaa+").unwrap(),
+        BTreeMap::from([
+            ("aaa".to_owned(), "aaa+".to_owned()),
+            ("bbb".to_owned(), "bbb+1.0.0".to_owned()),
+            ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
+        ])
+    );
+    assert_eq!(
+        graph.bazel_repo_mapping_for("ccc+").unwrap(),
+        BTreeMap::from([
+            ("ccc".to_owned(), "ccc+".to_owned()),
+            ("bbb".to_owned(), "bbb+2.0.0".to_owned()),
+            ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
+        ])
+    );
+    assert_eq!(
+        graph.bazel_repo_mapping_for("bbb+1.0.0").unwrap(),
+        BTreeMap::from([
+            ("bbb".to_owned(), "bbb+1.0.0".to_owned()),
+            ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
+        ])
+    );
+
+    assert_eq!(
+        graph
+            .extension_generated_repo_mapping("+ext+generated", "generated")
+            .unwrap(),
+        BTreeMap::from([
+            ("".to_owned(), "".to_owned()),
+            ("repo_mapping_root".to_owned(), "".to_owned()),
+            ("generated".to_owned(), "+ext+generated".to_owned()),
+            ("aaa".to_owned(), "aaa+".to_owned()),
+            ("ccc".to_owned(), "ccc+".to_owned()),
+            ("bazel_tools".to_owned(), "bazel_tools".to_owned()),
+        ])
+    );
+}
+#[test]
 fn multiple_version_override_rejects_unlisted_requested_version() {
     let root = module(
         r#"

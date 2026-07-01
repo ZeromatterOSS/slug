@@ -80,18 +80,61 @@ impl ResolvedGraph {
     }
 
     pub fn repo_mapping_for(&self, canonical_repo: &str) -> Option<BTreeMap<String, String>> {
-        let module = self
-            .modules
-            .values()
-            .find(|module| module.canonical_repo == canonical_repo)?;
-        Some(
-            module
-                .dependencies
-                .iter()
-                .map(|dep| (dep.apparent_repo_name.clone(), dep.canonical_repo.clone()))
-                .collect(),
-        )
+        let module = self.module_by_canonical_repo(canonical_repo)?;
+        Some(module_dependency_mapping(module))
     }
+
+    pub fn bazel_repo_mapping_for(&self, canonical_repo: &str) -> Option<BTreeMap<String, String>> {
+        let module = self.module_by_canonical_repo(canonical_repo)?;
+        Some(bazel_module_repo_mapping(module))
+    }
+
+    pub fn extension_generated_repo_mapping(
+        &self,
+        generated_repo_canonical: impl Into<String>,
+        generated_repo_apparent: impl Into<String>,
+    ) -> Result<BTreeMap<String, String>, String> {
+        let root = self
+            .modules
+            .get(&self.root)
+            .ok_or_else(|| format!("root module {} is missing from resolved graph", self.root))?;
+        let mut mapping = BTreeMap::new();
+        mapping.insert(
+            generated_repo_apparent.into(),
+            generated_repo_canonical.into(),
+        );
+        mapping.insert(String::new(), String::new());
+        mapping.insert(root.key.name.clone(), String::new());
+        mapping.extend(module_dependency_mapping(root));
+        mapping.insert("bazel_tools".to_owned(), "bazel_tools".to_owned());
+        Ok(mapping)
+    }
+
+    fn module_by_canonical_repo(&self, canonical_repo: &str) -> Option<&ResolvedModule> {
+        self.modules
+            .values()
+            .find(|module| module.canonical_repo == canonical_repo)
+    }
+}
+
+fn module_dependency_mapping(module: &ResolvedModule) -> BTreeMap<String, String> {
+    module
+        .dependencies
+        .iter()
+        .map(|dep| (dep.apparent_repo_name.clone(), dep.canonical_repo.clone()))
+        .collect()
+}
+
+fn bazel_module_repo_mapping(module: &ResolvedModule) -> BTreeMap<String, String> {
+    let mut mapping = module_dependency_mapping(module);
+    if matches!(module.source, ModuleSource::Root) {
+        mapping.insert(String::new(), String::new());
+        mapping.insert(module.key.name.clone(), String::new());
+    } else {
+        mapping.insert(module.key.name.clone(), module.canonical_repo.clone());
+    }
+    mapping.insert("bazel_tools".to_owned(), "bazel_tools".to_owned());
+    mapping
 }
 
 pub fn bazel_canonical_module_repo_name(module_name: &str) -> String {
