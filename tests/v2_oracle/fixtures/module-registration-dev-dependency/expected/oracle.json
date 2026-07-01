@@ -9,6 +9,7 @@
       "cwd": "<workspace>",
       "duration_ms": "<duration_ms>",
       "env_allowlist": {},
+      "env_overrides": {},
       "executed_argv": [
         "<tool_executable>",
         "query",
@@ -20,9 +21,67 @@
       "mutations": [],
       "name": "query_registered_targets",
       "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded",
-      "normalized_stdout": "//:host_platform\n//:tc\n//:tc_type",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-registration-dev-dependency\\20260630-125810-48872-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-registration-dev-dependency\\20260630-125827-4328-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
-      "stdout": "//:host_platform\n//:tc\n//:tc_type\n"
+      "normalized_stdout": "//:host_platform\n//:tc\n//:tc_impl\n//:tc_type\n//:uses_toolchain",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-registration-dev-dependency\\20260630-220639-47012-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-registration-dev-dependency\\20260630-220709-37344-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//:host_platform\n//:tc\n//:tc_impl\n//:tc_type\n//:uses_toolchain\n"
+    },
+    {
+      "argv": [
+        "build",
+        "//:uses_toolchain"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:uses_toolchain"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "a04e529d389452de637656ef97722a9e57ee4aa5fdcc60744b66c4bc2b787076",
+          "mode": "0o444",
+          "path": "uses_toolchain.txt",
+          "root": "bazel-bin/uses_toolchain.txt",
+          "size": 22,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "build_with_dev_registration",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:uses_toolchain (4 packages loaded, 6 targets configured)\nAnalyzing: target //:uses_toolchain (4 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:uses_toolchain (75 packages loaded, 435 targets configured).\nINFO: Found 1 target...\nTarget //:uses_toolchain up-to-date:\n  bazel-bin/uses_toolchain.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:uses_toolchain (4 packages loaded, 6 targets configured)\nAnalyzing: target //:uses_toolchain (4 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:uses_toolchain (75 packages loaded, 435 targets configured).\nINFO: Found 1 target...\nTarget //:uses_toolchain up-to-date:\n  bazel-bin/uses_toolchain.txt\nINFO: Elapsed time: 1.049s, Critical Path: 0.02s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:uses_toolchain",
+        "--ignore_dev_dependency"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:uses_toolchain",
+        "--ignore_dev_dependency"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_ignore_dev_registration",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:uses_toolchain (2 packages loaded, 2 targets configured)\nAnalyzing: target //:uses_toolchain (2 packages loaded, 2 targets configured)\n\nERROR: <workspace>/BUILD.bazel:15:15: While resolving toolchains for target //:uses_toolchain (19cc255): No matching toolchains found for types:\n  //:tc_type\nTo debug, rerun with --toolchain_resolution_debug='//:tc_type'\nFor more information on platforms or toolchains see https://bazel.build/concepts/platforms-intro.\nERROR: Analysis of target '//:uses_toolchain' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:uses_toolchain (2 packages loaded, 2 targets configured)\nAnalyzing: target //:uses_toolchain (2 packages loaded, 2 targets configured)\n\nERROR: C:/dev/kuro/target/v2o/runs/module-registration-dev-dependency/20260630-220709-37344-bazel/workspace/BUILD.bazel:15:15: While resolving toolchains for target //:uses_toolchain (19cc255): No matching toolchains found for types:\n  //:tc_type\nTo debug, rerun with --toolchain_resolution_debug='//:tc_type'\nFor more information on platforms or toolchains see https://bazel.build/concepts/platforms-intro.\nERROR: Analysis of target '//:uses_toolchain' failed; build aborted\nINFO: Elapsed time: 0.538s, Critical Path: 0.01s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
     }
   ],
   "fixture": "module-registration-dev-dependency",

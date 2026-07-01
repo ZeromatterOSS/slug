@@ -2,11 +2,26 @@
 name = "module-registration-dev-dependency"
 description = "MODULE.bazel registration directives with dev_dependency flags under Bazel 9 bzlmod."
 comparison = "message_shape"
-oracle_notes = "Self-contained Bazel 9 oracle fixture: register_toolchains and register_execution_platforms accept dev_dependency while preserving normal package loading."
+oracle_notes = "Self-contained Bazel 9 oracle fixture: register_toolchains and register_execution_platforms accept dev_dependency flags; --ignore_dev_dependency skips root dev-only toolchain registrations."
 
 [[commands]]
 name = "query_registered_targets"
 argv = ["query", "//:all", "--output=label"]
 compare = "message_shape"
 expected_exit = 0
-stdout_contains = ["//:host_platform", "//:tc", "//:tc_type"]
+stdout_contains = ["//:host_platform", "//:tc", "//:tc_type", "//:uses_toolchain"]
+
+[[commands]]
+name = "build_with_dev_registration"
+argv = ["build", "//:uses_toolchain"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Target //:uses_toolchain up-to-date"]
+manifest_roots = ["bazel-bin/uses_toolchain.txt"]
+
+[[commands]]
+name = "build_ignore_dev_registration"
+argv = ["build", "//:uses_toolchain", "--ignore_dev_dependency"]
+compare = "message_shape"
+expected_exit = 1
+stderr_contains = ["No matching toolchains found for types:", "//:tc_type"]

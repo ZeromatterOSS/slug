@@ -2,12 +2,14 @@ use std::collections::BTreeMap;
 
 use slug_bzlmod_v2::ArchiveOverride;
 use slug_bzlmod_v2::BazelDep;
+use slug_bzlmod_v2::DevDependencyMode;
 use slug_bzlmod_v2::Directive;
 use slug_bzlmod_v2::ExtensionTag;
 use slug_bzlmod_v2::GitOverride;
 use slug_bzlmod_v2::InjectRepo;
 use slug_bzlmod_v2::LocalPathOverride;
 use slug_bzlmod_v2::ModuleAttributeValue;
+use slug_bzlmod_v2::ModuleDirectiveOwner;
 use slug_bzlmod_v2::ModuleFile;
 use slug_bzlmod_v2::ModuleRegistrationDirective;
 use slug_bzlmod_v2::MultipleVersionOverride;
@@ -20,6 +22,7 @@ use slug_bzlmod_v2::SingleVersionOverride;
 use slug_bzlmod_v2::UseExtension;
 use slug_bzlmod_v2::UseRepo;
 use slug_bzlmod_v2::UseRepoRule;
+use slug_bzlmod_v2::active_module_registration_directives;
 use slug_bzlmod_v2::expand_included_module_files;
 use slug_bzlmod_v2::module_registration_directives;
 
@@ -156,6 +159,31 @@ register_toolchains("//:extra")
                 dev_dependency: false,
             },
         ]
+    );
+
+    assert_eq!(
+        active_module_registration_directives(
+            &parsed,
+            ModuleDirectiveOwner::Root,
+            DevDependencyMode::IncludeRoot,
+        ),
+        registrations
+    );
+    assert_eq!(
+        active_module_registration_directives(
+            &parsed,
+            ModuleDirectiveOwner::Root,
+            DevDependencyMode::IgnoreRoot,
+        ),
+        registrations[1..].to_vec()
+    );
+    assert_eq!(
+        active_module_registration_directives(
+            &parsed,
+            ModuleDirectiveOwner::NonRoot,
+            DevDependencyMode::IncludeRoot,
+        ),
+        registrations[1..].to_vec()
     );
 }
 #[test]

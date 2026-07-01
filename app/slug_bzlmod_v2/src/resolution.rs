@@ -20,9 +20,11 @@ use crate::BzlmodRepoMappingDigest;
 use crate::Directive;
 use crate::ModuleFile;
 use crate::ModuleHeader;
+use crate::ModuleRegistrationDirective;
 use crate::digest_repo_mapping_entries;
 use crate::digest_repo_mappings;
 use crate::expand_included_module_files;
+use crate::module_registration_directives;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModuleKey {
@@ -63,6 +65,12 @@ pub enum ModuleSource {
 pub enum DevDependencyMode {
     IncludeRoot,
     IgnoreRoot,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModuleDirectiveOwner {
+    Root,
+    NonRoot,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -428,6 +436,21 @@ pub(crate) fn validate_root_overrides_have_targets(
             missing.join(", ")
         ))
     }
+}
+
+pub fn active_module_registration_directives(
+    module_file: &ModuleFile,
+    owner: ModuleDirectiveOwner,
+    dev_dependency_mode: DevDependencyMode,
+) -> Vec<ModuleRegistrationDirective> {
+    module_registration_directives(module_file)
+        .into_iter()
+        .filter(|registration| {
+            !registration.dev_dependency
+                || (matches!(owner, ModuleDirectiveOwner::Root)
+                    && matches!(dev_dependency_mode, DevDependencyMode::IncludeRoot))
+        })
+        .collect()
 }
 
 pub(crate) fn active_bazel_deps(
