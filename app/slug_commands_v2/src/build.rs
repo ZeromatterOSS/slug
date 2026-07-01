@@ -8,12 +8,14 @@
  * above-listed licenses.
  */
 
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_identity_v2::TargetPattern;
 
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
+use crate::common::bzlmod_command_policy;
 use crate::common::parse_target_patterns;
 use crate::common::split_args;
 
@@ -21,14 +23,17 @@ use crate::common::split_args;
 pub struct BuildRequest {
     pub targets: Vec<TargetPattern>,
     pub flags: Vec<ParsedFlag>,
+    pub bzlmod_policy: BzlmodCommandPolicyKey,
 }
 
 impl BuildRequest {
     pub fn parse(args: &[impl AsRef<str>]) -> Result<Self, CommandParseError> {
         let parsed = split_args(args);
+        let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
         Ok(Self {
             targets: parse_target_patterns(CommandKind::Build, &parsed.positionals)?,
             flags: parsed.flags,
+            bzlmod_policy,
         })
     }
 

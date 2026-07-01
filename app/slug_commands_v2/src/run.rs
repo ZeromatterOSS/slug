@@ -8,12 +8,14 @@
  * above-listed licenses.
  */
 
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_identity_v2::TargetPattern;
 
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
+use crate::common::bzlmod_command_policy;
 use crate::common::parse_single_target;
 use crate::common::split_args;
 
@@ -22,6 +24,7 @@ pub struct RunRequest {
     pub target: TargetPattern,
     pub program_args: Vec<String>,
     pub flags: Vec<ParsedFlag>,
+    pub bzlmod_policy: BzlmodCommandPolicyKey,
 }
 
 impl RunRequest {
@@ -30,10 +33,12 @@ impl RunRequest {
         let target = parse_single_target(CommandKind::Run, parsed.positionals.first())?;
         let mut program_args = parsed.positionals.into_iter().skip(1).collect::<Vec<_>>();
         program_args.extend(parsed.passthrough);
+        let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
         Ok(Self {
             target,
             program_args,
             flags: parsed.flags,
+            bzlmod_policy,
         })
     }
 

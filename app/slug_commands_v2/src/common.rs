@@ -10,6 +10,7 @@
 
 use std::fmt;
 
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::QueryExpression;
 use slug_query_v2::QueryParseError;
@@ -54,6 +55,7 @@ pub enum CommandParseError {
     MissingQueryExpression { command: CommandKind },
     InvalidTargetPattern { value: String, message: String },
     InvalidQueryExpression { message: String },
+    InvalidFlagValue { flag: String, message: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,6 +149,9 @@ impl fmt::Display for CommandParseError {
             Self::InvalidQueryExpression { message } => {
                 write!(f, "invalid query expression: {message}")
             }
+            Self::InvalidFlagValue { flag, message } => {
+                write!(f, "invalid value for {flag}: {message}")
+            }
         }
     }
 }
@@ -225,6 +230,42 @@ pub(crate) fn parse_query_expression_for(
     QueryExpression::parse(&expression).map_err(query_error)
 }
 
+pub(crate) fn bzlmod_command_policy(
+    flags: &[ParsedFlag],
+) -> Result<BzlmodCommandPolicyKey, CommandParseError> {
+    let allow_yanked_versions = flags
+        .iter()
+        .rev()
+        .find(|flag| flag.name == "allow_yanked_versions")
+        .map(|flag| {
+            flag.value
+                .as_deref()
+                .ok_or_else(|| CommandParseError::InvalidFlagValue {
+                    flag: flag.raw.clone(),
+                    message: "expected 'all' or a comma-separated module@version allowlist"
+                        .to_owned(),
+                })
+        })
+        .transpose()?;
+    let ignore_dev_dependency = flags
+        .iter()
+        .rev()
+        .find_map(|flag| match flag.name.as_str() {
+            "ignore_dev_dependency" => Some(parse_bool_flag(flag, false)),
+            "noignore_dev_dependency" => Some(parse_bool_flag(flag, true)),
+            _ => None,
+        })
+        .transpose()?
+        .unwrap_or(false);
+
+    BzlmodCommandPolicyKey::from_flags(allow_yanked_versions, ignore_dev_dependency).map_err(
+        |message| CommandParseError::InvalidFlagValue {
+            flag: "--allow_yanked_versions".to_owned(),
+            message,
+        },
+    )
+}
+
 pub(crate) fn output_format(flags: &[ParsedFlag]) -> QueryOutputFormat {
     let Some(value) = flags
         .iter()
@@ -240,6 +281,25 @@ pub(crate) fn output_format(flags: &[ParsedFlag]) -> QueryOutputFormat {
         "label_kind" => QueryOutputFormat::LabelKind,
         "build" => QueryOutputFormat::Build,
         other => QueryOutputFormat::Other(other.to_owned()),
+    }
+}
+
+fn parse_bool_flag(flag: &ParsedFlag, negated: bool) -> Result<bool, CommandParseError> {
+    let parsed = match flag.value.as_deref() {
+        Some(value) => parse_bool_value(&flag.raw, value)?,
+        None => true,
+    };
+    Ok(if negated { !parsed } else { parsed })
+}
+
+fn parse_bool_value(flag: &str, value: &str) -> Result<bool, CommandParseError> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" => Ok(true),
+        "0" | "false" | "no" => Ok(false),
+        _ => Err(CommandParseError::InvalidFlagValue {
+            flag: flag.to_owned(),
+            message: "expected a boolean value".to_owned(),
+        }),
     }
 }
 
@@ -260,7 +320,11 @@ fn parse_flag(raw: &str) -> ParsedFlag {
 
 fn classify_flag(name: &str) -> FlagDisposition {
     match name {
-        "output" | "config" => FlagDisposition::ParseOnly,
+        "output"
+        | "config"
+        | "allow_yanked_versions"
+        | "ignore_dev_dependency"
+        | "noignore_dev_dependency" => FlagDisposition::ParseOnly,
         "color" | "show_progress" | "noshow_progress" | "keep_going" => {
             FlagDisposition::IgnoredCompatible
         }

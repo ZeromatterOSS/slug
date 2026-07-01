@@ -211,6 +211,29 @@ Skipped from the full Stage 8 validation matrix in this checkpoint:
   the landed `rules-oci-basic-no-daemon` fixture as action-graph evidence until
   a Linux-backed oracle or upstream wrapper fix is available.
 
+### Command Bzlmod Policy Bridge
+
+- Added command-surface extraction for `--allow_yanked_versions`,
+  `--ignore_dev_dependency`, and `--noignore_dev_dependency` in
+  `slug_commands_v2`. Build, run, test, query, cquery, and aquery request
+  parsing now carries the Stage 5 `BzlmodCommandPolicyKey` before placeholder
+  execution, so later command-runner wiring can feed bzlmod graph keys without
+  process-global command state.
+- The new parser path classifies these flags as parse-only, preserves the
+  original argv for placeholder diagnostics, and reports structured parse
+  errors for invalid yanked-version allowlists or boolean values.
+
+Validation run:
+
+```bash
+cargo fmt -p slug_commands_v2 -p slug_cli_v2
+CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_commands_v2
+CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_cli_v2
+USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-root-dev-dependency-visibility --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120
+USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-registration-dev-dependency --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120
+python -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py
+```
+
 ### Public Ruleset Fixture Start
 
 - Added Bazel 9 oracle fixtures for `rules-cc-basic`, `rules-cc-run-env`,

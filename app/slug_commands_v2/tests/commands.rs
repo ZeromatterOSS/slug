@@ -23,17 +23,91 @@ fn build_request_parses_target_patterns_and_classifies_flags() {
     let request = BuildRequest::parse(&[
         "--remote_executor=grpc://127.0.0.1:50051",
         "--keep_going",
+        "--allow_yanked_versions=zzz@2.0.0,yyy@1.0.0",
+        "--ignore_dev_dependency",
         "//pkg:bin",
         "//pkg:all",
     ])
     .unwrap();
 
     assert_eq!(request.targets.len(), 2);
-    assert_eq!(request.flags[0].disposition, FlagDisposition::Planned);
     assert_eq!(
-        request.flags[1].disposition,
+        request
+            .flags
+            .iter()
+            .find(|flag| flag.name == "remote_executor")
+            .unwrap()
+            .disposition,
+        FlagDisposition::Planned
+    );
+    assert_eq!(
+        request
+            .flags
+            .iter()
+            .find(|flag| flag.name == "keep_going")
+            .unwrap()
+            .disposition,
         FlagDisposition::IgnoredCompatible
     );
+    assert_eq!(
+        request
+            .flags
+            .iter()
+            .find(|flag| flag.name == "allow_yanked_versions")
+            .unwrap()
+            .disposition,
+        FlagDisposition::ParseOnly
+    );
+    assert_eq!(
+        request
+            .flags
+            .iter()
+            .find(|flag| flag.name == "ignore_dev_dependency")
+            .unwrap()
+            .disposition,
+        FlagDisposition::ParseOnly
+    );
+    assert_eq!(
+        request.bzlmod_policy.stable_serialize(),
+        "allow_yanked=[yyy@1.0.0,zzz@2.0.0];ignore_dev_dependency=true"
+    );
+}
+
+#[test]
+fn command_requests_extract_bzlmod_policy_flags() {
+    let query = QueryRequest::parse(&[
+        "--ignore_dev_dependency=false",
+        "--output=streamed_jsonproto",
+        "deps(//pkg:bin)",
+    ])
+    .unwrap();
+    let cquery = CqueryRequest::parse(&["--allow_yanked_versions=all", "//pkg:bin"]).unwrap();
+    let aquery = AqueryRequest::parse(&["--ignore_dev_dependency", "deps(//pkg:bin)"]).unwrap();
+    let run = RunRequest::parse(&["--ignore_dev_dependency", "//pkg:bin"]).unwrap();
+    let test = TestRequest::parse(&["--noignore_dev_dependency", "//pkg:probe_test"]).unwrap();
+
+    assert_eq!(query.output, QueryOutputFormat::StreamedJsonProto);
+    assert!(!query.bzlmod_policy.ignore_dev_dependency());
+    assert_eq!(
+        cquery.query.bzlmod_policy.stable_serialize(),
+        "allow_yanked=all;ignore_dev_dependency=false"
+    );
+    assert!(aquery.query.bzlmod_policy.ignore_dev_dependency());
+    assert!(run.bzlmod_policy.ignore_dev_dependency());
+    assert!(!test.bzlmod_policy.ignore_dev_dependency());
+}
+
+#[test]
+fn bzlmod_policy_flags_report_structured_parse_errors() {
+    let allow_error = BuildRequest::parse(&["--allow_yanked_versions=not-a-module", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
+    let bool_error = QueryRequest::parse(&["--ignore_dev_dependency=maybe", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
+
+    assert!(allow_error.contains("module@version"));
+    assert!(bool_error.contains("expected a boolean value"));
 }
 
 #[test]
