@@ -171,9 +171,10 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   `OutputGroupInfo`, `RunEnvironmentInfo`, `FilesToRunProvider`, `PlatformInfo`,
   user providers, and duplicate-provider collection validation. Added
   `custom-rule-analysis-basic` and `depset-orders-and-rejections` oracle
-  fixtures; expected Bazel outputs remain placeholders because the local
-  `bazel.exe` is Bazelisk and could not fetch Bazel under the restricted
-  network/proxy environment.
+  fixtures; expected Bazel outputs were placeholders at this checkpoint because
+  the local `bazel.exe` could not fetch Bazel under the restricted
+  network/proxy environment. The depset fixture was refreshed with Bazel 9.1.1
+  in the 2026-07-01 checkpoint below.
   Validation: `cargo test -p slug_build_api_v2`; `cargo test -p
   slug_build_api_v2 depset`; `py -3 -B tools/v2_oracle list`; `rg -n
   "std::fs|process-global|CellResolver|buck-out" app/slug_build_api_v2`
@@ -231,3 +232,17 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   "std::fs|process-global|CellResolver|buck-out" app/slug_analysis_v2
   app/slug_build_api_v2` returned no matches. Fixture execution remains
   skipped until Stage 2 `build` has real configured-target analysis.
+- 2026-07-01 Stage 6 depset oracle refresh: regenerated
+  `depset-orders-and-rejections` expected output with Bazel 9.1.1 now that the
+  local oracle is available. Strengthened the fixture to manifest-compare
+  `bazel-bin/probe.txt`, pinning the `depset.to_list()` output bytes in
+  addition to the incompatible `preorder`/`postorder` diagnostic.
+  Validation: `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run
+  --fixture depset-orders-and-rejections --tool bazel --bazel
+  C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120 --update-expected`;
+  same command without `--update-expected`; `CARGO_TARGET_DIR=.codex-cargo-target
+  CARGO_BUILD_JOBS=1 cargo test -p slug_build_api_v2 depset`; `py -3 -B -m
+  tools.v2_oracle list`; bundled `pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py`. Custom rule, ctx, action, and toolchain
+  fixtures still need either Bazel expected-output refreshes or full V2
+  configured-target analysis before Slug-side oracle comparison is meaningful.

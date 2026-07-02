@@ -9,6 +9,7 @@ name = "build_depset_probe"
 argv = ["build", "//:probe"]
 compare = "message_shape"
 expected_exit = 0
+manifest_roots = ["bazel-bin/probe.txt"]
 
 [[commands]]
 name = "build_bad_depset_order"

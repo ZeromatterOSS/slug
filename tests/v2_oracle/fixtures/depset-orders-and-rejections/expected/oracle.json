@@ -1,7 +1,68 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:probe"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "444699f34ab43dbba446d9a5bf5f977baa71683549c27cace2510301bb0d8490",
+          "mode": "0o444",
+          "path": "probe.txt",
+          "root": "bazel-bin/probe.txt",
+          "size": 63,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "build_depset_probe",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date:\n  bazel-bin/probe.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date:\n  bazel-bin/probe.txt\nINFO: Elapsed time: 6.202s, Critical Path: 0.03s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:bad"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_bad_depset_order",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:bad (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:4:11: in depset_bad rule //:bad: \nTraceback (most recent call last):\n\tFile \"<workspace>/defs.bzl\", line 29, column 11, in _bad_impl\n\t\tdepset([\"x\"], order = \"preorder\", transitive = [depset([\"y\"], order = \"postorder\")])\nError in depset: Order 'preorder' is incompatible with order 'postorder'\nERROR: <workspace>/BUILD.bazel:4:11: Analysis of target '//:bad' (config: 19cc255) failed\nERROR: Analysis of target '//:bad' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:bad (0 packages loaded, 0 targets configured)\nAnalyzing: target //:bad (0 packages loaded, 0 targets configured)\n\nERROR: C:/dev/kuro/target/v2o/runs/depset-orders-and-rejections/20260701-195232-45904-bazel/workspace/BUILD.bazel:4:11: in depset_bad rule //:bad: \nTraceback (most recent call last):\n\tFile \"C:/dev/kuro/target/v2o/runs/depset-orders-and-rejections/20260701-195232-45904-bazel/workspace/defs.bzl\", line 29, column 11, in _bad_impl\n\t\tdepset([\"x\"], order = \"preorder\", transitive = [depset([\"y\"], order = \"postorder\")])\nError in depset: Order 'preorder' is incompatible with order 'postorder'\nERROR: C:/dev/kuro/target/v2o/runs/depset-orders-and-rejections/20260701-195232-45904-bazel/workspace/BUILD.bazel:4:11: Analysis of target '//:bad' (config: 19cc255) failed\nERROR: Analysis of target '//:bad' failed; build aborted\nINFO: Elapsed time: 0.271s, Critical Path: 0.01s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "depset-orders-and-rejections",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }
