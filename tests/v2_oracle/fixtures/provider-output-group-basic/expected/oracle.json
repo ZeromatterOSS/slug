@@ -1,7 +1,45 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//pkg:probe"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:probe"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "01666ec060466c14b9fa06c613fbac449163f2a2017558fe16526209ab78c6b0",
+          "mode": "0o444",
+          "path": "probe.txt",
+          "root": "bazel-bin/pkg",
+          "size": 8,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "build_probe",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:probe up-to-date:\n  bazel-bin/pkg/probe.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:probe up-to-date:\n  bazel-bin/pkg/probe.txt\nINFO: Elapsed time: 3.436s, Critical Path: 0.02s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "provider-output-group-basic",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

@@ -1,7 +1,37 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "aquery",
+        "//pkg:actions",
+        "--output=summary"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//pkg:actions",
+        "--output=summary"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "aquery_actions",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:actions (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:actions (5 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "6 total actions.\n\nMnemonics:\n  Symlink: 1\n  ActionRunProbe: 1\n  TemplateExpand: 1\n  ActionShellProbe: 1\n  FileWrite: 2\n\nConfigurations:\n  x64_windows-fastbuild: 6\n\nExecution Platforms:\n  @@platforms//host:host: 6",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\actions-api-basic\\20260702-184823-15292-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\actions-api-basic\\20260702-202027-65212-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:actions (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:actions (5 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 4.912s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "6 total actions.\n\nMnemonics:\n  Symlink: 1\n  ActionRunProbe: 1\n  TemplateExpand: 1\n  ActionShellProbe: 1\n  FileWrite: 2\n\nConfigurations:\n  x64_windows-fastbuild: 6\n\nExecution Platforms:\n  @@platforms//host:host: 6\n"
+    }
+  ],
   "fixture": "actions-api-basic",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

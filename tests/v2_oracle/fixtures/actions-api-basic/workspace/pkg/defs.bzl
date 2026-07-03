@@ -4,7 +4,7 @@ def _impl(ctx):
     template_out = ctx.actions.declare_file(ctx.label.name + ".template.txt")
     run_out = ctx.actions.declare_file(ctx.label.name + ".run.txt")
     shell_out = ctx.actions.declare_file(ctx.label.name + ".shell.txt")
-    link_out = ctx.actions.declare_symlink(ctx.label.name + ".link.txt")
+    link_out = ctx.actions.declare_file(ctx.label.name + ".link.txt")
 
     ctx.actions.write(write_out, "write\n")
     ctx.actions.write(json_out, "{\"ok\": true}\n")

@@ -1,7 +1,45 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//pkg:custom"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:custom"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "c95b74032c438c7a91af14ef1af75c773ccd775ad81bf98a2a1fbdd1d75ea38d",
+          "mode": "0o444",
+          "path": "custom.txt",
+          "root": "bazel-bin/pkg",
+          "size": 7,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "build_custom_rule",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:custom (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:custom (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:custom (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:custom up-to-date:\n  bazel-bin/pkg/custom.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:custom (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:custom (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:custom (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:custom up-to-date:\n  bazel-bin/pkg/custom.txt\nINFO: Elapsed time: 5.564s, Critical Path: 0.02s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "custom-rule-analysis-basic",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

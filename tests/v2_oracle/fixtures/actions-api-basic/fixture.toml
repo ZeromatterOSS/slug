@@ -1,12 +1,12 @@
 [fixture]
 name = "actions-api-basic"
 description = "Starlark action API fixture for write, run, run_shell, symlink, and expand_template IR comparison."
-comparison = "semantic"
-manifest_roots = ["bazel-bin/pkg"]
-oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 6 action IR/aquery projection exists."
+comparison = "message_shape"
+oracle_notes = "Bazel 9.1.1 oracle uses aquery summary so Stage 6 can pin action declaration shape without executing host-specific shell actions."
 
 [[commands]]
-name = "build_actions"
-argv = ["build", "//pkg:actions"]
-compare = "semantic"
+name = "aquery_actions"
+argv = ["aquery", "//pkg:actions", "--output=summary"]
+compare = "message_shape"
 expected_exit = 0
+stdout_contains = ["ActionRunProbe: 1", "ActionShellProbe: 1", "FileWrite:", "TemplateExpand: 1", "Symlink:"]

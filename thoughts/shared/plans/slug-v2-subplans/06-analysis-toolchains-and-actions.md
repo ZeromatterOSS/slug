@@ -243,6 +243,20 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   same command without `--update-expected`; `CARGO_TARGET_DIR=.codex-cargo-target
   CARGO_BUILD_JOBS=1 cargo test -p slug_build_api_v2 depset`; `py -3 -B -m
   tools.v2_oracle list`; bundled `pytest -q -p no:cacheprovider
-  tests/v2_oracle/test_v2_oracle.py`. Custom rule, ctx, action, and toolchain
-  fixtures still need either Bazel expected-output refreshes or full V2
-  configured-target analysis before Slug-side oracle comparison is meaningful.
+  tests/v2_oracle/test_v2_oracle.py`. Toolchain and transition/aspect fixtures
+  still need either Bazel expected-output refreshes or full V2 configured-target
+  analysis before Slug-side oracle comparison is meaningful.
+- 2026-07-02 Stage 6 custom/context/action oracle refresh: regenerated Bazel
+  9.1.1 expected output for `custom-rule-analysis-basic`,
+  `ctx-attrs-files-executable`, `default-info-runfiles-executable`, and
+  `provider-output-group-basic`. Adjusted `actions-api-basic` to use Bazel
+  aquery summary rather than build execution, matching the Stage 6 criterion to
+  compare action declaration IR without depending on host shell execution; the
+  fixture still declares write, run, run_shell, symlink, and expand_template
+  actions. Bazel 9 also proved `ctx.actions.symlink(target_file = ...)` requires
+  a file/directory output, so the fixture now declares the symlink output as a
+  file while preserving the symlink action.
+  Validation: Bazel 9.1.1 `--update-expected` and no-update oracle runs for all
+  five fixtures; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo
+  test -p slug_build_api_v2`; `py -3 -B -m tools.v2_oracle list`; bundled
+  `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.

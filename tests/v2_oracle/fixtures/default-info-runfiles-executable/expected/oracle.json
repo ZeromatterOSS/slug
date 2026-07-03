@@ -1,7 +1,90 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//pkg:probe"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:probe"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "7806da8b5f2935beaeaa264a194b10779c96e70693431549938443ff9da86b21",
+          "mode": "0o444",
+          "path": "probe.txt",
+          "root": "bazel-bin/pkg",
+          "size": 9,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "b8e38b67c978021d277734b8826c7bf4d233873752dfd326d8ab8ebb83380964",
+          "mode": "0o444",
+          "path": "probe.txt.repo_mapping",
+          "root": "bazel-bin/pkg",
+          "size": 40,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "probe.txt.runfiles",
+          "root": "bazel-bin/pkg",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": null,
+          "mode": "0o666",
+          "path": "probe.txt.runfiles/MANIFEST",
+          "root": "bazel-bin/pkg",
+          "size": null,
+          "symlink_target": "\\\\?\\C:\\dev\\kuro\\target\\v2o\\ob\\default-info-runfiles-executable\\bazel\\execroot\\_main\\bazel-out\\x64_windows-fastbuild\\bin\\pkg\\probe.txt.runfiles_manifest",
+          "type": "symlink"
+        },
+        {
+          "digest": null,
+          "mode": "0o777",
+          "path": "probe.txt.runfiles/_main",
+          "root": "bazel-bin/pkg",
+          "size": null,
+          "symlink_target": null,
+          "type": "directory"
+        },
+        {
+          "digest": "a39e59a9270d2c4b884c771e57630798253b6aa2e95305f52767f33fa372aa09",
+          "mode": "0o444",
+          "path": "probe.txt.runfiles_manifest",
+          "root": "bazel-bin/pkg",
+          "size": 307,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "build_probe",
+      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:probe up-to-date:\n  bazel-bin/pkg/probe.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:probe up-to-date:\n  bazel-bin/pkg/probe.txt\nINFO: Elapsed time: 3.477s, Critical Path: 0.02s\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "default-info-runfiles-executable",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }
