@@ -94,6 +94,10 @@ surfaces remain available through `slug-v1-archive`, `v1-archive`, and
 - REAPI is the execution boundary. Local execution is useful only as a REAPI
   service backend, with NativeLink first and actiond optional behind the same
   boundary.
+- Progress is demonstrated by a vertical Bazel-shaped build, not by independent
+  identity, parser, DICE-shaped, action, or REAPI data models. A wrapper trait
+  or stable-serialization helper is scaffolding until the owner fixture drives
+  it through the real runtime boundary.
 - V2 output layout targets Bazel-shaped paths. Any deliberate Slug-specific
   divergence must be explicitly documented as an extension, not assumed.
 - V1 plans and code are evidence and extraction sources, not the V2 source of
@@ -130,14 +134,122 @@ Do not import these V1 surfaces without redesign:
 |-------|------------|-------------|------------|
 | 0 | [00-v1-archive-and-clean-root.md](./slug-v2-subplans/00-v1-archive-and-clean-root.md) | Serial | V1 is tagged/branched, V2 root docs and metadata are active, archive policy is clear. |
 | 1 | [01-compliance-oracle-harness.md](./slug-v2-subplans/01-compliance-oracle-harness.md) | Parallel | A fixture runner compares Java Bazel and Slug V2 for exit status, outputs, events, and selected diagnostics. |
-| 2 | [02-rust-skeleton-and-runtime-substrate.md](./slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md) | Parallel | Minimal Rust CLI/server skeleton uses Buck2 runtime crates without exposing Buck semantics. |
+| 2 | [02-rust-skeleton-and-runtime-substrate.md](./slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md) | Parallel | Minimal Rust CLI/server skeleton uses actual Buck2 runtime crates without exposing Buck semantics. |
 | 3 | [03-bazel-identity-and-layout.md](./slug-v2-subplans/03-bazel-identity-and-layout.md) | Parallel after Stage 2 starts | Labels, repositories, packages, target ids, execroot, and output paths are Bazel-shaped. |
 | 4 | [04-starlark-loading-and-build-packages.md](./slug-v2-subplans/04-starlark-loading-and-build-packages.md) | Parallel after Stage 3 basics | `BUILD.bazel` and `.bzl` loading work for small packages with Bazel globals. |
-| 5 | [05-bzlmod-and-repository-graph.md](./slug-v2-subplans/05-bzlmod-and-repository-graph.md) | Parallel after Stage 3 basics | `MODULE.bazel`, registry, repo mapping, extensions, repo specs, and lockfile policy are DICE-owned. |
+| 5 | [05-bzlmod-and-repository-graph.md](./slug-v2-subplans/05-bzlmod-and-repository-graph.md) | Parallel after Stage 3 basics | Starlark-evaluated `MODULE.bazel`, registry, repo mapping, extensions, repo specs, and lockfile policy are DICE-owned. |
 | 6 | [06-analysis-toolchains-and-actions.md](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) | Parallel after Stages 4/5 | Configured-target analysis, toolchains, providers, depsets, and action declarations pass focused oracle fixtures. |
 | 7 | [07-reapi-native-execution.md](./slug-v2-subplans/07-reapi-native-execution.md) | Parallel with synthetic actions, then after Stage 6 | Shell and ruleset actions execute through REAPI with upload, AC, materialization, and zero direct-local proof. |
 | 8 | [08-ruleset-and-command-conformance.md](./slug-v2-subplans/08-ruleset-and-command-conformance.md) | Parallel after Stages 4-7 | Modern rules_cc, rules_rust, rules_python, protobuf, query, run, test, and BEP slices pass public fixtures. |
-| 9 | [09-v1-extraction-ledger.md](./slug-v2-subplans/09-v1-extraction-ledger.md) | Continuous | Every V1 extraction has an owner, oracle proof, and cleanup decision. |
+| 9 | [09-v1-extraction-ledger.md](./slug-v2-subplans/09-v1-extraction-ledger.md) | Continuous | Every V1 or Buck2-derived extraction has an owner, oracle proof, and cleanup decision. |
+
+## Two-Tier Work-Packet Contract
+
+Use role boundaries rather than relying on a particular model to infer project
+architecture. The default assignment is a Terra or Luna xhigh agent as the
+**implementation worker** and a Sol agent as the **design reviewer**; another
+model may fill either role only if it follows the same contract.
+
+- The implementation worker executes one bounded packet, makes only local
+  implementation choices already implied by its owner plan, edits only the
+  named scope, and produces the fixture, patch, validation, and evidence bundle.
+- The design reviewer owns choices that change architecture, public or
+  cross-crate interfaces, DICE keys/ownership/invalidation/locking, stage
+  boundaries, or V1/Buck2 reuse and adaptation boundaries. Read-only discovery
+  may precede review, but implementation of such a choice may not.
+- Every Stage 2-8 packet begins with reuse discovery, even when its request does
+  not mention an import. Before new implementation, the worker must inspect the
+  owner plan, the matching Stage 9 candidates, relevant retained Buck2-derived
+  crates, and the V1 and mixed-root refs documented by `V1_ARCHIVE.md`, then
+  obtain Sol approval for the recorded reuse decisions.
+- Sol review is mandatory before any reserved choice and after every validated
+  packet. The post-validation result is `accept`, `revise`, or `replan`; only an
+  accepted packet may be recorded as completed evidence in its owner plan.
+
+Copy and fill this template before editing. Every field is required; use
+`none` with a reason rather than omitting a field. Paths, commands, pass
+criteria, and exclusions must be concrete enough that another worker can run
+the packet without reconstructing its design.
+
+```text
+Work packet ID: WP-<stage>-<short-name>
+Owner stage and plan: <stage number and exact V2 subplan path>
+Goal and gate link: <one result; First Real Bazel Build clause or narrow independent oracle reason>
+Prerequisites and current state: <required prior packets; branch/HEAD; relevant dirty paths; observed baseline>
+Oracle-first artifact: <fixture and expected artifact path, or exact local Bazel source citation, created/verified before implementation>
+Reuse audit (required for Stages 2-8):
+- Candidates checked: <owner-plan sections and exact Stage 9 rows>
+- Sources inspected: <exact retained paths; archive or mixed-root ref@commit:path>
+- Prior evidence inspected: <tests, oracle/evidence paths, and relevant results>
+- Decision and Sol approval: <adopt/port/rewrite/reference-only/reject for each candidate with reason; approval reference>
+Exact scope: <allowed files/symbols plus explicit exclusions>
+Decisions reserved for design reviewer: <questions and affected boundary, or none with reason>
+Implementation steps:
+1. <ordered bounded step>
+2. <ordered bounded step>
+Focused validation: <exact commands and pass criteria>
+Evidence and plan update: <owner-plan section; oracle/result/diff facts to record after acceptance>
+Stop conditions: <state mismatch, missing oracle, dirty overlap, scope growth, reserved decision, changed failure class, or other packet-specific stop>
+```
+
+For every Stage 2-8 packet, reuse discovery is required before new
+implementation, including apparently greenfield work. The worker records the
+Stage 9 rows and owner-plan candidates checked; the exact retained active-tree
+paths and archive or mixed-root refs, commits, and paths inspected; prior tests
+or evidence read; and an `adopt`, `port`, `rewrite`, `reference-only`, or
+`reject` decision with a reason for each candidate. A request that names no
+import is not a reason to skip the audit. If discovery finds no reusable
+candidate, record the concrete sources checked and why they were rejected or
+kept reference-only. Sol must approve the audit before implementation begins.
+
+After reuse approval where required, the worker checks the stated current state
+and creates or refreshes the oracle artifact. If another reserved question
+appears, the worker sends Sol the packet plus the smallest relevant source/plan
+evidence and waits for a recorded decision before related edits. After
+implementation and focused validation, the worker sends Sol the packet ID,
+scoped diff, oracle or Bazel citation, command results, and residual risks.
+`revise` returns to the same packet and requires revalidation; `replan` ends it
+and requires a replacement packet. Record the accepted result and reviewer
+outcome compactly in the owner plan before starting another packet.
+
+## First Real Bazel Build Integration Gate
+
+The first implementation milestone after the Stage 2 skeleton is a small but
+complete Bazel-shaped build. It is owned here because it crosses the Stage 1-7
+boundaries; implementation and detailed evidence remain in their stage owners.
+
+The gate is:
+
+1. `slug build` opens a real DICE transaction and evaluates a root
+   `MODULE.bazel` and `BUILD.bazel` through starlark-rust.
+2. A small package resolves a typed label, evaluates one custom rule, and
+   produces a provider plus a shared-DAG depset and declared action.
+3. The action becomes serialized REAPI `Command`, `Directory`, and `Action`
+   protobufs; it uploads, executes through NativeLink, and materializes the
+   declared output.
+4. The matching Stage 1 fixture has a checked-in Bazel oracle, proves
+   `reapi_actions=1` and `direct_local_actions=0`, and compares the declared
+   output digest.
+5. Once the daemon exists, an edit to the loaded `.bzl` reruns the affected
+   computation in the same daemon for named DICE dependencies.
+
+`simple-rule-action`, `shell-action-reapi`, and `load-invalidation` are the
+initial fixture chain. A missing-module probe is separate: Bazel 9 creates an
+empty `MODULE.bazel` with a warning, so V2 must not treat a missing module file
+as a generic WORKSPACE-only failure.
+
+Do not mark Stages 5-8 accepted, or add broad new substrate-only checkpoints in
+those stages, until a change either advances this gate or has a narrow oracle
+reason to remain independent. Stage 9 records the concrete V1/Buck2 reuse that
+makes each segment real.
+
+This integration gate is not one implementation packet. Each packet names the
+single numbered gate clause and owner stage it advances; detailed evidence
+stays in that stage's plan. Cross-stage interface choices require pre-review.
+After the contributing packets are accepted, a final integration packet runs
+the complete fixture chain and receives Sol review before this gate is marked
+complete. Passing substrate-only tests or one stage's isolated fixture cannot
+substitute for that integration review.
 
 ## First Commit Scope
 

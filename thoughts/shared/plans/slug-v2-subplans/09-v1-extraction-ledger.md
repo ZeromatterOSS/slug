@@ -2,18 +2,20 @@
 
 ## Goal
 
-Track every deliberate extraction from Slug V1 into V2 so useful work is
-preserved without importing V1 architectural debt blindly.
+Track every deliberate extraction from Slug V1 or Buck2-derived infrastructure
+into V2 so useful work is preserved without importing V1 architectural debt or
+Buck user semantics blindly.
 
 ## Extraction Rule
 
 An extraction is acceptable only when it has:
 
 - a named V2 owner stage;
-- the V1 source path or test path;
+- a source class, source path or test path, and exact immutable source commit;
 - the Bazel source/test oracle or oracle fixture that justifies it;
 - a clear import mode: copy, port, rewrite from behavior, reference-only, or
   reject;
+- exact reachable V2 commit ids for landed or partially landed work;
 - validation evidence after landing.
 
 The current mixed-root `codex/slugv2` branch is treated as an extraction source
@@ -21,6 +23,11 @@ too. Importing code or fixtures from that branch into a clean-root V2 line must
 record whether the import is a direct cherry-pick, a port, a rewrite from
 behavior, or reference-only. Do not treat mixed-root commits as already accepted
 V2 trunk work merely because they compile in the old workspace.
+
+Buck2-derived infrastructure follows the same rule. Reuse its DICE,
+starlark-rust, REAPI, interning, hashing, compact-collection, allocation, and
+strong-hash primitives behind V2-owned Bazel abstractions; do not expose Buck
+cells, labels, target patterns, executor configuration, or output semantics.
 
 The clean-root remediation branch keeps the already-landed V2-only stage
 artifacts from `codex/slugv2` only where the owner subplan records the oracle
@@ -31,7 +38,7 @@ not active-root content.
 ## Workflow
 
 1. Open the V2 owner plan and identify the exact behavior needed.
-2. Inspect V1 source and tests, plus the Bazel oracle source/test.
+2. Inspect V1 or Buck2 source and tests, plus the Bazel oracle source/test.
 3. Choose an import mode:
    - `copy`: code is infrastructure with no V1 semantic leak;
    - `port`: code is useful but names/types/path assumptions must change;
@@ -39,7 +46,10 @@ not active-root content.
    - `reference-only`: external implementation or backend contract only;
    - `reject`: document why the V1 surface should not enter V2.
 4. Add or update an oracle fixture before landing the extraction.
-5. Update this ledger and the owner plan with validation evidence.
+5. Record the exact source commit and the exact V2 commit or commit list. A
+   branch name or prose such as "the checkpoint containing this entry" is not
+   recoverable evidence.
+6. Update this ledger and the owner plan with validation evidence.
 
 ## Review Checklist
 
@@ -49,47 +59,74 @@ Before moving an entry out of `Proposed`, answer:
   direct-local assumptions?
 - Does it rely on process-global state or fallback scanners?
 - Which DICE key owns the semantic value in V2?
+- Is a retained Buck2 utility or V1 shared-DAG primitive preferable to a new
+  owned `String`, collection, recursive copy, or text-derived digest?
 - Which Bazel source/test proves the behavior?
 - Which command proves the extraction after landing?
+- Can every source and V2 commit be recovered with `git show`, without relying
+  on a movable branch name?
 
 ## Ledger
 
-| Status | V2 Stage | V1 Surface | Import Mode | Oracle / Validation |
+Source-path convention: `slug-v1-archive:path` explicitly names archived V1
+content at `e218054d4c796655939b968d90208b185decb352`; both
+`slug-v1-archive^{commit}` and `v1-archive` were verified at that commit for
+this ledger baseline. Every archived V1 source, test, fixture tree, and plan
+path in this ledger must carry the `slug-v1-archive:` qualifier; an unqualified
+path denotes retained active-root or V2 content, never an implicit V1 fallback.
+A later source revision must record its own exact commit rather than inheriting
+this baseline implicitly.
+
+| Status | V2 Stage | Source Surface | Import Mode | Oracle / Validation |
 |--------|----------|------------|-------------|---------------------|
-| Proposed | Stage 5 | `app/slug_bzlmod/src/parser.rs` | Port selectively | `MODULE.bazel` parser fixtures against Bazel |
-| Proposed | Stage 5 | `app/slug_bzlmod/src/extension_execution_dice.rs` | Rewrite from behavior plus selective port | module extension replay fixtures |
-| Proposed | Stage 5 | `tests/core/bzlmod/test_plan61_guardrails.py` | Port tests after fixture cleanup | bzlmod same-daemon replay fixtures |
-| Proposed | Stage 7 | `tests/plan34/test_reapi_local_executor_smoke.py` | Port harness | NativeLink REAPI fixture |
-| Proposed | Stage 7 | `tests/plan34/validate_reapi_evidence.py`, `tests/plan34/test_ci_gate.py`, `.github/actions/setup_plan34_nativelink/action.yml`, `.github/actions/run_plan34_reapi/action.yml`, `.github/workflows/plan34-reapi.yml` | Rewrite behavior into V2 oracle harness; copy only small validator schema ideas | `shell-action-reapi` plus evidence validator |
-| Proposed | Stage 7 | `app/slug_execute/src/execute/action_digest.rs`, `app/slug_execute/src/execute/action_digest_and_blobs.rs` | Port concepts, rewrite implementation around Bazel action declarations | REAPI action identity fixtures |
-| Proposed | Stage 7 | `app/slug_execute_impl/src/executors/re.rs`, `app/slug_execute/src/re/client.rs`, `app/slug_execute/src/re/remote_action_result.rs`, `app/slug_execute_impl/src/re/download.rs` | Selective rewrite; reject Buck executor/config assumptions | upload/execute/download REAPI fixtures |
-| Proposed | Stage 7 | Plan 31 persistent action-cache tests | Port tests and materializer checks | REAPI AC hit/stale-entry fixtures |
-| Proposed | Stage 7 | `app/slug_execute_impl/src/sqlite/action_cache_db.rs`, `app/slug_execute_impl/src/sqlite/tables/action_cache_table.rs`, `app/slug_execute_impl/src/executors/action_cache.rs`, `app/slug_execute_impl/src/executors/caching.rs`, `app/slug_server/src/daemon/state.rs`, `tests/plan31/test_persistent_re_action_cache.py` | Port schema/value semantics and stale-entry behavior; Stage 3 owns output/cache layout | durable RE `ActionDigest -> ActionResult` fixtures |
-| Proposed | Stage 7 | Plan 34 paramfile/generated-output fixtures | Port fixtures after Stage 6 can declare matching action graphs | `reapi-paramfile-input-tree` and `reapi-generated-output-reupload` |
-| Proposed | Stage 7 / Stage 8 | Plan 34 `cc_actions` and `rules_cc` fixture themes | Stage 7 owns execution evidence; Stage 8 owns ruleset conformance breadth | `rules-cc-reapi-basic` plus Stage 8 rules_cc fixtures |
+| Proposed | Stage 2 | Retained Buck2-derived DICE runtime: `dice/dice/src/transaction.rs`, `dice/dice/src/api/computations.rs`, `dice/dice/src/api/key.rs` | Adopt behind the V2 runtime wrapper; expose no Buck cells or labels | Generate and check in the `simple-rule-action` and `load-invalidation` Bazel expectations first; then prove a real transaction and same-daemon recomputation |
+| Proposed | Stage 2 | Retained Buck2-derived Starlark runtime: `starlark-rust/starlark/src/eval.rs`, `starlark-rust/starlark/src/eval/runtime/evaluator.rs`, `starlark-rust/starlark/src/eval/runtime/file_loader.rs` | Adopt the evaluator/compiler runtime only; Stages 4 and 5 own Bazel loading and globals | Generate the `simple-rule-action` Bazel expectation first; then prove the V2 runtime invokes `Evaluator::eval_module` |
+| Proposed | Stage 4 | Retained evaluator `starlark-rust/starlark/src/eval.rs`; V1 loading lessons in `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/calculation.rs`, `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs`, `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/interpreter_for_dir.rs` | Rewrite the `BUILD.bazel`/`.bzl` load boundary around Stage 3 labels and Stage 4 DICE keys; reject Buck file/cell semantics | Generate and check in `build-file-loading` and `load-invalidation` with Bazel first; then compare the Slug package/load results |
+| Proposed | Stage 5 | Retained evaluator `starlark-rust/starlark/src/eval.rs`; V1 module-evaluation lessons in `slug-v1-archive:app/slug_bzlmod/src/parser.rs`, `slug-v1-archive:app/slug_bzlmod/src/globals.rs` | Rewrite `MODULE.bazel` evaluation with V2-owned globals and Stage 5 DICE keys; retain directive recording only as scaffold | Generate and check in `module-file-directives` and `simple-rule-action` with Bazel first; then compare Slug module evaluation and invalidation |
+| Proposed | Stages 3 / 6 | V1 utility wrappers `slug-v1-archive:app/slug_core/src/target/label/interner.rs`, `slug-v1-archive:app/slug_util/src/arc_str.rs`, `slug-v1-archive:app/slug_util/src/hash.rs`; retained Buck2-derived utilities `starlark-rust/starlark_map/src/small_map.rs`, `starlark-rust/starlark_map/src/small_set.rs`, `shed/static_interner/src/lib.rs`, `gazebo/dupe/src/lib.rs`, `allocative/allocative/src/lib.rs`, `gazebo/strong_hash/src/lib.rs` | Selective port or retained dependency by measured hot-path need; keep wrappers V2-owned | Generate `labels-and-output-paths`, `custom-rule-analysis-basic`, or `depset-orders-and-rejections` first as appropriate; then add focused allocation and determinism tests |
+| Proposed | Stage 6 | V1 shared-DAG sources `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/nested_set.rs`, `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/transitive_set/traversal.rs`; archived design record `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/54-depset-transitive-set-shared-core.md` | Port shared node/traversal concepts; keep the Bazel depset facade V2-owned and reject implicit `transitive_set` coercion | Generate `depset-orders-and-rejections` first; then prove shared child identity and no implicit flattening |
+| Proposed | Stage 7 | V1 input-tree source `slug-v1-archive:app/slug_execute/src/execute/inputs_directory.rs`; V1 protocol source `slug-v1-archive:remote_execution/oss/re_grpc_proto/proto/build/bazel/remote/execution/v2/remote_execution.proto` | Port the protobuf/Merkle contract behind V2 action types; reject Buck paths and executor configuration | Generate serialized `Command`/`Directory`/`Action` expectations first; then run `shell-action-reapi` and `reapi-paramfile-input-tree` through NativeLink |
+| Proposed | Stage 5 | `slug-v1-archive:app/slug_bzlmod/src/parser.rs` | Rewrite through starlark-rust; retain directive recording only as scaffold | `MODULE.bazel` evaluation fixtures against Bazel |
+| Proposed | Stage 5 | `slug-v1-archive:app/slug_bzlmod/src/extension_execution_dice.rs` | Rewrite from behavior plus selective port | module extension replay fixtures |
+| Proposed | Stage 5 | `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py` | Port tests after fixture cleanup | bzlmod same-daemon replay fixtures |
+| Proposed | Stage 7 | `slug-v1-archive:tests/plan34/test_reapi_local_executor_smoke.py`; paramfile fixture tree `slug-v1-archive:tests/plan34/fixtures/paramfile` | Port the harness and fixture inputs after Stage 6 can declare the matching action graphs | `shell-action-reapi`, `reapi-paramfile-input-tree`, and `reapi-generated-output-reupload` |
+| Proposed | Stage 7 | `slug-v1-archive:tests/plan34/validate_reapi_evidence.py`, `slug-v1-archive:tests/plan34/test_ci_gate.py`, `slug-v1-archive:.github/actions/setup_plan34_nativelink/action.yml`, `slug-v1-archive:.github/actions/run_plan34_reapi/action.yml`, `slug-v1-archive:.github/workflows/plan34-reapi.yml` | Rewrite behavior into V2 oracle harness; copy only small validator schema ideas | `shell-action-reapi` plus evidence validator |
+| Proposed | Stage 7 | `slug-v1-archive:app/slug_execute/src/execute/action_digest.rs`, `slug-v1-archive:app/slug_execute/src/execute/action_digest_and_blobs.rs` | Selective port of protobuf/blob assembly; rewrite only the V2 action boundary | REAPI action identity fixtures |
+| Proposed | Stage 7 | `slug-v1-archive:app/slug_execute_impl/src/executors/re.rs`, `slug-v1-archive:app/slug_execute/src/re/client.rs`, `slug-v1-archive:app/slug_execute/src/re/remote_action_result.rs`, `slug-v1-archive:app/slug_execute_impl/src/re/download.rs` | Selective rewrite; reject Buck executor/config assumptions | upload/execute/download REAPI fixtures |
+| Proposed | Stage 7 | `slug-v1-archive:app/slug_execute_impl/src/sqlite/action_cache_db.rs`, `slug-v1-archive:app/slug_execute_impl/src/sqlite/tables/action_cache_table.rs`, `slug-v1-archive:app/slug_execute_impl/src/executors/action_cache.rs`, `slug-v1-archive:app/slug_execute_impl/src/executors/caching.rs`, `slug-v1-archive:app/slug_server/src/daemon/state.rs`, `slug-v1-archive:tests/plan31/test_persistent_re_action_cache.py`, `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/31-bazel-perf-parity.md` | Port schema/value semantics, normal materializer-path reuse, and stale-entry behavior; Stage 3 owns output/cache layout | durable RE `ActionDigest -> ActionResult` hit/stale-entry fixtures |
+| Proposed | Stage 7 / Stage 8 | archived fixture trees `slug-v1-archive:tests/plan34/fixtures/cc_actions` and `slug-v1-archive:tests/plan34/fixtures/rules_cc`; evidence owner `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/34-sandboxed-execution-strategy.md` | Stage 7 owns execution evidence; Stage 8 owns ruleset conformance breadth | `rules-cc-reapi-basic` plus Stage 8 rules_cc fixtures |
 | Reference only | Stage 7 | NativeLink source checkout | Backend contract reference, not Slug import | same REAPI evidence with `remote_service=nativelink` |
 | Reference only | Stage 7 | actiond source checkout | Optional REAPI backend validation only | same REAPI evidence with `remote_service=local_actiond` |
-| Landed | Stage 6 | `app/slug_build_api_tests/src/interpreter/rule_defs/depset.rs`; `app/slug_build_api_tests/src/interpreter/rule_defs/provider/collection.rs` | Rewrite from behavior | V2 commits `9e519f97`, `ed636308`, `aa9b820f`; fixtures `depset-orders-and-rejections`, `custom-rule-analysis-basic`, `ctx-attrs-files-executable`, `default-info-runfiles-executable`, `provider-output-group-basic`; validation in Stage 6 plan |
-| Proposed | Stage 3 | V1 label/repo mapping helpers | Rewrite from behavior | Bazel label/output path oracle fixtures |
-| Proposed | Stage 4 | V1 `slug_interpreter_for_build` globals/loading tests | Port tests, rewrite loading boundary | Bazel `PackageFunction`/`BzlLoadFunction` fixtures |
-| Proposed | Stage 6 | V1 `cc_common` feature and provider work | Port selectively | rules_cc public fixture plus Bazel analysis oracle |
-| Proposed | Stage 8 | V1 public ruleset smoke fixtures | Port tests after sanitizing versions and paths | ruleset oracle fixtures |
+| Partially landed | Stage 6 | `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/depset.rs`; `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/provider/collection.rs` | Rewrite behavior only; shared-DAG extraction remains proposed | V2 commits `9e519f97`, `ed636308`, `aa9b820f`; fixtures `depset-orders-and-rejections`, `custom-rule-analysis-basic`, `ctx-attrs-files-executable`, `default-info-runfiles-executable`, `provider-output-group-basic`; validation in Stage 6 plan |
+| Proposed | Stage 3 | `slug-v1-archive:app/slug_core/src/target/label/interner.rs`, `slug-v1-archive:app/slug_bzlmod/src/repo_mapping.rs`, and `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/26-string-interning.md` | Rewrite label/repository semantics; selectively reuse typed interning utilities | Bazel label/output path oracle fixtures plus allocation/determinism tests |
+| Proposed | Stage 4 | `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/globals.rs`, `slug-v1-archive:app/slug_interpreter_for_build_tests/src/interpreter.rs`, `slug-v1-archive:app/slug_interpreter_for_build_tests/src/functions/load_symbols.rs` | Port focused tests and rewrite the loading boundary | Bazel `PackageFunction`/`BzlLoadFunction` fixtures |
+| Proposed | Stage 6 | `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/cc_common/feature_config.rs`, `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/cc_common/providers.rs`, `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/cc_common.rs` | Port selectively | rules_cc public fixture plus Bazel analysis oracle |
 | Proposed | Reject by default | Direct-local executor success, copied-output bridge hits, Buck output-root spelling, and old compiled NativeLink/actiond adapter artifacts | Reject | Does not prove V2 Bazel REAPI parity |
 | Proposed | Reject by default | V1 Buck cell graph and fallback cell machinery | Reject unless Stage 5 proves a Bazel equivalent | Stage 3/5 identity and bzlmod tests |
 | Proposed | Reject by default | V1 BXL user surface | Defer as Slug extension | Not part of Bazel compliance |
 | Reference only | Stage 0 | Mixed-root `codex/slugv2` V1 source/test paths, old docs/plans, root Bazel/Buck metadata, shims, wrappers, and `remote_execution/` | Reject from active root; inspect through archive refs or prototype branch only | `scripts/v2_archive_status.sh`; clean-root tracked-file grep in Stage 0 |
-| Landed | Stage 1 | `codex/slugv2` Stage 1 oracle harness and fixtures | Retain as V2-only scaffold | Owner plan `01-compliance-oracle-harness.md`; `python3 -B -m tools.v2_oracle list`; `python3 -m pytest -q tests/v2_oracle/test_v2_oracle.py` |
-| Landed | Stage 2 | `codex/slugv2` Stage 2 CLI/core V2 crates | Retain as V2-only scaffold | Owner plan `02-rust-skeleton-and-runtime-substrate.md`; `cargo check -p slug_cli_v2 -p slug_core_v2`; `cargo test -p slug_cli_v2` |
-| Landed | Stages 3-8 | `codex/slugv2` V2 crate and fixture checkpoints under `app/slug_*_v2` and `tests/v2_oracle/` | Retain only where owner stage records fixture/citation evidence | Owner plans `03` through `08`; focused cargo tests and oracle fixture commands recorded per stage |
+| Landed | Stage 1 | `codex/slugv2` Stage 1 oracle harness and fixtures introduced by `5181fabb` | Retain as V2-only scaffold | Owner plan `01-compliance-oracle-harness.md`; `python3 -B -m tools.v2_oracle list`; `python3 -m pytest -q tests/v2_oracle/test_v2_oracle.py` |
+| Landed | Stage 2 | `codex/slugv2` Stage 2 CLI/core V2 crates introduced by `75d8147a` | Retain as V2-only scaffold | Owner plan `02-rust-skeleton-and-runtime-substrate.md`; `cargo check -p slug_cli_v2 -p slug_core_v2`; `cargo test -p slug_cli_v2` |
+| Partially landed | Stages 3-8 | `codex/slugv2` V2 crate and fixture checkpoints under `app/slug_*_v2` and `tests/v2_oracle/`; recoverable mixed-root source snapshot `70c5e924`, beginning with Stage 3 commit `fa4af489` | Retain only as scaffolding or where the owner records fixture/citation evidence; exact accepted commits are recorded in the stage owners and detailed entries below | Owner plans `03` through `08`; focused cargo tests and oracle fixture commands recorded per stage |
 
 ## Evidence Template
 
-Use this when updating a ledger row after landing:
+Use this when updating a ledger row after landing. `Landed` and
+`Partially landed` entries must name a full commit id or a repository-unambiguous
+abbreviation verified with `git cat-file -e <id>^{commit}`. An inclusive range
+is allowed only when every commit in that range belongs to the entry. A branch
+name is useful orientation but does not replace either commit field. For a
+multi-commit entry, map each commit to its fixture or implementation slice and
+point to the exact companion evidence entry instead of copying its full detail.
 
 ```text
 Status:
-V2 commit:
-V1 source inspected:
+Source ref/commit(s):
+V2 commit(s):
+Source class:
+Source inspected:
+Reusable primitive or lesson:
+V2 wrapper/boundary:
 Bazel oracle:
 V2 fixture:
 Expected evidence artifact:
@@ -98,11 +135,41 @@ Validation:
 Residual risk:
 ```
 
+## First-Real-Build Reuse Order
+
+Use this order for every packet in the canonical integration gate before
+expanding standalone substrates:
+
+1. Stage 1 adds or strengthens the narrow fixture and its comparison fields.
+2. Run the fixture with Bazel 9, generate and check in the expected oracle,
+   verify `expected/oracle.json` records `generated: true`, then rerun Bazel
+   without `--update-expected`. Do not start implementation while the expected
+   result is still a placeholder.
+3. Stage 2 connects the packet to actual DICE and starlark-rust runtime paths.
+4. Stage 4 evaluates the packet's `BUILD.bazel` and loaded `.bzl` files through
+   Bazel-shaped loading keys and globals.
+5. Stage 5 evaluates its `MODULE.bazel` through starlark-rust and actual
+   bzlmod DICE keys; a directive recorder is not this integration.
+6. Stage 6 carries the evaluated rule through providers, shared-DAG depsets,
+   and the declared action IR.
+7. Stage 7 serializes the real REAPI `Command`, `Directory`, and `Action`,
+   constructs the input Merkle tree, and executes through NativeLink.
+8. Stage 1 runs the same fixture with Slug, compares it with the checked-in
+   Bazel result, validates REAPI and same-daemon evidence where applicable,
+   and only then records landed evidence here and in each owner plan.
+
+Do not call a `*DiceKey` structure, a parser record, a text digest, or an
+evidence validator an implementation of its corresponding runtime boundary
+until this chain exercises it. A later packet must repeat the Bazel-first step;
+it cannot inherit an unrelated fixture's generated oracle as implementation
+permission.
+
 ### Stage 5 MODULE.bazel parser directive records
 
 Status: Partially landed
-V2 commit: Stage 5 parser checkpoints on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\parser.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `9a5faa1d`, `2f6049e4`, `b6add7d7`, `3252e8b1`, `42b10f93`, `c484d9bf`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entries "Stage 5 repo directive parser checkpoint", "Stage 5 module extension tag parser checkpoint", "Stage 5 registration dev-dependency parser checkpoint", "Stage 5 use_repo_rule dev-dependency checkpoint", "Stage 5 multiline MODULE directive parser checkpoint", and "Stage 5 single-quoted MODULE string parser checkpoint", respectively
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/parser.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 oracle fixtures for MODULE directive shape
 V2 fixture: `module-repo-directives`, `module-extension-tags`, `module-registration-dev-dependency`, `module-use-repo-rule-dev-dependency`, `module-multiline-directives`, `module-single-quoted-directives`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected` for each fixture
@@ -113,8 +180,9 @@ Residual risk: parser remains a lightweight directive recorder; full Starlark MO
 ### Stage 5 local module graph substrate
 
 Status: Partially landed
-V2 commit: Stage 5 local resolution checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\resolution.rs`
+V2 commit(s): `9499cfaa`, `e8a815d4`, `3e9669b5`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entries "Stage 5 local module graph substrate checkpoint", "Stage 5 local override declared-version checkpoint", and "Stage 5 local override request-order checkpoint", respectively
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/resolution.rs`
 Bazel oracle: Bazel 9.1.1 `module-resolution-basic` fixture with build plus cquery evidence
 V2 fixture: `module-resolution-basic`, `module-local-override-version-selection`, `module-local-override-request-order`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -125,8 +193,9 @@ Residual risk: local graph substrate still does not implement multiple_version_o
 ### Stage 5 registry MVS substrate
 
 Status: Partially landed
-V2 commit: Stage 5 registry MVS checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\registry.rs`, `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\resolution.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `242568cb`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 registry MVS substrate checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/registry.rs`, `slug-v1-archive:app/slug_bzlmod/src/resolution.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `module-registry-mvs-basic` fixture using a workspace-local registry and `bazel mod graph`
 V2 fixture: `module-registry-mvs-basic`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -137,8 +206,9 @@ Residual risk: registry file hashes, source.json repo spec materialization, mult
 ### Stage 5 yanked-version policy substrate
 
 Status: Partially landed
-V2 commit: Stage 5 yanked-version policy checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\registry.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `bbefd325`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 yanked-version policy checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/registry.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `yanked-version-policy` fixture using a workspace-local registry and `bazel mod graph`
 V2 fixture: `yanked-version-policy`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -149,8 +219,9 @@ Residual risk: registry file hashes, lockfile selected-yanked-version recording,
 ### Stage 5 registry source.json policy substrate
 
 Status: Partially landed
-V2 commit: Stage 5 registry source.json checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\registry.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `7a459f21`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 registry source.json policy checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/registry.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `registry-source-json-policy` fixture using a workspace-local registry and `bazel mod graph`
 V2 fixture: `registry-source-json-policy`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -161,8 +232,9 @@ Residual risk: archive download/extraction, patch application, registry hash enf
 ### Stage 5 registry metadata parser substrate
 
 Status: Partially landed
-V2 commit: Stage 5 registry metadata checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\registry.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `665403bf`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 registry metadata parser checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/registry.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `yanked-version-policy` fixture using a workspace-local registry and `bazel mod graph`
 V2 fixture: `yanked-version-policy`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -173,8 +245,9 @@ Residual risk: registry clients, registry file hashes, lockfile selected-yanked-
 ### Stage 5 multiple-version override resolver substrate
 
 Status: Partially landed
-V2 commit: Stage 5 multiple-version override checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\registry.rs`, `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\resolution.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `f92de49f`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 multiple-version override resolver checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/registry.rs`, `slug-v1-archive:app/slug_bzlmod/src/resolution.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `module-registry-multiple-version-override` fixture using a workspace-local registry, `bazel mod graph`, and `bazel mod dump_repo_mapping`
 V2 fixture: `module-registry-multiple-version-override`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -185,8 +258,9 @@ Residual risk: multiple-version override lockfile data, exact full repo-mapping 
 ### Stage 5 single-version override resolver substrate
 
 Status: Partially landed
-V2 commit: Stage 5 single-version override checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\registry.rs`, `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\resolution.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `8f0c5d94`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 single-version override resolver checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/registry.rs`, `slug-v1-archive:app/slug_bzlmod/src/resolution.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `module-registry-single-version-override` fixture using a workspace-local registry, `bazel mod graph`, and `bazel mod dump_repo_mapping`
 V2 fixture: `module-registry-single-version-override`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -197,8 +271,9 @@ Residual risk: single-version override patches, alternate registry selection, lo
 ### Stage 5 ordered registry fallback substrate
 
 Status: Partially landed
-V2 commit: Stage 5 ordered registry fallback checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\registry.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `1ec4bb16`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 ordered registry fallback checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/registry.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `registry-fallback-order` fixture using two workspace-local registries and `bazel mod graph`
 V2 fixture: `registry-fallback-order`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -209,8 +284,9 @@ Residual risk: HTTP/file registry clients, registry file hashes, refresh/error l
 ### Stage 5 selected-yanked visible lockfile substrate
 
 Status: Partially landed
-V2 commit: Stage 5 selected-yanked lockfile checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\lockfile.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `159df871`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 selected-yanked lockfile checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/lockfile.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `lockfile-selected-yanked-version` fixture using a workspace-local yanked registry, `--allow_yanked_versions=yyy@1.0.0`, and generated lockfile-line printing
 V2 fixture: `lockfile-selected-yanked-version`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -221,8 +297,9 @@ Residual risk: lockfile write/update/refresh/error modes, hidden lockfiles, exte
 ### Stage 5 registry-hash lockfile error substrate
 
 Status: Partially landed
-V2 commit: Stage 5 registry-hash lockfile checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\lockfile.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `2688c70f`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 registry-hash lockfile error checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/lockfile.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `lockfile-error-mode-registry-hash` fixture using a stale BCR `registryFileHashes` entry and `bazel mod graph --lockfile_mode=error`
 V2 fixture: `lockfile-error-mode-registry-hash`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -233,8 +310,9 @@ Residual risk: computing registry file hashes, HTTP/file registry clients, lockf
 ### Stage 5 yanked-version environment allowlist substrate
 
 Status: Partially landed
-V2 commit: Stage 5 yanked env allowlist checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py` and `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\registry.rs`; no env-specific allowlist implementation or fixture was imported
+V2 commit(s): `5a5a69a9`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 yanked-version environment allowlist checkpoint"
+Source inspected: `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py` and `slug-v1-archive:app/slug_bzlmod/src/registry.rs`; no env-specific allowlist implementation or fixture was imported
 Bazel oracle: Bazel 9.1.1 `yanked-version-env-allowlist` fixture using `BZLMOD_ALLOW_YANKED_VERSIONS=yyy@1.0.0`
 V2 fixture: `yanked-version-env-allowlist`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -245,8 +323,9 @@ Residual risk: process env wiring into DICE-owned bzlmod keys, env-change invali
 ### Stage 5 bzlmod DICE environment key substrate
 
 Status: Partially landed
-V2 commit: Stage 5 bzlmod DICE env-key checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\dice_graph.rs`, `C:\tmp\kuro-v1-archive\tests\core\bzlmod\test_plan61_guardrails.py`
+V2 commit(s): `6f5099b9`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 bzlmod DICE environment key checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/dice_graph.rs`, `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 Bazel oracle: Bazel 9.1.1 `yanked-version-env-change` fixture proving command env changes alter yanked-version policy behavior
 V2 fixture: `yanked-version-env-change`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -257,8 +336,9 @@ Residual risk: actual DICE `Key` wiring, digest producers for files/env/registri
 ### Stage 5 bzlmod command/environment policy key substrate
 
 Status: Partially landed
-V2 commit: Stage 5 yanked command/environment policy checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: No V1 compute code imported for this slice; it extends the prior Stage 5 yanked-policy/DICE substrate from Bazel-observed behavior
+V2 commit(s): `1621bf26`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 yanked command/environment policy checkpoint"
+Source inspected: No V1 compute code imported for this slice; it extends the prior Stage 5 yanked-policy/DICE substrate from Bazel-observed behavior
 Bazel oracle: Bazel 9.1.1 `yanked-version-command-env-union` fixture proving `--allow_yanked_versions` and `BZLMOD_ALLOW_YANKED_VERSIONS` combine as a union
 V2 fixture: `yanked-version-command-env-union`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -269,8 +349,9 @@ Residual risk: actual DICE `Key` wiring, command flag plumbing into evaluation, 
 ### Stage 5 module-extension recorded-input lockfile substrate
 
 Status: Partially landed
-V2 commit: Stage 5 recorded file lockfile checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\lockfile.rs`
+V2 commit(s): `2f4664fa`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 module-extension recorded file lockfile error checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/lockfile.rs`
 Bazel oracle: Bazel 9.1.1 `module-extension-lockfile-error-recorded-file` fixture proving `--lockfile_mode=error` rejects stale module extension FILE recorded inputs
 V2 fixture: `module-extension-lockfile-error-recorded-file`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -281,8 +362,9 @@ Residual risk: real recorded-input digest production, hidden lockfile replay, lo
 ### Stage 5 module-extension recorded-environment lockfile substrate
 
 Status: Partially landed
-V2 commit: Stage 5 recorded environment lockfile checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\lockfile.rs` for recorded-input orientation only
+V2 commit(s): `5357e84e`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 module-extension recorded environment lockfile error checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/lockfile.rs` for recorded-input orientation only
 Bazel oracle: Bazel 9.1.1 `module-extension-lockfile-error-recorded-env` fixture proving `--lockfile_mode=error` rejects stale module extension ENV recorded inputs
 V2 fixture: `module-extension-lockfile-error-recorded-env`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -293,8 +375,9 @@ Residual risk: real process-environment capture into DICE keys, hidden lockfile 
 ### Stage 5 visible lockfile version substrate
 
 Status: Partially landed
-V2 commit: Stage 5 lockfile version checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\lockfile.rs` for lockfile-surface orientation only
+V2 commit(s): `64b43202`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 lockfile version error checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/lockfile.rs` for lockfile-surface orientation only
 Bazel oracle: Bazel 9.1.1 `lockfile-version-error` fixture proving `--lockfile_mode=error` rejects unsupported visible lockfile versions with query exit code 48
 V2 fixture: `lockfile-version-error`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -305,8 +388,9 @@ Residual risk: actual lockfile read/update/refresh/error lifecycle, hidden lockf
 ### Stage 5 registry checksum lockfile error substrate
 
 Status: Partially landed
-V2 commit: Stage 5 missing registry checksum checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\lockfile.rs` for lockfile-surface orientation only
+V2 commit(s): `5ba0180d`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 missing registry checksum lockfile error checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/lockfile.rs` for lockfile-surface orientation only
 Bazel oracle: Bazel 9.1.1 `lockfile-error-missing-registry-hash` fixture proving `--lockfile_mode=error` rejects missing registry checksum entries with query exit code 48
 V2 fixture: `lockfile-error-missing-registry-hash`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -317,8 +401,9 @@ Residual risk: real required-URL discovery, registry fetching/hash production, l
 ### Stage 5 lockfile mode policy substrate
 
 Status: Partially landed
-V2 commit: Stage 5 lockfile mode off policy checkpoint on `codex/slugv2-clean-root-remediation`
-V1 source inspected: `C:\tmp\kuro-v1-archive\app\slug_bzlmod\src\lockfile.rs` for mode-policy orientation only
+V2 commit(s): `f065e5df`
+Companion evidence: [Stage 5 evidence shard 1](./05-bzlmod-checkpoint-evidence.md), entry "Stage 5 lockfile mode off policy checkpoint"
+Source inspected: `slug-v1-archive:app/slug_bzlmod/src/lockfile.rs` for mode-policy orientation only
 Bazel oracle: Bazel 9.1.1 `lockfile-mode-off` fixture proving `--lockfile_mode=off` leaves `MODULE.bazel.lock` absent by an empty manifest root
 V2 fixture: `lockfile-mode-off`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools.v2_oracle --update-expected`
@@ -341,7 +426,9 @@ Cleanup needed in V1 archive docs:
 ## Validation
 
 The ledger is documentation, but any entry moved out of `Proposed` must cite the
-landed validation command in the owning stage plan.
+landed validation command in the owning stage plan. A first-real-build segment
+also needs its generated Bazel oracle and an integration result, not only a
+unit test of a standalone data model.
 
 Doc-only validation:
 
@@ -353,24 +440,25 @@ git diff --check -- thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledg
 
 ### Stage 6 depset/provider/rule context tests
 
-Status: Landed
-V2 commit: `9e519f97`, `ed636308`, `aa9b820f`
-V1 source inspected: `app/slug_build_api_tests/src/interpreter/rule_defs/depset.rs`, `app/slug_build_api_tests/src/interpreter/rule_defs/provider/collection.rs`
+Status: Partially landed
+V2 commit(s): `9e519f97`, `ed636308`, `aa9b820f`
+Source inspected: `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/depset.rs`, `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/provider/collection.rs`
 Bazel oracle: Bazel 9.1 depset/provider probe expectations captured in the V1 tests plus V2 oracle fixture scaffolds
 V2 fixture: `depset-orders-and-rejections`, `custom-rule-analysis-basic`, `ctx-attrs-files-executable`, `default-info-runfiles-executable`, `provider-output-group-basic`
 Expected evidence artifact: Stage 1 oracle expected output remains placeholder until V2 configured-target analysis can execute fixtures
-Implementation summary: Rewrote behavior into V2 depset/provider/context substrates without importing V1 Buck labels, `transitive_set` coercions, or direct-local assumptions
+Implementation summary: Rewrote behavior into V2 depset/provider/context substrates without importing V1 Buck labels, `transitive_set` coercions, or direct-local assumptions; shared-DAG storage and traversal remain open
 Validation: `cargo test -p slug_build_api_v2`; `cargo test -p slug_analysis_v2`; `py -3 -B tools/v2_oracle list`; Stage 6 shortcut grep recorded in `06-analysis-toolchains-and-actions.md`
-Residual risk: Starlark evaluator integration and Bazel-generated oracle outputs are still pending
+Residual risk: shared-DAG storage/traversal, Starlark evaluator integration, and Bazel-generated oracle outputs are still pending
 
 ### Stage 8 public ruleset fixtures
 
 Status: Partially landed
-V2 commit: public-ruleset fixture checkpoint containing this entry
-V1 source inspected: `tests/plan34/fixtures/rules_cc/MODULE.bazel`, `tests/plan34/fixtures/rules_cc/BUILD.bazel`, `tests/plan34/fixtures/rules_cc/hello.c`
+V2 commit(s): `86e1c5d5` (`rules-cc-basic`, `bazel-skylib-basic`, `rules-python-basic`), `70c5e924` (`rules-cc-run-env`, `rules-cc-test-env-inherit`), `2645e432` (`rules-python-runfiles`), `26b05ac1` (`protobuf-basic`), `39f5b4be` (`rules-rust-basic`), `43617d18` (`rules-oci-basic-no-daemon`)
+Companion evidence: fixture-introduction commits above, verified with `git log --diff-filter=A -- tests/v2_oracle/fixtures/<fixture>`; validation and residual scope are recorded under [Stage 8: Public Ruleset Fixture Start](./08-ruleset-and-command-conformance.md#public-ruleset-fixture-start)
+Source inspected: `slug-v1-archive:tests/plan34/fixtures/rules_cc/MODULE.bazel`, `slug-v1-archive:tests/plan34/fixtures/rules_cc/BUILD.bazel`, `slug-v1-archive:tests/plan34/fixtures/rules_cc/hello.c`
 Bazel oracle: Bazel 9.1.1 with BCR metadata for current public ruleset module versions
 V2 fixture: `rules-cc-basic`, `rules-cc-run-env`, `rules-cc-test-env-inherit`, `bazel-skylib-basic`, `rules-python-basic`, `rules-python-runfiles`, `protobuf-basic`, `rules-rust-basic`, `rules-oci-basic-no-daemon`
 Expected evidence artifact: Stage 1 oracle expected output generated by `tools/v2_oracle --update-expected` for each fixture
-Implementation summary: Rewrote Plan34 `rules_cc` behavior into Bazel 9 bzlmod fixtures and added fresh skylib/python/protobuf/rules_rust/rules_oci public ruleset fixtures, including C++ run/test environment and Python runfiles coverage, without importing V1 execution or output-root assumptions
-Validation: `py -3 -B -m tools.v2_oracle run --fixture rules-cc-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`; same command for `rules-cc-run-env`, `rules-cc-test-env-inherit`, `bazel-skylib-basic`, `rules-python-basic`, `rules-python-runfiles`, `protobuf-basic`, `rules-rust-basic`, and `rules-oci-basic-no-daemon`
+Implementation summary: Rewrote behavior from `slug-v1-archive:tests/plan34/fixtures/rules_cc` into Bazel 9 bzlmod fixtures and added fresh skylib/python/protobuf/rules_rust/rules_oci public ruleset fixtures, including C++ run/test environment and Python runfiles coverage, without importing V1 execution or output-root assumptions
+Validation: `python3 -B -m tools.v2_oracle run --fixture rules-cc-basic --tool bazel --bazel <Bazel-9.1.1-binary>`; same command for `rules-cc-run-env`, `rules-cc-test-env-inherit`, `bazel-skylib-basic`, `rules-python-basic`, `rules-python-runfiles`, `protobuf-basic`, `rules-rust-basic`, and `rules-oci-basic-no-daemon`
 Residual risk: rules_oci full no-daemon image/package build still needs a Linux-backed oracle or upstream Windows wrapper fix; output/runfiles comparisons need platform-aware oracle manifests before upgrading beyond message-shape checks

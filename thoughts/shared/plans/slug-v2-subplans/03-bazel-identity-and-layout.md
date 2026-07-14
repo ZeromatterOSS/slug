@@ -21,6 +21,13 @@ V1 accumulated too much Buck cell and output-root residue. V2 should not start
 with a compatibility exception for `buck-out`; output and exec paths should be
 Bazel-shaped unless a Slug extension explicitly documents otherwise.
 
+Archive inspection rule: paths prefixed with `slug-v1-archive:` are absent from
+the active clean root. Inspect them with
+`git show slug-v1-archive:<path>` or an external archive worktree; do not search
+for or import them from the active root. Use the matching
+[Stage 9 extraction-ledger](./09-v1-extraction-ledger.md) row to choose the
+import mode, oracle, and validation before editing V2 code.
+
 ## Implementation Slices
 
 ### 3.1 Identity Types
@@ -44,10 +51,11 @@ Initial concrete files:
 - `app/slug_identity_v2/src/{repo.rs,repo_mapping.rs,package.rs,label.rs,pattern.rs,layout.rs,serialization.rs,lib.rs}`
 - `app/slug_identity_v2/tests/{label_roundtrip.rs,pattern.rs,layout.rs}`
 
-Mine `app/slug_bzlmod/src/repo_mapping.rs` for behavior, but do not expose V1
-types. Split `ApparentLabel`, `CanonicalLabel`, and `ResolvedLabel`; any DICE
-key built from an apparent label must include the `RepositoryMappingId` used to
-resolve it.
+Mine `slug-v1-archive:app/slug_bzlmod/src/repo_mapping.rs` for behavior and
+`slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/26-string-interning.md`
+for measured interning lessons, but do not expose V1 types. Split
+`ApparentLabel`, `CanonicalLabel`, and `ResolvedLabel`; any DICE key built from
+an apparent label must include the `RepositoryMappingId` used to resolve it.
 
 ### 3.2 Filesystem Layout Model
 
@@ -62,7 +70,9 @@ Model these paths explicitly:
 - convenience symlinks as optional, non-semantic filesystem artifacts.
 
 Do not derive this model from V1 `buck-out` helpers, `slug info`, or archived
-artifact path code. Those paths may be inspected as rejection examples only.
+artifact path code such as
+`slug-v1-archive:app/slug_execute/src/path/artifact_path.rs`. Those paths may be
+inspected as rejection examples only.
 
 ### 3.3 Serialization and DICE Keys
 

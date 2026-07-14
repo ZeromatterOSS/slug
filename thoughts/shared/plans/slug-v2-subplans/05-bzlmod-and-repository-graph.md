@@ -20,14 +20,20 @@ materialization manifests.
 
 Review and selectively extract from:
 
-- `app/slug_bzlmod/src/parser.rs`
-- `app/slug_bzlmod/src/dice_graph.rs`
-- `app/slug_bzlmod/src/extension_execution_dice.rs`
-- `app/slug_bzlmod/src/lockfile.rs`
-- `app/slug_bzlmod/src/repo_mapping.rs`
-- `tests/core/bzlmod/test_plan61_guardrails.py`
+- `slug-v1-archive:app/slug_bzlmod/src/parser.rs`
+- `slug-v1-archive:app/slug_bzlmod/src/dice_graph.rs`
+- `slug-v1-archive:app/slug_bzlmod/src/extension_execution_dice.rs`
+- `slug-v1-archive:app/slug_bzlmod/src/lockfile.rs`
+- `slug-v1-archive:app/slug_bzlmod/src/repo_mapping.rs`
+- `slug-v1-archive:app/slug_bzlmod/src/repo_spec.rs`
+- `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py`
 
 Each extraction needs an oracle fixture or direct Bazel source citation.
+These paths are absent from the active clean root: inspect them with
+`git show slug-v1-archive:<path>` or an external archive worktree, not by
+searching or importing from the active root. The matching
+[Stage 9 extraction-ledger](./09-v1-extraction-ledger.md) row owns the import
+mode, oracle, validation, and residual-risk decision.
 
 ## Bazel Oracle Anchors
 
@@ -53,8 +59,11 @@ Each extraction needs an oracle fixture or direct Bazel source citation.
 
 ### 5.1 MODULE.bazel Evaluation
 
-- Implement a parser/evaluator for root, registry, and non-registry
-  `MODULE.bazel` files.
+- Implement root, registry, and non-registry `MODULE.bazel` evaluation through
+  starlark-rust with V2-owned Bazel module globals.
+- A handwritten directive recorder may support fixture scaffolding only. It is
+  not the production evaluator or acceptance evidence, because Bazel compiles
+  and executes module files and includes as Starlark.
 - Capture module name, version, compatibility level, bazel compatibility,
   `bazel_dep`, overrides, `include`, `use_extension`, `use_repo`,
   `override_repo`, `inject_repo`, `use_repo_rule`, `register_toolchains`,
@@ -68,8 +77,10 @@ Each extraction needs an oracle fixture or direct Bazel source citation.
 - Define registry client traits for BCR, local registries, file URL, HTTP
   registry, archive override, git override, local path override, and single or
   multiple version overrides.
-- Add DICE keys for discovery, MVS resolution, yanked versions, registry file
-  hashes, and `source.json` repo specs.
+- Add actual DICE `Key` implementations for discovery, MVS resolution, yanked
+  versions, registry file hashes, and `source.json` repo specs. Plain
+  hash/equality input records are useful key inputs, but are not DICE keys until
+  a `DiceComputations` implementation owns their dependencies and invalidation.
 - All fetched content must produce content digests and watched inputs.
 - Cache directory paths are not semantic identity; content and policy are.
 - Registry hash reuse/enforcement, yanked policy, and repo specs must match the
@@ -102,8 +113,9 @@ single-`@` storage with unambiguous canonical label rules from Stage 3.
   overrides, lockfile replay entries, facts, factsVersions, `.bzl` transitive
   digest, usages digest, and recorded-input validation.
 - Execute extension implementation with prepared module data and repo mapping.
-- Rewrite V1 thread-local repo-spec registry into explicit per-evaluation
-  state.
+- Rewrite the V1 thread-local repo-spec registry in
+  `slug-v1-archive:app/slug_bzlmod/src/repo_spec.rs` into explicit
+  per-evaluation state.
 - `repository_ctx` and `module_ctx` methods must not perform hidden semantic
   discovery; label paths, reads, downloads, and env lookups route through named
   async bridges or DICE keys.
@@ -143,11 +155,11 @@ single-`@` storage with unambiguous canonical label rules from Stage 3.
 
 ### 5.7 V1 Guardrail Fixture Migration
 
-Mine `tests/core/bzlmod/test_plan61_guardrails.py` for fixture themes only:
-root, local, registry invalidation, included module files, lockfile writer
-modes, extension replay, repo mapping, recorded inputs, materialization
-markers, and same-daemon generation tests. Do not port exact V1 counters as
-truth.
+Mine `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py` for fixture
+themes only: root, local, registry invalidation, included module files,
+lockfile writer modes, extension replay, repo mapping, recorded inputs,
+materialization markers, and same-daemon generation tests. Do not port exact
+V1 counters as truth.
 
 Every imported fixture must name its Bazel source/test oracle and have a V2
 regression before code extraction, matching the Stage 9 extraction rule.
@@ -180,8 +192,9 @@ companion evidence file remain below the 1000-line cap.
 
 ## Exact Test Criteria
 
-- Unit tests cover parser round-trips for every directive above, including
-  order-sensitive registration lists.
+- Unit tests cover evaluator results and diagnostics for every directive above,
+  including order-sensitive registration lists. Parser round-trips alone are
+  scaffold evidence only.
 - `module-resolution-basic` fixture resolves at least root plus two transitive
   modules and matches Bazel's selected versions and canonical repos.
 - `module-file-directives` fixture covers `include`, `override_repo`,
@@ -210,6 +223,8 @@ companion evidence file remain below the 1000-line cap.
 ## Acceptance Criteria
 
 - No process-global semantic registry is required for bzlmod correctness.
+- `MODULE.bazel` behavior is produced by starlark-rust evaluation and real DICE
+  keys, not a directive recorder or key-shaped value structs.
 - Same-daemon create/edit/delete transitions replay for clear DICE reasons.
 - Lockfile replay rejects stale repo mappings, stale extension facts, and
   changed watched inputs.

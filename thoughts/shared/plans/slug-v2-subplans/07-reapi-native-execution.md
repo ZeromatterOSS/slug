@@ -16,15 +16,31 @@ Make REAPI the primary and routine execution boundary for Slug V2.
 
 ## V1 Extraction Candidates
 
-- Plan 34 NativeLink smoke harness.
-- Plan 31 persistent action-cache tests.
-- what-ran and what-uploaded evidence patterns.
-- materializer and stale-entry handling where it reuses Buck2 RE contracts.
-- `app/slug_execute/src/execute/action_digest.rs` and
-  `action_digest_and_blobs.rs` as behavior sources for REAPI identity.
-- `app/slug_execute_impl/src/executors/re.rs`,
-  `app/slug_execute_impl/src/re/download.rs`, and
-  `app/slug_execute/src/re/client.rs` as selective rewrite sources.
+- Plan 34 design and NativeLink smoke harness in
+  `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/34-sandboxed-execution-strategy.md`,
+  `slug-v1-archive:tests/plan34/test_reapi_local_executor_smoke.py`, and
+  `slug-v1-archive:tests/plan34/validate_reapi_evidence.py`.
+- Plan 31 persistent action-cache design and tests in
+  `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/31-bazel-perf-parity.md`
+  and `slug-v1-archive:tests/plan31/test_persistent_re_action_cache.py`.
+- what-ran and what-uploaded evidence patterns from the archived Plan 34 smoke
+  and validator paths above.
+- materializer and stale-entry handling from
+  `slug-v1-archive:app/slug_execute_impl/src/materializers/deferred/io_handler.rs`
+  and the archived Plan 31 test above where they reuse Buck2 RE contracts.
+- `slug-v1-archive:app/slug_execute/src/execute/action_digest.rs` and
+  `slug-v1-archive:app/slug_execute/src/execute/action_digest_and_blobs.rs` as
+  behavior sources for REAPI identity.
+- `slug-v1-archive:app/slug_execute_impl/src/executors/re.rs`,
+  `slug-v1-archive:app/slug_execute_impl/src/re/download.rs`, and
+  `slug-v1-archive:app/slug_execute/src/re/client.rs` as selective rewrite
+  sources.
+
+These paths are absent from the active clean root. Inspect them with
+`git show slug-v1-archive:<path>` or an external archive worktree; do not search
+for or import them from the active root. Use the matching
+[Stage 9 extraction-ledger](./09-v1-extraction-ledger.md) row to choose the
+import mode, oracle, and validation.
 
 ## Bazel Oracle Anchors
 
@@ -43,13 +59,18 @@ Make REAPI the primary and routine execution boundary for Slug V2.
 
 ### 7.1 NativeLink REAPI Harness
 
-- Port behavior from the Plan 34 harness into Stage 1 oracle fixtures:
-  NativeLink config writing, process startup, evidence validation,
-  what-ran checks, upload checks, and remote AC-hit assertions.
+- Port behavior from
+  `slug-v1-archive:tests/plan34/test_reapi_local_executor_smoke.py` into Stage 1
+  oracle fixtures: NativeLink config writing, process startup, evidence
+  validation, what-ran checks, upload checks, and remote AC-hit assertions.
 - NativeLink is the mandatory hosted-Linux baseline for CAS, AC, Execution,
   ByteStream, Capabilities, and WorkerApi.
-- Use existing Plan 34 GitHub actions and CI gate tests as shape references,
-  but move the V2 proof into `slug-v2-oracle`.
+- Use
+  `slug-v1-archive:.github/actions/setup_plan34_nativelink/action.yml`,
+  `slug-v1-archive:.github/actions/run_plan34_reapi/action.yml`,
+  `slug-v1-archive:.github/workflows/plan34-reapi.yml`, and
+  `slug-v1-archive:tests/plan34/test_ci_gate.py` as shape references, but move
+  the V2 proof into `slug-v2-oracle`.
 - CI must fail hard if NativeLink setup or the evidence validator is absent on
   hosted Linux.
 
@@ -73,6 +94,13 @@ Make REAPI the primary and routine execution boundary for Slug V2.
   action declarations. Do not carry Buck path spelling into identity.
 - Identity is `Command` digest plus input-root digest plus platform and timeout
   fields exactly as REAPI `Action` encodes them.
+- Digest serialized REAPI protobuf messages and construct a real `Directory`
+  Merkle tree. Rust `Debug` formatting, ad hoc text serialization, a flat input
+  list, or a separately invented platform digest are never action identity.
+- Selectively port the design from
+  `slug-v1-archive:app/slug_execute/src/execute/action_digest_and_blobs.rs`
+  behind V2-owned action types; preserve the protobuf and CAS contract while
+  rejecting Buck executor configuration and path semantics.
 
 ### 7.4 CAS Upload, Execute, and Materialize
 
@@ -92,8 +120,11 @@ Make REAPI the primary and routine execution boundary for Slug V2.
 - AC lookup, stale-entry handling, download, and cache-hit accounting are
   separate testable steps.
 - Do not count copied-output bridges or direct-local fallbacks as cache success.
-- Extract schema/value semantics and stale-entry behavior from Plan 31
-  persistent AC work, but let Stage 3 own V2 output/cache layout.
+- Extract schema/value semantics and stale-entry behavior from
+  `slug-v1-archive:app/slug_execute_impl/src/sqlite/action_cache_db.rs`,
+  `slug-v1-archive:app/slug_execute_impl/src/sqlite/tables/action_cache_table.rs`,
+  and `slug-v1-archive:tests/plan31/test_persistent_re_action_cache.py`, but let
+  Stage 3 own V2 output/cache layout.
 - Remote AC replay must survive Slug restart and local persistent AC deletion.
 - Local durable AC replay must prove SQLite AC short-circuited remote lookup,
   without `CacheQuery` or `Re` evidence.
@@ -104,7 +135,10 @@ Make REAPI the primary and routine execution boundary for Slug V2.
 
 - Defer broad ruleset conformance to Stage 8.
 - Stage 7 owns REAPI execution proof for C and rules_cc-shaped compile/link
-  actions using the existing Plan 34 fixture themes.
+  actions using the archived
+  `slug-v1-archive:tests/plan34/fixtures/cc_actions/BUILD.bazel`,
+  `slug-v1-archive:tests/plan34/fixtures/cc_actions/defs.bzl`, and
+  `slug-v1-archive:tests/plan34/fixtures/rules_cc/BUILD.bazel` fixture themes.
 - Stage 8 may depend on these fixtures but must not redefine executor-boundary
   evidence.
 
@@ -153,6 +187,9 @@ Every REAPI execution fixture must record:
   Slug re-uploads before consumer execution.
 - `reapi-paramfile-input-tree` proves nested paramfiles are part of the uploaded
   input tree.
+- REAPI identity tests compare serialized `Command`, `Directory`, and `Action`
+  digests against the Bazel oracle or a directly equivalent protobuf fixture;
+  text/debug serialization is forbidden by regression coverage.
 - `rules-cc-reapi-basic` proves compile/link-shaped actions cross the REAPI
   boundary before Stage 8 ruleset breadth.
 - `tag-no-remote-cache` and `tag-no-cache` fixtures match Bazel remote test
@@ -166,6 +203,8 @@ Every REAPI execution fixture must record:
 
 - A one-action shell fixture executes through NativeLink REAPI with zero
   direct-local actions.
+- Action and input-root digests come from REAPI protobuf/Merkle serialization
+  and are accepted by the configured REAPI backend.
 - A generated-output fixture uploads inputs, materializes outputs, and can feed
   a downstream action.
 - Remote Action Cache hit proof survives Slug daemon restart and local persistent

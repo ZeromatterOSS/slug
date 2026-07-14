@@ -48,13 +48,20 @@ Use the local Bazel checkout as the source of truth:
 - Failure artifacts are compact and written under
   `${SLUG_V2_ORACLE_ROOT:-target/v2o}/runs/<fixture>/`.
 
-Initial concrete files:
+Initial concrete harness files present in the checkout:
 
 - `tools/v2_oracle`
 - `tools/v2_oracle_lib/{fixture.py,runner.py,normalize.py,manifest.py,compare.py}`
 - `tests/v2_oracle/README.md`
 - `tests/v2_oracle/test_v2_oracle.py`
 - `tests/v2_oracle/fixtures/{version-bazel9,empty-module-build,exports-and-filegroup,simple-rule-action,load-invalidation,module-local-override,negative-no-workspace}/`
+
+The next Stage 1 fixture packet must add
+`tests/v2_oracle/fixtures/workspace-file-ignored/` and
+`tests/v2_oracle/fixtures/missing-module-warning/`. Neither directory exists in
+the current checkout. Do not run or report either fixture as validation until
+the packet adds its workspace, `fixture.toml`, generated Bazel 9 oracle, and
+focused harness tests.
 
 ### 1.2 Comparison Contract
 
@@ -91,7 +98,17 @@ Create these fixtures first:
 | `simple-rule-action` | `build //pkg:write_file` | exact declared output digest |
 | `load-invalidation` | build, edit `.bzl`, rebuild | semantic invalidation and changed output |
 | `module-local-override` | `build @dep//:target` | lockfile/repo mapping facts |
-| `negative-no-workspace` | `build //...` with WORKSPACE-only root | message shape failure |
+| `workspace-file-ignored` | `build //...` with `MODULE.bazel` and an otherwise-invalid legacy `WORKSPACE` | semantic success; the legacy file has no effect |
+| `missing-module-warning` | `build //...` without `MODULE.bazel` | semantic warning/created-empty-module behavior observed from Bazel |
+
+The existing `negative-no-workspace` scaffold is not an acceptance fixture. It
+must be replaced or rebaselined as the two probes above when its Bazel oracle is
+generated: Bazel 9 rejects legacy WORKSPACE semantics, but a missing
+`MODULE.bazel` is not itself the asserted failure mode.
+
+The two replacement probes are the next bounded fixture packet, not completed
+checkpoint evidence. Generate and review their Bazel 9 results before any Slug
+implementation attempts to match them.
 
 ### 1.4 Oracle Anchors
 
@@ -105,6 +122,17 @@ Keep the fixture mapping tied to local Bazel source:
 - execution: `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteActionContextProvider.java`
   and `GrpcRemoteExecutor.java`.
 
+### 1.5 Generated-Oracle Policy
+
+- A fixture is not acceptance evidence while its checked-in oracle has
+  `generated: false`.
+- `message_shape` is reserved for diagnostics whose text is intentionally
+  normalized; build outputs, action structures, and REAPI evidence use exact
+  or semantic comparison.
+- The First Real Bazel Build gate requires generated Bazel results for
+  `simple-rule-action`, `shell-action-reapi`, and `load-invalidation` before a
+  Slug result can be called parity evidence.
+
 ## Acceptance Criteria
 
 - The harness records command line, exit code, stdout/stderr, output manifest,
@@ -113,7 +141,7 @@ Keep the fixture mapping tied to local Bazel source:
   matching, or semantic matching.
 - A failed comparison produces a small artifact that an agent can use without
   re-running the whole suite.
-- The first seven fixtures above can run against upstream Bazel before Slug V2
+- The initial fixture set above can run against upstream Bazel before Slug V2
   implements them, producing checked-in expected outputs or clearly documented
   generated artifacts.
 - Stage 1 records action and event facts but does not assert REAPI executor
@@ -121,7 +149,12 @@ Keep the fixture mapping tied to local Bazel source:
 - Harness output is deterministic enough that a failed fixture can be reviewed
   with `git diff --no-index` against the previous artifact.
 
-## Exact Test Criteria
+## Target-State Exact Test Criteria
+
+These criteria define Stage 1 acceptance. They are not all runnable from the
+current checkout: the two missing-module replacement fixtures are the next
+fixture packet, and `shell-action-reapi` remains gated on the Stage 7
+NativeLink-backed harness.
 
 - `tools/v2_oracle run --fixture empty-module-build --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev`
   succeeds against upstream Bazel.
@@ -130,14 +163,13 @@ Keep the fixture mapping tied to local Bazel source:
   files.
 - Editing a loaded `.bzl` file in `load-invalidation` changes the second-run
   output digest and records that the first result was not reused.
-- `negative-no-workspace` fails under both tools once Slug V2 exists, with a
-  diagnostic that mentions missing `MODULE.bazel` or Bazel-9-only workspace
-  policy.
+- `workspace-file-ignored` proves that legacy WORKSPACE content is not evaluated
+  when `MODULE.bazel` is present; `missing-module-warning` captures Bazel's
+  empty-module creation and warning behavior rather than asserting failure.
 - Execution fixtures must include zero direct-local rows once Stage 7 is active.
 - `python3 -m pytest -q tests/v2_oracle/test_v2_oracle.py` covers fixture
   parsing, normalization, manifest comparison, and failure artifact writing
   without requiring Slug V2 to exist.
-
 
 ## Checkpoint Evidence
 
@@ -148,7 +180,9 @@ Stage 1 scaffold checkpoint:
   comparison, and compact failure artifacts.
 - Added initial fixture directories for `version-bazel9`, `empty-module-build`,
   `exports-and-filegroup`, `simple-rule-action`, `load-invalidation`,
-  `module-local-override`, and `negative-no-workspace`.
+  `module-local-override`, and `negative-no-workspace`. The latter is
+  superseded by the planned `workspace-file-ignored` and
+  `missing-module-warning` probes; it must not be used as parity evidence.
 - Local validation: `py -3 tools/v2_oracle list` and bundled-runtime
   `python -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`
   passed on Windows.
@@ -182,18 +216,68 @@ Stage 1 command environment checkpoint:
   tests/v2_oracle/test_v2_oracle.py`; `yanked-version-env-allowlist` generated
   and compared with `BZLMOD_ALLOW_YANKED_VERSIONS` set through the command
   environment.
+
 ## Validation
 
+### Runnable Current-Checkout Validation
+
+These commands reference only files and fixture names that exist now and run
+with the standard-library Python environment; they do not require Bazel, Slug
+V2, or the two absent fixture directories.
+
 ```bash
-cd /var/mnt/dev/bazel && bazel build //src:bazel-dev
 cd /var/mnt/dev/slug
-python3 tools/v2_oracle list
-python3 tools/v2_oracle run --fixture empty-module-build --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
-python3 tools/v2_oracle run --fixture simple-rule-action --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
-python3 tools/v2_oracle run --fixture load-invalidation --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
-python3 tools/v2_oracle run --fixture negative-no-workspace --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev
-python3 -m pytest -q tests/v2_oracle/test_v2_oracle.py
+python3 -B -m tools.v2_oracle list
 git diff --check -- tools/v2_oracle tools/v2_oracle_lib tests/v2_oracle thoughts/shared/plans/slug-v2-subplans/01-compliance-oracle-harness.md
 ```
 
-The command names are placeholders until Stage 2 creates the binary layout.
+Where the test environment includes `pytest`, also run the current focused
+harness suite; it does not require Bazel or Slug V2:
+
+```bash
+cd /var/mnt/dev/slug
+python3 -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py
+```
+
+When a local Bazel 9 source binary is available, the existing oracle-first
+fixture chain is generated with these exact commands:
+
+```bash
+cd /var/mnt/dev/slug
+python3 -B -m tools.v2_oracle run --tool bazel --fixture empty-module-build --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
+python3 -B -m tools.v2_oracle run --tool bazel --fixture simple-rule-action --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
+python3 -B -m tools.v2_oracle run --tool bazel --fixture load-invalidation --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
+```
+
+### Next Fixture Packet And Target-State Validation
+
+The next packet creates `workspace-file-ignored` and
+`missing-module-warning`, cites the Bazel 9 source or observed behavior behind
+each expectation, generates each checked-in `expected/oracle.json`, and adds
+focused parsing/comparison tests. Once both fixture directories land, this
+block becomes mandatory and replaces any use of `negative-no-workspace` as
+parity evidence:
+
+```bash
+cd /var/mnt/dev/slug
+python3 -B -m tools.v2_oracle run --tool bazel --fixture workspace-file-ignored --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
+python3 -B -m tools.v2_oracle run --tool bazel --fixture missing-module-warning --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
+python3 -B -m tools.v2_oracle run --tool bazel --fixture workspace-file-ignored --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev
+python3 -B -m tools.v2_oracle run --tool bazel --fixture missing-module-warning --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev
+python3 -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py
+git diff --check -- tools/v2_oracle tools/v2_oracle_lib tests/v2_oracle thoughts/shared/plans/slug-v2-subplans/01-compliance-oracle-harness.md
+```
+
+`shell-action-reapi` is a separate target-state gate and is not runnable as a
+NativeLink oracle today. After Stage 7 supplies and starts the NativeLink-backed
+harness, injects its remote endpoint into the fixture command, and records the
+required REAPI evidence, generate the Bazel result with:
+
+```bash
+cd /var/mnt/dev/slug
+python3 -B -m tools.v2_oracle run --tool bazel --fixture shell-action-reapi --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
+```
+
+That command must replace the placeholder at
+`tests/v2_oracle/fixtures/shell-action-reapi/expected/oracle.json`; a result
+with `generated: false` is not acceptance evidence.

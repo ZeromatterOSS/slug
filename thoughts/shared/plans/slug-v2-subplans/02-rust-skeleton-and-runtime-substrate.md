@@ -9,7 +9,7 @@ exposing Buck user semantics.
 ## Scope
 
 - CLI entrypoint with `version`, `help`, `build`, `query`, `test`, and `run`
-  command placeholders.
+  command placeholders only until the first real build slice replaces `build`.
 - Server or daemon boundary only where it helps DICE and warm-state validation.
 - Buck2 crate reuse policy and wrapper crates.
 - Basic diagnostics, event logging, and test fixture wiring.
@@ -22,6 +22,13 @@ Reuse infrastructure:
 - `starlark-rust`
 - remote execution client/materializer pieces
 - event and superconsole infrastructure where it does not leak Buck concepts
+
+The retained crates must be normal dependencies of the V2 runtime before a
+later stage can call its substrate complete. A trait named after DICE or
+Starlark is not reuse; the first real build must execute an actual DICE compute
+and parse/evaluate through starlark-rust. Re-import REAPI protocol/client code
+only as a small V2 wrapper after proving it does not retain V1 `slug_*`
+dependencies.
 
 Do not expose or depend on:
 
@@ -92,6 +99,22 @@ CLI contract does not have to change when the daemon appears.
   `clear-dice` or `new-transaction` control so oracle fixtures can assert warm
   behavior.
 
+### 2.5 First-Real-Build Promotion
+
+Before Stage 5-8 work can advance beyond scaffold status:
+
+- `slug_core_v2` has normal dependencies on `dice` and `starlark`, and the
+  runtime executes a DICE computation for the first build fixture;
+- the CLI dispatches `build` into that runtime instead of emitting a planned
+  command error;
+- the evaluator parses and evaluates a minimal root module/build pair through
+  starlark-rust; and
+- the owner plans connect the resulting typed action to the Stage 7 protobuf
+  REAPI path. The daemon remains optional until the same-daemon invalidation
+  portion of the canonical integration gate is reached.
+
+These are integration prerequisites, not a claim that all Bazel commands are
+implemented in Stage 2.
 
 ## Checkpoint Evidence
 
@@ -117,6 +140,9 @@ Stage 2 skeleton checkpoint:
   app crates other than explicitly vendored Buck2 infrastructure.
 - `cargo tree -p slug_cli_v2` shows no dependency on `app/slug`, `slug_client`,
   `slug_server`, or V1 `slug_core`.
+- Before the First Real Bazel Build gate, `cargo tree` for the V2 runtime shows
+  `dice` and `starlark`; a focused test proves an actual `DiceComputations`
+  path, not a capability trait alone.
 - `slug version` exits 0 and prints `Slug V2` plus `Bazel compatibility: >=9.0.0`.
 - `slug help` does not mention `buck`, `BUCK`, `TARGETS`, `cell`, or
   `.buckconfig`.
@@ -131,6 +157,8 @@ Stage 2 skeleton checkpoint:
 - `slug help` is V2-specific and does not advertise V1/Buck behavior.
 - The oracle harness can invoke the V2 binary.
 - The codegraph sees V2 crates as separate from any archived V1 code.
+- `build` has crossed the DICE and starlark-rust runtime boundaries for the
+  canonical first-build fixture.
 
 ## Validation
 
@@ -138,6 +166,7 @@ Stage 2 skeleton checkpoint:
 cargo check -p slug_cli_v2 -p slug_core_v2
 cargo test -p slug_cli_v2
 SLUG_V2_BIN=target/debug/slug tools/v2_oracle run --fixture version-bazel9
+cargo tree -p slug_cli_v2 | rg 'dice|starlark'
 rg -n "buck|BUCK|TARGETS|CellResolver|buck-out" app/slug_cli_v2 app/slug_core_v2
 git diff --check
 ```

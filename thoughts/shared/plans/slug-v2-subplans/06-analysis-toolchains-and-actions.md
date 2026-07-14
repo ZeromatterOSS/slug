@@ -18,10 +18,34 @@ configuration transitions, toolchain resolution, and action declarations.
 
 ## V1 Extraction Candidates
 
-- depset/providing tests from `slug_build_api_tests`;
-- `rule(implementation=...)` tests;
-- selected `cc_common` and provider surfaces;
-- action declaration plumbing only after Stage 3 path semantics are clean.
+- depset/provider tests from
+  `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/depset.rs`
+  and
+  `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/provider/collection.rs`;
+- `rule(implementation=...)` tests from
+  `slug-v1-archive:app/slug_interpreter_for_build_tests/src/tests.rs`, with
+  implementation orientation from
+  `slug-v1-archive:app/slug_interpreter_for_build/src/rule.rs`;
+- selected `cc_common` and provider surfaces from
+  `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/cc_common.rs`,
+  `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/provider.rs`,
+  and
+  `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/provider/collection.rs`;
+- action declaration plumbing from
+  `slug-v1-archive:app/slug_build_api/src/actions/registry.rs` and
+  `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/context.rs`,
+  only after Stage 3 path semantics are clean;
+- shared-DAG design and traversal from
+  `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/nested_set.rs`,
+  `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/transitive_set/traversal.rs`,
+  and
+  `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/54-depset-transitive-set-shared-core.md`.
+
+These paths are absent from the active clean root. Inspect them with
+`git show slug-v1-archive:<path>` or an external archive worktree; do not search
+for or import them from the active root. Use the matching
+[Stage 9 extraction-ledger](./09-v1-extraction-ledger.md) row to choose the
+import mode, oracle, and validation.
 
 ## Bazel Oracle Anchors
 
@@ -49,8 +73,10 @@ configuration transitions, toolchain resolution, and action declarations.
   inputs, not global process state.
 - Initial modules: `app/slug_analysis_v2/src/{key.rs,result.rs,dice.rs,configured_target.rs}`
   and `app/slug_build_api_v2/src/providers/`.
-- Use V1 `slug_build_api` analysis code only as a pattern source; do not port
-  Buck labels or V1 configuration identity.
+- Use archived V1 analysis code such as
+  `slug-v1-archive:app/slug_analysis/src/analysis/calculation.rs` and
+  `slug-v1-archive:app/slug_analysis/src/analysis/toolchain_resolution.rs` only
+  as pattern sources; do not port Buck labels or V1 configuration identity.
 
 ### 6.2 Providers and Depsets
 
@@ -59,9 +85,14 @@ configuration transitions, toolchain resolution, and action declarations.
   collection API needed by the first rulesets.
 - Implement Bazel `depset` order, validation, flattening, equality constraints,
   and transitive nesting without implicit `transitive_set` coercion.
+- Store the transitive structure as an immutable shared nested DAG: composition
+  must not recursively copy children, and flattening is an explicit consuming
+  operation. Selectively extract the archived shared traversal/depth lessons
+  named above while keeping the Bazel depset facade V2-owned.
 - Initial modules: `app/slug_build_api_v2/src/{ctx.rs,attrs.rs,providers.rs,runfiles.rs,depset.rs}`.
-- Extraction candidates are V1 depset/provider tests and implementation
-  details, but public types must be Bazel-shaped and Stage-3 label based.
+- Extraction candidates are the archived V1 depset/provider tests and
+  implementation paths named above, but public types must be Bazel-shaped and
+  Stage-3 label based.
 
 ### 6.3 Rule Implementation Context
 
@@ -122,6 +153,8 @@ configuration transitions, toolchain resolution, and action declarations.
   failures, nested depsets, duplicate handling, and flattening order.
 - `depset-orders-and-rejections` fixture compares `to_list()` order and
   rejection diagnostics.
+- A focused structural test proves that combining nested depsets preserves
+  shared child-node identity and does not flatten or recursively clone the DAG.
 - `actions-api-basic` fixture declares write, run, run_shell, symlink, and
   expand_template actions and compares action IR to Bazel aquery where
   available.
@@ -144,6 +177,8 @@ configuration transitions, toolchain resolution, and action declarations.
 ## Acceptance Criteria
 
 - Custom Starlark rule fixtures produce the same providers/actions as Bazel.
+- Depset construction is cheap shared-DAG composition; flattening/copying is
+  confined to explicit Bazel-visible operations.
 - Toolchain and platform fixtures match Bazel for focused public examples.
 - Action declarations produce REAPI-ready command/input/output structures.
 - No analysis shortcut depends on Buck cells or direct filesystem scans outside
@@ -239,7 +274,7 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   addition to the incompatible `preorder`/`postorder` diagnostic.
   Validation: `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run
   --fixture depset-orders-and-rejections --tool bazel --bazel
-  C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120 --update-expected`;
+  <Bazel-9.1.1-binary> --timeout 120 --update-expected`;
   same command without `--update-expected`; `CARGO_TARGET_DIR=.codex-cargo-target
   CARGO_BUILD_JOBS=1 cargo test -p slug_build_api_v2 depset`; `py -3 -B -m
   tools.v2_oracle list`; bundled `pytest -q -p no:cacheprovider
