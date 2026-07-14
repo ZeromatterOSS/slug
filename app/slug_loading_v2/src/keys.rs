@@ -8,33 +8,64 @@
  * above-listed licenses.
  */
 
+use std::fmt;
+
+use allocative::Allocative;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::PackageIdentifier;
-use slug_identity_v2::RepositoryMappingId;
 
-use crate::load_label::LoadLabel;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct BzlParseKey {
-    pub label: LoadLabel,
+    pub workspace: std::path::PathBuf,
+    pub path: std::path::PathBuf,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+impl fmt::Display for BzlParseKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bzl-parse:{}", self.path.display())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct LoadLabelResolutionKey {
-    pub requesting_package: PackageIdentifier,
-    pub mapping_id: RepositoryMappingId,
-    pub load: LoadLabel,
+    pub workspace: std::path::PathBuf,
+    pub requesting_package: std::path::PathBuf,
+    pub load: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+impl fmt::Display for LoadLabelResolutionKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "bzl-load-resolution:{}:{}",
+            self.requesting_package.display(),
+            self.load
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct BzlModuleEvalKey {
-    pub label: LoadLabel,
-    pub mapping_id: RepositoryMappingId,
+    pub workspace: std::path::PathBuf,
+    pub path: std::path::PathBuf,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+impl fmt::Display for BzlModuleEvalKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bzl-module-eval:{}", self.path.display())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct PackageLoadKey {
-    pub package: PackageIdentifier,
+    pub workspace: std::path::PathBuf,
+    pub package: std::path::PathBuf,
+}
+
+impl fmt::Display for PackageLoadKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "package-load:{}", self.package.display())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

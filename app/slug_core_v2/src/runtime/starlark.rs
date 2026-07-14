@@ -8,6 +8,17 @@
  * above-listed licenses.
  */
 
+use std::path::Path;
+
+use starlark::environment::Globals;
+use starlark::environment::GlobalsBuilder;
+use starlark::environment::Module;
+use starlark::eval::Evaluator;
+use starlark::starlark_module;
+use starlark::syntax::AstModule;
+use starlark::syntax::Dialect;
+use starlark::values::none::NoneType;
+
 pub trait StarlarkEvaluator {
     fn implementation_name(&self) -> &'static str;
 }
@@ -19,4 +30,36 @@ impl StarlarkEvaluator for DeferredStarlarkEvaluator {
     fn implementation_name(&self) -> &'static str {
         "starlark-rust-wrapper-pending"
     }
+}
+
+#[starlark_module]
+fn module_file_globals(globals: &mut GlobalsBuilder) {
+    fn module(name: String, version: Option<String>) -> anyhow::Result<NoneType> {
+        let _ = (name, version);
+        Ok(NoneType)
+    }
+}
+
+/// Evaluate one root-level file with the intentionally small V2 global set.
+///
+/// Full Bazel globals, `load()` resolution, and file dependency keys belong to
+/// Stages 4 and 5; this function only establishes the actual starlark-rust
+/// parse/evaluation boundary required by the first-build chain.
+pub(crate) fn evaluate_file(path: &Path, source: &str, is_module: bool) -> anyhow::Result<()> {
+    let ast = AstModule::parse(
+        &path.display().to_string(),
+        source.to_owned(),
+        &Dialect::Standard,
+    )
+    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let globals = if is_module {
+        GlobalsBuilder::standard().with(module_file_globals).build()
+    } else {
+        Globals::standard()
+    };
+    let module = Module::new();
+    Evaluator::new(&module)
+        .eval_module(ast, &globals)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    Ok(())
 }

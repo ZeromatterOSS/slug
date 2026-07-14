@@ -7,5 +7,15 @@ repository = { workspace = true }
 version = "0.1.0"
 
 [dependencies]
+allocative = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+dice = { workspace = true }
+dice_futures = { workspace = true }
+dupe = { workspace = true }
 globset = { workspace = true }
 slug_identity_v2 = { workspace = true }
+sha2 = { workspace = true }
+starlark = { workspace = true }
+starlark_map = { workspace = true }
+tokio = { workspace = true }

@@ -9,6 +9,8 @@ version = "0.1.0"
 [dependencies]
 slug_commands_v2 = { workspace = true }
 slug_core_v2 = { workspace = true }
+slug_reapi_v2 = { workspace = true }
+tokio = { workspace = true }
 
 [[bin]]
 name = "slug"

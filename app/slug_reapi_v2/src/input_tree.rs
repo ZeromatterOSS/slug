@@ -12,28 +12,21 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
+use prost::Message;
 use slug_build_api_v2::ActionInput;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ParamFile;
 use slug_build_api_v2::ParamFileFormat;
 
+use crate::command::digest_to_proto;
 use crate::digest::ReapiDigest;
+use crate::proto;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputTreeEntryKind {
     Input,
     Tool,
     ParamFile,
-}
-
-impl InputTreeEntryKind {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Input => "input",
-            Self::Tool => "tool",
-            Self::ParamFile => "paramfile",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -63,16 +56,36 @@ impl ReapiInputTreeEntry {
     pub fn kind(&self) -> InputTreeEntryKind {
         self.kind
     }
-
-    fn stable_serialize(&self) -> String {
-        format!("{} {} {}", self.kind.as_str(), self.path, self.digest)
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ReapiInputTree {
     entries: Vec<ReapiInputTreeEntry>,
     root_digest: ReapiDigest,
+    directory_blobs: Vec<ReapiBlob>,
+    inline_blobs: Vec<ReapiBlob>,
+}
+
+/// A byte-bearing REAPI CAS object owned by the action projection.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ReapiBlob {
+    digest: ReapiDigest,
+    data: Vec<u8>,
+}
+
+impl ReapiBlob {
+    pub fn from_bytes(data: Vec<u8>) -> Self {
+        let digest = ReapiDigest::of_bytes(&data);
+        Self { digest, data }
+    }
+
+    pub fn digest(&self) -> &ReapiDigest {
+        &self.digest
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
 }
 
 impl ReapiInputTree {
@@ -84,21 +97,26 @@ impl ReapiInputTree {
         for tool in action.tools() {
             insert_action_input(&mut entries, tool, InputTreeEntryKind::Tool)?;
         }
+        let mut inline_blobs = Vec::new();
         for param_file in action.param_files() {
             let content = render_param_file(param_file);
+            let blob = ReapiBlob::from_bytes(content.into_bytes());
             let entry = ReapiInputTreeEntry::new(
                 param_file.path().to_owned(),
-                ReapiDigest::of_bytes(content.as_bytes()),
+                blob.digest().clone(),
                 InputTreeEntryKind::ParamFile,
             );
             insert_entry(&mut entries, entry)?;
+            inline_blobs.push(blob);
         }
 
         let entries = entries.into_values().collect::<Vec<_>>();
-        let root_digest = root_digest(&entries);
+        let (root_digest, directory_blobs) = merkle_directories(&entries)?;
         Ok(Self {
             entries,
             root_digest,
+            directory_blobs,
+            inline_blobs,
         })
     }
 
@@ -110,12 +128,16 @@ impl ReapiInputTree {
         &self.root_digest
     }
 
-    pub fn stable_serialize(&self) -> String {
-        self.entries
-            .iter()
-            .map(ReapiInputTreeEntry::stable_serialize)
-            .collect::<Vec<_>>()
-            .join("\n")
+    /// Serialized Directory messages, from leaves to the root, that must be in
+    /// CAS before an Action can refer to `root_digest`.
+    pub fn directory_blobs(&self) -> &[ReapiBlob] {
+        &self.directory_blobs
+    }
+
+    /// Inline action inputs (currently param files) whose bytes are owned by
+    /// the action projection.
+    pub fn inline_blobs(&self) -> &[ReapiBlob] {
+        &self.inline_blobs
     }
 }
 
@@ -124,6 +146,7 @@ pub enum InputTreeError {
     MissingDigest { path: String },
     InvalidDigest { path: String, error: String },
     ConflictingPath { path: String },
+    InvalidPath { path: String },
 }
 
 impl fmt::Display for InputTreeError {
@@ -136,6 +159,10 @@ impl fmt::Display for InputTreeError {
             Self::ConflictingPath { path } => write!(
                 f,
                 "REAPI input path declared twice with different digests: {path}"
+            ),
+            Self::InvalidPath { path } => write!(
+                f,
+                "REAPI input path must contain non-empty normal segments: {path}"
             ),
         }
     }
@@ -169,6 +196,7 @@ fn insert_entry(
     entries: &mut BTreeMap<String, ReapiInputTreeEntry>,
     entry: ReapiInputTreeEntry,
 ) -> Result<(), InputTreeError> {
+    validate_path(entry.path())?;
     match entries.get(entry.path()) {
         Some(existing) if existing.digest() != entry.digest() => {
             Err(InputTreeError::ConflictingPath {
@@ -183,15 +211,79 @@ fn insert_entry(
     }
 }
 
-fn root_digest(entries: &[ReapiInputTreeEntry]) -> ReapiDigest {
-    ReapiDigest::of_bytes(
-        entries
-            .iter()
-            .map(ReapiInputTreeEntry::stable_serialize)
-            .collect::<Vec<_>>()
-            .join("\n")
-            .as_bytes(),
-    )
+#[derive(Default)]
+struct DirectoryBuilder {
+    files: BTreeMap<String, ReapiDigest>,
+    directories: BTreeMap<String, DirectoryBuilder>,
+}
+
+fn merkle_directories(
+    entries: &[ReapiInputTreeEntry],
+) -> Result<(ReapiDigest, Vec<ReapiBlob>), InputTreeError> {
+    let mut root = DirectoryBuilder::default();
+    for entry in entries {
+        let mut segments = entry.path().split('/').peekable();
+        let mut directory = &mut root;
+        while let Some(segment) = segments.next() {
+            if segments.peek().is_none() {
+                if directory.directories.contains_key(segment)
+                    || directory
+                        .files
+                        .insert(segment.to_owned(), entry.digest().clone())
+                        .is_some()
+                {
+                    return Err(InputTreeError::ConflictingPath {
+                        path: entry.path().to_owned(),
+                    });
+                }
+            } else {
+                directory = directory.directories.entry(segment.to_owned()).or_default();
+            }
+        }
+    }
+
+    let mut blobs = Vec::new();
+    let root = serialize_directory(&root, &mut blobs);
+    Ok((root, blobs))
+}
+
+fn serialize_directory(directory: &DirectoryBuilder, blobs: &mut Vec<ReapiBlob>) -> ReapiDigest {
+    let directories = directory
+        .directories
+        .iter()
+        .map(|(name, child)| proto::DirectoryNode {
+            name: name.clone(),
+            digest: Some(digest_to_proto(&serialize_directory(child, blobs))),
+        })
+        .collect();
+    let files = directory
+        .files
+        .iter()
+        .map(|(name, digest)| proto::FileNode {
+            name: name.clone(),
+            digest: Some(digest_to_proto(digest)),
+            is_executable: false,
+        })
+        .collect();
+    let blob = ReapiBlob::from_bytes(proto::Directory { files, directories }.encode_to_vec());
+    let digest = blob.digest().clone();
+    blobs.push(blob);
+    digest
+}
+
+fn validate_path(path: &str) -> Result<(), InputTreeError> {
+    if path.is_empty()
+        || path.starts_with('/')
+        || path.ends_with('/')
+        || path
+            .split('/')
+            .any(|segment| segment.is_empty() || matches!(segment, "." | ".."))
+    {
+        return Err(InputTreeError::InvalidPath {
+            path: path.to_owned(),
+        });
+    }
+    Ok(())
 }
 
 fn render_param_file(param_file: &ParamFile) -> String {

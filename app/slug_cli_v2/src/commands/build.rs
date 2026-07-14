@@ -10,8 +10,180 @@
 
 use slug_commands_v2::CommandKind;
 use slug_commands_v2::build::BuildRequest;
+use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::evaluate_workspace_targets;
+use slug_reapi_v2::RemoteConfig;
+use slug_reapi_v2::RemoteMode;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    let result = BuildRequest::parse(&argv).map(|request| request.placeholder_error());
-    super::emit_result(CommandKind::Build, argv, result)
+    let request = match BuildRequest::parse(&argv) {
+        Ok(request) => request,
+        Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
+    };
+    let workspace = match std::env::current_dir() {
+        Ok(workspace) => workspace,
+        Err(error) => {
+            eprintln!(
+                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
+                json_escape(&error.to_string())
+            );
+            return 2;
+        }
+    };
+
+    match evaluate_workspace_targets(&workspace, &request.targets) {
+        Ok(evaluation) => {
+            let argv_json = argv
+                .iter()
+                .map(|arg| format!("\"{}\"", json_escape(arg)))
+                .collect::<Vec<_>>()
+                .join(",");
+            let analyzed_target_count = evaluation
+                .packages
+                .iter()
+                .filter(|package| package.analysis.is_some())
+                .count();
+            let declared_action_count = evaluation
+                .packages
+                .iter()
+                .filter_map(|package| package.analysis.as_ref())
+                .map(|analysis| analysis.actions().len())
+                .sum::<usize>();
+            let completed_boundary = if analyzed_target_count == 0 {
+                "dice_starlark_package_loading"
+            } else {
+                "dice_starlark_rule_analysis"
+            };
+            let remote_args = argv.iter().map(String::as_str).collect::<Vec<_>>();
+            let remote = match RemoteConfig::from_args(&remote_args) {
+                Ok(remote) => remote,
+                Err(error) => {
+                    eprintln!(
+                        "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
+                        json_escape(&error.to_string())
+                    );
+                    return 2;
+                }
+            };
+            if remote.mode() == RemoteMode::Execute {
+                return run_reapi_build(
+                    &workspace,
+                    &evaluation,
+                    analyzed_target_count,
+                    declared_action_count,
+                    &remote,
+                );
+            }
+            eprintln!(
+                "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"argv\":[{}],\"target_count\":{},\"loaded_package_count\":{},\"analyzed_target_count\":{},\"declared_action_count\":{},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"{}\"}}",
+                argv_json,
+                request.targets.len(),
+                evaluation.packages.len(),
+                analyzed_target_count,
+                declared_action_count,
+                completed_boundary,
+            );
+            2
+        }
+        Err(error) => {
+            eprintln!(
+                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
+                json_escape(&error.to_string())
+            );
+            2
+        }
+    }
+}
+
+fn run_reapi_build(
+    workspace: &std::path::Path,
+    evaluation: &slug_core_v2::runtime::WorkspaceBuildEvaluation,
+    analyzed_target_count: usize,
+    declared_action_count: usize,
+    remote: &RemoteConfig,
+) -> i32 {
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            eprintln!(
+                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
+                json_escape(&error.to_string())
+            );
+            return 2;
+        }
+    };
+    let output_root = workspace.join("bazel-bin");
+    let execution = runtime.block_on(async {
+        let mut reapi_actions = 0_u64;
+        let mut direct_local_actions = 0_u64;
+        let mut uploaded_digests = 0_usize;
+        let mut materialized_outputs = 0_usize;
+        let mut ac_hits = 0_u64;
+        let mut ac_misses = 0_u64;
+        for package in &evaluation.packages {
+            let Some(analysis) = &package.analysis else {
+                continue;
+            };
+            for action in analysis.actions() {
+                let result = slug_reapi_v2::execute_action(remote, action)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                slug_reapi_v2::materialize_outputs(&output_root, &result)
+                    .map_err(|error| error.to_string())?;
+                reapi_actions += result.evidence.reapi_actions;
+                direct_local_actions += result.evidence.direct_local_actions;
+                uploaded_digests += result.evidence.uploaded_digests.len();
+                materialized_outputs += result.evidence.materialized_outputs.len();
+                ac_hits += result.evidence.ac_hits;
+                ac_misses += result.evidence.ac_misses;
+            }
+        }
+        Ok::<_, String>((
+            reapi_actions,
+            direct_local_actions,
+            uploaded_digests,
+            materialized_outputs,
+            ac_hits,
+            ac_misses,
+        ))
+    });
+    match execution {
+        Ok((
+            reapi_actions,
+            direct_local_actions,
+            uploaded_digests,
+            materialized_outputs,
+            ac_hits,
+            ac_misses,
+        )) if reapi_actions > 0 => {
+            eprintln!(
+                "{{\"success\":true,\"command\":\"build\",\"analyzed_target_count\":{},\"declared_action_count\":{},\"reapi_actions\":{},\"direct_local_actions\":{},\"uploaded_digest_count\":{},\"materialized_output_count\":{},\"ac_hits\":{},\"ac_misses\":{},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"reapi_native_execution\"}}",
+                analyzed_target_count,
+                declared_action_count,
+                reapi_actions,
+                direct_local_actions,
+                uploaded_digests,
+                materialized_outputs,
+                ac_hits,
+                ac_misses,
+            );
+            0
+        }
+        Ok(_) => {
+            eprintln!(
+                "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"message\":\"no executable actions were declared\",\"runtime_mode\":\"one-shot\"}}"
+            );
+            2
+        }
+        Err(error) => {
+            eprintln!(
+                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
+                json_escape(&error)
+            );
+            2
+        }
+    }
 }

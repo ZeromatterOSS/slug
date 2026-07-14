@@ -1,12 +1,12 @@
 [fixture]
 name = "simple-rule-action"
 description = "A custom Starlark rule declares and writes one output file."
-comparison = "exact"
+comparison = "semantic"
 manifest_roots = ["bazel-bin/pkg"]
-oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected; manifest should contain the declared output."
+oracle_notes = "Bazel progress output is volatile; compare the declared output manifest and digest generated with upstream Bazel 9."
 
 [[commands]]
 name = "build_write_file"
 argv = ["build", "//pkg:write_file"]
-compare = "exact"
+compare = "semantic"
 expected_exit = 0

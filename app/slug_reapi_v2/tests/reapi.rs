@@ -10,15 +10,18 @@
 
 use std::collections::BTreeMap;
 
+use prost::Message;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_reapi_v2::ExecutionEvidence;
+use slug_reapi_v2::GeneratedOutput;
 use slug_reapi_v2::ReapiActionIdentity;
 use slug_reapi_v2::ReapiCommand;
 use slug_reapi_v2::ReapiDigest;
 use slug_reapi_v2::RemoteConfig;
+use slug_reapi_v2::RemoteExecutionResult;
 use slug_reapi_v2::RemoteMode;
 
 #[test]
@@ -85,7 +88,106 @@ fn action_ir_projects_to_reapi_command_and_identity() {
         identity.command_digest.hash(),
         identity.input_root_digest.hash()
     );
-    assert!(identity.stable_serialize().contains("timeout=Some(30)"));
+    assert_ne!(
+        identity.action_digest.hash(),
+        identity.command_digest.hash()
+    );
+    let action = slug_reapi_v2::proto::Action::decode(identity.action_bytes()).unwrap();
+    assert_eq!(
+        action.command_digest.unwrap().hash,
+        identity.command_digest.hash()
+    );
+    assert_eq!(
+        action.input_root_digest.unwrap().hash,
+        identity.input_root_digest.hash()
+    );
+    assert_eq!(action.timeout.unwrap().seconds, 30);
+    assert_eq!(
+        action.platform.unwrap().properties[0].name,
+        "container-image"
+    );
+}
+
+#[test]
+fn declarative_write_action_lowers_to_a_remote_shell_command() {
+    let action = ActionSpec::new(
+        ActionKind::Write {
+            content: "hello from reapi\n".to_owned(),
+            is_executable: false,
+        },
+        "FileWrite",
+        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+    );
+
+    let command = ReapiCommand::for_execution(&action).unwrap();
+    assert_eq!(command.argv[..2], ["sh", "-c"]);
+    assert!(command.argv[2].contains("pkg/out.txt"));
+    assert!(command.argv[2].contains("hello from reapi"));
+}
+
+#[test]
+fn verified_remote_outputs_materialize_beneath_the_requested_root() {
+    let root = std::env::temp_dir().join(format!("slug-reapi-test-{}", std::process::id()));
+    let output = GeneratedOutput::new("pkg/out.txt", ReapiDigest::of_bytes(b"materialized"));
+    let execution = RemoteExecutionResult {
+        action_digest: ReapiDigest::of_bytes(b"action"),
+        result: slug_reapi_v2::ActionResult::new(vec![output]),
+        output_blobs: [("pkg/out.txt".to_owned(), b"materialized".to_vec())]
+            .into_iter()
+            .collect(),
+        evidence: ExecutionEvidence::reapi("nativelink"),
+    };
+
+    slug_reapi_v2::materialize_outputs(&root, &execution).unwrap();
+    assert_eq!(
+        std::fs::read(root.join("pkg/out.txt")).unwrap(),
+        b"materialized"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires a locally running NativeLink REAPI service"]
+async fn native_link_executes_uploaded_write_action_and_materializes_output() {
+    let endpoint = std::env::var("SLUG_V2_NATIVELINK_ENDPOINT")
+        .expect("SLUG_V2_NATIVELINK_ENDPOINT points at the local NativeLink server");
+    let config = RemoteConfig {
+        executor: Some(endpoint),
+        cache: None,
+        instance_name: None,
+        headers: BTreeMap::new(),
+        timeout_seconds: Some(30),
+        retry_attempts: None,
+        default_exec_properties: BTreeMap::new(),
+    };
+    let action = ActionSpec::new(
+        ActionKind::Write {
+            content: "hello from NativeLink\n".to_owned(),
+            is_executable: false,
+        },
+        "FileWrite",
+        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+    );
+
+    let execution = slug_reapi_v2::execute_action(&config, &action)
+        .await
+        .unwrap();
+    assert_eq!(execution.evidence.executor_boundary, "reapi");
+    assert_eq!(execution.evidence.reapi_actions, 1);
+    assert_eq!(execution.evidence.direct_local_actions, 0);
+    assert_eq!(execution.result.output_files().len(), 1);
+    assert_eq!(
+        execution.output_blobs.get("pkg/out.txt").unwrap(),
+        b"hello from NativeLink\n"
+    );
+
+    let root = std::env::temp_dir().join(format!("slug-nativelink-test-{}", std::process::id()));
+    slug_reapi_v2::materialize_outputs(&root, &execution).unwrap();
+    assert_eq!(
+        std::fs::read(root.join("pkg/out.txt")).unwrap(),
+        b"hello from NativeLink\n"
+    );
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
@@ -149,6 +251,21 @@ fn paramfiles_are_part_of_reapi_input_tree() {
             .any(|entry| entry.kind() == InputTreeEntryKind::ParamFile)
     );
     assert_ne!(tree.root_digest(), &ReapiDigest::of_bytes(b""));
+    assert_eq!(
+        tree.directory_blobs().last().unwrap().digest(),
+        tree.root_digest()
+    );
+    let root =
+        slug_reapi_v2::proto::Directory::decode(tree.directory_blobs().last().unwrap().data())
+            .unwrap();
+    assert_eq!(
+        root.directories
+            .iter()
+            .map(|directory| directory.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["pkg", "tools"]
+    );
+    assert_eq!(tree.inline_blobs().len(), 1);
 }
 
 #[test]
@@ -187,10 +304,9 @@ fn cas_upload_plan_is_digest_first_and_deduped() {
     let tree = ReapiInputTree::from_action(&action).unwrap();
 
     let plan = CasUploadPlan::from_missing(&tree, &[digest.clone(), tree.root_digest().clone()]);
-    assert_eq!(
-        plan.missing_blobs(),
-        &[tree.root_digest().clone(), digest.clone()]
-    );
+    let mut expected_missing = vec![tree.root_digest().clone(), digest.clone()];
+    expected_missing.sort();
+    assert_eq!(plan.missing_blobs(), expected_missing);
     assert_eq!(
         plan.uploaded_bytes(),
         tree.root_digest().size_bytes() + digest.size_bytes()

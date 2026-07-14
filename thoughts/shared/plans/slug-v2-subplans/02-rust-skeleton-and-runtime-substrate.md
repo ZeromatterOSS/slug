@@ -118,6 +118,37 @@ implemented in Stage 2.
 
 ## Checkpoint Evidence
 
+### Pending `WP-2-dice-starlark-root-evaluation` review — not accepted
+
+- Gate link: advances clauses 1 and 2 of the First Real Bazel Build gate only:
+  `slug build` opens a one-shot DICE transaction, then evaluates the root
+  `MODULE.bazel` and `BUILD.bazel` through starlark-rust. It does not yet load
+  packages, evaluate custom rules, declare actions, or execute REAPI.
+- Oracle first: Bazel 9.1.1 generated and then verified
+  `tests/v2_oracle/fixtures/simple-rule-action/expected/oracle.json`; it records
+  the declared `bazel-bin/pkg/write_file.txt` SHA-256
+  `dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49`.
+- Reuse audit: adopted retained `dice/dice` transaction/key APIs and retained
+  `starlark-rust` `AstModule`/`Evaluator` APIs behind V2-owned runtime types.
+  Inspected `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs`
+  as reference only and rejected its Buck-cell, package-label, file-ops, and
+  global-interpreter dependencies.
+- Scoped implementation: `slug_core_v2::runtime::evaluate_workspace` owns a
+  `WorkspaceEvaluationKey`, opens `Dice::builder()` with a real transaction,
+  and evaluates the root files. `slug build` now enters that boundary and
+  reports `analysis_not_implemented` only after successful evaluation.
+- Focused validation passed:
+  `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_core_v2 -p slug_cli_v2`
+  (2 runtime tests and 5 CLI tests); `scripts/v2_archive_status.sh`; and
+  `git diff --check`.
+- Pending reviewer decision: this packet has no recorded Sol acceptance and no
+  V2 commit yet, so it is not completed evidence and must not advance the
+  integration gate. Reviewer must confirm the V2-owned one-shot boundary and
+  approve the Stage 4/5 handoff before the status changes.
+- Residual risk: root file reads are one-shot key inputs, not yet Stage 4/5
+  tracked file/load dependencies; the temporary `module()` global is not the
+  Bazel MODULE API; custom-rule analysis and REAPI execution remain open.
+
 Stage 2 skeleton checkpoint:
 
 - Added `slug_core_v2` with build identity, structured planned-command errors,

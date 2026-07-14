@@ -295,3 +295,24 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   five fixtures; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo
   test -p slug_build_api_v2`; `py -3 -B -m tools.v2_oracle list`; bundled
   `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+- 2026-07-14 Stage 6 shared-depset correction: replaced the recursive
+  by-value `Depset<T>` storage with immutable `Arc` nodes and immutable child
+  slices. Composition now retains child identity and flattening remains the
+  only operation that walks the DAG. This follows the archived V1 nested-set
+  traversal lesson while retaining a V2 Bazel-shaped facade, and uses the
+  retained Buck2 `FxHashSet` traversal pattern rather than a new default
+  hasher. The focused structural regression proves two parents retain the
+  same child node; Bazel order, deduplication, compatibility, and depth tests
+  remain the contract.
+- 2026-07-14 Stage 6 first-rule-analysis packet: `rule(implementation=...)`
+  now retains its frozen Starlark closure through package loading. A V2-owned
+  evaluator invokes that closure with prepared `ctx.label`,
+  `ctx.actions.declare_file`, and `ctx.actions.write` values, turns declared
+  outputs into a `DefaultInfo.files` shared depset, and carries the action IR
+  into `slug build`. The context state lock is scoped only around synchronous
+  action-registry mutations and never crosses DICE or evaluator re-entry.
+  The rebuilt `simple-rule-action` smoke reports
+  `dice_starlark_rule_analysis`, `analyzed_target_count=1`, and
+  `declared_action_count=1`. This advances gate clause 2 but does not execute,
+  upload, materialize, or claim oracle parity for the output; those remain
+  Stage 7/integration work.

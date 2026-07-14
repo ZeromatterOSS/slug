@@ -89,7 +89,18 @@ impl GeneratedOutputReuploadPlan {
 
 fn required_blobs(input_tree: &ReapiInputTree) -> BTreeSet<ReapiDigest> {
     let mut blobs = BTreeSet::new();
-    blobs.insert(input_tree.root_digest().clone());
+    blobs.extend(
+        input_tree
+            .directory_blobs()
+            .iter()
+            .map(|blob| blob.digest().clone()),
+    );
+    blobs.extend(
+        input_tree
+            .inline_blobs()
+            .iter()
+            .map(|blob| blob.digest().clone()),
+    );
     for entry in input_tree.entries() {
         blobs.insert(entry.digest().clone());
     }

@@ -98,6 +98,17 @@ fn topological_order_delays_shared_dependencies() {
 }
 
 #[test]
+fn composition_retains_shared_child_nodes_without_recursive_cloning() {
+    let shared = leaf(DepsetOrder::Default, "shared");
+    let left = Depset::new(DepsetOrder::Default, s(&["left"]), vec![shared.clone()]).unwrap();
+    let right = Depset::new(DepsetOrder::Default, s(&["right"]), vec![shared.clone()]).unwrap();
+
+    assert!(left.transitive()[0].shares_node_with(&shared));
+    assert!(right.transitive()[0].shares_node_with(&shared));
+    assert!(left.transitive()[0].shares_node_with(&right.transitive()[0]));
+}
+
+#[test]
 fn depset_to_list_deduplicates_preserving_flatten_order() {
     let child = Depset::from_direct(DepsetOrder::Default, s(&["a", "b"])).unwrap();
     let parent = Depset::new(DepsetOrder::Default, s(&["a", "a"]), vec![child]).unwrap();

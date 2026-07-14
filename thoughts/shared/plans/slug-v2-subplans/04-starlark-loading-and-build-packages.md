@@ -117,6 +117,56 @@ Stage 4 Bazel oracle refresh:
 - Validation passed: `py -3 -B -m tools.v2_oracle run --fixture build-file-loading --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe`;
   same command for `load-invalidation` and `no-load-native-cc-library`; bundled
   `python.exe -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`.
+
+Stage 4 local `.bzl` DICE loading packet (pending review and commit):
+
+- Replaced the key-shaped `BzlParseKey`, `LoadLabelResolutionKey`, and
+  `BzlModuleEvalKey` scaffolding with real DICE keys. `BzlParseKey` owns the
+  source read and parse, resolution accepts root-repository `//pkg:file.bzl`
+  and package-relative `:file.bzl` forms, and evaluation recursively freezes
+  the loaded modules for starlark-rust's `FileLoader`.
+- `BzlModuleEvaluator` exposes an explicit file invalidation boundary. The
+  focused regression proves a transitive local load is reused until
+  `invalidate_path()` marks its parsed source key dirty, then proves the next
+  evaluation observes the edited invalid syntax. External-repository loading
+  remains rejected until the Stage 5 repository-mapping contract exists.
+- Reused retained Buck2-derived DICE `Key`/transaction and starlark-rust
+  `AstModule`/`FileLoader` primitives behind V2 workspace paths. The archived
+  V1 calculation delegate was reference-only: its Buck cells, package labels,
+  and filesystem APIs do not enter this boundary.
+- Validation: `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target
+  CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2` passed (9 tests), plus
+  `cargo fmt --check -p slug_loading_v2` and `git diff --check`.
+- This is not package loading or first-build acceptance: `BUILD` globals,
+  package construction, repo mappings, Slug CLI wiring, and the
+  `build-file-loading` Slug-vs-Bazel oracle comparison remain open.
+
+Stage 4 local package-loading packet (pending review and commit):
+
+- `PackageLoadKey` now evaluates a local `BUILD.bazel`/`BUILD` through the
+  same DICE-backed local `.bzl` graph, records `package()` visibility,
+  `exports_files`, `filegroup`, `alias`, and targets declared through a
+  generic `rule(implementation=...)` callable. The target declaration is the
+  boundary: rule implementations, providers, and depsets are explicitly
+  loading-only placeholders until Stage 6 configured-target analysis owns
+  them.
+- The V2 build command maps root-repository single-package patterns into this
+  evaluator and reports `dice_starlark_package_loading` before its intentional
+  `analysis_not_implemented` result. The existing simple action rule therefore
+  proves a real local `.bzl` rule definition and BUILD declaration are loaded,
+  without misrepresenting action execution as complete.
+- Validation: `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target
+  CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 -p slug_core_v2 -p
+  slug_cli_v2 --no-fail-fast` passed (14 loading, 2 runtime, and 6 CLI
+  integration tests). External repository loading, repo mappings, attributes,
+  glob consumption, same-daemon package invalidation, configured-target
+  analysis, and execution remain open.
+- The package result now has explicit watcher-facing invalidation boundaries:
+  `invalidate_path()` dirties a loaded `.bzl` parse key and recomputes its
+  dependent package, while `invalidate_package()` dirties a changed local
+  BUILD package. Focused regressions prove both transitions in one retained
+  evaluator; daemon ownership and filesystem watching remain later work.
+
 ## Exact Test Criteria
 
 - Oracle `build-file-loading` fixture covers `exports_files`, `filegroup`,

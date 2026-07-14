@@ -41,18 +41,43 @@ fn help_is_bazel_v2_specific() {
 }
 
 #[test]
-fn planned_build_preserves_unknown_bazel_flag() {
+fn simple_rule_fixture_enters_the_dice_starlark_runtime_before_analysis() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/simple-rule-action/workspace");
+
     let output = slug()
-        .args(["build", "//:x", "--unknown_flag"])
+        .current_dir(workspace)
+        .args(["build", "//pkg:write_file", "--unknown_flag"])
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("\"error\":\"planned_placeholder\""));
+    assert!(stderr.contains("\"error\":\"analysis_not_implemented\""));
     assert!(stderr.contains("\"command\":\"build\""));
-    assert!(stderr.contains("//:x"));
+    assert!(stderr.contains("\"target_count\":1"));
+    assert!(stderr.contains("//pkg:write_file"));
     assert!(stderr.contains("--unknown_flag"));
-    assert!(stderr.contains("\"owner_stage\":\"Stage 6/7\""));
+    assert!(stderr.contains("\"loaded_package_count\":1"));
+    assert!(stderr.contains("\"analyzed_target_count\":1"));
+    assert!(stderr.contains("\"declared_action_count\":1"));
+    assert!(stderr.contains("\"completed_boundary\":\"dice_starlark_rule_analysis\""));
+}
+
+#[test]
+fn build_file_loading_fixture_reaches_package_loading_before_analysis() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/build-file-loading/workspace");
+
+    let output = slug()
+        .current_dir(workspace)
+        .args(["build", "//pkg:fg"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("\"error\":\"analysis_not_implemented\""));
+    assert!(stderr.contains("\"loaded_package_count\":1"));
+    assert!(stderr.contains("\"completed_boundary\":\"dice_starlark_package_loading\""));
 }
 
 #[test]

@@ -217,6 +217,21 @@ Stage 1 command environment checkpoint:
   and compared with `BZLMOD_ALLOW_YANKED_VERSIONS` set through the command
   environment.
 
+Stage 1 simple-rule-action oracle checkpoint:
+
+- Generated `tests/v2_oracle/fixtures/simple-rule-action/expected/oracle.json`
+  with local Bazel 9.1.1, then reran the fixture successfully without
+  `--update-expected`. The generated manifest contains only
+  `bazel-bin/pkg/write_file.txt` with SHA-256
+  `dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49`.
+- Corrected this fixture from `exact` to `semantic`: Bazel server/progress
+  stderr and action-count summaries vary across cold and warm runs, while the
+  declared output manifest/digest is the intended exact oracle fact. The
+  harness still compares that manifest exactly.
+- The standard-library fixture listing passed. The focused pytest suite was not
+  available in this Linux environment because `pytest` is not installed; this
+  is a validation-environment gap, not a claim of test success.
+
 ## Validation
 
 ### Runnable Current-Checkout Validation

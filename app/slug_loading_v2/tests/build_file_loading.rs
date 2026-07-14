@@ -2,6 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::PackageTarget;
+use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::file_discovery::BUILD_FILE_FALLBACK;
 use slug_loading_v2::file_discovery::BUILD_FILE_PRIMARY;
 use slug_loading_v2::file_discovery::MODULE_FILE;
@@ -57,4 +60,86 @@ fn build_file_discovery_is_bazel_only() {
 fn recognizes_bzl_extension_only() {
     assert!(is_bzl_file(&PathBuf::from("defs.bzl")));
     assert!(!is_bzl_file(&PathBuf::from("defs.star")));
+}
+
+#[test]
+fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
+    let workspace = scratch("package-load");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def make_export(name, src):\n    native.exports_files([src])\n    native.filegroup(name = name, srcs = [src])\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"make_export\")\npackage(default_visibility = [\"//visibility:public\"])\nexports_files([\"data.txt\"])\nfilegroup(name = \"fg\", srcs = [\"data.txt\"])\nalias(name = \"alias_fg\", actual = \":fg\")\nmake_export(name = \"macro_file\", src = \"macro.txt\")\n",
+    )
+    .unwrap();
+
+    let evaluator = BzlModuleEvaluator::new(&workspace).unwrap();
+    let loaded = evaluator.evaluate_package(&package).unwrap();
+
+    assert_eq!(loaded.default_visibility, vec!["//visibility:public"]);
+    assert_eq!(
+        loaded.targets,
+        vec![
+            PackageTarget {
+                name: "data.txt".to_owned(),
+                kind: PackageTargetKind::ExportedFile,
+            },
+            PackageTarget {
+                name: "fg".to_owned(),
+                kind: PackageTargetKind::Filegroup {
+                    srcs: vec!["data.txt".to_owned()],
+                },
+            },
+            PackageTarget {
+                name: "alias_fg".to_owned(),
+                kind: PackageTargetKind::Alias {
+                    actual: ":fg".to_owned(),
+                },
+            },
+            PackageTarget {
+                name: "macro.txt".to_owned(),
+                kind: PackageTargetKind::ExportedFile,
+            },
+            PackageTarget {
+                name: "macro_file".to_owned(),
+                kind: PackageTargetKind::Filegroup {
+                    srcs: vec!["macro.txt".to_owned()],
+                },
+            },
+        ]
+    );
+}
+
+#[test]
+fn package_load_registers_a_generic_starlark_rule_without_executing_it() {
+    let workspace = scratch("rule-load");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name + \".txt\")\n    return [DefaultInfo(files = depset([out]))]\n\nexample = rule(implementation = _impl)\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"example\")\nexample(name = \"registered\", arbitrary_attribute = \"kept for analysis\")\n",
+    )
+    .unwrap();
+
+    let evaluator = BzlModuleEvaluator::new(&workspace).unwrap();
+    let loaded = evaluator.evaluate_package(&package).unwrap();
+
+    assert_eq!(loaded.targets.len(), 1,);
+    assert_eq!(loaded.targets[0].name, "registered");
+    assert!(matches!(
+        loaded.targets[0].kind,
+        PackageTargetKind::StarlarkRule(_)
+    ));
 }

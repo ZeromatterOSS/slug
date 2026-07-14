@@ -8,11 +8,13 @@
  * above-listed licenses.
  */
 
-use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
 use std::hash::Hash;
 use std::str::FromStr;
+use std::sync::Arc;
+
+use fxhash::FxHashSet;
 
 pub const MAX_DEPTH: usize = 3500;
 
@@ -94,19 +96,31 @@ impl Error for DepsetError {}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Depset<T> {
+    node: Arc<DepsetNode<T>>,
+}
+
+/// Immutable shared node for Bazel depsets.
+///
+/// Composition only clones `Arc` pointers to child nodes. Flattening is the
+/// explicit consuming operation in [`Depset::to_list`], matching the V1
+/// nested-set traversal lesson without retaining its Buck-facing types.
+#[derive(Debug, Eq, PartialEq)]
+struct DepsetNode<T> {
     order: DepsetOrder,
-    direct: Vec<T>,
-    transitive: Vec<Depset<T>>,
+    direct: Arc<[T]>,
+    transitive: Arc<[Depset<T>]>,
     depth: usize,
 }
 
 impl<T> Depset<T> {
     pub fn empty() -> Self {
         Self {
-            order: DepsetOrder::Default,
-            direct: Vec::new(),
-            transitive: Vec::new(),
-            depth: 0,
+            node: Arc::new(DepsetNode {
+                order: DepsetOrder::Default,
+                direct: Arc::from([]),
+                transitive: Arc::from([]),
+                depth: 0,
+            }),
         }
     }
 
@@ -116,10 +130,10 @@ impl<T> Depset<T> {
         transitive: Vec<Depset<T>>,
     ) -> Result<Self, DepsetError> {
         for child in &transitive {
-            if !order.compatible_with(child.order) {
+            if !order.compatible_with(child.order()) {
                 return Err(DepsetError::IncompatibleOrder {
                     parent: order,
-                    child: child.order,
+                    child: child.order(),
                 });
             }
         }
@@ -142,10 +156,12 @@ impl<T> Depset<T> {
         }
 
         Ok(Self {
-            order,
-            direct,
-            transitive,
-            depth,
+            node: Arc::new(DepsetNode {
+                order,
+                direct: Arc::from(direct),
+                transitive: Arc::from(transitive),
+                depth,
+            }),
         })
     }
 
@@ -154,23 +170,29 @@ impl<T> Depset<T> {
     }
 
     pub fn order(&self) -> DepsetOrder {
-        self.order
+        self.node.order
     }
 
     pub fn direct(&self) -> &[T] {
-        &self.direct
+        &self.node.direct
     }
 
     pub fn transitive(&self) -> &[Depset<T>] {
-        &self.transitive
+        &self.node.transitive
     }
 
     pub fn depth(&self) -> usize {
-        self.depth
+        self.node.depth
     }
 
     pub fn is_empty(&self) -> bool {
-        self.direct.is_empty() && self.transitive.iter().all(Depset::is_empty)
+        self.node.direct.is_empty() && self.node.transitive.iter().all(Depset::is_empty)
+    }
+
+    /// Whether two handles retain the same immutable nested-set node.
+    /// This is a structural performance invariant, not Bazel-visible equality.
+    pub fn shares_node_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.node, &other.node)
     }
 }
 
@@ -180,8 +202,8 @@ where
 {
     pub fn to_list(&self) -> Vec<T> {
         let mut out = Vec::new();
-        let mut seen = HashSet::new();
-        match self.order {
+        let mut seen = FxHashSet::default();
+        match self.order() {
             DepsetOrder::Default | DepsetOrder::Postorder => {
                 self.visit_postorder(&mut out, &mut seen)
             }
@@ -191,38 +213,38 @@ where
         out
     }
 
-    fn push_direct(&self, out: &mut Vec<T>, seen: &mut HashSet<T>) {
-        for item in &self.direct {
+    fn push_direct(&self, out: &mut Vec<T>, seen: &mut FxHashSet<T>) {
+        for item in self.node.direct.iter() {
             if seen.insert(item.clone()) {
                 out.push(item.clone());
             }
         }
     }
 
-    fn visit_postorder(&self, out: &mut Vec<T>, seen: &mut HashSet<T>) {
-        for child in &self.transitive {
+    fn visit_postorder(&self, out: &mut Vec<T>, seen: &mut FxHashSet<T>) {
+        for child in self.node.transitive.iter() {
             child.visit_postorder(out, seen);
         }
         self.push_direct(out, seen);
     }
 
-    fn visit_preorder(&self, out: &mut Vec<T>, seen: &mut HashSet<T>) {
+    fn visit_preorder(&self, out: &mut Vec<T>, seen: &mut FxHashSet<T>) {
         self.push_direct(out, seen);
-        for child in &self.transitive {
+        for child in self.node.transitive.iter() {
             child.visit_preorder(out, seen);
         }
     }
 
-    fn visit_topological(&self, out: &mut Vec<T>, seen: &mut HashSet<T>) {
+    fn visit_topological(&self, out: &mut Vec<T>, seen: &mut FxHashSet<T>) {
         self.push_direct(out, seen);
         self.visit_topological_children(out, seen);
     }
 
-    fn visit_topological_children(&self, out: &mut Vec<T>, seen: &mut HashSet<T>) {
-        for child in &self.transitive {
+    fn visit_topological_children(&self, out: &mut Vec<T>, seen: &mut FxHashSet<T>) {
+        for child in self.node.transitive.iter() {
             child.push_direct(out, seen);
         }
-        for child in &self.transitive {
+        for child in self.node.transitive.iter() {
             child.visit_topological_children(out, seen);
         }
     }

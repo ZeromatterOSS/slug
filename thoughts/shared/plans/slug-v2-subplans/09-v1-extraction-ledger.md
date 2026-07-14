@@ -438,6 +438,20 @@ git diff --check -- thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledg
 
 ## Landed Evidence
 
+### Stage 2 DICE and starlark-rust root-evaluation packet
+
+Status: Pending reviewer decision; not landed
+Source ref/commit(s): retained active-tree `dice/dice/src/{api/dice.rs,api/key.rs,api/computations.rs}` and `starlark-rust/starlark/src/{eval.rs,eval/runtime/evaluator.rs}`; inspected `slug-v1-archive^{commit}:app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs` at `e218054d4c796655939b968d90208b185decb352`
+V2 commit(s): none; current worktree only, so this entry is deliberately not an accepted extraction record
+Source class: retained Buck2-derived runtime plus V1 reference-only interpreter delegate
+Reusable primitive or lesson: use a real `Dice` transaction and `Key`, then `AstModule` plus `Evaluator::eval_module`; keep the runtime wrapper V2-owned
+V2 wrapper/boundary: `slug_core_v2::runtime::evaluate_workspace` and `WorkspaceEvaluationKey`; CLI dispatch reaches this boundary before analysis
+Bazel oracle: Bazel 9.1.1 generated `simple-rule-action` expected result, including declared output digest `dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49`
+V2 fixture: `simple-rule-action`; it is oracle-ready but cannot yet run under Slug because Stage 4/6/7 semantics are not connected
+Validation: `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_core_v2 -p slug_cli_v2`; `scripts/v2_archive_status.sh`; `git diff --check`
+Decision pending: adopt retained DICE/starlark-rust primitives; V1 delegate is reference-only/rejected for Buck cells, package labels, file-ops, and global interpreter state; await Sol acceptance before moving this entry to Partially landed
+Residual risk: no DICE-tracked root-file dependencies or same-daemon invalidation, no Bazel-shaped globals/load graph, no configured target/action path, and no REAPI execution
+
 ### Stage 6 depset/provider/rule context tests
 
 Status: Partially landed
@@ -446,9 +460,39 @@ Source inspected: `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule
 Bazel oracle: Bazel 9.1 depset/provider probe expectations captured in the V1 tests plus V2 oracle fixture scaffolds
 V2 fixture: `depset-orders-and-rejections`, `custom-rule-analysis-basic`, `ctx-attrs-files-executable`, `default-info-runfiles-executable`, `provider-output-group-basic`
 Expected evidence artifact: Stage 1 oracle expected output remains placeholder until V2 configured-target analysis can execute fixtures
-Implementation summary: Rewrote behavior into V2 depset/provider/context substrates without importing V1 Buck labels, `transitive_set` coercions, or direct-local assumptions; shared-DAG storage and traversal remain open
-Validation: `cargo test -p slug_build_api_v2`; `cargo test -p slug_analysis_v2`; `py -3 -B tools/v2_oracle list`; Stage 6 shortcut grep recorded in `06-analysis-toolchains-and-actions.md`
-Residual risk: shared-DAG storage/traversal, Starlark evaluator integration, and Bazel-generated oracle outputs are still pending
+Implementation summary: Rewrote behavior into V2 depset/provider/context substrates without importing V1 Buck labels, `transitive_set` coercions, or direct-local assumptions. On 2026-07-14, replaced recursive by-value depset storage with immutable shared `Arc` nodes and child slices; composition preserves child identity and flattening is explicit. Retained Buck2 `FxHashSet` is used only for flattening deduplication. The V1 nested-set sources remain behavior/reference inputs, not imported Buck-facing code.
+Validation: `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_build_api_v2 depset --no-fail-fast`; the focused structural regression proves shared child identity; `cargo test -p slug_analysis_v2`; `py -3 -B tools/v2_oracle list`; Stage 6 shortcut grep recorded in `06-analysis-toolchains-and-actions.md`
+Residual risk: Starlark evaluator integration and Slug-side Bazel oracle execution remain pending
+
+### Stage 6 first-rule analysis handoff
+
+Status: Pending reviewer decision; current worktree only
+Source inspected: `slug-v1-archive:app/slug_interpreter_for_build/src/rule.rs`
+for the frozen rule-callable lifecycle; retained
+`starlark-rust/starlark/src/eval.rs` for `Evaluator::eval_function`; retained
+Buck2 `starlark_map` and DICE primitives remain the only runtime imports
+V2 wrapper/boundary: `slug_loading_v2::StarlarkRuleImplementation` retains a
+frozen implementation with the loaded package; `slug_analysis_v2::analyze_loaded_rule`
+owns the prepared-context evaluation and produces the existing V2
+`AnalysisResult`/`DefaultInfo`/`ActionSpec` values
+Validation: focused analysis regression; clean rebuilt CLI smoke from
+`tests/v2_oracle/fixtures/simple-rule-action/workspace` emitted
+`dice_starlark_rule_analysis` with one analyzed target and one declared action
+Decision: retain V1's freeze-before-call lesson only. Do not import V1 rule
+IDs, Buck labels, global interpreter context, or action registry.
+Residual risk: Starlark `DefaultInfo`/`depset` return values are placeholders
+while the first vertical derives `DefaultInfo.files` from declared outputs;
+full provider return decoding, attrs, DICE-owned configured-target keys, and
+Stage 7 execution remain open.
+
+### Stage 7 protobuf/Merkle identity correction
+
+Status: Pending reviewer decision; current worktree only
+Source inspected: Bazel `third_party/remoteapis/build/bazel/remote/execution/v2/remote_execution.proto` at local `3579084382`, specifically the `Action`, `Command`, `Platform`, and canonical `Directory` contracts; `slug-v1-archive:app/slug_execute/src/execute/action_digest_and_blobs.rs`
+V2 wrapper/boundary: `slug_reapi_v2::{command,input_tree,proto,executor}` owns a narrow wire-compatible REAPI v2 subset. It serializes `Command`/`Action`, builds child-first `Directory` blobs from normal path segments, drives CAS discovery/upload and Execution, verifies/downloads returned outputs, and exposes the V2-owned materializer to `slug_cli_v2` for `bazel-bin` output paths.
+Reusable primitive or lesson: retain V1's protobuf-blob assembly boundary and Bazel's canonical ordering rules; do not retain V1 Buck executor settings, path vocabulary, or the provisional V2 debug/text digest.
+Validation: a real local NativeLink CAS/AC/Execution/worker process passed the focused ignored write-action smoke through V2 `FindMissingBlobs`, `BatchUpdateBlobs`, `Execute`, output download, digest verification, and materialization; `cargo test -p slug_reapi_v2 --no-fail-fast` passed 13 non-backend tests; `cargo check -p slug_cli_v2`; `cargo fmt --check`; `git diff --check`.
+Residual risk: Stage 1 has not yet driven this path through its checked-in oracle fixture. Headers/TLS/retries, directory outputs, durable remote/local AC replay, generated-output reupload, and same-daemon invalidation remain open.
 
 ### Stage 8 public ruleset fixtures
 

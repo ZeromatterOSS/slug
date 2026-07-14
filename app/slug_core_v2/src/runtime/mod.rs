@@ -13,6 +13,11 @@ pub mod events;
 pub mod reapi;
 pub mod starlark;
 
+pub use dice::WorkspaceBuildEvaluation;
+pub use dice::WorkspaceEvaluation;
+pub use dice::evaluate_workspace;
+pub use dice::evaluate_workspace_targets;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeMode {
     OneShot,

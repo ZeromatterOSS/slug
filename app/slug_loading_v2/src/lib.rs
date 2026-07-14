@@ -15,3 +15,9 @@ pub mod globals;
 pub mod keys;
 pub mod load_label;
 pub mod package;
+
+pub use bzl_module::BzlModuleEvaluator;
+pub use bzl_module::EvaluatedBzlModule;
+pub use package::LoadedPackage;
+pub use package::PackageTarget;
+pub use package::PackageTargetKind;

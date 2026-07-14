@@ -12,6 +12,7 @@ pub mod configured_target;
 pub mod dice;
 pub mod key;
 pub mod result;
+pub mod starlark_rule;
 pub mod toolchains;
 
 pub use configured_target::ConfiguredDependency;
@@ -26,6 +27,7 @@ pub use key::ConfiguredTargetKey;
 pub use result::AnalysisDiagnostic;
 pub use result::AnalysisResult;
 pub use result::DiagnosticSeverity;
+pub use starlark_rule::analyze_loaded_rule;
 pub use toolchains::ConstraintSet;
 pub use toolchains::ConstraintSetting;
 pub use toolchains::ConstraintValue;

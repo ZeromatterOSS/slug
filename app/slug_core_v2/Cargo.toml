@@ -7,3 +7,16 @@ repository = { workspace = true }
 version = "0.1.0"
 
 [dependencies]
+allocative = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+dice = { workspace = true }
+dice_futures = { workspace = true }
+slug_identity_v2 = { workspace = true }
+slug_analysis_v2 = { workspace = true }
+slug_loading_v2 = { workspace = true }
+starlark = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

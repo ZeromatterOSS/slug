@@ -275,3 +275,35 @@ slug-v2-oracle validate-evidence /path/to/evidence.jsonl
   app/slug_reapi_v2 app/slug_analysis_v2 app/slug_build_api_v2` returned no
   matches. Durable SQLite persistence, remote AC service calls, daemon restart
   replay, and REAPI re-execution still require the Stage 7 backend harness.
+- 2026-07-14 Stage 7.3 protobuf/Merkle correction: replaced the provisional
+  debug/text command and flat-input identity with a wire-compatible REAPI v2
+  subset. `Command` and `Action` are encoded with their protocol field
+  numbers; `Action` owns the command, input-root, platform, and timeout fields.
+  Input paths now build canonical nested `Directory` messages, ordered by path,
+  and retain every directory plus inline-paramfile blob for CAS upload. This
+  follows Bazel `third_party/remoteapis/build/bazel/remote/execution/v2/
+  remote_execution.proto` (`Action`, `Command`, `Directory`, `Platform`), and
+  the blob-assembly boundary in
+  `slug-v1-archive:app/slug_execute/src/execute/action_digest_and_blobs.rs`.
+  Validation: `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target
+  CARGO_BUILD_JOBS=1 cargo test -p slug_reapi_v2 --no-fail-fast` passed 11
+  tests, including decoded Action fields and a nested `pkg`/`tools` Directory
+  regression; `cargo fmt --check`; `git diff --check`. This is only the
+  identity/CAS-object substrate: `FindMissingBlobs`, upload, Execute,
+  NativeLink acceptance, materialization, and AC service calls are still open.
+- 2026-07-14 Stage 7.3/7.4 first NativeLink execution slice: generated the
+  narrow REAPI v2 CAS/Execution client from a checked-in projection of Bazel's
+  protocol, then added V2-owned missing-blob discovery, batch upload, Execute
+  stream decoding, output download, digest verification, and safe
+  `bazel-bin` materialization. Declarative `ctx.actions.write` actions lower
+  to an uploaded shell command rather than running locally. The one-shot
+  `slug build --remote_executor=...` boundary now executes declared actions
+  through this client and reports REAPI evidence. Validation: a real
+  `../nativelink/target/release/nativelink` process using its local
+  CAS/AC/scheduler/worker configuration passed the ignored focused test
+  `native_link_executes_uploaded_write_action_and_materializes_output` with
+  one REAPI action, zero direct-local actions, and the materialized output
+  bytes. `cargo test -p slug_reapi_v2 --no-fail-fast` passed 13 non-backend
+  tests; `cargo check -p slug_cli_v2` passed. Remaining work is Stage 1 oracle
+  integration, request headers/TLS/retries, output-directory/tree handling,
+  durable AC replay, and same-daemon invalidation.

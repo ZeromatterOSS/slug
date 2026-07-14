@@ -10,10 +10,13 @@
 
 use std::collections::BTreeMap;
 
+use prost::Message;
+use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ReapiCommandProjection;
 
 use crate::digest::ReapiDigest;
+use crate::proto;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ReapiCommand {
@@ -36,28 +39,104 @@ impl ReapiCommand {
         }
     }
 
-    pub fn digest(&self) -> ReapiDigest {
-        ReapiDigest::of_bytes(self.stable_serialize().as_bytes())
+    /// Convert an action into a worker-executable command. The Stage 6 write
+    /// actions are still declarative, so this is the first V2-owned lowering
+    /// point rather than a direct-local shortcut.
+    pub fn for_execution(action: &ActionSpec) -> Result<Self, String> {
+        let mut command = Self::from_action(action);
+        if !command.argv.is_empty() {
+            return Ok(command);
+        }
+
+        let output = action
+            .outputs()
+            .first()
+            .ok_or_else(|| format!("{} declares no output", action.mnemonic()))?;
+        let parent = output
+            .path()
+            .rsplit_once('/')
+            .map_or(".", |(parent, _)| parent);
+        match action.kind() {
+            ActionKind::Write {
+                content,
+                is_executable,
+            } => {
+                let mut script = format!(
+                    "mkdir -p -- {} && printf %s {} > {}",
+                    shell_quote(parent),
+                    shell_quote(content),
+                    shell_quote(output.path())
+                );
+                if *is_executable {
+                    script.push_str(&format!(" && chmod +x -- {}", shell_quote(output.path())));
+                }
+                command.argv = vec!["sh".to_owned(), "-c".to_owned(), script];
+                Ok(command)
+            }
+            ActionKind::WriteJson { content } => {
+                command.argv = vec![
+                    "sh".to_owned(),
+                    "-c".to_owned(),
+                    format!(
+                        "mkdir -p -- {} && printf %s {} > {}",
+                        shell_quote(parent),
+                        shell_quote(content),
+                        shell_quote(output.path())
+                    ),
+                ];
+                Ok(command)
+            }
+            kind => Err(format!(
+                "REAPI execution lowering is not implemented for {kind:?}"
+            )),
+        }
     }
 
-    pub fn stable_serialize(&self) -> String {
-        format!(
-            "argv={:?};env={:?};files={:?};dirs={:?};platform={:?}",
-            self.argv,
-            self.env,
-            self.output_files,
-            self.output_directories,
-            self.platform_properties
-        )
+    pub fn serialized(&self) -> Vec<u8> {
+        self.to_proto().encode_to_vec()
     }
+
+    pub fn digest(&self) -> ReapiDigest {
+        ReapiDigest::of_bytes(&self.serialized())
+    }
+
+    fn to_proto(&self) -> proto::Command {
+        proto::Command {
+            arguments: self.argv.clone(),
+            environment_variables: self
+                .env
+                .iter()
+                .map(|(name, value)| proto::command::EnvironmentVariable {
+                    name: name.clone(),
+                    value: value.clone(),
+                })
+                .collect(),
+            output_files: self.output_files.clone(),
+            output_directories: self.output_directories.clone(),
+            // The v2.2 Action field is authoritative, but the protocol asks
+            // clients to also populate this retained Command field.
+            platform: Some(platform_from_properties(&self.platform_properties)),
+            output_paths: self
+                .output_files
+                .iter()
+                .chain(&self.output_directories)
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ReapiActionIdentity {
+    pub action_digest: ReapiDigest,
     pub command_digest: ReapiDigest,
     pub input_root_digest: ReapiDigest,
-    pub platform_digest: ReapiDigest,
     pub timeout_seconds: Option<u64>,
+    action_bytes: Vec<u8>,
 }
 
 impl ReapiActionIdentity {
@@ -66,20 +145,51 @@ impl ReapiActionIdentity {
         input_root_digest: ReapiDigest,
         timeout_seconds: Option<u64>,
     ) -> Self {
-        let platform_digest =
-            ReapiDigest::of_bytes(format!("{:?}", command.platform_properties).as_bytes());
+        let command_digest = command.digest();
+        let action = proto::Action {
+            command_digest: Some(digest_to_proto(&command_digest)),
+            input_root_digest: Some(digest_to_proto(&input_root_digest)),
+            timeout: timeout_seconds.map(|seconds| prost_types::Duration {
+                seconds: seconds.try_into().expect("timeout fits in i64"),
+                nanos: 0,
+            }),
+            do_not_cache: false,
+            salt: Vec::new(),
+            platform: Some(platform_from_properties(&command.platform_properties)),
+        };
+        let action_bytes = action.encode_to_vec();
         Self {
-            command_digest: command.digest(),
+            action_digest: ReapiDigest::of_bytes(&action_bytes),
+            command_digest,
             input_root_digest,
-            platform_digest,
             timeout_seconds,
+            action_bytes,
         }
     }
 
-    pub fn stable_serialize(&self) -> String {
-        format!(
-            "command={};input_root={};platform={};timeout={:?}",
-            self.command_digest, self.input_root_digest, self.platform_digest, self.timeout_seconds
-        )
+    pub fn action_bytes(&self) -> &[u8] {
+        &self.action_bytes
+    }
+}
+
+pub(crate) fn digest_to_proto(digest: &ReapiDigest) -> proto::Digest {
+    proto::Digest {
+        hash: digest.hash().to_owned(),
+        size_bytes: digest
+            .size_bytes()
+            .try_into()
+            .expect("REAPI digest size fits in i64"),
+    }
+}
+
+fn platform_from_properties(properties: &BTreeMap<String, String>) -> proto::Platform {
+    proto::Platform {
+        properties: properties
+            .iter()
+            .map(|(name, value)| proto::platform::Property {
+                name: name.clone(),
+                value: value.clone(),
+            })
+            .collect(),
     }
 }
