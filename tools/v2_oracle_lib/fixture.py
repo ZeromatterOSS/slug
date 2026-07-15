@@ -40,6 +40,13 @@ class FixtureCommand:
 
 
 @dataclass(frozen=True)
+class ReapiConfig:
+    remote_executor: bool = False
+    default_exec_properties: tuple[str, ...] = ()
+    worker_platform_properties: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Fixture:
     name: str
     root: Path
@@ -50,6 +57,7 @@ class Fixture:
     commands: tuple[FixtureCommand, ...] = field(default_factory=tuple)
     manifest_roots: tuple[str, ...] = ()
     oracle_notes: str = ""
+    reapi: ReapiConfig = field(default_factory=ReapiConfig)
 
     @property
     def expected_oracle(self) -> Path:
@@ -178,6 +186,25 @@ def load_fixture(path: Path) -> Fixture:
         commands=tuple(commands),
         manifest_roots=manifest_roots,
         oracle_notes=str(fixture_data.get("oracle_notes", "")),
+        reapi=_parse_reapi(raw.get("reapi")),
+    )
+
+
+def _parse_reapi(value: Any) -> ReapiConfig:
+    if value is None:
+        return ReapiConfig()
+    if not isinstance(value, dict):
+        raise ValueError("reapi must be a table")
+    remote_executor = bool(value.get("remote_executor", False))
+    exec_properties = _as_str_list(
+        value.get("default_exec_properties"), "reapi.default_exec_properties"
+    )
+    return ReapiConfig(
+        remote_executor=remote_executor,
+        default_exec_properties=exec_properties,
+        worker_platform_properties=_as_str_list(
+            value.get("worker_platform_properties"), "reapi.worker_platform_properties"
+        ),
     )
 
 

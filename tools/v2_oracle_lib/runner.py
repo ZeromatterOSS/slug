@@ -11,6 +11,7 @@ from typing import Any
 
 from .fixture import Fixture, FixtureCommand
 from .manifest import collect_manifest_roots
+from .nativelink import NativeLinkService, discover_nativelink_binary, start_nativelink, stop_nativelink
 from .normalize import normalize_text, path_replacements
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +71,35 @@ def _argv(tool: ToolConfig, command: FixtureCommand, output_base: Path) -> list[
     return [str(tool.executable), *command.argv]
 
 
+def _slug_reapi_argv(
+    argv: list[str],
+    service: NativeLinkService,
+    default_exec_properties: tuple[str, ...],
+) -> list[str]:
+    result = list(argv)
+    result.append(f"--remote_executor={service.endpoint}")
+    for prop in default_exec_properties:
+        result.append(f"--remote_default_exec_properties={prop}")
+    return result
+
+
+def _extract_reapi_evidence(stderr: str) -> dict[str, Any] | None:
+    # The slug build command emits one JSON object on stderr. The captured
+    # stderr string contains that object with quotes intact, so a direct
+    # json.loads on the last non-empty line is the robust extraction.
+    for line in reversed(stderr.splitlines()):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if parsed.get("completed_boundary") == "reapi_native_execution":
+            return parsed
+    return None
+
+
 def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict[str, Any]:
     run_id = time.strftime("%Y%m%d-%H%M%S") + f"-{os.getpid()}-{tool.name}"
     run_dir = options.run_root / "runs" / fixture.name / run_id
@@ -79,28 +109,48 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
     output_base.mkdir(parents=True, exist_ok=True)
     replacements = path_replacements(workspace=workspace, run_dir=run_dir, output_base=output_base)
 
-    records: list[dict[str, Any]] = []
-    for command in fixture.commands:
-        mutations = _apply_mutations(workspace, command)
-        argv = _argv(tool, command, output_base)
-        env = os.environ.copy()
-        env_overrides = dict(command.env)
-        env.update(env_overrides)
-        start = time.monotonic()
-        completed = subprocess.run(
-            argv,
-            cwd=workspace,
-            env=env,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=options.timeout_seconds,
-            check=False,
+    nativelink_service: NativeLinkService | None = None
+    if fixture.reapi.remote_executor and tool.name == "slug":
+        binary = discover_nativelink_binary()
+        if binary is None:
+            raise FileNotFoundError(
+                "fixture requires NativeLink but no binary was found; set "
+                "SLUG_V2_NATIVELINK_BIN or build ../nativelink/target/release/nativelink"
+            )
+        nativelink_service = start_nativelink(
+            binary,
+            run_dir / "nativelink",
+            fixture.reapi.worker_platform_properties,
         )
-        duration_ms = int((time.monotonic() - start) * 1000)
-        manifest_roots = command.manifest_roots or fixture.manifest_roots
-        records.append(
-            {
+
+    try:
+        records: list[dict[str, Any]] = []
+        for command in fixture.commands:
+            mutations = _apply_mutations(workspace, command)
+            argv = _argv(tool, command, output_base)
+            if nativelink_service is not None:
+                argv = _slug_reapi_argv(
+                    argv,
+                    nativelink_service,
+                    fixture.reapi.default_exec_properties,
+                )
+            env = os.environ.copy()
+            env_overrides = dict(command.env)
+            env.update(env_overrides)
+            start = time.monotonic()
+            completed = subprocess.run(
+                argv,
+                cwd=workspace,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=options.timeout_seconds,
+                check=False,
+            )
+            duration_ms = int((time.monotonic() - start) * 1000)
+            manifest_roots = command.manifest_roots or fixture.manifest_roots
+            record: dict[str, Any] = {
                 "name": command.name,
                 "argv": command.argv,
                 "executed_argv": argv,
@@ -116,7 +166,13 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
                 "mutations": mutations,
                 "manifest": collect_manifest_roots(workspace, manifest_roots),
             }
-        )
+            if nativelink_service is not None:
+                record["reapi_evidence"] = _extract_reapi_evidence(completed.stderr)
+                record["reapi_endpoint"] = nativelink_service.endpoint
+            records.append(record)
+    finally:
+        if nativelink_service is not None:
+            stop_nativelink(nativelink_service)
 
     result = {
         "schema_version": 1,

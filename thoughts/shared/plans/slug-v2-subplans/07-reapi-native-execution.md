@@ -307,3 +307,85 @@ slug-v2-oracle validate-evidence /path/to/evidence.jsonl
   tests; `cargo check -p slug_cli_v2` passed. Remaining work is Stage 1 oracle
   integration, request headers/TLS/retries, output-directory/tree handling,
   durable AC replay, and same-daemon invalidation.
+- 2026-07-14 Stage 7.8 oracle integration (gate clause 4): the
+  `simple-rule-action` fixture now drives the full REAPI boundary through the
+  Stage 1 oracle harness. Added `tools/v2_oracle_lib/nativelink.py` with
+  NativeLink binary discovery (`SLUG_V2_NATIVELINK_BIN` then sibling
+  `../nativelink/target/{release,smol,debug}/nativelink`), local CAS/AC/
+  scheduler/worker config generation, startup readiness polling, and teardown.
+  The fixture parser gained a `[reapi]` section; when `remote_executor = true`
+  and the tool is slug, the runner starts NativeLink, appends
+  `--remote_executor=<endpoint>` (plus declared `default_exec_properties`) to
+  the slug argv, extracts the REAPI evidence JSON from stderr, and tears down
+  NativeLink in a `finally` block. The build command now emits valid JSON with
+  `action_digests`, `uploaded_digests`, and `materialized_outputs` digest
+  lists; the comparison layer validates `reapi_actions >= 1`,
+  `direct_local_actions == 0`, and nonempty digest lists for slug+reapi runs.
+  Materialized outputs are now written with mode `0o555` to match Bazel's
+  read-only action-output policy. The Bazel oracle (generated with Bazel 9.1.1)
+  compares the declared output manifest and digest exactly. Validation:
+  `python3 -B -m tools.v2_oracle run --fixture simple-rule-action --tool slug
+  --slug <slug-v2-bin> --timeout 60` reported `status: ok` with
+  `reapi_actions=1`, `direct_local_actions=0`, materialized output digest
+  `dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49/21`
+  matching the checked-in Bazel oracle; `CARGO_BUILD_JOBS=1 cargo test -p
+  slug_cli_v2 -p slug_reapi_v2 --no-fail-fast` passed 20 tests (1 ignored);
+  `python3.12 -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py` passed 17 tests; `cargo fmt --check`;
+  forbidden-surface grep unchanged. Remaining Stage 7 work: headers/TLS/
+  retries, output-directory/tree handling, durable AC replay, and same-daemon
+  invalidation.
+- 2026-07-14 Stage 7.9 run_shell execution (gate clause 4, second fixture):
+  the `shell-action-reapi` fixture drives `ctx.actions.run_shell` through the
+  full REAPI boundary. Added the `ctx.actions.run_shell(outputs, command,
+  arguments)` Starlark binding and a `path` property on declared files
+  (`get_attr`/`has_attr` on `DeclaredFile`, not a method, because starlark-rust
+  0.13 method lookup shadows `get_attr`). Fixed the shell argv pad bug: Bazel's
+  `ShellCommand` (StarlarkActionFactory.java:627 "add an empty argument before
+  other arguments") inserts an empty `$0` when arguments are present so the
+  first user argument is `$1`; `CtxActions::run_shell` now matches this `pad`
+  behavior. Citation: `src/main/java/.../analysis/actions/ShellCommand.java:46`
+  and `.../starlark/StarlarkActionFactory.java:631`. The `RunShell` action
+  lowers through the existing argv path in `ReapiCommand::for_execution` (no
+  new lowering needed since `run_shell` sets argv directly). Generated the
+  Bazel 9.2.0 oracle with `--remote_executor` against NativeLink 1.4.0 (local
+  CAS/AC/scheduler/worker); Bazel also succeeds remotely, confirming the worker
+  creates output parent directories from declared `output_files`. Validation:
+  `python3 -B -m tools.v2_oracle run --fixture shell-action-reapi --tool slug
+  --slug <slug-v2-bin> --timeout 60` reported `status: ok` with
+  `reapi_actions=1`, `direct_local_actions=0`, materialized output digest
+  `ac0cb855e0243634730f146e7b14a0dbc8ed0c3271e7b6ca4974c116a87f2a28/5`
+  matching the checked-in Bazel oracle; `CARGO_BUILD_JOBS=1 cargo test -p
+  slug_cli_v2 -p slug_reapi_v2 -p slug_analysis_v2 -p slug_build_api_v2
+  --no-fail-fast` passed 49 tests (1 ignored); `python3.12 -B -m pytest -q -p
+  no:cacheprovider tests/v2_oracle/test_v2_oracle.py` passed 17 tests; `cargo
+  fmt --check`. Remaining Stage 7 work: headers/TLS/retries,
+  output-directory/tree handling, durable AC replay, and same-daemon
+  invalidation.
+- 2026-07-14 Stage 7.10 bare-executor and platform-properties fixtures:
+  converted the `bare-remote-executor-reapi` and
+  `platform-exec-properties-reapi` placeholder fixtures to live oracle
+  fixtures. Both now use the harness `[reapi]` section (no hardcoded ports).
+  `bare-remote-executor-reapi` proves that bare `--remote_executor` (no
+  `--remote_cache`) supplies CAS/AC; output digest
+  `ac0cb855e0243634730f146e7b14a0dbc8ed0c3271e7b6ca4974c116a87f2a28/5`
+  matches Bazel 9.2.0. `platform-exec-properties-reapi` exercises Platform
+  properties: the fixture declares `default_exec_properties` (sent to slug as
+  `--remote_default_exec_properties`) and `worker_platform_properties`
+  (injected into the NativeLink scheduler `supported_platform_properties` +
+  worker `platform_properties`). NativeLink 1.4.0 config detail: string
+  properties need `PropertyType::Exact` (not `Minimum`, which is u64-only), and
+  keys with hyphens must be quoted in JSON5 (`"container-image"`). Slug now
+  emits `platform_properties` in the REAPI evidence JSON, and the comparison
+  layer validates that each declared property appears in the evidence.
+  Citation: `nativelink-config/src/schedulers.rs:43` (`PropertyType` enum).
+  Validation: both fixtures report `status: ok` through the oracle harness;
+  `CARGO_BUILD_JOBS=1 cargo test -p slug_cli_v2 -p slug_reapi_v2 -p
+  slug_analysis_v2 -p slug_build_api_v2 --no-fail-fast` passed 49 tests (1
+  ignored); `python3.12 -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py` passed 20 tests (3 new: platform-property
+  parser + reject/accept evidence); `cargo fmt --check`. Four REAPI fixtures
+  now pass: `simple-rule-action`, `shell-action-reapi`,
+  `bare-remote-executor-reapi`, `platform-exec-properties-reapi`. Remaining
+  Stage 7 work: headers/TLS/retries, output-directory/tree handling, durable
+  AC replay, and same-daemon invalidation.

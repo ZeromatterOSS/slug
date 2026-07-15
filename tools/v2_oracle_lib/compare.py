@@ -27,6 +27,8 @@ def write_expected(path: Path, result: dict[str, Any]) -> None:
         command["executed_argv"] = ["<tool_executable>", *command.get("argv", [])]
         command["cwd"] = "<workspace>"
         command["duration_ms"] = "<duration_ms>"
+        command.pop("reapi_evidence", None)
+        command.pop("reapi_endpoint", None)
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
@@ -67,6 +69,32 @@ def _compare_expected_command(command: FixtureCommand, expected: dict[str, Any],
     return failures
 
 
+def _compare_reapi_evidence(
+    actual_command: dict[str, Any], fixture: Fixture
+) -> list[str]:
+    evidence = actual_command.get("reapi_evidence")
+    if evidence is None:
+        return [f"{actual_command.get('name')}: REAPI evidence was not emitted by Slug"]
+    failures: list[str] = []
+    name = actual_command.get("name")
+    if evidence.get("reapi_actions", 0) < 1:
+        failures.append(f"{name}: reapi_actions must be positive")
+    if evidence.get("direct_local_actions", 0) != 0:
+        failures.append(f"{name}: direct_local_actions must be 0")
+    for field in ("action_digests", "uploaded_digests", "materialized_outputs"):
+        if not evidence.get(field):
+            failures.append(f"{name}: {field} must be nonempty")
+    if fixture.reapi.default_exec_properties:
+        actual_props = evidence.get("platform_properties", {})
+        for prop in fixture.reapi.default_exec_properties:
+            key, _, value = prop.partition("=")
+            if actual_props.get(key) != value:
+                failures.append(
+                    f"{name}: platform property {key}={value} not in evidence"
+                )
+    return failures
+
+
 def compare_result(fixture: Fixture, actual: dict[str, Any], expected: dict[str, Any] | None) -> list[str]:
     failures: list[str] = []
     actual_commands = actual.get("commands", [])
@@ -83,6 +111,8 @@ def compare_result(fixture: Fixture, actual: dict[str, Any], expected: dict[str,
             failures.extend(_compare_expected_command(command, expected_commands[index], actual_command))
         else:
             failures.extend(_compare_command_shape(command, actual_command))
+        if actual.get("tool") == "slug" and fixture.reapi.remote_executor:
+            failures.extend(_compare_reapi_evidence(actual_command, fixture))
     return failures
 
 

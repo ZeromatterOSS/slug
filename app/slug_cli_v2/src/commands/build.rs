@@ -119,10 +119,17 @@ fn run_reapi_build(
     let execution = runtime.block_on(async {
         let mut reapi_actions = 0_u64;
         let mut direct_local_actions = 0_u64;
-        let mut uploaded_digests = 0_usize;
-        let mut materialized_outputs = 0_usize;
         let mut ac_hits = 0_u64;
         let mut ac_misses = 0_u64;
+        let mut action_digests: Vec<String> = Vec::new();
+        let mut uploaded_digests: Vec<String> = Vec::new();
+        let mut materialized_outputs: Vec<String> = Vec::new();
+        let mut platform_properties: Vec<(String, String)> = remote
+            .default_exec_properties
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        platform_properties.sort();
         for package in &evaluation.packages {
             let Some(analysis) = &package.analysis else {
                 continue;
@@ -135,40 +142,79 @@ fn run_reapi_build(
                     .map_err(|error| error.to_string())?;
                 reapi_actions += result.evidence.reapi_actions;
                 direct_local_actions += result.evidence.direct_local_actions;
-                uploaded_digests += result.evidence.uploaded_digests.len();
-                materialized_outputs += result.evidence.materialized_outputs.len();
                 ac_hits += result.evidence.ac_hits;
                 ac_misses += result.evidence.ac_misses;
+                action_digests.push(result.action_digest.to_string());
+                uploaded_digests.extend(
+                    result
+                        .evidence
+                        .uploaded_digests
+                        .iter()
+                        .map(|digest| digest.to_string()),
+                );
+                materialized_outputs.extend(
+                    result
+                        .evidence
+                        .materialized_outputs
+                        .iter()
+                        .map(|digest| digest.to_string()),
+                );
             }
         }
         Ok::<_, String>((
             reapi_actions,
             direct_local_actions,
-            uploaded_digests,
-            materialized_outputs,
             ac_hits,
             ac_misses,
+            action_digests,
+            uploaded_digests,
+            materialized_outputs,
+            platform_properties,
         ))
     });
     match execution {
         Ok((
             reapi_actions,
             direct_local_actions,
-            uploaded_digests,
-            materialized_outputs,
             ac_hits,
             ac_misses,
+            action_digests,
+            uploaded_digests,
+            materialized_outputs,
+            platform_properties,
         )) if reapi_actions > 0 => {
+            let action_digests_json = action_digests
+                .iter()
+                .map(|digest| format!("\"{}\"", json_escape(digest)))
+                .collect::<Vec<_>>()
+                .join(",");
+            let uploaded_digests_json = uploaded_digests
+                .iter()
+                .map(|digest| format!("\"{}\"", json_escape(digest)))
+                .collect::<Vec<_>>()
+                .join(",");
+            let materialized_outputs_json = materialized_outputs
+                .iter()
+                .map(|digest| format!("\"{}\"", json_escape(digest)))
+                .collect::<Vec<_>>()
+                .join(",");
+            let platform_properties_json = platform_properties
+                .iter()
+                .map(|(key, value)| format!("\"{}\":\"{}\"", json_escape(key), json_escape(value)))
+                .collect::<Vec<_>>()
+                .join(",");
             eprintln!(
-                "{{\"success\":true,\"command\":\"build\",\"analyzed_target_count\":{},\"declared_action_count\":{},\"reapi_actions\":{},\"direct_local_actions\":{},\"uploaded_digest_count\":{},\"materialized_output_count\":{},\"ac_hits\":{},\"ac_misses\":{},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"reapi_native_execution\"}}",
+                "{{\"success\":true,\"command\":\"build\",\"analyzed_target_count\":{},\"declared_action_count\":{},\"reapi_actions\":{},\"direct_local_actions\":{},\"ac_hits\":{},\"ac_misses\":{},\"action_digests\":[{}],\"uploaded_digests\":[{}],\"materialized_outputs\":[{}],\"platform_properties\":{{{}}},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"reapi_native_execution\"}}",
                 analyzed_target_count,
                 declared_action_count,
                 reapi_actions,
                 direct_local_actions,
-                uploaded_digests,
-                materialized_outputs,
                 ac_hits,
                 ac_misses,
+                action_digests_json,
+                uploaded_digests_json,
+                materialized_outputs_json,
+                platform_properties_json,
             );
             0
         }

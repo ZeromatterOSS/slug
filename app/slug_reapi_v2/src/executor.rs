@@ -294,6 +294,18 @@ pub fn materialize_outputs(
             path: path.display().to_string(),
             error: error.to_string(),
         })?;
+        // Bazel marks action outputs read-only with mode 0555; match that so
+        // manifest comparison against the Bazel oracle is byte-for-byte.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&path, PermissionsExt::from_mode(0o555)).map_err(|error| {
+                RemoteExecutionError::Io {
+                    path: path.display().to_string(),
+                    error: error.to_string(),
+                }
+            })?;
+        }
     }
     Ok(())
 }

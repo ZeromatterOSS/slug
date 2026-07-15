@@ -16,7 +16,7 @@ from tools.v2_oracle_lib.evidence import validate_evidence
 from tools.v2_oracle_lib.fixture import discover_fixtures, load_fixture
 from tools.v2_oracle_lib.manifest import collect_manifest
 from tools.v2_oracle_lib.normalize import normalize_text, path_replacements
-from tools.v2_oracle_lib.runner import RunOptions, ToolConfig, run_fixture
+from tools.v2_oracle_lib.runner import RunOptions, ToolConfig, _extract_reapi_evidence, run_fixture
 
 FIXTURES = ROOT / "tests" / "v2_oracle" / "fixtures"
 
@@ -245,3 +245,174 @@ def test_cli_validate_evidence_outputs_status() -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert '"status": "ok"' in completed.stdout
+
+
+def test_fixture_parser_reads_reapi_section() -> None:
+    fixture = load_fixture(FIXTURES / "simple-rule-action")
+    assert fixture.reapi.remote_executor is True
+
+
+def test_extract_reapi_evidence_parses_slug_stderr() -> None:
+    stderr = (
+        '{"success":true,"command":"build","analyzed_target_count":1,'
+        '"declared_action_count":1,"reapi_actions":1,"direct_local_actions":0,'
+        '"ac_hits":0,"ac_misses":1,'
+        '"action_digests":["abc/1"],"uploaded_digests":["def/2"],'
+        '"materialized_outputs":["ghi/3"],"runtime_mode":"one-shot",'
+        '"completed_boundary":"reapi_native_execution"}\n'
+    )
+    evidence = _extract_reapi_evidence(stderr)
+    assert evidence is not None
+    assert evidence["reapi_actions"] == 1
+    assert evidence["direct_local_actions"] == 0
+    assert evidence["action_digests"] == ["abc/1"]
+
+
+def test_extract_reapi_evidence_returns_none_for_non_reapi_stderr() -> None:
+    stderr = '{"error":"analysis_not_implemented","command":"build"}\n'
+    assert _extract_reapi_evidence(stderr) is None
+
+
+def test_compare_rejects_missing_evidence_for_remote_fixture() -> None:
+    fixture = load_fixture(FIXTURES / "simple-rule-action")
+    actual = {
+        "tool": "slug",
+        "commands": [
+            {
+                "exit_code": 0,
+                "name": "build_write_file",
+                "normalized_stdout": "",
+                "normalized_stderr": "",
+                "manifest": [],
+            }
+        ],
+    }
+    failures = compare_result(fixture, actual, expected=None)
+    assert any("REAPI evidence" in failure for failure in failures)
+
+
+def test_compare_accepts_valid_reapi_evidence() -> None:
+    fixture = load_fixture(FIXTURES / "simple-rule-action")
+    oracle_manifest = [
+        {
+            "digest": "dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49",
+            "mode": "0o555",
+            "path": "write_file.txt",
+            "root": "bazel-bin/pkg",
+            "size": 21,
+            "symlink_target": None,
+            "type": "file",
+        }
+    ]
+    expected = {
+        "commands": [
+            {
+                "exit_code": 0,
+                "manifest": oracle_manifest,
+            }
+        ]
+    }
+    actual = {
+        "tool": "slug",
+        "commands": [
+            {
+                "exit_code": 0,
+                "name": "build_write_file",
+                "normalized_stdout": "",
+                "normalized_stderr": "",
+                "manifest": oracle_manifest,
+                "reapi_evidence": {
+                    "reapi_actions": 1,
+                    "direct_local_actions": 0,
+                    "action_digests": ["abc/1"],
+                    "uploaded_digests": ["def/2"],
+                    "materialized_outputs": ["ghi/3"],
+                },
+            }
+        ],
+    }
+    failures = compare_result(fixture, actual, expected=expected)
+    assert failures == []
+
+
+def test_fixture_parser_reads_platform_exec_properties() -> None:
+    fixture = load_fixture(FIXTURES / "platform-exec-properties-reapi")
+    assert fixture.reapi.remote_executor is True
+    assert fixture.reapi.default_exec_properties == ("container-image=toolchain:v1",)
+    assert fixture.reapi.worker_platform_properties == ("container-image=toolchain:v1",)
+
+
+def test_compare_rejects_missing_platform_property_in_evidence() -> None:
+    fixture = load_fixture(FIXTURES / "platform-exec-properties-reapi")
+    oracle_manifest = [
+        {
+            "digest": "ac0cb855e0243634730f146e7b14a0dbc8ed0c3271e7b6ca4974c116a87f2a28",
+            "mode": "0o555",
+            "path": "probe.txt",
+            "root": "bazel-bin/pkg",
+            "size": 5,
+            "symlink_target": None,
+            "type": "file",
+        }
+    ]
+    expected = {"commands": [{"exit_code": 0, "manifest": oracle_manifest}]}
+    actual = {
+        "tool": "slug",
+        "commands": [
+            {
+                "exit_code": 0,
+                "name": "build_probe",
+                "normalized_stdout": "",
+                "normalized_stderr": "",
+                "manifest": oracle_manifest,
+                "reapi_evidence": {
+                    "reapi_actions": 1,
+                    "direct_local_actions": 0,
+                    "action_digests": ["abc/1"],
+                    "uploaded_digests": ["def/2"],
+                    "materialized_outputs": ["ghi/3"],
+                    "platform_properties": {},
+                },
+            }
+        ],
+    }
+    failures = compare_result(fixture, actual, expected=expected)
+    assert any("container-image" in failure for failure in failures)
+
+
+def test_compare_accepts_matching_platform_property_in_evidence() -> None:
+    fixture = load_fixture(FIXTURES / "platform-exec-properties-reapi")
+    oracle_manifest = [
+        {
+            "digest": "ac0cb855e0243634730f146e7b14a0dbc8ed0c3271e7b6ca4974c116a87f2a28",
+            "mode": "0o555",
+            "path": "probe.txt",
+            "root": "bazel-bin/pkg",
+            "size": 5,
+            "symlink_target": None,
+            "type": "file",
+        }
+    ]
+    expected = {"commands": [{"exit_code": 0, "manifest": oracle_manifest}]}
+    actual = {
+        "tool": "slug",
+        "commands": [
+            {
+                "exit_code": 0,
+                "name": "build_probe",
+                "normalized_stdout": "",
+                "normalized_stderr": "",
+                "manifest": oracle_manifest,
+                "reapi_evidence": {
+                    "reapi_actions": 1,
+                    "direct_local_actions": 0,
+                    "action_digests": ["abc/1"],
+                    "uploaded_digests": ["def/2"],
+                    "materialized_outputs": ["ghi/3"],
+                    "platform_properties": {"container-image": "toolchain:v1"},
+                },
+            }
+        ],
+    }
+    failures = compare_result(fixture, actual, expected=expected)
+    assert failures == []

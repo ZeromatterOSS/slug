@@ -121,7 +121,19 @@ impl fmt::Display for DeclaredFile {
 starlark::starlark_simple_value!(DeclaredFile);
 
 #[starlark_value(type = "declared_file")]
-impl<'v> StarlarkValue<'v> for DeclaredFile {}
+impl<'v> StarlarkValue<'v> for DeclaredFile {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        if attribute == "path" {
+            Some(heap.alloc_str(self.output.path()).to_value())
+        } else {
+            None
+        }
+    }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        attribute == "path"
+    }
+}
 
 #[starlark_module]
 fn analysis_actions_methods(builder: &mut MethodsBuilder) {
@@ -152,6 +164,45 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
             .lock()
             .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
             .write(output.output.clone(), content, false)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        Ok(NoneType)
+    }
+
+    fn run_shell<'v>(
+        this: Value<'v>,
+        outputs: Value<'v>,
+        command: &str,
+        arguments: Value<'v>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<NoneType> {
+        let actions = AnalysisActions::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
+        let mut declared = Vec::new();
+        for item in outputs
+            .iterate(heap)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        {
+            let file = DeclaredFile::from_value(item).ok_or_else(|| {
+                anyhow::anyhow!("ctx.actions.run_shell outputs must be declared files")
+            })?;
+            declared.push(file.output.clone());
+        }
+        let output = declared
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("ctx.actions.run_shell requires at least one output"))?;
+        let mut args = Vec::new();
+        for item in arguments
+            .iterate(heap)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?
+        {
+            args.push(item.to_str());
+        }
+        actions
+            .actions
+            .lock()
+            .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
+            .run_shell(output, command, args, Vec::new())
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         Ok(NoneType)
     }

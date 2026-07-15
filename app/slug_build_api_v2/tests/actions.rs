@@ -92,6 +92,36 @@ fn ctx_actions_records_basic_action_ir() {
 }
 
 #[test]
+fn run_shell_pads_empty_dollar_zero_when_arguments_are_present() {
+    let mut actions = CtxActions::new();
+    let out = actions.declare_file("pkg/out.txt").unwrap();
+    actions
+        .run_shell(
+            out,
+            "printf reapi > $1",
+            vec!["pkg/out.txt".to_owned()],
+            vec![],
+        )
+        .unwrap();
+    let action = &actions.registry().actions()[0];
+    // Bazel's ShellCommand inserts an empty $0 before user arguments so the
+    // first argument is $1, not $0.
+    assert_eq!(
+        action.argv(),
+        &["sh", "-c", "printf reapi > $1", "", "pkg/out.txt"]
+    );
+}
+
+#[test]
+fn run_shell_omits_pad_when_no_arguments() {
+    let mut actions = CtxActions::new();
+    let out = actions.declare_file("pkg/out.txt").unwrap();
+    actions.run_shell(out, "echo hi", vec![], vec![]).unwrap();
+    let action = &actions.registry().actions()[0];
+    assert_eq!(action.argv(), &["sh", "-c", "echo hi"]);
+}
+
+#[test]
 fn registry_rejects_conflicting_outputs() {
     let mut actions = CtxActions::new();
     let first = actions.declare_file("pkg/out.txt").unwrap();

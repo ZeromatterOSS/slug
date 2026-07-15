@@ -5,6 +5,9 @@ comparison = "semantic"
 manifest_roots = ["bazel-bin/pkg"]
 oracle_notes = "Bazel progress output is volatile; compare the declared output manifest and digest generated with upstream Bazel 9."
 
+[reapi]
+remote_executor = true
+
 [[commands]]
 name = "build_write_file"
 argv = ["build", "//pkg:write_file"]

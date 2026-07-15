@@ -1,7 +1,45 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//pkg:probe"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:probe"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "ac0cb855e0243634730f146e7b14a0dbc8ed0c3271e7b6ca4974c116a87f2a28",
+          "mode": "0o555",
+          "path": "probe.txt",
+          "root": "bazel-bin/pkg",
+          "size": 5,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "build_probe",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe (2 packages loaded)\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:probe up-to-date:\n  bazel-bin/pkg/probe.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 disk cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 3bc524a8-4d60-4c2d-9f53-acd3701f8ad0\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:probe (2 packages loaded)\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:probe up-to-date:\n  bazel-bin/pkg/probe.txt\nINFO: Elapsed time: 8.412s, Critical Path: 0.10s\nINFO: 2 processes: 1 disk cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\n",
+      "stdout": ""
+    }
+  ],
   "fixture": "platform-exec-properties-reapi",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9/NativeLink oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected when the Stage 7 harness exists.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

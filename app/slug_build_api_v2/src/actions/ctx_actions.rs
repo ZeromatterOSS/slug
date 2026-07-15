@@ -116,7 +116,14 @@ impl CtxActions {
         inputs: Vec<ActionInput>,
     ) -> Result<usize, ActionError> {
         let command = command.into();
+        // Match Bazel's ShellCommand pad behavior (StarlarkActionFactory.java:
+        // "add an empty argument before other arguments"): when arguments are
+        // present, an empty $0 is inserted so the first user argument is $1.
+        let pad = !args.is_empty();
         let mut argv = vec!["sh".to_owned(), "-c".to_owned(), command.clone()];
+        if pad {
+            argv.push(String::new());
+        }
         argv.extend(args);
         let action = ActionSpec::new(ActionKind::RunShell { command }, "Shell", vec![output])
             .with_argv(argv)

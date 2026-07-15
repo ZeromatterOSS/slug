@@ -296,3 +296,53 @@ python3 -B -m tools.v2_oracle run --tool bazel --fixture shell-action-reapi --ba
 That command must replace the placeholder at
 `tests/v2_oracle/fixtures/shell-action-reapi/expected/oracle.json`; a result
 with `generated: false` is not acceptance evidence.
+
+## REAPI Oracle Integration Checkpoint
+
+- 2026-07-14 Stage 1 REAPI oracle integration: the harness now starts a local
+  NativeLink REAPI service for fixtures that declare `[reapi]
+  remote_executor = true` and the tool is slug. Added
+  `tools/v2_oracle_lib/nativelink.py` (binary discovery, config generation,
+  readiness polling, teardown), a `[reapi]` fixture section, runner injection
+  of `--remote_executor=<endpoint>` plus `default_exec_properties`, REAPI
+  evidence extraction from slug stderr, and comparison-layer validation of
+  `reapi_actions >= 1`, `direct_local_actions == 0`, and nonempty
+  action/upload/materialized digest lists. The `simple-rule-action` fixture
+  declares `reapi.remote_executor = true`; its checked-in Bazel 9.1.1 oracle
+  (manifest digest
+  `dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49`) is
+  compared exactly against the Slug materialized output. This satisfies the
+  First Real Bazel Build gate clause 4 for `simple-rule-action`:
+  `reapi_actions=1`, `direct_local_actions=0`, and the declared output digest
+  matches. Validation: `python3 -B -m tools.v2_oracle run --fixture
+  simple-rule-action --tool slug --slug <slug-v2-bin> --timeout 60` reported
+  `status: ok`; `python3.12 -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py` passed 17 tests (5 new REAPI-lifecycle
+  and evidence tests). The `shell-action-reapi` Bazel oracle is still a
+  placeholder; it requires the same NativeLink lifecycle applied to a Bazel
+  run with `--remote_executor`, which is a later packet.
+
+- 2026-07-14 Stage 1 `shell-action-reapi` oracle landed: the fixture's Bazel
+  oracle is now generated (`generated: true`) with Bazel 9.2.0 using
+  `--remote_executor` against NativeLink 1.4.0. The `shell-action-reapi`
+  fixture declares `[reapi] remote_executor = true` and exercises
+  `ctx.actions.run_shell` through the same harness path as
+  `simple-rule-action`. Slug produces the same declared output manifest
+  (`probe.txt`, digest
+  `ac0cb855e0243634730f146e7b14a0dbc8ed0c3271e7b6ca4974c116a87f2a28`, mode
+  `0o555`, size 5) as the Bazel oracle, with `reapi_actions=1` and
+  `direct_local_actions=0`. This satisfies gate clause 4 for the second
+  fixture in the initial chain. The `load-invalidation` fixture (clause 5)
+  remains, pending the daemon.
+- 2026-07-14 Stage 1 bare-executor and platform-properties fixtures landed:
+  `bare-remote-executor-reapi` and `platform-exec-properties-reapi` are now
+  live oracle fixtures (both `generated: true`). The harness `[reapi]` section
+  gained `default_exec_properties` (injected as
+  `--remote_default_exec_properties`) and `worker_platform_properties`
+  (injected into the NativeLink scheduler + worker config). The comparison
+  layer validates that declared platform properties appear in slug's REAPI
+  evidence `platform_properties` field. Python test count is now 20 (3 new
+  platform-property tests). Four REAPI fixtures pass end-to-end:
+  `simple-rule-action`, `shell-action-reapi`, `bare-remote-executor-reapi`,
+  `platform-exec-properties-reapi`. The `load-invalidation` fixture (clause 5)
+  remains, pending the daemon.

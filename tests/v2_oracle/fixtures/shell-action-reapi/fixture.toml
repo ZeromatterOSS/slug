@@ -5,6 +5,9 @@ comparison = "semantic"
 manifest_roots = ["bazel-bin/pkg"]
 oracle_notes = "Regenerate with upstream Bazel 9 and NativeLink once Stage 7 execution harness exists."
 
+[reapi]
+remote_executor = true
+
 [[commands]]
 name = "build_probe"
 argv = ["build", "//pkg:probe"]
