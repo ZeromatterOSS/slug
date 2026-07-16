@@ -388,4 +388,29 @@ slug-v2-oracle validate-evidence /path/to/evidence.jsonl
   now pass: `simple-rule-action`, `shell-action-reapi`,
   `bare-remote-executor-reapi`, `platform-exec-properties-reapi`. Remaining
   Stage 7 work: headers/TLS/retries, output-directory/tree handling, durable
-  AC replay, and same-daemon invalidation.
+  AC replay.
+- 2026-07-16 Stage 7.11 same-daemon DICE invalidation (gate clause 5): the
+  `load-invalidation` fixture now passes end-to-end through the oracle
+  harness. Introduced `slug_server_v2` with a `Daemon` that retains a
+  `BzlModuleEvaluator` + file-digest cache across builds. Before each build
+  the daemon rescans `.bzl`/`BUILD.bazel` files, compares SHA-256 digests,
+  and calls `invalidate_path`/`invalidate_package` for changed paths; the
+  DICE graph replays only the affected computations. The CLI gains
+  `--output_base` startup-flag parsing and auto-starts the daemon via Unix
+  socket when set; `--serve` mode re-execs the binary as the server. The
+  harness gains a `daemon` fixture flag that passes `--output_base` to slug
+  and shuts down the daemon after all commands. Fixed: stale read-only
+  outputs (0o555) blocked same-daemon rebuilds — `materialize_outputs` now
+  removes stale files before writing. Regenerated the Bazel 9.2.0 oracle
+  (stale `0o444` mode → correct `0o555`). Validation: `python3 -B -m
+  tools.v2_oracle run --fixture load-invalidation --tool slug --slug
+  <slug-v2-bin> --timeout 60` reported `status: ok`; prime digest
+  `2c8b08da.../4`, after_bzl_edit digest `27dd8ed4.../4` (1 file
+  invalidated), both mode `0o555`, matching the Bazel oracle;
+  `CARGO_BUILD_JOBS=1 cargo test -p slug_server_v2 -p slug_cli_v2 -p
+  slug_reapi_v2 -p slug_core_v2 -p slug_analysis_v2 -p slug_build_api_v2
+  --no-fail-fast` passed 56 tests (1 ignored); `python3.12 -B -m pytest -q
+  -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py` passed 22 tests;
+  `cargo fmt --check`. All five gate clauses now have passing fixtures.
+  Remaining Stage 7 work: headers/TLS/retries, output-directory/tree
+  handling, durable AC replay.

@@ -166,6 +166,12 @@ Stage 4 local package-loading packet (pending review and commit):
   dependent package, while `invalidate_package()` dirties a changed local
   BUILD package. Focused regressions prove both transitions in one retained
   evaluator; daemon ownership and filesystem watching remain later work.
+- 2026-07-16 Stage 4 daemon ownership landed: `slug_server_v2::Daemon`
+  retains the `BzlModuleEvaluator` across builds and performs filesystem
+  watching by rescanning `.bzl`/`BUILD.bazel` files and comparing SHA-256
+  digests. Changed paths call `invalidate_path`/`invalidate_package` (the
+  Stage 4 DICE invalidation boundaries proven above) before each build. The
+  `load-invalidation` oracle fixture passes end-to-end (gate clause 5).
 
 ## Exact Test Criteria
 
