@@ -15,6 +15,7 @@ pub mod starlark;
 
 pub use dice::WorkspaceBuildEvaluation;
 pub use dice::WorkspaceEvaluation;
+pub use dice::evaluate_packages_with;
 pub use dice::evaluate_workspace;
 pub use dice::evaluate_workspace_targets;
 

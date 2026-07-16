@@ -290,6 +290,10 @@ pub fn materialize_outputs(
                 error: error.to_string(),
             })?;
         }
+        // Remove any stale output from a previous build. The previous build
+        // may have left the file read-only (mode 0o555), which would cause
+        // the write below to fail with EACCES on a same-daemon rebuild.
+        let _ = std::fs::remove_file(&path);
         std::fs::write(&path, data).map_err(|error| RemoteExecutionError::Io {
             path: path.display().to_string(),
             error: error.to_string(),

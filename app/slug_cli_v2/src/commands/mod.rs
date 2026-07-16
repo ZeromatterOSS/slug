@@ -29,11 +29,46 @@ where
 {
     let mut args = args.into_iter().map(Into::into);
     let _program = args.next();
-    let Some(command) = args.next() else {
+    let all_args: Vec<String> = args.collect();
+    // Collect startup flags (--output_base and its value) that appear before
+    // the subcommand, then dispatch the remaining args.
+    let mut startup_output_base: Option<String> = None;
+    let mut rest: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < all_args.len() {
+        let arg = &all_args[i];
+        if let Some(value) = arg.strip_prefix("--output_base=") {
+            startup_output_base = Some(value.to_string());
+            i += 1;
+            continue;
+        }
+        if arg == "--output_base" {
+            if i + 1 < all_args.len() {
+                startup_output_base = Some(all_args[i + 1].clone());
+                i += 2;
+            } else {
+                i += 1;
+            }
+            continue;
+        }
+        rest.push(arg.clone());
+        i += 1;
+    }
+    if rest.first().is_some_and(|f| f == "--serve") {
+        return serve_daemon(&rest[1..]);
+    }
+    // Extract the command (first non-flag in rest).
+    let command = rest.iter().position(|a| !a.starts_with('-'));
+    let Some(command_idx) = command else {
         help::print_help();
         return 0;
     };
-    let rest = args.collect::<Vec<_>>();
+    let command = rest[command_idx].clone();
+    rest.drain(..=command_idx);
+    // Inject --output_base back into the build args if it was a startup flag.
+    if let Some(ob) = &startup_output_base {
+        rest.insert(0, format!("--output_base={ob}"));
+    }
     match command.as_str() {
         "help" | "--help" | "-h" => {
             help::print_help();
@@ -93,6 +128,41 @@ fn parse_error(command: CommandKind, error: CommandParseError) -> i32 {
         json_escape(&error.to_string()),
     );
     2
+}
+
+/// Enter daemon server mode. Parses `--socket` and `--workspace` from the
+/// args, then blocks serving build requests on the Unix socket.
+fn serve_daemon(args: &[String]) -> i32 {
+    let mut socket = None;
+    let mut workspace = None;
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if let Some(value) = arg.strip_prefix("--socket=") {
+            socket = Some(value.to_string());
+        } else if arg == "--socket" {
+            socket = iter.next().cloned();
+        } else if let Some(value) = arg.strip_prefix("--workspace=") {
+            workspace = Some(value.to_string());
+        } else if arg == "--workspace" {
+            workspace = iter.next().cloned();
+        }
+    }
+    let (Some(socket), Some(workspace)) = (socket, workspace) else {
+        eprintln!(
+            "{{\"error\":\"daemon_args\",\"message\":\"--socket and --workspace are required for --serve mode\"}}"
+        );
+        return 2;
+    };
+    match slug_server_v2::serve(&socket, &workspace) {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!(
+                "{{\"error\":\"daemon_serve_error\",\"message\":\"{}\"}}",
+                json_escape(&error.to_string())
+            );
+            2
+        }
+    }
 }
 
 #[cfg(test)]

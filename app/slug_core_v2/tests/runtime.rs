@@ -51,6 +51,7 @@ fn loaded_custom_rule_reaches_analysis_and_declares_an_action() {
         "module(name = \"runtime_test\")\n",
     )
     .unwrap();
+    fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
     fs::write(
         package.join("defs.bzl"),
         "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name + \".txt\")\n    ctx.actions.write(out, \"hello\\n\")\n    return [DefaultInfo(files = depset([out]))]\n\nwrite_file = rule(implementation = _impl)\n",

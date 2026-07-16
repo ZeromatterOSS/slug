@@ -1,0 +1,25 @@
+[package]
+name = "slug_server_v2"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+slug_core_v2 = { path = "../slug_core_v2" }
+slug_loading_v2 = { path = "../slug_loading_v2" }
+slug_analysis_v2 = { path = "../slug_analysis_v2" }
+slug_identity_v2 = { path = "../slug_identity_v2" }
+slug_reapi_v2 = { path = "../slug_reapi_v2" }
+slug_build_api_v2 = { path = "../slug_build_api_v2" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(unix)'] }

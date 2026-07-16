@@ -1,9 +1,13 @@
 [fixture]
 name = "load-invalidation"
-description = "A loaded .bzl file edit changes the output produced by a second build in the copied workspace."
+description = "A loaded .bzl file edit changes the output produced by a second build in the same daemon."
 comparison = "semantic"
 manifest_roots = ["bazel-bin/pkg"]
-oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected after same-daemon semantics are available."
+daemon = true
+oracle_notes = "Same-daemon DICE invalidation: the second build runs in the same slug daemon, detects the message.bzl edit, and replays the affected computation."
+
+[reapi]
+remote_executor = true
 
 [[commands]]
 name = "prime"

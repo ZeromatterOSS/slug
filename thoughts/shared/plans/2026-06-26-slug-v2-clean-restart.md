@@ -251,6 +251,20 @@ the complete fixture chain and receives Sol review before this gate is marked
 complete. Passing substrate-only tests or one stage's isolated fixture cannot
 substitute for that integration review.
 
+### Gate status — 2026-07-16
+
+All five clauses have contributing packets accepted:
+1. `simple-rule-action` (clause 4, write action via REAPI) — pass
+2. `shell-action-reapi` (clause 4, run_shell via REAPI) — pass
+3. `bare-remote-executor-reapi` (clause 4, bare executor) — pass
+4. `platform-exec-properties-reapi` (clause 4, platform properties) — pass
+5. `load-invalidation` (clause 5, same-daemon DICE invalidation) — pass
+
+The fixture chain (`simple-rule-action`, `shell-action-reapi`,
+`load-invalidation`) passes end-to-end through the oracle harness with
+NativeLink-backed REAPI execution and the `slug_server_v2` daemon. A final
+integration review by Sol is required before the gate is marked complete.
+
 ## First Commit Scope
 
 The first V2 implementation commit is documentation and ownership only:

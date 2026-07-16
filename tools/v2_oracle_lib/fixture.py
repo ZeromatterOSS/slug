@@ -58,6 +58,7 @@ class Fixture:
     manifest_roots: tuple[str, ...] = ()
     oracle_notes: str = ""
     reapi: ReapiConfig = field(default_factory=ReapiConfig)
+    daemon: bool = False
 
     @property
     def expected_oracle(self) -> Path:
@@ -187,6 +188,7 @@ def load_fixture(path: Path) -> Fixture:
         manifest_roots=manifest_roots,
         oracle_notes=str(fixture_data.get("oracle_notes", "")),
         reapi=_parse_reapi(raw.get("reapi")),
+        daemon=bool(fixture_data.get("daemon", False)),
     )
 
 

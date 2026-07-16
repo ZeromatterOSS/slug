@@ -65,10 +65,37 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
     return applied
 
 
-def _argv(tool: ToolConfig, command: FixtureCommand, output_base: Path) -> list[str]:
+def _argv(tool: ToolConfig, command: FixtureCommand, output_base: Path, daemon: bool = False) -> list[str]:
     if tool.name == "bazel":
         return [str(tool.executable), f"--output_base={output_base}", *command.argv]
+    if daemon:
+        return [str(tool.executable), f"--output_base={output_base}", *command.argv]
     return [str(tool.executable), *command.argv]
+
+
+def _shutdown_slug_daemon(output_base: Path) -> None:
+    """Send a shutdown command to the slug daemon if its socket exists."""
+    socket_path = output_base / "slugd.sock"
+    if not socket_path.exists():
+        return
+    try:
+        import socket as _socket
+
+        sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+        sock.settimeout(2.0)
+        sock.connect(str(socket_path))
+        sock.sendall(b"shutdown\n")
+        sock.close()
+    except OSError:
+        pass
+    # Clean up stale socket/pid files.
+    for name in ("slugd.sock", "slugd.pid"):
+        stale = output_base / name
+        if stale.exists():
+            try:
+                stale.unlink()
+            except OSError:
+                pass
 
 
 def _slug_reapi_argv(
@@ -127,7 +154,7 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
         records: list[dict[str, Any]] = []
         for command in fixture.commands:
             mutations = _apply_mutations(workspace, command)
-            argv = _argv(tool, command, output_base)
+            argv = _argv(tool, command, output_base, fixture.daemon)
             if nativelink_service is not None:
                 argv = _slug_reapi_argv(
                     argv,
@@ -171,6 +198,8 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
                 record["reapi_endpoint"] = nativelink_service.endpoint
             records.append(record)
     finally:
+        if fixture.daemon and tool.name == "slug":
+            _shutdown_slug_daemon(output_base)
         if nativelink_service is not None:
             stop_nativelink(nativelink_service)
 

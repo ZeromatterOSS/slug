@@ -190,9 +190,26 @@ pub fn evaluate_workspace_targets(
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
     let workspace_evaluation = evaluate_workspace(workspace.clone())?;
     let package_evaluator = BzlModuleEvaluator::new(&workspace)?;
+    evaluate_packages_with(
+        &workspace,
+        &workspace_evaluation,
+        &package_evaluator,
+        targets,
+    )
+}
+
+/// Evaluate packages using a pre-existing [`BzlModuleEvaluator`]. The daemon
+/// calls this with its retained evaluator so DICE state persists and
+/// invalidation across builds is honored.
+pub fn evaluate_packages_with(
+    workspace: &Path,
+    workspace_evaluation: &WorkspaceEvaluation,
+    package_evaluator: &BzlModuleEvaluator,
+    targets: &[TargetPattern],
+) -> anyhow::Result<WorkspaceBuildEvaluation> {
     let mut packages = Vec::with_capacity(targets.len());
     for target in targets {
-        let package = package_path_for_target(&workspace, target)?;
+        let package = package_path_for_target(workspace, target)?;
         let loaded_package = package_evaluator.evaluate_package(package)?;
         let analysis = analysis_for_target(target, &loaded_package)?;
         packages.push(RequestedPackageEvaluation {
@@ -202,12 +219,13 @@ pub fn evaluate_workspace_targets(
         });
     }
     Ok(WorkspaceBuildEvaluation {
-        workspace: workspace_evaluation,
+        workspace: workspace_evaluation.clone(),
         packages,
     })
 }
 
-fn analysis_for_target(
+/// Analyze a single target within a loaded package.
+pub fn analysis_for_target(
     target: &TargetPattern,
     package: &LoadedPackage,
 ) -> anyhow::Result<Option<AnalysisResult>> {
@@ -246,7 +264,11 @@ fn analysis_for_target(
         .map_err(anyhow::Error::msg)
 }
 
-fn package_path_for_target(workspace: &Path, target: &TargetPattern) -> anyhow::Result<PathBuf> {
+/// Resolve a target pattern to its workspace-relative package directory.
+pub fn package_path_for_target(
+    workspace: &Path,
+    target: &TargetPattern,
+) -> anyhow::Result<PathBuf> {
     let (repo, package) = match target {
         TargetPattern::Single(label) => (label.repo(), label.package()),
         TargetPattern::PackageAll { repo, package } => (repo, package),

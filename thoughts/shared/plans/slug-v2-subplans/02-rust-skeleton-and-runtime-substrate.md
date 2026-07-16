@@ -191,6 +191,26 @@ Stage 2 skeleton checkpoint:
 - `build` has crossed the DICE and starlark-rust runtime boundaries for the
   canonical first-build fixture.
 
+### `WP-2.4-slug-server-v2-daemon` — accepted 2026-07-16
+
+- Gate link: satisfies clause 5 of the First Real Bazel Build gate
+  (same-daemon DICE invalidation).
+- `slug_server_v2` crate introduced with a `Daemon` struct that retains a
+  `BzlModuleEvaluator` + file-digest cache across builds.
+- `Daemon::invalidate_changed()` rescans `.bzl`/`BUILD.bazel` files, compares
+  SHA-256 digests to the previous build, and calls `invalidate_path` /
+  `invalidate_package` for changed paths. The DICE graph replays only the
+  affected computations.
+- Unix-socket server (`server.rs`) with `serve()`, `send_build_request()`,
+  `send_shutdown()`. The CLI auto-starts the daemon when `--output_base` is
+  set and connects via the socket.
+- 3 focused Rust tests: first-build-invalidates-zero, bzl-edit-invalidates-one,
+  third-build-after-no-edit-invalidates-zero.
+- `load-invalidation` oracle fixture passes end-to-end: prime produces
+  `message.txt` digest `2c8b08da.../4` (mode 0o555); after_bzl_edit invalidates
+  1 file and produces `27dd8ed4.../4` (mode 0o555) — both match the Bazel 9.2.0
+  oracle.
+
 ## Validation
 
 ```bash

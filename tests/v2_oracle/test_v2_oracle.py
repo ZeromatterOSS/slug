@@ -416,3 +416,14 @@ def test_compare_accepts_matching_platform_property_in_evidence() -> None:
     }
     failures = compare_result(fixture, actual, expected=expected)
     assert failures == []
+
+
+def test_fixture_parser_reads_daemon_flag() -> None:
+    fixture = load_fixture(FIXTURES / "load-invalidation")
+    assert fixture.daemon is True
+    assert fixture.reapi.remote_executor is True
+
+
+def test_fixture_parser_daemon_defaults_false() -> None:
+    fixture = load_fixture(FIXTURES / "simple-rule-action")
+    assert fixture.daemon is False
