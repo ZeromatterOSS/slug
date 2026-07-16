@@ -81,9 +81,13 @@ def _compare_reapi_evidence(
         failures.append(f"{name}: reapi_actions must be positive")
     if evidence.get("direct_local_actions", 0) != 0:
         failures.append(f"{name}: direct_local_actions must be 0")
-    for field in ("action_digests", "uploaded_digests", "materialized_outputs"):
+    for field in ("action_digests", "materialized_outputs"):
         if not evidence.get(field):
             failures.append(f"{name}: {field} must be nonempty")
+    # uploaded_digests is empty on an action-cache hit (blobs already in CAS).
+    # Only require it when the action was a miss (i.e. actually executed).
+    if evidence.get("ac_hits", 0) == 0 and not evidence.get("uploaded_digests"):
+        failures.append(f"{name}: uploaded_digests must be nonempty on AC miss")
     if fixture.reapi.default_exec_properties:
         actual_props = evidence.get("platform_properties", {})
         for prop in fixture.reapi.default_exec_properties:

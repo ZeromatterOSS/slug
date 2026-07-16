@@ -174,49 +174,42 @@ pub async fn execute_action(
         }
     }
 
-    let mut execution = proto::execution_client::ExecutionClient::connect(endpoint)
+    let mut execution = proto::execution_client::ExecutionClient::connect(endpoint.clone())
         .await
         .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
-    let mut operations = execution
-        .execute(proto::ExecuteRequest {
+
+    // Try the ActionCache first. If GetActionResult returns a result, the
+    // action was cached — skip execution entirely. This is the REAPI-spec
+    // client-side AC lookup (distinct from the execution server's internal
+    // skip_cache_lookup).
+    let inline_output_files: Vec<String> = action
+        .outputs()
+        .iter()
+        .filter(|output| output.kind() == ActionOutputKind::File)
+        .map(|output| output.path().to_owned())
+        .collect();
+    let mut ac_client = proto::action_cache_client::ActionCacheClient::connect(endpoint)
+        .await
+        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
+    let ac_result = ac_client
+        .get_action_result(proto::GetActionResultRequest {
             instance_name: config.instance_name.clone().unwrap_or_default(),
-            skip_cache_lookup: false,
             action_digest: Some(digest_to_proto(&identity.action_digest)),
             inline_stdout: true,
             inline_stderr: true,
-            inline_output_files: action
-                .outputs()
-                .iter()
-                .filter(|output| output.kind() == ActionOutputKind::File)
-                .map(|output| output.path().to_owned())
-                .collect(),
+            inline_output_files: inline_output_files.clone(),
         })
-        .await
-        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
-        .into_inner();
-    let operation = loop {
-        let operation = operations
-            .message()
-            .await
-            .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
-            .ok_or_else(|| {
-                RemoteExecutionError::Protocol(
-                    "Execution stream ended before completion".to_owned(),
-                )
-            })?;
-        if operation.done {
-            break operation;
+        .await;
+    let (result, cached_result) = match ac_result {
+        Ok(cached) => (cached.into_inner(), true),
+        Err(_) => {
+            // AC miss: proceed to Execute.
+            let result =
+                execute_through_server(&mut execution, config, &identity, inline_output_files)
+                    .await?;
+            (result.0, result.1)
         }
     };
-    let response = decode_execute_response(operation)?;
-    if let Some(status) = &response.status
-        && status.code != 0
-    {
-        return Err(RemoteExecutionError::Protocol(status.message.clone()));
-    }
-    let result = response.result.ok_or_else(|| {
-        RemoteExecutionError::Protocol("completed Execute response omitted ActionResult".to_owned())
-    })?;
     if result.exit_code != 0 {
         return Err(RemoteExecutionError::Protocol(format!(
             "remote action exited {}: {}",
@@ -248,7 +241,7 @@ pub async fn execute_action(
         action_result = action_result.with_stderr_digest(digest_from_proto(digest)?);
     }
     let mut evidence = ExecutionEvidence::reapi("nativelink").record_action();
-    evidence = if response.cached_result {
+    evidence = if cached_result {
         evidence.record_ac_hit()
     } else {
         evidence.record_ac_miss()
@@ -265,6 +258,52 @@ pub async fn execute_action(
         output_blobs,
         evidence,
     })
+}
+
+/// Execute an action through the Execution server (AC miss path). Returns the
+/// ActionResult and whether the server reported a cached result.
+async fn execute_through_server(
+    execution: &mut proto::execution_client::ExecutionClient<tonic::transport::Channel>,
+    config: &RemoteConfig,
+    identity: &ReapiActionIdentity,
+    inline_output_files: Vec<String>,
+) -> Result<(proto::ActionResult, bool), RemoteExecutionError> {
+    let mut operations = execution
+        .execute(proto::ExecuteRequest {
+            instance_name: config.instance_name.clone().unwrap_or_default(),
+            skip_cache_lookup: false,
+            action_digest: Some(digest_to_proto(&identity.action_digest)),
+            inline_stdout: true,
+            inline_stderr: true,
+            inline_output_files,
+        })
+        .await
+        .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
+        .into_inner();
+    let operation = loop {
+        let operation = operations
+            .message()
+            .await
+            .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?
+            .ok_or_else(|| {
+                RemoteExecutionError::Protocol(
+                    "Execution stream ended before completion".to_owned(),
+                )
+            })?;
+        if operation.done {
+            break operation;
+        }
+    };
+    let response = decode_execute_response(operation)?;
+    if let Some(status) = &response.status
+        && status.code != 0
+    {
+        return Err(RemoteExecutionError::Protocol(status.message.clone()));
+    }
+    let result = response.result.ok_or_else(|| {
+        RemoteExecutionError::Protocol("completed Execute response omitted ActionResult".to_owned())
+    })?;
+    Ok((result, response.cached_result))
 }
 
 pub fn materialize_outputs(

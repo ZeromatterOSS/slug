@@ -1,9 +1,13 @@
 [fixture]
 name = "reapi-action-cache-hit"
-description = "Remote Action Cache hit should replay ActionDigest to ActionResult after restart/local AC deletion."
+description = "Remote Action Cache hit: the second build replays the cached ActionResult without re-executing."
 comparison = "semantic"
 manifest_roots = ["bazel-bin/pkg"]
-oracle_notes = "Regenerate with upstream Bazel 9 and NativeLink once Stage 7 action-cache harness exists."
+daemon = true
+oracle_notes = "Same-daemon AC hit: the second build hits the NativeLink action cache and reports ac_hits=1."
+
+[reapi]
+remote_executor = true
 
 [[commands]]
 name = "prime_cache"

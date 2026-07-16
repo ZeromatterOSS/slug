@@ -427,3 +427,105 @@ def test_fixture_parser_reads_daemon_flag() -> None:
 def test_fixture_parser_daemon_defaults_false() -> None:
     fixture = load_fixture(FIXTURES / "simple-rule-action")
     assert fixture.daemon is False
+
+
+def test_reapi_evidence_comparison_accepts_ac_hit_with_empty_uploads() -> None:
+    """An action-cache hit has no uploads (blobs already in CAS)."""
+    fixture = load_fixture(FIXTURES / "reapi-action-cache-hit")
+    oracle_manifest = [
+        {
+            "digest": "3673014e72b67383be302485694555a57ad393afdebaed6ded110a775bd0556d",
+            "mode": "0o555",
+            "path": "probe.txt",
+            "root": "bazel-bin/pkg",
+            "size": 6,
+        }
+    ]
+    cmd_miss = {
+        "name": "prime_cache",
+        "exit_code": 0,
+        "manifest": oracle_manifest,
+        "reapi_evidence": {
+            "reapi_actions": 1,
+            "direct_local_actions": 0,
+            "ac_hits": 0,
+            "ac_misses": 1,
+            "action_digests": ["abc/140"],
+            "uploaded_digests": ["def/10"],
+            "materialized_outputs": ["3673014e.../6"],
+        },
+    }
+    cmd_hit = {
+        "name": "replay_cache",
+        "exit_code": 0,
+        "manifest": oracle_manifest,
+        "reapi_evidence": {
+            "reapi_actions": 1,
+            "direct_local_actions": 0,
+            "ac_hits": 1,
+            "ac_misses": 0,
+            "action_digests": ["abc/140"],
+            "uploaded_digests": [],
+            "materialized_outputs": ["3673014e.../6"],
+        },
+    }
+    actual = {"tool": "slug", "commands": [cmd_miss, cmd_hit]}
+    expected = {
+        "commands": [
+            {"name": "prime_cache", "exit_code": 0, "manifest": oracle_manifest},
+            {"name": "replay_cache", "exit_code": 0, "manifest": oracle_manifest},
+        ]
+    }
+    failures = compare_result(fixture, actual, expected=expected)
+    assert failures == []
+
+
+def test_reapi_evidence_comparison_rejects_empty_uploads_on_ac_miss() -> None:
+    """An AC miss must have nonempty uploaded_digests."""
+    fixture = load_fixture(FIXTURES / "reapi-action-cache-hit")
+    oracle_manifest = [
+        {
+            "digest": "3673014e72b67383be302485694555a57ad393afdebaed6ded110a775bd0556d",
+            "mode": "0o555",
+            "path": "probe.txt",
+            "root": "bazel-bin/pkg",
+            "size": 6,
+        }
+    ]
+    cmd_miss_empty_uploads = {
+        "name": "prime_cache",
+        "exit_code": 0,
+        "manifest": oracle_manifest,
+        "reapi_evidence": {
+            "reapi_actions": 1,
+            "direct_local_actions": 0,
+            "ac_hits": 0,
+            "ac_misses": 1,
+            "action_digests": ["abc/140"],
+            "uploaded_digests": [],
+            "materialized_outputs": ["3673014e.../6"],
+        },
+    }
+    cmd_hit = {
+        "name": "replay_cache",
+        "exit_code": 0,
+        "manifest": oracle_manifest,
+        "reapi_evidence": {
+            "reapi_actions": 1,
+            "direct_local_actions": 0,
+            "ac_hits": 1,
+            "ac_misses": 0,
+            "action_digests": ["abc/140"],
+            "uploaded_digests": [],
+            "materialized_outputs": ["3673014e.../6"],
+        },
+    }
+    actual = {"tool": "slug", "commands": [cmd_miss_empty_uploads, cmd_hit]}
+    expected = {
+        "commands": [
+            {"name": "prime_cache", "exit_code": 0, "manifest": oracle_manifest},
+            {"name": "replay_cache", "exit_code": 0, "manifest": oracle_manifest},
+        ]
+    }
+    failures = compare_result(fixture, actual, expected=expected)
+    assert any("uploaded_digests must be nonempty" in f for f in failures)

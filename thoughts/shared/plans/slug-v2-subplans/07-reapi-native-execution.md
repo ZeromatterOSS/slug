@@ -414,3 +414,24 @@ slug-v2-oracle validate-evidence /path/to/evidence.jsonl
   `cargo fmt --check`. All five gate clauses now have passing fixtures.
   Remaining Stage 7 work: headers/TLS/retries, output-directory/tree
   handling, durable AC replay.
+- 2026-07-16 Stage 7.12 action-cache hit (GetActionResult client lookup):
+  added the REAPI `ActionCache` service with `GetActionResult` to
+  `reapi_v2.proto` (message `GetActionResultRequest` with instance_name,
+  action_digest, inline_stdout/stderr/inline_output_files). The executor
+  now calls `GetActionResult` before `Execute`: a hit returns the cached
+  `ActionResult` and skips the execution server entirely; a miss falls
+  through to the existing `Execute` path (extracted into
+  `execute_through_server`). Evidence distinguishes the two:
+  `ac_hits=1, uploaded=0` on a hit vs `ac_misses=1, uploaded>0` on a miss.
+  The `reapi-action-cache-hit` fixture (daemon mode, two builds) passes:
+  prime reports `ac_misses=1` with 2 uploads; replay reports `ac_hits=1`
+  with 0 uploads. The comparison layer now requires `uploaded_digests`
+  only on AC misses (hits legitimately have no uploads). Citation:
+  `third_party/remoteapis/build/bazel/remote/execution/v2/
+  remote_execution.proto` (`ActionCache.GetActionResult`). Validation:
+  `python3 -B -m tools.v2_oracle run --fixture reapi-action-cache-hit
+  --tool slug` reported `status: ok`; `CARGO_BUILD_JOBS=1 cargo test -p
+  slug_reapi_v2 -p slug_cli_v2 --no-fail-fast` passed 20 tests (1
+  ignored); `python3.12 -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py` passed 24 tests (2 new AC-evidence
+  comparison tests); `cargo fmt --check`.
