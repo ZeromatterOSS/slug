@@ -1,0 +1,11 @@
+load("//rules:defs.bzl", "leaf_rule")
+
+leaf_rule(
+    name = "first",
+    visibility = ["//visibility:public"],
+)
+
+leaf_rule(
+    name = "second",
+    visibility = ["//visibility:public"],
+)

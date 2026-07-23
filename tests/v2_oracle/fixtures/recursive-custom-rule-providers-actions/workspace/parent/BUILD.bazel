@@ -1,0 +1,9 @@
+load("//rules:defs.bzl", "parent_rule")
+
+parent_rule(
+    name = "parent",
+    deps = [
+        "//leaf:second",
+        "//leaf:first",
+    ],
+)

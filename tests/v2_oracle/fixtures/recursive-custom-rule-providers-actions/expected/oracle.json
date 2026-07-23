@@ -1,0 +1,120 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "//parent:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//parent:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cquery_parent_provider",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //parent:parent (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //parent:parent (6 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//parent:parent files=parent/parent.txt provider=//rules:defs.bzl%ParentInfo value=second,first",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/recursive-custom-rule-providers-actions/20260722-222723-296717-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/recursive-custom-rule-providers-actions/20260722-222757-297622-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: e3327030-ebab-49da-b0b9-a36aa516b7fc\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e3327030-ebab-49da-b0b9-a36aa516b7fc\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //parent:parent (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //parent:parent (6 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 4.817s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e3327030-ebab-49da-b0b9-a36aa516b7fc\n",
+      "stdout": "label=@@//parent:parent files=parent/parent.txt provider=//rules:defs.bzl%ParentInfo value=second,first\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//leaf:first",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//leaf:first",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cquery_first_leaf_provider",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //leaf:first (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //leaf:first (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//leaf:first files=leaf/first.txt provider=//rules:defs.bzl%LeafInfo value=first",
+      "stderr": "INFO: Invocation ID: c787611f-487d-4be3-8be6-a045ffc1175d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/c787611f-487d-4be3-8be6-a045ffc1175d\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //leaf:first (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //leaf:first (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.102s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/c787611f-487d-4be3-8be6-a045ffc1175d\n",
+      "stdout": "label=@@//leaf:first files=leaf/first.txt provider=//rules:defs.bzl%LeafInfo value=first\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//leaf:second",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//leaf:second",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cquery_second_leaf_provider",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //leaf:second (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //leaf:second (0 packages loaded, 1 target configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//leaf:second files=leaf/second.txt provider=//rules:defs.bzl%LeafInfo value=second",
+      "stderr": "INFO: Invocation ID: 57e80b0a-c4cb-4dec-870d-699862ef7c4d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/57e80b0a-c4cb-4dec-870d-699862ef7c4d\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //leaf:second (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //leaf:second (0 packages loaded, 1 target configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.029s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/57e80b0a-c4cb-4dec-870d-699862ef7c4d\n",
+      "stdout": "label=@@//leaf:second files=leaf/second.txt provider=//rules:defs.bzl%LeafInfo value=second\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "deps(//parent:parent)",
+        "--output=text",
+        "--include_file_write_contents"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "deps(//parent:parent)",
+        "--output=text",
+        "--include_file_write_contents"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "aquery_recursive_target_owned_writes",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //parent:parent (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //parent:parent (1 packages loaded, 1 target configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file parent/parent.txt'\n  Mnemonic: FileWrite\n  Target: //parent:parent\n  Configuration: k8-fastbuild\n  Execution platform: @@platforms//host:host\n  ActionKey: 083611ded69070f97a499ad76d20e46cc9aa75ffe00e13b560bca299447fa604\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/parent/parent.txt]\n  IsExecutable: false\n  FileWriteContents: [c2Vjb25kLGZpcnN0Cg==]\n\naction 'Writing file leaf/second.txt'\n  Mnemonic: FileWrite\n  Target: //leaf:second\n  Configuration: k8-fastbuild\n  Execution platform: @@platforms//host:host\n  ActionKey: 0c8a5a4afe9664f1b907fe501053649ed67cc49cae059ceacf322130d9fc0cc2\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/leaf/second.txt]\n  IsExecutable: false\n  FileWriteContents: [c2Vjb25kCg==]\n\naction 'Writing file leaf/first.txt'\n  Mnemonic: FileWrite\n  Target: //leaf:first\n  Configuration: k8-fastbuild\n  Execution platform: @@platforms//host:host\n  ActionKey: 64b41dc25f6be6e6d78f8344e66a6e7279ccfdc597e813326fef47fdfa30a501\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/leaf/first.txt]\n  IsExecutable: false\n  FileWriteContents: [Zmlyc3QK]",
+      "stderr": "INFO: Invocation ID: 51b1772e-0ff2-4f05-a65f-5a8d96f439da\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/51b1772e-0ff2-4f05-a65f-5a8d96f439da\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //parent:parent (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //parent:parent (1 packages loaded, 1 target configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.037s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/51b1772e-0ff2-4f05-a65f-5a8d96f439da\n",
+      "stdout": "action 'Writing file parent/parent.txt'\n  Mnemonic: FileWrite\n  Target: //parent:parent\n  Configuration: k8-fastbuild\n  Execution platform: @@platforms//host:host\n  ActionKey: 083611ded69070f97a499ad76d20e46cc9aa75ffe00e13b560bca299447fa604\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/parent/parent.txt]\n  IsExecutable: false\n  FileWriteContents: [c2Vjb25kLGZpcnN0Cg==]\n\naction 'Writing file leaf/second.txt'\n  Mnemonic: FileWrite\n  Target: //leaf:second\n  Configuration: k8-fastbuild\n  Execution platform: @@platforms//host:host\n  ActionKey: 0c8a5a4afe9664f1b907fe501053649ed67cc49cae059ceacf322130d9fc0cc2\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/leaf/second.txt]\n  IsExecutable: false\n  FileWriteContents: [c2Vjb25kCg==]\n\naction 'Writing file leaf/first.txt'\n  Mnemonic: FileWrite\n  Target: //leaf:first\n  Configuration: k8-fastbuild\n  Execution platform: @@platforms//host:host\n  ActionKey: 64b41dc25f6be6e6d78f8344e66a6e7279ccfdc597e813326fef47fdfa30a501\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/leaf/first.txt]\n  IsExecutable: false\n  FileWriteContents: [Zmlyc3QK]\n\n"
+    }
+  ],
+  "fixture": "recursive-custom-rule-providers-actions",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

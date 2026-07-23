@@ -1,0 +1,47 @@
+[fixture]
+name = "recursive-custom-rule-providers-actions"
+description = "Recursive custom-rule analysis exposes ordered dependency providers and target-owned write actions."
+comparison = "message_shape"
+oracle_notes = "Oracle-only M2 fixture: cquery proves configured providers and aquery proves action declaration ownership without build execution or materialization."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/skyframe/ConfiguredTargetFunction.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContext.java",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/StarlarkOutputFormatterCallback.java",
+  "src/test/shell/integration/configured_query_test.sh#test_starlark_output_providers_starlark_provider",
+  "src/test/shell/integration/aquery_test.sh#test_file_write",
+]
+translation_notes = "Separate single-target cquery commands make configured labels, sorted DefaultInfo short paths, qualified provider keys, and provider values exact. Text aquery with file contents retains target/action ownership while regex ignores action keys and configuration noise."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture recursive-custom-rule-providers-actions --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture recursive-custom-rule-providers-actions --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "cquery_parent_provider"
+argv = ["cquery", "//parent:parent", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//parent:parent files=parent/parent\\.txt provider=//rules:defs\\.bzl%ParentInfo value=second,first\\Z"]
+
+[[commands]]
+name = "cquery_first_leaf_provider"
+argv = ["cquery", "//leaf:first", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//leaf:first files=leaf/first\\.txt provider=//rules:defs\\.bzl%LeafInfo value=first\\Z"]
+
+[[commands]]
+name = "cquery_second_leaf_provider"
+argv = ["cquery", "//leaf:second", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//leaf:second files=leaf/second\\.txt provider=//rules:defs\\.bzl%LeafInfo value=second\\Z"]
+
+[[commands]]
+name = "aquery_recursive_target_owned_writes"
+argv = ["aquery", "deps(//parent:parent)", "--output=text", "--include_file_write_contents"]
+expected_exit = 0
+stdout_patterns = [
+  "(?s)action 'Writing file leaf/first\\.txt'.*?Mnemonic: FileWrite.*?Target: //leaf:first.*?Outputs: \\[bazel-out/[^\\]]+/bin/leaf/first\\.txt\\].*?FileWriteContents: \\[Zmlyc3QK\\]",
+  "(?s)action 'Writing file leaf/second\\.txt'.*?Mnemonic: FileWrite.*?Target: //leaf:second.*?Outputs: \\[bazel-out/[^\\]]+/bin/leaf/second\\.txt\\].*?FileWriteContents: \\[c2Vjb25kCg==\\]",
+  "(?s)action 'Writing file parent/parent\\.txt'.*?Mnemonic: FileWrite.*?Target: //parent:parent.*?Outputs: \\[bazel-out/[^\\]]+/bin/parent/parent\\.txt\\].*?FileWriteContents: \\[c2Vjb25kLGZpcnN0Cg==\\]",
+]
