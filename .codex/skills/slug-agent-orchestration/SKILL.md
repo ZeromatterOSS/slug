@@ -15,8 +15,8 @@ commits. Delegate bounded work to the least-cost capable agent.
 2. Read only the current owner plan's goal/current-priority/acceptance sections
    and the exact active packet heading. Search for the packet ID; do not load an
    entire long evidence history by default.
-3. Use the routing table below. Search `references/routing-log.md` for an
-   analogous packet and read only the matching recent rows.
+3. Read `references/routing-guide.md`. Search `references/routing-log.md` only
+   when a recent analogous packet may change that default.
 4. Check `git status --short --branch` and dirty diffs. Inspect live
    agent/Cargo/slugd processes only before overlapping work, retry, or
    daemon-sensitive validation.
@@ -97,7 +97,7 @@ the bounded routing log, and commit only accepted work.
 
 ## Log Use
 
-`references/routing-log.md` is append-only evidence, not routine startup
-context. Search it for an analogous packet and read only the relevant rows.
-When it needs archival, preserve old rows under a dated history file before
-trimming the active log.
+`references/routing-guide.md` is the normal routing input.
+`references/routing-log.md` keeps at most 20 terminal packet rows or 250 lines.
+Archive older rows by month as `references/routing-history-YYYY-MM.md`;
+histories are not routine startup context.

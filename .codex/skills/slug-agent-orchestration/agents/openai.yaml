@@ -1,4 +1,4 @@
 interface:
   display_name: "Slug Agent Orchestration"
   short_description: "Run the Slug V2 plan through reviewed work packets"
-  default_prompt: "Use $slug-agent-orchestration as the root orchestrator: read Live Status, select one critical-path packet, route bounded Terra work, retain root validation and plan ownership, and obtain the required Sol verdict."
+  default_prompt: "Use $slug-agent-orchestration: read Live Status, select one packet, route bounded work, and retain root integration; request Sol review when the packet crosses a reserved boundary."
