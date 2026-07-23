@@ -101,7 +101,8 @@ else
 fi
 
 codex_v1_paths=$(git ls-files -- .codex \
-  ':!.codex/skills/slug-buck2-utility-reuse/**' 2>/dev/null || true)
+  ':!.codex/skills/slug-buck2-utility-reuse/**' \
+  ':!.codex/skills/slug-agent-orchestration/**' 2>/dev/null || true)
 if [ -n "$codex_v1_paths" ]; then
   fail "tracked non-V2 .codex paths remain:"
   printf '%s\n' "$codex_v1_paths"
@@ -120,7 +121,8 @@ app_v1_paths=$(git ls-files -- app \
   ':!app/slug_identity_v2/**' \
   ':!app/slug_loading_v2/**' \
   ':!app/slug_query_v2/**' \
-  ':!app/slug_reapi_v2/**' 2>/dev/null || true)
+  ':!app/slug_reapi_v2/**' \
+  ':!app/slug_server_v2/**' 2>/dev/null || true)
 if [ -n "$app_v1_paths" ]; then
   fail "tracked non-V2 app paths remain:"
   printf '%s\n' "$app_v1_paths"
@@ -150,12 +152,13 @@ thought_v1_paths=$(git ls-files -- thoughts \
   ':!thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md' \
   ':!thoughts/shared/plans/slug-v2-subplans/**' \
   ':!thoughts/shared/prompts/2026-06-29-slug-v2-generic-implementer.md' \
+  ':!thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md' \
   2>/dev/null || true)
 if [ -n "$thought_v1_paths" ]; then
   fail "tracked non-V2 thoughts paths remain:"
   printf '%s\n' "$thought_v1_paths"
 else
-  ok "only V2 plans and prompt are tracked under thoughts/"
+  ok "only V2 plans and prompts are tracked under thoughts/"
 fi
 
 doc_v1_paths=$(git ls-files -- docs ':!docs/developers/dice.md' 2>/dev/null || true)
