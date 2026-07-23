@@ -14,13 +14,8 @@ pub mod graph;
 mod parser;
 pub(crate) mod provenance;
 
-pub use evaluator::LoadingQueryEnvironment;
-pub use evaluator::QueryEnvironment;
-pub use evaluator::QueryEvaluator;
 pub use evaluator::QueryOrder;
 pub use evaluator::QueryOutput;
-pub use evaluator::TargetSet;
-pub use evaluator::async_depth_limited_traversal;
 pub use evaluator::evaluate_loading_query;
 pub use expr::BinaryOperator;
 pub use expr::QueryExpression;

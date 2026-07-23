@@ -23,6 +23,8 @@ use dice::DiceComputations;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use slug_identity_v2::TargetPattern;
+use slug_loading_v2::discover_build_file_companion;
+use slug_loading_v2::keys::PackageLoadKey;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -37,6 +39,10 @@ use crate::graph::UnconfiguredPackageGraph;
 use crate::graph::UnconfiguredPackageGraphKey;
 use crate::loading_query_function;
 use crate::parse_query_expression;
+use crate::provenance::QueryCandidate;
+use crate::provenance::QueryCandidateArena;
+use crate::provenance::QueryCandidateBatches;
+use crate::provenance::QueryCandidateId;
 use crate::validate_loading_query;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
@@ -86,7 +92,7 @@ impl QueryOutput {
 }
 
 #[derive(Debug, Clone, Allocative)]
-pub struct TargetSet<T>(SmallSet<T>);
+pub(crate) struct TargetSet<T>(SmallSet<T>);
 
 impl<T> Default for TargetSet<T> {
     fn default() -> Self {
@@ -98,59 +104,38 @@ impl<T> TargetSet<T>
 where
     T: Clone + Eq + Hash,
 {
-    pub fn singleton(value: T) -> Self {
+    fn singleton(value: T) -> Self {
         let mut values = SmallSet::new();
         values.insert(value);
         Self(values)
     }
 
-    pub fn insert(&mut self, value: T) {
+    fn insert(&mut self, value: T) {
         self.0.insert(value);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
+    fn iter(&self) -> impl Iterator<Item = &T> {
         self.0.iter()
     }
 
-    pub fn contains(&self, value: &T) -> bool {
+    fn contains(&self, value: &T) -> bool {
         self.0.contains(value)
-    }
-
-    fn union(mut self, other: Self) -> Self {
-        for value in other.0 {
-            self.0.insert(value);
-        }
-        self
-    }
-
-    fn difference(mut self, other: &Self) -> Self {
-        for value in other.iter() {
-            self.0.shift_remove(value);
-        }
-        self
-    }
-
-    fn intersection(mut self, other: &Self) -> Self {
-        let remove = self
-            .iter()
-            .filter(|value| !other.0.contains(*value))
-            .cloned()
-            .collect::<Vec<_>>();
-        for value in remove {
-            self.0.shift_remove(&value);
-        }
-        self
     }
 }
 
 #[async_trait]
-pub trait QueryEnvironment {
+pub(crate) trait QueryEnvironment {
     type Target: Clone + Eq + Hash + Send + Sync;
+    type Set: Clone + Send + Sync;
 
-    async fn resolve_literal(
-        &mut self,
-        literal: &str,
-    ) -> Result<TargetSet<Self::Target>, QueryError>;
+    fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set;
+    fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set;
+    fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
+    fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
+    fn eval_all(&self, set: &Self::Set) -> TargetSet<Self::Target>;
+    fn lift_one_delivery(&self, targets: TargetSet<Self::Target>) -> Self::Set;
+
+    async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
 
     async fn dependencies(
         &mut self,
@@ -162,13 +147,16 @@ pub trait QueryEnvironment {
         targets: &TargetSet<Self::Target>,
     ) -> Result<TargetSet<Self::Target>, QueryError>;
 
-    async fn siblings(
+    async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
+
+    async fn loading_files(
         &mut self,
-        targets: &TargetSet<Self::Target>,
-    ) -> Result<TargetSet<Self::Target>, QueryError>;
+        targets: &Self::Set,
+        include_buildfiles: bool,
+    ) -> Result<Self::Set, QueryError>;
 }
 
-pub struct QueryEvaluator<E> {
+pub(crate) struct QueryEvaluator<E> {
     environment: E,
     functions: LoadingQueryFunctions,
 }
@@ -177,17 +165,14 @@ impl<E> QueryEvaluator<E>
 where
     E: QueryEnvironment + Send,
 {
-    pub fn new(environment: E) -> Self {
+    fn new(environment: E) -> Self {
         Self {
             environment,
             functions: LoadingQueryFunctions,
         }
     }
 
-    pub async fn evaluate(
-        &mut self,
-        expression: &QueryExpression,
-    ) -> Result<TargetSet<E::Target>, QueryError> {
+    async fn evaluate(&mut self, expression: &QueryExpression) -> Result<E::Set, QueryError> {
         let mut variables = SmallMap::new();
         self.evaluate_inner(expression, &mut variables).await
     }
@@ -195,8 +180,8 @@ where
     fn evaluate_inner<'a>(
         &'a mut self,
         expression: &'a QueryExpression,
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
             match &expression.kind {
                 QueryExpressionKind::TargetLiteral(literal) => {
@@ -213,12 +198,11 @@ where
                         .await
                 }
                 QueryExpressionKind::Set(literals) => {
-                    let mut result = TargetSet::default();
+                    let mut resolved = Vec::with_capacity(literals.len());
                     for literal in literals.iter() {
-                        result =
-                            result.union(self.environment.resolve_literal(&literal.value).await?);
+                        resolved.push(self.environment.resolve_literal(&literal.value).await?);
                     }
-                    Ok(result)
+                    Ok(self.environment.one_delivery(&resolved))
                 }
                 QueryExpressionKind::Let { name, value, body } => {
                     let value = self.evaluate_inner(value, variables).await?;
@@ -236,9 +220,11 @@ where
                     for (operator, right) in operations.iter() {
                         let right = self.evaluate_inner(right, variables).await?;
                         result = match operator {
-                            BinaryOperator::Union => result.union(right),
-                            BinaryOperator::Except => result.difference(&right),
-                            BinaryOperator::Intersect => result.intersection(&right),
+                            BinaryOperator::Union => self.environment.union(result, right),
+                            BinaryOperator::Except => self.environment.except(&result, &right),
+                            BinaryOperator::Intersect => {
+                                self.environment.intersection(&result, &right)
+                            }
                         };
                     }
                     Ok(result)
@@ -262,23 +248,23 @@ where
 /// Buck2-shaped dynamic query function registry. The evaluator performs only
 /// generic lookup/invoke; each function owns typed argument conversion and
 /// implementation.
-pub trait QueryFunctions<E: QueryEnvironment>: Send + Sync {
+trait QueryFunctions<E: QueryEnvironment>: Send + Sync {
     fn get(&self, name: &str) -> Option<&dyn QueryFunction<E>>;
 }
 
-pub trait QueryFunction<E: QueryEnvironment>: Send + Sync {
+trait QueryFunction<E: QueryEnvironment>: Send + Sync {
     fn spec(&self) -> &'static crate::QueryFunctionSpec;
 
     fn invoke<'a>(
         &'a self,
         evaluator: &'a mut QueryEvaluator<E>,
         args: &'a [QueryExpression],
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>>;
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>>;
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct LoadingQueryFunctions;
+struct LoadingQueryFunctions;
 
 static DEPS_FUNCTION: DepsFunction = DepsFunction;
 static RDEPS_FUNCTION: RdepsFunction = RdepsFunction;
@@ -287,6 +273,12 @@ static SIBLINGS_FUNCTION: SiblingsFunction = SiblingsFunction;
 static ALLPATHS_FUNCTION: AllPathsFunction = AllPathsFunction;
 static SOME_FUNCTION: SomeFunction = SomeFunction;
 static SOMEPATH_FUNCTION: SomePathFunction = SomePathFunction;
+static BUILDFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
+    include_buildfiles: true,
+};
+static LOADFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
+    include_buildfiles: false,
+};
 
 impl<E> QueryFunctions<E> for LoadingQueryFunctions
 where
@@ -299,7 +291,9 @@ where
         }
         [
             &ALLPATHS_FUNCTION as &dyn QueryFunction<E>,
+            &BUILDFILES_FUNCTION as &dyn QueryFunction<E>,
             &DEPS_FUNCTION as &dyn QueryFunction<E>,
+            &LOADFILES_FUNCTION as &dyn QueryFunction<E>,
             &RDEPS_FUNCTION as &dyn QueryFunction<E>,
             &SAME_PKG_DIRECT_RDEPS_FUNCTION as &dyn QueryFunction<E>,
             &SIBLINGS_FUNCTION as &dyn QueryFunction<E>,
@@ -319,21 +313,8 @@ trait QueryFunctionArg<E: QueryEnvironment>: Sized {
     fn eval<'a>(
         evaluator: &'a mut QueryEvaluator<E>,
         expression: &'a QueryExpression,
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+        variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<Self, QueryError>>;
-}
-
-impl<E> QueryFunctionArg<E> for TargetSet<E::Target>
-where
-    E: QueryEnvironment + Send,
-{
-    fn eval<'a>(
-        evaluator: &'a mut QueryEvaluator<E>,
-        expression: &'a QueryExpression,
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<Self, QueryError>> {
-        evaluator.evaluate_inner(expression, variables)
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -347,7 +328,7 @@ impl<E: QueryEnvironment> QueryFunctionArg<E> for QueryDepth {
     fn eval<'a>(
         _evaluator: &'a mut QueryEvaluator<E>,
         expression: &'a QueryExpression,
-        _variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+        _variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<Self, QueryError>> {
         async move {
             expression
@@ -370,7 +351,7 @@ impl<E: QueryEnvironment> QueryFunctionArg<E> for QuerySelectionCount {
     fn eval<'a>(
         _evaluator: &'a mut QueryEvaluator<E>,
         expression: &'a QueryExpression,
-        _variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+        _variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<Self, QueryError>> {
         async move {
             expression
@@ -385,7 +366,7 @@ impl<E: QueryEnvironment> QueryFunctionArg<E> for QuerySelectionCount {
 fn eval_arg<'a, E, A>(
     evaluator: &'a mut QueryEvaluator<E>,
     args: &'a [QueryExpression],
-    variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+    variables: &'a mut SmallMap<CompactString, E::Set>,
     index: usize,
 ) -> BoxFuture<'a, Result<A, QueryError>>
 where
@@ -398,6 +379,21 @@ where
             A::accept_none().ok_or_else(|| QueryError::syntax("missing query function argument"))
         }
         .boxed(),
+    }
+}
+
+fn eval_set_arg<'a, E>(
+    evaluator: &'a mut QueryEvaluator<E>,
+    args: &'a [QueryExpression],
+    variables: &'a mut SmallMap<CompactString, E::Set>,
+    index: usize,
+) -> BoxFuture<'a, Result<E::Set, QueryError>>
+where
+    E: QueryEnvironment + Send,
+{
+    match args.get(index) {
+        Some(expression) => evaluator.evaluate_inner(expression, variables),
+        None => async move { Err(QueryError::syntax("missing query function argument")) }.boxed(),
     }
 }
 
@@ -415,12 +411,14 @@ where
         &'a self,
         evaluator: &'a mut QueryEvaluator<E>,
         args: &'a [QueryExpression],
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
-            let roots: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            let roots = eval_set_arg(evaluator, args, variables, 0).await?;
             let depth: QueryDepth = eval_arg(evaluator, args, variables, 1).await?;
-            transitive_closure(&mut evaluator.environment, roots, depth.0).await
+            let roots = evaluator.environment.eval_all(&roots);
+            let result = transitive_closure(&mut evaluator.environment, roots, depth.0).await?;
+            Ok(evaluator.environment.lift_one_delivery(result))
         }
         .boxed()
     }
@@ -440,13 +438,17 @@ where
         &'a self,
         evaluator: &'a mut QueryEvaluator<E>,
         args: &'a [QueryExpression],
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
-            let universe: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
-            let from: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 1).await?;
+            let universe = eval_set_arg(evaluator, args, variables, 0).await?;
+            let from = eval_set_arg(evaluator, args, variables, 1).await?;
             let depth: QueryDepth = eval_arg(evaluator, args, variables, 2).await?;
-            reverse_dependencies(&mut evaluator.environment, universe, from, depth.0).await
+            let universe = evaluator.environment.eval_all(&universe);
+            let from = evaluator.environment.eval_all(&from);
+            let result =
+                reverse_dependencies(&mut evaluator.environment, universe, from, depth.0).await?;
+            Ok(evaluator.environment.lift_one_delivery(result))
         }
         .boxed()
     }
@@ -470,10 +472,10 @@ where
         &'a self,
         evaluator: &'a mut QueryEvaluator<E>,
         args: &'a [QueryExpression],
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
-            let targets: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            let targets = eval_set_arg(evaluator, args, variables, 0).await?;
             evaluator.environment.siblings(&targets).await
         }
         .boxed()
@@ -492,11 +494,12 @@ where
         &'a self,
         evaluator: &'a mut QueryEvaluator<E>,
         args: &'a [QueryExpression],
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
-            let candidates: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            let candidates = eval_set_arg(evaluator, args, variables, 0).await?;
             let count: QuerySelectionCount = eval_arg(evaluator, args, variables, 1).await?;
+            let candidates = evaluator.environment.eval_all(&candidates);
             let mut selected = TargetSet::default();
             if count.0 > 0 {
                 for candidate in candidates.iter().take(count.0 as usize) {
@@ -506,7 +509,7 @@ where
             if selected.iter().next().is_none() {
                 Err(QueryError::evaluation("argument set is empty"))
             } else {
-                Ok(selected)
+                Ok(evaluator.environment.lift_one_delivery(selected))
             }
         }
         .boxed()
@@ -525,12 +528,15 @@ where
         &'a self,
         evaluator: &'a mut QueryEvaluator<E>,
         args: &'a [QueryExpression],
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
-            let from: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
-            let to: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 1).await?;
-            reverse_dependencies(&mut evaluator.environment, from, to, None).await
+            let from = eval_set_arg(evaluator, args, variables, 0).await?;
+            let to = eval_set_arg(evaluator, args, variables, 1).await?;
+            let from = evaluator.environment.eval_all(&from);
+            let to = evaluator.environment.eval_all(&to);
+            let result = reverse_dependencies(&mut evaluator.environment, from, to, None).await?;
+            Ok(evaluator.environment.lift_one_delivery(result))
         }
         .boxed()
     }
@@ -550,12 +556,15 @@ where
         &'a self,
         evaluator: &'a mut QueryEvaluator<E>,
         args: &'a [QueryExpression],
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
-            let from: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
-            let to: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 1).await?;
-            some_path(&mut evaluator.environment, from, to).await
+            let from = eval_set_arg(evaluator, args, variables, 0).await?;
+            let to = eval_set_arg(evaluator, args, variables, 1).await?;
+            let from = evaluator.environment.eval_all(&from);
+            let to = evaluator.environment.eval_all(&to);
+            let result = some_path(&mut evaluator.environment, from, to).await?;
+            Ok(evaluator.environment.lift_one_delivery(result))
         }
         .boxed()
     }
@@ -576,11 +585,50 @@ where
         &'a self,
         evaluator: &'a mut QueryEvaluator<E>,
         args: &'a [QueryExpression],
-        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
-    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
-            let targets: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
-            evaluator.environment.same_pkg_direct_rdeps(&targets).await
+            let targets = eval_set_arg(evaluator, args, variables, 0).await?;
+            let targets = evaluator.environment.eval_all(&targets);
+            let result = evaluator
+                .environment
+                .same_pkg_direct_rdeps(&targets)
+                .await?;
+            Ok(evaluator.environment.lift_one_delivery(result))
+        }
+        .boxed()
+    }
+}
+
+struct LoadingFilesFunction {
+    include_buildfiles: bool,
+}
+
+impl<E> QueryFunction<E> for LoadingFilesFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function(if self.include_buildfiles {
+            "buildfiles"
+        } else {
+            "loadfiles"
+        })
+        .expect("loading file function is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
+        async move {
+            let targets = eval_set_arg(evaluator, args, variables, 0).await?;
+            evaluator
+                .environment
+                .loading_files(&targets, self.include_buildfiles)
+                .await
         }
         .boxed()
     }
@@ -638,43 +686,6 @@ where
         if !children.contains(&to) {
             children.push(to);
         }
-    }
-
-    fn selected_induced(&self, selected: &TargetSet<T>) -> Self
-    where
-        T: Ord,
-    {
-        let mut targets = selected.iter().cloned().collect::<Vec<_>>();
-        targets.sort_unstable();
-        let mut graph = Self::new();
-        graph.nodes.reserve(targets.len());
-        graph.target_to_index.reserve(targets.len());
-        for target in targets {
-            graph.get_or_create(target);
-        }
-        for index in 0..graph.nodes.len() {
-            let target = graph.nodes[index].target.clone();
-            let mut children = self
-                .target_to_index
-                .get(&target)
-                .into_iter()
-                .flat_map(|recorded| self.nodes[*recorded as usize].children.iter())
-                .filter_map(|child| {
-                    graph
-                        .target_to_index
-                        .get(&self.nodes[*child as usize].target)
-                        .copied()
-                })
-                .collect::<Vec<_>>();
-            children.sort_unstable_by(|left, right| {
-                graph.nodes[*left as usize]
-                    .target
-                    .cmp(&graph.nodes[*right as usize].target)
-            });
-            children.dedup();
-            graph.nodes[index].children = children;
-        }
-        graph
     }
 
     fn deterministic_topological_order(&self) -> Vec<T> {
@@ -992,7 +1003,7 @@ where
 /// Buck2 can queue concurrent immutable node lookups. Loading query owns a
 /// mutable `DiceComputations`, so this port preserves the generic lookup /
 /// visited / ordered-queue abstraction while resolving one node at a time.
-pub async fn async_depth_limited_traversal<E>(
+async fn async_depth_limited_traversal<E>(
     environment: &mut E,
     roots: impl IntoIterator<Item = E::Target>,
     max_depth: Option<i32>,
@@ -1025,18 +1036,20 @@ where
     Ok(())
 }
 
-pub struct LoadingQueryEnvironment<'a, 'd> {
+struct LoadingQueryEnvironment<'a, 'd> {
     ctx: &'a mut DiceComputations<'d>,
     workspace: PathBuf,
     evaluation_graph: ResolvedGraph<QueryLabel>,
+    candidates: QueryCandidateArena,
 }
 
 impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
-    pub fn new(ctx: &'a mut DiceComputations<'d>, workspace: PathBuf) -> Self {
+    fn new(ctx: &'a mut DiceComputations<'d>, workspace: PathBuf) -> Self {
         Self {
             ctx,
             workspace,
             evaluation_graph: ResolvedGraph::new(),
+            candidates: QueryCandidateArena::new(),
         }
     }
 
@@ -1140,26 +1153,111 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         }
         Ok(result)
     }
+
+    fn real_delivery(
+        &mut self,
+        labels: impl IntoIterator<Item = QueryLabel>,
+    ) -> QueryCandidateBatches {
+        QueryCandidateBatches::from_delivery(
+            &mut self.candidates,
+            labels.into_iter().map(QueryCandidate::real),
+        )
+    }
+
+    fn selected_full_order(&self, targets: &QueryCandidateBatches) -> Vec<QueryLabel> {
+        let materialized = targets.materialized_by_label(&self.candidates);
+        let mut included = SmallMap::<QueryLabel, bool>::new();
+        for (label, id) in materialized {
+            let candidate = self.candidates.get(id);
+            let real = candidate.evaluation_graph_label().is_some();
+            if !real || self.evaluation_graph.contains(&label) {
+                included.insert(label, real);
+            }
+        }
+
+        let mut labels = included.keys().cloned().collect::<Vec<_>>();
+        labels.sort_unstable();
+        let mut renderer = ResolvedGraph::new();
+        for label in labels {
+            renderer.record_node(label);
+        }
+        for (label, real) in &included {
+            if !real {
+                continue;
+            }
+            let Some(index) = self.evaluation_graph.target_to_index.get(label).copied() else {
+                continue;
+            };
+            for child in self.evaluation_graph.nodes[index as usize]
+                .children
+                .iter()
+                .copied()
+            {
+                let child = &self.evaluation_graph.nodes[child as usize].target;
+                if included.get(child).copied() == Some(true) {
+                    renderer.record_edge(label.clone(), child.clone());
+                }
+            }
+        }
+        renderer.deterministic_topological_order()
+    }
 }
 
 #[async_trait]
 impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
-    type Target = QueryLabel;
+    type Target = QueryCandidateId;
+    type Set = QueryCandidateBatches;
 
-    async fn resolve_literal(
-        &mut self,
-        literal: &str,
-    ) -> Result<TargetSet<Self::Target>, QueryError> {
+    fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
+        let mut seen = SmallSet::new();
+        let mut ids = Vec::new();
+        for set in sets {
+            for (label, id) in set.materialized_by_label(&self.candidates) {
+                if seen.insert(label) {
+                    ids.push(id);
+                }
+            }
+        }
+        QueryCandidateBatches::from_materialized_ids(ids)
+    }
+
+    fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set {
+        left.union(right)
+    }
+
+    fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+        left.intersection(&self.candidates, right)
+    }
+
+    fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+        left.except(&self.candidates, right)
+    }
+
+    fn eval_all(&self, set: &Self::Set) -> TargetSet<Self::Target> {
+        let mut result = TargetSet::default();
+        if let Some(batch) = set.eval_all(&self.candidates) {
+            for id in batch.ids() {
+                result.insert(*id);
+            }
+        }
+        result
+    }
+
+    fn lift_one_delivery(&self, targets: TargetSet<Self::Target>) -> Self::Set {
+        QueryCandidateBatches::from_materialized_ids(targets.iter().copied().collect())
+    }
+
+    async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
         if literal == "//..." {
-            return self.resolve_recursive("").await;
+            let labels = self.resolve_recursive("").await?;
+            return Ok(self.real_delivery(labels.iter().cloned()));
         }
         let pattern = TargetPattern::parse(literal).map_err(QueryError::evaluation)?;
         match pattern {
             TargetPattern::Single(label) => {
                 let label = QueryLabel::parse_root(&label.to_string())?;
-                self.resolve_single(label.clone())
-                    .await
-                    .map(|_| TargetSet::singleton(label))
+                self.resolve_single(label.clone()).await?;
+                Ok(self.real_delivery([label]))
             }
             TargetPattern::PackageAll { repo, package } => {
                 if !repo.is_root() {
@@ -1175,7 +1273,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                     }
                 }
                 self.record_pattern_graph(&graph, &result);
-                Ok(result)
+                Ok(self.real_delivery(result.iter().cloned()))
             }
             TargetPattern::Recursive { repo, package } => {
                 if !repo.is_root() {
@@ -1183,7 +1281,8 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                         "external repository query patterns are deferred: {literal}"
                     )));
                 }
-                self.resolve_recursive(package.as_str()).await
+                let labels = self.resolve_recursive(package.as_str()).await?;
+                Ok(self.real_delivery(labels.iter().cloned()))
             }
         }
     }
@@ -1192,12 +1291,21 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         &mut self,
         target: &Self::Target,
     ) -> Result<Arc<[Self::Target]>, QueryError> {
-        let node = self.resolve_single(target.clone()).await?;
+        let candidate = self.candidates.get(*target).clone();
+        let Some(label) = candidate.evaluation_graph_label().cloned() else {
+            return Ok(Arc::from([]));
+        };
+        let node = self.resolve_single(label.clone()).await?;
+        let mut dependencies = Vec::with_capacity(node.dependencies.len());
         for dependency in node.dependencies.iter() {
             self.evaluation_graph
-                .record_edge(target.clone(), dependency.clone());
+                .record_edge(label.clone(), dependency.clone());
+            dependencies.push(
+                self.candidates
+                    .intern(QueryCandidate::real(dependency.clone())),
+            );
         }
-        Ok(node.dependencies)
+        Ok(dependencies.into())
     }
 
     async fn same_pkg_direct_rdeps(
@@ -1206,10 +1314,18 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
     ) -> Result<TargetSet<Self::Target>, QueryError> {
         let mut by_package = SmallMap::<CompactString, SmallSet<QueryLabel>>::new();
         for target in targets.iter() {
+            let Some(target) = self
+                .candidates
+                .get(*target)
+                .evaluation_graph_label()
+                .cloned()
+            else {
+                continue;
+            };
             by_package
                 .entry(CompactString::new(target.package()))
                 .or_default()
-                .insert(target.clone());
+                .insert(target);
         }
 
         let mut result = TargetSet::default();
@@ -1226,28 +1342,107 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                     .iter()
                     .any(|dependency| package_targets.contains(dependency))
                 {
-                    result.insert(node.label.clone());
+                    result.insert(
+                        self.candidates
+                            .intern(QueryCandidate::real(node.label.clone())),
+                    );
                 }
             }
         }
         Ok(result)
     }
 
-    async fn siblings(
-        &mut self,
-        targets: &TargetSet<Self::Target>,
-    ) -> Result<TargetSet<Self::Target>, QueryError> {
-        let packages = targets
-            .iter()
-            .map(|target| CompactString::new(target.package()))
-            .collect::<SmallSet<_>>();
-        let mut result = TargetSet::default();
-        for package in packages {
-            let graph = self.package_graph(&package).await?;
+    async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        let packages = targets.sibling_packages(&self.candidates);
+        let mut result = QueryCandidateBatches::empty();
+        for package in packages.iter() {
+            let graph = self.package_graph(package).await?;
+            let mut labels = Vec::with_capacity(graph.nodes.len());
             for label in graph.nodes.keys() {
                 self.evaluation_graph.record_node(label.clone());
-                result.insert(label.clone());
+                labels.push(label.clone());
             }
+            result = result.union(self.real_delivery(labels));
+        }
+        Ok(result)
+    }
+
+    async fn loading_files(
+        &mut self,
+        targets: &Self::Set,
+        include_buildfiles: bool,
+    ) -> Result<Self::Set, QueryError> {
+        let mut seen_packages = SmallSet::new();
+        let mut seen_bzl_labels = SmallSet::new();
+        let mut seen_output_labels = SmallSet::new();
+        let mut result = QueryCandidateBatches::empty();
+
+        for batch in targets.batches() {
+            let ids = batch.ids().to_vec();
+            let mut delivered = Vec::new();
+            for id in ids {
+                let candidate = self.candidates.get(id).clone();
+                let candidate_package = CompactString::new(candidate.printed_label().package());
+                if !seen_packages.insert(candidate_package) {
+                    continue;
+                }
+                let owner = candidate.owner_package();
+                let package = self.workspace.join(owner.as_str());
+                let value = self
+                    .ctx
+                    .compute(&PackageLoadKey {
+                        workspace: self.workspace.clone(),
+                        package,
+                    })
+                    .await
+                    .map_err(|error| QueryError::evaluation(error.to_string()))?;
+                let loaded = value
+                    .as_ref()
+                    .as_ref()
+                    .map_err(|error| QueryError::evaluation(error.to_string()))?;
+
+                if include_buildfiles {
+                    let basename = loaded
+                        .build_file
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .ok_or_else(|| {
+                            QueryError::evaluation("loaded BUILD file has no UTF-8 basename")
+                        })?;
+                    let label = QueryLabel::parse_root(&format!("//{owner}:{basename}"))?;
+                    if seen_output_labels.insert(label.clone()) {
+                        delivered.push(QueryCandidate::real(label));
+                    }
+                }
+
+                for load in loaded.reachable_loads.iter() {
+                    let label = QueryLabel::from_canonical(load.label.clone());
+                    if !seen_bzl_labels.insert(label.clone()) {
+                        continue;
+                    }
+                    if seen_output_labels.insert(label.clone()) {
+                        delivered.push(QueryCandidate::fake(label.clone(), owner.clone()));
+                    }
+                    if include_buildfiles {
+                        let load_package =
+                            self.workspace.join(load.label.package().package().as_str());
+                        let companion =
+                            discover_build_file_companion(self.ctx, &self.workspace, &load_package)
+                                .await
+                                .map_err(|error| QueryError::evaluation(error.to_string()))?;
+                        if let Some(companion) = companion {
+                            let label = QueryLabel::from_canonical(companion.label);
+                            if seen_output_labels.insert(label.clone()) {
+                                delivered.push(QueryCandidate::fake(label, owner.clone()));
+                            }
+                        }
+                    }
+                }
+            }
+            result = result.union(QueryCandidateBatches::from_delivery(
+                &mut self.candidates,
+                delivered,
+            ));
         }
         Ok(result)
     }
@@ -1265,13 +1460,13 @@ pub async fn evaluate_loading_query(
     let mut evaluator = QueryEvaluator::new(LoadingQueryEnvironment::new(ctx, workspace));
     let targets = evaluator.evaluate(&expression).await?;
     let mut labels = if order == QueryOrder::Full {
-        evaluator
-            .environment
-            .evaluation_graph
-            .selected_induced(&targets)
-            .deterministic_topological_order()
+        evaluator.environment.selected_full_order(&targets)
     } else {
-        targets.iter().cloned().collect::<Vec<_>>()
+        targets
+            .unique_output_labels(&evaluator.environment.candidates)
+            .iter()
+            .cloned()
+            .collect()
     };
     if order == QueryOrder::Auto && !expression.is_top_level_somepath() {
         labels.sort_unstable();

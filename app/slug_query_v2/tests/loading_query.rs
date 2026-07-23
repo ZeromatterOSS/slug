@@ -309,6 +309,165 @@ async fn siblings_exposes_only_the_active_build_file_node_and_all_package_nodes(
 }
 
 #[tokio::test]
+async fn loading_files_preserve_fake_owners_and_projection_boundaries() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("a/BUILD.bazel"),
+        "load(\"//shared:defs.bzl\", \"defs\")\nfilegroup(name = \"a\")\n",
+    );
+    write(
+        workspace.join("b/BUILD.bazel"),
+        "load(\"//shared:defs.bzl\", \"defs\")\nfilegroup(name = \"b\")\n",
+    );
+    write(
+        workspace.join("shared/BUILD.bazel"),
+        "exports_files([\"defs.bzl\"])\nfilegroup(name = \"shared\")\n",
+    );
+    write(
+        workspace.join("shared/defs.bzl"),
+        "load(\"//left:left.bzl\", \"left\")\n\
+         load(\"//right:right.bzl\", \"right\")\n\
+         defs = left + right\n",
+    );
+    write(
+        workspace.join("left/BUILD.bazel"),
+        "exports_files([\"left.bzl\"])\n",
+    );
+    write(
+        workspace.join("left/left.bzl"),
+        "load(\"//leaf:leaf.bzl\", \"leaf\")\nleft = leaf\n",
+    );
+    write(
+        workspace.join("right/BUILD.bazel"),
+        "exports_files([\"right.bzl\"])\n",
+    );
+    write(
+        workspace.join("right/right.bzl"),
+        "load(\"//leaf:leaf.bzl\", \"leaf\")\nright = leaf\n",
+    );
+    write(
+        workspace.join("leaf/BUILD.bazel"),
+        "exports_files([\"leaf.bzl\"])\n",
+    );
+    write(workspace.join("leaf/leaf.bzl"), "leaf = 1\n");
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, expected) in [
+        (
+            "loadfiles(//a:a)",
+            "//leaf:leaf.bzl\n//left:left.bzl\n//right:right.bzl\n//shared:defs.bzl\n",
+        ),
+        (
+            "loadfiles(loadfiles(//a:a))",
+            "//leaf:leaf.bzl\n//left:left.bzl\n//right:right.bzl\n//shared:defs.bzl\n",
+        ),
+        ("loadfiles(set())", ""),
+        (
+            "buildfiles(//a:a)",
+            "//a:BUILD.bazel\n//leaf:BUILD.bazel\n//leaf:leaf.bzl\n//left:BUILD.bazel\n//left:left.bzl\n//right:BUILD.bazel\n//right:right.bzl\n//shared:BUILD.bazel\n//shared:defs.bzl\n",
+        ),
+        (
+            "buildfiles(buildfiles(//a:a))",
+            "//a:BUILD.bazel\n//leaf:BUILD.bazel\n//leaf:leaf.bzl\n//left:BUILD.bazel\n//left:left.bzl\n//right:BUILD.bazel\n//right:right.bzl\n//shared:BUILD.bazel\n//shared:defs.bzl\n",
+        ),
+        (
+            "deps(loadfiles(//a:a))",
+            "//leaf:leaf.bzl\n//left:left.bzl\n//right:right.bzl\n//shared:defs.bzl\n",
+        ),
+        (
+            "siblings(loadfiles(//a:a) union loadfiles(//b:b))",
+            "//a:BUILD.bazel\n//a:a\n//b:BUILD.bazel\n//b:b\n",
+        ),
+        (
+            "siblings(loadfiles(//b:b) union loadfiles(//a:a))",
+            "//a:BUILD.bazel\n//a:a\n//b:BUILD.bazel\n//b:b\n",
+        ),
+        (
+            "siblings(loadfiles(//a:a) intersect //shared:defs.bzl)",
+            "//a:BUILD.bazel\n//a:a\n",
+        ),
+        (
+            "siblings(//shared:defs.bzl intersect loadfiles(//a:a))",
+            "//shared:BUILD.bazel\n//shared:defs.bzl\n//shared:shared\n",
+        ),
+        (
+            "loadfiles(//a:a) except //shared:defs.bzl",
+            "//leaf:leaf.bzl\n//left:left.bzl\n//right:right.bzl\n",
+        ),
+        ("//shared:defs.bzl except loadfiles(//a:a)", ""),
+    ] {
+        let output = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+
+    for (expression, expected) in [
+        (
+            "loadfiles(//a:a)",
+            "//shared:defs.bzl\n//right:right.bzl\n//left:left.bzl\n//leaf:leaf.bzl\n",
+        ),
+        (
+            "buildfiles(//a:a)",
+            "//shared:defs.bzl\n//shared:BUILD.bazel\n//right:right.bzl\n//right:BUILD.bazel\n//left:left.bzl\n//left:BUILD.bazel\n//leaf:leaf.bzl\n//leaf:BUILD.bazel\n",
+        ),
+        (
+            "deps(buildfiles(//a:a))",
+            "//shared:defs.bzl\n//shared:BUILD.bazel\n//right:right.bzl\n//right:BUILD.bazel\n//left:left.bzl\n//left:BUILD.bazel\n//leaf:leaf.bzl\n//leaf:BUILD.bazel\n//a:BUILD.bazel\n",
+        ),
+    ] {
+        let output = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Full,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+}
+
+#[tokio::test]
+async fn buildfiles_discovers_a_broken_load_package_companion_without_loading_it() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("app/BUILD.bazel"),
+        "load(\"//broken:defs.bzl\", \"defs\")\nfilegroup(name = \"app\")\n",
+    );
+    write(
+        workspace.join("broken/defs.bzl"),
+        "load(\"//no_build:leaf.bzl\", \"leaf\")\ndefs = leaf\n",
+    );
+    write(workspace.join("broken/BUILD.bazel"), "this is not valid(\n");
+    write(workspace.join("no_build/leaf.bzl"), "leaf = 1\n");
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let output = evaluate_loading_query(
+        &mut transaction,
+        workspace.clone(),
+        "buildfiles(//app:app)",
+        QueryOrder::Auto,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        output.stdout(),
+        "//app:BUILD.bazel\n//broken:BUILD.bazel\n//broken:defs.bzl\n//no_build:leaf.bzl\n"
+    );
+}
+
+#[tokio::test]
 async fn package_graph_has_one_zero_edge_build_file_node_synthesized_or_coalesced() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");

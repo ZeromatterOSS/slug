@@ -50,8 +50,8 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 }
 
 // QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query
-// registry source of truth. This packet adds only the reviewed path-query pair
-// to the existing deps/reverse vertical.
+// registry source of truth. Loading-file provenance activates buildfiles and
+// loadfiles while the other ordinary functions remain deferred.
 #[test]
 fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures() {
     assert_eq!(loading_query_functions().len(), 16);
@@ -63,7 +63,9 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             .collect::<Vec<_>>(),
         [
             "allpaths",
+            "buildfiles",
             "deps",
+            "loadfiles",
             "rdeps",
             "same_pkg_direct_rdeps",
             "siblings",
@@ -112,6 +114,15 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
     )
     .unwrap();
     validate_loading_query(&QueryExpression::parse("some(//:single, '-1')").unwrap()).unwrap();
+    validate_loading_query(&QueryExpression::parse("buildfiles(//pkg:bin)").unwrap()).unwrap();
+    validate_loading_query(&QueryExpression::parse("loadfiles(//pkg:bin)").unwrap()).unwrap();
+    assert_eq!(
+        loading_query_functions()
+            .iter()
+            .filter(|function| function.status == QueryFunctionStatus::Deferred)
+            .count(),
+        7
+    );
 }
 
 #[test]

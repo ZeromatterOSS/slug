@@ -115,7 +115,12 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
         status: QueryFunctionStatus::Implemented,
     },
     deferred("attr", 3, &[WORD, WORD, EXPR]),
-    deferred("buildfiles", 1, &[EXPR]),
+    QueryFunctionSpec {
+        name: "buildfiles",
+        mandatory_arguments: 1,
+        argument_kinds: &[EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     QueryFunctionSpec {
         name: "deps",
         mandatory_arguments: 1,
@@ -126,7 +131,12 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
     deferred("filter", 2, &[WORD, EXPR]),
     deferred("kind", 2, &[WORD, EXPR]),
     deferred("labels", 2, &[WORD, EXPR]),
-    deferred("loadfiles", 1, &[EXPR]),
+    QueryFunctionSpec {
+        name: "loadfiles",
+        mandatory_arguments: 1,
+        argument_kinds: &[EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     QueryFunctionSpec {
         name: "rdeps",
         mandatory_arguments: 2,

@@ -10,11 +10,9 @@
 
 //! Request-local real/fake query candidate identity and set algebra.
 //!
-//! This module deliberately does not activate any query function. It preserves
-//! candidate provenance until an operation's Bazel label-keyed materialization
-//! boundary, while keeping fake candidates out of the real evaluation graph.
-
-#![allow(dead_code)] // Gate A substrate remains disconnected until Gate B activation.
+//! Candidate provenance is preserved until an operation's Bazel label-keyed
+//! materialization boundary, while fake candidates remain outside the real
+//! evaluation graph.
 
 use std::sync::Arc;
 
@@ -77,7 +75,7 @@ impl QueryCandidate {
         }
     }
 
-    fn sibling_package(&self) -> CompactString {
+    pub(crate) fn owner_package(&self) -> CompactString {
         match self {
             Self::Real(label) => CompactString::new(label.package()),
             Self::Fake {
@@ -238,7 +236,7 @@ impl QueryCandidateBatches {
         let mut packages = SmallSet::new();
         for batch in &self.batches {
             for id in batch.ids.iter().copied() {
-                packages.insert(arena.get(id).sibling_package());
+                packages.insert(arena.get(id).owner_package());
             }
         }
         packages.into_iter().collect::<Vec<_>>().into()
@@ -254,13 +252,13 @@ impl QueryCandidateBatches {
             .into()
     }
 
-    fn from_materialized_ids(ids: Vec<QueryCandidateId>) -> Self {
+    pub(crate) fn from_materialized_ids(ids: Vec<QueryCandidateId>) -> Self {
         Self {
             batches: QueryCandidateBatch::from_ids(ids).into_iter().collect(),
         }
     }
 
-    fn materialized_by_label(
+    pub(crate) fn materialized_by_label(
         &self,
         arena: &QueryCandidateArena,
     ) -> SmallMap<QueryLabel, QueryCandidateId> {
