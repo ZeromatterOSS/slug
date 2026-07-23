@@ -1,0 +1,938 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//modern:BUILD.bazel"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//modern:BUILD.bazel"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "modern_actual_build_bazel",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-032909-569623-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 546ed066-3f63-4e8d-a268-4e619d8e149c\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//modern:BUILD"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//modern:BUILD"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "modern_wrong_build_missing",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//modern:BUILD': target 'BUILD' not declared in package 'modern' defined by <workspace>/modern/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: b29e4c0d-f234-4b03-82b0-8818732beed6\nLoading: 0 packages loaded\nERROR: no such target '//modern:BUILD': target 'BUILD' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel/workspace/modern/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//fallback:BUILD"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//fallback:BUILD"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "fallback_actual_build",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//fallback:BUILD",
+      "stderr": "INFO: Invocation ID: ac27c53c-3861-477d-9962-00e0ced2f21b\nLoading: 0 packages loaded\n",
+      "stdout": "//fallback:BUILD\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//fallback:BUILD.bazel"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//fallback:BUILD.bazel"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "fallback_wrong_build_bazel_missing",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//fallback:BUILD.bazel': target 'BUILD.bazel' not declared in package 'fallback' defined by <workspace>/fallback/BUILD",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 9e575ea0-e7e7-4272-9f62-5bef6a23fac7\nLoading: 0 packages loaded\nERROR: no such target '//fallback:BUILD.bazel': target 'BUILD.bazel' not declared in package 'fallback' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel/workspace/fallback/BUILD\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//fallback:BUILD)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//fallback:BUILD)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_fallback_actual_build_once",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//fallback:BUILD\n//fallback:only",
+      "stderr": "INFO: Invocation ID: 515e27be-1e6e-4e89-8fb3-b79a06a6e244\nLoading: 0 packages loaded\n",
+      "stdout": "//fallback:BUILD\n//fallback:only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:BUILD.bazel"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:BUILD.bazel"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "root_actual_build_bazel",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: d87366e1-90da-4db8-9d3a-767aa8e3e79b\nLoading: 0 packages loaded\n",
+      "stdout": "//:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:BUILD"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:BUILD"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "root_wrong_build_missing",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//:BUILD': target 'BUILD' not declared in package '' defined by <workspace>/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ffb46293-a799-49ba-83b2-4da3733fdcf0\nLoading: 0 packages loaded\nERROR: no such target '//:BUILD': target 'BUILD' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel/workspace/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//:BUILD.bazel)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//:BUILD.bazel)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_root_actual_build_bazel_once",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:BUILD.bazel\n//:root_rule",
+      "stderr": "INFO: Invocation ID: dbbd6254-07eb-4145-8f5d-7412903ed85a\nLoading: 0 packages loaded\n",
+      "stdout": "//:BUILD.bazel\n//:root_rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//dual:preferred"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//dual:preferred"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "dual_build_bazel_priority_target",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//dual:preferred",
+      "stderr": "INFO: Invocation ID: 843030e2-d125-456a-a73f-d416c3fac090\nLoading: 0 packages loaded\n",
+      "stdout": "//dual:preferred\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//dual:BUILD.bazel"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//dual:BUILD.bazel"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "dual_build_file_is_build_bazel",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//dual:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 9b42cf6e-08d9-46d8-b7c9-a3a2eabd0e3f\nLoading: 0 packages loaded\n",
+      "stdout": "//dual:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//dual:BUILD"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//dual:BUILD"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "dual_wrong_build_missing_despite_ignored_build_file",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//dual:BUILD': target 'BUILD' not declared in package 'dual' defined by <workspace>/dual/BUILD.bazel; however, a source file of this name exists.  (Perhaps add 'exports_files([\"BUILD\"])' to dual/BUILD.bazel?)",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 22c9f784-9f2d-402f-9762-4aa83aa4bd30\nLoading: 0 packages loaded\nERROR: no such target '//dual:BUILD': target 'BUILD' not declared in package 'dual' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel/workspace/dual/BUILD.bazel; however, a source file of this name exists.  (Perhaps add 'exports_files([\"BUILD\"])' to dual/BUILD.bazel?)\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//dual:BUILD.bazel)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//dual:BUILD.bazel)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_dual_actual_build_bazel_excludes_ignored_build",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//dual:BUILD.bazel\n//dual:preferred",
+      "stderr": "INFO: Invocation ID: 6f0ee7b2-2109-4d15-a917-1313995ee540\nLoading: 0 packages loaded\n",
+      "stdout": "//dual:BUILD.bazel\n//dual:preferred\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//dual:ignored"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//dual:ignored"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "dual_ignored_build_target_missing",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//dual:ignored': target 'ignored' not declared in package 'dual' defined by <workspace>/dual/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 6cda3907-e27c-4abe-a6fd-7458b4275440\nLoading: 0 packages loaded\nERROR: no such target '//dual:ignored': target 'ignored' not declared in package 'dual' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel/workspace/dual/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:BUILD.bazel)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:BUILD.bazel)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "modern_exported_active_build_once",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 1f311e3f-7173-4945-ad66-9837371510e3\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:rule)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:rule)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_rule_default",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 267e7737-cef5-4b14-9aee-f17f57574ad1\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:explicit.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:explicit.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_explicit_source",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 2e72274c-32c3-49f2-bfe2-52d8ceeb4343\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:implicit.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:implicit.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_attribute_created_source",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 4b327f21-da2b-4674-904b-546cc806d657\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:alias)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:alias)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_alias",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 9cbcc221-7bba-40ac-a467-2f16c30721ca\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:custom)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:custom)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_custom_rule",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 32b31682-8c5a-4044-8830-211c9c4261ee\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//namedall:BUILD.bazel)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//namedall:BUILD.bazel)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_target_named_all_via_actual_build",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//namedall:BUILD.bazel\n//namedall:all\n//namedall:other",
+      "stderr": "INFO: Invocation ID: 9865d6dd-47f4-4648-af73-1af04fd4adf5\nLoading: 0 packages loaded\n",
+      "stdout": "//namedall:BUILD.bazel\n//namedall:all\n//namedall:other\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(set(//modern:rule //modern:alias //modern:rule))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(set(//modern:rule //modern:alias //modern:rule))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_duplicate_same_package",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: c0b8ea66-aa44-46d4-a693-be2828404e4c\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(set(//modern:rule //fallback:only))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(set(//modern:rule //fallback:only))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_multiple_packages",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 8c1ff4e6-6c7f-4fe3-aa50-cfecb7cdb0b9\nLoading: 0 packages loaded\n",
+      "stdout": "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(set())"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(set())"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_empty_set",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: dd5c824e-e2ef-4913-9b65-bdbcd0946642\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:rule) union //fallback:only"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:rule) union //fallback:only"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_union",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 9c530b72-9623-490d-91be-968d2a3848b8\nLoading: 0 packages loaded\n",
+      "stdout": "//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(set(//modern:rule //fallback:only))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(set(//modern:rule //fallback:only))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_set",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 42ea7eca-4973-41f0-be34-878e6ed8526d\nLoading: 0 packages loaded\n",
+      "stdout": "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:rule) intersect set(//modern:BUILD.bazel //modern:rule //fallback:only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:rule) intersect set(//modern:BUILD.bazel //modern:rule //fallback:only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_intersect",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 512deb02-b77e-4129-8dd9-e5b81507d878\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:rule) except set(//modern:BUILD.bazel //modern:implicit.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:rule) except set(//modern:BUILD.bazel //modern:implicit.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_except",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: 4ea43347-2527-47a7-a65f-846720a0e59d\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//modern:BUILD.bazel)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//modern:BUILD.bazel)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_actual_build_is_self",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 414fb8a8-a4de-40ff-9640-217974b7975a\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(siblings(//modern:rule), //modern:BUILD.bazel)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(siblings(//modern:rule), //modern:BUILD.bazel)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_build_zero_edge",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 5be96b4a-d1a2-4d92-a566-8c8147ae7ef5\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps(//modern:BUILD.bazel)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps(//modern:BUILD.bazel)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_direct_rdeps_build_zero_edge",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 0b0b5fc4-db10-43c5-9e26-7527400a879d\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "siblings(//modern:rule)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "siblings(//modern:rule)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_auto_chain",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
+      "stderr": "INFO: Invocation ID: ff0cb73e-d152-45fd-b3ec-557c6767a629\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "siblings(//modern:rule)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "siblings(//modern:rule)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_full_chain",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 418f4c57-fb6b-4d4c-a6a5-3b5b9449681e\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "siblings(//modern:cycle_a)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "siblings(//modern:cycle_a)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_full_cycle",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 84b5a911-5e47-497f-8440-d27abacb570f\nLoading: 0 packages loaded\n",
+      "stdout": "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings()"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings()"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_too_few_arguments",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings()': too few arguments to function 'siblings' at ')'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8a1320af-46a2-4b7a-8515-a2b1a82795c7\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings()': too few arguments to function 'siblings' at ')'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:rule, //fallback:only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:rule, //fallback:only)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_too_many_arguments",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(//modern:rule, //fallback:only)': too many arguments to function 'siblings' at ', //fallback:only )'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: d4922250-841f-41e1-9ddb-11edcf6198b8\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(//modern:rule, //fallback:only)': too many arguments to function 'siblings' at ', //fallback:only )'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings("
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings("
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_premature_syntax",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(': premature end of input",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 0aeb97cd-be37-4e2f-91f1-bc0327d79677\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(': premature end of input\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:missing)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:missing)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_missing_target",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by <workspace>/modern/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 728108f0-0d94-4539-9be3-03c81e175b6e\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel/workspace/modern/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//missing:target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//missing:target)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_missing_package",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 570941f0-6f6b-46e1-a897-1334617d41ac\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:rule union //modern:missing)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:rule union //modern:missing)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_later_missing_target_no_partial_stdout",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by <workspace>/modern/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8b56a7d9-1cec-4b19-a01d-a17be872bdcc\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel/workspace/modern/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//modern:rule union //missing:target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//modern:rule union //missing:target)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_later_missing_package_no_partial_stdout",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: c834f702-cf6f-4fc9-bf5c-e965beea404d\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "query-siblings-build-file-node",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

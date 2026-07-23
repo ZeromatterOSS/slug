@@ -1,0 +1,3 @@
+exports_files(["BUILD.bazel"])
+filegroup(name = "all")
+filegroup(name = "other")

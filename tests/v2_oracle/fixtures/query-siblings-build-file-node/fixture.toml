@@ -1,0 +1,276 @@
+[fixture]
+name = "query-siblings-build-file-node"
+description = "Bazel 9.2 ordinary-query oracle for siblings() and actual package BUILD-file target basenames."
+comparison = "message_shape"
+oracle_notes = "Root-repository loading-query slice only. BUILD-file labels follow the active loaded basename (BUILD.bazel preferred over BUILD); exports_files of that active file is observed exactly once. No buildfiles/loadfiles/fake .bzl, kind/regex, generated/output, external, configured, or action semantics are claimed."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/SiblingsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryEnvironment.java#TargetAccessor",
+  "src/main/java/com/google/devtools/build/lib/pkgcache/PackageProvider.java",
+  "src/main/java/com/google/devtools/build/lib/packages/Package.java",
+  "src/test/java/com/google/devtools/build/lib/packages/PackageFactoryTest.java",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSiblings_simple",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSiblings_duplicatePackages",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSiblings_samePackageRdeps",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSiblings_matchesTargetNamedAll",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSiblings_withBuildfiles",
+]
+translation_notes = "Ports only siblings package projection and PackageProvider active-BUILD basename behavior into a root-only graph. AbstractQueryTest kind/buildfiles interactions are source themes for node containment and are deliberately not accepted Slug commands. BUILD and BUILD.bazel targets are ordinary source-like query targets with zero dependency edges in the intended V2 packet."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-siblings-build-file-node --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-siblings-build-file-node --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "modern_actual_build_bazel"
+argv = ["query", "//modern:BUILD.bazel"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "modern_wrong_build_missing"
+argv = ["query", "//modern:BUILD"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//modern:BUILD'"]
+
+[[commands]]
+name = "fallback_actual_build"
+argv = ["query", "//fallback:BUILD"]
+expected_exit = 0
+stdout_patterns = ["\\A//fallback:BUILD\\Z"]
+
+[[commands]]
+name = "fallback_wrong_build_bazel_missing"
+argv = ["query", "//fallback:BUILD.bazel"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//fallback:BUILD.bazel'"]
+
+[[commands]]
+name = "siblings_fallback_actual_build_once"
+argv = ["query", "siblings(//fallback:BUILD)"]
+expected_exit = 0
+stdout_patterns = ["\\A//fallback:BUILD\\n//fallback:only\\Z"]
+
+[[commands]]
+name = "root_actual_build_bazel"
+argv = ["query", "//:BUILD.bazel"]
+expected_exit = 0
+stdout_patterns = ["\\A//:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "root_wrong_build_missing"
+argv = ["query", "//:BUILD"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:BUILD'"]
+
+[[commands]]
+name = "siblings_root_actual_build_bazel_once"
+argv = ["query", "siblings(//:BUILD.bazel)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:BUILD\\.bazel\\n//:root_rule\\Z"]
+
+[[commands]]
+name = "dual_build_bazel_priority_target"
+argv = ["query", "//dual:preferred"]
+expected_exit = 0
+stdout_patterns = ["\\A//dual:preferred\\Z"]
+
+[[commands]]
+name = "dual_build_file_is_build_bazel"
+argv = ["query", "//dual:BUILD.bazel"]
+expected_exit = 0
+stdout_patterns = ["\\A//dual:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "dual_wrong_build_missing_despite_ignored_build_file"
+argv = ["query", "//dual:BUILD"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//dual:BUILD'"]
+
+[[commands]]
+name = "siblings_dual_actual_build_bazel_excludes_ignored_build"
+argv = ["query", "siblings(//dual:BUILD.bazel)"]
+expected_exit = 0
+stdout_patterns = ["\\A//dual:BUILD\\.bazel\\n//dual:preferred\\Z"]
+
+[[commands]]
+name = "dual_ignored_build_target_missing"
+argv = ["query", "//dual:ignored"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//dual:ignored'"]
+
+[[commands]]
+name = "modern_exported_active_build_once"
+argv = ["query", "siblings(//modern:BUILD.bazel)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_rule_default"
+argv = ["query", "siblings(//modern:rule)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_explicit_source"
+argv = ["query", "siblings(//modern:explicit.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_attribute_created_source"
+argv = ["query", "siblings(//modern:implicit.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_alias"
+argv = ["query", "siblings(//modern:alias)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_custom_rule"
+argv = ["query", "siblings(//modern:custom)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_target_named_all_via_actual_build"
+argv = ["query", "siblings(//namedall:BUILD.bazel)"]
+expected_exit = 0
+stdout_patterns = ["\\A//namedall:BUILD\\.bazel\\n//namedall:all\\n//namedall:other\\Z"]
+
+[[commands]]
+name = "siblings_duplicate_same_package"
+argv = ["query", "siblings(set(//modern:rule //modern:alias //modern:rule))"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_multiple_packages"
+argv = ["query", "siblings(set(//modern:rule //fallback:only))"]
+expected_exit = 0
+stdout_patterns = ["\\A//fallback:BUILD\\n//fallback:only\\n//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_empty_set"
+argv = ["query", "siblings(set())"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "siblings_union"
+argv = ["query", "siblings(//modern:rule) union //fallback:only"]
+expected_exit = 0
+stdout_patterns = ["\\A//fallback:only\\n//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_set"
+argv = ["query", "siblings(set(//modern:rule //fallback:only))"]
+expected_exit = 0
+stdout_patterns = ["\\A//fallback:BUILD\\n//fallback:only\\n//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_intersect"
+argv = ["query", "siblings(//modern:rule) intersect set(//modern:BUILD.bazel //modern:rule //fallback:only)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_except"
+argv = ["query", "siblings(//modern:rule) except set(//modern:BUILD.bazel //modern:implicit.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "deps_actual_build_is_self"
+argv = ["query", "deps(//modern:BUILD.bazel)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "rdeps_build_zero_edge"
+argv = ["query", "rdeps(siblings(//modern:rule), //modern:BUILD.bazel)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "same_pkg_direct_rdeps_build_zero_edge"
+argv = ["query", "same_pkg_direct_rdeps(//modern:BUILD.bazel)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "siblings_auto_chain"
+argv = ["query", "--order_output=auto", "siblings(//modern:rule)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:BUILD\\.bazel\\n//modern:alias\\n//modern:custom\\n//modern:cycle_a\\n//modern:cycle_b\\n//modern:explicit.txt\\n//modern:implicit.txt\\n//modern:leaf\\n//modern:rule\\Z"]
+
+[[commands]]
+name = "siblings_full_chain"
+argv = ["query", "--order_output=full", "siblings(//modern:rule)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:rule\\n//modern:leaf\\n//modern:implicit.txt\\n//modern:explicit.txt\\n//modern:cycle_b\\n//modern:cycle_a\\n//modern:custom\\n//modern:alias\\n//modern:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "siblings_full_cycle"
+argv = ["query", "--order_output=full", "siblings(//modern:cycle_a)"]
+expected_exit = 0
+stdout_patterns = ["\\A//modern:rule\\n//modern:leaf\\n//modern:implicit.txt\\n//modern:explicit.txt\\n//modern:cycle_b\\n//modern:cycle_a\\n//modern:custom\\n//modern:alias\\n//modern:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "siblings_too_few_arguments"
+argv = ["query", "siblings()"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too few arguments to function 'siblings'"]
+
+[[commands]]
+name = "siblings_too_many_arguments"
+argv = ["query", "siblings(//modern:rule, //fallback:only)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too many arguments to function 'siblings'"]
+
+[[commands]]
+name = "siblings_premature_syntax"
+argv = ["query", "siblings("]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["premature end of input"]
+
+[[commands]]
+name = "siblings_missing_target"
+argv = ["query", "siblings(//modern:missing)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//modern:missing'"]
+
+[[commands]]
+name = "siblings_missing_package"
+argv = ["query", "siblings(//missing:target)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such package 'missing': BUILD file not found"]
+
+[[commands]]
+name = "siblings_later_missing_target_no_partial_stdout"
+argv = ["query", "siblings(//modern:rule union //modern:missing)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//modern:missing'"]
+
+[[commands]]
+name = "siblings_later_missing_package_no_partial_stdout"
+argv = ["query", "siblings(//modern:rule union //missing:target)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such package 'missing': BUILD file not found"]

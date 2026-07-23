@@ -1,0 +1,10 @@
+load("//defs:defs.bzl", "custom_rule")
+
+exports_files(["BUILD.bazel", "explicit.txt"])
+
+filegroup(name = "leaf")
+filegroup(name = "rule", srcs = [":leaf", ":explicit.txt", ":implicit.txt"])
+filegroup(name = "cycle_a", srcs = [":cycle_b"])
+filegroup(name = "cycle_b", srcs = [":cycle_a"])
+alias(name = "alias", actual = ":rule")
+custom_rule(name = "custom", dep = ":leaf")
