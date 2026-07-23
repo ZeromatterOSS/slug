@@ -65,6 +65,9 @@ Start from the live checkout, not from memory.
   by `SLUG_V2_BIN`.
 - Clean stale `slugd` processes before and after Slug smokes or focused
   daemon-sensitive tests.
+- Bazel commands may use ordinary RC discovery and the user's `~/.bazelrc` for
+  BuildBuddy authentication. Never inspect, print, copy, or commit its contents;
+  no credential or derived secret material may enter this checkout or Git.
 
 ## DICE and incremental state
 

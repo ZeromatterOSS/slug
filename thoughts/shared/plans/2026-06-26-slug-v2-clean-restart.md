@@ -149,6 +149,10 @@ owner plan records the bounded repair before M0 acceptance.
   development/CI lane; sibling `../actiond` is the preferred hermetic local
   conformance backend; NativeLink remains a useful regression backend. All sit
   behind the same REAPI boundary.
+- Bazel invocations may use ordinary RC discovery and consume the user's
+  `~/.bazelrc` for BuildBuddy authentication. Agents and inspection tools must
+  never read or copy its contents, and credentials or derived secret material
+  must never enter this checkout, logs intended for commit, or Git history.
 - Slug-local sandbox implementation is deferred until after analysis, exact
   `aquery`, remote execution, and cache correctness. Backend isolation supplied
   by BuildBuddy or actiond does not count as a Slug sandbox implementation.
@@ -218,6 +222,14 @@ order. Use this overlay for scheduling new packets:
 | M6: execution and caching | Stage 6 actions execute and replay only through REAPI | 7 | BuildBuddy and local actiond evidence prove upload, execute, AC, and materialization with zero direct-local actions. |
 | M7: command/ruleset breadth | `build`, `run`, `test`, BEP, and public rulesets use the accepted graph and executor | 8 | Focused public fixtures match; stress projects remain supplemental. |
 | M8: bootstrap | Bazel-built Slug builds Slug and reaches a self-hosted fixed point | 10 | Stage1 and stage2 action graphs and declared outputs match. |
+
+M3 progress: implementation commit `61ca25db` lands the first accepted
+DICE-backed loading-query thin vertical over the root repository, with
+Buck2-derived parser/evaluator/traversal seams and retained-daemon execution.
+It passes the Bazel 9.2 `query-parser-and-sets` and
+`query-loading-thin-vertical` oracle fixtures through Slug. M3 remains open for
+the remaining functions, repositories and patterns, ordering modes, and
+formatters; this checkpoint must not be described as full query parity.
 
 ## Two-Tier Work-Packet Contract
 

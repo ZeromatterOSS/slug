@@ -562,9 +562,11 @@ Implementation steps:
    fresh-runtime convenience path may call the identical runtime entry point,
    but it is not same-daemon evidence.
 5. Add exact `ActivationTracker` multiset regressions: initial evaluation;
-   zero activation on an identical revision; no package-graph activation for
-   an unrelated package BUILD edit during a literal `deps()` query; deliberate
-   package-set validation and affected package evaluation for `//...`; BUILD
+   zero activation on an identical revision; no package-graph evaluation for
+   an unrelated package BUILD edit during a literal `deps()` query (the
+   retained global observation revision may honestly emit `Reused` validation
+   callbacks, as in the accepted Stage 6 evidence); deliberate package-set
+   validation and affected package evaluation for `//...`; BUILD
    target/edge edit; package create/delete/recreate via directory inputs; and
    dependency changes reflected by `deps` without restarting the runtime.
 6. Run the affected/downstream suite serially and obtain Sol-low
@@ -641,7 +643,86 @@ Externally observed loading-graph facts:
 Generation and independent no-update reruns passed for both fixtures using
 `/usr/bin/bazel` 9.2.0. Fixture discovery, immutable provenance,
 `generated: true`, exact stdout/stderr pattern coverage, whitespace checks, and
-candidate credential scans passed. Bazel used ordinary RC discovery; no
-external RC or credential file was read, copied, logged into project files, or
-committed. Sol-low requested the deliberately absent source-label case, then
-returned `ACCEPT` after regeneration and an independent root rerun.
+candidate credential scans passed. Bazel was allowed ordinary RC discovery,
+including the user's `~/.bazelrc`; no agent or inspection tool read its
+contents, and no external RC or credential content was copied, logged into
+project files, or committed. Sol-low requested the deliberately absent
+source-label case, then returned `ACCEPT` after regeneration and an independent
+root rerun.
+
+#### Implementation evidence landed (2026-07-23)
+
+Implementation commit `61ca25db` completes
+`WP-8-m3-loading-query-thin-vertical`. It remains a thin vertical, not full
+loading-query parity or M3 completion.
+
+Reuse and ownership:
+
+- `slug_query_v2::parser` ports Buck2's borrowed `Span`, `nom` combinators,
+  `spanned()` locations, generic-call parsing, and non-recursive
+  `BinaryOpSequence` from
+  `app/buck2_query_parser/src/{lib.rs,span.rs,spanned.rs}`. Bazel `let`,
+  Bazel-owned diagnostics, and compact owned lowering are the V2 deltas.
+- The evaluator ports the `QueryFunctions`/`QueryFunction::invoke` and typed
+  required/optional argument seams from Buck2
+  `query/syntax/simple/{functions.rs,functions/helpers.rs,eval/evaluator.rs}`.
+  The complete 16-function Bazel 9.2 loading registry is V2-owned; only
+  `deps` is callable and the other 15 functions fail explicitly.
+- Depth-limited traversal adapts Buck2
+  `query/{traversal.rs,graph/visited.rs}`. It retains ordered compact visited
+  state but resolves serially because the loading environment owns mutable
+  `DiceComputations`.
+- `UnconfiguredPackageGraphKey` consumes one `PackageLoadKey`;
+  `RootPackageSetKey` consumes recursive `WorkspaceDirectoryKey` values only
+  for `//...`. Query keys/evaluation perform no direct filesystem reads and
+  create no second DICE graph, runtime, semantic cache, or command-local
+  graph. Nodes and traversal use canonical labels, `SmallMap`, `SmallSet`,
+  `Arc` slices, `CompactString`, `Dupe`, and `Allocative`.
+
+Integrated behavior:
+
+- Root-repository literals, rule-only `:all`/`//...`, explicit, implicit, and
+  absent attribute-created sources, aliases, custom-rule label-list edges,
+  cycles, `let`, `set`, the accepted binary operators, and depth-limited
+  `deps` match the two Bazel 9.2 oracle fixtures. Auto/default output sorts
+  canonical labels structurally before rendering; full output retains
+  traversal order.
+- CLI policy admits only text output, `auto`/`full` order, and output-base
+  routing. Every other flag or missing value fails instead of being silently
+  discarded. `cquery` and `aquery` remain unchanged placeholders.
+- The wire protocol is limited to tagged `Build`/`Query` requests and one
+  response envelope. Query sends only the raw expression and order;
+  authoritative parsing/evaluation remains in the retained
+  `WorkspaceRuntime` transaction. Build fields and response behavior have
+  round-trip regressions, and an output-base CLI regression proves the daemon
+  PID survives a BUILD dependency edit.
+
+Exact query-key activation evidence:
+
+- initial `deps(//app:bin)`: `app Evaluated`, `lib Evaluated`;
+- identical revision: no events;
+- unrelated BUILD edit: `app Reused`, `lib Reused`, with no package-graph
+  evaluation;
+- first `//...`: `unrelated Evaluated`, `RootPackageSet Evaluated`;
+- recursive package create/recreate: `app Reused`, `dynamic Evaluated`,
+  `lib Reused`, `unrelated Reused`, `RootPackageSet Evaluated`;
+- recursive package delete: `app Reused`, `lib Reused`,
+  `unrelated Reused`, `RootPackageSet Evaluated`; and
+- affected BUILD changes and literal missing/create/delete/recreate transitions
+  evaluate only the requested affected package graph.
+
+Validation:
+
+- the serial six-crate suite passed 67 tests under
+  `CARGO_TARGET_DIR=/tmp/slug-m3-query-target CARGO_BUILD_JOBS=1`;
+- `cargo build -p slug_cli_v2`, `cargo fmt --all -- --check`, and
+  `git diff --check` passed;
+- both `query-parser-and-sets` and `query-loading-thin-vertical` passed through
+  `tools.v2_oracle --tool slug` against the rebuilt V2 binary; and
+- root reran the full suite and both Slug oracle fixtures after the final
+  corrections. Sol-low's final post-implementation review returned `ACCEPT`.
+
+Residual scope remains explicit: external repositories and repository mapping,
+the other 15 loading functions, broader target patterns and Sky Query,
+non-text formats and remaining ordering modes, configured/action environments,
+and `cquery`/`aquery` are not implemented by this packet.

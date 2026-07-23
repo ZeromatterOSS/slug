@@ -685,7 +685,7 @@ Residual risk: rules_oci full no-daemon image/package build still needs a Linux-
 
 ### Stage 8 loading-query thin vertical — approved extraction plan
 
-Status: Oracle landed; implementation pending
+Status: Thin vertical landed; full loading query remains open
 Source ref/commit(s): Buck2
 `088c75c7e36805df99c3de29062baa95db700b8b`
 `app/buck2_query_parser`,
@@ -694,7 +694,7 @@ and `app/buck2_query_impls/src/uquery`; V1
 `e218054d4c796655939b968d90208b185decb352`
 `app/{slug_query_parser,slug_query,slug_query_impls,slug_cmd_query_server}` and
 `tests/core/query/test_bazel_compat_query.py`
-V2 commit(s): oracle `7e8993b2`
+V2 commit(s): oracle `7e8993b2`; implementation `61ca25db`
 Source class: port Buck2's Bazel-neutral parser spans, generic evaluator,
 traversal, and compact deterministic-set machinery; adapt environment/DICE
 separation; use V1 only as same-lineage reference and scenario inventory
@@ -723,10 +723,22 @@ uquery environment separation; reject Buck cells, labels, patterns,
 registries, attributes, diagnostics, printers, configured/action graphs, and
 V1 process/server context. Keep known-but-deferred functions and formats as
 explicit errors, not parity claims.
+Implementation summary: Ported Buck2's borrowed-span `nom` parser,
+non-recursive binary sequence, generic callable registry with typed optional
+arguments, compact target sets, and depth-limited traversal. Adapted the
+environment to V2 canonical labels and demand-driven DICE package/directory
+keys. V1 remained same-lineage reference material; no V1 server/process
+context, cells, labels, configured nodes, action nodes, diagnostics, or
+printers were imported. Added only tagged Build/Query daemon requests so raw
+loading queries execute in the retained `WorkspaceRuntime`.
 Validation: both fixtures generated and independently reran no-update with
 `/usr/bin/bazel` 9.2.0; discovery/provenance/generated/assertion/whitespace and
-candidate credential checks passed; Sol-low oracle review `ACCEPT`.
-Implementation validation remains pending.
+candidate credential checks passed. Both fixtures then passed through the
+rebuilt Slug V2 CLI. The serial six-crate suite passed 67 tests; exact DICE
+events cover identical/unrelated/affected revisions and recursive package
+create/delete/recreate; build protocol and same-daemon query regressions pass.
+Root reran the suite and Slug oracles after final fixes; Sol-low final review
+`ACCEPT`.
 Residual risk: this is the first integrated M3 vertical, not full query.
 External repositories, the remaining function registry, Sky Query,
 configuration/action environments, and non-text formatters remain open.

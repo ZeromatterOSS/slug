@@ -564,9 +564,10 @@ with `generated: false` is not acceptance evidence.
 - Generation and an independent no-update rerun both passed with
   `/usr/bin/bazel` 9.2.0. Fixture discovery, immutable provenance,
   `generated: true`, whitespace checks, and candidate credential scans passed.
-  Bazel used ordinary RC discovery; no external RC or BuildBuddy credential
-  content was read, copied, logged into project files, or committed. Sol-low
-  reviewed the fixture and returned `ACCEPT`.
+  Bazel used ordinary RC discovery and was allowed to consume the user's
+  `~/.bazelrc`. No agent or inspection tool read its contents, and no external
+  RC or BuildBuddy credential content was copied, logged into project files,
+  or committed. Sol-low reviewed the fixture and returned `ACCEPT`.
 - Implementation commit `4f4599e0` consumes this oracle through one recursive
   configured-target DICE key. Focused Slug tests match the fixture's structural
   provider identities, dependency order, returned `DefaultInfo.files`, and
@@ -593,6 +594,18 @@ with `generated: false` is not acceptance evidence.
 - Generation plus independent no-update reruns passed with `/usr/bin/bazel`
   9.2.0. Every command has stable stdout/stderr assertions; fixture discovery,
   provenance, generated markers, whitespace, and candidate credential scans
-  passed. Ordinary RC discovery was used without reading, copying, logging, or
-  committing external RC or BuildBuddy credential content. Sol-low returned
-  `ACCEPT` after requiring and reviewing the absent-source-node regression.
+  passed. Bazel was allowed ordinary RC discovery, including the user's
+  `~/.bazelrc`; no agent or inspection tool read its contents, and no external
+  RC or BuildBuddy credential content was copied, logged into project files,
+  or committed. Sol-low returned `ACCEPT` after requiring and reviewing the
+  absent-source-node regression.
+- Implementation commit `61ca25db` now passes both fixtures through the Slug
+  V2 CLI. A table-driven CLI regression pins the complete accepted loading
+  matrix, including the absent source, rule-only expansion, alias/custom-rule
+  closure, cycle termination, set result, structural auto ordering, and exit-7
+  failures. Source-cited Rust tests separately pin spans, equal-precedence
+  binary sequencing, generic calls, `let`, and the 16-entry Bazel 9.2 loading
+  registry. The serial six-crate suite passed 67 tests, root independently
+  reran both Slug fixtures after final corrections, and Sol-low returned
+  `ACCEPT`. This proves only the recorded thin vertical; the remaining
+  functions, repositories, patterns, formats, cquery, and aquery stay open.
