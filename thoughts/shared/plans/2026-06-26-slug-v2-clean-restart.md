@@ -22,9 +22,9 @@ and advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the query module extraction is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the query module extraction is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | run `WP-8-query-evaluator-module-extraction` without semantic changes |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 Java `Pattern` audit is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 Java `Pattern` audit is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | run the read-only Java `Pattern` feasibility/reuse audit before selecting another function |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -46,14 +46,15 @@ cleanup:
    wrapper around the existing `tools/v2_oracle` Slug comparison path. It
    fails closed on daemon/socket and cleanup failures rather than skipping
    them.
-4. Current: run `WP-8-query-evaluator-module-extraction`, an oracle-neutral
-   `slug_query_v2` packet that separates output formatting, traversal,
-   function dispatch, and the loading environment from `evaluator.rs`;
-   preserve every accepted fixture and obtain Sol pre/final review for the
-   internal interface boundary.
-5. Run a read-only Java `Pattern` feasibility/reuse audit and Sol adjudication
-   before implementing `filter`, `attr`, or regex-based `kind`. Finite fixture
-   agreement or substituting Rust/fancy regex is not Bazel parity.
+4. Accepted: `65c6c54f` completes
+   `WP-8-query-evaluator-module-extraction`. The oracle-neutral split preserves
+   both public evaluator paths while separating output formatting, generic
+   evaluation/function dispatch, traversal, and the DICE-backed loading
+   environment behind crate-private seams.
+5. Current: run a read-only Java `Pattern` feasibility/reuse audit and Sol
+   adjudication before implementing `filter`, `attr`, or regex-based `kind`.
+   Finite fixture agreement or substituting Rust/fancy regex is not Bazel
+   parity.
 
 The root owns Live Status updates. Implementation workers return source/test
 patches and evidence; they do not append checkpoint prose or create commits.

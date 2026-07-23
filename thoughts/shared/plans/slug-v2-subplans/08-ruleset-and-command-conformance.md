@@ -2071,3 +2071,37 @@ delete/recreate transitions. Root validation passed 45 query tests, 50
 downstream CLI/commands/server tests, formatting/diff checks, and a clean CLI
 build; Sol-low returned final `ACCEPT`. Five ordinary functions remain
 deferred and M3 itself remains open.
+
+## WP-8 query evaluator module extraction accepted (2026-07-23)
+
+Commit `65c6c54f` completes the oracle-neutral evaluator ownership split.
+`evaluator.rs` is now the public loading-query facade and preserves both
+`slug_query_v2::evaluator::{QueryOrder, QueryOutput,
+evaluate_loading_query}` and the existing crate-root reexports.
+Crate-private modules now separately own:
+
+- result values and exact DOT formatting in `output.rs`;
+- generic expression evaluation, typed argument handling, registry dispatch,
+  and all eleven implemented functions in `generic.rs`;
+- request-local compact traversal and resolved-graph state in `traversal.rs`;
+  and
+- the retained-transaction DICE loading environment, candidate/provenance
+  projection, and FULL text ordering in `loading_environment.rs`.
+
+The moved bodies are unchanged apart from the minimum crate-private
+cross-module visibility. The split retains `SmallMap`, `SmallSet`,
+`CompactString`, `Arc`, checked-`u32` graph indexes, DICE compute placement,
+candidate identity, traversal order, and output behavior. It adds no Cargo
+dependency, DICE key, public API, fixture, or Stage 9 extraction row: this is
+reorganization of the already accepted Buck2-shaped V2 substrate.
+
+Worker and root validation passed the 45-test query crate suite. Root also
+passed the serial affected suite with 95 tests across query, commands, server,
+CLI, and graph output; the serialized wrapper passed all seven fully accepted
+query fixtures; the archive checker passed; and no daemon/socket marker
+remained. Sol-low approved the boundary before implementation and returned
+final `ACCEPT` after full-diff review.
+
+Five ordinary query functions remain deferred. The next packet is the
+read-only Java `Pattern` feasibility/reuse audit required before selecting
+`filter`, `attr`, or regex-based `kind`.
