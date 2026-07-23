@@ -1189,6 +1189,36 @@ exception. Sol-low accepted the fixture but required the narrow
 `evaluate_loading_query` AST seam and nested-expression regressions recorded
 above before implementation.
 
+#### Oracle evidence landed (2026-07-23)
+
+Oracle commit `2b73c08d` lands the generated 43-command Bazel 9.2.0
+`query-path-topology` fixture at immutable source commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+The fixture proves the reviewed topology, endpoint, ordering, diagnostic, and
+bounded-arbitrary-path matrix. In particular, direct root-node `somepath`
+preserves `linear_start, linear_mid, linear_end` for default and explicit
+AUTO output, while a top-level union containing the same call sorts
+`disconnected, linear_end, linear_mid, linear_start`. The latter two rows
+would fail a broader function-local or graph-local ordering exception.
+
+Generation
+`target/v2o/runs/query-path-topology/20260723-013430-473612-bazel`, the
+worker's clean no-update rerun
+`target/v2o/runs/query-path-topology/20260723-013510-476303-bazel`, and root's
+independent clean no-update rerun
+`target/v2o/runs/query-path-topology/20260723-013603-478981-bazel` all passed
+sequentially. Root matched all 43 exits and configured anchored stdout/stderr
+patterns, checked immutable provenance and whitespace, and found no candidate
+credential material in fixture files. Bazel could consume the user's external
+`~/.bazelrc`; no agent or inspection tool read its contents, and no external
+RC or BuildBuddy credential content entered the repository. Sol-low returned
+final `ACCEPT`.
+
+The oracle-first gate is closed. Implementation, exact activation evidence,
+retained-daemon transitions, and Slug fixture parity remain pending; do not
+mark this packet or M3 complete from the oracle alone.
+
 Stop conditions: an unstable diamond oracle that cannot be bounded to complete
 valid alternatives; behavior contradicting generated Bazel 9.2; any need for
 generated/output nodes, attrs/visibility/tests/executable/load/build/configured

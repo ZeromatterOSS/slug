@@ -236,6 +236,10 @@ root-repository subtree patterns, `rdeps`, and
 through the retained daemon with prefix-local package enumeration and
 Buck2-derived reverse traversal. M3 remains open for the other 13 loading
 functions, repository/pattern breadth, ordering modes, and formatters.
+Oracle commit `2b73c08d` now pins the next 43-command packet for `allpaths`
+and `somepath`, including bounded arbitrary shortest paths and Bazel's
+source-backed root-node `somepath` AUTO-order exception. Rust implementation
+and DICE evidence remain pending; this oracle does not close M3.
 
 ## Two-Tier Work-Packet Contract
 

@@ -644,3 +644,29 @@ with `generated: false` is not acceptance evidence.
   suite passed 71 tests, root independently reran all three Slug fixtures, and
   Sol-low returned final `ACCEPT`. M3 remains open for the residual registry,
   repositories, patterns, order modes, and formatters.
+
+## Path Topology Oracle Checkpoint
+
+- 2026-07-23 commit `2b73c08d` added the generated Bazel 9.2.0
+  `query-path-topology` fixture at immutable source commit
+  `8220c6198837d5c13d53fea211cf3282aa12408a`.
+- Its 43 commands cover `allpaths` and `somepath` over linear, diamond, cycle,
+  zero-length, disconnected, empty, duplicate, multiple-origin/destination,
+  source-direction, alias, and custom-rule topology. Arbitrary diamond and
+  multi-pair results admit only bounded complete shortest paths; arity and
+  both integer-operand positions are pinned.
+- Bazel preserves forward insertion order for a root-node `somepath` under
+  default/AUTO output, while a top-level union containing that call returns
+  lexical AUTO order. The two nested rows deliberately distinguish those
+  policies; `QueryCommand.java:112-118` and
+  `QueryExpression.java:110-114` supply the source boundary.
+- Generation and two independent sequential no-update reruns passed with
+  `/usr/bin/bazel` 9.2.0. All 43 exits and anchored output patterns,
+  provenance, whitespace, and fixture-only candidate credential scans passed.
+  Bazel could consume the user's external `~/.bazelrc`; no agent or inspection
+  tool read its contents, and no external RC or BuildBuddy credential content
+  was copied, logged into project files, or committed. Sol-low returned
+  `ACCEPT`.
+- This checkpoint authorizes the reviewed Rust packet; it does not prove an
+  implementation. `allpaths`, `somepath`, exact DICE activation, retained
+  daemon transitions, and all Slug fixture results remain pending.
