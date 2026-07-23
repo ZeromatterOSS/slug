@@ -1296,9 +1296,8 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: 23-command oracle and loading-metadata design accepted; first Gate A
-implementation closed `REPLAN` with no code retained; total query-attribute
-provenance review next
+Status: 23-command tests oracle, total explicitness design, and 33-command
+labels/filegroup provenance oracle accepted; retry loading/query Gate A next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1362,3 +1361,9 @@ mandatory alias and retained Starlark provenance project exact values; suite
 No V1/Buck implementation is imported and no new DICE owner is introduced.
 The next packet is oracle-only: add exact filegroup omitted/explicit-empty
 build-output rows before retrying Gate A.
+
+Commit `e1d3f910` now supplies that missing native discriminator by extending
+`query-labels-attribute-metadata` to 33 passing Bazel commands. Omitted
+filegroup `srcs` is absent from build output while explicit empty is printed.
+The result changes no reuse decision: Gate A remains V2-owned loading/query
+metadata with compact values and existing DICE ownership.

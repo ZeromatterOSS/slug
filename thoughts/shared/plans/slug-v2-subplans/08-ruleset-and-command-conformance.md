@@ -2364,3 +2364,18 @@ and `ProtoOutputFormatter`; root verified the sources; Sol-low returned
 `ACCEPT`. Before implementation retry, add only the missing filegroup
 omitted-versus-explicit-empty build-output discriminator to
 `query-labels-attribute-metadata`.
+
+## Native filegroup attribute provenance oracle accepted (2026-07-23)
+
+Commit `e1d3f910` extends `query-labels-attribute-metadata` from 31 to 33
+Bazel 9.2 commands. Two exact `--output=build` rows select sibling native
+filegroups: omitted `srcs` produces no stanza, while explicit `srcs=[]` prints
+`srcs = []`. The rows anchor the complete rule body, source location, and
+instantiation stack.
+
+The evidence is representation-only and does not accept a Slug build/proto
+formatter. Worker generation and clean verification passed; root independently
+passed all 33 commands in run
+`20260723-120148-1028764-bazel`; Sol-low returned `ACCEPT`. Gate A may now be
+retried with total exact explicitness across native, Starlark, suite, and
+generated query attributes.

@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 filegroup provenance oracle is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 filegroup provenance oracle is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0`; total query-attribute explicitness design Sol-accepted after the first Gate A implementation closed `REPLAN` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, the native filegroup provenance discriminator, and remaining command breadth | add the filegroup omitted-versus-explicit-empty oracle only; do not retry Gate A yet |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while M3 test-suite loading Gate A is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while M3 test-suite loading Gate A is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0`; total query-attribute explicitness design Sol-accepted; filegroup provenance oracle accepted in `e1d3f910` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, Gate A metadata implementation, and remaining command breadth | retry loading/query metadata Gate A with total exact explicitness; do not plumb strict mode or activate `tests` |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,18 +33,32 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Extend only `query-labels-attribute-metadata` with the missing native
-filegroup attribute-provenance discriminator. Add sibling filegroups whose
-`srcs` values are omitted and explicitly `[]`, then add exact Bazel 9.2
-`--output=build` rows proving that only the explicit-empty rule prints a
-`srcs = []` stanza. Cite `FilegroupRule`, `RuleOrMacroInstance`,
-`BuildOutputFormatter`, and `ProtoOutputFormatter`.
+Retry loading/query metadata Gate A with the accepted total explicitness
+boundary. Add internal duplicate-preserving order-independent string lists;
+inherited common `tags=[]` and test `size="medium"`; derived test metadata;
+native `test_suite`; exclusive explicit-or-implicit membership with the
+explicit-empty bit; suite capability/scalars/attributes; and deduplicated
+ordinary suite edges.
 
-This is an oracle-only packet. Do not restore the rejected implementation or
-edit Rust, DICE state, the generic evaluator/registry, command plumbing, or
-formatters. After worker and root independently pass the generated fixture,
-review the evidence and only then reschedule loading/query metadata Gate A
-with the accepted total explicitness design.
+Add a total `QueryAttribute.explicit` whose only meaning is Bazel
+`isAttributeValueExplicitlySpecified`. Loading must retain native
+`filegroup.srcs` input explicitness instead of inferring it from the normalized
+list. Mandatory alias is true; retained Starlark Explicit is true and
+Default/Implicit false; suite `tests` uses its input bit; materialized
+`$implicit_tests` is true.
+
+Use only existing package-load and unconfigured-package-graph DICE ownership.
+Focused tests must cover filegroup omitted/explicit-empty package and graph
+inequality with identical edges; natural reorder versus duplicate inequality;
+inherited defaults/overrides/redeclaration; suite omitted/explicit-empty
+membership and provenance; explicit/implicit lifecycle; tags/size/manual;
+non-test, missing, generated, and external boundaries; downstream
+`deps`/`rdeps`/`labels`/graph projection; and the inactive `tests()` guard.
+
+Allowed source remains loading attrs/package exports, the unconfigured query
+graph, and their focused loading/query/lifecycle tests. Do not add a DICE key
+or lock, plumb `--strict_test_suite`, edit the generic evaluator/registry,
+activate `tests`, implement a formatter, begin `visible`, or add regex work.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.
