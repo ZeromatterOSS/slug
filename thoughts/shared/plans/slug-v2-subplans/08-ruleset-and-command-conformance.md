@@ -2452,3 +2452,16 @@ the corrected evidence remained green. Sol-low returned `ACCEPT`.
 The next packet implements the shared loading label-normalization foundation
 only. Native suite construction and all other test metadata remain deferred
 until that foundation is accepted.
+
+## Loading label-normalization implementation stopped on core identity (2026-07-23)
+
+The foundation worker reached its explicit stop before any edit.
+`CanonicalLabel::parse` splits at the first colon, while
+`TargetName::parse` does not reject another colon. Constructing a canonical
+same-package label from invalid relative `pkg:target` therefore succeeds, and
+rejecting only that loading spelling would invent a partial label grammar.
+
+The worktree remained clean and no tests were needed. Stage 3 now owns a
+central target-name validation review and implementation. Package-context
+loading normalization, native suite metadata, strict policy, and `tests()`
+activation remain blocked behind that accepted identity boundary.

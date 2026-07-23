@@ -138,3 +138,18 @@ cargo test -p slug_identity_v2
 slug-v2-oracle run --fixture labels-and-output-paths
 rg -n "buck-out|CellName|CellResolver|cell resolver|cell name" app/slug_identity_v2
 ```
+
+## Target-name validation gap blocks loading label normalization (2026-07-23)
+
+The package-context loading label foundation stopped before editing because
+`CanonicalLabel::parse` splits at the first colon and `TargetName::parse`
+accepts additional colons. Consequently V2 accepts a canonical spelling
+constructed from Bazel-invalid relative `pkg:target`, while the accepted
+`query-labels-attribute-metadata` oracle requires Bazel's
+“absolute label must begin with `@` or `//`” conversion failure.
+
+Reject a loading-local special case. The next packet reviews the central
+`TargetName` validator against pinned Bazel
+`LabelValidator.validateTargetName` and `LabelParser.Parts.parse`, including
+colon/backslash/control/path-segment rules and Bazel's temporary `.`/`/.`
+exceptions. Loading resumes only after the core identity boundary is exact.

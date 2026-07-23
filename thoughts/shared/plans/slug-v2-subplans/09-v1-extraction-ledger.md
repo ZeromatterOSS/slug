@@ -1298,7 +1298,8 @@ representation-only; five ordinary query functions and M3 remain open.
 
 Status: 25-command tests oracle, total explicitness design, and 37-command
 labels/package-context oracle accepted; second Gate A attempt closed `REPLAN`
-with no code retained; shared loading label-normalization foundation next
+with no code retained; loading foundation stopped cleanly on permissive core
+target-name parsing; Stage 3 identity validation review next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1391,3 +1392,8 @@ cross-package rule use preserves the defining `.bzl` default package, invalid
 relative package syntax is pinned, and native suite source members remain
 ordinary edges. The implementation packet is now the V2-owned shared converter
 and canonical loading storage only; Gate A remains deferred.
+
+The loading foundation then stopped cleanly before implementation because the
+V2 `TargetName` type permits extra colons. A loading-local workaround is
+rejected; Stage 3 must first make the central target-name validator Bazel-shaped.
+No V1/Buck extraction decision changes and no code was retained.
