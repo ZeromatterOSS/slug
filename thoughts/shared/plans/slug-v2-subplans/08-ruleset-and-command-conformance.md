@@ -2494,3 +2494,24 @@ diff checks. Native suite metadata is now unblocked; strict policy and
 The current packet retries loading/query metadata Gate A with the already
 accepted invariant-safe suite membership and total query-attribute explicitness
 designs. It must not activate the function or formatter surfaces.
+
+## Third loading metadata Gate A implementation replanned (2026-07-23)
+
+The nine-file retry implemented the accepted metadata, total explicitness, and
+package-context suite-member designs. Root corrected an in-flight misreading
+of Guava `Ordering.natural()` as numeric-aware sorting. Focused and full
+validation then passed 47 loading and 50 query tests without activating
+`tests()` or strict policy.
+
+Sol's permitted correction found that `-+tag` must exclude the literal `+tag`,
+not `tag`; the corrected source-derived regression passed. Final review then
+found a second material ordering mismatch: Rust string ordering is not Java
+UTF-16 `String.compareTo` for supplementary Unicode. This affects retained
+tags, suite labels, package equality, and query projection.
+
+The correction budget was exhausted, so the packet closed `REPLAN`; all nine
+files were restored exactly to `HEAD` and no Rust code was retained. The
+replacement packet is design/oracle-only: establish exact Bazel string and
+label comparators, including BMP/supplementary and duplicate discriminators,
+before Gate A retries. Strict policy, function activation, and formatters
+remain deferred.

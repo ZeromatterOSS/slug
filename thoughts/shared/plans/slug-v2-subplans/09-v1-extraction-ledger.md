@@ -1298,8 +1298,8 @@ representation-only; five ordinary query functions and M3 remain open.
 
 Status: 25-command tests oracle, total explicitness design, and 37-command
 labels/package-context oracle accepted; exact identity and package-context
-loading foundation accepted through `40ac1cd2`; tests loading/query metadata
-Gate A retry next
+loading foundation accepted through `40ac1cd2`; third Gate A attempt closed
+`REPLAN` with no code retained; Java UTF-16/string/label ordering design next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1412,3 +1412,9 @@ full loading/query validation, including retained-DICE transitions and exact
 triple-dot package rejection. No V1/Buck semantics were imported. Gate A may
 now retry the accepted suite/test metadata and total explicitness design;
 strict policy and function activation remain separate.
+
+That third Gate A attempt retained no code. After one suite-tag correction,
+Sol found Rust ordering diverges from Java UTF-16 natural order for
+supplementary Unicode, affecting both string tags and labels. The next packet
+must design and oracle the V2 comparator boundary; no V1/Buck ordering
+semantics are authorized by this replan.

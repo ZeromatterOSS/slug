@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 tests-metadata Gate A retry is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 tests-metadata Gate A retry is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 25-command Bazel oracle including suite provenance/source members and 37-command labels oracle accepted through `3621b3e7`; total query-attribute explicitness and tests-loading designs Sol-accepted; exact target identity and package-context loading normalization accepted through `40ac1cd2`; two earlier Gate A attempts closed `REPLAN` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, Gate A metadata implementation, strict policy/`tests()` activation, and remaining command breadth | retry `tests` loading/query metadata Gate A only |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 Java ordering review is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 Java ordering review is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 25-command Bazel oracle including suite provenance/source members and 37-command labels oracle accepted through `3621b3e7`; total query-attribute explicitness and tests-loading designs Sol-accepted; exact target identity and package-context loading normalization accepted through `40ac1cd2`; three Gate A attempts closed `REPLAN`, most recently with no code retained on Java-ordering mismatch | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, exact order-independent string/label ordering, Gate A metadata implementation, strict policy/`tests()` activation, and remaining command breadth | design and oracle Java UTF-16/label ordering before Gate A retries |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,32 +33,27 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Retry only the accepted `tests` loading/query metadata Gate A on top of
-`40ac1cd2`. Add native `test_suite` with one invariant-safe membership
-representation: nonempty explicit `tests` is explicit membership; omitted and
-explicit-empty both use implicit same-package membership with an orthogonal
-input-explicitness bit. Bare/slash suite members use the accepted package-context
-converter. Naturally sort order-independent lists while preserving duplicates.
+Review the exact Bazel ordering boundary that blocks `tests` metadata Gate A.
+Pinned `BuildType#convertFromBuildLangType` sorts order-independent values with
+Guava `Ordering.natural()`, while Java `String.compareTo` compares UTF-16 code
+units. Rust `str`/`CompactString` ordering compares Unicode scalar bytes, so
+supplementary versus BMP values can reverse.
 
-Retain common `tags=[]` on every Starlark rule and test-only `size="medium"`.
-Derive test tags, size, and manual state from retained typed values. Extend the
-unconfigured graph once to project exact test/suite capability, scalar metadata,
-distinct `tests` and `$implicit_tests` attributes, and ordinary suite edges.
-`QueryAttribute.explicit` has total Bazel
-`isAttributeValueExplicitlySpecified` meaning: native filegroup retains its
-input bit, alias `actual` is true, Starlark Explicit is true while
-Default/Implicit are false, suite `tests` uses its input bit, and materialized
-`$implicit_tests` is true. Preserve label ordering/multiplicity separately from
-edge deduplication.
+Audit every Gate A order-independent value: inherited Starlark `tags`, native
+suite `tags`, explicit suite label members, and derived implicit suite labels.
+Trace Bazel `Label.compareTo`, package/repository comparison, and target-name
+comparison rather than assuming labels sort by display strings. Decide one
+small reusable V2 comparator boundary, its allocation behavior, and whether
+strings and canonical labels require separate comparators.
 
-Strengthen focused loading, same-DICE create/edit/delete/recreate, and query
-graph tests before implementation. Use the existing package-load and graph
-DICE keys and V2 compact/Arc storage only.
+Design a Bazel 9.2 oracle discriminator using BMP/supplementary Unicode and
+duplicates for both string and label lists. New implementation work must add
+or strengthen that oracle before retrying Gate A.
 
-Do not activate `tests()`, add strict-suite request policy, edit build/proto
-formatters, add repository mapping or filesystem discovery, change identity
-APIs, or import V1/Buck test semantics. Stop on a representation conflict
-rather than extending the packet.
+This is design/review only. Do not restore the reverted metadata code, change
+identity ordering globally, add UTF-16 storage, activate `tests()`, plumb
+strict mode, edit formatters, or add DICE state. Stop if exact label ordering
+requires a broader identity packet.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.
