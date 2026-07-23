@@ -3,5 +3,5 @@ def _impl(ctx):
 
 custom_rule = rule(
     implementation = _impl,
-    attrs = {"dep": attr.label()},
+    attrs = {"deps": attr.label_list()},
 )
