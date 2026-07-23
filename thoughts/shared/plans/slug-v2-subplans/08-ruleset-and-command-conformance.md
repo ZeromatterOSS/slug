@@ -2432,3 +2432,23 @@ Before implementation, extend the labels fixture for explicit bare/slash
 values, source edges, defining-`.bzl` default ownership, and invalid relative
 package syntax; extend the tests fixture for native suite bare/slash members
 and their ordinary dependency edges.
+
+## Package-context loading label oracles accepted (2026-07-23)
+
+Commit `3621b3e7` extends `query-labels-attribute-metadata` from 33 to 37
+Bazel 9.2 commands and `tests-query-expansion` from 23 to 25. The labels rows
+pin canonical explicit bare/slash/colon/root forms, implicit same-package
+source edges without physical files, defining-`.bzl` ownership for a
+cross-package rule default, and the invalid relative `pkg:target` diagnostic.
+The tests rows pin native suite bare/slash `labels(tests, ...)` and ordinary
+`deps` source edges without activating `tests()`.
+
+Worker generation and clean verification passed both fixtures. Root
+independently passed labels run `20260723-123634-1062591-bazel` and tests run
+`20260723-123704-1065110-bazel`. Root required one correction removing
+`exports_files` declarations so the local sources were genuinely implicit;
+the corrected evidence remained green. Sol-low returned `ACCEPT`.
+
+The next packet implements the shared loading label-normalization foundation
+only. Native suite construction and all other test metadata remain deferred
+until that foundation is accepted.

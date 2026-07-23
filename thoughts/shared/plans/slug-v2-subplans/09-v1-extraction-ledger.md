@@ -1296,10 +1296,9 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: 23-command tests oracle, total explicitness design, and 33-command
-labels/filegroup provenance oracle accepted; second Gate A attempt closed
-`REPLAN` with no code retained; package-context label design accepted; two
-oracle extensions next
+Status: 25-command tests oracle, total explicitness design, and 37-command
+labels/package-context oracle accepted; second Gate A attempt closed `REPLAN`
+with no code retained; shared loading label-normalization foundation next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1385,3 +1384,10 @@ against the defining `.bzl` package. Native filegroup/alias storage becomes
 canonical, and output ownership remains a wrapper. No Buck/V1 grammar,
 repository mapping, or DICE owner is imported. Two focused oracle extensions
 are next before this foundation is implemented.
+
+Commit `3621b3e7` accepts those two oracle extensions at 37 labels commands and
+25 tests commands. Bare/slash labels become canonical implicit source nodes,
+cross-package rule use preserves the defining `.bzl` default package, invalid
+relative package syntax is pinned, and native suite source members remain
+ordinary edges. The implementation packet is now the V2-owned shared converter
+and canonical loading storage only; Gate A remains deferred.
