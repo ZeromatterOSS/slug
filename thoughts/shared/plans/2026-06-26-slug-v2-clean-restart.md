@@ -487,3 +487,24 @@ whole-workspace scanning, a new DICE key without review, or a claim that a
 broken syntax or a broken `load()` and must still contribute its discovered
 companion basename without a successful `PackageLoad` value; missing selected
 loads and `.bzl` cycles are explicit failure-oracle cases.
+
+Oracle evidence landed in `8f6f02b3` (`test: add build and load files
+oracles`): `query-build-load-files-provenance` has 58 Bazel 9.2 commands.
+Update `043543-650513`, Terra clean `043649-655650`, root clean
+`043934-665303`, and post-note root clean `044122-670177` passed; Sol-low
+returned final `ACCEPT`. This accepts only the oracle: nine functions remain
+deferred and neither Gate A nor Gate B is implemented. It proves selected
+active BUILD/transitive-load/active-companion `buildfiles`, loads-only
+`loadfiles`, fallback/dual/diamond/multi-package/empty/idempotent/deps/failure
+cases, and broken companion discovery without package loading.
+
+Within one invocation `seenBzlLabels` label-deduplicates; across separately
+evaluated functions one printed fake label can have different consuming
+packages. Intersections preserve left provenance, equal fake/fake except is
+empty, and real/fake except is asymmetric. Gate A must retain `(printed label,
+consuming package, real/fake)`; Gate B may not use a request-global winner or
+`QueryLabel`-only result identity. Factored FULL uses `--output=graph
+--graph:factored`: fake nodes are zero-edge, direct `buildfiles` omits the
+selected real BUILD unless another graph observer materializes it,
+`deps(buildfiles(...))` includes result nodes, and no synthetic projection
+edge is allowed.

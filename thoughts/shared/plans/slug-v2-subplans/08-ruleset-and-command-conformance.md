@@ -1809,3 +1809,22 @@ Hard stops: external mapping, silent `.scl` omission, direct filesystem
 discovery, whole-workspace scan, global identity rewrite, unreviewed DICE key,
 or treating a `.bzl` cycle as success. After B, seven ordinary functions
 remain deferred; regex and rule-metadata dependent functions remain blocked.
+
+#### Oracle evidence landed (2026-07-23)
+
+`8f6f02b3` lands the shared 58-command Bazel 9.2 fixture
+`query-build-load-files-provenance`. Update `043543-650513`, Terra clean
+`043649-655650`, root clean `043934-665303`, and post-note root clean
+`044122-670177` passed; Sol-low final review was `ACCEPT`. It covers selected
+active BUILD/transitive loads/active companions for `buildfiles`, loads-only
+`loadfiles`, fallback/dual/diamond/multi-package/empty/idempotent/deps/failure
+cases, broken companions without package loading, and factored FULL with
+`--output=graph --graph:factored`.
+
+Gate B must retain `(printed label, consuming package, real/fake)`: left
+intersections preserve provenance, equal fake/fake except is empty, and
+real/fake except is asymmetric. Fake nodes are zero-edge; direct FULL
+`buildfiles` omits the selected real package BUILD unless another graph
+observer materializes it, while `deps(buildfiles(...))` includes result nodes.
+This is oracle evidence only: Gate A and activation remain pending and nine
+ordinary functions remain deferred.

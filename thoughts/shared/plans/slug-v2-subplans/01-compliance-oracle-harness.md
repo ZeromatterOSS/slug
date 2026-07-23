@@ -762,3 +762,20 @@ with `generated: false` is not acceptance evidence.
   `040418-626692`, `040423-626782`, `040427-626870`; independent root
   `040534-628098`, `040540-628123`, `040546-628189`, `040549-628247`,
   `040554-628339`, `040558-628428`.
+
+### Build/load provenance oracle checkpoint (2026-07-23)
+
+`8f6f02b3` adds the 58-command Bazel 9.2 fixture
+`query-build-load-files-provenance`. Update `043543-650513`, Terra clean
+`043649-655650`, root clean `043934-665303`, and post-note root clean
+`044122-670177` passed; Sol-low final review was `ACCEPT`. Its seven anchors
+are `BuildFilesFunction`, `LoadFilesFunction`,
+`AbstractBlazeQueryEnvironment#transitiveLoadFiles`, `FakeLoadTarget`,
+`BlazeQueryEnvironment#getTransitiveLoadFilesHelper`,
+`BlazeTargetAccessor#getPackage`, and `TargetKeyExtractor`, all at
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+This is an implementation prerequisite, not Slug parity evidence: nine
+ordinary functions remain deferred. It establishes transitive/companion,
+fake-provenance/set, failure, and factored FULL observations with
+`--output=graph --graph:factored`.

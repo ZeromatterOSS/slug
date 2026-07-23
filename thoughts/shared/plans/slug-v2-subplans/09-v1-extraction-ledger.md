@@ -1057,3 +1057,23 @@ Sol approval before implementation.
 Validation must prove manifest equality invalidates the owning package/query
 for direct-root, transitive-edge, and leaf-content changes while excluding
 retained `FrozenModule` pointer identity from equality.
+
+#### Oracle evidence landed (2026-07-23)
+
+`8f6f02b3` (`test: add build and load files oracles`) lands 58 Bazel 9.2
+records in `query-build-load-files-provenance`: update `043543-650513`, Terra
+clean `043649-655650`, root clean `043934-665303`, and post-note root clean
+`044122-670177`; Sol-low final review was `ACCEPT`. The source anchors are
+`BuildFilesFunction`, `LoadFilesFunction`,
+`AbstractBlazeQueryEnvironment#transitiveLoadFiles`, `FakeLoadTarget`,
+`BlazeQueryEnvironment#getTransitiveLoadFilesHelper`,
+`BlazeTargetAccessor#getPackage`, and `TargetKeyExtractor`.
+
+No V1/Buck semantics were imported. The observed V2 boundary is stricter:
+request-local state retains `(printed label, consuming package, real/fake)`
+through set composition. `seenBzlLabels` deduplicates per invocation, but
+separate invocations can project the same printed label to different consumers;
+do not replace that with global `QueryLabel` identity or a request-global
+winner. Factored FULL (`--output=graph --graph:factored`) confirms zero fake
+edges and forbids synthetic projection edges. Gate A/B remain unimplemented;
+nine ordinary functions remain deferred.
