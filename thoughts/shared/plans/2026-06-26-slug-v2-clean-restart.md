@@ -245,8 +245,15 @@ retained-daemon execution. M3 remains open for the other 11 loading functions,
 repository/pattern breadth, ordering modes, and formatters.
 Oracle commit `e8e1d9ef` now pins the next 42-command ordinary-query packet for
 `some` and the shared signed Java-`int` boundary used by `deps`/`rdeps`.
-Implementation and DICE evidence remain pending; `filter` stays deferred until
-an exact Java `Pattern` substrate exists.
+Implementation commit `b25c8aff` now passes that packet through the retained
+daemon: `some` selects from the existing insertion-ordered `TargetSet`, while
+the shared FULL renderer deterministically topologically orders the selected
+induced graph. It also carries signed `i32` depth/count values through
+`deps`/`rdeps` and renders bare-negative syntax safely for UTF-8 input. Worker
+and root each passed the six-crate 82-test suite and all five accepted query
+fixtures (133/133 rows). M3 remains open for the other ten loading functions,
+repository/pattern/order/formatter breadth; `filter` stays deferred until an
+exact Java `Pattern` substrate exists.
 
 ## Two-Tier Work-Packet Contract
 

@@ -705,6 +705,14 @@ with `generated: false` is not acceptance evidence.
   `~/.bazelrc`; no agent or tool read its contents, and no external RC or
   BuildBuddy credential content entered the repository. Sol-low returned
   `ACCEPT`.
-- This oracle closes only the behavior gate. `some`, the bounded signed
-  integer correction, DICE/daemon evidence, and Slug fixture parity remain
-  pending.
+- Implementation commit `b25c8aff` closes the fixture's Slug parity gate:
+  worker and root independently passed the serial six-crate 82-test suite and
+  all five query fixtures, 10+12+26+43+42 = 133/133 rows. The worker runs end
+  `030821`, `030825`, `030829`, `030833`, and `030837`; the independent root
+  runs are parser `031045-559795`, loading `031045-559816`, rdeps
+  `031045-559841`, path `031045-559894`, and some `031045-559794`.
+- The landed shared signed-`i32` seam covers `some` count and `deps`/`rdeps`
+  depth without narrowing expression-position target literals. The retained
+  daemon transition regressions and all fixture-only credential constraints
+  remained clean; no new key/cache/protocol/filesystem/lock boundary entered
+  the harness or command path.

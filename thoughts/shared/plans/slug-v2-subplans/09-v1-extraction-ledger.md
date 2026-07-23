@@ -881,7 +881,7 @@ modes, non-text formatters, `cquery`, and `aquery` remain open.
 
 ### Stage 8 arbitrary-selection packet — approved extraction plan
 
-Status: Oracle landed; implementation pending
+Status: Landed and validated
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -913,7 +913,7 @@ source anchors are the files named above
 
 V2 fixture: `query-some-selection`
 
-V2 commit(s): oracle `e8e1d9ef`; implementation pending
+V2 commit(s): oracle `e8e1d9ef`; implementation `b25c8aff`
 
 Expected evidence artifact: singleton and arbitrary bounded selections;
 omitted/zero/negative/equal/excess counts; duplicate/nested/empty/cycle/
@@ -925,20 +925,29 @@ candidate create/rename/delete/recreate transitions
 Decision: activate only `some`; select from the existing unique insertion
 order; add the minimum typed signed-integer seam shared with `deps`/`rdeps`;
 keep generic expression integers and all graph/DICE/protocol ownership
-unchanged. Defer `filter` until an exact Java `Pattern` substrate exists.
+unchanged. Selection order is not FULL output order: the shared selected-graph
+deterministic topological renderer follows Bazel
+`AbstractUnorderedFormatter`/`Digraph`, as exposed by the failed
+`equal_count_full` gate. The UTF-8-safe three-token bare-negative diagnostic
+is part of that landed parser boundary. Defer `filter` until an exact Java
+`Pattern` substrate exists.
 
 Validation: final Bazel generation plus worker/root independent sequential
 no-update reruns passed all 42 commands and anchored patterns. Normal-query
 later-error probes emitted empty stdout; provenance, generated metadata,
 diff/whitespace, and fixture-only credential checks passed; Sol-low returned
-`ACCEPT`. Implementation still requires the serial six-crate suite, rebuilt V2
-CLI, all five query fixture runs, exact activation multisets, ownership/scope
-scans, formatting/diff checks, daemon cleanup, and early/final Sol-low reviews.
+`ACCEPT`. Implementation `b25c8aff` then passed worker and root independent
+serial six-crate suites (82/82) and all five Slug fixtures (133/133 rows):
+worker run ends `030821/030825/030829/030833/030837`; root parser/loading/rdeps/
+path/some runs are `031045-559795`, `-559816`, `-559841`, `-559894`, and
+`-559794`. Exact activation/retained transitions, signed `i32` depth behavior,
+scope/reuse, formatting/diff, and daemon cleanup passed. No key, cache,
+protocol, filesystem, or lock was added; Buck2 `SmallMap`/`SmallSet` and `u32`
+indices remain the hot-path representation.
 
-Residual risk: ordinary query may mask later failures or emit nonempty partial
-stdout on failure, neither of which is representable by the current eager
-result boundary; signed integer correction may affect existing depth
-semantics. Sky Query, Java regex, BUILD pseudo-nodes, generated nodes,
+Residual risk: the accepted ordinary-query stop probes show no masked later
+failure or partial stdout, and signed-depth behavior is now covered. Sky
+Query, Java regex, BUILD pseudo-nodes, generated nodes,
 metadata, attrs, loads, visibility, tests, executables, external repositories,
 the other ten loading functions, non-text formatters, `cquery`, and `aquery`
 remain open.

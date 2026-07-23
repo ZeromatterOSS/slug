@@ -1426,8 +1426,10 @@ Required implementation:
    evaluation and existing traversal ownership; add no traversal, graph,
    cache, or key.
 4. Preserve ordinary output policy. Root `some` has no top-level ordering
-   exception: default/AUTO lexically sort whatever subset was selected, and
-   FULL preserves evaluator insertion order.
+   exception: default/AUTO lexically sort whatever subset was selected. FULL
+   is not `some` insertion order: it uses the shared deterministic
+   topological renderer over the selected induced graph, matching Bazel's
+   `AbstractUnorderedFormatter` and `Digraph` ordering path.
 5. Add focused parser/registry/integer tests, evaluator selection/error/order
    tests, complete CLI oracle coverage, exact DICE activation multisets, and a
    retained-daemon candidate create/rename/delete/recreate regression.
@@ -1523,9 +1525,50 @@ the user's external `~/.bazelrc`; no agent or tool read its contents, and no
 external RC or BuildBuddy credential material entered the repository.
 Sol-low returned final `ACCEPT`.
 
-The oracle-first gate is closed. Implementation, signed-depth ownership,
-exact activation multisets, retained-daemon transitions, and five Slug fixture
-runs remain pending; do not mark this packet or M3 complete from the oracle.
+The oracle-first gate is closed. Implementation evidence follows; do not mark
+M3 complete from this one function packet.
+
+#### Implementation evidence landed (2026-07-23)
+
+Implementation commit `b25c8aff` lands `SomeFunction` in the existing generic
+registry. It evaluates the complete operand once, chooses up to the requested
+members in `TargetSet<SmallSet<_>>` insertion order, and retains the existing
+empty-selection diagnostic. That insertion choice is deliberately distinct
+from rendering: default/AUTO lexically order the selected result, while FULL
+builds the selected induced graph and deterministically topologically renders
+it. The first Slug gate failed `equal_count_full` because the old packet claim
+that FULL preserved insertion was wrong; Bazel 9.2's
+`query2/query/output/AbstractUnorderedFormatter.java` and
+`graph/Digraph.java` establish the shared renderer boundary. The
+corrected gate also required the UTF-8-safe three-token bare-negative message
+`syntax error at '- 1 )'`, rather than a byte-offset-only parser error.
+
+The typed optional-integer seam now parses signed Java `i32` values for
+`some`, `deps`, and `rdeps`: max is accepted, quoted negative/minimum depth
+returns empty success for the traversal functions, and overflow is rejected
+before operand demand. Expression-position integers remain target literals.
+No DICE key, cache, runtime, protocol, filesystem access, or lock was added;
+the patch retains Buck2-derived `SmallMap`, `SmallSet`, and `u32` graph
+indices.
+
+Exact DICE regressions record: a two-package `some` evaluates both packages
+even after the first supplies a candidate; zero count evaluates its valid
+operand, invalid count activates none; negative `deps` evaluates its root and
+negative `rdeps` evaluates the existing universe closure; recursive `some`
+evaluates its two packages plus `SubtreePackageSet`; and the retained candidate
+transition is initial `cand Evaluated`, identical no events, unrelated edit
+`cand Reused`, then candidate create/rename/delete/recreate each `cand
+Evaluated` with the exact all-selected result updated.
+
+Worker validation passed the serial six-crate suite, 82/82 tests, and the five
+Slug fixtures `query-parser-and-sets`, `query-loading-thin-vertical`,
+`query-rdeps-and-subtree-patterns`, `query-path-topology`, and
+`query-some-selection` for 10+12+26+43+42 = 133/133 rows at run directories
+ending `030821`, `030825`, `030829`, `030833`, and `030837`. Root independently
+repeated 82/82 and those fixture gates at parser `031045-559795`, loading
+`031045-559816`, rdeps `031045-559841`, path `031045-559894`, and some
+`031045-559794`. Formatting, diff, scope/reuse, and stale-daemon checks were
+clean. `filter` remains deferred pending exact Java `Pattern` parity.
 
 Stop conditions: normal Bazel 9.2 query masks a later operand failure after an
 early selection, or exits nonzero with nonempty partial stdout; signed integer
