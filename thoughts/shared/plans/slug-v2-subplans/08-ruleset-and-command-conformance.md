@@ -398,3 +398,197 @@ py -3 -B -m tools.v2_oracle run --fixture protobuf-basic --tool bazel --bazel C:
 py -3 -B -m tools.v2_oracle run --fixture rules-rust-basic --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 py -3 -B -m tools.v2_oracle run --fixture rules-oci-basic-no-daemon --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe
 ```
+
+### Reviewed next packet — `WP-8-m3-loading-query-thin-vertical` (2026-07-22)
+
+Work packet ID: `WP-8-m3-loading-query-thin-vertical`
+
+Owner stage and plan: Stage 8,
+`thoughts/shared/plans/slug-v2-subplans/08-ruleset-and-command-conformance.md`.
+
+Goal and gate link: land the first honest M3 integration vertical by replacing
+the ad hoc seven-function parser with reusable generic query machinery and
+driving it through a DICE-owned root-repository loading graph from the real
+`query` CLI. This packet is not “full query”; M3 remains open until the complete
+Bazel 9 registry, patterns, ordering, diagnostics, and formatter matrix pass.
+
+Prerequisites and current state:
+
+- implementation commit `4f4599e0` and evidence commit `34959d5e` provide the
+  retained workspace transaction, `PackageLoadKey`, directory observations,
+  and configured analysis graph; unconfigured query must consume loading, not
+  configured analysis;
+- `slug_query_v2::expr` currently hard-codes seven function names, rejects
+  functions during parsing, and lacks spans, `let`, parentheses, `set`,
+  integers, and binary operators;
+- `QueryRequest` and the CLI return a planned placeholder;
+- `LoadedPackage` is a declaration record, not a complete unconfigured query
+  graph: filegroup/alias edges are raw strings and implicit source-file nodes
+  are absent; and
+- `query-basic` is a stale Bazel 9.1.1 Windows capture that requests
+  `streamed_jsonproto`. It is not Bazel-9.2 M3 acceptance evidence.
+
+Oracle-first artifacts:
+
+1. Create or refresh `query-parser-and-sets` with Bazel 9.2.0 CLI commands that
+   make quoting, `let` binding, parentheses, set/operator precedence,
+   implemented-function arity, syntax failures, unknown functions, duplicate
+   elimination, and accepted text ordering externally observable.
+2. Create `query-loading-thin-vertical` with root packages containing
+   filegroups, an alias, exported and implicit source-file labels, a custom
+   rule with `deps`, nested dependency edges, and a package subtree. Cover
+   literal labels, `//pkg:all`, `//...`, alias traversal, `deps`, accepted set
+   operators, missing packages/targets, and cycles.
+3. Generate and independently rerun both with `/usr/bin/bazel` 9.2.0 at
+   immutable source commit
+   `8220c6198837d5c13d53fea211cf3282aa12408a`. Use ordinary Bazel RC
+   discovery so the user's external BuildBuddy configuration may accelerate
+   the commands; never read, copy, log, or commit `~/.bazelrc` or credentials.
+4. Bazel CLI does not expose its parsed AST or source-span structure. Port
+   precise parser-shape/span cases as Rust unit tests with citations to
+   `QueryParser.java` and `QueryParserTest.java`; do not describe those unit
+   tests as generated oracle output. Known-but-deferred Bazel functions get
+   source-derived registry/diagnostic tests and a residual entry, not a
+   falsely passing Bazel-versus-Slug comparison.
+
+Reuse audit and approved decisions:
+
+- port parser spans, generic expression AST, `set`, operator grammar, and
+  parser mechanics from Buck2 commit
+  `088c75c7e36805df99c3de29062baa95db700b8b`
+  `app/buck2_query_parser/src/{lib.rs,span.rs,spanned.rs,multi_query.rs}`;
+  replace the error surface and reconcile grammar/precedence with Bazel 9.2;
+- selectively port the generic environment, target set, graph, and traversal
+  machinery from
+  `app/buck2_query/src/query/{environment.rs,graph.rs,traversal.rs}` and its
+  `syntax/simple` evaluator. Preserve generic evaluation and compact,
+  deterministic traversal shapes; replace Buck attributes, files, functions,
+  and printers;
+- adapt only the DICE literal pre-resolution/environment separation lesson
+  from `app/buck2_query_impls/src/uquery/{environment.rs,evaluator.rs}`;
+  reject cells, cell resolvers, Buck labels/patterns, target graphs, package
+  semantics, registries, diagnostics, and output rendering;
+- inspect V1 `e218054d4c796655939b968d90208b185decb352`
+  `app/{slug_query_parser,slug_query,slug_query_impls,slug_cmd_query_server}`
+  as same-lineage reference material. Extract scenarios from
+  `tests/core/query/test_bazel_compat_query.py`, then regenerate all
+  expectations with Bazel 9.2; do not import V1 server/process context,
+  cells, labels, configured/action nodes, or printers; and
+- reuse `SmallMap`, `SmallSet`, `SortedMap` or an explicitly justified
+  Buck2-derived fast-hash traversal set, immutable shared slices, `Dupe`, and
+  `Allocative`. Do not introduce a string-heavy
+  `HashMap<String, Vec<String>>` graph.
+
+Sol-low approved the combined vertical after rejecting both a disconnected
+parser-only scaffold and an environment built around the current invented AST.
+It required the structural graph, exact transaction boundary, observable
+oracle split, complete event multisets, and explicit thin-vertical wording.
+
+Reviewed architecture and exact scope:
+
+1. Replace `app/slug_query_v2/src/expr.rs` with a generic spanned parser,
+   registry-driven evaluator, compact target set, and traversal substrate.
+   Parsing accepts generic calls. A V2-owned complete Bazel 9.2 loading-query
+   registry then distinguishes unknown functions, known-but-deferred
+   functions, and this packet's implemented functions while validating arity
+   and argument kinds before evaluation.
+2. Implement this packet's expression slice only: target literals,
+   `let name = expression in expression`, parentheses, `set(...)`, `deps`, and
+   Bazel-confirmed `union`/`+`, `except`/`-`, and `intersect`/`^`. A known
+   deferred function fails explicitly; it is never silently accepted.
+3. Add a demand-driven
+   `UnconfiguredPackageGraphKey { workspace, package }`. It consumes exactly
+   one `PackageLoadKey` and produces structural canonical-label nodes for that
+   package. Literal, package-all, and dependency traversal compute package
+   graph keys only as needed. Add a separate
+   `RootPackageSetKey { workspace }` that recursively consumes
+   `WorkspaceDirectoryKey` only for `//...` and future universe-wide
+   operations, returning compact package identities before those packages are
+   loaded. No monolithic workspace graph, query key, or evaluator reads/scans
+   the filesystem.
+4. Nodes distinguish rule-like targets from source files and retain
+   query-visible kind, build-file identity, and normalized outgoing edges.
+   Custom-rule `deps` use the existing canonical ordered labels; alias keeps
+   its own node and one normalized `actual` edge; filegroup normalizes each
+   `srcs` entry; file paths create explicit source-file nodes with no outgoing
+   edges. Graph storage uses compact V2-owned values. A request-local compact
+   visited/result set is traversal state, never a competing semantic cache.
+5. Evaluate the graph inside the same committed `WorkspaceRuntime`
+   transaction that injected file/directory observations. The CLI must not
+   create a second DICE instance, cache, fixture graph, or filesystem view.
+6. Wire text `query` only. Accept default/`--order_output=auto` and `full` only
+   when the oracle establishes their exact behavior. Reject `deps`, `no`,
+   structured formats, unsupported flag combinations, and deferred functions
+   until separately implemented and oracle-pinned. Leave `cquery` and
+   `aquery` placeholders untouched.
+
+Target-pattern behavior is provisional until oracle generation:
+
+- `//pkg:target` resolves one declared rule/alias or addressable source-file
+  node and reports Bazel-shaped missing package/target failures;
+- `//pkg:all` expands rule-like targets only and is not silently treated as
+  `:*`;
+- `//...` expands rule-like targets recursively in root packages; dependency
+  traversal may then reach source-file nodes;
+- `deps(x)` includes `x` and its transitive closure; alias remains visible and
+  traverses its `actual`; and
+- accepted set operations use Bazel precedence/associativity and deterministic
+  duplicate elimination.
+
+If Bazel 9.2 disagrees about `:all`, `//...`, implicit/explicit source nodes,
+alias traversal, diagnostics, cycles, or ordering, stop and revise this packet
+before Rust implementation.
+
+Implementation steps:
+
+1. Generate and independently rerun the two Bazel 9.2 fixtures; replace or
+   explicitly supersede stale `query-basic` evidence.
+2. Port the generic parser/span/set/evaluator/traversal substrate and add
+   source-cited parser/registry tests.
+3. Add the demand-driven DICE package-graph key, recursive-only package-set
+   key, structural nodes, normalized edges, and focused ownership/pattern
+   tests.
+4. Add the retained-transaction query entry point, command evaluation, and
+   text renderer; remove the query placeholder only for the accepted matrix.
+5. Add exact `ActivationTracker` multiset regressions: initial evaluation;
+   zero activation on an identical revision; no package-graph activation for
+   an unrelated package BUILD edit during a literal `deps()` query; deliberate
+   package-set validation and affected package evaluation for `//...`; BUILD
+   target/edge edit; package create/delete/recreate via directory inputs; and
+   dependency changes reflected by `deps` without restarting the runtime.
+6. Run the affected/downstream suite serially and obtain Sol-low
+   post-validation review before recording completion evidence.
+
+Focused validation:
+
+```bash
+CARGO_TARGET_DIR=/tmp/slug-m3-query-target CARGO_BUILD_JOBS=1 cargo test \
+  -p slug_query_v2 -p slug_loading_v2 -p slug_core_v2 \
+  -p slug_commands_v2 -p slug_cli_v2
+python3 -B -m tools.v2_oracle run --fixture query-parser-and-sets \
+  --tool bazel --bazel /usr/bin/bazel
+python3 -B -m tools.v2_oracle run --fixture query-loading-thin-vertical \
+  --tool bazel --bazel /usr/bin/bazel
+cargo fmt --all -- --check
+git diff --check
+```
+
+Also grep for direct filesystem access in query keys/evaluation, extra DICE or
+runtime creation, command-local graphs, configured/action query imports,
+default hash collections/string-heavy graph state, blocking bridges, and
+locks across DICE work.
+
+Evidence and plan update: land oracle evidence first. After implementation
+acceptance, record exact commits, Bazel provenance, externally observed
+semantics, AST-test source citations, activation multisets, reuse decisions,
+validation, and residual functions/formats here, in Stage 1, Stage 9, and the
+orchestration routing log.
+
+Stop conditions: dirty overlap; non-generated or non-9.2 oracle evidence; any
+oracle disagreement named above; direct filesystem/package scanning in a
+query key; inability to evaluate in the retained committed transaction; a need
+for external repositories, repository mapping, arbitrary Starlark attributes,
+Sky Query universe behavior, configured identities/transitions/providers,
+action nodes/formatters, or execution; or pressure to label this packet “full
+query.” Stop at the first deferred function or format rather than inventing
+semantics.
