@@ -1234,3 +1234,10 @@ Authority:
 `AggregatingAttributeMapper#getReachableLabels`, and
 `AbstractQueryTest#testLabelsOperator` at `8220c619…`. Add formal ledger entry
 after implementation with source/mode, oracle, validation, and residual risk.
+
+`8dfae99c` is accepted immutable 31-row Bazel evidence: seven public default
+label-bearing constructors, dormant exclusion, selector-key false, valid dedup,
+distinct output generators, generated kind, and fail-fast errors. 29 rows are
+eventual Slug CLI evidence; two `label_kind` rows remain Bazel-only until
+focused `QueryNodeKind::GeneratedFile` assertions. No extraction decision
+changes.

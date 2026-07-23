@@ -783,3 +783,26 @@ fake-provenance/set, failure, and factored FULL observations with
 `--output=graph --graph:factored`: intersection keeps the left representative,
 label-equal `except` is symmetric, and union preserves distinct callback
 batches to `siblings`.
+
+### Labels metadata oracle landed (2026-07-23)
+
+`8dfae99c` generated 31 Bazel rows. Exact command names are
+`scalar_explicit`, `label_list_explicit_cross_package`,
+`label_list_omitted_default`, `label_list_explicit_empty`,
+`existing_non_label_attribute`, `absent_attribute`,
+`implicit_attribute_dollar_spelling`, `implicit_attribute_wrong_spelling`,
+`selector_all_branches_default_no_keys`, `selector_concatenation_deduplicates`,
+`output_scalar_generated_target`, `output_scalar_generated_label_kind`,
+`output_list_generated_targets`, `output_list_generated_label_kind`,
+`second_output_producer_generated_targets`, `outputs_reach_generating_rule`,
+`outputs_and_generating_rule_graph`, `outputs_and_generating_rule_deps`,
+`distinct_output_generators_deps`, `distinct_output_generators_graph`,
+`string_keyed_label_dict_values`, `label_keyed_string_dict_keys`,
+`label_list_dict_values`, `source_alias_and_build_operands`,
+`duplicate_and_cross_package_composition`, `union_composition`, `default_order`,
+`auto_order`, `full_order`, `missing_referenced_target`,
+`mandatory_attribute_package_error`. Seven public default label attrs are
+covered; dormant attrs excluded. 29 rows are future CLI; two `label_kind` rows
+are Bazel-only generated-file representation evidence pending
+`QueryNodeKind::GeneratedFile`. Worker/root runs and all fixture checks passed;
+pytest unavailable; Sol `ACCEPT`.

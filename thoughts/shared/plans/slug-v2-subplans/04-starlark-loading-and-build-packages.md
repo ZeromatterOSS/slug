@@ -592,3 +592,9 @@ representation beyond the exact output/output-list surface required here is a
 stop. Buck2 attribute files supply utility/traversal shapes only; reject Buck
 cell, select, attr, and provider semantics. V1 `labels` is
 unimplemented/reference-only.
+
+`8dfae99c` accepts immutable 31-row Bazel evidence: all seven default public
+label-bearing attrs, dormant exclusion, select-key false, valid dedup, two
+output producers with distinct generated-file owners/edges, and fail-fast
+missing/mandatory errors. 29 normal rows are future CLI evidence; two
+label-kind rows require focused `QueryNodeKind::GeneratedFile` tests first.

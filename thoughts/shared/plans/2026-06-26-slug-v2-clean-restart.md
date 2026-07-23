@@ -667,3 +667,13 @@ before activation for any missing reachable-label form, output-target
 ambiguity, coercion/provenance ambiguity, or query-time Starlark/filesystem
 work. Reuse only Buck2 compact utility and traversal shapes; V1/Buck2 `labels`
 is unimplemented and reference-only.
+
+Oracle Gate 1 landed in `8dfae99c`: 31 generated Bazel 9.2 rows cover all
+seven default public label-bearing attrs; experimental documented-false dormant
+attrs are excluded. Select keys are false; valid dedup, two output producers,
+generated kind/output→own-generator edges, and fail-fast missing/mandatory
+errors are pinned. Worker `…/20260723-071512-784968-bazel` and root
+`…/20260723-071641-791259-bazel` passed fixture-list, command-set, staged
+diff/provenance/generated/credential-pattern checks; pytest unavailable; Sol
+`ACCEPT`. This is Bazel evidence only: 29 rows are eventual Slug CLI gate and
+two `label_kind` rows require focused `QueryNodeKind::GeneratedFile` assertions.

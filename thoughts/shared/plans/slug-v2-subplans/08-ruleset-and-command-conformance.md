@@ -1991,3 +1991,9 @@ rather than activate when a known unconfigured reachable-label form is
 unsupported. Same-daemon schema/value/select/default/output edits must activate
 the demand-loaded package graph, while semantically equal and non-semantic edits
 reuse it.
+
+Oracle `8dfae99c` has 31 Bazel rows. The Stage 8 CLI gate is exactly the 29
+non-`label_kind` Stage 1 names; never claim Slug 31/31. Two Bazel label-kind
+rows constrain generated-file representation only and require focused
+`QueryNodeKind::GeneratedFile` assertions. Preserve output→own-generator,
+select-key exclusion, valid dedup, and fail-fast contracts.
