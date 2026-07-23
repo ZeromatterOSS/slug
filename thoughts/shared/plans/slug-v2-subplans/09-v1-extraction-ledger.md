@@ -1261,3 +1261,17 @@ query attrs separate from deps, selectors exclude keys, generated files only
 output→own-generator edges, exact 29 rows, two formatter-deferred label-kind
 rows. Sol `ACCEPT` after graph/order corrections. Six functions/M3 remain open;
 no V1/Buck import or 31/31 claim.
+
+### WP-4-8-m3-executables-rule-capability — prospective extraction decision
+
+Pending oracle/implementation. Stage 4 owns a V2 `RuleCapability {
+rule_class: CompactString, executable: bool }`, exported-name capture through
+starlark-rust `StarlarkValue::export_as`, and equality/invalidation. Stage 8
+owns only `executables(EXPR)` projection/filtering. Use the bounded Buck2 rule
+export/capture shape and existing V2 provider `OnceCell`/freeze pattern as
+reference mechanisms; do not port Buck rule classification, cells, query
+semantics, or `fancy-regex`. V1 query target capability hooks are
+reference-only, not a Bazel source of truth. Bazel 9.2
+`ExecutablesFunction`, `BlazeTargetAccessor`, and `TargetUtils` at
+`8220c619…` are the oracle: per-target executable capability plus rule class
+not ending `_test`. Native genrule behavior remains a separate oracle gate.

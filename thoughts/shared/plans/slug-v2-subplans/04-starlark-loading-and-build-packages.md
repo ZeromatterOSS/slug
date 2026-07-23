@@ -623,3 +623,29 @@ Stage 8 `8fec2696` consumes this substrate through compact immutable
 `Allocative` QueryNode attrs separate from deps: all selector branches/default,
 not keys, and only output→own-generator generated edges. Same-DICE semantic/
 reuse and same-daemon metadata transitions passed; no loading scope expands.
+
+## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
+
+After the immutable Bazel 9.2 oracle, retain V2-owned immutable `Allocative`
+`RuleCapability { rule_class: CompactString, executable: bool }` for every
+loadable rule and include both fields in `StarlarkRuleImplementation` and
+`LoadedPackage` semantic equality. For Starlark rules, `RuleDefinitionGen`
+captures the exact exported `.bzl` name via `StarlarkValue::export_as`, using
+the bounded Buck2 rule pattern and the existing V2 provider `OnceCell`/freeze
+shape; never use implementation identity or BUILD target name. The oracle
+fixes `test=true` iff the class ends `_test`, with test implying executable.
+
+Project exact fixed native classifications only: `filegroup`, `alias`, and
+`config_setting` have their Bazel class names and `executable=false`; an alias
+does not inherit its actual's capability. Source, BUILD, and generated targets
+remain non-rules. Do not add `test_suite` while no native global exists.
+`genrule` positive/negative executable behavior is separately oracle-gated;
+this packet states its current-loadable-graph boundary and stops if a full
+native-positive answer is needed. No configured evaluation, provider, global
+registry, new DICE key, or query activation belongs here.
+
+Gate A tests prove false→true executable, false→true test, exported-rule rename,
+and target rename crossing `_test` with unchanged classification, plus
+delete/recreate and semantically equal formatting reuse through
+`BzlModuleEvalKey → PackageLoadKey → focused semantic consumer/observer`.
+Stage 8 may not start until Sol accepts this equality/invalidation boundary.

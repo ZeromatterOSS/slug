@@ -2019,3 +2019,36 @@ transitions pass. Root validation: loading 37, query 42, CLI 21
 (1 unit/17 CLI/3 graph), server 15, analysis 11, plus fmt/diff. Sol corrected
 error classification, exact graph evidence, and generated-only ordering before
 final `ACCEPT`; M3 remains open and this is never a 31/31 claim.
+
+## WP-4-8-m3-executables-rule-capability: Stage 8 Gate B (2026-07-23)
+
+The next reviewed packet is `executables(EXPR)` only, after its immutable
+Bazel 9.2 oracle and Stage 4 Gate A receive Sol acceptance. Authority is
+`ExecutablesFunction.java`, `BlazeTargetAccessor`, and `TargetUtils` at
+`8220c619…`: filter the once-evaluated operand by retained per-target
+`Rule.isExecutable()` / `$is_executable` and a rule-class name not ending
+`_test`. An executable test is excluded. The class is the exported `.bzl`
+rule name, never the BUILD target name or implementation identity.
+
+Stage 8 projects `RuleCapability { rule_class: CompactString, executable:
+bool }` from the demand-loaded graph and adds exactly one function registry and
+evaluator path. It creates no query edges and retains existing set identity,
+order, AUTO/FULL/default formatting, and graph presentation. It must reject no
+known current-loadable target kind: source/BUILD/generated targets are
+non-rules; supported native filegroup/alias/config_setting are exact
+non-executable classes and alias never inherits. `test_suite` is out of scope
+while absent from globals. Native `genrule` executable positives/negatives are
+a separate oracle/substrate gate, not an inferred subset. Both capability
+fields participate in `QueryNode` and `UnconfiguredPackageGraphKey`
+equality/invalidation at this projection boundary.
+
+The oracle-first matrix includes executable and non-executable Starlark rules;
+`test=true` iff `_test` suffix and test-implies-executable; executable `_test`
+exclusion; native/non-rule negatives; nested/set/let compositions; exact order
+and graph rows; syntax/arity/no-partial-output diagnostics; and retained-daemon
+false→true executable, false→true test, export rename, target rename crossing
+`_test` without class change, formatting-only reuse, and delete/recreate.
+Hard-stop on any need for a DICE key, direct filesystem/query-time Starlark,
+global classifier, configured analysis/providers, Java regex, visibility, or
+tests expansion. On activation only five ordinary functions remain deferred;
+M3 itself remains open.

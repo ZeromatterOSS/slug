@@ -714,3 +714,40 @@ open: never claim 31/31. This implementation reused the checked-in oracle and
 needed no Bazel invocation; no agent or tool accessed `~/.bazelrc`. Future
 Bazel commands may consume it through ordinary RC discovery without inspection.
 Archive-status baseline failures (v1-archive/stale allowlists) are unrelated.
+
+## Authoritative Next M3 Packet: Executable Rule Capability (2026-07-23)
+
+`WP-4-8-m3-executables-rule-capability` supersedes the labels packet. It is an
+oracle-first, three-gate vertical: immutable Bazel 9.2.0 evidence; Stage 4
+load-only capability retention; then, only after Sol acceptance, Stage 8
+activation of `executables(EXPR)`. Bazel authority is
+`ExecutablesFunction`, `BlazeTargetAccessor#isExecutableNonTestRule`, and
+`TargetUtils#isExecutableNonTestRule` at `8220c619…`: the predicate is the
+per-target `Rule.isExecutable()` / `$is_executable` capability *and* a retained
+rule-class name not ending in `_test`. It is never inferred from a BUILD target
+name or from a frozen implementation identity.
+
+Stage 4 retains immutable, `Allocative` `RuleCapability { rule_class:
+CompactString, executable: bool }` in each Starlark rule instance and in all
+semantic equality paths. `RuleDefinitionGen` must retain the exact exported
+`.bzl` rule name through `StarlarkValue::export_as`, following the bounded
+Buck2 rule shape and the existing V2 provider `OnceCell`/freeze pattern; the
+exported rule name, not a target name, is the class. Gate A proves `test=true`
+iff the class suffix is `_test`, test implies executable, and an executable
+test is excluded. Supported native `filegroup`, `alias`, and `config_setting`
+receive exact class names and `executable=false`; alias never inherits;
+source/BUILD/generated nodes are non-rules. Do not add `test_suite` while its
+global is absent. Native `genrule` executable true/false is a separate
+oracle/substrate gate: the current-loadable-graph boundary must be stated, and
+the packet stops if full native-positive coverage is required rather than
+inferring it.
+
+Stage 8 evaluates its sole operand once, filters existing selected rules by
+that projection, and adds no edges. It adds no DICE key, filesystem scan,
+global classification, configured analysis, provider, regex, visibility, or
+tests activation. Oracle and retained-daemon rows cover non-rules, executable
+and non-executable rules, executable `_test` exclusion, native negatives,
+composition/order/graph/diagnostics, false→true executable, false→true test,
+export rename, target rename crossing `_test` without classification change,
+formatting reuse, and delete/recreate. M3 remains open; only after this gate
+would five ordinary functions remain deferred.
