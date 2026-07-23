@@ -1,0 +1,5 @@
+load(":defs.bzl", "make_consumer")
+
+package(default_visibility = ["//visibility:private"])
+
+make_consumer(name = "consumer")

@@ -1,0 +1,6 @@
+package(default_visibility = [
+    "//viewer:__pkg__",
+    "//viewer:__subpackages__",
+])
+
+filegroup(name = "omitted")

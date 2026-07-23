@@ -1,0 +1,798 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, set(//owner:explicit_public //owner:explicit_private //owner:default_private //defaults_public:default_public //owner:viewer_pkg //owner:viewer_subpackages //owner:other_subpackages))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, set(//owner:explicit_public //owner:explicit_private //owner:default_private //defaults_public:default_public //owner:viewer_pkg //owner:viewer_subpackages //owner:other_subpackages))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_explicit_default_and_direct_specs",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//defaults_public:default_public\n//owner:explicit_public\n//owner:viewer_pkg\n//owner:viewer_subpackages",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-visible-visibility/20260723-153328-1209951-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-visible-visibility/20260723-153535-1213419-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: cc899ac1-ac77-4ff9-902a-d0ee289121a0\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//defaults_public:default_public\n//owner:explicit_public\n//owner:viewer_pkg\n//owner:viewer_subpackages\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer/sub:caller, set(//owner:viewer_pkg //owner:viewer_subpackages))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer/sub:caller, set(//owner:viewer_pkg //owner:viewer_subpackages))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_subpackage_distinguishes_pkg_from_subpackages",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:viewer_subpackages",
+      "stderr": "INFO: Invocation ID: 685a5a47-242f-4cee-a77c-49df16c7a569\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:viewer_subpackages\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//owner:ordinary, //owner:explicit_private)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//owner:ordinary, //owner:explicit_private)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_same_package_overrides_private",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:explicit_private",
+      "stderr": "INFO: Invocation ID: 9e876cc4-2e2e-488b-b5a4-49bd73655bae\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:explicit_private\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(set(//viewer:caller //other:caller), set(//owner:explicit_public //owner:viewer_pkg))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(set(//viewer:caller //other:caller), set(//owner:explicit_public //owner:viewer_pkg))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_requires_all_callers",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:explicit_public",
+      "stderr": "INFO: Invocation ID: 8693d751-1ac2-457b-b271-a7943460a1b1\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:explicit_public\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(set(), set(//owner:explicit_private //owner:default_private //owner:viewer_pkg))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(set(), set(//owner:explicit_private //owner:default_private //owner:viewer_pkg))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_empty_callers_is_vacuously_true",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:default_private\n//owner:explicit_private\n//owner:viewer_pkg",
+      "stderr": "INFO: Invocation ID: 394b47ab-c6d6-4016-9bb5-d1055a9f208b\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:default_private\n//owner:explicit_private\n//owner:viewer_pkg\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, //owner:exact_only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, //owner:exact_only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_package_group_exact_positive",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:exact_only",
+      "stderr": "INFO: Invocation ID: f412cb34-a992-448b-893b-f9127c968e77\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:exact_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer/sub:caller, //owner:exact_only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer/sub:caller, //owner:exact_only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_package_group_exact_rejects_descendant",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8ae4f784-4843-4386-9d16-2e22c440030b\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer/sub:caller, //owner:subtree_only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer/sub:caller, //owner:subtree_only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_package_group_subtree_accepts_descendant",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:subtree_only",
+      "stderr": "INFO: Invocation ID: f1b0bf27-0672-4f9d-b3ff-96b0ad278a1f\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:subtree_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer/blocked/reallowed:caller, set(//owner:base_only //owner:top_reallow //owner:direct_reallow))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer/blocked/reallowed:caller, set(//owner:base_only //owner:top_reallow //owner:direct_reallow))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_local_negative_separate_include_and_direct_reallow",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:direct_reallow\n//owner:top_reallow",
+      "stderr": "INFO: Invocation ID: e37f8968-45f5-4a9e-ae5f-8f543deab93b\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:direct_reallow\n//owner:top_reallow\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer/blocked:caller, set(//owner:base_only //owner:top_reallow //owner:direct_reallow))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer/blocked:caller, set(//owner:base_only //owner:top_reallow //owner:direct_reallow))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_local_negative_blocks_without_matching_reallow",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:direct_reallow",
+      "stderr": "INFO: Invocation ID: 87af9860-7dcb-49db-921c-0766bb81df65\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:direct_reallow\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, //owner:cycle_visible)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, //owner:cycle_visible)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_package_group_include_cycle_terminates",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:cycle_visible",
+      "stderr": "INFO: Invocation ID: 4a9bc115-3e4d-439f-8be8-1266f8927526\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:cycle_visible\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//owner:cycle_visible)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//owner:cycle_visible)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_package_group_include_cycle_retains_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:cycle_a\n//owner:cycle_b\n//owner:cycle_visible",
+      "stderr": "INFO: Invocation ID: b1cae68f-cdab-4cc5-a424-f675f04ec682\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:cycle_a\n//owner:cycle_b\n//owner:cycle_visible\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//javatests/acme:caller, //java/acme:private)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//javatests/acme:caller, //java/acme:private)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_matching_javatests_caller_sees_private_java",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//java/acme:private",
+      "stderr": "INFO: Invocation ID: dc8a9d51-bfbd-4d36-907d-bf5df37d6604\nLoading: 0 packages loaded\n",
+      "stdout": "//java/acme:private\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//java/acme:caller, //javatests/acme:private)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//java/acme:caller, //javatests/acme:private)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_private_java_caller_cannot_see_javatests",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: d79c114e-d4b7-4dfc-84b0-af9fefee7ed2\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//javatests/other:caller, //java/acme:private)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//javatests/other:caller, //java/acme:private)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_mismatching_javatests_suffix_is_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e578d72f-3057-4d56-80ef-3db6797c38c0\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, set(//artifacts:exported.txt //artifacts:implicit.txt //artifacts:public.out //artifacts:private.out //artifacts:BUILD.bazel //build_public:BUILD.bazel //artifacts:friends))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, set(//artifacts:exported.txt //artifacts:implicit.txt //artifacts:public.out //artifacts:private.out //artifacts:BUILD.bazel //build_public:BUILD.bazel //artifacts:friends))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_generated_source_build_and_package_group_kinds",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//artifacts:exported.txt\n//artifacts:friends\n//artifacts:public.out\n//build_public:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 058f5bea-d394-423d-8da1-1bb87cd67000\nLoading: 0 packages loaded\n",
+      "stdout": "//artifacts:exported.txt\n//artifacts:friends\n//artifacts:public.out\n//build_public:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, loadfiles(//loads:consumer))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, loadfiles(//loads:consumer))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_fake_load_target_is_public",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//loads:defs.bzl",
+      "stderr": "INFO: Invocation ID: 38423de6-864a-4d02-9f03-cde37920e367\nLoading: 0 packages loaded\n",
+      "stdout": "//loads:defs.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, //loads:defs.bzl)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, //loads:defs.bzl)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_real_same_label_load_source_uses_real_visibility",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 071e384c-1d3f-4f7d-b027-db9a12562943\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, set(//owner:wrong_direct //owner:wrong_include_target))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, set(//owner:wrong_direct //owner:wrong_include_target))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_wrong_kind_group_label_and_include_are_ignored",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 4b5742e3-decf-4457-bb99-a92b97d71a8d\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, //errors/missing_top:target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, //errors/missing_top:target)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_missing_top_level_group_diagnostic",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"visible(//viewer:caller, //errors/missing_top:target)\" failed: Invalid visibility label '//errors/missing_top:does_not_exist': no such target '//errors/missing_top:does_not_exist': target 'does_not_exist' not declared in package 'errors<workspace>/errors/missing_top/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 438bbd9f-3518-4709-a5c4-1a7d0e06f787\nLoading: 0 packages loaded\nERROR: Evaluation of query \"visible(//viewer:caller, //errors/missing_top:target)\" failed: Invalid visibility label '//errors/missing_top:does_not_exist': no such target '//errors/missing_top:does_not_exist': target 'does_not_exist' not declared in package 'errors/missing_top' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-visible-visibility/20260723-153535-1213419-bazel/workspace/errors/missing_top/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, //errors/missing_include:target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, //errors/missing_include:target)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_missing_included_group_diagnostic",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"visible(//viewer:caller, //errors/missing_include:target)\" failed: Invalid visibility label '//errors/missing_include:top': no such target '//errors/missing_include:does_not_exist': target 'does_not_exist' not declared in package 'errors<workspace>/errors/missing_include/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1c99a12f-d23c-4042-b264-9fd024884f2e\nLoading: 0 packages loaded\nERROR: Evaluation of query \"visible(//viewer:caller, //errors/missing_include:target)\" failed: Invalid visibility label '//errors/missing_include:top': no such target '//errors/missing_include:does_not_exist': target 'does_not_exist' not declared in package 'errors/missing_include' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-visible-visibility/20260723-153535-1213419-bazel/workspace/errors/missing_include/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//errors/misspelled:target"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//errors/misspelled:target"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "misspelled_special_visibility_label_diagnostic",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/errors/misspelled/BUILD.bazel:1:10: //errors/misspelled:target Invalid visibility label '//visibility:plubic'; did you mean //visibility:public or //visibility:private?\nERROR: Evaluation of query \"//errors/misspelled:target\" failed",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 7aaf7f60-5ddf-4a28-b5c0-e0b597c357b2\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-visible-visibility/20260723-153535-1213419-bazel/workspace/errors/misspelled/BUILD.bazel:1:10: //errors/misspelled:target Invalid visibility label '//visibility:plubic'; did you mean //visibility:public or //visibility:private?\nERROR: Evaluation of query \"//errors/misspelled:target\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//errors/malformed_spec:target"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//errors/malformed_spec:target"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "malformed_package_specification_diagnostic",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/errors/malformed_spec/BUILD.bazel:1:14: invalid package name 'not-a-package': must start with '//', '@', or be 'public' or 'private'\nERROR: Evaluation of query \"//errors/malformed_spec:target\" failed",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ede76c9c-4f2f-44d4-aab9-fb2f2d7bdbbe\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-visible-visibility/20260723-153535-1213419-bazel/workspace/errors/malformed_spec/BUILD.bazel:1:14: invalid package name 'not-a-package': must start with '//', '@', or be 'public' or 'private'\nERROR: Evaluation of query \"//errors/malformed_spec:target\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels(visibility, //owner:base_only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(visibility, //owner:base_only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "labels_visibility_explicit_group_projects_raw_target",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:base",
+      "stderr": "INFO: Invocation ID: 92277518-166e-4a7c-a02a-bf4a5e8f7748\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:base\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(visibility, //default_group:omitted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(visibility, //default_group:omitted)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "labels_visibility_omitted_default_group_is_empty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: dbaafa44-517b-4ddb-b56c-112668cda455\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels(visibility, //owner:direct_specs)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(visibility, //owner:direct_specs)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "labels_visibility_explicit_direct_specs_fail_non_loadable_lookup",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('visibility', //owner:direct_specs)\" failed: in 'visibility' of rule //owner:direct_specs: no such target '//viewer:__pkg__': target '__pkg__' not declared in package 'viewer' defined by <workspace>/viewer/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8bd81c36-aade-4511-b6c0-aab78218951d\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('visibility', //owner:direct_specs)\" failed: in 'visibility' of rule //owner:direct_specs: no such target '//viewer:__pkg__': target '__pkg__' not declared in package 'viewer' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-visible-visibility/20260723-153535-1213419-bazel/workspace/viewer/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels(visibility, //default_direct:omitted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(visibility, //default_direct:omitted)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "labels_visibility_omitted_default_direct_specs_is_empty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 4b618b29-cf8b-4abd-afff-4fcfa9c4d734\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//owner:base_only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//owner:base_only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_explicit_visibility_group_edge",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:base\n//owner:base_only",
+      "stderr": "INFO: Invocation ID: 92d30e9d-eae6-4548-afc1-8bd4521238dc\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:base\n//owner:base_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//owner:top_reallow)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//owner:top_reallow)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_transitive_package_group_include_edges",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:base\n//owner:middle\n//owner:reallow\n//owner:top\n//owner:top_reallow",
+      "stderr": "INFO: Invocation ID: a31aef3a-0a1d-4ac6-9faa-38ff9b68db22\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:base\n//owner:middle\n//owner:reallow\n//owner:top\n//owner:top_reallow\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(set(//default_group:omitted //default_group:data.txt))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(set(//default_group:omitted //default_group:data.txt))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_inherited_group_edges_for_rule_and_source",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//default_group:data.txt\n//default_group:omitted\n//owner:exact",
+      "stderr": "INFO: Invocation ID: 00ef13ee-6c12-4f09-ba38-31202c3ea06f\nLoading: 0 packages loaded\n",
+      "stdout": "//default_group:data.txt\n//default_group:omitted\n//owner:exact\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//owner:direct_specs)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//owner:direct_specs)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_direct_package_specs_are_not_targets",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:direct_specs",
+      "stderr": "INFO: Invocation ID: 1c45300b-6ea5-4fa4-954b-70003a798867\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:direct_specs\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(visibility, //owner:direct_subpackages_only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(visibility, //owner:direct_subpackages_only)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "labels_visibility_explicit_subpackages_spec_fails_non_loadable_lookup",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('visibility', //owner:direct_subpackages_only)\" failed: in 'visibility' of rule //owner:direct_subpackages_only: no such target '//viewer:__subpackages__': target '__subpackages__' not declared in package 'viewer' defined by <workspace>/viewer/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1b250db8-82b1-445a-bd27-cfa249e0b98f\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('visibility', //owner:direct_subpackages_only)\" failed: in 'visibility' of rule //owner:direct_subpackages_only: no such target '//viewer:__subpackages__': target '__subpackages__' not declared in package 'viewer' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-visible-visibility/20260723-153535-1213419-bazel/workspace/viewer/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "--noimplicit_deps",
+        "deps(set(//owner:base_only //default_group:omitted))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--noimplicit_deps",
+        "deps(set(//owner:base_only //default_group:omitted))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "bazel_only_structure_noimplicit_keeps_explicit_drops_inherited_visibility",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//default_group:omitted\n//owner:base\n//owner:base_only",
+      "stderr": "INFO: Invocation ID: daf80498-d609-4987-98c4-1d66138d513d\nLoading: 0 packages loaded\n",
+      "stdout": "//default_group:omitted\n//owner:base\n//owner:base_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--nonodep_deps",
+        "deps(set(//owner:top_reallow //owner:top))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--nonodep_deps",
+        "deps(set(//owner:top_reallow //owner:top))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "bazel_only_structure_nonodep_removes_rule_visibility_keeps_group_includes",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//owner:base\n//owner:middle\n//owner:reallow\n//owner:top\n//owner:top_reallow",
+      "stderr": "INFO: Invocation ID: 2bcd7b73-c687-4bf6-8cff-ade0deec6fc9\nLoading: 0 packages loaded\n",
+      "stdout": "//owner:base\n//owner:middle\n//owner:reallow\n//owner:top\n//owner:top_reallow\n"
+    }
+  ],
+  "fixture": "query-visible-visibility",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

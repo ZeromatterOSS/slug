@@ -1,0 +1,30 @@
+load(":defs.bzl", "emit")
+
+package(default_visibility = ["//visibility:private"])
+
+exports_files(
+    ["exported.txt"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "uses_implicit",
+    srcs = ["implicit.txt"],
+)
+
+emit(
+    name = "public_gen",
+    out = "public.out",
+    visibility = ["//visibility:public"],
+)
+
+emit(
+    name = "private_gen",
+    out = "private.out",
+    visibility = ["//visibility:private"],
+)
+
+package_group(
+    name = "friends",
+    packages = ["//viewer"],
+)

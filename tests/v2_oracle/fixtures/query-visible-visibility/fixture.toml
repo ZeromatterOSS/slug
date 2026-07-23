@@ -1,0 +1,246 @@
+[fixture]
+name = "query-visible-visibility"
+description = "Bazel 9.2.0 ordinary-query oracle for target visibility representation, package groups, visible(), and visibility query edges."
+comparison = "message_shape"
+oracle_notes = "Root-repository, bzlmod-only fixture. The first 32 rows are future Slug representation/visible gates. The final two bazel_only_structure_* rows are Bazel-only evidence for flag-sensitive graph structure and do not authorize Slug command support or enter a future Slug acceptance count."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/VisibleFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryVisibility.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeTargetAccessor.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryVisibility.java",
+  "src/main/java/com/google/devtools/build/lib/query2/compat/FakeLoadTarget.java",
+  "src/main/java/com/google/devtools/build/lib/packages/RuleVisibility.java",
+  "src/main/java/com/google/devtools/build/lib/packages/PackageGroupsRuleVisibility.java",
+  "src/main/java/com/google/devtools/build/lib/packages/PackageSpecification.java",
+  "src/main/java/com/google/devtools/build/lib/packages/PackageGroup.java",
+  "src/main/java/com/google/devtools/build/lib/packages/Target.java",
+  "src/main/java/com/google/devtools/build/lib/packages/Rule.java",
+  "src/main/java/com/google/devtools/build/lib/packages/InputFile.java",
+  "src/main/java/com/google/devtools/build/lib/packages/OutputFile.java",
+  "src/main/java/com/google/devtools/build/lib/packages/LabelVisitationUtils.java",
+  "src/main/java/com/google/devtools/build/lib/packages/AggregatingAttributeMapper.java#visitRawNonConfigurableAttributeValue",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/LabelsFunction.java",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testVisible_simple_public",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testVisible_private_same_package",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testVisible_package_group_include",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testVisible_java_javatests",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testDefaultVisibilityReturnedInDeps",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testIncludesReturnedInDeps",
+]
+translation_notes = "VisibleFunction materializes callers once and retains an input only when every caller can see it; an empty caller set is vacuously true. BlazeTargetAccessor always adds same-package access and the one-way matching javatests/X caller to private java/X target. Direct package specifications and recursively expanded package-group contents are OR alternatives. Negatives override positives only inside one PackageGroupContents, so a separate direct or included positive can re-allow a package. Real generated/source/BUILD targets retain real visibility; package_group and fake load targets are public. LabelsFunction calls TargetAccessor.getPrerequisites; BlazeTargetAccessor.getPrerequisites then calls AggregatingAttributeMapper.getReachableLabels over the stored/raw rule attribute. visitRawNonConfigurableAttributeValue is the mapper's related declared-visibility special case, not this LabelsFunction call path. Explicit loadable group labels project as targets, omitted visibility stays empty even when the package default names a group, explicit direct __pkg__/__subpackages__ values are retained but fail target lookup because they are non-loadable pseudo-labels, and omitted visibility with direct package defaults stays empty. In contrast, deps and LabelVisitationUtils use effective visibility dependency labels, including inherited groups; direct package specifications remain visibility values but never dependency targets. The bazel_only_structure rows document flag-sensitive graph distinctions without authorizing those flags for Slug."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-visible-visibility --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-visible-visibility --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "visible_explicit_default_and_direct_specs"
+argv = ["query", "visible(//viewer:caller, set(//owner:explicit_public //owner:explicit_private //owner:default_private //defaults_public:default_public //owner:viewer_pkg //owner:viewer_subpackages //owner:other_subpackages))"]
+expected_exit = 0
+stdout_patterns = ["\\A//defaults_public:default_public\\n//owner:explicit_public\\n//owner:viewer_pkg\\n//owner:viewer_subpackages\\n?\\Z"]
+
+[[commands]]
+name = "visible_subpackage_distinguishes_pkg_from_subpackages"
+argv = ["query", "visible(//viewer/sub:caller, set(//owner:viewer_pkg //owner:viewer_subpackages))"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:viewer_subpackages\\n?\\Z"]
+
+[[commands]]
+name = "visible_same_package_overrides_private"
+argv = ["query", "visible(//owner:ordinary, //owner:explicit_private)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:explicit_private\\n?\\Z"]
+
+[[commands]]
+name = "visible_requires_all_callers"
+argv = ["query", "visible(set(//viewer:caller //other:caller), set(//owner:explicit_public //owner:viewer_pkg))"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:explicit_public\\n?\\Z"]
+
+[[commands]]
+name = "visible_empty_callers_is_vacuously_true"
+argv = ["query", "visible(set(), set(//owner:explicit_private //owner:default_private //owner:viewer_pkg))"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:default_private\\n//owner:explicit_private\\n//owner:viewer_pkg\\n?\\Z"]
+
+[[commands]]
+name = "visible_package_group_exact_positive"
+argv = ["query", "visible(//viewer:caller, //owner:exact_only)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:exact_only\\n?\\Z"]
+
+[[commands]]
+name = "visible_package_group_exact_rejects_descendant"
+argv = ["query", "visible(//viewer/sub:caller, //owner:exact_only)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "visible_package_group_subtree_accepts_descendant"
+argv = ["query", "visible(//viewer/sub:caller, //owner:subtree_only)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:subtree_only\\n?\\Z"]
+
+[[commands]]
+name = "visible_local_negative_separate_include_and_direct_reallow"
+argv = ["query", "visible(//viewer/blocked/reallowed:caller, set(//owner:base_only //owner:top_reallow //owner:direct_reallow))"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:direct_reallow\\n//owner:top_reallow\\n?\\Z"]
+
+[[commands]]
+name = "visible_local_negative_blocks_without_matching_reallow"
+argv = ["query", "visible(//viewer/blocked:caller, set(//owner:base_only //owner:top_reallow //owner:direct_reallow))"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:direct_reallow\\n?\\Z"]
+
+[[commands]]
+name = "visible_package_group_include_cycle_terminates"
+argv = ["query", "visible(//viewer:caller, //owner:cycle_visible)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:cycle_visible\\n?\\Z"]
+
+[[commands]]
+name = "deps_package_group_include_cycle_retains_graph"
+argv = ["query", "deps(//owner:cycle_visible)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:cycle_a\\n//owner:cycle_b\\n//owner:cycle_visible\\n?\\Z"]
+
+[[commands]]
+name = "visible_matching_javatests_caller_sees_private_java"
+argv = ["query", "visible(//javatests/acme:caller, //java/acme:private)"]
+expected_exit = 0
+stdout_patterns = ["\\A//java/acme:private\\n?\\Z"]
+
+[[commands]]
+name = "visible_private_java_caller_cannot_see_javatests"
+argv = ["query", "visible(//java/acme:caller, //javatests/acme:private)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "visible_mismatching_javatests_suffix_is_rejected"
+argv = ["query", "visible(//javatests/other:caller, //java/acme:private)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "visible_generated_source_build_and_package_group_kinds"
+argv = ["query", "visible(//viewer:caller, set(//artifacts:exported.txt //artifacts:implicit.txt //artifacts:public.out //artifacts:private.out //artifacts:BUILD.bazel //build_public:BUILD.bazel //artifacts:friends))"]
+expected_exit = 0
+stdout_patterns = ["\\A//artifacts:exported\\.txt\\n//artifacts:friends\\n//artifacts:public\\.out\\n//build_public:BUILD\\.bazel\\n?\\Z"]
+
+[[commands]]
+name = "visible_fake_load_target_is_public"
+argv = ["query", "visible(//viewer:caller, loadfiles(//loads:consumer))"]
+expected_exit = 0
+stdout_patterns = ["\\A//loads:defs\\.bzl\\n?\\Z"]
+
+[[commands]]
+name = "visible_real_same_label_load_source_uses_real_visibility"
+argv = ["query", "visible(//viewer:caller, //loads:defs.bzl)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "visible_wrong_kind_group_label_and_include_are_ignored"
+argv = ["query", "visible(//viewer:caller, set(//owner:wrong_direct //owner:wrong_include_target))"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "visible_missing_top_level_group_diagnostic"
+argv = ["query", "visible(//viewer:caller, //errors/missing_top:target)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["Invalid visibility label '//errors/missing_top:does_not_exist': no such target '//errors/missing_top:does_not_exist'", "target 'does_not_exist' not declared"]
+
+[[commands]]
+name = "visible_missing_included_group_diagnostic"
+argv = ["query", "visible(//viewer:caller, //errors/missing_include:target)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["Invalid visibility label '//errors/missing_include:top': no such target '//errors/missing_include:does_not_exist'", "target 'does_not_exist' not declared"]
+
+[[commands]]
+name = "misspelled_special_visibility_label_diagnostic"
+argv = ["query", "//errors/misspelled:target"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["Invalid visibility label '//visibility:plubic'; did you mean //visibility:public or //visibility:private?", "Evaluation of query"]
+
+[[commands]]
+name = "malformed_package_specification_diagnostic"
+argv = ["query", "//errors/malformed_spec:target"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["invalid package name 'not-a-package': must start with '//', '@', or be 'public' or 'private'", "Evaluation of query"]
+
+[[commands]]
+name = "labels_visibility_explicit_group_projects_raw_target"
+argv = ["query", "labels(visibility, //owner:base_only)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:base\\n?\\Z"]
+
+[[commands]]
+name = "labels_visibility_omitted_default_group_is_empty"
+argv = ["query", "labels(visibility, //default_group:omitted)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "labels_visibility_explicit_direct_specs_fail_non_loadable_lookup"
+argv = ["query", "labels(visibility, //owner:direct_specs)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["in 'visibility' of rule //owner:direct_specs: no such target '//viewer:__pkg__': target '__pkg__' not declared in package 'viewer'"]
+
+[[commands]]
+name = "labels_visibility_omitted_default_direct_specs_is_empty"
+argv = ["query", "labels(visibility, //default_direct:omitted)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "deps_explicit_visibility_group_edge"
+argv = ["query", "deps(//owner:base_only)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:base\\n//owner:base_only\\n?\\Z"]
+
+[[commands]]
+name = "deps_transitive_package_group_include_edges"
+argv = ["query", "deps(//owner:top_reallow)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:base\\n//owner:middle\\n//owner:reallow\\n//owner:top\\n//owner:top_reallow\\n?\\Z"]
+
+[[commands]]
+name = "deps_inherited_group_edges_for_rule_and_source"
+argv = ["query", "deps(set(//default_group:omitted //default_group:data.txt))"]
+expected_exit = 0
+stdout_patterns = ["\\A//default_group:data\\.txt\\n//default_group:omitted\\n//owner:exact\\n?\\Z"]
+
+[[commands]]
+name = "deps_direct_package_specs_are_not_targets"
+argv = ["query", "deps(//owner:direct_specs)"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:direct_specs\\n?\\Z"]
+
+[[commands]]
+name = "labels_visibility_explicit_subpackages_spec_fails_non_loadable_lookup"
+argv = ["query", "labels(visibility, //owner:direct_subpackages_only)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["in 'visibility' of rule //owner:direct_subpackages_only: no such target '//viewer:__subpackages__': target '__subpackages__' not declared in package 'viewer'"]
+
+[[commands]]
+name = "bazel_only_structure_noimplicit_keeps_explicit_drops_inherited_visibility"
+argv = ["query", "--noimplicit_deps", "deps(set(//owner:base_only //default_group:omitted))"]
+expected_exit = 0
+stdout_patterns = ["\\A//default_group:omitted\\n//owner:base\\n//owner:base_only\\n?\\Z"]
+
+[[commands]]
+name = "bazel_only_structure_nonodep_removes_rule_visibility_keeps_group_includes"
+argv = ["query", "--nonodep_deps", "deps(set(//owner:top_reallow //owner:top))"]
+expected_exit = 0
+stdout_patterns = ["\\A//owner:base\\n//owner:middle\\n//owner:reallow\\n//owner:top\\n//owner:top_reallow\\n?\\Z"]
