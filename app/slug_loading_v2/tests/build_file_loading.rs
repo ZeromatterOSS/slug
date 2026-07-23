@@ -7,7 +7,10 @@ use std::time::SystemTime;
 use dice::DetectCycles;
 use dice::Dice;
 use slug_identity_v2::CanonicalLabel;
+use slug_loading_v2::AttributeKind;
+use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::PackageTarget;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::file_discovery::BUILD_FILE_FALLBACK;
@@ -340,6 +343,294 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
             .unwrap_err()
             .to_string();
         assert!(error.contains(expected), "error: {error}");
+    }
+}
+
+#[test]
+fn rule_attribute_schema_retains_provenance_selectors_dicts_and_generated_outputs() {
+    let workspace = scratch("attribute-metadata");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+def _impl(ctx):
+    return [DefaultInfo()]
+
+probe = rule(
+    implementation = _impl,
+    attrs = {
+        "one": attr.label(),
+        "many": attr.label_list(default = [":default"]),
+        "note": attr.string(default = "text"),
+        "_implicit": attr.label(default = ":implicit"),
+        "chosen": attr.label_list(),
+        "string_labels": attr.string_keyed_label_dict(),
+        "label_strings": attr.label_keyed_string_dict(),
+        "label_lists": attr.label_list_dict(),
+        "out": attr.output(mandatory = True),
+        "outs": attr.output_list(mandatory = True),
+        "trailing": attr.label_list(),
+        "locked": attr.label(configurable = False),
+        "chained": attr.label_list(),
+        "nested_prefix": attr.label_list(),
+    },
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+load(":defs.bzl", "probe")
+probe(
+    name = "metadata",
+    one = ":source",
+    chosen = [":shared"] + select({":condition": [":linux"], "//conditions:default": [":fallback"]}),
+    string_labels = {"local": ":source"},
+    label_strings = {":default": "default"},
+    label_lists = {"local": [":implicit", ":source"]},
+    out = "one.out",
+    outs = ["two.out", "three.out"],
+    trailing = select({":condition": [":linux"], "//conditions:default": [":fallback"]}) + [":after"],
+    chained = [":before"] + select({":condition": [":one"], "//conditions:default": [":one_default"]}) + select({":second_condition": [":two"], "//conditions:default": [":two_default"]}) + [":after"] + [":again"],
+    nested_prefix = [":outer"] + ([":inner"] + select({":condition": [":selected"]})),
+)
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::StarlarkRule(rule) = &loaded.targets[0].kind else {
+        panic!("expected Starlark rule")
+    };
+    assert_eq!(
+        rule.schema()
+            .iter()
+            .map(|schema| schema.kind())
+            .collect::<Vec<_>>(),
+        vec![
+            AttributeKind::Label,
+            AttributeKind::LabelList,
+            AttributeKind::String,
+            AttributeKind::Label,
+            AttributeKind::LabelList,
+            AttributeKind::StringKeyedLabelDict,
+            AttributeKind::LabelKeyedStringDict,
+            AttributeKind::LabelListDict,
+            AttributeKind::Output,
+            AttributeKind::OutputList,
+            AttributeKind::LabelList,
+            AttributeKind::Label,
+            AttributeKind::LabelList,
+            AttributeKind::LabelList,
+        ]
+    );
+    assert_eq!(rule.schema()[3].declaration_name(), "_implicit");
+    assert_eq!(rule.schema()[3].query_name(), "$implicit");
+    assert!(rule.schema()[3].default().is_some());
+    assert!(rule.schema()[8].mandatory());
+    assert!(rule.schema()[0].configurable());
+    assert!(!rule.schema()[8].configurable());
+    assert!(!rule.schema()[9].configurable());
+    assert!(!rule.schema()[11].configurable());
+    assert!(rule.schema()[2].dependency_reachable() == false);
+    assert!(matches!(
+        rule.schema()[0].default(),
+        Some(CoercedAttributeValue::None)
+    ));
+    assert!(
+        matches!(rule.schema()[4].default(), Some(CoercedAttributeValue::LabelList(values)) if values.is_empty())
+    );
+    assert!(
+        matches!(rule.schema()[5].default(), Some(CoercedAttributeValue::StringKeyedLabelDict(values)) if values.is_empty())
+    );
+    assert!(
+        matches!(rule.schema()[6].default(), Some(CoercedAttributeValue::LabelKeyedStringDict(values)) if values.is_empty())
+    );
+    assert!(
+        matches!(rule.schema()[7].default(), Some(CoercedAttributeValue::LabelListDict(values)) if values.is_empty())
+    );
+    assert!(
+        matches!(rule.schema()[9].default(), Some(CoercedAttributeValue::OutputList(values)) if values.is_empty())
+    );
+
+    let values = rule.values();
+    assert_eq!(values[0].provenance, AttributeProvenance::Explicit);
+    assert_eq!(values[1].provenance, AttributeProvenance::Default);
+    assert_eq!(values[2].provenance, AttributeProvenance::Default);
+    assert_eq!(values[3].provenance, AttributeProvenance::Implicit);
+    assert!(matches!(
+        values.iter().find(|value| value.declaration_name == "note").unwrap().value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "text"
+    ));
+    assert!(matches!(
+        values
+            .iter()
+            .find(|value| value.declaration_name == "string_labels")
+            .unwrap()
+            .value
+            .as_ref(),
+        CoercedAttributeValue::StringKeyedLabelDict(_)
+    ));
+    assert!(matches!(
+        values
+            .iter()
+            .find(|value| value.declaration_name == "label_strings")
+            .unwrap()
+            .value
+            .as_ref(),
+        CoercedAttributeValue::LabelKeyedStringDict(_)
+    ));
+    assert!(matches!(
+        values
+            .iter()
+            .find(|value| value.declaration_name == "label_lists")
+            .unwrap()
+            .value
+            .as_ref(),
+        CoercedAttributeValue::LabelListDict(_)
+    ));
+    assert!(matches!(
+        values
+            .iter()
+            .find(|value| value.declaration_name == "chosen")
+            .unwrap()
+            .value
+            .as_ref(),
+        CoercedAttributeValue::Concatenation(_, _)
+    ));
+    let mut chosen_labels = Vec::new();
+    values
+        .iter()
+        .find(|value| value.declaration_name == "chosen")
+        .unwrap()
+        .value
+        .labels(&mut chosen_labels);
+    assert_eq!(
+        chosen_labels,
+        vec![
+            CanonicalLabel::parse("@@//pkg:shared").unwrap(),
+            CanonicalLabel::parse("@@//pkg:linux").unwrap(),
+            CanonicalLabel::parse("@@//pkg:fallback").unwrap(),
+        ]
+    );
+    assert!(!chosen_labels.contains(&CanonicalLabel::parse("@@//pkg:condition").unwrap()));
+    let mut trailing_labels = Vec::new();
+    values
+        .iter()
+        .find(|value| value.declaration_name == "trailing")
+        .unwrap()
+        .value
+        .labels(&mut trailing_labels);
+    assert_eq!(
+        trailing_labels,
+        vec![
+            CanonicalLabel::parse("@@//pkg:linux").unwrap(),
+            CanonicalLabel::parse("@@//pkg:fallback").unwrap(),
+            CanonicalLabel::parse("@@//pkg:after").unwrap(),
+        ]
+    );
+    let mut chained_labels = Vec::new();
+    values
+        .iter()
+        .find(|value| value.declaration_name == "chained")
+        .unwrap()
+        .value
+        .labels(&mut chained_labels);
+    assert_eq!(
+        chained_labels,
+        vec![
+            CanonicalLabel::parse("@@//pkg:before").unwrap(),
+            CanonicalLabel::parse("@@//pkg:one").unwrap(),
+            CanonicalLabel::parse("@@//pkg:one_default").unwrap(),
+            CanonicalLabel::parse("@@//pkg:two").unwrap(),
+            CanonicalLabel::parse("@@//pkg:two_default").unwrap(),
+            CanonicalLabel::parse("@@//pkg:after").unwrap(),
+            CanonicalLabel::parse("@@//pkg:again").unwrap(),
+        ]
+    );
+    let mut nested_prefix_labels = Vec::new();
+    values
+        .iter()
+        .find(|value| value.declaration_name == "nested_prefix")
+        .unwrap()
+        .value
+        .labels(&mut nested_prefix_labels);
+    assert_eq!(
+        nested_prefix_labels,
+        vec![
+            CanonicalLabel::parse("@@//pkg:outer").unwrap(),
+            CanonicalLabel::parse("@@//pkg:inner").unwrap(),
+            CanonicalLabel::parse("@@//pkg:selected").unwrap(),
+        ]
+    );
+
+    assert!(matches!(
+        loaded.targets[1].kind,
+        PackageTargetKind::GeneratedFile { ref generating_rule, ref label }
+            if generating_rule == "metadata" && label == &CanonicalLabel::parse("@@//pkg:one.out").unwrap()
+    ));
+    assert_eq!(loaded.targets[1].name, "one.out");
+    assert_eq!(loaded.targets[3].name, "three.out");
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"missing_output\")\n",
+    )
+    .unwrap();
+    assert!(
+        try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string()
+            .contains("missing value for mandatory attribute `out`")
+    );
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nexports_files([\"one.out\"])\nprobe(name = \"colliding_output\", out = \"one.out\", outs = [])\n",
+    )
+    .unwrap();
+    assert!(
+        try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string()
+            .contains("target 'one.out' declared more than once")
+    );
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"locked_select\", locked = select({\":condition\": \":source\"}), out = \"one.out\", outs = [])\n",
+    )
+    .unwrap();
+    assert!(
+        try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string()
+            .contains("attribute `locked` is not configurable")
+    );
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"output_select\", out = select({\":condition\": \"one.out\"}), outs = [])\n",
+    )
+    .unwrap();
+    assert!(
+        try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string()
+            .contains("attribute `out` is not configurable")
+    );
+    for invalid in ["//other:out", "../out", "bad:name"] {
+        fs::write(
+            package.join(BUILD_FILE_PRIMARY),
+            format!("load(\":defs.bzl\", \"probe\")\nprobe(name = \"bad_output\", out = \"{invalid}\", outs = [])\n"),
+        )
+        .unwrap();
+        assert!(
+            try_load_package(&workspace, &package)
+                .unwrap_err()
+                .to_string()
+                .contains("output label must name a valid target in this package")
+        );
     }
 }
 

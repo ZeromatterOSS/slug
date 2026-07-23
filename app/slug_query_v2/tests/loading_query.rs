@@ -559,6 +559,42 @@ async fn active_build_basename_non_export_target_collision_is_a_query_error() {
 }
 
 #[tokio::test]
+async fn output_targets_remain_unmaterialized_in_the_preactivation_query_graph() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"out\": attr.output(mandatory = True), \"outs\": attr.output_list(mandatory = True)})\n",
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", out = \"one.out\", outs = [\"two.out\"])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace,
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    let labels = graph
+        .nodes
+        .keys()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    assert_eq!(labels, vec!["//pkg:rule", "//pkg:BUILD.bazel"]);
+    let rule = graph
+        .nodes
+        .values()
+        .find(|node| node.label.to_string() == "//pkg:rule")
+        .unwrap();
+    assert!(rule.dependencies.is_empty());
+}
+
+#[tokio::test]
 async fn build_file_zero_edges_and_full_siblings_order_match_bazel_oracle() {
     let workspace = fs::canonicalize(
         Path::new(env!("CARGO_MANIFEST_DIR"))

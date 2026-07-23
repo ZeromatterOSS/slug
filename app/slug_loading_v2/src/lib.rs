@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+pub mod attrs;
 pub mod bzl_module;
 mod cycle_detector;
 pub mod file_discovery;
@@ -19,6 +20,11 @@ pub mod package;
 #[doc(hidden)]
 pub mod provider;
 
+pub use attrs::AttributeKind;
+pub use attrs::AttributeProvenance;
+pub use attrs::AttributeSchema;
+pub use attrs::AttributeValue;
+pub use attrs::CoercedAttributeValue;
 pub use bzl_module::BuildFileCompanion;
 pub use bzl_module::BzlLoadManifest;
 pub use bzl_module::BzlModuleEvaluator;

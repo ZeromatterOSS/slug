@@ -2,14 +2,25 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
 use std::time::SystemTime;
 
+use allocative::Allocative;
+use async_trait::async_trait;
+use dice::ActivationData;
+use dice::ActivationTracker;
+use dice::CancellationContext;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::DiceComputations;
+use dice::DynKey;
+use dice::Key;
 use dice::UserComputationData;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::bzl_load_cycle_detector;
+use slug_loading_v2::keys::BzlModuleEvalKey;
+use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
@@ -19,6 +30,137 @@ use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_loading_v2::load_label::LoadLabel;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LoadActivation {
+    Evaluated,
+    Reused,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum AttributeKeyIdentity {
+    BzlModuleEval(PathBuf),
+    PackageLoad(PathBuf),
+    Consumer(PathBuf),
+    Observer(PathBuf),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct AttributeConsumerKey {
+    workspace: PathBuf,
+    package: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct AttributeObserverKey(AttributeConsumerKey);
+
+impl std::fmt::Display for AttributeObserverKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "attribute-observer:{}", self.0.package.display())
+    }
+}
+
+impl std::fmt::Display for AttributeConsumerKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "attribute-consumer:{}", self.package.display())
+    }
+}
+
+#[async_trait]
+impl Key for AttributeConsumerKey {
+    type Value = Arc<Result<slug_loading_v2::LoadedPackage, String>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let value = ctx
+            .compute(&PackageLoadKey {
+                workspace: self.workspace.clone(),
+                package: self.package.clone(),
+            })
+            .await
+            .map_err(|error| error.to_string())
+            .and_then(|value| {
+                value
+                    .as_ref()
+                    .as_ref()
+                    .cloned()
+                    .map_err(ToString::to_string)
+            });
+        Arc::new(value)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[async_trait]
+impl Key for AttributeObserverKey {
+    type Value = Arc<Result<slug_loading_v2::LoadedPackage, String>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.compute(&self.0)
+            .await
+            .expect("attribute consumer")
+            .as_ref()
+            .clone()
+            .into()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Default)]
+struct AttributeTracker {
+    events: Mutex<Vec<(AttributeKeyIdentity, LoadActivation)>>,
+}
+
+impl AttributeTracker {
+    fn take(&self) -> Vec<(AttributeKeyIdentity, LoadActivation)> {
+        std::mem::take(&mut *self.events.lock().unwrap())
+    }
+}
+
+impl ActivationTracker for AttributeTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        _deps: &mut dyn Iterator<Item = &DynKey>,
+        activation: ActivationData,
+    ) {
+        let identity = key
+            .downcast_ref::<BzlModuleEvalKey>()
+            .map(|key| AttributeKeyIdentity::BzlModuleEval(key.path.clone()))
+            .or_else(|| {
+                key.downcast_ref::<PackageLoadKey>()
+                    .map(|key| AttributeKeyIdentity::PackageLoad(key.package.clone()))
+            })
+            .or_else(|| {
+                key.downcast_ref::<AttributeConsumerKey>()
+                    .map(|key| AttributeKeyIdentity::Consumer(key.package.clone()))
+            })
+            .or_else(|| {
+                key.downcast_ref::<AttributeObserverKey>()
+                    .map(|key| AttributeKeyIdentity::Observer(key.0.package.clone()))
+            });
+        if let Some(identity) = identity {
+            let activation = match activation {
+                ActivationData::Evaluated(_) => LoadActivation::Evaluated,
+                ActivationData::Reused => LoadActivation::Reused,
+            };
+            self.events.lock().unwrap().push((identity, activation));
+        }
+    }
+}
 
 fn scratch(name: &str) -> PathBuf {
     let nanos = SystemTime::now()
@@ -74,7 +216,9 @@ fn load_package(
     package: &Path,
     bzl_paths: &[PathBuf],
 ) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
-    runtime.block_on(load_package_request(dice, workspace, package, bzl_paths))
+    runtime.block_on(load_package_request(
+        dice, workspace, package, bzl_paths, None, false,
+    ))
 }
 
 async fn load_package_request(
@@ -82,6 +226,8 @@ async fn load_package_request(
     workspace: &Path,
     package: &Path,
     bzl_paths: &[PathBuf],
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    consume_metadata: bool,
 ) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
     let paths = [
         vec![
@@ -109,6 +255,7 @@ async fn load_package_request(
     let evaluator = BzlModuleEvaluator::new(workspace)?;
     let mut updater = dice.updater_with_data(UserComputationData {
         cycle_detector: Some(bzl_load_cycle_detector()),
+        activation_tracker: tracker,
         ..Default::default()
     });
     updater.changed_to(vec![(
@@ -126,7 +273,20 @@ async fn load_package_request(
         Arc::new(directory_snapshot(workspace)),
     )])?;
     let mut transaction = updater.commit().await;
-    evaluator.evaluate_package(&mut transaction, package).await
+    if consume_metadata {
+        let value = transaction
+            .compute(&AttributeObserverKey(AttributeConsumerKey {
+                workspace: workspace.to_path_buf(),
+                package: package.to_path_buf(),
+            }))
+            .await?;
+        match value.as_ref().as_ref() {
+            Ok(package) => Ok(package.clone()),
+            Err(error) => Err(anyhow::anyhow!(error.clone())),
+        }
+    } else {
+        evaluator.evaluate_package(&mut transaction, package).await
+    }
 }
 
 fn evaluate_load(
@@ -249,7 +409,14 @@ fn bzl_load_cycles_report_bazel_shape_without_hanging_and_recover_in_same_dice()
         .block_on(async {
             tokio::time::timeout(
                 Duration::from_secs(1),
-                load_package_request(&dice, &workspace, &package, &[one.clone(), two.clone()]),
+                load_package_request(
+                    &dice,
+                    &workspace,
+                    &package,
+                    &[one.clone(), two.clone()],
+                    None,
+                    false,
+                ),
             )
             .await
         })
@@ -298,7 +465,7 @@ fn bzl_load_cycle_preserves_the_acyclic_path_from_the_build_file() {
         .block_on(async {
             tokio::time::timeout(
                 Duration::from_secs(1),
-                load_package_request(&dice, &workspace, &package, &[entry, one, two]),
+                load_package_request(&dice, &workspace, &package, &[entry, one, two], None, false),
             )
             .await
         })
@@ -332,7 +499,7 @@ fn bzl_self_cycle_uses_bazel_self_edge_shape() {
         .block_on(async {
             tokio::time::timeout(
                 Duration::from_secs(1),
-                load_package_request(&dice, &workspace, &package, &[one]),
+                load_package_request(&dice, &workspace, &package, &[one], None, false),
             )
             .await
         })
@@ -370,7 +537,14 @@ fn bzl_load_diamond_is_not_reported_as_a_cycle() {
         .block_on(async {
             tokio::time::timeout(
                 Duration::from_secs(1),
-                load_package_request(&dice, &workspace, &package, &[left, right, leaf]),
+                load_package_request(
+                    &dice,
+                    &workspace,
+                    &package,
+                    &[left, right, leaf],
+                    None,
+                    false,
+                ),
             )
             .await
         })
@@ -734,6 +908,201 @@ fn build_comment_and_whitespace_edits_do_not_change_loaded_package() {
     );
     let formatted = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
     assert_eq!(initial, formatted);
+}
+
+#[test]
+fn same_dice_attribute_metadata_edits_are_semantic_and_recreate_cleanly() {
+    let workspace = scratch("attribute-metadata-transitions");
+    let package = workspace.join("pkg");
+    let build = package.join("BUILD.bazel");
+    let defs = package.join("defs.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let schema_v1 = r#"
+def _impl(ctx):
+    return [DefaultInfo()]
+probe = rule(implementation = _impl, attrs = {
+    "many": attr.label_list(default = [":default"]),
+    "_implicit": attr.label(default = ":implicit"),
+    "chosen": attr.label_list(),
+    "out": attr.output(mandatory = True),
+})
+"#;
+    write(&defs, schema_v1);
+    let explicit = "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\", many = [\":explicit\"], out = \"one.out\")\n";
+    write(&build, explicit);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let initial = load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+
+    write(
+        &build,
+        "# formatting only\nload(\":defs.bzl\", \"probe\")\nprobe( name = \"metadata\", many = [\":explicit\"], out = \"one.out\" )\n",
+    );
+    let formatted = load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_eq!(initial, formatted);
+
+    write(
+        &build,
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\", many = [\":changed\"], out = \"one.out\")\n",
+    );
+    let build_value_changed =
+        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_ne!(formatted, build_value_changed);
+
+    let schema_default_changed = schema_v1.replace(":default", ":other_default");
+    write(&defs, &schema_default_changed);
+    let default_changed =
+        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_ne!(build_value_changed, default_changed);
+
+    let schema_implicit_changed = schema_default_changed.replace(":implicit", ":other_implicit");
+    write(&defs, &schema_implicit_changed);
+    let implicit_changed =
+        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_ne!(default_changed, implicit_changed);
+
+    let schema_select_type_name_changed = schema_implicit_changed.replace(
+        "\"chosen\": attr.label_list(),",
+        "\"renamed\": attr.label(),",
+    );
+    write(&defs, &schema_select_type_name_changed);
+    write(
+        &build,
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\", renamed = select({\":condition\": \":branch\", \"//conditions:default\": \":fallback\"}), out = \"one.out\")\n",
+    );
+    let selector_changed =
+        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_ne!(implicit_changed, selector_changed);
+
+    write(
+        &build,
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\", renamed = select({\":condition\": \":branch\", \"//conditions:default\": \":fallback\"}), out = \"two.out\")\n",
+    );
+    let output_changed =
+        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_ne!(selector_changed, output_changed);
+    assert!(
+        output_changed
+            .targets
+            .iter()
+            .any(|target| target.name == "two.out")
+    );
+
+    fs::remove_file(&defs).unwrap();
+    assert!(load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).is_err());
+    write(&defs, &schema_select_type_name_changed);
+    let recreated = load_package(&dice, &runtime, &workspace, &package, &[defs]).unwrap();
+    assert_eq!(output_changed, recreated);
+}
+
+#[test]
+fn retained_attribute_metadata_loads_activate_or_reuse_by_semantics() {
+    let workspace = scratch("attribute-metadata-activation");
+    let package = workspace.join("pkg");
+    let defs = package.join("defs.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let schema = "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"dep\": attr.label(default = \":one\")})\n";
+    write(&defs, schema);
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"metadata\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let tracker = Arc::new(AttributeTracker::default());
+    let expected = |bzl_module, package_load, consumer, observer| {
+        vec![
+            (
+                AttributeKeyIdentity::BzlModuleEval(defs.clone()),
+                bzl_module,
+            ),
+            (
+                AttributeKeyIdentity::PackageLoad(package.clone()),
+                package_load,
+            ),
+            (AttributeKeyIdentity::Consumer(package.clone()), consumer),
+            (AttributeKeyIdentity::Observer(package.clone()), observer),
+        ]
+    };
+    let load = |tracker: Arc<AttributeTracker>| {
+        runtime.block_on(load_package_request(
+            &dice,
+            &workspace,
+            &package,
+            &[defs.clone()],
+            Some(tracker),
+            true,
+        ))
+    };
+
+    let initial = load(tracker.clone()).unwrap();
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "# non-semantic\nload(\":defs.bzl\", \"probe\")\nprobe( name = \"metadata\" )\n",
+    );
+    let formatted = load(tracker.clone()).unwrap();
+    assert_eq!(initial, formatted);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Reused,
+            LoadActivation::Evaluated,
+            LoadActivation::Reused,
+            LoadActivation::Reused,
+        )
+    );
+
+    write(&defs, &schema.replace(":one", ":two"));
+    let changed = load(tracker.clone()).unwrap();
+    assert_ne!(formatted, changed);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+
+    fs::remove_file(&defs).unwrap();
+    assert!(load(tracker.clone()).is_err());
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+    write(&defs, &schema.replace(":one", ":two"));
+    let recreated = load(tracker.clone()).unwrap();
+    assert_eq!(changed, recreated);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Reused,
+            LoadActivation::Evaluated,
+            LoadActivation::Reused,
+            LoadActivation::Reused,
+        )
+    );
 }
 
 #[test]

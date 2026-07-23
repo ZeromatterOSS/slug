@@ -32,17 +32,24 @@ use starlark::values::FreezeResult;
 use starlark::values::Freezer;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
+use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
 
+use crate::attrs::AttributeKind;
+use crate::attrs::AttributeProvenance;
+use crate::attrs::AttributeSchema;
+use crate::attrs::AttributeValue;
+use crate::attrs::CoercedAttributeValue;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::FrozenBzlLifetimeEntry;
 use crate::glob::GlobSpec;
@@ -108,6 +115,12 @@ pub enum PackageTargetKind {
     Alias {
         actual: String,
     },
+    /// A file declared by an `attr.output` or `attr.output_list` value.
+    /// Its generator is retained explicitly; names alone cannot determine it.
+    GeneratedFile {
+        label: CanonicalLabel,
+        generating_rule: CompactString,
+    },
     /// A target declared by a Starlark `rule()` definition.
     ///
     /// Stage 4 records the declaration and retains the frozen implementation.
@@ -117,12 +130,26 @@ pub enum PackageTargetKind {
 
 /// The frozen rule implementation retained for configured-target analysis.
 /// The containing package keeps its source `.bzl` module alive.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
     dependencies: Arc<[CanonicalLabel]>,
+    schema: Arc<[AttributeSchema]>,
+    values: Arc<[AttributeValue]>,
 }
+
+impl PartialEq for StarlarkRuleImplementation {
+    fn eq(&self, other: &Self) -> bool {
+        // The frozen function is retained for Stage 6 lifetime only. Its heap
+        // address is not package semantics and must not defeat DICE equality.
+        self.dependencies == other.dependencies
+            && self.schema == other.schema
+            && self.values == other.values
+    }
+}
+
+impl Eq for StarlarkRuleImplementation {}
 
 impl StarlarkRuleImplementation {
     pub fn frozen_value(&self) -> FrozenValue {
@@ -131,6 +158,14 @@ impl StarlarkRuleImplementation {
 
     pub fn dependencies(&self) -> &[CanonicalLabel] {
         &self.dependencies
+    }
+
+    pub fn schema(&self) -> &[AttributeSchema] {
+        &self.schema
+    }
+
+    pub fn values(&self) -> &[AttributeValue] {
+        &self.values
     }
 }
 
@@ -194,13 +229,31 @@ impl PackageRecorder {
         &self,
         name: String,
         implementation: FrozenValue,
-        dependencies: Vec<CanonicalLabel>,
+        schema: Arc<[AttributeSchema]>,
+        values: Arc<[AttributeValue]>,
     ) -> anyhow::Result<()> {
+        let mut dependencies = Vec::new();
+        for value in values.iter() {
+            let schema = schema
+                .iter()
+                .find(|schema| schema.declaration_name() == value.declaration_name);
+            if schema.is_some_and(|schema| {
+                schema.dependency_reachable() && schema.kind().contributes_ordinary_dependencies()
+            }) {
+                value.value.labels(&mut dependencies);
+            }
+        }
+        // Existing analysis/query consumers use this aggregate. It is derived
+        // after structured values are retained, and selector keys never enter.
+        let mut seen = starlark_map::small_set::SmallSet::new();
+        dependencies.retain(|label| seen.insert(label.clone()));
         self.record_target(
             name,
             PackageTargetKind::StarlarkRule(StarlarkRuleImplementation {
                 implementation,
                 dependencies: dependencies.into(),
+                schema,
+                values,
             }),
         )
     }
@@ -223,6 +276,25 @@ impl PackageRecorder {
         CanonicalLabel::parse(&canonical).map_err(anyhow::Error::msg)
     }
 
+    fn output_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
+        let label = if value.starts_with(':') || value.starts_with("//") || value.starts_with('@') {
+            self.dependency_label(value).map_err(|_| {
+                anyhow::anyhow!("output label must name a valid target in this package: {value}")
+            })?
+        } else {
+            CanonicalLabel::parse(&format!("@@//{}:{value}", self.package)).map_err(|_| {
+                anyhow::anyhow!("output label must name a valid target in this package: {value}")
+            })?
+        };
+        if label.package().package().as_str() != self.package
+            || !label.package().repo().is_root()
+            || label.target().as_str().contains(':')
+        {
+            anyhow::bail!("output label must name a valid target in this package: {value}");
+        }
+        Ok(label)
+    }
+
     fn record_target(&self, name: String, kind: PackageTargetKind) -> anyhow::Result<()> {
         let mut state = self.state.borrow_mut();
         if state.targets.get(&name).is_some() {
@@ -230,6 +302,17 @@ impl PackageRecorder {
         }
         state.targets.insert(name, kind);
         Ok(())
+    }
+
+    fn generated_file(&self, label: CanonicalLabel, generating_rule: &str) -> anyhow::Result<()> {
+        let name = label.target().to_string();
+        self.record_target(
+            name,
+            PackageTargetKind::GeneratedFile {
+                label,
+                generating_rule: generating_rule.into(),
+            },
+        )
     }
 
     fn glob(&self, spec: GlobSpec) -> anyhow::Result<Vec<String>> {
@@ -328,13 +411,272 @@ fn glob_global<'v>(
     PackageRecorder::for_glob(eval)?.glob(spec)
 }
 
+fn raw_attribute_value(value: Value) -> anyhow::Result<RawAttributeValue> {
+    if let Some(value) = value.unpack_str() {
+        return Ok(RawAttributeValue::String(value.into()));
+    }
+    if let Some(values) = ListRef::from_value(value) {
+        return values
+            .iter()
+            .map(raw_attribute_value)
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map(|values| RawAttributeValue::List(values.into()));
+    }
+    if let Some(values) = DictRef::from_value(value) {
+        return values
+            .iter()
+            .map(|(key, value)| Ok((raw_attribute_value(key)?, raw_attribute_value(value)?)))
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map(|values| RawAttributeValue::Dict(values.into()));
+    }
+    anyhow::bail!("attribute values must contain strings, lists, or dictionaries")
+}
+
+fn raw_string(value: &RawAttributeValue, context: &str) -> anyhow::Result<CompactString> {
+    match value {
+        RawAttributeValue::String(value) => Ok(value.clone()),
+        _ => anyhow::bail!("attribute `{context}` must be a string"),
+    }
+}
+
+fn raw_label(
+    recorder: &PackageRecorder,
+    value: &RawAttributeValue,
+    context: &str,
+) -> anyhow::Result<CanonicalLabel> {
+    recorder.dependency_label(&raw_string(value, context)?)
+}
+
+fn raw_output(
+    recorder: &PackageRecorder,
+    value: &RawAttributeValue,
+    context: &str,
+) -> anyhow::Result<CanonicalLabel> {
+    recorder.output_label(&raw_string(value, context)?)
+}
+
+// Bazel 9.2 source: Attribute.Builder documents type defaults as label=null,
+// list=[], and string="". StarlarkAttrModule applies the corresponding empty
+// defaults to the public label dictionaries and output_list.
+fn intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
+    match kind {
+        AttributeKind::Label | AttributeKind::Output => CoercedAttributeValue::None,
+        AttributeKind::LabelList => CoercedAttributeValue::LabelList(Arc::from([])),
+        AttributeKind::String => CoercedAttributeValue::String(CompactString::default()),
+        AttributeKind::StringKeyedLabelDict => {
+            CoercedAttributeValue::StringKeyedLabelDict(Arc::from([]))
+        }
+        AttributeKind::LabelKeyedStringDict => {
+            CoercedAttributeValue::LabelKeyedStringDict(Arc::from([]))
+        }
+        AttributeKind::LabelListDict => CoercedAttributeValue::LabelListDict(Arc::from([])),
+        AttributeKind::OutputList => CoercedAttributeValue::OutputList(Arc::from([])),
+    }
+}
+
+fn coerce_raw_value(
+    recorder: &PackageRecorder,
+    kind: AttributeKind,
+    raw: &RawAttributeValue,
+) -> anyhow::Result<CoercedAttributeValue> {
+    let labels = |values: &[RawAttributeValue], context| {
+        values
+            .iter()
+            .map(|value| raw_label(recorder, value, context))
+            .collect::<anyhow::Result<Vec<_>>>()
+    };
+    match kind {
+        AttributeKind::Label => Ok(CoercedAttributeValue::Label(raw_label(
+            recorder, raw, "label",
+        )?)),
+        AttributeKind::Output => Ok(CoercedAttributeValue::Output(raw_output(
+            recorder, raw, "output",
+        )?)),
+        AttributeKind::String => Ok(CoercedAttributeValue::String(raw_string(raw, "string")?)),
+        AttributeKind::LabelList | AttributeKind::OutputList => {
+            let RawAttributeValue::List(values) = raw else {
+                anyhow::bail!("attribute must be a list of labels");
+            };
+            let values = if kind == AttributeKind::LabelList {
+                labels(values, "label list")?
+            } else {
+                values
+                    .iter()
+                    .map(|value| raw_output(recorder, value, "output list"))
+                    .collect::<anyhow::Result<Vec<_>>>()?
+            };
+            Ok(if kind == AttributeKind::LabelList {
+                CoercedAttributeValue::LabelList(values.into())
+            } else {
+                CoercedAttributeValue::OutputList(values.into())
+            })
+        }
+        AttributeKind::StringKeyedLabelDict => {
+            let RawAttributeValue::Dict(values) = raw else {
+                anyhow::bail!("attribute must be a dictionary");
+            };
+            Ok(CoercedAttributeValue::StringKeyedLabelDict(
+                values
+                    .iter()
+                    .map(|(key, value)| {
+                        Ok((
+                            raw_string(key, "dictionary key")?,
+                            raw_label(recorder, value, "dictionary value")?,
+                        ))
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?
+                    .into(),
+            ))
+        }
+        AttributeKind::LabelKeyedStringDict => {
+            let RawAttributeValue::Dict(values) = raw else {
+                anyhow::bail!("attribute must be a dictionary");
+            };
+            Ok(CoercedAttributeValue::LabelKeyedStringDict(
+                values
+                    .iter()
+                    .map(|(key, value)| {
+                        Ok((
+                            raw_label(recorder, key, "dictionary key")?,
+                            raw_string(value, "dictionary value")?,
+                        ))
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?
+                    .into(),
+            ))
+        }
+        AttributeKind::LabelListDict => {
+            let RawAttributeValue::Dict(values) = raw else {
+                anyhow::bail!("attribute must be a dictionary");
+            };
+            Ok(CoercedAttributeValue::LabelListDict(
+                values
+                    .iter()
+                    .map(|(key, value)| {
+                        let RawAttributeValue::List(value) = value else {
+                            anyhow::bail!("attribute dictionary values must be lists");
+                        };
+                        Ok((
+                            raw_string(key, "dictionary key")?,
+                            labels(value, "dictionary list")?.into(),
+                        ))
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?
+                    .into(),
+            ))
+        }
+    }
+}
+
+fn coerce_starlark_value(
+    recorder: &PackageRecorder,
+    kind: AttributeKind,
+    attribute_name: &str,
+    configurable: bool,
+    value: Value,
+) -> anyhow::Result<CoercedAttributeValue> {
+    if let Some(selector) = SelectorValue::from_value(value) {
+        if !configurable {
+            anyhow::bail!(
+                "attribute `{attribute_name}` is not configurable and cannot use select()"
+            );
+        }
+        let selector = match selector {
+            starlark::__macro_refs::Either::Left(selector) => selector,
+            starlark::__macro_refs::Either::Right(_) => {
+                anyhow::bail!("frozen select values are not valid BUILD attribute values")
+            }
+        };
+        let mut result: Option<CoercedAttributeValue> = None;
+        for part in &selector.parts {
+            let mut branches = Vec::new();
+            let mut default = None;
+            for branch in part.branches.iter() {
+                if branch.condition == "//conditions:default" {
+                    default = Some(Arc::new(coerce_starlark_value(
+                        recorder,
+                        kind,
+                        attribute_name,
+                        configurable,
+                        branch.value,
+                    )?));
+                } else {
+                    branches.push((
+                        recorder.dependency_label(&branch.condition)?,
+                        Arc::new(coerce_starlark_value(
+                            recorder,
+                            kind,
+                            attribute_name,
+                            configurable,
+                            branch.value,
+                        )?),
+                    ));
+                }
+            }
+            let selected = CoercedAttributeValue::Selector {
+                branches: branches.into(),
+                default,
+            };
+            let selected =
+                part.prefix
+                    .iter()
+                    .rev()
+                    .copied()
+                    .try_fold(selected, |selected, prefix| {
+                        Ok::<_, anyhow::Error>(CoercedAttributeValue::Concatenation(
+                            Arc::new(coerce_starlark_value(
+                                recorder,
+                                kind,
+                                attribute_name,
+                                configurable,
+                                prefix,
+                            )?),
+                            Arc::new(selected),
+                        ))
+                    })?;
+            let selected = part
+                .suffix
+                .iter()
+                .copied()
+                .try_fold(selected, |selected, suffix| {
+                    Ok::<_, anyhow::Error>(CoercedAttributeValue::Concatenation(
+                        Arc::new(selected),
+                        Arc::new(coerce_starlark_value(
+                            recorder,
+                            kind,
+                            attribute_name,
+                            configurable,
+                            suffix,
+                        )?),
+                    ))
+                })?;
+            result = Some(match result {
+                Some(left) => {
+                    CoercedAttributeValue::Concatenation(Arc::new(left), Arc::new(selected))
+                }
+                None => selected,
+            });
+        }
+        return result.ok_or_else(|| anyhow::anyhow!("select() requires at least one branch"));
+    }
+    if matches!(kind, AttributeKind::LabelList | AttributeKind::OutputList)
+        && ListRef::from_value(value).is_none()
+    {
+        anyhow::bail!("attribute `{attribute_name}` must be a list of labels");
+    }
+    let raw = raw_attribute_value(value).map_err(|_| {
+        anyhow::anyhow!("attribute `{attribute_name}` must contain only string labels")
+    })?;
+    coerce_raw_value(recorder, kind, &raw)
+}
+
 /// The callable returned by Bazel's `rule()` global during package loading.
 /// It retains the implementation for Stage 6, but package construction never
 /// executes that implementation.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 struct RuleDefinitionGen<V> {
     implementation: V,
-    has_deps: bool,
+    schema: Arc<[RuleAttributeSchema]>,
 }
 
 type RuleDefinition<'v> = RuleDefinitionGen<Value<'v>>;
@@ -354,24 +696,183 @@ impl<'v> Freeze for RuleDefinition<'v> {
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
         Ok(FrozenRuleDefinition {
             implementation: self.implementation.freeze(freezer)?,
-            has_deps: self.has_deps,
+            schema: self.schema,
         })
     }
 }
 
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct LabelListAttr;
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum RawAttributeValue {
+    String(CompactString),
+    List(Arc<[RawAttributeValue]>),
+    Dict(Arc<[(RawAttributeValue, RawAttributeValue)]>),
+}
 
-starlark::starlark_simple_value!(LabelListAttr);
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct RuleAttributeSchema {
+    name: CompactString,
+    kind: AttributeKind,
+    mandatory: bool,
+    configurable: bool,
+    default: Option<RawAttributeValue>,
+}
 
-impl fmt::Display for LabelListAttr {
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AttributeDefinition {
+    kind: AttributeKind,
+    mandatory: bool,
+    configurable: bool,
+    default: Option<RawAttributeValue>,
+}
+
+starlark::starlark_simple_value!(AttributeDefinition);
+
+impl fmt::Display for AttributeDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("attr.label_list()")
+        write!(f, "attr.{:?}()", self.kind)
     }
 }
 
-#[starlark_value(type = "label_list_attr")]
-impl<'v> StarlarkValue<'v> for LabelListAttr {}
+#[starlark_value(type = "attribute")]
+impl<'v> StarlarkValue<'v> for AttributeDefinition {}
+
+#[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
+struct SelectorBranchGen<V> {
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    condition: CompactString,
+    value: V,
+}
+
+#[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
+struct SelectorPartGen<V> {
+    prefix: Vec<V>,
+    suffix: Vec<V>,
+    branches: Vec<SelectorBranchGen<V>>,
+}
+
+#[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
+struct SelectorValueGen<V> {
+    parts: Vec<SelectorPartGen<V>>,
+}
+
+type SelectorValue<'v> = SelectorValueGen<Value<'v>>;
+type FrozenSelectorValue = SelectorValueGen<FrozenValue>;
+type SelectorPart<'v> = SelectorPartGen<Value<'v>>;
+starlark::starlark_complex_values!(SelectorValue);
+
+impl<V> fmt::Display for SelectorValueGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("select(...)")
+    }
+}
+
+#[starlark_value(type = "select")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for SelectorValueGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = FrozenSelectorValue;
+    fn radd(&self, lhs: Value<'v>, heap: Heap<'v>) -> Option<starlark::Result<Value<'v>>> {
+        let mut parts = Vec::with_capacity(self.parts.len());
+        for (index, part) in self.parts.iter().enumerate() {
+            parts.push(SelectorPartGen {
+                prefix: {
+                    let mut prefix = if index == 0 { vec![lhs] } else { Vec::new() };
+                    prefix.extend(part.prefix.iter().copied().map(ValueLike::to_value));
+                    prefix
+                },
+                suffix: part
+                    .suffix
+                    .iter()
+                    .copied()
+                    .map(ValueLike::to_value)
+                    .collect(),
+                branches: part
+                    .branches
+                    .iter()
+                    .map(|branch| SelectorBranchGen {
+                        condition: branch.condition.clone(),
+                        value: branch.value.to_value(),
+                    })
+                    .collect(),
+            });
+        }
+        Some(Ok(heap.alloc(SelectorValueGen { parts })))
+    }
+
+    fn add(&self, rhs: Value<'v>, heap: Heap<'v>) -> Option<starlark::Result<Value<'v>>> {
+        let mut parts: Vec<SelectorPart<'v>> = self
+            .parts
+            .iter()
+            .map(|part| SelectorPartGen {
+                prefix: part
+                    .prefix
+                    .iter()
+                    .copied()
+                    .map(ValueLike::to_value)
+                    .collect(),
+                suffix: part
+                    .suffix
+                    .iter()
+                    .copied()
+                    .map(ValueLike::to_value)
+                    .collect(),
+                branches: part
+                    .branches
+                    .iter()
+                    .map(|branch| SelectorBranchGen {
+                        condition: branch.condition.clone(),
+                        value: branch.value.to_value(),
+                    })
+                    .collect(),
+            })
+            .collect();
+        if let Some(other) = SelectorValue::from_value(rhs) {
+            match other {
+                starlark::__macro_refs::Either::Left(other) => {
+                    parts.extend(other.parts.iter().map(|part| {
+                        SelectorPartGen {
+                            prefix: part.prefix.clone(),
+                            suffix: part.suffix.clone(),
+                            branches: part
+                                .branches
+                                .iter()
+                                .map(|branch| SelectorBranchGen {
+                                    condition: branch.condition.clone(),
+                                    value: branch.value,
+                                })
+                                .collect(),
+                        }
+                    }))
+                }
+                starlark::__macro_refs::Either::Right(other) => {
+                    parts.extend(other.parts.iter().map(|part| {
+                        SelectorPartGen {
+                            prefix: part.prefix.iter().map(|value| value.to_value()).collect(),
+                            suffix: part.suffix.iter().map(|value| value.to_value()).collect(),
+                            branches: part
+                                .branches
+                                .iter()
+                                .map(|branch| SelectorBranchGen {
+                                    condition: branch.condition.clone(),
+                                    value: branch.value.to_value(),
+                                })
+                                .collect(),
+                        }
+                    }))
+                }
+            }
+        } else {
+            if let Some(last) = parts.last_mut() {
+                last.suffix.push(rhs);
+            } else {
+                return None;
+            }
+        }
+        Some(Ok(heap.alloc(SelectorValueGen { parts })))
+    }
+}
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct AttrModule;
@@ -384,10 +885,121 @@ impl fmt::Display for AttrModule {
     }
 }
 
+fn attribute_definition(
+    kind: AttributeKind,
+    mandatory: bool,
+    configurable: bool,
+    default: Option<Value>,
+) -> anyhow::Result<AttributeDefinition> {
+    Ok(AttributeDefinition {
+        kind,
+        mandatory,
+        configurable,
+        default: default.map(raw_attribute_value).transpose()?,
+    })
+}
+
 #[starlark_module]
 fn attr_methods(builder: &mut MethodsBuilder) {
-    fn label_list(#[starlark(this)] _attr: Value) -> anyhow::Result<LabelListAttr> {
-        Ok(LabelListAttr)
+    fn label(
+        #[starlark(this)] _attr: Value,
+        mandatory: Option<bool>,
+        #[starlark(default = true)] configurable: bool,
+        default: Option<Value>,
+    ) -> anyhow::Result<AttributeDefinition> {
+        attribute_definition(
+            AttributeKind::Label,
+            mandatory.unwrap_or(false),
+            configurable,
+            default,
+        )
+    }
+    fn label_list(
+        #[starlark(this)] _attr: Value,
+        mandatory: Option<bool>,
+        #[starlark(default = true)] configurable: bool,
+        default: Option<Value>,
+    ) -> anyhow::Result<AttributeDefinition> {
+        attribute_definition(
+            AttributeKind::LabelList,
+            mandatory.unwrap_or(false),
+            configurable,
+            default,
+        )
+    }
+    fn string_keyed_label_dict(
+        #[starlark(this)] _attr: Value,
+        mandatory: Option<bool>,
+        #[starlark(default = true)] configurable: bool,
+        default: Option<Value>,
+    ) -> anyhow::Result<AttributeDefinition> {
+        attribute_definition(
+            AttributeKind::StringKeyedLabelDict,
+            mandatory.unwrap_or(false),
+            configurable,
+            default,
+        )
+    }
+    fn label_keyed_string_dict(
+        #[starlark(this)] _attr: Value,
+        mandatory: Option<bool>,
+        #[starlark(default = true)] configurable: bool,
+        default: Option<Value>,
+    ) -> anyhow::Result<AttributeDefinition> {
+        attribute_definition(
+            AttributeKind::LabelKeyedStringDict,
+            mandatory.unwrap_or(false),
+            configurable,
+            default,
+        )
+    }
+    fn label_list_dict(
+        #[starlark(this)] _attr: Value,
+        mandatory: Option<bool>,
+        #[starlark(default = true)] configurable: bool,
+        default: Option<Value>,
+    ) -> anyhow::Result<AttributeDefinition> {
+        attribute_definition(
+            AttributeKind::LabelListDict,
+            mandatory.unwrap_or(false),
+            configurable,
+            default,
+        )
+    }
+    fn output(
+        #[starlark(this)] _attr: Value,
+        mandatory: Option<bool>,
+    ) -> anyhow::Result<AttributeDefinition> {
+        attribute_definition(
+            AttributeKind::Output,
+            mandatory.unwrap_or(false),
+            false,
+            None,
+        )
+    }
+    fn output_list(
+        #[starlark(this)] _attr: Value,
+        mandatory: Option<bool>,
+    ) -> anyhow::Result<AttributeDefinition> {
+        attribute_definition(
+            AttributeKind::OutputList,
+            mandatory.unwrap_or(false),
+            false,
+            None,
+        )
+    }
+    fn string(
+        #[starlark(this)] _attr: Value,
+        mandatory: Option<bool>,
+        #[starlark(default = true)] configurable: bool,
+        default: Option<Value>,
+    ) -> anyhow::Result<AttributeDefinition> {
+        attribute_definition(
+            AttributeKind::String,
+            mandatory.unwrap_or(false),
+            configurable,
+            default,
+        )
     }
 }
 
@@ -423,17 +1035,18 @@ where
             ))
         })?;
         for attribute in names.keys() {
-            if !matches!(attribute.as_str(), "name" | "deps" | "visibility") {
+            if attribute.as_str() != "name"
+                && attribute.as_str() != "visibility"
+                && !self
+                    .schema
+                    .iter()
+                    .any(|schema| schema.name == attribute.as_str())
+            {
                 return Err(starlark::Error::new_other(anyhow::anyhow!(
                     "target `{name}` received unknown attribute `{}`",
                     attribute.as_str()
                 )));
             }
-        }
-        if names.contains_key("deps") && !self.has_deps {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "target `{name}` received unknown attribute `deps`"
-            )));
         }
         if let Some(visibility) = names.get("visibility") {
             let visibility = ListRef::from_value(*visibility).ok_or_else(|| {
@@ -447,15 +1060,6 @@ where
                 )));
             }
         }
-        let dependency_values = match names.get("deps") {
-            Some(value) => ListRef::from_value(*value).ok_or_else(|| {
-                starlark::Error::new_other(anyhow::anyhow!(
-                    "attribute `deps` must be a list of labels"
-                ))
-            })?,
-            None => ListRef::from_value(eval.heap().alloc(Vec::<Value>::new()))
-                .expect("allocated empty list"),
-        };
         let implementation = self
             .implementation
             .to_value()
@@ -467,16 +1071,78 @@ where
             })?;
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
-                let dependencies = dependency_values
-                    .iter()
-                    .map(|value| {
-                        let value = value.unpack_str().ok_or_else(|| {
-                            anyhow::anyhow!("attribute `deps` must contain only string labels")
-                        })?;
-                        recorder.dependency_label(value)
-                    })
-                    .collect::<anyhow::Result<Vec<_>>>()?;
-                recorder.starlark_rule(name.to_owned(), implementation, dependencies)
+                let mut schema = Vec::with_capacity(self.schema.len());
+                let mut values = Vec::with_capacity(self.schema.len());
+                let mut generated = Vec::new();
+                for declaration in self.schema.iter() {
+                    let attribute_schema = AttributeSchema::new(
+                        declaration.name.clone(),
+                        declaration.kind,
+                        declaration.mandatory,
+                        declaration.configurable,
+                        Some(
+                            declaration
+                                .default
+                                .as_ref()
+                                .map(|value| coerce_raw_value(recorder, declaration.kind, value))
+                                .transpose()?
+                                .unwrap_or_else(|| intrinsic_default(declaration.kind)),
+                        ),
+                    );
+                    // Keep the full declaration schema even for an omitted
+                    // optional value. Stage 8 must distinguish absent-looking
+                    // values from a missing declaration.
+                    schema.push(attribute_schema.clone());
+                    let explicit = names.get(declaration.name.as_str()).copied();
+                    let (provenance, value) = match explicit {
+                        Some(value) => (
+                            AttributeProvenance::Explicit,
+                            coerce_starlark_value(
+                                recorder,
+                                declaration.kind,
+                                &declaration.name,
+                                declaration.configurable,
+                                value,
+                            )?,
+                        ),
+                        None if declaration.mandatory => anyhow::bail!(
+                            "missing value for mandatory attribute `{}`",
+                            declaration.name
+                        ),
+                        None if declaration.name.starts_with('_') => (
+                            AttributeProvenance::Implicit,
+                            attribute_schema
+                                .default()
+                                .expect("intrinsic default")
+                                .clone(),
+                        ),
+                        None => (
+                            AttributeProvenance::Default,
+                            attribute_schema
+                                .default()
+                                .expect("intrinsic default")
+                                .clone(),
+                        ),
+                    };
+                    if matches!(
+                        attribute_schema.kind(),
+                        AttributeKind::Output | AttributeKind::OutputList
+                    ) {
+                        value.labels(&mut generated);
+                    }
+                    values.push(AttributeValue {
+                        declaration_name: declaration.name.clone(),
+                        provenance,
+                        value: Arc::new(value),
+                    });
+                }
+                let schema: Arc<[AttributeSchema]> = schema.into();
+                let values: Arc<[AttributeValue]> = values.into();
+                recorder.starlark_rule(name.to_owned(), implementation, schema, values)?;
+                for output in generated {
+                    recorder.generated_file(output, name)?;
+                }
+                Ok(())
             })
             .map_err(starlark::Error::new_other)?;
         Ok(Value::new_none())
@@ -525,21 +1191,23 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         implementation: Value<'v>,
         attrs: Option<SmallMap<String, Value<'v>>>,
     ) -> anyhow::Result<RuleDefinition<'v>> {
-        let mut has_deps = false;
+        let mut schema = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
-                if name != "deps" {
-                    anyhow::bail!("rule() received unsupported attribute schema `{name}`");
-                }
-                if LabelListAttr::from_value(value).is_none() {
-                    anyhow::bail!("rule attribute `deps` must use attr.label_list()");
-                }
-                has_deps = true;
+                let definition = AttributeDefinition::from_value(value)
+                    .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
+                schema.push(RuleAttributeSchema {
+                    name: CompactString::new(name),
+                    kind: definition.kind,
+                    mandatory: definition.mandatory,
+                    configurable: definition.configurable,
+                    default: definition.default.clone(),
+                });
             }
         }
         Ok(RuleDefinition {
             implementation,
-            has_deps,
+            schema: schema.into(),
         })
     }
 
@@ -548,6 +1216,28 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator,
     ) -> anyhow::Result<UserProviderCallable> {
         UserProviderCallable::from_evaluator(fields, eval)
+    }
+}
+
+#[starlark_module]
+fn select_globals(builder: &mut GlobalsBuilder) {
+    fn select<'v>(branches: SmallMap<String, Value<'v>>) -> anyhow::Result<SelectorValue<'v>> {
+        if branches.is_empty() {
+            anyhow::bail!("select() requires at least one branch");
+        }
+        Ok(SelectorValueGen {
+            parts: vec![SelectorPart {
+                prefix: Vec::new(),
+                suffix: Vec::new(),
+                branches: branches
+                    .into_iter()
+                    .map(|(condition, value)| SelectorBranchGen {
+                        condition: CompactString::new(condition),
+                        value,
+                    })
+                    .collect(),
+            }],
+        })
     }
 }
 
@@ -615,7 +1305,9 @@ impl AllocFrozenValue for NativeModule {
 }
 
 pub(crate) fn loading_globals() -> Globals {
-    let mut globals = GlobalsBuilder::standard().with(package_globals);
+    let mut globals = GlobalsBuilder::standard()
+        .with(package_globals)
+        .with(select_globals);
     globals.set("native", NativeModule);
     globals.set("attr", AttrModule);
     globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));

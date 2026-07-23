@@ -225,6 +225,12 @@ async fn compute_package_graph(
     let mut nodes = SmallMap::with_capacity(loaded.targets.len() + 1);
 
     for target in &loaded.targets {
+        // Stage 4 records generated files in the loading package so their
+        // identity/owner is available to the later labels() projection.
+        // Do not activate them in the existing ordinary-query graph yet.
+        if matches!(target.kind, PackageTargetKind::GeneratedFile { .. }) {
+            continue;
+        }
         let label = label_in_package(&package_name, &target.name)?;
         let (kind, dependencies) = match &target.kind {
             PackageTargetKind::ExportedFile if target.name == build_basename => {
@@ -255,6 +261,8 @@ async fn compute_package_graph(
                     .collect::<Vec<_>>()
                     .into(),
             ),
+            // Filtered above: Stage 8 will give this a real query-node kind.
+            PackageTargetKind::GeneratedFile { .. } => unreachable!("filtered generated target"),
         };
         if target.name == build_basename && !matches!(kind, QueryNodeKind::BuildFile) {
             return Err(QueryError::evaluation(format!(
