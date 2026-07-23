@@ -1049,7 +1049,8 @@ Oracle-first artifact:
      reachable, and a genuinely ambiguous multi-pair case checked through
      bounded complete-path alternatives rather than root precedence;
    - default, `auto`, and `full` output for `allpaths` and unique-path
-     `somepath`; and
+     `somepath`, plus a `somepath` wrapped in a top-level set operation whose
+     insertion order differs from lexical order; and
    - too few/too many arguments for both functions plus integer expression
      operands in both positions across the pair. Integers retain the existing
      `//:1` missing-target exit-7 behavior; they are not type errors.
@@ -1067,6 +1068,10 @@ Bazel 9.2 source anchors:
 - `query2/engine/{AllPathsFunction,SomePathFunction}.java`;
 - `query2/query/BlazeQueryEnvironment.java` and graph shortest-path support
   used by `getNodesOnPath`; and
+- `runtime/commands/QueryCommand.java:112-118` plus
+  `query2/engine/QueryExpression.java:110-114`, where Bazel disables AUTO
+  lexicographic aggregation only for a root expression that is directly
+  `somepath`; and
 - `src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java`
   `testSomePathOperator`, `testSomePathOperatorOrdering`, and
   `testAllPathsOperator`. Deliberately omit
@@ -1110,11 +1115,23 @@ Required implementation:
    map. Return one shortest path for one reachable pair, a one-node path when
    an origin is also a destination, or empty success when none exists.
    Multiple-root/endpoint choice remains unspecified.
-4. Reuse the exact existing `QueryEnvironment::dependencies`/DICE transaction.
-   Add no QueryNode/loading representation, DICE key, protocol, runtime, cache,
-   filesystem, lock, configured/action import, function, target pattern,
-   formatter, or order-mode change.
-5. Add focused graph/evaluator tests, a full CLI fixture regression including
+4. Add only Bazel's top-level-`somepath` AUTO exception at the point where the
+   parsed AST and `QueryOrder` already meet: `evaluate_loading_query` sorts
+   labels iff `order == Auto` and the parsed root node is not directly the
+   `somepath` function. Parentheses that lower to that root remain top-level;
+   binary union/intersect/except and `let` wrappers are not top-level and keep
+   ordinary AUTO sorting. `Full` always retains evaluator/path insertion
+   order. Do not put this decision inside `SomePathFunction`,
+   `ResolvedGraph`, the CLI, or the daemon protocol.
+5. Reuse the exact existing `QueryEnvironment::dependencies`/DICE transaction.
+   Add no new order mode, QueryNode/loading representation, DICE key, protocol,
+   runtime, cache, filesystem, lock, configured/action import, other function,
+   target pattern, or formatter.
+6. Add focused AST/output tests for direct and parenthesized top-level
+   recognition; binary and `let` non-top-level wrappers; direct
+   default/explicit-auto/full forward path order; nested default/auto lexical
+   order; and unchanged `allpaths` AUTO sorting. Add a full CLI fixture
+   regression including
    bounded diamond alternatives, and retained-daemon edge/package transition
    coverage. Preserve all three preceding query fixtures.
 
@@ -1153,7 +1170,8 @@ Also rerun the three preceding Slug query fixtures and inspect for duplicate
 graph discovery, direct filesystem access, extra DICE/runtime/cache creation,
 string adjacency/default hash collections, locks across DICE, configured or
 action imports, unrelated registry changes, and build/cquery/aquery
-protocol/placeholder drift.
+protocol/placeholder drift. Reject any sorting change broader than the parsed
+root-node `somepath` exception.
 
 Evidence and completion boundary: land and review the generated oracle before
 Rust changes. Require Sol-low approval of the shared graph/parent-map port
@@ -1166,12 +1184,18 @@ reverse-dependency reuse, one shared `ResolvedGraph` parent-map BFS, honest
 bounded alternatives for arbitrary paths, the complete endpoint/order/error
 matrix, and exact DICE demand evidence.
 
+The generated oracle then exposed Bazel's source-backed top-level ordering
+exception. Sol-low accepted the fixture but required the narrow
+`evaluate_loading_query` AST seam and nested-expression regressions recorded
+above before implementation.
+
 Stop conditions: an unstable diamond oracle that cannot be bounded to complete
 valid alternatives; behavior contradicting generated Bazel 9.2; any need for
 generated/output nodes, attrs/visibility/tests/executable/load/build/configured
 or action state, external repositories, Sky Query flags, filters, non-text
 formats, a duplicated dependency traversal, persistent graph/reverse cache,
 new DICE/runtime, direct filesystem read, lock across DICE, protocol expansion,
-or changes to build/cquery/aquery behavior. Defer `some`, `siblings`, `filter`,
+sorting behavior broader than the exact top-level `somepath` exception, or
+changes to build/cquery/aquery behavior. Defer `some`, `siblings`, `filter`,
 `kind`, `attr`, `labels`, `buildfiles`, `loadfiles`, `tests`, `visible`,
 `executables`, remaining patterns/order modes/formats, `cquery`, and `aquery`.

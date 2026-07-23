@@ -835,25 +835,34 @@ second semantic graph or dependency walk
 V2 wrapper/boundary: V2 owns Bazel argument evaluation, root-repository
 structural labels, arbitrary multi-root/endpoint choice, exact
 default/auto/full rendering where stable, bounded diamond alternatives,
-diagnostics, and serial mutable-DICE lookup. No generated/output nodes,
+diagnostics, serial mutable-DICE lookup, and only the
+`QueryCommand`/`QueryExpression` top-level-`somepath` AUTO-sorting exception in
+`evaluate_loading_query`. Nested set/binary/`let` expressions keep ordinary
+AUTO sorting. No generated/output nodes,
 persistent cache, new DICE key, Buck label/cell/general environment,
 configured/action state, filter, or printer is imported.
 
 Bazel oracle: must be generated and independently verified with
 `/usr/bin/bazel` 9.2.0 at commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`
+`8220c6198837d5c13d53fea211cf3282aa12408a`; output-policy anchors are
+`runtime/commands/QueryCommand.java:112-118` and
+`query2/engine/QueryExpression.java:110-114`
 
 V2 fixture: `query-path-topology`
 
 Expected evidence artifact: exact all-path sets; unique shortest paths; bounded
 complete diamond/multi-pair alternatives; zero/no-path, cycle, source
 direction, multiple/duplicate/empty operands; stable order modes; arity and
-integer-literal diagnostics
+integer-literal diagnostics; direct top-level forward ordering and nested
+set-operation lexical AUTO ordering
 
 Decision: call the landed unbounded reverse-dependency helper for `allpaths`;
 port only Buck2's integer BFS/parent reconstruction for `somepath`; adapt both
-to the existing compact V2 graph and retained DICE transaction. Reject V1
-implementation/output and all semantics outside the reviewed Stage 8 packet.
+to the existing compact V2 graph and retained DICE transaction. Add the
+top-level AST ordering exception only in `evaluate_loading_query`; reject
+function-local, graph-local, CLI/protocol, or broader sorting policy. Reject
+V1 implementation/output and all semantics outside the reviewed Stage 8
+packet.
 
 Validation: pending oracle-first implementation; require Bazel generation plus
 independent rerun, the serial six-crate suite, rebuilt V2 CLI, all four query
