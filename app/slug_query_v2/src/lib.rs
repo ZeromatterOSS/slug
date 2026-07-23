@@ -10,9 +10,13 @@
 
 pub mod evaluator;
 pub mod expr;
+mod generic;
 pub mod graph;
+mod loading_environment;
+mod output;
 mod parser;
 pub(crate) mod provenance;
+mod traversal;
 
 pub use evaluator::QueryOrder;
 pub use evaluator::QueryOutput;
