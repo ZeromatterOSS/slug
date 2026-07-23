@@ -80,8 +80,11 @@ Production allowlist:
 `app/slug_core_v2/src/runtime/{mod.rs,dice.rs}`, and
 `app/slug_query_v2/src/{lib.rs,evaluator.rs,expr.rs,generic.rs,loading_environment.rs,graph.rs}`.
 Tests may change only the matching command, server, core runtime, query loading,
-and CLI integration files named by the accepted design. Keep the fixture
-read-only.
+query registry, and CLI integration files named by the accepted design. The
+query-registry owner test in `app/slug_query_v2/tests/query.rs` is included
+solely to move `tests` from deferred to implemented, update the exact
+implemented/deferred counts, and validate its existing one-expression
+signature. Keep the fixture read-only.
 
 Do not implement build/proto formatting, broaden public diagnostics, start
 `visible`, add repository mapping/keep-going/cquery/aquery policy, add a DICE
