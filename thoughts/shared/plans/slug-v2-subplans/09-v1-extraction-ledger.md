@@ -1296,7 +1296,7 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: Oracle accepted in `8212afd6`; provenance discriminator required
+Status: 23-command oracle accepted through `fd4c5da0`; metadata review next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1331,4 +1331,7 @@ loading-metadata-only; strict plumbing and activation remain later packets.
 That narrower review also closed `REPLAN`: omitted and explicit-empty `tests`
 produce the same implicit membership but Bazel retains their different
 attribute explicitness for formatter output. The next oracle-only packet pins
-that distinction before another representation proposal.
+that distinction before another representation proposal. Commit `fd4c5da0`
+now proves the same membership and distinct `--output=build` provenance. The
+next design must retain an explicitness bit orthogonally within one exclusive
+membership representation; no V1/Buck extraction decision changes.

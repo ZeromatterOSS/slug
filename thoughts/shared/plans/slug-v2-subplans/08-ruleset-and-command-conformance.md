@@ -38,14 +38,15 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
-### Live packet: `WP-8-m3-tests-suite-provenance-oracle`
+### Live packet: `WP-8-m3-tests-loading-metadata-review-v3`
 
-Extend only `tests-query-expansion` with Bazel 9.2.0 rows that distinguish
-omitted `tests` from explicit `tests=[]`. Pin that both forms receive identical
-implicit membership while formatter/proto output retains explicit attribute
-provenance. This is oracle-only: do not add loading/query representation, DICE
-state, strict plumbing, function activation, `visible`, or a regex engine. Live
-Status in the canonical plan owns scheduling.
+Review a provenance-safe loading metadata and graph projection design against
+the accepted 23-command oracle. One exclusive membership representation must
+retain nonempty explicit members or implicit members plus omitted-versus-empty
+explicitness. Include canonical order/duplicates, inherited tags/size, derived
+manual, suite capability/tags, equality, and lifecycle invalidation. This is
+design/review only; strict plumbing and function activation remain later.
+Live Status in the canonical plan owns scheduling.
 
 ### Query engine reuse policy
 
@@ -2281,3 +2282,19 @@ Bazel oracle discriminator for this explicitness boundary. A later design must
 store explicitness orthogonally to one membership source, make package equality
 distinguish it, and still derive identical implicit membership for both forms.
 Strict plumbing and `tests` activation remain separate.
+
+## `test_suite` attribute provenance oracle accepted (2026-07-23)
+
+Commit `fd4c5da0` extends `tests-query-expansion` from 16 to 23 Bazel 9.2.0
+commands. Omitted and explicit-empty suites each expand to the same test,
+expose the same `$implicit_tests` label set, and expose an empty public `tests`
+label set. Exact `--output=build` rows distinguish them: omitted output has no
+`tests` stanza, while explicit empty prints `tests = []`; both print the same
+`_implicit_tests` member.
+
+The build-format rows are representation-only and do not claim Slug formatter
+acceptance. Root inspected the `AttributeProvider`, `Rule`,
+`BuildOutputFormatter`, and query-function sources and independently passed all
+23 commands. No loading/query code, DICE state, strict policy, or function
+activation changed. The next design must retain this explicitness
+orthogonally to invariant-safe membership.

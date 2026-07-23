@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 suite-provenance oracle is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 suite-provenance oracle is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 16-command Bazel oracle accepted in `8212afd6` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | add the oracle-only omitted-versus-explicit-empty suite provenance discriminator |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 suite-metadata design is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 suite-metadata design is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | review the provenance-safe loading metadata design; do not implement or activate `tests` |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,22 +33,23 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Extend only the accepted `tests-query-expansion` Bazel 9.2.0 fixture with a
-provenance discriminator for omitted `tests` versus explicit `tests=[]`.
-Observe both membership behavior and a stable text formatter that exposes
-attribute explicitness, preferably `--output=streamed_jsonproto` and/or
-`--output=build`. Prove both suites receive identical package-finalized
-`$implicit_tests`, while only explicit empty retains an explicitly specified
-empty `tests` attribute.
+Review the provenance-safe loading metadata design required by the accepted
+23-command oracle. Retain one invariant-safe suite membership source:
+nonempty explicit members, or finalized implicit members plus an orthogonal
+`tests_explicit` bit that distinguishes omitted from explicit empty. Package
+equality must distinguish that bit even though both forms derive identical
+implicit membership.
 
-Pin `AttributeProvider`, `BuildOutputFormatter`,
-`ProtoOutputFormatter#shouldIncludeAttribute`, and the streamed JSON formatter
-at `8220c619…`. Assertions must be exact or exact-set/order-bounded and must not
-infer asynchronous suite callback order. This packet is oracle-only: do not
-change loading/query representation, implement native `test_suite`, activate
-`tests`, plumb strict mode, begin `visible`, or add a regex engine. The next
-representation design must retain explicitness orthogonally to one
-invariant-safe membership source and include it in package equality.
+The design must also pin natural sorting of order-independent lists with
+duplicate preservation; common `tags=[]` on every Starlark rule; test-only
+`size="medium"`; derived `manual`; exact native suite capability and tags; and
+distinct `tests`/`$implicit_tests` query attributes whose deduplicated union is
+ordinary graph edges. Use existing package/query DICE keys only and specify the
+loading/graph implementation file and test allowlist.
+
+This packet is design/review only. Strict request plumbing is later. Record a
+fresh Sol verdict before implementation. Do not activate `tests`, add a DICE
+key or lock, begin `visible`, or add a regex engine.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.
