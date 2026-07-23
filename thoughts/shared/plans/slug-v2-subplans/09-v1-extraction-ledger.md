@@ -1468,3 +1468,16 @@ The corrected activation design is Sol-accepted with the same decision:
 implement the Bazel algorithm in V2's generic evaluator and request-local
 loading accessor, reuse only compact set/worklist shapes, and import no
 V1/Buck test semantics or DICE ownership.
+
+Commit `3a8ae78a` accepts that V2-owned activation. The implementation uses the
+existing generic evaluator, candidate arena, loading accessor, retained runtime,
+and DICE package graph; Buck2 contributes only compact `SmallSet` uniqueness
+and the ordinary iterative worklist shape. No V1 test evaluator, suite model,
+strict-policy semantics, registry, diagnostic taxonomy, or DICE ownership was
+ported. Exact one-shot/daemon oracle gates, request-local invalidation and graph
+reuse, full affected tests, and Sol-low review passed.
+
+The next `visible()` packet remains source/representation audit only. Inspect
+V1/Buck visibility code as reference only after the pinned Bazel 9 rule,
+package-group, and accessor semantics are fixed; no extraction decision or Rust
+reuse is authorized in advance.

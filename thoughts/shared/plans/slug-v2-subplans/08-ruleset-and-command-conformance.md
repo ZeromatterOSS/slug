@@ -2671,3 +2671,36 @@ named command, CLI, server, core-runtime, query, and matching test files. The
 acceptance gate is 21 function rows through one-shot and daemon paths plus the
 exact 27 non-build fixture set, request-toggle reuse evidence, full owning and
 downstream tests, CLI rebuild, and format/archive/diff checks.
+
+## Request-local strict-suite and `tests()` activation accepted (2026-07-23)
+
+Commit `3a8ae78a` activates `tests(EXPR)` through one copyable default-false
+request policy, ordinary-query-only positive/negative boolean parsing, a
+serde-compatible daemon field, and policy-aware one-shot, retained-runtime,
+and evaluator paths. The policy remains outside package, graph, DICE key,
+equality, and user-data identity.
+
+The generic iterative implementation evaluates its operand once, drops fake
+and top-level non-test candidates without loading lookup, uses separate
+compact test/suite uniquifiers, filters before test uniqueness, applies
+suite-local nested filters and literal `-+tag`, diagnoses only explicit
+non-test members in strict mode, accepts only tests from `$implicit_tests`,
+terminates cycles, and emits one delivery. Named suite-attribute access records
+ordinary query edges. Crate-private target-missing versus package-loading
+classification preserves exact function-owned missing-member prefixes without
+adding a public diagnostic taxonomy.
+
+The exact 27-row one-shot gate passed: all 21 `tests()` rows plus six existing
+non-build labels/deps/loading rows, with all five build-format rows excluded.
+All 21 function rows also passed through one retained daemon. Unchanged
+false/true/false strict toggles reported zero invalidated files and reused the
+same unconfigured package graph. Root independently passed 13 command, 55
+query, 10 core-runtime, 16 server, 21 CLI, and three graph-output tests, rebuilt
+`slug_cli_v2`, and passed formatting, archive, and diff checks. Sol-low returned
+final `ACCEPT` without correction.
+
+M3 now implements 12 of Bazel's 16 default loading-query functions. The next
+packet is read-only: audit pinned Bazel visibility representation and current
+V2 loading/query ownership, then design the smallest truthful oracle for
+`visible(PREDICATE, INPUT)`. No production visibility implementation or
+activation is authorized by this acceptance.

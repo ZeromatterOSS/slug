@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 strict-suite policy review is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 strict-suite policy review is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` oracle has 32 commands through `1edb2775` and labels metadata 39 through `57192df9`; identity, package-context normalization, structural label comparison, and direct duplicate rejection accepted through `5bbc4604`; tests loading/query metadata Gate A accepted in `7abcbdce`; request-local activation design Sol-accepted | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, `tests()` activation, and remaining command breadth | implement only the accepted strict-suite/`tests()` activation packet |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 visibility audit is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 visibility audit is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 12 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604` | four functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, visibility representation, and remaining command breadth | audit Bazel 9 visibility representation and design the smallest truthful `visible()` oracle; no Rust activation yet |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,71 +33,32 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Implement only the accepted request-local policy and evaluator seam for
-`tests(EXPR)` on top of `7abcbdce` and the 32-command oracle `1edb2775`. The
-Slug gate is exactly 27 non-build rows: 21 `tests()` rows plus six
-already-supported labels/deps/loading rows. The five `--output=build` rows
-remain Bazel-only formatter evidence.
+Audit Bazel 9 visibility representation and design the smallest truthful
+`visible(PREDICATE, INPUT)` oracle before changing Rust. Start from the pinned
+Bazel 9.2 sources for `VisibleFunction`, the target accessor, rule visibility,
+package specifications/groups, and native rule defaults. Compare only the
+current V2 loading/query representation and the matching Stage 9 rows.
 
-Add one cheap copyable `QueryPolicy { strict_test_suite }`, default false, and
-thread it by value through ordinary-query command parsing, one-shot and daemon
-request paths, runtime, evaluator, and the request-local loading environment.
-Accept Bazel boolean positive/negative spellings only for ordinary `query`;
-keep old daemon requests compatible with a serde default. Policy must not enter
-loaded-package, unconfigured-graph, DICE-key, equality, or user-data identity.
+The audit must account for explicit and default target visibility, package
+groups with includes/excludes, same-package behavior, the asymmetric
+`javatests`-to-`java` rule, generated/source/non-rule operands, missing or
+malformed visibility prerequisites, and evaluation-graph edges. Separate
+loading-owned representation from the later generic query predicate. Do not
+claim a graph-light subset that makes Bazel-visible targets fail or makes
+Bazel failures succeed.
 
-The generic `TestsFunction` evaluates its operand once and uses accessor-shaped
-environment primitives rather than loading nodes. It partitions top-level
-tests, suites, and others; maintains separate compact test and suite
-uniquifiers; and expands suites with an iterative worklist. Each suite uses its
-own tags. Filter explicit tests before uniqueness, recurse into nested suites
-without inheriting the parent filter, apply strict errors only to explicit
-non-test members, and accept only filtered tests from `$implicit_tests`.
-Preserve literal `-+tag`, size matching, manual behavior, cycles, cross-package
-resolution, and one materialized output delivery.
+The first mutable packet after review is oracle-only. It may add one
+self-contained root-repository fixture that discriminates the smallest
+complete representation and query boundary accepted by source review. No
+production Rust, DICE key, repository mapping, external repository behavior,
+configured analysis, visibility migration shim, or `visible()` activation is
+authorized yet. Stop and replan if truthful parity requires a larger Stage 4
+schema than can be bounded in one reviewed foundation.
 
-Accessor lookup retains crate-private missing-target versus package-loading
-detail and the function unconditionally adds the exact suite/attribute prefix.
-Strict rejection uses the exact Bazel message through the existing evaluation
-error surface; do not add an unused public/general failure-code API. Require
-command/wire tests, focused algorithm regressions, all 21 function rows through
-one-shot and daemon paths, the exact 27-row non-build gate, and unchanged-workspace
-false/true/false strict toggles with zero file invalidations and graph reuse.
-
-Strengthen tests before production code. Cover command boolean parsing and
-ordinary-query isolation; old and new daemon wire forms; fake candidates;
-suite-local filters; filter-before-uniqueness; literal `-+tag`; explicit-only
-strictness; cycles/dedup; missing-member prefixes; and suite edge recording.
-Run all 21 function rows through one-shot and daemon paths, then the exact 27
-non-build set. Prove an unchanged-workspace false/true/false strict sequence
-changes the result with zero file invalidations and reuses the existing graph
-keys.
-
-Production allowlist:
-`app/slug_commands_v2/src/{common.rs,query.rs}`,
-`app/slug_cli_v2/src/commands/query.rs`,
-`app/slug_server_v2/src/{lib.rs,server.rs}`,
-`app/slug_core_v2/src/runtime/{mod.rs,dice.rs}`, and
-`app/slug_query_v2/src/{lib.rs,evaluator.rs,expr.rs,generic.rs,loading_environment.rs,graph.rs}`.
-Tests may change only the matching command, server, core runtime, query loading,
-query registry, and CLI integration files named by the accepted design. The
-query-registry owner test in `app/slug_query_v2/tests/query.rs` is included
-solely to move `tests` from deferred to implemented, update the exact
-implemented/deferred counts, and validate its existing one-expression
-signature. Keep the fixture read-only.
-
-Do not implement build/proto formatting, broaden public diagnostics, start
-`visible`, add repository mapping/keep-going/cquery/aquery policy, add a DICE
-key or semantic input, change loading metadata, or import V1/Buck test
-semantics. Stop if any accepted row requires work outside this allowlist.
-`visible` remains second because a truthful first slice already requires
-explicit/default target visibility, package groups and includes/excludes,
-same-package handling, and the asymmetric `javatests` to `java` rule.
-
-Do not react to the rejected regex candidate by starting a UTF-16 engine fork.
-`filter`, `attr`, and regex-based `kind` remain deferred; a V2-owned engine is
-an unapproved future architecture packet with its own UTF-16, diagnostic,
-resource, allocation, and differential-corpus gate.
+The rejected regex candidate does not authorize a UTF-16 engine fork.
+`filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine
+requires its own UTF-16, diagnostic, resource, allocation, and
+differential-corpus gate.
 
 ## Operating Decision
 
