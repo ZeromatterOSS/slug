@@ -178,7 +178,11 @@ async fn load_revision(
         .targets
         .iter()
         .find_map(|target| match &target.kind {
-            PackageTargetKind::Filegroup { srcs } if target.name == "all" => Some(srcs.clone()),
+            PackageTargetKind::Filegroup { srcs } if target.name == "all" => Some(
+                srcs.iter()
+                    .map(|label| label.target().to_string())
+                    .collect(),
+            ),
             _ => None,
         })
         .unwrap();

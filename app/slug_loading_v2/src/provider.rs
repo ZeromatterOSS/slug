@@ -45,6 +45,16 @@ impl BzlEvaluationContext {
             source_label: source_label.into(),
         }
     }
+
+    pub(crate) fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> {
+        eval.extra
+            .and_then(|extra| extra.downcast_ref::<Self>())
+            .ok_or_else(|| anyhow::anyhow!("operation may only be called in a .bzl module"))
+    }
+
+    pub(crate) fn source_label(&self) -> &str {
+        &self.source_label
+    }
 }
 
 /// Loading-time provider constructor. `export_as` establishes its structural
@@ -62,10 +72,8 @@ impl UserProviderCallable {
         fields: SmallMap<String, String>,
         eval: &Evaluator<'_, '_, '_>,
     ) -> anyhow::Result<Self> {
-        let context = eval
-            .extra
-            .and_then(|extra| extra.downcast_ref::<BzlEvaluationContext>())
-            .ok_or_else(|| anyhow::anyhow!("provider() may only be called in a .bzl module"))?;
+        let context = BzlEvaluationContext::from_evaluator(eval)
+            .map_err(|_| anyhow::anyhow!("provider() may only be called in a .bzl module"))?;
         let mut names = fields
             .into_iter()
             .map(|(name, _documentation)| CompactString::new(name))

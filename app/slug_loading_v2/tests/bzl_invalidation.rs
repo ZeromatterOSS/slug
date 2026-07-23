@@ -1105,6 +1105,107 @@ fn same_dice_config_setting_values_are_package_semantics() {
 }
 
 #[test]
+fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
+    let workspace = scratch("package-context-labels");
+    let package = workspace.join("consumer");
+    let definitions = workspace.join("definitions/defs.bzl");
+    let build = package.join("BUILD.bazel");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let schema = |default: &str| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {{\"dep\": attr.label(default = \"{default}\")}})\n"
+        )
+    };
+    write(&definitions, &schema("one.txt"));
+    let build_for = |srcs: &str, actual: &str| {
+        format!(
+            "load(\"//definitions:defs.bzl\", \"probe\")\nprobe(name = \"rule\")\nfilegroup(name = \"group\", srcs = {srcs})\nalias(name = \"redirect\", actual = \"{actual}\")\n"
+        )
+    };
+    write(
+        &build,
+        &build_for("[\"one.txt\", \":two.txt\", \"one.txt\"]", "group"),
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let initial = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
+    )
+    .unwrap();
+    write(
+        &build,
+        &build_for("[\":one.txt\", \"two.txt\", \":one.txt\"]", ":group"),
+    );
+    let equivalent = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
+    )
+    .unwrap();
+    assert_eq!(initial, equivalent);
+
+    write(
+        &build,
+        &build_for("[\"two.txt\", \"one.txt\", \"one.txt\"]", "group"),
+    );
+    let reordered = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
+    )
+    .unwrap();
+    assert_ne!(equivalent, reordered);
+    write(&build, &build_for("[\"two.txt\", \"one.txt\"]", "group"));
+    let duplicate_removed = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
+    )
+    .unwrap();
+    assert_ne!(reordered, duplicate_removed);
+
+    write(&definitions, &schema("two.txt"));
+    let default_changed = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
+    )
+    .unwrap();
+    assert_ne!(duplicate_removed, default_changed);
+
+    fs::remove_file(&definitions).unwrap();
+    assert!(
+        load_package(
+            &dice,
+            &runtime,
+            &workspace,
+            &package,
+            &[definitions.clone()]
+        )
+        .is_err()
+    );
+    write(&definitions, &schema("two.txt"));
+    let recreated = load_package(&dice, &runtime, &workspace, &package, &[definitions]).unwrap();
+    assert_eq!(default_changed, recreated);
+}
+
+#[test]
 fn same_dice_attribute_metadata_edits_are_semantic_and_recreate_cleanly() {
     let workspace = scratch("attribute-metadata-transitions");
     let package = workspace.join("pkg");

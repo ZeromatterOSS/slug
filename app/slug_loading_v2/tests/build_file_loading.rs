@@ -78,6 +78,14 @@ fn try_load_package(
     workspace: &Path,
     package: &Path,
 ) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+    try_load_package_with_extra_bzl(workspace, package, &[])
+}
+
+fn try_load_package_with_extra_bzl(
+    workspace: &Path,
+    package: &Path,
+    extra_bzl: &[PathBuf],
+) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut paths = vec![
         workspace.join(MODULE_FILE),
@@ -92,6 +100,7 @@ fn try_load_package(
             paths.push(path);
         }
     }
+    paths.extend(extra_bzl.iter().cloned());
     let files = paths
         .into_iter()
         .map(|path| {
@@ -352,13 +361,13 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
             PackageTarget {
                 name: "fg".to_owned(),
                 kind: PackageTargetKind::Filegroup {
-                    srcs: vec!["data.txt".to_owned()],
+                    srcs: vec![CanonicalLabel::parse("@@//pkg:data.txt").unwrap()].into(),
                 },
             },
             PackageTarget {
                 name: "alias_fg".to_owned(),
                 kind: PackageTargetKind::Alias {
-                    actual: ":fg".to_owned(),
+                    actual: CanonicalLabel::parse("@@//pkg:fg").unwrap(),
                 },
             },
             PackageTarget {
@@ -368,11 +377,70 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
             PackageTarget {
                 name: "macro_file".to_owned(),
                 kind: PackageTargetKind::Filegroup {
-                    srcs: vec!["macro.txt".to_owned()],
+                    srcs: vec![CanonicalLabel::parse("@@//pkg:macro.txt").unwrap()].into(),
                 },
             },
         ]
     );
+}
+
+#[test]
+fn native_labels_canonicalize_spelling_but_preserve_order_and_duplicates() {
+    let workspace = scratch("native-label-canonicalization");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    let build = package.join(BUILD_FILE_PRIMARY);
+    let write_build = |srcs: &str, actual: &str| {
+        fs::write(
+            &build,
+            format!(
+                "filegroup(name = \"group\", srcs = {srcs})\nalias(name = \"redirect\", actual = \"{actual}\")\n"
+            ),
+        )
+        .unwrap();
+        load_package(&workspace, &package)
+    };
+
+    let initial = write_build(
+        "[\"one.txt\", \":two.txt\", \"dir/name.txt\", \"//other:cross.txt\", \"one.txt\"]",
+        "group",
+    );
+    let equivalent = write_build(
+        "[\":one.txt\", \"two.txt\", \":dir/name.txt\", \"//other:cross.txt\", \":one.txt\"]",
+        ":group",
+    );
+    assert_eq!(initial, equivalent);
+
+    let PackageTargetKind::Filegroup { srcs } = &equivalent.targets[0].kind else {
+        panic!("expected filegroup")
+    };
+    assert_eq!(
+        srcs.as_ref(),
+        [
+            CanonicalLabel::parse("@@//pkg:one.txt").unwrap(),
+            CanonicalLabel::parse("@@//pkg:two.txt").unwrap(),
+            CanonicalLabel::parse("@@//pkg:dir/name.txt").unwrap(),
+            CanonicalLabel::parse("@@//other:cross.txt").unwrap(),
+            CanonicalLabel::parse("@@//pkg:one.txt").unwrap(),
+        ]
+    );
+    assert!(matches!(
+        &equivalent.targets[1].kind,
+        PackageTargetKind::Alias { actual }
+            if actual == &CanonicalLabel::parse("@@//pkg:group").unwrap()
+    ));
+
+    let reordered = write_build(
+        "[\"two.txt\", \"one.txt\", \"dir/name.txt\", \"//other:cross.txt\", \"one.txt\"]",
+        "group",
+    );
+    assert_ne!(equivalent, reordered);
+    let duplicate_removed = write_build(
+        "[\"two.txt\", \"one.txt\", \"dir/name.txt\", \"//other:cross.txt\"]",
+        "group",
+    );
+    assert_ne!(reordered, duplicate_removed);
 }
 
 #[test]
@@ -419,7 +487,7 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
     .unwrap();
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
-        "load(\":defs.bzl\", \"with_deps\")\nwith_deps(name = \"ordered\", deps = [\"//leaf:second\", \":local\", \"//leaf:first\"], visibility = [\"//visibility:public\"])\nwith_deps(name = \"omitted\")\n",
+        "load(\":defs.bzl\", \"with_deps\")\nwith_deps(name = \"ordered\", deps = [\"//leaf:second\", \"bare\", \"dir/name\", \":local\", \"//leaf:first\"], visibility = [\"//visibility:public\"])\nwith_deps(name = \"omitted\")\n",
     )
     .unwrap();
 
@@ -438,6 +506,8 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
         dependencies,
         [
             CanonicalLabel::parse("@@//leaf:second").unwrap(),
+            CanonicalLabel::parse("@@//parent:bare").unwrap(),
+            CanonicalLabel::parse("@@//parent:dir/name").unwrap(),
             CanonicalLabel::parse("@@//parent:local").unwrap(),
             CanonicalLabel::parse("@@//leaf:first").unwrap(),
         ]
@@ -472,8 +542,32 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
             "attribute `deps` must contain only string labels",
         ),
         (
-            "with_deps(name = \"bad\", deps = [\"relative\"])\n",
-            "dependency label must be package-relative",
+            "with_deps(name = \"bad\", deps = [\"pkg:target\"])\n",
+            "invalid label 'pkg:target': absolute label must begin with '@' or '//'",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"...\"])\n",
+            "invalid label '...': package name cannot contain '...'",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"foo/...\"])\n",
+            "invalid label 'foo/...': package name cannot contain '...'",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"...:all\"])\n",
+            "invalid label '...:all': package name cannot contain '...'",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"foo/...:all\"])\n",
+            "invalid label 'foo/...:all': package name cannot contain '...'",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"//foo/...\"])\n",
+            "invalid label '//foo/...': package name cannot contain '...'",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"//foo/...:all\"])\n",
+            "invalid label '//foo/...:all': package name cannot contain '...'",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"@repo//leaf:one\"])\n",
@@ -495,6 +589,101 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
             .to_string();
         assert!(error.contains(expected), "error: {error}");
     }
+}
+
+#[test]
+fn label_defaults_use_the_defining_bzl_package_while_explicit_values_use_build_package() {
+    let workspace = scratch("definition-package-defaults");
+    let definitions = workspace.join("definitions");
+    let consumer = workspace.join("consumer");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&definitions).unwrap();
+    fs::create_dir_all(&consumer).unwrap();
+    fs::write(
+        definitions.join("defs.bzl"),
+        r#"
+def _impl(ctx):
+    return [DefaultInfo()]
+
+probe = rule(
+    implementation = _impl,
+    attrs = {
+        "explicit": attr.label_list(mandatory = True),
+        "scalar": attr.label(default = "scalar.txt"),
+        "defaulted": attr.label_list(default = ["default.txt", "dir/default.txt", ":colon.txt", "//:root.txt"]),
+        "string_labels": attr.string_keyed_label_dict(default = {"key": "dict-value.txt"}),
+        "label_strings": attr.label_keyed_string_dict(default = {"dict-key.txt": "value"}),
+        "label_lists": attr.label_list_dict(default = {"key": ["list-value.txt"]}),
+    },
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        consumer.join(BUILD_FILE_PRIMARY),
+        "load(\"//definitions:defs.bzl\", \"probe\")\nprobe(name = \"consumer\", explicit = [\"bare.txt\", \"dir/bare.txt\", \":colon.txt\", \"//other:cross.txt\", \"//:root.txt\"])\n",
+    )
+    .unwrap();
+
+    let loaded =
+        try_load_package_with_extra_bzl(&workspace, &consumer, &[definitions.join("defs.bzl")])
+            .unwrap();
+    let PackageTargetKind::StarlarkRule(rule) = &loaded.targets[0].kind else {
+        panic!("expected Starlark rule")
+    };
+    let labels_for = |name| {
+        let mut labels = Vec::new();
+        rule.values()
+            .iter()
+            .find(|value| value.declaration_name == name)
+            .unwrap()
+            .value
+            .labels(&mut labels);
+        labels
+    };
+    assert_eq!(
+        labels_for("explicit"),
+        vec![
+            CanonicalLabel::parse("@@//consumer:bare.txt").unwrap(),
+            CanonicalLabel::parse("@@//consumer:dir/bare.txt").unwrap(),
+            CanonicalLabel::parse("@@//consumer:colon.txt").unwrap(),
+            CanonicalLabel::parse("@@//other:cross.txt").unwrap(),
+            CanonicalLabel::parse("@@//:root.txt").unwrap(),
+        ]
+    );
+    let defining_defaults = vec![
+        CanonicalLabel::parse("@@//definitions:default.txt").unwrap(),
+        CanonicalLabel::parse("@@//definitions:dir/default.txt").unwrap(),
+        CanonicalLabel::parse("@@//definitions:colon.txt").unwrap(),
+        CanonicalLabel::parse("@@//:root.txt").unwrap(),
+    ];
+    assert_eq!(
+        labels_for("scalar"),
+        [CanonicalLabel::parse("@@//definitions:scalar.txt").unwrap()]
+    );
+    assert_eq!(labels_for("defaulted"), defining_defaults);
+    assert_eq!(
+        labels_for("string_labels"),
+        [CanonicalLabel::parse("@@//definitions:dict-value.txt").unwrap()]
+    );
+    assert_eq!(
+        labels_for("label_strings"),
+        [CanonicalLabel::parse("@@//definitions:dict-key.txt").unwrap()]
+    );
+    assert_eq!(
+        labels_for("label_lists"),
+        [CanonicalLabel::parse("@@//definitions:list-value.txt").unwrap()]
+    );
+    let defaulted_schema = rule
+        .schema()
+        .iter()
+        .find(|schema| schema.declaration_name() == "defaulted")
+        .unwrap();
+    assert!(matches!(
+        defaulted_schema.default(),
+        Some(CoercedAttributeValue::LabelList(labels))
+            if labels.as_ref() == defining_defaults.as_slice()
+    ));
 }
 
 #[test]
@@ -542,8 +731,8 @@ probe(
     string_labels = {"local": ":source"},
     label_strings = {":default": "default"},
     label_lists = {"local": [":implicit", ":source"]},
-    out = "one.out",
-    outs = ["two.out", "three.out"],
+    out = "dir/one.out",
+    outs = [":two.out", "//pkg:three.out"],
     trailing = select({":condition": [":linux"], "//conditions:default": [":fallback"]}) + [":after"],
     chained = [":before"] + select({":condition": [":one"], "//conditions:default": [":one_default"]}) + select({":second_condition": [":two"], "//conditions:default": [":two_default"]}) + [":after"] + [":again"],
     nested_prefix = [":outer"] + ([":inner"] + select({":condition": [":selected"]})),
@@ -721,9 +910,9 @@ probe(
     assert!(matches!(
         loaded.targets[1].kind,
         PackageTargetKind::GeneratedFile { ref generating_rule, ref label }
-            if generating_rule == "metadata" && label == &CanonicalLabel::parse("@@//pkg:one.out").unwrap()
+            if generating_rule == "metadata" && label == &CanonicalLabel::parse("@@//pkg:dir/one.out").unwrap()
     ));
-    assert_eq!(loaded.targets[1].name, "one.out");
+    assert_eq!(loaded.targets[1].name, "dir/one.out");
     assert_eq!(loaded.targets[3].name, "three.out");
 
     fs::write(
@@ -819,29 +1008,32 @@ fn build_and_macro_native_glob_share_the_prepared_package_listing() {
             (
                 "direct".to_owned(),
                 PackageTargetKind::Filegroup {
-                    srcs: vec!["keep.txt".to_owned()]
+                    srcs: vec![CanonicalLabel::parse("@@//pkg:keep.txt").unwrap()].into()
                 }
             ),
             (
                 "dirs".to_owned(),
                 PackageTargetKind::Filegroup {
                     srcs: vec![
-                        "BUILD.bazel".to_owned(),
-                        "defs.bzl".to_owned(),
-                        "keep.txt".to_owned(),
-                        "skip.txt".to_owned(),
-                        "sub".to_owned()
+                        CanonicalLabel::parse("@@//pkg:BUILD.bazel").unwrap(),
+                        CanonicalLabel::parse("@@//pkg:defs.bzl").unwrap(),
+                        CanonicalLabel::parse("@@//pkg:keep.txt").unwrap(),
+                        CanonicalLabel::parse("@@//pkg:skip.txt").unwrap(),
+                        CanonicalLabel::parse("@@//pkg:sub").unwrap()
                     ]
+                    .into()
                 }
             ),
             (
                 "omitted".to_owned(),
-                PackageTargetKind::Filegroup { srcs: Vec::new() },
+                PackageTargetKind::Filegroup {
+                    srcs: Arc::from([]),
+                },
             ),
             (
                 "macro".to_owned(),
                 PackageTargetKind::Filegroup {
-                    srcs: vec!["sub/child.txt".to_owned()]
+                    srcs: vec![CanonicalLabel::parse("@@//pkg:sub/child.txt").unwrap()].into()
                 }
             ),
         ]

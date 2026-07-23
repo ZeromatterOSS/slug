@@ -58,6 +58,7 @@ use crate::glob::GlobSpec;
 use crate::glob::PackageListing;
 use crate::glob::expand_glob;
 use crate::provider::AnalysisBuiltinCallable;
+use crate::provider::BzlEvaluationContext;
 use crate::provider::UserProviderCallable;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,10 +143,10 @@ static CONFIG_SETTING_RULE_CAPABILITY: RuleCapability = RuleCapability {
 pub enum PackageTargetKind {
     ExportedFile,
     Filegroup {
-        srcs: Vec<String>,
+        srcs: Arc<[CanonicalLabel]>,
     },
     Alias {
-        actual: String,
+        actual: CanonicalLabel,
     },
     /// Loading-only representation of Bazel's `config_setting`. Its values
     /// are retained for package semantic equality; configuration matching is
@@ -272,10 +273,16 @@ impl PackageRecorder {
     }
 
     fn filegroup(&self, name: String, srcs: Vec<String>) -> anyhow::Result<()> {
+        let srcs = srcs
+            .iter()
+            .map(|src| self.dependency_label(src))
+            .collect::<anyhow::Result<Vec<_>>>()?
+            .into();
         self.record_target(name, PackageTargetKind::Filegroup { srcs })
     }
 
     fn alias(&self, name: String, actual: String) -> anyhow::Result<()> {
+        let actual = self.dependency_label(&actual)?;
         self.record_target(name, PackageTargetKind::Alias { actual })
     }
 
@@ -329,40 +336,7 @@ impl PackageRecorder {
     }
 
     fn dependency_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
-        if value.starts_with('@') {
-            anyhow::bail!(
-                "external repository dependency labels are not supported in this analysis packet: {value}"
-            );
-        }
-        let canonical = if let Some(target) = value.strip_prefix(':') {
-            format!("@@//{}:{target}", self.package)
-        } else if let Some(absolute) = value.strip_prefix("//") {
-            format!("@@//{absolute}")
-        } else {
-            anyhow::bail!(
-                "dependency label must be package-relative `:name` or root `//pkg:name`: {value}"
-            );
-        };
-        CanonicalLabel::parse(&canonical).map_err(anyhow::Error::msg)
-    }
-
-    fn output_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
-        let label = if value.starts_with(':') || value.starts_with("//") || value.starts_with('@') {
-            self.dependency_label(value).map_err(|_| {
-                anyhow::anyhow!("output label must name a valid target in this package: {value}")
-            })?
-        } else {
-            CanonicalLabel::parse(&format!("@@//{}:{value}", self.package)).map_err(|_| {
-                anyhow::anyhow!("output label must name a valid target in this package: {value}")
-            })?
-        };
-        if label.package().package().as_str() != self.package
-            || !label.package().repo().is_root()
-            || label.target().as_str().contains(':')
-        {
-            anyhow::bail!("output label must name a valid target in this package: {value}");
-        }
-        Ok(label)
+        package_context_label(&self.package, value)
     }
 
     fn record_target(&self, name: String, kind: PackageTargetKind) -> anyhow::Result<()> {
@@ -421,6 +395,45 @@ impl PackageRecorder {
 
 fn list(items: UnpackListOrTuple<&str>) -> Vec<String> {
     items.items.into_iter().map(str::to_owned).collect()
+}
+
+pub(crate) fn package_context_label(
+    base_package: &str,
+    raw: &str,
+) -> anyhow::Result<CanonicalLabel> {
+    if raw.starts_with('@') {
+        anyhow::bail!(
+            "external repository dependency labels are not supported in this analysis packet: {raw}"
+        );
+    }
+    let without_root = raw.strip_prefix("//").unwrap_or(raw);
+    let package_part = without_root
+        .split_once(':')
+        .map_or(without_root, |(package, _)| package);
+    if package_part == "..." || package_part.ends_with("/...") {
+        anyhow::bail!("invalid label '{raw}': package name cannot contain '...'");
+    }
+    let canonical = if let Some(target) = raw.strip_prefix(':') {
+        format!("@@//{base_package}:{target}")
+    } else if let Some(absolute) = raw.strip_prefix("//") {
+        format!("@@//{absolute}")
+    } else {
+        if raw.contains(':') {
+            anyhow::bail!("invalid label '{raw}': absolute label must begin with '@' or '//'");
+        }
+        format!("@@//{base_package}:{raw}")
+    };
+    CanonicalLabel::parse(&canonical).map_err(anyhow::Error::msg)
+}
+
+fn package_output_label(base_package: &str, raw: &str) -> anyhow::Result<CanonicalLabel> {
+    let label = package_context_label(base_package, raw).map_err(|_| {
+        anyhow::anyhow!("output label must name a valid target in this package: {raw}")
+    })?;
+    if label.package().package().as_str() != base_package || !label.package().repo().is_root() {
+        anyhow::bail!("output label must name a valid target in this package: {raw}");
+    }
+    Ok(label)
 }
 
 fn package_global(
@@ -510,19 +523,20 @@ fn raw_string(value: &RawAttributeValue, context: &str) -> anyhow::Result<Compac
 }
 
 fn raw_label(
-    recorder: &PackageRecorder,
+    base_package: &str,
     value: &RawAttributeValue,
     context: &str,
 ) -> anyhow::Result<CanonicalLabel> {
-    recorder.dependency_label(&raw_string(value, context)?)
+    package_context_label(base_package, &raw_string(value, context)?)
 }
 
 fn raw_output(
-    recorder: &PackageRecorder,
+    base_package: &str,
     value: &RawAttributeValue,
     context: &str,
 ) -> anyhow::Result<CanonicalLabel> {
-    recorder.output_label(&raw_string(value, context)?)
+    let raw = raw_string(value, context)?;
+    package_output_label(base_package, &raw)
 }
 
 // Bazel 9.2 source: Attribute.Builder documents type defaults as label=null,
@@ -545,22 +559,26 @@ fn intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
 }
 
 fn coerce_raw_value(
-    recorder: &PackageRecorder,
+    base_package: &str,
     kind: AttributeKind,
     raw: &RawAttributeValue,
 ) -> anyhow::Result<CoercedAttributeValue> {
     let labels = |values: &[RawAttributeValue], context| {
         values
             .iter()
-            .map(|value| raw_label(recorder, value, context))
+            .map(|value| raw_label(base_package, value, context))
             .collect::<anyhow::Result<Vec<_>>>()
     };
     match kind {
         AttributeKind::Label => Ok(CoercedAttributeValue::Label(raw_label(
-            recorder, raw, "label",
+            base_package,
+            raw,
+            "label",
         )?)),
         AttributeKind::Output => Ok(CoercedAttributeValue::Output(raw_output(
-            recorder, raw, "output",
+            base_package,
+            raw,
+            "output",
         )?)),
         AttributeKind::String => Ok(CoercedAttributeValue::String(raw_string(raw, "string")?)),
         AttributeKind::LabelList | AttributeKind::OutputList => {
@@ -572,7 +590,7 @@ fn coerce_raw_value(
             } else {
                 values
                     .iter()
-                    .map(|value| raw_output(recorder, value, "output list"))
+                    .map(|value| raw_output(base_package, value, "output list"))
                     .collect::<anyhow::Result<Vec<_>>>()?
             };
             Ok(if kind == AttributeKind::LabelList {
@@ -591,7 +609,7 @@ fn coerce_raw_value(
                     .map(|(key, value)| {
                         Ok((
                             raw_string(key, "dictionary key")?,
-                            raw_label(recorder, value, "dictionary value")?,
+                            raw_label(base_package, value, "dictionary value")?,
                         ))
                     })
                     .collect::<anyhow::Result<Vec<_>>>()?
@@ -607,7 +625,7 @@ fn coerce_raw_value(
                     .iter()
                     .map(|(key, value)| {
                         Ok((
-                            raw_label(recorder, key, "dictionary key")?,
+                            raw_label(base_package, key, "dictionary key")?,
                             raw_string(value, "dictionary value")?,
                         ))
                     })
@@ -737,7 +755,7 @@ fn coerce_starlark_value(
     let raw = raw_attribute_value(value).map_err(|_| {
         anyhow::anyhow!("attribute `{attribute_name}` must contain only string labels")
     })?;
-    coerce_raw_value(recorder, kind, &raw)
+    coerce_raw_value(&recorder.package, kind, &raw)
 }
 
 /// The callable returned by Bazel's `rule()` global during package loading.
@@ -843,7 +861,7 @@ struct RuleAttributeSchema {
     kind: AttributeKind,
     mandatory: bool,
     configurable: bool,
-    default: Option<RawAttributeValue>,
+    default: Option<CoercedAttributeValue>,
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -851,7 +869,7 @@ struct AttributeDefinition {
     kind: AttributeKind,
     mandatory: bool,
     configurable: bool,
-    default: Option<RawAttributeValue>,
+    default: Option<CoercedAttributeValue>,
 }
 
 starlark::starlark_simple_value!(AttributeDefinition);
@@ -1019,12 +1037,22 @@ fn attribute_definition(
     mandatory: bool,
     configurable: bool,
     default: Option<Value>,
+    eval: &Evaluator<'_, '_, '_>,
 ) -> anyhow::Result<AttributeDefinition> {
+    let default = default
+        .map(|value| {
+            let raw = raw_attribute_value(value)?;
+            let context = BzlEvaluationContext::from_evaluator(eval)?;
+            let source = CanonicalLabel::parse(&format!("@@{}", context.source_label()))
+                .map_err(anyhow::Error::msg)?;
+            coerce_raw_value(source.package().package().as_str(), kind, &raw)
+        })
+        .transpose()?;
     Ok(AttributeDefinition {
         kind,
         mandatory,
         configurable,
-        default: default.map(raw_attribute_value).transpose()?,
+        default,
     })
 }
 
@@ -1035,12 +1063,14 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
         default: Option<Value>,
+        eval: &mut Evaluator,
     ) -> anyhow::Result<AttributeDefinition> {
         attribute_definition(
             AttributeKind::Label,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            eval,
         )
     }
     fn label_list(
@@ -1048,12 +1078,14 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
         default: Option<Value>,
+        eval: &mut Evaluator,
     ) -> anyhow::Result<AttributeDefinition> {
         attribute_definition(
             AttributeKind::LabelList,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            eval,
         )
     }
     fn string_keyed_label_dict(
@@ -1061,12 +1093,14 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
         default: Option<Value>,
+        eval: &mut Evaluator,
     ) -> anyhow::Result<AttributeDefinition> {
         attribute_definition(
             AttributeKind::StringKeyedLabelDict,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            eval,
         )
     }
     fn label_keyed_string_dict(
@@ -1074,12 +1108,14 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
         default: Option<Value>,
+        eval: &mut Evaluator,
     ) -> anyhow::Result<AttributeDefinition> {
         attribute_definition(
             AttributeKind::LabelKeyedStringDict,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            eval,
         )
     }
     fn label_list_dict(
@@ -1087,34 +1123,40 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
         default: Option<Value>,
+        eval: &mut Evaluator,
     ) -> anyhow::Result<AttributeDefinition> {
         attribute_definition(
             AttributeKind::LabelListDict,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            eval,
         )
     }
     fn output(
         #[starlark(this)] _attr: Value,
         mandatory: Option<bool>,
+        eval: &mut Evaluator,
     ) -> anyhow::Result<AttributeDefinition> {
         attribute_definition(
             AttributeKind::Output,
             mandatory.unwrap_or(false),
             false,
             None,
+            eval,
         )
     }
     fn output_list(
         #[starlark(this)] _attr: Value,
         mandatory: Option<bool>,
+        eval: &mut Evaluator,
     ) -> anyhow::Result<AttributeDefinition> {
         attribute_definition(
             AttributeKind::OutputList,
             mandatory.unwrap_or(false),
             false,
             None,
+            eval,
         )
     }
     fn string(
@@ -1122,12 +1164,14 @@ fn attr_methods(builder: &mut MethodsBuilder) {
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
         default: Option<Value>,
+        eval: &mut Evaluator,
     ) -> anyhow::Result<AttributeDefinition> {
         attribute_definition(
             AttributeKind::String,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            eval,
         )
     }
 }
@@ -1204,9 +1248,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         Some(
                             declaration
                                 .default
-                                .as_ref()
-                                .map(|value| coerce_raw_value(recorder, declaration.kind, value))
-                                .transpose()?
+                                .clone()
                                 .unwrap_or_else(|| intrinsic_default(declaration.kind)),
                         ),
                     );

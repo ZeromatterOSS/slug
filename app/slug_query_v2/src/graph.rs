@@ -283,13 +283,20 @@ async fn compute_package_graph(
                 (QueryNodeKind::SourceFile, Arc::from([]), Arc::from([]))
             }
             PackageTargetKind::Filegroup { srcs } => {
-                let dependencies = srcs
+                let labels = srcs
                     .iter()
-                    .map(|value| normalize_dependency(&package_name, value))
-                    .collect::<Result<Vec<_>, _>>()?;
+                    .cloned()
+                    .map(QueryLabel::from_canonical)
+                    .collect::<Vec<_>>();
+                let mut seen = SmallSet::new();
+                let dependencies = labels
+                    .iter()
+                    .filter(|label| seen.insert((*label).dupe()))
+                    .map(QueryLabel::dupe)
+                    .collect::<Vec<_>>();
                 let attributes = Arc::from([QueryAttribute {
                     name: CompactString::new("srcs"),
-                    labels: dependencies.clone().into(),
+                    labels: labels.into(),
                 }]);
                 (
                     QueryNodeKind::Rule(CompactString::new("filegroup rule")),
@@ -298,7 +305,7 @@ async fn compute_package_graph(
                 )
             }
             PackageTargetKind::Alias { actual } => {
-                let actual = normalize_dependency(&package_name, actual)?;
+                let actual = QueryLabel::from_canonical(actual.clone());
                 (
                     QueryNodeKind::Rule(CompactString::new("alias rule")),
                     Arc::from([actual.dupe()]),
@@ -507,18 +514,4 @@ fn path_to_package(path: &Path) -> Result<CompactString, QueryError> {
 
 fn label_in_package(package: &str, target: &str) -> Result<QueryLabel, QueryError> {
     QueryLabel::parse_root(&format!("//{package}:{target}"))
-}
-
-fn normalize_dependency(package: &str, value: &str) -> Result<QueryLabel, QueryError> {
-    if let Some(target) = value.strip_prefix(':') {
-        label_in_package(package, target)
-    } else if value.starts_with("//") {
-        QueryLabel::parse_root(value)
-    } else if value.starts_with('@') {
-        Err(QueryError::evaluation(format!(
-            "external repository dependency labels are deferred: {value}"
-        )))
-    } else {
-        label_in_package(package, value)
-    }
 }

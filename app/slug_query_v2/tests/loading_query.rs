@@ -753,7 +753,7 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
     );
     write(
         workspace.join("pkg/BUILD.bazel"),
-        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", out = \"one.out\", outs = [\"two.out\"])\n",
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", out = \"dir/one.out\", outs = [\":two.out\", \"//pkg:three.out\"])\n",
     );
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
@@ -775,8 +775,9 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
         labels,
         vec![
             "//pkg:BUILD.bazel",
-            "//pkg:one.out",
+            "//pkg:dir/one.out",
             "//pkg:rule",
+            "//pkg:three.out",
             "//pkg:two.out",
         ]
     );
@@ -786,7 +787,7 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
         .find(|node| node.label.to_string() == "//pkg:rule")
         .unwrap();
     assert!(rule.dependencies.is_empty());
-    for output in ["//pkg:one.out", "//pkg:two.out"] {
+    for output in ["//pkg:dir/one.out", "//pkg:two.out", "//pkg:three.out"] {
         let output = graph
             .nodes
             .values()
@@ -810,7 +811,7 @@ async fn labels_projects_supported_native_filegroup_and_alias_attributes() {
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
     write(
         workspace.join("pkg/BUILD.bazel"),
-        "filegroup(name = \"group\", srcs = [\":local.txt\", \"//other:cross.txt\"])\nalias(name = \"redirect\", actual = \":group\")\n",
+        "filegroup(name = \"group\", srcs = [\"local.txt\", \"dir/local.txt\", \":colon.txt\", \"//other:cross.txt\"])\nalias(name = \"redirect\", actual = \"group\")\n",
     );
     write(
         workspace.join("other/BUILD.bazel"),
@@ -823,10 +824,202 @@ async fn labels_projects_supported_native_filegroup_and_alias_attributes() {
     for (expression, expected) in [
         (
             "labels(srcs, //pkg:group)",
-            "//other:cross.txt\n//pkg:local.txt\n",
+            "//other:cross.txt\n//pkg:colon.txt\n//pkg:dir/local.txt\n//pkg:local.txt\n",
         ),
         ("labels(actual, //pkg:redirect)", "//pkg:group\n"),
         ("labels(srcs, //pkg:local.txt)", ""),
+    ] {
+        let output = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+}
+
+#[tokio::test]
+async fn native_label_canonicalization_reuses_and_preserves_attribute_multiplicity() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    let build = workspace.join("pkg/BUILD.bazel");
+    let build_for = |srcs: &str, actual: &str| {
+        format!(
+            "filegroup(name = \"group\", srcs = {srcs})\nalias(name = \"redirect\", actual = \"{actual}\")\n"
+        )
+    };
+    write(&build, &build_for("[\"one.txt\", \":two.txt\"]", "group"));
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "labels(srcs, //pkg:group)";
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(initial.unwrap().stdout(), "//pkg:one.txt\n//pkg:two.txt\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&build, &build_for("[\":one.txt\", \"two.txt\"]", ":group"));
+    let (equivalent, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        equivalent.unwrap().stdout(),
+        "//pkg:one.txt\n//pkg:two.txt\n"
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+
+    write(
+        &build,
+        &build_for("[\"one.txt\", \"two.txt\", \":one.txt\"]", "group"),
+    );
+    let (duplicate, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        duplicate.unwrap().stdout(),
+        "//pkg:one.txt\n//pkg:two.txt\n"
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        &build_for("[\"two.txt\", \"one.txt\", \":one.txt\"]", "group"),
+    );
+    let (reordered, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        reordered.unwrap().stdout(),
+        "//pkg:one.txt\n//pkg:two.txt\n"
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace: workspace.clone(),
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    let group = graph
+        .nodes
+        .values()
+        .find(|node| node.label.to_string() == "//pkg:group")
+        .unwrap();
+    assert_eq!(
+        group.attributes[0]
+            .labels
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:two.txt", "//pkg:one.txt", "//pkg:one.txt"]
+    );
+    assert_eq!(
+        group
+            .dependencies
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:two.txt", "//pkg:one.txt"]
+    );
+
+    fs::remove_file(&build).unwrap();
+    let (deleted, _) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert!(deleted.is_err());
+    write(
+        &build,
+        &build_for("[\"two.txt\", \"one.txt\", \":one.txt\"]", "group"),
+    );
+    let (recreated, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        recreated.unwrap().stdout(),
+        "//pkg:one.txt\n//pkg:two.txt\n"
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+}
+
+#[tokio::test]
+async fn invalid_relative_package_target_fails_in_loading_label_conversion() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"dep\": attr.label(mandatory = True)})\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (raw, expected) in [
+        (
+            "pkg:target",
+            "invalid label 'pkg:target': absolute label must begin with '@' or '//'",
+        ),
+        (
+            "...",
+            "invalid label '...': package name cannot contain '...'",
+        ),
+        (
+            "foo/...:all",
+            "invalid label 'foo/...:all': package name cannot contain '...'",
+        ),
+        (
+            "//foo/...",
+            "invalid label '//foo/...': package name cannot contain '...'",
+        ),
+    ] {
+        write(
+            workspace.join("pkg/BUILD.bazel"),
+            &format!("load(\":defs.bzl\", \"probe\")\nprobe(name = \"bad\", dep = \"{raw}\")\n"),
+        );
+        let mut transaction = transaction(&dice, &workspace).await;
+        let graph = transaction
+            .compute(&UnconfiguredPackageGraphKey {
+                workspace: workspace.clone(),
+                package: PathBuf::from("pkg"),
+            })
+            .await
+            .unwrap();
+        let error = graph.as_ref().as_ref().unwrap_err().to_string();
+        assert!(error.contains(expected), "{raw}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn starlark_package_context_labels_use_build_and_definition_packages() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("definitions/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"explicit\": attr.label_list(mandatory = True), \"defaulted\": attr.label(default = \"default.txt\")})\n",
+    );
+    write(
+        workspace.join("definitions/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"default_owner\", explicit = [])\n",
+    );
+    write(
+        workspace.join("consumer/BUILD.bazel"),
+        "load(\"//definitions:defs.bzl\", \"probe\")\nprobe(name = \"consumer\", explicit = [\"bare.txt\", \"dir/bare.txt\", \":colon.txt\", \"//other:cross.txt\", \"//:root.txt\"])\n",
+    );
+    write(
+        workspace.join("other/BUILD.bazel"),
+        "exports_files([\"cross.txt\"])\n",
+    );
+    write(
+        workspace.join("BUILD.bazel"),
+        "exports_files([\"root.txt\"])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, expected) in [
+        (
+            "labels(explicit, //consumer:consumer)",
+            "//:root.txt\n//consumer:bare.txt\n//consumer:colon.txt\n//consumer:dir/bare.txt\n//other:cross.txt\n",
+        ),
+        (
+            "labels(defaulted, //consumer:consumer)",
+            "//definitions:default.txt\n",
+        ),
+        (
+            "deps(//consumer:consumer, 1)",
+            "//:root.txt\n//consumer:bare.txt\n//consumer:colon.txt\n//consumer:consumer\n//consumer:dir/bare.txt\n//definitions:default.txt\n//other:cross.txt\n",
+        ),
     ] {
         let output = evaluate_loading_query(
             &mut transaction,
