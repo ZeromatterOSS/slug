@@ -50,8 +50,8 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 }
 
 // QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query
-// registry source of truth. This packet adds only the reviewed reverse-query
-// pair to the existing deps vertical.
+// registry source of truth. This packet adds only the reviewed path-query pair
+// to the existing deps/reverse vertical.
 #[test]
 fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures() {
     assert_eq!(loading_query_functions().len(), 16);
@@ -61,7 +61,13 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             .filter(|function| function.status == QueryFunctionStatus::Implemented)
             .map(|function| function.name)
             .collect::<Vec<_>>(),
-        ["deps", "rdeps", "same_pkg_direct_rdeps"]
+        [
+            "allpaths",
+            "deps",
+            "rdeps",
+            "same_pkg_direct_rdeps",
+            "somepath",
+        ]
     );
 
     let unknown = QueryExpression::parse("not_a_bazel_query_function(//pkg:bin)").unwrap();
@@ -94,6 +100,44 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
         &QueryExpression::parse("same_pkg_direct_rdeps(//tree/left:leaf)").unwrap(),
     )
     .unwrap();
+    validate_loading_query(
+        &QueryExpression::parse("allpaths(//:linear_start, //:linear_end)").unwrap(),
+    )
+    .unwrap();
+    validate_loading_query(
+        &QueryExpression::parse("somepath(//:linear_start, //:linear_end)").unwrap(),
+    )
+    .unwrap();
+}
+
+#[test]
+fn top_level_somepath_recognition_is_narrow_and_parentheses_lower_away() {
+    for source in [
+        "somepath(//:linear_start, //:linear_end)",
+        "(somepath(//:linear_start, //:linear_end))",
+        "((somepath(//:linear_start, //:linear_end)))",
+    ] {
+        assert!(
+            QueryExpression::parse(source)
+                .unwrap()
+                .is_top_level_somepath(),
+            "{source}"
+        );
+    }
+    for source in [
+        "somepath(//:linear_start, //:linear_end) union //:disconnected",
+        "somepath(//:linear_start, //:linear_end) intersect set(//:linear_start //:linear_end)",
+        "somepath(//:linear_start, //:linear_end) except //:linear_mid",
+        "let p = somepath(//:linear_start, //:linear_end) in $p",
+        "allpaths(//:linear_start, //:linear_end)",
+    ] {
+        assert!(
+            !QueryExpression::parse(source)
+                .unwrap()
+                .is_top_level_somepath(),
+            "{source}"
+        );
+    }
 }
 
 #[test]

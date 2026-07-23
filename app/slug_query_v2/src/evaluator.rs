@@ -278,6 +278,8 @@ pub struct LoadingQueryFunctions;
 static DEPS_FUNCTION: DepsFunction = DepsFunction;
 static RDEPS_FUNCTION: RdepsFunction = RdepsFunction;
 static SAME_PKG_DIRECT_RDEPS_FUNCTION: SamePkgDirectRdepsFunction = SamePkgDirectRdepsFunction;
+static ALLPATHS_FUNCTION: AllPathsFunction = AllPathsFunction;
+static SOMEPATH_FUNCTION: SomePathFunction = SomePathFunction;
 
 impl<E> QueryFunctions<E> for LoadingQueryFunctions
 where
@@ -289,9 +291,11 @@ where
             return None;
         }
         [
+            &ALLPATHS_FUNCTION as &dyn QueryFunction<E>,
             &DEPS_FUNCTION as &dyn QueryFunction<E>,
             &RDEPS_FUNCTION as &dyn QueryFunction<E>,
             &SAME_PKG_DIRECT_RDEPS_FUNCTION as &dyn QueryFunction<E>,
+            &SOMEPATH_FUNCTION as &dyn QueryFunction<E>,
         ]
         .into_iter()
         .find(|function| std::ptr::eq(spec, function.spec()))
@@ -411,6 +415,56 @@ where
             let from: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 1).await?;
             let depth: QueryDepth = eval_arg(evaluator, args, variables, 2).await?;
             reverse_dependencies(&mut evaluator.environment, universe, from, depth.0).await
+        }
+        .boxed()
+    }
+}
+
+struct AllPathsFunction;
+
+impl<E> QueryFunction<E> for AllPathsFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("allpaths").expect("allpaths is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        async move {
+            let from: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            let to: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 1).await?;
+            reverse_dependencies(&mut evaluator.environment, from, to, None).await
+        }
+        .boxed()
+    }
+}
+
+struct SomePathFunction;
+
+impl<E> QueryFunction<E> for SomePathFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("somepath").expect("somepath is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        async move {
+            let from: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            let to: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 1).await?;
+            some_path(&mut evaluator.environment, from, to).await
         }
         .boxed()
     }
@@ -664,6 +718,54 @@ where
         }
         result
     }
+
+    /// Compact integer-index BFS and parent reconstruction adapted from Buck2
+    /// `query/graph/async_bfs.rs::async_bfs_find_path`. The forward graph is
+    /// already resolved through the serial mutable-DICE transaction, so this
+    /// V2 seam queues integer indices rather than lookup futures.
+    fn shortest_path(&self, roots: &[T], destinations: &TargetSet<T>) -> TargetSet<T> {
+        let mut visited = SmallSet::new();
+        let mut parents = vec![None; self.nodes.len()];
+        let mut pending = VecDeque::new();
+
+        for root in roots {
+            let Some(root_index) = self.target_to_index.get(root).copied() else {
+                continue;
+            };
+            if destinations.contains(root) {
+                return TargetSet::singleton(root.clone());
+            }
+            if visited.insert(root_index) {
+                pending.push_back(root_index);
+            }
+        }
+
+        while let Some(parent) = pending.pop_front() {
+            for child in self.nodes[parent as usize].children.iter().copied() {
+                if !visited.insert(child) {
+                    continue;
+                }
+                parents[child as usize] = Some(parent);
+                if destinations.contains(&self.nodes[child as usize].target) {
+                    let mut path = vec![child];
+                    let mut cursor = child;
+                    while let Some(parent) = parents[cursor as usize] {
+                        path.push(parent);
+                        cursor = parent;
+                    }
+                    path.reverse();
+                    let mut result = TargetSet::default();
+                    for index in path {
+                        result.insert(self.nodes[index as usize].target.clone());
+                    }
+                    return result;
+                }
+                pending.push_back(child);
+            }
+        }
+
+        TargetSet::default()
+    }
 }
 
 async fn reverse_dependencies<E>(
@@ -687,6 +789,19 @@ where
         None => graph,
     };
     Ok(graph.depth_first_postorder(&roots))
+}
+
+async fn some_path<E>(
+    environment: &mut E,
+    from: TargetSet<E::Target>,
+    to: TargetSet<E::Target>,
+) -> Result<TargetSet<E::Target>, QueryError>
+where
+    E: QueryEnvironment + Send,
+{
+    let graph = ResolvedGraph::build_stable_forward(environment, from.iter().cloned()).await?;
+    let roots = from.iter().cloned().collect::<Vec<_>>();
+    Ok(graph.shortest_path(&roots, &to))
 }
 
 /// Generic depth-limited traversal adapted from Buck2
@@ -905,7 +1020,7 @@ pub async fn evaluate_loading_query(
         .evaluate(&expression)
         .await?;
     let mut labels = targets.iter().cloned().collect::<Vec<_>>();
-    if order == QueryOrder::Auto {
+    if order == QueryOrder::Auto && !expression.is_top_level_somepath() {
         labels.sort_unstable();
     }
     Ok(QueryOutput {

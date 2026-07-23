@@ -555,6 +555,90 @@ async fn subtree_rdeps_and_same_package_reverse_queries_match_bazel_oracle() {
 }
 
 #[tokio::test]
+async fn path_queries_share_topology_and_apply_only_root_somepath_auto_exception() {
+    let workspace = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/v2_oracle/fixtures/query-path-topology/workspace"),
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, order, expected) in [
+        (
+            "somepath(//:linear_start, //:linear_end)",
+            QueryOrder::Auto,
+            "//:linear_start\n//:linear_mid\n//:linear_end\n",
+        ),
+        (
+            "(somepath(//:linear_start, //:linear_end))",
+            QueryOrder::Auto,
+            "//:linear_start\n//:linear_mid\n//:linear_end\n",
+        ),
+        (
+            "somepath(//:linear_start, //:linear_end)",
+            QueryOrder::Full,
+            "//:linear_start\n//:linear_mid\n//:linear_end\n",
+        ),
+        (
+            "somepath(//:linear_start, //:linear_end) union //:disconnected",
+            QueryOrder::Auto,
+            "//:disconnected\n//:linear_end\n//:linear_mid\n//:linear_start\n",
+        ),
+        (
+            "somepath(//:linear_start, //:linear_end) intersect set(//:linear_start //:linear_end)",
+            QueryOrder::Auto,
+            "//:linear_end\n//:linear_start\n",
+        ),
+        (
+            "somepath(//:linear_start, //:linear_end) except //:linear_mid",
+            QueryOrder::Auto,
+            "//:linear_end\n//:linear_start\n",
+        ),
+        (
+            "let p = somepath(//:linear_start, //:linear_end) in $p",
+            QueryOrder::Auto,
+            "//:linear_end\n//:linear_mid\n//:linear_start\n",
+        ),
+        (
+            "allpaths(//:linear_start, //:linear_end)",
+            QueryOrder::Auto,
+            "//:linear_end\n//:linear_mid\n//:linear_start\n",
+        ),
+        (
+            "allpaths(//:linear_start, //:linear_end)",
+            QueryOrder::Full,
+            "//:linear_start\n//:linear_mid\n//:linear_end\n",
+        ),
+        (
+            "allpaths(//:diamond_start, //:diamond_end)",
+            QueryOrder::Auto,
+            "//:diamond_end\n//:diamond_left\n//:diamond_right\n//:diamond_split\n//:diamond_start\n",
+        ),
+        (
+            "somepath(//:cycle_a, //:cycle_end)",
+            QueryOrder::Full,
+            "//:cycle_a\n//:cycle_b\n//:cycle_end\n",
+        ),
+        (
+            "somepath(//:linear_mid, //:linear_mid)",
+            QueryOrder::Auto,
+            "//:linear_mid\n",
+        ),
+        (
+            "somepath(//:linear_start, //:disconnected)",
+            QueryOrder::Auto,
+            "",
+        ),
+    ] {
+        let output = evaluate_loading_query(&mut transaction, workspace.clone(), expression, order)
+            .await
+            .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression} ({order})");
+    }
+}
+
+#[tokio::test]
 async fn reverse_query_keys_have_prefix_and_operand_local_activation_multisets() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
@@ -758,4 +842,198 @@ async fn reverse_query_keys_have_prefix_and_operand_local_activation_multisets()
     let (unchanged, events) = query_revision(&dice, &tracker, &workspace, expression).await;
     assert_eq!(unchanged.unwrap().labels.as_ref(), ["//left:local"]);
     assert_eq!(events, [package("left", ActivationKind::Reused)]);
+}
+
+#[tokio::test]
+async fn path_queries_reuse_dice_graphs_and_invalidate_only_demanded_closure() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//mid:item\"])\n",
+    );
+    write(
+        workspace.join("mid/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"//dest:end\"])\n",
+    );
+    write(
+        workspace.join("dest/BUILD.bazel"),
+        "filegroup(name = \"end\", srcs = [])\n",
+    );
+    write(
+        workspace.join("outside/BUILD.bazel"),
+        "filegroup(name = \"target\", srcs = [])\n",
+    );
+    write(
+        workspace.join("unrelated/BUILD.bazel"),
+        "filegroup(name = \"unrelated\", srcs = [])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "allpaths(//origin:top, //dest:end)";
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        initial.unwrap().labels.as_ref(),
+        ["//dest:end", "//mid:item", "//origin:top"]
+    );
+    assert_eq!(
+        events,
+        [
+            package("dest", ActivationKind::Evaluated),
+            package("mid", ActivationKind::Evaluated),
+            package("origin", ActivationKind::Evaluated),
+        ]
+    );
+
+    let (identical, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        identical.unwrap().labels.as_ref(),
+        ["//dest:end", "//mid:item", "//origin:top"]
+    );
+    assert_eq!(events, []);
+
+    write(
+        workspace.join("unrelated/BUILD.bazel"),
+        "filegroup(name = \"changed\", srcs = [])\n",
+    );
+    let (_, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        events,
+        [
+            package("dest", ActivationKind::Reused),
+            package("mid", ActivationKind::Reused),
+            package("origin", ActivationKind::Reused),
+        ]
+    );
+
+    write(
+        workspace.join("mid/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [])\n",
+    );
+    let (lost, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert!(lost.unwrap().labels.is_empty());
+    assert_eq!(
+        events,
+        [
+            package("dest", ActivationKind::Reused),
+            package("mid", ActivationKind::Evaluated),
+            package("origin", ActivationKind::Reused),
+        ]
+    );
+
+    write(
+        workspace.join("mid/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"//dest:end\"])\n",
+    );
+    let (restored, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        restored.unwrap().labels.as_ref(),
+        ["//dest:end", "//mid:item", "//origin:top"]
+    );
+    assert_eq!(
+        events,
+        [
+            package("dest", ActivationKind::Reused),
+            package("mid", ActivationKind::Evaluated),
+            package("origin", ActivationKind::Reused),
+        ]
+    );
+
+    write(
+        workspace.join("branch/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"//dest:end\"])\n",
+    );
+    write(
+        workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//mid:item\", \"//branch:item\"])\n",
+    );
+    let (gained, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        gained.unwrap().labels.as_ref(),
+        ["//branch:item", "//dest:end", "//mid:item", "//origin:top",]
+    );
+    assert_eq!(
+        events,
+        [
+            package("branch", ActivationKind::Evaluated),
+            package("dest", ActivationKind::Reused),
+            package("mid", ActivationKind::Reused),
+            package("origin", ActivationKind::Evaluated),
+        ]
+    );
+
+    write(
+        workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//mid:item\"])\n",
+    );
+    let (removed, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        removed.unwrap().labels.as_ref(),
+        ["//dest:end", "//mid:item", "//origin:top"]
+    );
+    assert_eq!(
+        events,
+        [
+            package("dest", ActivationKind::Reused),
+            package("mid", ActivationKind::Reused),
+            package("origin", ActivationKind::Evaluated),
+        ]
+    );
+
+    write(
+        workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//mid:item\", \"//branch:item\"])\n",
+    );
+    let (_, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        events,
+        [
+            package("branch", ActivationKind::Reused),
+            package("dest", ActivationKind::Reused),
+            package("mid", ActivationKind::Reused),
+            package("origin", ActivationKind::Evaluated),
+        ]
+    );
+
+    write(
+        workspace.join("outside/BUILD.bazel"),
+        "filegroup(name = \"changed_outside\", srcs = [])\n",
+    );
+    let (_, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        events,
+        [
+            package("branch", ActivationKind::Reused),
+            package("dest", ActivationKind::Reused),
+            package("mid", ActivationKind::Reused),
+            package("origin", ActivationKind::Reused),
+        ]
+    );
+
+    let outside_dice = Dice::builder().build(DetectCycles::Enabled);
+    let outside_tracker = Arc::new(QueryTracker::default());
+    let (outside, events) = query_revision(
+        &outside_dice,
+        &outside_tracker,
+        &workspace,
+        "somepath(//origin:top, //outside:changed_outside)",
+    )
+    .await;
+    assert!(outside.unwrap().labels.is_empty());
+    assert_eq!(
+        events,
+        [
+            package("branch", ActivationKind::Evaluated),
+            package("dest", ActivationKind::Evaluated),
+            package("mid", ActivationKind::Evaluated),
+            package("origin", ActivationKind::Evaluated),
+            package("outside", ActivationKind::Evaluated),
+        ]
+    );
+    assert!(
+        events
+            .iter()
+            .all(|(identity, _)| !matches!(identity, QueryKeyIdentity::SubtreePackageSet(_)))
+    );
 }

@@ -316,3 +316,79 @@ fn retained_daemon_reverse_query_observes_edge_and_subtree_transitions() {
     assert_eq!(created.exit_code, 0, "{created:?}");
     assert_eq!(created.stdout, "//tree/base:base\n//tree/dynamic:dynamic\n");
 }
+
+#[test]
+fn retained_daemon_path_query_observes_edge_and_reachable_package_transitions() {
+    let workspace = scratch("path-query-transitions");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//mid:item\"])\n",
+    );
+    write(
+        &workspace.join("mid/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"//dest:end\"])\n",
+    );
+    write(
+        &workspace.join("dest/BUILD.bazel"),
+        "filegroup(name = \"end\", srcs = [])\n",
+    );
+    let expression = "somepath(//origin:top, //dest:end)";
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let initial = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(initial.exit_code, 0, "{initial:?}");
+    assert_eq!(initial.stdout, "//origin:top\n//mid:item\n//dest:end\n");
+
+    write(
+        &workspace.join("mid/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [])\n",
+    );
+    let lost = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(lost.exit_code, 0, "{lost:?}");
+    assert!(lost.stdout.is_empty(), "{lost:?}");
+
+    write(
+        &workspace.join("mid/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"//dest:end\"])\n",
+    );
+    let restored = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(restored.exit_code, 0, "{restored:?}");
+    assert_eq!(restored.stdout, "//origin:top\n//mid:item\n//dest:end\n");
+
+    write(
+        &workspace.join("branch/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"//dest:end\"])\n",
+    );
+    write(
+        &workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//branch:item\"])\n",
+    );
+    let gained = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(gained.exit_code, 0, "{gained:?}");
+    assert_eq!(gained.stdout, "//origin:top\n//branch:item\n//dest:end\n");
+
+    write(
+        &workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//mid:item\"])\n",
+    );
+    fs::remove_file(workspace.join("branch/BUILD.bazel")).unwrap();
+    let removed = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(removed.exit_code, 0, "{removed:?}");
+    assert_eq!(removed.stdout, "//origin:top\n//mid:item\n//dest:end\n");
+
+    write(
+        &workspace.join("branch/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"//dest:end\"])\n",
+    );
+    write(
+        &workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//branch:item\"])\n",
+    );
+    let recreated = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(recreated.exit_code, 0, "{recreated:?}");
+    assert_eq!(
+        recreated.stdout,
+        "//origin:top\n//branch:item\n//dest:end\n"
+    );
+}

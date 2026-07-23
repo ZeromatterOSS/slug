@@ -385,6 +385,274 @@ fn reverse_query_fixture_matches_all_twenty_six_bazel_rows_through_cli() {
 }
 
 #[test]
+fn path_topology_fixture_covers_all_forty_three_bazel_rows_through_cli() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-path-topology/workspace");
+    const LINEAR_ALL_AUTO: &str = "//:linear_end\n//:linear_mid\n//:linear_start\n";
+    const LINEAR_FORWARD: &str = "//:linear_start\n//:linear_mid\n//:linear_end\n";
+    const EMPTY: &str = "";
+    let successes: &[(&[&str], &[&str])] = &[
+        (
+            &["query", "allpaths(//:linear_start, //:linear_end)"],
+            &[LINEAR_ALL_AUTO],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=auto",
+                "allpaths(//:linear_start, //:linear_end)",
+            ],
+            &[LINEAR_ALL_AUTO],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=full",
+                "allpaths(//:linear_start, //:linear_end)",
+            ],
+            &[LINEAR_FORWARD],
+        ),
+        (
+            &["query", "somepath(//:linear_start, //:linear_end)"],
+            &[LINEAR_FORWARD],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=auto",
+                "somepath(//:linear_start, //:linear_end)",
+            ],
+            &[LINEAR_FORWARD],
+        ),
+        (
+            &[
+                "query",
+                "somepath(//:linear_start, //:linear_end) union //:disconnected",
+            ],
+            &["//:disconnected\n//:linear_end\n//:linear_mid\n//:linear_start\n"],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=auto",
+                "somepath(//:linear_start, //:linear_end) union //:disconnected",
+            ],
+            &["//:disconnected\n//:linear_end\n//:linear_mid\n//:linear_start\n"],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=full",
+                "somepath(//:linear_start, //:linear_end)",
+            ],
+            &[LINEAR_FORWARD],
+        ),
+        (
+            &["query", "allpaths(//:diamond_start, //:diamond_end)"],
+            &[
+                "//:diamond_end\n//:diamond_left\n//:diamond_right\n//:diamond_split\n//:diamond_start\n",
+            ],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=full",
+                "somepath(//:diamond_start, //:diamond_end)",
+            ],
+            &[
+                "//:diamond_start\n//:diamond_split\n//:diamond_left\n//:diamond_end\n",
+                "//:diamond_start\n//:diamond_split\n//:diamond_right\n//:diamond_end\n",
+            ],
+        ),
+        (
+            &["query", "allpaths(//:cycle_a, //:cycle_end)"],
+            &["//:cycle_a\n//:cycle_b\n//:cycle_end\n"],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=full",
+                "somepath(//:cycle_a, //:cycle_end)",
+            ],
+            &["//:cycle_a\n//:cycle_b\n//:cycle_end\n"],
+        ),
+        (
+            &["query", "allpaths(//:linear_mid, //:linear_mid)"],
+            &["//:linear_mid\n"],
+        ),
+        (
+            &["query", "somepath(//:linear_mid, //:linear_mid)"],
+            &["//:linear_mid\n"],
+        ),
+        (
+            &["query", "allpaths(//:linear_start, //:disconnected)"],
+            &[EMPTY],
+        ),
+        (
+            &["query", "somepath(//:linear_start, //:disconnected)"],
+            &[EMPTY],
+        ),
+        (&["query", "allpaths(set(), //:linear_end)"], &[EMPTY]),
+        (&["query", "allpaths(//:linear_start, set())"], &[EMPTY]),
+        (&["query", "somepath(set(), //:linear_end)"], &[EMPTY]),
+        (&["query", "somepath(//:linear_start, set())"], &[EMPTY]),
+        (
+            &[
+                "query",
+                "allpaths(set(//:multi_a //:multi_b), set(//:multi_end_a //:multi_end_b))",
+            ],
+            &["//:multi_a\n//:multi_b\n//:multi_end_a\n//:multi_end_b\n"],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=full",
+                "somepath(set(//:one_pair_origin //:one_pair_other_origin), set(//:one_pair_destination //:one_pair_other_destination))",
+            ],
+            &["//:one_pair_origin\n//:one_pair_destination\n"],
+        ),
+        (
+            &[
+                "query",
+                "--order_output=full",
+                "somepath(set(//:ambiguous_a //:ambiguous_b), set(//:ambiguous_a_end //:ambiguous_b_end))",
+            ],
+            &[
+                "//:ambiguous_a\n//:ambiguous_a_left\n//:ambiguous_a_end\n",
+                "//:ambiguous_a\n//:ambiguous_a_right\n//:ambiguous_a_end\n",
+                "//:ambiguous_b\n//:ambiguous_b_left\n//:ambiguous_b_end\n",
+                "//:ambiguous_b\n//:ambiguous_b_right\n//:ambiguous_b_end\n",
+            ],
+        ),
+        (
+            &[
+                "query",
+                "allpaths(//:linear_start, set(//:linear_end //:disconnected))",
+            ],
+            &[LINEAR_ALL_AUTO],
+        ),
+        (
+            &[
+                "query",
+                "somepath(//:linear_start, set(//:linear_end //:disconnected))",
+            ],
+            &[LINEAR_FORWARD],
+        ),
+        (
+            &[
+                "query",
+                "allpaths(set(//:linear_start //:linear_start), set(//:linear_end //:linear_end))",
+            ],
+            &[LINEAR_ALL_AUTO],
+        ),
+        (
+            &[
+                "query",
+                "somepath(set(//:linear_start //:linear_start), set(//:linear_end //:linear_end))",
+            ],
+            &[LINEAR_FORWARD],
+        ),
+        (
+            &["query", "allpaths(//:source_parent, //:source.txt)"],
+            &["//:source.txt\n//:source_parent\n"],
+        ),
+        (
+            &["query", "somepath(//:source_parent, //:source.txt)"],
+            &["//:source_parent\n//:source.txt\n"],
+        ),
+        (
+            &["query", "allpaths(//:source.txt, //:source_parent)"],
+            &[EMPTY],
+        ),
+        (
+            &["query", "somepath(//:source.txt, //:source_parent)"],
+            &[EMPTY],
+        ),
+        (
+            &["query", "allpaths(//:alias_start, //:linear_end)"],
+            &["//:alias_start\n//:linear_end\n//:linear_mid\n//:linear_start\n"],
+        ),
+        (
+            &["query", "somepath(//:alias_start, //:linear_end)"],
+            &["//:alias_start\n//:linear_start\n//:linear_mid\n//:linear_end\n"],
+        ),
+        (
+            &["query", "allpaths(//:custom_start, //:custom_end)"],
+            &["//:custom_end\n//:custom_mid\n//:custom_start\n"],
+        ),
+        (
+            &["query", "somepath(//:custom_start, //:custom_end)"],
+            &["//:custom_start\n//:custom_mid\n//:custom_end\n"],
+        ),
+    ];
+    for (args, alternatives) in successes {
+        let output = slug().current_dir(&workspace).args(*args).output().unwrap();
+        assert!(output.status.success(), "{args:?}: {output:?}");
+        let stdout = std::str::from_utf8(&output.stdout).unwrap();
+        assert!(
+            alternatives.contains(&stdout),
+            "{args:?}: unexpected complete-path alternative {stdout:?}"
+        );
+    }
+
+    let failures: &[(&[&str], i32, &str)] = &[
+        (
+            &["query", "allpaths()"],
+            2,
+            "too few arguments to function 'allpaths'",
+        ),
+        (
+            &[
+                "query",
+                "allpaths(//:linear_start, //:linear_end, //:linear_mid)",
+            ],
+            2,
+            "too many arguments to function 'allpaths'",
+        ),
+        (
+            &["query", "somepath()"],
+            2,
+            "too few arguments to function 'somepath'",
+        ),
+        (
+            &[
+                "query",
+                "somepath(//:linear_start, //:linear_end, //:linear_mid)",
+            ],
+            2,
+            "too many arguments to function 'somepath'",
+        ),
+        (
+            &["query", "allpaths(1, //:linear_end)"],
+            7,
+            "no such target '//:1': target '1' not declared in package ''",
+        ),
+        (
+            &["query", "allpaths(//:linear_start, 1)"],
+            7,
+            "no such target '//:1': target '1' not declared in package ''",
+        ),
+        (
+            &["query", "somepath(1, //:linear_end)"],
+            7,
+            "no such target '//:1': target '1' not declared in package ''",
+        ),
+        (
+            &["query", "somepath(//:linear_start, 1)"],
+            7,
+            "no such target '//:1': target '1' not declared in package ''",
+        ),
+    ];
+    for (args, exit, message) in failures {
+        let output = slug().current_dir(&workspace).args(*args).output().unwrap();
+        assert_eq!(output.status.code(), Some(*exit), "{args:?}: {output:?}");
+        assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(message), "{args:?}: {stderr}");
+    }
+}
+
+#[test]
 fn output_base_query_reuses_one_daemon_across_build_edits() {
     let workspace = scratch("query-workspace");
     let output_base = scratch("query-output-base");

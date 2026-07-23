@@ -108,7 +108,12 @@ const INT: QueryArgumentKind = QueryArgumentKind::Integer;
 
 // Bazel 9.2 QueryEnvironment.DEFAULT_QUERY_FUNCTIONS, in source order.
 const FUNCTIONS: &[QueryFunctionSpec] = &[
-    deferred("allpaths", 2, &[EXPR, EXPR]),
+    QueryFunctionSpec {
+        name: "allpaths",
+        mandatory_arguments: 2,
+        argument_kinds: &[EXPR, EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     deferred("attr", 3, &[WORD, WORD, EXPR]),
     deferred("buildfiles", 1, &[EXPR]),
     QueryFunctionSpec {
@@ -136,7 +141,12 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
     },
     deferred("siblings", 1, &[EXPR]),
     deferred("some", 1, &[EXPR, INT]),
-    deferred("somepath", 2, &[EXPR, EXPR]),
+    QueryFunctionSpec {
+        name: "somepath",
+        mandatory_arguments: 2,
+        argument_kinds: &[EXPR, EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     deferred("tests", 1, &[EXPR]),
     deferred("visible", 2, &[EXPR, EXPR]),
 ];
@@ -173,6 +183,16 @@ pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryP
 impl QueryExpression {
     pub fn parse(source: &str) -> Result<Self, QueryParseError> {
         parse_query_expression(source)
+    }
+
+    /// Bazel's QueryCommand AUTO-order exception applies only when the parsed
+    /// root expression is directly `somepath`. Parentheses lower away in the
+    /// parser, while binary operations and `let` retain wrapper nodes.
+    pub fn is_top_level_somepath(&self) -> bool {
+        matches!(
+            &self.kind,
+            QueryExpressionKind::Function { name, .. } if name.value == "somepath"
+        )
     }
 }
 
