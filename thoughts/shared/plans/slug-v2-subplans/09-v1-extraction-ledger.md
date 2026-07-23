@@ -954,7 +954,7 @@ remain open.
 
 ### Stage 8 siblings BUILD-file-node packet — approved extraction plan
 
-Status: Reviewed, oracle and implementation pending
+Status: Oracle landed; implementation pending
 
 Source ref/commit(s): Bazel `8220c6198837d5c13d53fea211cf3282aa12408a`,
 `src/main/java/com/google/devtools/build/lib/query2/engine/SiblingsFunction.java`,
@@ -970,7 +970,7 @@ Buck2
 
 V2 fixture: `query-siblings-build-file-node`
 
-V2 commit(s): pending oracle; pending implementation
+V2 commit(s): oracle `8c28877b`; implementation pending
 
 Decision: port no Buck2/V1 function semantics. Add the minimum V2-owned
 `BuildFile` package-graph node with its actual loaded basename and zero edges,
@@ -990,10 +990,16 @@ ordering; empty/error behavior; and exact retained-DICE lifecycle,
 BUILD-content, basename-priority/rename, and package delete/recreate
 transitions.
 
-Validation boundary: generation and two independent Bazel no-update runs,
-then focused V2 graph/evaluator/CLI/daemon tests and the preceding five Slug
-fixtures. Require compact utility/reuse, collision, scope, diff/format, and
-daemon-clean checks plus Sol-low review before recording a landed commit.
+Validation: final 40-row generation
+`query-siblings-build-file-node/20260723-033048-572448-bazel`, worker clean
+no-update `20260723-033115-575225-bazel`, and root independent no-update
+`20260723-033329-578427-bazel` passed. The unlanded 35-row draft had a wrong
+`PackageProvider` anchor and lacked root/fallback/dual/syntax rows; root
+corrected it before `8c28877b`, and Sol-low returned `ACCEPT`. Generated/tool/
+schema/provenance, anchored records, whitespace/diff, and fixture-only hygiene
+were clean. Implementation still requires focused V2 graph/evaluator/CLI/
+daemon tests, exact DICE transitions, and rebuilt-Slug comparison against this
+fixture plus the preceding five query fixtures.
 
 Residual risk: `buildfiles`/`loadfiles` require a separate transitive loading
 representation; do not treat their source tests or `kind` interactions as

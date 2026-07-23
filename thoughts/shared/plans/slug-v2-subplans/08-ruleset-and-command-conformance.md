@@ -1670,3 +1670,31 @@ repository, a new cache/key/protocol/filesystem/lock boundary, changed current
 rule-only pattern semantics, metadata/attribute/visibility/test/executable
 semantics, regex matching, or configured/action state. `buildfiles` and
 `loadfiles` remain the subsequent load-provenance packet.
+
+#### Oracle evidence landed (2026-07-23)
+
+Oracle commit `8c28877b` lands the generated 40-command Bazel 9.2.0
+`query-siblings-build-file-node` fixture at immutable source commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. It establishes actual
+BUILD.bazel/BUILD/root labels, dual-file BUILD.bazel priority, one active
+exported BUILD target per matching package, all reviewed sibling operand
+kinds, complete supported compositions, exact default/AUTO/FULL order,
+zero-edge behavior, diagnostics, and empty stdout for later-operand failures.
+It explicitly excludes
+buildfiles/loadfiles/fake `.bzl`, kind/Java regex, generated/output, external,
+configured, and action semantics.
+
+The earlier 35-row draft was never landed. Root found the wrong
+`PackageProvider` anchor and missing root, fallback, dual, and malformed-syntax
+rows; the final fixture corrected all of them before commit. Authoritative
+generation `20260723-033048-572448-bazel`, worker no-update
+`20260723-033115-575225-bazel`, and root independent no-update
+`20260723-033329-578427-bazel` passed 40/40. Schema/generated/tool/provenance,
+anchoring, whitespace/diff, and fixture-only hygiene passed; external RC may
+be consumed only by Bazel invocation and was never inspected. Sol-low returned
+final `ACCEPT`.
+
+This closes only the oracle gate. `siblings`/`BuildFile` implementation, exact
+DICE activation and retained-daemon transitions, and rebuilt-Slug comparison
+against this fixture plus the preceding five query fixtures remain pending;
+M3 still has ten deferred functions.

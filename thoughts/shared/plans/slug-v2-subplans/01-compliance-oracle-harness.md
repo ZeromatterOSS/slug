@@ -716,3 +716,30 @@ with `generated: false` is not acceptance evidence.
   daemon transition regressions and all fixture-only credential constraints
   remained clean; no new key/cache/protocol/filesystem/lock boundary entered
   the harness or command path.
+
+## Siblings BUILD-file-node Oracle Checkpoint
+
+- Commit `8c28877b` lands the generated 40-command Bazel 9.2.0
+  `query-siblings-build-file-node` fixture at immutable source commit
+  `8220c6198837d5c13d53fea211cf3282aa12408a`.
+- It pins actual active basenames for modern `BUILD.bazel`, fallback `BUILD`,
+  root, and dual-file priority; matching exported active BUILD files appear
+  once. It covers rule/source/alias/custom/BUILD operands, same/multiple
+  packages, implemented set compositions, default/AUTO/FULL ordering,
+  zero-edge `deps`/`rdeps` behavior, empty/arity/syntax/missing diagnostics,
+  and no partial stdout after a later operand error.
+- Authoritative generation
+  `target/v2o/runs/query-siblings-build-file-node/20260723-033048-572448-bazel`,
+  worker clean no-update
+  `target/v2o/runs/query-siblings-build-file-node/20260723-033115-575225-bazel`,
+  and root independent no-update
+  `target/v2o/runs/query-siblings-build-file-node/20260723-033329-578427-bazel`
+  passed all 40/40 records. Schema/generated/tool/provenance, anchored
+  assertions, whitespace/diff, and fixture-only hygiene were clean. Bazel may
+  consume external `~/.bazelrc` only by invocation; no agent read its contents
+  and no RC/BuildBuddy credential material entered the repository.
+- The first 35-row draft was not landed: root caught the wrong
+  `PackageProvider` source path and absent root/fallback/dual/syntax coverage;
+  all were corrected before `8c28877b`. Sol-low final review returned
+  `ACCEPT`. This closes only the Bazel behavior gate; implementation, exact
+  DICE/daemon transitions, and Slug comparison remain pending.
