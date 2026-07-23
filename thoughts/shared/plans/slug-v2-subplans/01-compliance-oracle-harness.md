@@ -856,3 +856,30 @@ The retained-daemon transition matrix and focused DICE equality/reuse checks
 also pass. Root validation covered 45 query tests and 50 downstream
 CLI/commands/server tests; Sol-low returned final `ACCEPT`. Five ordinary
 functions remain deferred, so this is not full M3 acceptance.
+
+### Serialized Slug packet validation accepted (2026-07-23)
+
+Commit `0618a007` adds `scripts/v2_packet_validate.py` as root-owned
+orchestration around the existing `tools.v2_oracle` comparison path. It
+requires an explicit ordered fixture list, rejects unknown, duplicate, or
+ungenerated oracle evidence before building, takes one nonblocking repository
+lock, builds `slug_cli_v2` once with one Cargo job, and invokes the existing
+Slug oracle CLI sequentially with an explicit binary and unique artifact root.
+It does not discover a default suite, update expected output, invoke Bazel, or
+duplicate fixture parsing/comparison semantics.
+
+Daemon evidence stays fail-closed. The wrapper never probes and skips Unix
+sockets; it preflights the exact socket pathname, treats fixture failure as
+failure, and rejects leftover socket/PID markers without adding a kill or
+protocol path. The first integration run preserved a real 153-byte socket-path
+failure and stale marker; the single correction moved artifacts to a
+collision-safe short root and added the pathname guard. A second run passed
+`query-parser-and-sets` and all four same-daemon
+`glob-directory-invalidation` commands with no marker or process left.
+
+Validation passed 10 standard-library wrapper tests, help/bytecode/diff checks,
+three CLI `output_base_` daemon-reuse tests, and eight server
+`retained_daemon_` tests. The broader Python harness pytest suite could not run
+because `/usr/bin/python3` has no `pytest` module; this remains an explicit
+environment residual, not a pass or a reason to weaken the daemon lanes.
+Sol-low returned final `ACCEPT`.
