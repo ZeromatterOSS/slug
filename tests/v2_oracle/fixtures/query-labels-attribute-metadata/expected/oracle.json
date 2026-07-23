@@ -20,7 +20,7 @@
       "name": "scalar_explicit",
       "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:source.txt",
-      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-115957-1022038-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-120031-1024233-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 56df208a-3e35-4c11-b67f-c56a35795881\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123313-1050469-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123533-1057487-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 7c3f174a-af20-4445-9c6f-80a972930cb3\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:source.txt\n"
     },
     {
@@ -43,7 +43,7 @@
       "name": "label_list_explicit_cross_package",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
-      "stderr": "INFO: Invocation ID: 90df39a5-ea06-4fe1-a085-137f19caec1f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 303169a5-43c0-415f-b868-88e5adcfd048\nLoading: 0 packages loaded\n",
       "stdout": "//other:cross.txt\n//pkg:source.txt\n"
     },
     {
@@ -66,7 +66,7 @@
       "name": "label_list_omitted_default",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:default.txt",
-      "stderr": "INFO: Invocation ID: 04452414-94a9-4c50-b467-621dbf16b612\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: da4d82d3-db18-4b2e-9a8f-b07baf6fde0b\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:default.txt\n"
     },
     {
@@ -89,8 +89,77 @@
       "name": "label_list_explicit_empty",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 59c87e9c-17cf-4534-b428-41418190f037\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 3bd6e278-5a93-4c48-abb2-0d417db93d87\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels(one, //pkg:package_context) union labels(many, //pkg:package_context)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(one, //pkg:package_context) union labels(many, //pkg:package_context)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "package_context_explicit_labels_are_canonical",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:bare.txt\n//pkg:colon.txt\n//pkg:dir/bare.txt",
+      "stderr": "INFO: Invocation ID: d5ac2089-14e2-424a-bc40-f070d190fdd2\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:bare.txt\n//pkg:colon.txt\n//pkg:dir/bare.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//pkg:package_context)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//pkg:package_context)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "package_context_explicit_labels_are_implicit_same_package_source_deps",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:bare.txt\n//pkg:colon.txt\n//pkg:dir/bare.txt\n//pkg:package_context",
+      "stderr": "INFO: Invocation ID: e898fff8-2bc0-4d07-bfd6-f852f0330c82\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:bare.txt\n//pkg:colon.txt\n//pkg:dir/bare.txt\n//pkg:package_context\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(with_default, //consumer:default_consumer)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(with_default, //consumer:default_consumer)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "bzl_defined_label_default_uses_definition_package",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:default.txt",
+      "stderr": "INFO: Invocation ID: 0ee0d025-ee48-4590-a0de-5b1e10474877\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:default.txt\n"
     },
     {
       "argv": [
@@ -113,9 +182,9 @@
       "mutations": [],
       "name": "filegroup_srcs_omitted_build_lacks_srcs",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
-      "normalized_stdout": "# <workspace>/pkg/BUILD.bazel:26:10\nfilegroup(\n  name = \"filegroup_srcs_omitted\",\n)\n# Rule filegroup_srcs_omitted instantiated at (most recent call last):\n#   <workspace>/pkg/BUILD.bazel:26:10 in <toplevel>",
-      "stderr": "INFO: Invocation ID: 2a08c22b-adda-4dfe-b51e-18731b7ec992\nLoading: 0 packages loaded\n",
-      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-120031-1024233-bazel/workspace/pkg/BUILD.bazel:26:10\nfilegroup(\n  name = \"filegroup_srcs_omitted\",\n)\n# Rule filegroup_srcs_omitted instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-120031-1024233-bazel/workspace/pkg/BUILD.bazel:26:10 in <toplevel>\n\n"
+      "normalized_stdout": "# <workspace>/pkg/BUILD.bazel:31:10\nfilegroup(\n  name = \"filegroup_srcs_omitted\",\n)\n# Rule filegroup_srcs_omitted instantiated at (most recent call last):\n#   <workspace>/pkg/BUILD.bazel:31:10 in <toplevel>",
+      "stderr": "INFO: Invocation ID: bc0244f2-f2ed-42c1-a06e-04ba04e9584e\nLoading: 0 packages loaded\n",
+      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123533-1057487-bazel/workspace/pkg/BUILD.bazel:31:10\nfilegroup(\n  name = \"filegroup_srcs_omitted\",\n)\n# Rule filegroup_srcs_omitted instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123533-1057487-bazel/workspace/pkg/BUILD.bazel:31:10 in <toplevel>\n\n"
     },
     {
       "argv": [
@@ -138,9 +207,9 @@
       "mutations": [],
       "name": "filegroup_srcs_explicit_empty_build_has_srcs",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
-      "normalized_stdout": "# <workspace>/pkg/BUILD.bazel:27:10\nfilegroup(\n  name = \"filegroup_srcs_explicit_empty\",\n  srcs = [],\n)\n# Rule filegroup_srcs_explicit_empty instantiated at (most recent call last):\n#   <workspace>/pkg/BUILD.bazel:27:10 in <toplevel>",
-      "stderr": "INFO: Invocation ID: 020b015d-ff1b-42c6-9673-9c8ac2268ddc\nLoading: 0 packages loaded\n",
-      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-120031-1024233-bazel/workspace/pkg/BUILD.bazel:27:10\nfilegroup(\n  name = \"filegroup_srcs_explicit_empty\",\n  srcs = [],\n)\n# Rule filegroup_srcs_explicit_empty instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-120031-1024233-bazel/workspace/pkg/BUILD.bazel:27:10 in <toplevel>\n\n"
+      "normalized_stdout": "# <workspace>/pkg/BUILD.bazel:32:10\nfilegroup(\n  name = \"filegroup_srcs_explicit_empty\",\n  srcs = [],\n)\n# Rule filegroup_srcs_explicit_empty instantiated at (most recent call last):\n#   <workspace>/pkg/BUILD.bazel:32:10 in <toplevel>",
+      "stderr": "INFO: Invocation ID: cab46d7f-bd69-44b9-8688-fcfc4b23b7b8\nLoading: 0 packages loaded\n",
+      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123533-1057487-bazel/workspace/pkg/BUILD.bazel:32:10\nfilegroup(\n  name = \"filegroup_srcs_explicit_empty\",\n  srcs = [],\n)\n# Rule filegroup_srcs_explicit_empty instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123533-1057487-bazel/workspace/pkg/BUILD.bazel:32:10 in <toplevel>\n\n"
     },
     {
       "argv": [
@@ -162,7 +231,7 @@
       "name": "existing_non_label_attribute",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 2970d1b1-4af8-4106-81e5-8735044d2ac3\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 5cc7710e-5c53-42cc-aec2-6fcd9b045e18\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -185,7 +254,7 @@
       "name": "absent_attribute",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 20570388-69c3-4b8b-9a0a-9bf5cdf2ab61\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: c93db7f5-cd38-4c96-80b6-e4c618dc79fd\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -208,7 +277,7 @@
       "name": "implicit_attribute_dollar_spelling",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:implicit.txt",
-      "stderr": "INFO: Invocation ID: 0cfb5cec-b09f-4720-842d-1c92ec350793\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: fc729f06-53e9-4d87-b3ec-5d571baf48f1\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:implicit.txt\n"
     },
     {
@@ -231,7 +300,7 @@
       "name": "implicit_attribute_wrong_spelling",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 4e73c7f0-387f-4a43-8807-33dc0a357452\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: b5193e1a-97d0-4fc6-91ca-677369001459\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -254,7 +323,7 @@
       "name": "selector_all_branches_default_no_keys",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt",
-      "stderr": "INFO: Invocation ID: 428c1df4-c5cd-4381-9a7f-f1b6cc768e97\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 43cffcf0-fab0-4ef5-a60a-1a6c40ff9a2b\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt\n"
     },
     {
@@ -277,7 +346,7 @@
       "name": "selector_concatenation_deduplicates",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt\n//pkg:shared.txt",
-      "stderr": "INFO: Invocation ID: 4ccac28d-b1c6-4e57-af78-a0e1d027af32\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: c2724694-c071-4655-84b4-1ef2d31e3b28\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt\n//pkg:shared.txt\n"
     },
     {
@@ -300,7 +369,7 @@
       "name": "output_scalar_generated_target",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:one.out",
-      "stderr": "INFO: Invocation ID: b7032f89-7cfe-4a6c-a245-e0a2789c0521\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 9f2f9edf-ffe4-4ece-b442-288eb74f0396\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:one.out\n"
     },
     {
@@ -325,7 +394,7 @@
       "name": "output_scalar_generated_label_kind",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "generated file //pkg:one.out",
-      "stderr": "INFO: Invocation ID: ddb2fba5-facb-4588-a036-903516c2cc46\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: c8a051c3-2d26-4409-9ca5-fce5192f3153\nLoading: 0 packages loaded\n",
       "stdout": "generated file //pkg:one.out\n"
     },
     {
@@ -348,7 +417,7 @@
       "name": "output_list_generated_targets",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:three.out\n//pkg:two.out",
-      "stderr": "INFO: Invocation ID: 40599dec-1190-4239-844b-c12a5e8f8c5f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 99ac0e80-7aa2-4fab-aec7-253e06bd3c64\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:three.out\n//pkg:two.out\n"
     },
     {
@@ -373,7 +442,7 @@
       "name": "output_list_generated_label_kind",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "generated file //pkg:three.out\ngenerated file //pkg:two.out",
-      "stderr": "INFO: Invocation ID: dea8df92-0616-44b3-8883-86683a971b65\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 933b86b2-1b5c-4a02-aa62-53e2f28c64a6\nLoading: 0 packages loaded\n",
       "stdout": "generated file //pkg:three.out\ngenerated file //pkg:two.out\n"
     },
     {
@@ -396,7 +465,7 @@
       "name": "second_output_producer_generated_targets",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:five.out\n//pkg:six.out",
-      "stderr": "INFO: Invocation ID: 1726f168-b77e-4fbf-b3bb-0e724b60fd03\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: cf152a4e-d924-431d-9459-9f1b4a761c11\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:five.out\n//pkg:six.out\n"
     },
     {
@@ -419,7 +488,7 @@
       "name": "outputs_reach_generating_rule",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:outputs\n//pkg:three.out\n//pkg:two.out",
-      "stderr": "INFO: Invocation ID: e37026ee-4791-4970-ba9a-5e869548f3f0\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: b3475f10-83b4-466f-b8c3-609086505924\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:outputs\n//pkg:three.out\n//pkg:two.out\n"
     },
     {
@@ -445,9 +514,9 @@
       "mutations": [],
       "name": "outputs_and_generating_rule_graph",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
-      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:three.out/n//pkg:two.out\"\n  \"//pkg:three.out/n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}",
-      "stderr": "INFO: Invocation ID: 7bff40ba-5831-4740-9ccb-c1bf9a191c27\nLoading: 0 packages loaded\n",
-      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:three.out\\n//pkg:two.out\"\n  \"//pkg:three.out\\n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}\n"
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:two.out/n//pkg:three.out\"\n  \"//pkg:two.out/n//pkg:three.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}",
+      "stderr": "INFO: Invocation ID: 7d4e85d0-cf11-411b-aaf4-a3d1abf9f5ec\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:two.out\\n//pkg:three.out\"\n  \"//pkg:two.out\\n//pkg:three.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}\n"
     },
     {
       "argv": [
@@ -469,7 +538,7 @@
       "name": "outputs_and_generating_rule_deps",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:outputs\n//pkg:three.out\n//pkg:two.out",
-      "stderr": "INFO: Invocation ID: 05c0fa97-4393-4908-b203-2e1c8f0af68c\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 579de0b5-ca8b-422c-bbe9-4aeddfe207ab\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:outputs\n//pkg:three.out\n//pkg:two.out\n"
     },
     {
@@ -492,7 +561,7 @@
       "name": "distinct_output_generators_deps",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:five.out\n//pkg:outputs\n//pkg:outputs_two\n//pkg:six.out\n//pkg:three.out\n//pkg:two.out",
-      "stderr": "INFO: Invocation ID: c96817f6-e0db-4a92-9b9f-9244546d17b4\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 8fa2d9ea-022b-42fc-a881-9a9a3ddf69aa\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:five.out\n//pkg:outputs\n//pkg:outputs_two\n//pkg:six.out\n//pkg:three.out\n//pkg:two.out\n"
     },
     {
@@ -518,9 +587,9 @@
       "mutations": [],
       "name": "distinct_output_generators_graph",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
-      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:five.out/n//pkg:six.out\"\n  \"//pkg:five.out/n//pkg:six.out\" -> \"//pkg:outputs_two\"\n  \"//pkg:outputs_two\"\n  \"//pkg:three.out/n//pkg:two.out\"\n  \"//pkg:three.out/n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}",
-      "stderr": "INFO: Invocation ID: 1f1e21dd-ac16-4c15-b08f-35251f03d35c\nLoading: 0 packages loaded\n",
-      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:five.out\\n//pkg:six.out\"\n  \"//pkg:five.out\\n//pkg:six.out\" -> \"//pkg:outputs_two\"\n  \"//pkg:outputs_two\"\n  \"//pkg:three.out\\n//pkg:two.out\"\n  \"//pkg:three.out\\n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}\n"
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:six.out/n//pkg:five.out\"\n  \"//pkg:six.out/n//pkg:five.out\" -> \"//pkg:outputs_two\"\n  \"//pkg:outputs_two\"\n  \"//pkg:three.out/n//pkg:two.out\"\n  \"//pkg:three.out/n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}",
+      "stderr": "INFO: Invocation ID: 94dd29d6-ce43-4fdc-a5eb-d9a817219728\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:six.out\\n//pkg:five.out\"\n  \"//pkg:six.out\\n//pkg:five.out\" -> \"//pkg:outputs_two\"\n  \"//pkg:outputs_two\"\n  \"//pkg:three.out\\n//pkg:two.out\"\n  \"//pkg:three.out\\n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}\n"
     },
     {
       "argv": [
@@ -542,7 +611,7 @@
       "name": "string_keyed_label_dict_values",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
-      "stderr": "INFO: Invocation ID: 243a5efc-1288-4d2c-a6d8-09374827e1ab\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 2c31ff36-468f-4667-8c5b-296365c626c6\nLoading: 0 packages loaded\n",
       "stdout": "//other:cross.txt\n//pkg:source.txt\n"
     },
     {
@@ -565,7 +634,7 @@
       "name": "label_keyed_string_dict_keys",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//other:cross.txt\n//pkg:default.txt",
-      "stderr": "INFO: Invocation ID: 4fcbaf4d-cbe3-4786-9614-19244f17579f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: b671159f-6e29-420f-8187-2287792dc687\nLoading: 0 packages loaded\n",
       "stdout": "//other:cross.txt\n//pkg:default.txt\n"
     },
     {
@@ -588,7 +657,7 @@
       "name": "label_list_dict_values",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//other:cross.txt\n//pkg:implicit.txt\n//pkg:source.txt",
-      "stderr": "INFO: Invocation ID: 92fa610d-bf7a-4859-b519-fe44cc315f8b\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 1855714c-d072-44bd-b4fa-0d3b9d683a84\nLoading: 0 packages loaded\n",
       "stdout": "//other:cross.txt\n//pkg:implicit.txt\n//pkg:source.txt\n"
     },
     {
@@ -611,7 +680,7 @@
       "name": "source_alias_and_build_operands",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 25c50fe2-b491-460f-8ab2-b23e63a3b9f1\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: df630c1e-9cdf-41ab-9723-548eb4eec835\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -634,7 +703,7 @@
       "name": "duplicate_and_cross_package_composition",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
-      "stderr": "INFO: Invocation ID: d5a8aa5b-6311-4c3a-87ec-f2181df059d2\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: a80f55e7-86a6-4db7-9865-1155ad87a7ea\nLoading: 0 packages loaded\n",
       "stdout": "//other:cross.txt\n//pkg:source.txt\n"
     },
     {
@@ -657,7 +726,7 @@
       "name": "union_composition",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:default.txt\n//pkg:source.txt",
-      "stderr": "INFO: Invocation ID: bab3f227-fa64-495d-a771-230b44567756\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 59e88348-88d4-43ce-a931-4b493fd5346b\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:default.txt\n//pkg:source.txt\n"
     },
     {
@@ -680,7 +749,7 @@
       "name": "default_order",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
-      "stderr": "INFO: Invocation ID: 487390bc-aabc-4376-9500-19088f1e2dc9\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 0664774f-3d1c-45b3-baf5-46344edc6afe\nLoading: 0 packages loaded\n",
       "stdout": "//other:cross.txt\n//pkg:source.txt\n"
     },
     {
@@ -705,7 +774,7 @@
       "name": "auto_order",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
-      "stderr": "INFO: Invocation ID: 59d19e95-45b0-4008-9da8-1a9f15c7e378\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: d258c66a-1948-4cad-a709-4f890015bed6\nLoading: 0 packages loaded\n",
       "stdout": "//other:cross.txt\n//pkg:source.txt\n"
     },
     {
@@ -730,7 +799,7 @@
       "name": "full_order",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:source.txt\n//other:cross.txt",
-      "stderr": "INFO: Invocation ID: 00a2fcd2-a2ee-44d3-8741-64d55a4ce68d\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 70b53e83-3af6-4b56-8529-5440f50f7a79\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:source.txt\n//other:cross.txt\n"
     },
     {
@@ -753,7 +822,30 @@
       "name": "missing_referenced_target",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('many', //pkg:missing_ref)\" failed: in 'many' of rule //pkg:missing_ref: no such package 'does_not_exist': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - does_not_exist",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 348b6d7a-5955-4a29-a83c-d3231b898bc0\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('many', //pkg:missing_ref)\" failed: in 'many' of rule //pkg:missing_ref: no such package 'does_not_exist': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - does_not_exist\n",
+      "stderr": "INFO: Invocation ID: 1a6b40e9-181f-4134-b5cd-89b9fe9a68d2\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('many', //pkg:missing_ref)\" failed: in 'many' of rule //pkg:missing_ref: no such package 'does_not_exist': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - does_not_exist\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//invalid_relative:bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//invalid_relative:bad"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "invalid_relative_package_target_is_rejected_during_label_conversion",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/invalid_relative/BUILD.bazel:3:11: //invalid_relative:bad: invalid label 'pkg:target' in attribute 'one' of 'probe_rule': invalid label 'pkg:target': absolute label must begin with '@' or '//'\nERROR: Evaluation of query \"//invalid_relative:bad\" failed",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 898ac1f5-d329-4c85-9edf-ed53cdb78ad7\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123533-1057487-bazel/workspace/invalid_relative/BUILD.bazel:3:11: //invalid_relative:bad: invalid label 'pkg:target' in attribute 'one' of 'probe_rule': invalid label 'pkg:target': absolute label must begin with '@' or '//'\nERROR: Evaluation of query \"//invalid_relative:bad\" failed\n",
       "stdout": ""
     },
     {
@@ -776,7 +868,7 @@
       "name": "mandatory_attribute_package_error",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/broken/BUILD.bazel:3:10: //broken:must: missing value for mandatory attribute 'required' in 'must_rule' rule\nERROR: Evaluation of query \"//broken:must\" failed",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 84df03cc-f365-4b59-bd07-e5e43d1dc51f\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-120031-1024233-bazel/workspace/broken/BUILD.bazel:3:10: //broken:must: missing value for mandatory attribute 'required' in 'must_rule' rule\nERROR: Evaluation of query \"//broken:must\" failed\n",
+      "stderr": "INFO: Invocation ID: 04c736b5-f077-4c0e-8688-933d57bd4c30\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123533-1057487-bazel/workspace/broken/BUILD.bazel:3:10: //broken:must: missing value for mandatory attribute 'required' in 'must_rule' rule\nERROR: Evaluation of query \"//broken:must\" failed\n",
       "stdout": ""
     }
   ],

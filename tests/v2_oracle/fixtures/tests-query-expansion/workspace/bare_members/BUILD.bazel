@@ -1,0 +1,4 @@
+test_suite(
+    name = "suite",
+    tests = ["a.txt", "dir/b.txt"],
+)

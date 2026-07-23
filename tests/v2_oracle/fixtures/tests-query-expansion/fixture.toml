@@ -23,8 +23,9 @@ source_anchors = [
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorHandlesCyclesGracefully",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorReportsMissingTargets",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testStrictTestSuiteWithFile",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestSuiteWithFile",
 ]
-translation_notes = "TestsFunction partitions direct tests, suites, and other targets; uniquely visits suites/tests; filters explicit and implicit tests using tags plus size; and treats suite tag manual as a property, not a filter. TestSuiteImplicitTestsAccumulator supplies only same-package non-manual tests for an empty suite. The provenance rows pin Bazel's orthogonal explicitness: omitted and explicit-empty tests both receive identical $implicit_tests membership, while --output=build prints tests = [] only for the explicitly supplied value. These build-format rows are representation-only and do not authorize Slug formatter acceptance. V1 test-suite/accessor storage and Buck2 evaluator/sets are reference-only: this oracle imports no V1/Buck2 implementation."
+translation_notes = "TestsFunction partitions direct tests, suites, and other targets; uniquely visits suites/tests; filters explicit and implicit tests using tags plus size; and treats suite tag manual as a property, not a filter. TestSuiteImplicitTestsAccumulator supplies only same-package non-manual tests for an empty suite. AttributeProvider retains the loading representation, and AbstractQueryTest#testTestSuiteWithFile establishes that ordinary deps retains an explicit file-member edge even though tests() filtering is separate. The provenance rows pin Bazel's orthogonal explicitness: omitted and explicit-empty tests both receive identical $implicit_tests membership, while --output=build prints tests = [] only for the explicitly supplied value. This oracle is loading-representation-only: its build-format rows require state distinctions but grant no Slug formatter acceptance. V1 test-suite/accessor storage and Buck2 evaluator/sets are reference-only: this oracle imports no V1/Buck2 implementation."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture tests-query-expansion --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture tests-query-expansion --tool bazel --bazel /usr/bin/bazel"
 
@@ -99,6 +100,18 @@ name = "non_test_member_is_dropped_by_default"
 argv = ["query", "tests(//strict:non_test_member)"]
 expected_exit = 0
 stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "native_suite_bare_and_slash_members_have_canonical_labels"
+argv = ["query", "labels(tests, //bare_members:suite)"]
+expected_exit = 0
+stdout_patterns = ["\\A//bare_members:a\\.txt\\n//bare_members:dir/b\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "native_suite_bare_and_slash_members_are_ordinary_source_deps"
+argv = ["query", "deps(//bare_members:suite)"]
+expected_exit = 0
+stdout_patterns = ["\\A//bare_members:a\\.txt\\n//bare_members:dir/b\\.txt\\n//bare_members:suite\\n?\\Z"]
 
 [[commands]]
 name = "strict_non_test_member_reports_invalid_label"

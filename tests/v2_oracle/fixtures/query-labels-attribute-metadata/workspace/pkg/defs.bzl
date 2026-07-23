@@ -17,6 +17,14 @@ probe_rule = rule(
     },
 )
 
+context_rule = rule(
+    implementation = _impl,
+    attrs = {
+        "one": attr.label(mandatory = True),
+        "many": attr.label_list(mandatory = True),
+    },
+)
+
 output_rule = rule(
     implementation = _impl,
     attrs = {
