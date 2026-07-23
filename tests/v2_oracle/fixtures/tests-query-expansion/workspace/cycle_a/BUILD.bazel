@@ -1,0 +1,1 @@
+test_suite(name = "a", tests = ["//cycle_b:b"])

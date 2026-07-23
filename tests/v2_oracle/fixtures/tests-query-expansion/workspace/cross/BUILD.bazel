@@ -1,0 +1,4 @@
+load("//:defs.bzl", "oracle_test")
+
+test_suite(name = "cross_suite", tests = [":cross_test"])
+oracle_test(name = "cross_test")

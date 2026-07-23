@@ -1,0 +1,7 @@
+load("//:defs.bzl", "oracle_test")
+
+test_suite(name = "empty")
+
+oracle_test(name = "alpha_test")
+oracle_test(name = "large_test", size = "large")
+oracle_test(name = "manual_test", tags = ["manual"])

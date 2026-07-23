@@ -1,0 +1,12 @@
+load("//:defs.bzl", "oracle_test")
+
+oracle_test(name = "fast_test", tags = ["fast"])
+oracle_test(name = "slow_fast_test", tags = ["fast", "slow"])
+oracle_test(name = "plain_test")
+oracle_test(name = "large_test", size = "large")
+
+test_suite(name = "bare", tests = [":fast_test", ":plain_test"], tags = ["fast"])
+test_suite(name = "plus", tests = [":fast_test", ":plain_test"], tags = ["+fast"])
+test_suite(name = "exclude_slow", tests = [":fast_test", ":slow_fast_test"], tags = ["-slow"])
+test_suite(name = "manual_suite", tests = [":plain_test"], tags = ["manual"])
+test_suite(name = "large", tests = [":large_test", ":plain_test"], tags = ["large"])

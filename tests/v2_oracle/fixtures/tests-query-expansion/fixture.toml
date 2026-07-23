@@ -1,0 +1,122 @@
+[fixture]
+name = "tests-query-expansion"
+description = "Bazel 9.2.0 ordinary-query oracle for tests(EXPR) suite expansion, filtering, strictness, and output order."
+comparison = "message_shape"
+oracle_notes = "Root-repository, bzlmod-only fixture. Multi-result tests() rows assert exactly the expected label set but deliberately permit every callback order Bazel's asynchronous suite traversal can produce."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/TestsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/packages/TestSuiteImplicitTestsAccumulator.java",
+  "src/main/java/com/google/devtools/build/lib/packages/TargetUtils.java#isTestRule",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/QueryOptions.java#strict_test_suite",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorExpandsTestsAndExcludesNonTests",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorFiltersByTagSizeAndEnv",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorCrossesPackages",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorHandlesCyclesGracefully",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorReportsMissingTargets",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testStrictTestSuiteWithFile",
+]
+translation_notes = "TestsFunction partitions direct tests, suites, and other targets; uniquely visits suites/tests; filters explicit and implicit tests using tags plus size; and treats suite tag manual as a property, not a filter. TestSuiteImplicitTestsAccumulator supplies only same-package non-manual tests for an empty suite. V1 test-suite/accessor storage and Buck2 evaluator/sets are reference-only: this oracle imports no V1/Buck2 implementation."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture tests-query-expansion --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture tests-query-expansion --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "direct_test_partition_excludes_direct_non_test"
+argv = ["query", "tests(set(//direct:direct_test //direct:plain))"]
+expected_exit = 0
+stdout_patterns = ["\\A//direct:direct_test\\n?\\Z"]
+
+[[commands]]
+name = "empty_suite_uses_same_package_implicit_tests_and_excludes_manual"
+argv = ["query", "tests(//implicit:empty)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?=[\\s\\S]*(?m:^//implicit:alpha_test$))(?=[\\s\\S]*(?m:^//implicit:large_test$))(?:(?://implicit:alpha_test|//implicit:large_test)\\n?){2}\\Z"]
+
+[[commands]]
+name = "explicit_nested_and_cross_package_members_are_exact_set"
+argv = ["query", "tests(//explicit:root_suite)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?=[\\s\\S]*(?m:^//cross:cross_test$))(?=[\\s\\S]*(?m:^//explicit:direct_test$))(?=[\\s\\S]*(?m:^//explicit:nested_test$))(?:(?://cross:cross_test|//explicit:direct_test|//explicit:nested_test)\\n?){3}\\Z"]
+
+[[commands]]
+name = "explicit_suite_does_not_pull_unlisted_same_package_tests"
+argv = ["query", "tests(//explicit:only_direct)"]
+expected_exit = 0
+stdout_patterns = ["\\A//explicit:direct_test\\n?\\Z"]
+
+[[commands]]
+name = "cycle_terminates"
+argv = ["query", "tests(//cycle_a:a)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "shared_and_duplicate_members_deduplicate"
+argv = ["query", "tests(//dedup:root)"]
+expected_exit = 0
+stdout_patterns = ["\\A//dedup:shared_test\\n?\\Z"]
+
+[[commands]]
+name = "required_bare_tag"
+argv = ["query", "tests(//filters:bare)"]
+expected_exit = 0
+stdout_patterns = ["\\A//filters:fast_test\\n?\\Z"]
+
+[[commands]]
+name = "required_plus_tag"
+argv = ["query", "tests(//filters:plus)"]
+expected_exit = 0
+stdout_patterns = ["\\A//filters:fast_test\\n?\\Z"]
+
+[[commands]]
+name = "excluded_minus_tag"
+argv = ["query", "tests(//filters:exclude_slow)"]
+expected_exit = 0
+stdout_patterns = ["\\A//filters:fast_test\\n?\\Z"]
+
+[[commands]]
+name = "suite_manual_tag_is_not_a_filter"
+argv = ["query", "tests(//filters:manual_suite)"]
+expected_exit = 0
+stdout_patterns = ["\\A//filters:plain_test\\n?\\Z"]
+
+[[commands]]
+name = "test_size_matches_suite_tag"
+argv = ["query", "tests(//filters:large)"]
+expected_exit = 0
+stdout_patterns = ["\\A//filters:large_test\\n?\\Z"]
+
+[[commands]]
+name = "non_test_member_is_dropped_by_default"
+argv = ["query", "tests(//strict:non_test_member)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "strict_non_test_member_reports_invalid_label"
+argv = ["query", "--strict_test_suite", "tests(//strict:non_test_member)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["The label '//strict:plain' in the test_suite '//strict:non_test_member' does not refer to a test or test_suite rule!"]
+
+[[commands]]
+name = "missing_member_has_tests_attribute_expansion_prefix"
+argv = ["query", "tests(//missing:broken)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["couldn't expand 'tests' attribute of test_suite //missing:broken:", "no such target '//missing_target:missing_target'"]
+
+[[commands]]
+name = "default_output_exact_set_without_async_order_assumption"
+argv = ["query", "tests(//explicit:root_suite)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?=[\\s\\S]*(?m:^//cross:cross_test$))(?=[\\s\\S]*(?m:^//explicit:direct_test$))(?=[\\s\\S]*(?m:^//explicit:nested_test$))(?:(?://cross:cross_test|//explicit:direct_test|//explicit:nested_test)\\n?){3}\\Z"]
+
+[[commands]]
+name = "full_output_exact_set_without_async_order_assumption"
+argv = ["query", "--order_output=full", "tests(//explicit:root_suite)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?=[\\s\\S]*(?m:^//cross:cross_test$))(?=[\\s\\S]*(?m:^//explicit:direct_test$))(?=[\\s\\S]*(?m:^//explicit:nested_test$))(?:(?://cross:cross_test|//explicit:direct_test|//explicit:nested_test)\\n?){3}\\Z"]

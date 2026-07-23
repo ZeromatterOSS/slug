@@ -1,0 +1,1 @@
+test_suite(name = "broken", tests = ["//missing_target"])
