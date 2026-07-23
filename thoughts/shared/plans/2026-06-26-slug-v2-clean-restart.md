@@ -230,6 +230,10 @@ It passes the Bazel 9.2 `query-parser-and-sets` and
 `query-loading-thin-vertical` oracle fixtures through Slug. M3 remains open for
 the remaining functions, repositories and patterns, ordering modes, and
 formatters; this checkpoint must not be described as full query parity.
+Oracle commit `5b7806d7` now pins the next accepted behavior packet for
+root-repository subtree patterns, `rdeps`, and
+`same_pkg_direct_rdeps`; its Slug implementation and invalidation evidence
+remain pending.
 
 ## Two-Tier Work-Packet Contract
 

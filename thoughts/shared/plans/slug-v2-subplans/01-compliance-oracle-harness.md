@@ -609,3 +609,33 @@ with `generated: false` is not acceptance evidence.
   reran both Slug fixtures after final corrections, and Sol-low returned
   `ACCEPT`. This proves only the recorded thin vertical; the remaining
   functions, repositories, patterns, formats, cquery, and aquery stay open.
+
+## Reverse Query and Subtree Oracle Checkpoint
+
+- 2026-07-23 commit `5b7806d7` added the generated Bazel 9.2.0
+  `query-rdeps-and-subtree-patterns` fixture at immutable source commit
+  `8220c6198837d5c13d53fea211cf3282aa12408a`.
+- Its 26 commands cover existing nested and non-package-prefix
+  `//pkg/...` expansion, empty/missing subtree failures, unbounded and
+  depth-zero/one/two `rdeps`, universe-closure exclusion, multiple roots,
+  duplicate seeds, cycles, source/rule seeds, alias/custom-rule edges, empty
+  results, and default/auto/full ordering.
+- `same_pkg_direct_rdeps` evidence covers source inputs, duplicates, multiple
+  parents, alias/custom-rule parents, cross-package exclusion, and an
+  edge-specific two-package criss-cross case. Arity errors and integer
+  expression operands are also pinned.
+- Bazel 9.2 observed that empty and absent subtree patterns both exit 7 with
+  `no targets found beneath '<prefix>'`; `rdeps` depth zero returns only an
+  in-universe seed; and an integer in an expression position is parsed as the
+  target literal `//:1`, then fails with exit 7 rather than a syntax/type
+  error. Default/auto and full reverse traversal have distinct pinned orders.
+- Generation, the worker's independent rerun, and a separate root no-update
+  rerun passed with `/usr/bin/bazel` 9.2.0. Fixture discovery, immutable
+  provenance, `generated: true`, all-command assertion coverage, per-file
+  whitespace checks, and candidate credential scans passed. Bazel used
+  ordinary RC discovery and could consume the user's `~/.bazelrc`; no agent or
+  inspection tool read its contents, and no external RC or BuildBuddy
+  credential content was copied, logged into project files, or committed.
+  Sol-low reviewed the complete fixture and returned `ACCEPT`.
+- This is oracle evidence only. Slug does not yet implement the two functions
+  or subtree patterns, and M3 remains open.

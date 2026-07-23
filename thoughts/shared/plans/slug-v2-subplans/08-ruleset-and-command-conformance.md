@@ -886,3 +886,37 @@ oracle ordering/diagnostic mismatch that cannot be represented without
 expanding this packet. Defer `siblings`, `kind`, `filter`, `attr`, `labels`,
 `buildfiles`, `loadfiles`, `some`, path functions, tests/visibility functions,
 non-text formats, remaining order modes, `cquery`, and `aquery`.
+
+#### Oracle evidence landed (2026-07-23)
+
+Oracle commit `5b7806d7` adds the generated Bazel 9.2.0
+`query-rdeps-and-subtree-patterns` fixture at immutable source commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+The 26-command matrix establishes:
+
+- existing, nested, and non-package-prefix subtree expansion includes rules
+  but not sources; empty and absent prefixes both exit 7 with
+  `no targets found beneath '<prefix>'`;
+- `rdeps` is restricted to the forward universe closure, excludes seeds
+  outside it, includes an in-universe seed at depth zero, adds direct reverse
+  parents at depth one, handles greater depth and cycles, eliminates duplicate
+  seeds, and follows source/rule/alias/custom edges;
+- default and `auto` sort the focused reverse result as
+  `custom_parent, leaf, via_alias`, while `full` renders
+  `custom_parent, via_alias, leaf`;
+- `same_pkg_direct_rdeps` returns only direct parents whose matching edge and
+  operand share a package, including the two-package criss-cross exclusion;
+  and
+- too many/few arguments exit 2, while an integer in an expression position
+  is parsed as literal target `//:1` and exits 7 for the missing target.
+
+Generation and two independent no-update reruns passed with `/usr/bin/bazel`
+9.2.0. Discovery, provenance, generated/assertion coverage, whitespace, and
+candidate credential checks passed. Bazel used ordinary RC discovery and was
+allowed to consume the user's external BuildBuddy configuration; its contents
+were not inspected or copied. Sol-low reviewed the complete oracle and
+returned `ACCEPT`.
+
+Implementation and DICE activation evidence remain pending. Do not mark this
+packet or M3 complete from the oracle alone.

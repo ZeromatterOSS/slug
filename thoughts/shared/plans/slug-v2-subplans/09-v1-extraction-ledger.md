@@ -745,7 +745,7 @@ configuration/action environments, and non-text formatters remain open.
 
 ### Stage 8 reverse-deps/subtree-pattern packet — approved extraction plan
 
-Status: Reviewed packet; oracle and implementation pending
+Status: Oracle landed; implementation pending
 
 Source ref/commit(s): Buck2
 `088c75c7e36805df99c3de29062baa95db700b8b`
@@ -772,26 +772,29 @@ empty-prefix specialization. No persistent reverse graph, Buck labels/cells,
 external repositories, configured/action nodes, printers, or `siblings`
 surface is imported.
 
-Bazel oracle: must be generated and independently verified with `/usr/bin/bazel`
-9.2.0 and cite Bazel commit
+Bazel oracle: commit `5b7806d7`, generated and independently verified with
+`/usr/bin/bazel` 9.2.0 at Bazel commit
 `8220c6198837d5c13d53fea211cf3282aa12408a`
 
 V2 fixture: `query-rdeps-and-subtree-patterns`
 
-Expected evidence artifact: exact root-subtree expansion/failure, `rdeps`
-universe/depth/cycle/seed/order behavior, package-local/criss-cross direct
-reverse-dependency behavior, and arity/type diagnostics
+Expected evidence artifact: `5b7806d7` exact root-subtree expansion/failure,
+`rdeps` universe/depth/cycle/seed/order behavior, package-local/criss-cross
+direct reverse-dependency behavior, and arity/expression-operand diagnostics
 
 Decision: port the named Buck2 graph/reverse traversal machinery; adapt its
 lookup to the existing retained DICE transaction and compact V2 labels; reject
 V1 implementation/output and all Buck/Bazel semantics outside the reviewed
 Stage 8 packet
 
-Validation: pending oracle-first implementation; the Stage 8 packet requires
-the serial six-crate suite, rebuilt V2 CLI, Bazel and Slug fixture runs, exact
-activation multisets, ownership/reuse inspection, formatting/diff checks, and
-Sol-low post-review
+Validation: generation plus worker and root independent no-update reruns passed
+with `/usr/bin/bazel` 9.2.0; fixture discovery,
+provenance/generated/assertion/whitespace and candidate credential checks
+passed; Sol-low oracle review `ACCEPT`. Implementation still requires the
+serial six-crate suite, rebuilt V2 CLI, Slug fixture run, exact activation
+multisets, ownership/reuse inspection, formatting/diff checks, and Sol-low
+post-review.
 
-Residual risk: oracle output ordering and missing-subtree diagnostics are not
-yet observed; external repositories, Sky Query, the other loading functions,
-non-text formatters, `cquery`, and `aquery` remain open
+Residual risk: the oracle is not yet implemented by Slug. External
+repositories, Sky Query, the other loading functions, non-text formatters,
+`cquery`, and `aquery` remain open.
