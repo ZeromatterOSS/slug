@@ -878,3 +878,63 @@ Residual risk: Bazel's arbitrary diamond/multi-pair choice must be expressible
 as bounded complete alternatives. Generated/output-file reverse edges, the
 other 11 loading functions after this packet, repositories, patterns, order
 modes, non-text formatters, `cquery`, and `aquery` remain open.
+
+### Stage 8 arbitrary-selection packet — approved extraction plan
+
+Status: Reviewed packet; oracle and implementation pending
+
+Source ref/commit(s): Bazel
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+`SomeFunction.java`, ordinary/Sky `EvaluateExpression` implementations,
+`QueryEnvironmentFactory.java`, `QueryParser.java`, and `Lexer.java`; Buck2
+`088c75c7e36805df99c3de29062baa95db700b8b`
+`query/syntax/simple/eval/set.rs`; V1
+`e218054d4c796655939b968d90208b185decb352`
+
+Source class: implement Bazel ordinary-query `some` semantics over V2's landed
+compact ordered target set; reuse only Buck2's ordered compact-set lesson;
+reject V1 and Sky Query semantics
+
+Reusable primitive or lesson: arbitrary bounded selection needs no semantic
+graph beyond the already evaluated unique `SmallSet`; ordinary Blaze query
+does not cancel remaining operand evaluation
+
+V2 wrapper/boundary: V2 owns signed Java-`int` argument conversion,
+expression-position integer preservation, arbitrary-result alternatives,
+empty-selection diagnostics, AUTO/FULL rendering, root-repository DICE
+demand, and retained-daemon transitions. No streaming/cancellation surface,
+graph, target representation, DICE key, cache, runtime, protocol, filesystem,
+or order exception is added.
+
+Bazel oracle: must be generated and independently verified with
+`/usr/bin/bazel` 9.2.0 at commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`; cancellation and signed-integer
+source anchors are the files named above
+
+V2 fixture: `query-some-selection`
+
+Expected evidence artifact: singleton and arbitrary bounded selections;
+omitted/zero/negative/equal/excess counts; duplicate/nested/empty/cycle/
+recursive operands; normal-query later-error precedence; signed `i32`
+boundaries; retained expression-position integers; `deps`/`rdeps` shared
+signed-depth behavior; arity/type diagnostics; AUTO/FULL ordering; and
+candidate create/rename/delete/recreate transitions
+
+Decision: activate only `some`; select from the existing unique insertion
+order; add the minimum typed signed-integer seam shared with `deps`/`rdeps`;
+keep generic expression integers and all graph/DICE/protocol ownership
+unchanged. Defer `filter` until an exact Java `Pattern` substrate exists.
+
+Validation: pending oracle-first implementation; require Bazel generation plus
+independent rerun, normal-query cancellation/error probes, the serial
+six-crate suite, rebuilt V2 CLI, all five query fixture runs, exact activation
+multisets, ownership/scope scans, formatting/diff checks, daemon cleanup, and
+Sol-low reviews
+
+Residual risk: ordinary query may mask later failures or emit nonempty partial
+stdout on failure, neither of which is representable by the current eager
+result boundary; signed integer correction may affect existing depth
+semantics. Sky Query, Java regex, BUILD pseudo-nodes, generated nodes,
+metadata, attrs, loads, visibility, tests, executables, external repositories,
+the other ten loading functions, non-text formatters, `cquery`, and `aquery`
+remain open.

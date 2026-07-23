@@ -1299,3 +1299,195 @@ sorting behavior broader than the exact top-level `somepath` exception, or
 changes to build/cquery/aquery behavior. Defer `some`, `siblings`, `filter`,
 `kind`, `attr`, `labels`, `buildfiles`, `loadfiles`, `tests`, `visible`,
 `executables`, remaining patterns/order modes/formats, `cquery`, and `aquery`.
+
+### Reviewed next packet — `WP-8-m3-some-selection` (2026-07-23)
+
+Work packet ID: `WP-8-m3-some-selection`
+
+Owner stage and plan: Stage 8,
+`thoughts/shared/plans/slug-v2-subplans/08-ruleset-and-command-conformance.md`.
+
+Goal and gate link: implement only `some(expr[, count])` for ordinary,
+root-repository loading query, plus the signed-`i32` integer-argument
+correction required to parse its optional count with Bazel 9 semantics. This
+packet moves one loading function from deferred to implemented and leaves M3
+open with ten functions.
+
+Why this vertical and not `filter`:
+
+- `some` consumes the existing eager `TargetSet`, preserves its structural
+  deduplication, and selects a bounded arbitrary subset without another graph
+  or target representation;
+- ordinary `bazel query` uses `AbstractBlazeQueryEnvironment`, whose
+  `gracefullyCancel()` is a no-op. Its operand therefore continues evaluating
+  after `SomeFunction` has collected enough nodes. V2's eager materialization
+  is valid only for this non-Sky slice;
+- Sky Query can cancel streaming evaluation, but V2 has no universe-scope or
+  Sky Query surface and this packet must not add one; and
+- `filter` remains deferred because Bazel uses `java.util.regex.Pattern`.
+  Buck2's `fancy-regex` implementation is useful structural precedent but is
+  neither the same accepted language nor the same failure contract. A
+  knowingly restricted regex subset would violate Bazel 9 parity.
+
+Oracle-first artifact:
+
+1. Add `tests/v2_oracle/fixtures/query-some-selection/` with three deliberately
+   non-lexical root targets, duplicates, a cycle, two operand packages, a
+   recursive subtree with dynamic candidates, alias/source/custom-rule
+   candidates where useful, and no generated/output nodes.
+2. Generate and independently rerun with `/usr/bin/bazel` 9.2.0 at immutable
+   commit `8220c6198837d5c13d53fea211cf3282aa12408a`. Bazel may use ordinary RC
+   discovery and the user's external BuildBuddy configuration; agents and
+   tools must never read, copy, print, log, or commit `~/.bazelrc` or
+   credentials.
+3. Cover:
+   - singleton input with omitted count under default, explicit `auto`, and
+     `full`;
+   - a multi-target input with omitted count, count two of three, count equal
+     to size, count greater than size, duplicate operands, nested `some`, an
+     empty set, cycle closure, and recursive input;
+   - zero and quoted negative counts over nonempty and empty operands;
+     unquoted negative syntax; accepted `2147483647` and `'-2147483648'`;
+     rejected `2147483648`, `'-2147483649'`, and `2_147_483_647`; a
+     noninteger word; and too few/too many arguments;
+   - expression-position integers, including `2147483648`, remaining target
+     literals rather than being globally narrowed to `i32`;
+   - valid early candidates followed by a missing target and a missing package
+     in union and `set` operands. Record any partial stdout, exit, and error:
+     ordinary query must not silently mask the later failure;
+   - an invalid/out-of-range count paired with a missing operand, proving
+     integer parsing fails before target evaluation; and
+   - quoted-negative and `i32` boundary probes for the already implemented
+     optional integer positions of `deps` and `rdeps`, because the shared
+     correction must not leave those functions with unsigned or divergent
+     depth behavior.
+4. Bazel defines selection as arbitrary. For one-of-many and two-of-three
+   results, assertions may admit only finite complete alternatives: one actual
+   member, or two distinct actual members. AUTO alternatives must be lexical;
+   FULL alternatives may enumerate complete retained insertion orders. Do not
+   claim a winning label, callback batch, or root.
+5. Every command needs anchored stdout. Failures require empty or explicitly
+   observed partial stdout plus stable stderr and exit assertions. Nonempty
+   partial stdout on an ordinary-query failure is a stop condition because
+   V2's current result boundary cannot return output and an error together.
+   Exact output is appropriate for singleton and all-selected rows; arbitrary
+   subsets use bounded alternatives.
+
+Bazel 9.2 source anchors:
+
+- `query2/engine/SomeFunction.java` and
+  `QueryEnvironment.java#EvaluateExpression`;
+- `query2/common/AbstractBlazeQueryEnvironment.java`
+  `AbstractBlazeQueryEvaluateExpressionImpl`,
+  `query2/SkyQueryEnvironment.java`
+  `SkyQueryEvaluateExpressionImpl`, and
+  `query2/QueryEnvironmentFactory.java#canUseSkyQuery`;
+- `query2/engine/{QueryParser,Lexer}.java` for context-sensitive signed Java
+  integer parsing;
+- `runtime/commands/QueryCommand.java` and
+  `query2/query/output/QueryOutputUtils.java` for normal rendering; and
+- `AbstractQueryTest` `testSomeOperator_noCountParameter`,
+  `testSomeOperator_countParameterNotEqualActualCount`,
+  `testSomeOperator_nestedSomeTest`, and
+  `testUnconditionalQueryException`.
+
+Reuse audit and approved decisions:
+
+- Buck2 commit `088c75c7e36805df99c3de29062baa95db700b8b`
+  has no default `some` function. Reuse only the compact ordered-set lesson
+  from `query/syntax/simple/eval/set.rs`; retain V2's `TargetSet<SmallSet<_>>`
+  and do not import Buck query semantics;
+- V1 commit `e218054d4c796655939b968d90208b185decb352`
+  has no reusable `some` scenario or implementation. Do not invent one from
+  the V1 query engine;
+- keep the generic AST's expression-position integer representation. At the
+  existing function-spec validation/typed-argument seam, accept an integer
+  token or WORD only for an expected integer slot, parse it with signed
+  Java-`int` bounds, and produce Bazel's
+  `expected an integer literal: '<raw>'` error before evaluation; and
+- carry signed `i32` through the shared optional integer argument used by
+  `deps`, `rdeps`, and `some`. Do not cast negative values to unsigned. Preserve
+  the oracle-observed depth result and demand behavior of `deps`/`rdeps`.
+
+Required implementation:
+
+1. Transition only `some` from deferred to implemented in the 16-entry
+   callable registry. Its generic typed invocation evaluates its operand once,
+   uses the existing unique insertion order, retains at most the requested
+   count, and returns `argument set is empty` when no node was selected.
+   Omitted count is one.
+2. Add only the bounded signed-integer conversion described above. Quoted
+   `'-1'` is a valid integer argument; bare `-1` remains a binary-minus syntax
+   failure. Values outside Java `i32` fail before operand lookup.
+   Expression-position integers remain target expressions, including values
+   above `i32::MAX`.
+3. Update shared depth handling only as required for the generated
+   `deps`/`rdeps` signed-boundary oracle. Preserve normal operand/universe
+   evaluation and existing traversal ownership; add no traversal, graph,
+   cache, or key.
+4. Preserve ordinary output policy. Root `some` has no top-level ordering
+   exception: default/AUTO lexically sort whatever subset was selected, and
+   FULL preserves evaluator insertion order.
+5. Add focused parser/registry/integer tests, evaluator selection/error/order
+   tests, complete CLI oracle coverage, exact DICE activation multisets, and a
+   retained-daemon candidate create/rename/delete/recreate regression.
+   Preserve all four preceding query fixtures and build/cquery/aquery
+   behavior.
+
+DICE acceptance must compare complete relevant activation multisets:
+
+- initial, identical, and unrelated-edit requests, distinguishing no
+  activation callback from `Reused` validation and `Evaluated` computation;
+- two-package operands remain fully demanded even when the first package
+  supplies enough selectable nodes;
+- recursive operands activate only the existing `SubtreePackageSetKey` and
+  demanded package graphs before selection;
+- zero and negative counts evaluate the valid operand before returning the
+  empty-selection error, while invalid/out-of-range counts activate no operand
+  keys;
+- cycle traversal terminates before selection;
+- creating, renaming, deleting, and recreating candidates through BUILD
+  target-name edits evaluates only the operand package and updates an exact
+  all-selected result when `count >= available`; and
+- no new DICE key, graph state, reverse cache, streaming/cancellation runtime,
+  direct filesystem read, protocol, or lock is introduced.
+
+Focused validation:
+
+```bash
+CARGO_TARGET_DIR=/tmp/slug-m3-some-target CARGO_BUILD_JOBS=1 cargo test \
+  -p slug_query_v2 -p slug_loading_v2 -p slug_core_v2 \
+  -p slug_commands_v2 -p slug_server_v2 -p slug_cli_v2
+CARGO_TARGET_DIR=/tmp/slug-m3-some-target CARGO_BUILD_JOBS=1 \
+  cargo build -p slug_cli_v2
+python3 -B -m tools.v2_oracle run \
+  --fixture query-some-selection --tool bazel --bazel /usr/bin/bazel
+python3 -B -m tools.v2_oracle run \
+  --fixture query-some-selection --tool slug --slug <absolute-rebuilt-v2-slug>
+cargo fmt --all -- --check
+git diff --check
+```
+
+Also rerun the four preceding Slug query fixtures and inspect for parser
+rewrites, unsigned casts, arbitrary-result overclaims, duplicate evaluator
+state, direct filesystem access, new DICE/runtime/cache/protocol/locks,
+unrelated registry changes, and build/cquery/aquery drift.
+
+Evidence and completion boundary: land and review the generated Bazel oracle
+before Rust edits. Require Sol-low approval of the signed-integer and arbitrary
+selection seams before broad validation, then a complete post-validation
+review. Update Stage 1, Stage 8, Stage 9, and the routing log with exact
+commits, bounded alternatives, activation events, validation, and residuals.
+
+Stop conditions: normal Bazel 9.2 query masks a later operand failure after an
+early selection, or exits nonzero with nonempty partial stdout; signed integer
+parity requires a broad/context-sensitive parser rewrite rather than the
+bounded typed-argument seam; negative depth behavior for `deps`/`rdeps` cannot
+be preserved; arbitrary results cannot be bounded to complete finite
+alternatives; or implementation requires Sky Query/universe scope,
+streaming/cancellation protocol, generated/output nodes, metadata, attrs,
+loads, visibility, tests, executables, external repositories, new
+graph/DICE/cache/runtime state, direct filesystem access, locks, or
+build/cquery/aquery changes. Defer `filter` pending a Java-regex compatibility
+substrate. If this packet stops, audit `siblings` plus BUILD pseudo-node
+representation as the next foundation.
