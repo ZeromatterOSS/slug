@@ -1450,3 +1450,11 @@ Full owning-crate tests and independent Sol review passed. No V1/Buck test
 evaluator, registry, graph, DICE key, or policy semantics were imported.
 Request-local strict-suite plumbing and `tests()` activation remain a separate
 design and implementation boundary.
+
+The first post-Gate-A activation design retained that V2-owned boundary:
+request-local policy, the current generic evaluator/candidate algebra, and
+accessor-shaped loading methods only. Sol required three additional Bazel
+oracle discriminators before implementation—nested filter isolation,
+filter-before-uniqueness, and literal `-+tag`. No V1/Buck test evaluator or
+error taxonomy is authorized by this `REPLAN`; the next packet changes only
+the Bazel fixture.

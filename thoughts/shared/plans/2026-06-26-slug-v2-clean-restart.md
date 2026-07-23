@@ -24,7 +24,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 strict-suite policy review is current |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 strict-suite policy review is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` oracle has 29 commands and labels metadata 39 through `57192df9`; identity, package-context normalization, structural label comparison, and direct duplicate rejection accepted through `5bbc4604`; tests loading/query metadata Gate A accepted in `7abcbdce` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, strict policy/`tests()` activation, and remaining command breadth | review request-local strict-suite policy and the bounded `tests()` activation seam |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` oracle has 29 commands and labels metadata 39 through `57192df9`; identity, package-context normalization, structural label comparison, and direct duplicate rejection accepted through `5bbc4604`; tests loading/query metadata Gate A accepted in `7abcbdce` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, strict policy/`tests()` activation, and remaining command breadth | add three source-critical `tests()` oracle discriminators before activation design |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,26 +33,26 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Review only the request-local policy and evaluator seam needed to activate the
-already-oracled `tests(EXPR)` function on top of `7abcbdce`. Trace pinned Bazel
-9.2.0 `TestsFunction`, `QueryOptions`, strict-suite diagnostics, and target
-accessors alongside V2's CLI/daemon request protocol, generic evaluator,
-candidate algebra, loading environment, and retained test/suite metadata.
+Extend only the Bazel 9.2.0 `tests-query-expansion` oracle with three
+source-critical successful-query discriminators:
 
-The design must keep `--strict_test_suite` request-local and out of loaded
-package, graph, and DICE semantic identity. It must account for direct tests;
-explicit, implicit, nested, cyclic, and cross-package suites; suite tag/size
-filters; deduplication; missing members; and default-drop versus strict-error
-handling for non-test members. Specify the exact reuse boundary, error
-classification and message ownership, same-daemon policy-toggle evidence, and
-the smallest later implementation allowlist. Reconcile every claim with the
-accepted 29-command `tests-query-expansion` oracle.
+1. a parent suite's filters do not propagate into a nested suite;
+2. an explicitly referenced test excluded by one suite route is filtered
+   before global test uniqueness, so a later nested route may still emit it;
+3. suite filter `-+tag` excludes the literal `+tag`, not `tag`.
 
-This is a design/review packet only. Do not activate `tests()`, add protocol or
-query code, mutate fixtures, edit formatters, start `visible`, add repository
-mapping or filesystem discovery, change global identity ordering, or import
-V1/Buck test semantics. Stop if the retained Gate A graph cannot express an
-oracle row without a new representation packet.
+Use topology and distinct expected labels that make each wrong algorithm
+observably different. Keep the current 29 commands unchanged and append the
+smallest rows/workspace declarations. Generate and then clean-verify against
+the pinned Bazel 9.2.0 binary; root independently reruns the final fixture.
+
+Do not edit Rust, activate `tests()`, add strict policy or protocol fields,
+change existing expected records, claim the five `--output=build` rows as Slug
+formatter acceptance, start `visible`, add repository behavior, or import
+V1/Buck test semantics. After the oracle is accepted, re-review the already
+viable request-local policy and generic evaluator design with only
+crate-private missing-target/package-loading detail and no new public error
+taxonomy.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.

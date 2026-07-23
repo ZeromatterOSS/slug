@@ -2610,3 +2610,26 @@ V1/Buck semantics did not enter Gate A.
 The next packet is design-only: review request-local
 `--strict_test_suite` ownership and the bounded evaluator/diagnostic seam for
 activating the already accepted 29-command `tests(EXPR)` oracle.
+
+## `tests()` activation design replanned to oracle discriminators (2026-07-23)
+
+Pinned-source and V2 auditing confirmed that Gate A can express every
+non-formatter row: 18 current `tests()` rows plus six existing
+labels/deps/loading rows. Five `--output=build` rows remain Bazel-only
+representation evidence; two additionally require source location and
+instantiation-stack state that V2 does not retain.
+
+The proposed activation keeps `--strict_test_suite` request-local, outside all
+package/graph/DICE identity; uses the generic evaluator with accessor-shaped
+loading primitives; evaluates the operand once; and recursively expands suites
+with separate compact test/suite uniquifiers. Source requires filtering before
+test uniqueness, suite-local rather than inherited nested filters, and literal
+`-+tag` handling. Sol-low returned `REPLAN` because the 29-command oracle does
+not yet discriminate those three choices.
+
+No Rust or fixture change was made during the audit. The replacement packet is
+oracle-only and appends three successful-query rows before the activation
+design is reviewed again. Error work is narrowed: lookup retains crate-private
+missing-target versus package-loading detail, the function adds exact
+suite/attribute or strict text, and no unused public/general failure-code API
+is introduced.
