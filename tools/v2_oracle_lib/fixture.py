@@ -18,6 +18,8 @@ COMPARE_MODES = {"exact", "message_shape", "semantic"}
 @dataclass(frozen=True)
 class Mutation:
     path: str
+    op: str | None = None
+    destination: str | None = None
     find: str | None = None
     replace: str | None = None
     content: str | None = None
@@ -47,6 +49,16 @@ class ReapiConfig:
 
 
 @dataclass(frozen=True)
+class FixtureProvenance:
+    bazel_release: str | None = None
+    bazel_commit: str | None = None
+    source_anchors: tuple[str, ...] = ()
+    translation_notes: str | None = None
+    generation_command: str | None = None
+    verification_command: str | None = None
+
+
+@dataclass(frozen=True)
 class Fixture:
     name: str
     root: Path
@@ -58,6 +70,7 @@ class Fixture:
     manifest_roots: tuple[str, ...] = ()
     oracle_notes: str = ""
     reapi: ReapiConfig = field(default_factory=ReapiConfig)
+    provenance: FixtureProvenance = field(default_factory=FixtureProvenance)
     daemon: bool = False
 
     @property
@@ -115,19 +128,78 @@ def _parse_mutations(items: Any) -> tuple[Mutation, ...]:
         path = item.get("path")
         if not isinstance(path, str) or not path:
             raise ValueError("mutation.path is required")
+        _validate_relative_path(path, "mutation.path")
+        op = item.get("op")
+        if op is not None and (not isinstance(op, str) or op not in {"create", "delete", "rename"}):
+            raise ValueError("mutation.op must be create, delete, or rename")
         find = item.get("find")
         replace = item.get("replace")
         content = item.get("content")
+        destination = item.get("destination")
         if find is not None and not isinstance(find, str):
             raise ValueError("mutation.find must be a string")
         if replace is not None and not isinstance(replace, str):
             raise ValueError("mutation.replace must be a string")
         if content is not None and not isinstance(content, str):
             raise ValueError("mutation.content must be a string")
-        if content is None and (find is None or replace is None):
+        if destination is not None and (not isinstance(destination, str) or not destination):
+            raise ValueError("mutation.destination must be a non-empty string")
+        if isinstance(destination, str):
+            _validate_relative_path(destination, "mutation.destination")
+        if op == "create":
+            if content is None or any(value is not None for value in (find, replace, destination)):
+                raise ValueError("create mutation requires content and no find, replace, or destination")
+        elif op == "delete":
+            if any(value is not None for value in (find, replace, content, destination)):
+                raise ValueError("delete mutation permits only path")
+        elif op == "rename":
+            if destination is None or any(value is not None for value in (find, replace, content)):
+                raise ValueError("rename mutation requires destination and no find, replace, or content")
+        elif content is not None:
+            if any(value is not None for value in (find, replace, destination)):
+                raise ValueError("content mutation permits only path and content")
+        elif destination is not None or find is None or replace is None:
             raise ValueError("mutation requires content or find+replace")
-        mutations.append(Mutation(path=path, find=find, replace=replace, content=content))
+        mutations.append(
+            Mutation(
+                path=path,
+                op=op,
+                destination=destination,
+                find=find,
+                replace=replace,
+                content=content,
+            )
+        )
     return tuple(mutations)
+
+
+def _validate_relative_path(value: str, field_name: str) -> None:
+    candidate = Path(value)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise ValueError(f"{field_name} must be a relative workspace path without '..'")
+
+
+def _optional_string(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return value
+
+
+def _parse_provenance(value: Any) -> FixtureProvenance:
+    if value is None:
+        return FixtureProvenance()
+    if not isinstance(value, dict):
+        raise ValueError("provenance must be a table")
+    return FixtureProvenance(
+        bazel_release=_optional_string(value.get("bazel_release"), "provenance.bazel_release"),
+        bazel_commit=_optional_string(value.get("bazel_commit"), "provenance.bazel_commit"),
+        source_anchors=_as_str_list(value.get("source_anchors"), "provenance.source_anchors"),
+        translation_notes=_optional_string(value.get("translation_notes"), "provenance.translation_notes"),
+        generation_command=_optional_string(value.get("generation_command"), "provenance.generation_command"),
+        verification_command=_optional_string(value.get("verification_command"), "provenance.verification_command"),
+    )
 
 
 def load_fixture(path: Path) -> Fixture:
@@ -188,6 +260,7 @@ def load_fixture(path: Path) -> Fixture:
         manifest_roots=manifest_roots,
         oracle_notes=str(fixture_data.get("oracle_notes", "")),
         reapi=_parse_reapi(raw.get("reapi")),
+        provenance=_parse_provenance(raw.get("provenance")),
         daemon=bool(fixture_data.get("daemon", False)),
     )
 

@@ -7,16 +7,24 @@ import sys
 import uuid
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.v2_oracle_lib.compare import compare_result, write_failure_artifacts
 from tools.v2_oracle_lib.evidence import validate_evidence
-from tools.v2_oracle_lib.fixture import discover_fixtures, load_fixture
+from tools.v2_oracle_lib.fixture import FixtureCommand, Mutation, discover_fixtures, load_fixture
 from tools.v2_oracle_lib.manifest import collect_manifest
 from tools.v2_oracle_lib.normalize import normalize_text, path_replacements
-from tools.v2_oracle_lib.runner import RunOptions, ToolConfig, _extract_reapi_evidence, run_fixture
+from tools.v2_oracle_lib.runner import (
+    RunOptions,
+    ToolConfig,
+    _apply_mutations,
+    _extract_reapi_evidence,
+    run_fixture,
+)
 
 FIXTURES = ROOT / "tests" / "v2_oracle" / "fixtures"
 
@@ -37,6 +45,7 @@ def test_fixture_listing_includes_initial_stage1_set() -> None:
         "load-invalidation",
         "module-local-override",
         "negative-no-workspace",
+        "glob-directory-invalidation",
     } <= names
 
 
@@ -46,6 +55,124 @@ def test_fixture_parser_reads_commands_and_mutations() -> None:
     assert len(fixture.commands) == 2
     assert fixture.commands[1].mutations[0].path == "pkg/message.bzl"
     assert fixture.commands[1].mutations[0].replace == 'MESSAGE = "two"'
+
+
+def test_fixture_parser_reads_file_operations_and_provenance() -> None:
+    fixture = load_fixture(FIXTURES / "glob-directory-invalidation")
+    assert [command.mutations[0].op for command in fixture.commands[1:]] == [
+        "create",
+        "rename",
+        "delete",
+    ]
+    assert fixture.commands[2].mutations[0].destination == "pkg/renamed.txt"
+    assert fixture.provenance.bazel_release == "9.2.0"
+    assert fixture.provenance.bazel_commit == "8220c6198837d5c13d53fea211cf3282aa12408a"
+    assert len(fixture.provenance.source_anchors) == 3
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ('op = "create"\npath = "x.txt"', "create mutation requires content"),
+        ('op = "delete"\npath = "x.txt"\ncontent = "x"', "delete mutation permits only path"),
+        ('op = "rename"\npath = "x.txt"', "rename mutation requires destination"),
+        ('op = "create"\npath = "../x.txt"\ncontent = "x"', "relative workspace path"),
+        ('op = "rename"\npath = "x.txt"\ndestination = "/tmp/x.txt"', "relative workspace path"),
+        ('path = "x.txt"\ncontent = "x"\nfind = "old"', "content mutation permits only"),
+    ],
+)
+def test_fixture_parser_rejects_illegal_file_operations(mutation: str, message: str) -> None:
+    root = scratch_dir("mutation-parser")
+    (root / "workspace").mkdir()
+    (root / "expected").mkdir()
+    (root / "fixture.toml").write_text(
+        "[fixture]\nname = \"bad-mutation\"\n\n[[commands]]\nargv = [\"query\"]\n\n[[commands.mutations]]\n"
+        + mutation
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=message):
+        load_fixture(root)
+
+
+def test_runner_file_operations_and_rejections_stay_in_workspace() -> None:
+    root = scratch_dir("mutation-runner")
+    workspace = root / "workspace"
+    workspace.mkdir()
+    (workspace / "source.txt").write_text("source\n", encoding="utf-8")
+    fixture_root = root / "fixture"
+    fixture_root.mkdir()
+    (fixture_root / "fixture.toml").write_text(
+        """
+[fixture]
+name = "mutation-runner"
+
+[[commands]]
+argv = ["-c", "pass"]
+
+[[commands.mutations]]
+op = "create"
+path = "created.txt"
+content = "created\\n"
+
+[[commands.mutations]]
+op = "rename"
+path = "created.txt"
+destination = "renamed.txt"
+
+[[commands.mutations]]
+op = "delete"
+path = "renamed.txt"
+""".strip(),
+        encoding="utf-8",
+    )
+    command = load_fixture(fixture_root).commands[0]
+    assert _apply_mutations(workspace, command) == [
+        {"op": "create", "path": "created.txt"},
+        {"op": "rename", "path": "created.txt", "destination": "renamed.txt"},
+        {"op": "delete", "path": "renamed.txt"},
+    ]
+    assert not (workspace / "renamed.txt").exists()
+
+    def mutation_command(mutation: Mutation) -> FixtureCommand:
+        return FixtureCommand(
+            name="rejection", argv=("-c", "pass"), compare="semantic", mutations=(mutation,)
+        )
+
+    with pytest.raises(FileNotFoundError, match="source does not exist"):
+        _apply_mutations(workspace, mutation_command(Mutation(path="missing.txt", op="delete")))
+    with pytest.raises(FileExistsError, match="create destination exists"):
+        _apply_mutations(
+            workspace,
+            mutation_command(Mutation(path="source.txt", op="create", content="duplicate\n")),
+        )
+    with pytest.raises(FileExistsError, match="rename destination exists"):
+        _apply_mutations(
+            workspace,
+            mutation_command(Mutation(path="source.txt", op="rename", destination="source.txt")),
+        )
+    with pytest.raises(FileNotFoundError, match="existing real directory"):
+        _apply_mutations(
+            workspace,
+            mutation_command(
+                Mutation(path="missing/created.txt", op="create", content="no parent\n")
+            ),
+        )
+    with pytest.raises(FileNotFoundError, match="existing real directory"):
+        _apply_mutations(
+            workspace,
+            mutation_command(
+                Mutation(path="source.txt", op="rename", destination="missing/renamed.txt")
+            ),
+        )
+    outside = root / "outside"
+    outside.mkdir()
+    (workspace / "escape").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="escapes workspace"):
+        _apply_mutations(
+            workspace,
+            mutation_command(Mutation(path="escape/x.txt", op="create", content="nope\n")),
+        )
 
 
 def test_normalize_text_strips_host_specific_noise() -> None:

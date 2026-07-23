@@ -1,0 +1,120 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "deps(//pkg:txts)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//pkg:txts)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "initial",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:keep.txt\n//pkg:txts",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-directory-invalidation/20260722-205923-235264-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-directory-invalidation/20260722-205946-235805-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: aac32260-1a4c-4ebf-ac34-b2d2d178b8a2\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:keep.txt\n//pkg:txts\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//pkg:txts)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//pkg:txts)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "pkg/created.txt"
+        }
+      ],
+      "name": "after_create",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:created.txt\n//pkg:keep.txt\n//pkg:txts",
+      "stderr": "INFO: Invocation ID: 658f4a3d-edea-4275-a7b7-32dda915e00f\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:created.txt\n//pkg:keep.txt\n//pkg:txts\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//pkg:txts)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//pkg:txts)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "pkg/renamed.txt",
+          "op": "rename",
+          "path": "pkg/created.txt"
+        }
+      ],
+      "name": "after_rename",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:keep.txt\n//pkg:renamed.txt\n//pkg:txts",
+      "stderr": "INFO: Invocation ID: c6f25b78-3c5b-45d7-9141-cfd3153acf06\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:keep.txt\n//pkg:renamed.txt\n//pkg:txts\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//pkg:txts)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//pkg:txts)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "pkg/renamed.txt"
+        }
+      ],
+      "name": "after_delete",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:keep.txt\n//pkg:txts",
+      "stderr": "INFO: Invocation ID: d6fba891-487a-4c5e-be8c-2c8cb83f7d5e\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:keep.txt\n//pkg:txts\n"
+    }
+  ],
+  "fixture": "glob-directory-invalidation",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

@@ -1,0 +1,56 @@
+[fixture]
+name = "glob-directory-invalidation"
+description = "A filegroup glob observes create, rename, and delete mutations in one warm workspace."
+comparison = "message_shape"
+daemon = true
+oracle_notes = "Same-daemon directory listing and glob invalidation over a single copied workspace and output base."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/skyframe/DirectoryListingValue.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/GlobFunctionWithMultipleRecursiveFunctions.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageFunctionWithMultipleGlobDeps.java",
+]
+translation_notes = "Reduced to one package-local *.txt filegroup query so each directory mutation has a sorted-label oracle."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture glob-directory-invalidation --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture glob-directory-invalidation --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "initial"
+argv = ["query", "deps(//pkg:txts)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:keep\\.txt\\n//pkg:txts\\Z"]
+
+[[commands]]
+name = "after_create"
+argv = ["query", "deps(//pkg:txts)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:created\\.txt\\n//pkg:keep\\.txt\\n//pkg:txts\\Z"]
+
+[[commands.mutations]]
+op = "create"
+path = "pkg/created.txt"
+content = "created\n"
+
+[[commands]]
+name = "after_rename"
+argv = ["query", "deps(//pkg:txts)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:keep\\.txt\\n//pkg:renamed\\.txt\\n//pkg:txts\\Z"]
+
+[[commands.mutations]]
+op = "rename"
+path = "pkg/created.txt"
+destination = "pkg/renamed.txt"
+
+[[commands]]
+name = "after_delete"
+argv = ["query", "deps(//pkg:txts)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:keep\\.txt\\n//pkg:txts\\Z"]
+
+[[commands.mutations]]
+op = "delete"
+path = "pkg/renamed.txt"

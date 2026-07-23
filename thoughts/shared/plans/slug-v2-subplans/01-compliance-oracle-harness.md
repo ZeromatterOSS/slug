@@ -200,6 +200,107 @@ working-tree contents match that tag.
   proto formats. `stdout_contains` or a separately assembled debug view is not
   parity evidence.
 
+### Reviewed next packet — `WP-1-oracle-file-mutations` (2026-07-22)
+
+Work packet ID: `WP-1-oracle-file-mutations`
+
+Owner stage and plan: Stage 1,
+`thoughts/shared/plans/slug-v2-subplans/01-compliance-oracle-harness.md`.
+
+Goal and gate link: add oracle-harness create, rename, and delete mutations and
+generate the Bazel 9.2.0 `glob-directory-invalidation` evidence required before
+the M1 directory/glob DICE packet can begin.
+
+Prerequisites and current state: `3659b0f9` supplies the first unified
+workspace DICE runtime; the existing `glob-package-boundaries` oracle is
+generated from Bazel 9.1.1 and the harness can mutate only an existing file's
+contents. `/usr/bin/bazel` reports 9.2.0 when home, system, and workspace RC
+handling is left to Bazel. Bazel invocations may use the user's BuildBuddy
+configuration from `~/.bazelrc`, but the harness must never inspect, copy,
+record, or commit that configuration or its credentials.
+
+Oracle-first artifact:
+`tests/v2_oracle/fixtures/glob-directory-invalidation/expected/oracle.json`,
+generated and independently rerun with Bazel 9.2.0 at
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+Reuse audit: none required because this is a Stage 1 standard-library harness
+packet. The subsequent Stage 2/4 implementation has a separately approved
+reuse audit; this packet grants no DICE or Starlark bridge design permission.
+
+Exact scope:
+
+- `tools/v2_oracle_lib/{fixture.py,runner.py,compare.py}`;
+- `tests/v2_oracle/test_v2_oracle.py`;
+- `tests/v2_oracle/fixtures/glob-directory-invalidation/**`; and
+- this Stage 1 evidence section after validation.
+
+Bazel subprocesses retain normal RC handling so configured BuildBuddy services
+may accelerate them. Fixture artifacts record only the explicit fixture
+command and normalized tool path; no RC contents, credential headers, or auth
+material may enter the repository or captured evidence.
+
+Decisions reserved for design reviewer: Sol-low review accepted explicit,
+mutually exclusive `create`, `delete`, and `rename` operations with
+workspace-containment checks, deterministic mutation records, missing-source
+errors, and destination-collision errors. The existing edit/content forms
+remain supported for current fixtures.
+
+Implementation steps:
+
+1. Extend the parsed fixture model with the mutation operations and consumed
+   Bazel release/commit/source/translation/generation/verification provenance.
+2. Apply each operation safely inside the copied workspace and cover parsing,
+   execution, rejection, and credential-free evidence recording with focused
+   tests.
+3. Add ordered initial/create/rename/delete `query` commands over one workspace
+   and output base, generate the expected result with Bazel 9.2.0, then rerun
+   it without `--update-expected`.
+
+Focused validation:
+
+- `python3 -B -m pytest -q -p no:cacheprovider
+  tests/v2_oracle/test_v2_oracle.py`;
+- `python3 -B -m tools.v2_oracle run --fixture
+  glob-directory-invalidation --tool bazel --bazel /usr/bin/bazel
+  --update-expected`;
+- the same command without `--update-expected`; and
+- `git diff --check`.
+
+Evidence and plan update: record the generated Bazel version/commit, exact
+source anchors, command results, mutation sequence, and Sol post-review result
+in this section before committing.
+
+Stop conditions: stop on a Bazel version mismatch, credential or RC contents
+appearing in captured artifacts, a Bazel server restart between fixture
+commands, a mutation that escapes the copied workspace, or directory-tree
+semantics beyond the reviewed single-path create/delete/rename contract.
+
+Accepted evidence (2026-07-22):
+
+- The harness now parses and executes explicit file `create`, `rename`, and
+  `delete` operations while retaining the existing content and
+  find/replace forms. Mutations reject workspace escapes, missing sources,
+  existing destinations, and missing or symlink destination parents; they do
+  not create unrecorded directories.
+- `glob-directory-invalidation` records Bazel 9.2.0 and
+  `8220c6198837d5c13d53fea211cf3282aa12408a` provenance plus the reviewed
+  `DirectoryListingValue`, recursive glob, and package-function source
+  anchors. Its generated oracle proves sorted labels across initial, create,
+  rename, and delete queries in one output base.
+- Generation and an independent rerun with `/usr/bin/bazel` passed. Only the
+  first command restarted the Bazel server; the three post-mutation commands
+  stayed warm. A credential/header/token scan of the fixture, expected result,
+  and independent run artifact found no auth material.
+- `py_compile`, fixture listing, a direct standard-library mutation/rejection
+  exercise, and `git diff --check` passed. The focused pytest suite could not
+  run because this Python environment has no `pytest` module; this is recorded
+  as a validation residual rather than a passing command.
+- Sol-low post-review returned `ACCEPT` after one correction removed implicit
+  destination-parent creation. File-only operations and ordinary
+  check/use races inside the private copied workspace remain intentional
+  residuals.
+
 ## Acceptance Criteria
 
 - The harness records command line, exit code, stdout/stderr, output manifest,

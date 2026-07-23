@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .fixture import Fixture, FixtureCommand
+from .fixture import Fixture, FixtureCommand, Mutation
 from .manifest import collect_manifest_roots
 from .nativelink import NativeLinkService, discover_nativelink_binary, start_nativelink, stop_nativelink
 from .normalize import normalize_text, path_replacements
@@ -47,7 +47,31 @@ def _copy_workspace(fixture: Fixture, run_dir: Path) -> Path:
 def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str, str | None]]:
     applied: list[dict[str, str | None]] = []
     for mutation in command.mutations:
-        path = workspace / mutation.path
+        path = _workspace_mutation_path(workspace, mutation.path)
+        if mutation.op == "create":
+            if path.exists() or path.is_symlink():
+                raise FileExistsError(f"mutation create destination exists: {mutation.path}")
+            _require_existing_real_parent(path, mutation.path)
+            path.write_text(mutation.content or "", encoding="utf-8", newline="")
+            applied.append({"op": "create", "path": mutation.path})
+            continue
+        if mutation.op == "delete":
+            if not path.is_file():
+                raise FileNotFoundError(f"mutation source does not exist: {mutation.path}")
+            path.unlink()
+            applied.append({"op": "delete", "path": mutation.path})
+            continue
+        if mutation.op == "rename":
+            assert mutation.destination is not None
+            destination = _workspace_mutation_path(workspace, mutation.destination)
+            if not path.is_file():
+                raise FileNotFoundError(f"mutation source does not exist: {mutation.path}")
+            if destination.exists() or destination.is_symlink():
+                raise FileExistsError(f"mutation rename destination exists: {mutation.destination}")
+            _require_existing_real_parent(destination, mutation.destination)
+            path.rename(destination)
+            applied.append({"op": "rename", "path": mutation.path, "destination": mutation.destination})
+            continue
         if not path.is_file():
             raise FileNotFoundError(f"mutation target does not exist: {mutation.path}")
         if mutation.content is not None:
@@ -63,6 +87,23 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
         path.write_text(old.replace(mutation.find, mutation.replace), encoding="utf-8", newline="")
         applied.append({"path": mutation.path, "find": mutation.find, "replace": mutation.replace, "old_digest_hint": str(len(old))})
     return applied
+
+
+def _workspace_mutation_path(workspace: Path, path: str) -> Path:
+    workspace_root = workspace.resolve()
+    candidate = workspace / path
+    resolved = candidate.resolve(strict=False)
+    if not resolved.is_relative_to(workspace_root):
+        raise ValueError(f"mutation path escapes workspace: {path}")
+    return candidate
+
+
+def _require_existing_real_parent(path: Path, display_path: str) -> None:
+    parent = path.parent
+    if not parent.is_dir() or parent.is_symlink():
+        raise FileNotFoundError(
+            f"mutation destination parent must be an existing real directory: {display_path}"
+        )
 
 
 def _argv(tool: ToolConfig, command: FixtureCommand, output_base: Path, daemon: bool = False) -> list[str]:
