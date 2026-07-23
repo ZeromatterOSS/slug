@@ -552,3 +552,60 @@ transitions, graph/filesystem discovery from Starlark, a lock across
 repository identity, or any query/command-owned graph. Stage 5 does not block
 this root-only packet; non-root labels remain explicit errors until repository
 mapping is DICE-owned.
+
+### Recursive custom-rule analysis implementation evidence (2026-07-22)
+
+Implementation commit `4f4599e0` completes
+`WP-6-m2-recursive-custom-analysis` against oracle commit `9e6a4450`.
+`ConfiguredTargetAnalysisKey { workspace, configured_target }` is now the
+single production analysis identity. It consumes `PackageLoadKey`, computes
+unique direct dependencies with DICE's parallel join, restores declaration
+order, prepares immutable provider views, then synchronously evaluates the
+frozen rule. `WorkspaceRuntime` requests that key inside its retained
+transaction; the digest-only analysis scaffolds and production direct helper
+were removed.
+
+The bounded Starlark surface now preserves exactly the reviewed
+`attr.label_list` dependency schema, root/package-relative label normalization,
+frozen structural provider identity (`.bzl` label plus exported name),
+`DefaultInfo(files=depset(...))`, declared string-field providers, and
+target-local actions. Returned providers and `DefaultInfo.files` are
+authoritative. `AnalysisResult` owns the ordered direct configured-target keys,
+decoded providers, local actions, declared outputs, and diagnostics; it does
+not aggregate dependency actions or borrow evaluator heaps. Hot graph values
+use `CompactString`, `SmallMap`, `SmallSet`, immutable `Arc` slices, `Dupe`,
+and `Allocative` instead of new default hash collections or string-heavy
+parallel identities.
+
+Exact `ActivationTracker` multisets establish:
+
+- initial request: both leaves and the parent `Evaluated` exactly once;
+- identical observations: no analysis-key activation;
+- unrelated-package file creation: both leaves and the parent `Reused`
+  exactly once, with no rule evaluation;
+- shared provider/rule implementation edit: both leaves and the parent
+  `Evaluated` exactly once;
+- deleting one leaf declaration: both leaf keys and the dependent parent
+  `Evaluated`, producing the missing-target error; and
+- recreating the declaration: both leaves `Evaluated`, while the restored
+  equal parent result is `Reused`.
+
+Validation passed:
+`CARGO_TARGET_DIR=/tmp/slug-m2-analysis-target CARGO_BUILD_JOBS=1 cargo test
+-p slug_identity_v2 -p slug_loading_v2 -p slug_build_api_v2
+-p slug_analysis_v2 -p slug_core_v2 -p slug_server_v2 -p slug_cli_v2`;
+focused exact activation and external-label rejection regressions;
+`cargo fmt --all -- --check`; removed-identity/helper, filesystem/runtime,
+lock, and default-hash-collection ownership greps; and `git diff --check`.
+Sol-low initially requested exact event counts, explicit `@repo`/`@@repo`
+rejection tests, and corrected runtime documentation, then returned `ACCEPT`
+after all three changes. `scripts/v2_archive_status.sh` still reports its
+known environmental `v1-archive` branch absence and broad path-classification
+false positives; its immutable `slug-v1-archive` ref and physical-archive
+checks pass.
+
+Residual scope remains deliberate: external repositories/mapping,
+transitions/configuration selection, general attributes/providers, native
+rules, toolchains, query formatting/traversal, execution, and materialization
+remain later packets. The migration observer still scans the workspace before
+injecting immutable inputs; analysis itself performs no filesystem discovery.

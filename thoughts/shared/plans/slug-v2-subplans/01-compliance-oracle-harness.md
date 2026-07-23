@@ -567,3 +567,11 @@ with `generated: false` is not acceptance evidence.
   Bazel used ordinary RC discovery; no external RC or BuildBuddy credential
   content was read, copied, logged into project files, or committed. Sol-low
   reviewed the fixture and returned `ACCEPT`.
+- Implementation commit `4f4599e0` consumes this oracle through one recursive
+  configured-target DICE key. Focused Slug tests match the fixture's structural
+  provider identities, dependency order, returned `DefaultInfo.files`, and
+  per-target write-action ownership. The seven affected/downstream crates pass
+  together, and exact retained-DICE activation evidence is recorded in the
+  Stage 6 owner plan. This does not yet make the fixture runnable through
+  Slug's cquery/aquery command surfaces; those remain consumers of the landed
+  graph in later packets.

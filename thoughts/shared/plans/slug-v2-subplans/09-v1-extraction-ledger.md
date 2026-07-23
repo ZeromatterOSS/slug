@@ -563,6 +563,55 @@ Implementation summary: Rewrote behavior into V2 depset/provider/context substra
 Validation: `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_build_api_v2 depset --no-fail-fast`; the focused structural regression proves shared child identity; `cargo test -p slug_analysis_v2`; `py -3 -B tools/v2_oracle list`; Stage 6 shortcut grep recorded in `06-analysis-toolchains-and-actions.md`
 Residual risk: Starlark evaluator integration and Slug-side Bazel oracle execution remain pending
 
+### Stage 6 recursive configured custom-rule analysis
+
+Status: Partially landed
+Source ref/commit(s): Buck2
+`088c75c7e36805df99c3de29062baa95db700b8b`
+`app/buck2_analysis/src/analysis/{calculation.rs,env.rs}` and
+`app/buck2_build_api/src/analysis/registry.rs`; V1
+`slug-v1-archive:app/slug_analysis/src/analysis/calculation.rs` at
+`e218054d4c796655939b968d90208b185decb352` inspected as reference only
+V2 commit(s): oracle `9e6a4450`; implementation `4f4599e0`
+Source class: selectively translated Buck2 recursive DICE calculation,
+prepared dependency environment, target-local action-registry ownership, and
+compact utility shapes behind V2-owned Bazel identities; V1 freeze/evaluation
+lessons only
+Reusable primitive or lesson: one semantic configured-target key recursively
+computes unique dependencies in parallel, restores declared order before
+evaluation, and returns owned provider/action facts; structural provider
+identity must survive Starlark export and freeze
+V2 wrapper/boundary: `ConfiguredTargetAnalysisKey` consumes `PackageLoadKey`
+and root-repository `attr.label_list` dependencies in the retained workspace
+transaction. `ProviderId` is `.bzl` source label plus exported name;
+`AnalysisResult` owns ordered direct dependency keys, returned providers,
+`DefaultInfo.files`, target-local actions, and diagnostics.
+Bazel oracle: Bazel 9.2.0 at immutable commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+V2 fixture: `recursive-custom-rule-providers-actions`
+Expected evidence artifact: generated cquery/aquery oracle at `9e6a4450`;
+focused Slug structural and exact activation regressions at `4f4599e0`
+Implementation summary: removed the parallel digest-only analysis identity and
+direct production helper; retained rule schemas and invocation dependency
+values; added frozen string-field provider constructors and owned decoding;
+made returned providers/`DefaultInfo.files` authoritative; kept actions
+target-local; and wired recursive analysis through the daemon's retained DICE
+transaction. Graph values reuse `CompactString`, `SmallMap`, `SmallSet`,
+immutable `Arc` slices, `Dupe`, and `Allocative`.
+Validation: seven-crate serial Cargo suite; exact per-key ActivationTracker
+multisets for initial/identical/unrelated/edit/delete/recreate revisions;
+focused external-label and structural-provider lookup tests; format/diff and
+ownership greps; Sol-low post-review `ACCEPT`
+Decision: adopt Buck2's computation/environment/registry ownership and compact
+utility patterns, but retain V2 Bazel labels, configuration keys, provider
+semantics, output paths, and oracle as authoritative. Do not import Buck cells,
+V1 global registries, digest scaffolds, command-owned graphs, or action
+aggregation.
+Residual risk: root repository and one exact label-list/string-provider subset
+only; repository mapping, transitions, general attrs/providers, query
+consumers, execution, and materialization remain open. The migration observer
+still scans before injecting immutable inputs.
+
 ### Stage 6 first-rule analysis handoff
 
 Status: Pending reviewer decision; current worktree only
