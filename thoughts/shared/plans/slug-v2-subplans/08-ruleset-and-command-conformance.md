@@ -592,3 +592,41 @@ Sky Query universe behavior, configured identities/transitions/providers,
 action nodes/formatters, or execution; or pressure to label this packet “full
 query.” Stop at the first deferred function or format rather than inventing
 semantics.
+
+#### Oracle evidence landed (2026-07-22)
+
+Oracle commit `7e8993b2` added generated Bazel 9.2.0
+`query-parser-and-sets` and `query-loading-thin-vertical` fixtures at immutable
+source commit `8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+Externally observed parser/expression facts:
+
+- quoted literals, `let`, parentheses, `set`, word and symbolic set operators,
+  and duplicate elimination execute through the Bazel CLI;
+- wrong `deps` arity, syntax failure, and unknown functions exit 2 with stable
+  distinct diagnostics;
+- default and `--order_output=auto` render
+  `bin, data.txt, lib`, while `--order_output=full` renders dependency order
+  `bin, lib, data.txt`; and
+- the fixture claims only CLI-visible results/errors. AST shape and spans
+  remain source-cited Rust unit-test obligations.
+
+Externally observed loading-graph facts:
+
+- `//lib:all` and `//...` include rule-like targets but exclude source files;
+- explicit, implicit, and attribute-created source labels resolve literally.
+  `//lib:missing_input.txt` has no backing file, but its `filegroup.srcs`
+  reference creates a query-addressable node;
+- aliases remain result nodes and `deps(alias)` follows the actual edge;
+  custom-rule `attr.label_list` edges cross packages and reach source nodes;
+- a filegroup cycle is accepted structurally and terminates with both nodes;
+  and
+- missing target/package queries exit 7 with their distinct Bazel diagnostics.
+
+Generation and independent no-update reruns passed for both fixtures using
+`/usr/bin/bazel` 9.2.0. Fixture discovery, immutable provenance,
+`generated: true`, exact stdout/stderr pattern coverage, whitespace checks, and
+candidate credential scans passed. Bazel used ordinary RC discovery; no
+external RC or credential file was read, copied, logged into project files, or
+committed. Sol-low requested the deliberately absent source-label case, then
+returned `ACCEPT` after regeneration and an independent root rerun.

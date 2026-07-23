@@ -575,3 +575,24 @@ with `generated: false` is not acceptance evidence.
   Stage 6 owner plan. This does not yet make the fixture runnable through
   Slug's cquery/aquery command surfaces; those remain consumers of the landed
   graph in later packets.
+
+## Loading Query Oracle Checkpoint
+
+- 2026-07-22 commit `7e8993b2` added generated Bazel 9.2.0
+  `query-parser-and-sets` and `query-loading-thin-vertical` fixtures at
+  immutable source commit
+  `8220c6198837d5c13d53fea211cf3282aa12408a`.
+- CLI evidence covers quoted literals, `let`, parentheses, set operators and
+  duplicate elimination, parse/arity/unknown-function diagnostics, and the
+  distinct default/auto versus full text orders. It deliberately does not
+  claim internal AST or span evidence.
+- Loading evidence covers literal rule/source labels, rule-only `:all` and
+  recursive expansion, alias and custom-rule dependency traversal, a
+  structural cycle, missing target/package exit 7 diagnostics, and a
+  query-visible source label whose backing file is deliberately absent.
+- Generation plus independent no-update reruns passed with `/usr/bin/bazel`
+  9.2.0. Every command has stable stdout/stderr assertions; fixture discovery,
+  provenance, generated markers, whitespace, and candidate credential scans
+  passed. Ordinary RC discovery was used without reading, copying, logging, or
+  committing external RC or BuildBuddy credential content. Sol-low returned
+  `ACCEPT` after requiring and reviewing the absent-source-node regression.

@@ -685,7 +685,7 @@ Residual risk: rules_oci full no-daemon image/package build still needs a Linux-
 
 ### Stage 8 loading-query thin vertical — approved extraction plan
 
-Status: Approved next packet; implementation pending
+Status: Oracle landed; implementation pending
 Source ref/commit(s): Buck2
 `088c75c7e36805df99c3de29062baa95db700b8b`
 `app/buck2_query_parser`,
@@ -694,7 +694,7 @@ and `app/buck2_query_impls/src/uquery`; V1
 `e218054d4c796655939b968d90208b185decb352`
 `app/{slug_query_parser,slug_query,slug_query_impls,slug_cmd_query_server}` and
 `tests/core/query/test_bazel_compat_query.py`
-V2 commit(s): none yet
+V2 commit(s): oracle `7e8993b2`
 Source class: port Buck2's Bazel-neutral parser spans, generic evaluator,
 traversal, and compact deterministic-set machinery; adapt environment/DICE
 separation; use V1 only as same-lineage reference and scenario inventory
@@ -707,20 +707,24 @@ loading-query registry, diagnostics, demand-driven
 `UnconfiguredPackageGraphKey`, recursive-only `RootPackageSetKey`, structural
 rule/source nodes, normalized alias/filegroup/custom-rule edges, ordering, and
 text rendering
-Bazel oracle: pending Bazel 9.2.0 generation at
+Bazel oracle: generated with Bazel 9.2.0 at
 `8220c6198837d5c13d53fea211cf3282aa12408a`
-V2 fixture: planned `query-parser-and-sets` and
-`query-loading-thin-vertical`; stale Bazel 9.1.1 Windows `query-basic` is not
-acceptance evidence
-Expected evidence artifact: generated CLI results/errors for the implemented
-expression, graph, target-pattern, and ordering matrix; source-cited Rust unit
-tests for AST/span facts Bazel CLI cannot expose
+V2 fixture: `query-parser-and-sets` and `query-loading-thin-vertical`; stale
+Bazel 9.1.1 Windows `query-basic` is superseded for this text-query slice and
+is not acceptance evidence
+Expected evidence artifact: `7e8993b2` generated CLI results/errors for the
+implemented expression, graph, target-pattern, and ordering matrix;
+source-cited Rust unit tests remain required for AST/span facts Bazel CLI
+cannot expose
 Decision: port parser/spans/generic evaluator/traversal/compact sets; adapt
 uquery environment separation; reject Buck cells, labels, patterns,
 registries, attributes, diagnostics, printers, configured/action graphs, and
 V1 process/server context. Keep known-but-deferred functions and formats as
 explicit errors, not parity claims.
-Validation: pending the oracle-first and implementation packets
+Validation: both fixtures generated and independently reran no-update with
+`/usr/bin/bazel` 9.2.0; discovery/provenance/generated/assertion/whitespace and
+candidate credential checks passed; Sol-low oracle review `ACCEPT`.
+Implementation validation remains pending.
 Residual risk: this is the first integrated M3 vertical, not full query.
 External repositories, the remaining function registry, Sky Query,
 configuration/action environments, and non-text formatters remain open.
