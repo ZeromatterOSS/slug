@@ -61,6 +61,9 @@ use crate::glob::expand_glob;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::UserProviderCallable;
+use crate::visibility::PackageGroupContents;
+use crate::visibility::RuleVisibility;
+use crate::visibility::VisibilitySource;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageFile {
@@ -76,7 +79,7 @@ pub struct PackageFile {
 pub struct LoadedPackage {
     pub package_dir: PathBuf,
     pub build_file: PathBuf,
-    pub default_visibility: Vec<String>,
+    pub default_visibility: RuleVisibility,
     pub targets: Vec<PackageTarget>,
     pub used_globs: Vec<GlobSpec>,
     /// Ordered label-first direct `.bzl` roots for this BUILD evaluation.
@@ -104,10 +107,34 @@ impl PartialEq for LoadedPackage {
 
 impl Eq for LoadedPackage {}
 
+impl LoadedPackage {
+    pub fn effective_visibility(&self, target: &PackageTarget) -> Option<RuleVisibility> {
+        match &target.visibility {
+            VisibilitySource::Declared(visibility) => Some(visibility.clone()),
+            VisibilitySource::PackageDefault => Some(self.default_visibility.clone()),
+            VisibilitySource::AlwaysPublic => Some(RuleVisibility::Public),
+            VisibilitySource::GeneratingRule => {
+                let PackageTargetKind::GeneratedFile {
+                    generating_rule, ..
+                } = &target.kind
+                else {
+                    return None;
+                };
+                let generating_rule = self
+                    .targets
+                    .iter()
+                    .find(|candidate| candidate.name == generating_rule.as_str())?;
+                self.effective_visibility(generating_rule)
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct PackageTarget {
     pub name: String,
     pub kind: PackageTargetKind,
+    pub visibility: VisibilitySource,
 }
 
 impl PackageTarget {
@@ -119,6 +146,19 @@ impl PackageTarget {
 
     pub fn test_metadata(&self) -> Option<TestMetadata> {
         self.kind.test_metadata()
+    }
+
+    pub fn visibility_explicit(&self) -> bool {
+        matches!(self.visibility, VisibilitySource::Declared(_))
+    }
+
+    pub fn raw_visibility_labels(&self) -> &[CanonicalLabel] {
+        match &self.visibility {
+            VisibilitySource::Declared(visibility) => visibility.raw_declared_labels(),
+            VisibilitySource::PackageDefault
+            | VisibilitySource::GeneratingRule
+            | VisibilitySource::AlwaysPublic => &[],
+        }
     }
 }
 
@@ -220,6 +260,10 @@ pub enum PackageTargetKind {
         membership: TestSuiteMembership,
         tags: Arc<[CompactString]>,
     },
+    PackageGroup {
+        contents: Arc<PackageGroupContents>,
+        includes: Arc<[CanonicalLabel]>,
+    },
     /// A file declared by an `attr.output` or `attr.output_list` value.
     /// Its generator is retained explicitly; names alone cannot determine it.
     GeneratedFile {
@@ -243,7 +287,7 @@ impl PackageTargetKind {
             Self::ConfigSetting { .. } => Some(&CONFIG_SETTING_RULE_CAPABILITY),
             Self::TestSuite { .. } => Some(&TEST_SUITE_RULE_CAPABILITY),
             Self::StarlarkRule(rule) => Some(&rule.capability),
-            Self::ExportedFile | Self::GeneratedFile { .. } => None,
+            Self::ExportedFile | Self::GeneratedFile { .. } | Self::PackageGroup { .. } => None,
         }
     }
 
@@ -332,11 +376,27 @@ impl StarlarkRuleImplementation {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct PackageState {
-    default_visibility: Vec<String>,
-    targets: SmallMap<String, PackageTargetKind>,
+    default_visibility: RuleVisibility,
+    targets: SmallMap<String, RecordedTarget>,
     used_globs: Vec<GlobSpec>,
+}
+
+impl Default for PackageState {
+    fn default() -> Self {
+        Self {
+            default_visibility: RuleVisibility::Private,
+            targets: SmallMap::new(),
+            used_globs: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RecordedTarget {
+    kind: PackageTargetKind,
+    visibility: VisibilitySource,
 }
 
 #[derive(Debug, ProvidesStaticType)]
@@ -369,18 +429,29 @@ impl PackageRecorder {
             })
     }
 
-    fn set_default_visibility(&self, visibility: Vec<String>) {
-        self.state.borrow_mut().default_visibility = visibility;
+    fn set_default_visibility(&self, visibility: Vec<String>) -> anyhow::Result<()> {
+        self.state.borrow_mut().default_visibility = self.parse_visibility(visibility)?;
+        Ok(())
     }
 
-    fn exports_files(&self, srcs: Vec<String>) -> anyhow::Result<()> {
+    fn exports_files(
+        &self,
+        srcs: Vec<String>,
+        visibility: Option<Vec<String>>,
+    ) -> anyhow::Result<()> {
+        let visibility = self.visibility_source(visibility, VisibilitySource::AlwaysPublic)?;
         for src in srcs {
-            self.record_target(src, PackageTargetKind::ExportedFile)?;
+            self.record_target(src, PackageTargetKind::ExportedFile, visibility.clone())?;
         }
         Ok(())
     }
 
-    fn filegroup(&self, name: String, srcs: Option<Vec<String>>) -> anyhow::Result<()> {
+    fn filegroup(
+        &self,
+        name: String,
+        srcs: Option<Vec<String>>,
+        visibility: Option<Vec<String>>,
+    ) -> anyhow::Result<()> {
         let srcs_explicit = srcs.is_some();
         let srcs = srcs
             .unwrap_or_default()
@@ -395,6 +466,7 @@ impl PackageRecorder {
                 srcs,
                 srcs_explicit,
             },
+            self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
         )
     }
 
@@ -403,6 +475,7 @@ impl PackageRecorder {
         name: String,
         tests: Option<Vec<String>>,
         mut tags: Vec<String>,
+        visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
         let tests_explicit = tests.is_some();
         let mut tests = tests
@@ -433,15 +506,30 @@ impl PackageRecorder {
                     .collect::<Vec<_>>()
                     .into(),
             },
+            self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
         )
     }
 
-    fn alias(&self, name: String, actual: String) -> anyhow::Result<()> {
+    fn alias(
+        &self,
+        name: String,
+        actual: String,
+        visibility: Option<Vec<String>>,
+    ) -> anyhow::Result<()> {
         let actual = self.dependency_label(&actual)?;
-        self.record_target(name, PackageTargetKind::Alias { actual })
+        self.record_target(
+            name,
+            PackageTargetKind::Alias { actual },
+            self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
+        )
     }
 
-    fn config_setting(&self, name: String, values: SmallMap<String, String>) -> anyhow::Result<()> {
+    fn config_setting(
+        &self,
+        name: String,
+        values: SmallMap<String, String>,
+        visibility: Option<Vec<String>>,
+    ) -> anyhow::Result<()> {
         let mut values = values
             .into_iter()
             .map(|(key, value)| (CompactString::from(key), CompactString::from(value)))
@@ -452,6 +540,28 @@ impl PackageRecorder {
             PackageTargetKind::ConfigSetting {
                 values: values.into(),
             },
+            self.visibility_source(visibility, VisibilitySource::AlwaysPublic)?,
+        )
+    }
+
+    fn package_group(
+        &self,
+        name: String,
+        packages: Vec<String>,
+        includes: Vec<String>,
+    ) -> anyhow::Result<()> {
+        let contents = Arc::new(PackageGroupContents::from_package_specs(&packages)?);
+        let includes = includes
+            .iter()
+            .map(|include| self.dependency_label(include))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        self.record_target(
+            name,
+            PackageTargetKind::PackageGroup {
+                contents,
+                includes: includes.into(),
+            },
+            VisibilitySource::AlwaysPublic,
         )
     }
 
@@ -462,6 +572,7 @@ impl PackageRecorder {
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
+        visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
         let mut dependencies = Vec::new();
         for value in values.iter() {
@@ -490,6 +601,7 @@ impl PackageRecorder {
                 values,
                 capability,
             }),
+            self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
         )
     }
 
@@ -497,12 +609,41 @@ impl PackageRecorder {
         package_context_label(&self.package, value)
     }
 
-    fn record_target(&self, name: String, kind: PackageTargetKind) -> anyhow::Result<()> {
+    fn parse_visibility(&self, values: Vec<String>) -> anyhow::Result<RuleVisibility> {
+        RuleVisibility::from_declared_labels(
+            values
+                .iter()
+                .map(|value| self.dependency_label(value))
+                .collect::<anyhow::Result<Vec<_>>>()?,
+        )
+    }
+
+    fn visibility_source(
+        &self,
+        values: Option<Vec<String>>,
+        omitted: VisibilitySource,
+    ) -> anyhow::Result<VisibilitySource> {
+        values
+            .map(|values| {
+                self.parse_visibility(values)
+                    .map(VisibilitySource::Declared)
+            })
+            .unwrap_or(Ok(omitted))
+    }
+
+    fn record_target(
+        &self,
+        name: String,
+        kind: PackageTargetKind,
+        visibility: VisibilitySource,
+    ) -> anyhow::Result<()> {
         let mut state = self.state.borrow_mut();
         if state.targets.get(&name).is_some() {
             anyhow::bail!("target '{name}' declared more than once");
         }
-        state.targets.insert(name, kind);
+        state
+            .targets
+            .insert(name, RecordedTarget { kind, visibility });
         Ok(())
     }
 
@@ -514,6 +655,7 @@ impl PackageRecorder {
                 label,
                 generating_rule: generating_rule.into(),
             },
+            VisibilitySource::GeneratingRule,
         )
     }
 
@@ -536,9 +678,9 @@ impl PackageRecorder {
         let mut implicit_candidates = state
             .targets
             .iter()
-            .filter_map(|(name, kind)| match kind {
+            .filter_map(|(name, target)| match &target.kind {
                 PackageTargetKind::StarlarkRule(rule) if rule.is_test() => {
-                    kind.test_metadata().map(|metadata| {
+                    target.kind.test_metadata().map(|metadata| {
                         (
                             package_context_label(&self.package, name)
                                 .expect("recorded target names are valid package-context labels"),
@@ -550,11 +692,11 @@ impl PackageRecorder {
             })
             .collect::<Vec<_>>();
         implicit_candidates.sort_by(|(left, _), (right, _)| left.bazel_natural_cmp(right));
-        for (_, kind) in state.targets.iter_mut() {
+        for (_, target) in state.targets.iter_mut() {
             if let PackageTargetKind::TestSuite {
                 membership: TestSuiteMembership::Implicit { members, .. },
                 tags,
-            } = kind
+            } = &mut target.kind
             {
                 *members = implicit_candidates
                     .iter()
@@ -571,7 +713,11 @@ impl PackageRecorder {
             targets: state
                 .targets
                 .into_iter()
-                .map(|(name, kind)| PackageTarget { name, kind })
+                .map(|(name, target)| PackageTarget {
+                    name,
+                    kind: target.kind,
+                    visibility: target.visibility,
+                })
                 .collect(),
             used_globs: state.used_globs,
             direct_load_roots,
@@ -676,25 +822,31 @@ fn package_global(
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
     if let Some(default_visibility) = default_visibility {
-        PackageRecorder::from_evaluator(eval)?.set_default_visibility(list(default_visibility));
+        PackageRecorder::from_evaluator(eval)?.set_default_visibility(list(default_visibility))?;
     }
     Ok(NoneType)
 }
 
 fn exports_files_global(
     srcs: UnpackListOrTuple<&str>,
+    visibility: Option<UnpackListOrTuple<&str>>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?.exports_files(list(srcs))?;
+    PackageRecorder::from_evaluator(eval)?.exports_files(list(srcs), visibility.map(list))?;
     Ok(NoneType)
 }
 
 fn filegroup_global(
     name: &str,
     srcs: Option<UnpackListOrTuple<&str>>,
+    visibility: Option<UnpackListOrTuple<&str>>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?.filegroup(name.to_owned(), srcs.map(list))?;
+    PackageRecorder::from_evaluator(eval)?.filegroup(
+        name.to_owned(),
+        srcs.map(list),
+        visibility.map(list),
+    )?;
     Ok(NoneType)
 }
 
@@ -702,18 +854,29 @@ fn test_suite_global(
     name: &str,
     tests: Option<UnpackListOrTuple<&str>>,
     tags: UnpackListOrTuple<&str>,
+    visibility: Option<UnpackListOrTuple<&str>>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
     PackageRecorder::from_evaluator(eval)?.test_suite(
         name.to_owned(),
         tests.map(list),
         list(tags),
+        visibility.map(list),
     )?;
     Ok(NoneType)
 }
 
-fn alias_global(name: &str, actual: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?.alias(name.to_owned(), actual.to_owned())?;
+fn alias_global(
+    name: &str,
+    actual: &str,
+    visibility: Option<UnpackListOrTuple<&str>>,
+    eval: &mut Evaluator,
+) -> anyhow::Result<NoneType> {
+    PackageRecorder::from_evaluator(eval)?.alias(
+        name.to_owned(),
+        actual.to_owned(),
+        visibility.map(list),
+    )?;
     Ok(NoneType)
 }
 
@@ -1486,18 +1649,26 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 )));
             }
         }
-        if let Some(visibility) = names.get("visibility") {
+        let visibility = if let Some(visibility) = names.get("visibility") {
             let visibility = ListRef::from_value(*visibility).ok_or_else(|| {
                 starlark::Error::new_other(anyhow::anyhow!(
                     "attribute `visibility` must be a list of strings"
                 ))
             })?;
-            if visibility.iter().any(|value| value.unpack_str().is_none()) {
-                return Err(starlark::Error::new_other(anyhow::anyhow!(
-                    "attribute `visibility` must be a list of strings"
-                )));
-            }
-        }
+            visibility
+                .iter()
+                .map(|value| {
+                    value.unpack_str().map(ToOwned::to_owned).ok_or_else(|| {
+                        starlark::Error::new_other(anyhow::anyhow!(
+                            "attribute `visibility` must be a list of strings"
+                        ))
+                    })
+                })
+                .collect::<starlark::Result<Vec<_>>>()
+                .map(Some)?
+        } else {
+            None
+        };
         let implementation = self.implementation;
         let capability = self.capability.clone();
         PackageRecorder::from_evaluator(eval)
@@ -1573,6 +1744,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     capability,
                     schema,
                     values,
+                    visibility,
                 )?;
                 for output in generated {
                     recorder.generated_file(output, name)?;
@@ -1595,30 +1767,38 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn exports_files(
         srcs: UnpackListOrTuple<&str>,
+        visibility: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        exports_files_global(srcs, eval)
+        exports_files_global(srcs, visibility, eval)
     }
 
     fn filegroup(
         name: &str,
         srcs: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        filegroup_global(name, srcs, eval)
+        filegroup_global(name, srcs, visibility, eval)
     }
 
     fn test_suite(
         name: &str,
         tests: Option<UnpackListOrTuple<&str>>,
         #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
+        visibility: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        test_suite_global(name, tests, tags, eval)
+        test_suite_global(name, tests, tags, visibility, eval)
     }
 
-    fn alias(name: &str, actual: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
-        alias_global(name, actual, eval)
+    fn alias(
+        name: &str,
+        actual: &str,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        alias_global(name, actual, visibility, eval)
     }
 
     // Bazel 9.2 `ConfigRuleClasses.ConfigSettingRule` declares `values` as
@@ -1628,9 +1808,28 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn config_setting(
         name: &str,
         #[starlark(require = named)] values: SmallMap<String, String>,
+        visibility: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        PackageRecorder::from_evaluator(eval)?.config_setting(name.to_owned(), values)?;
+        PackageRecorder::from_evaluator(eval)?.config_setting(
+            name.to_owned(),
+            values,
+            visibility.map(list),
+        )?;
+        Ok(NoneType)
+    }
+
+    fn package_group(
+        name: &str,
+        #[starlark(default=UnpackListOrTuple::default())] packages: UnpackListOrTuple<&str>,
+        #[starlark(default=UnpackListOrTuple::default())] includes: UnpackListOrTuple<&str>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        PackageRecorder::from_evaluator(eval)?.package_group(
+            name.to_owned(),
+            list(packages),
+            list(includes),
+        )?;
         Ok(NoneType)
     }
 
@@ -1738,18 +1937,20 @@ fn native_methods(builder: &mut MethodsBuilder) {
     fn exports_files(
         #[starlark(this)] _native: Value,
         srcs: UnpackListOrTuple<&str>,
+        visibility: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        exports_files_global(srcs, eval)
+        exports_files_global(srcs, visibility, eval)
     }
 
     fn filegroup(
         #[starlark(this)] _native: Value,
         name: &str,
         srcs: Option<UnpackListOrTuple<&str>>,
+        visibility: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        filegroup_global(name, srcs, eval)
+        filegroup_global(name, srcs, visibility, eval)
     }
 
     fn test_suite(
@@ -1757,18 +1958,50 @@ fn native_methods(builder: &mut MethodsBuilder) {
         name: &str,
         tests: Option<UnpackListOrTuple<&str>>,
         #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
+        visibility: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        test_suite_global(name, tests, tags, eval)
+        test_suite_global(name, tests, tags, visibility, eval)
     }
 
     fn alias(
         #[starlark(this)] _native: Value,
         name: &str,
         actual: &str,
+        visibility: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        alias_global(name, actual, eval)
+        alias_global(name, actual, visibility, eval)
+    }
+
+    fn config_setting(
+        #[starlark(this)] _native: Value,
+        name: &str,
+        #[starlark(require = named)] values: SmallMap<String, String>,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        PackageRecorder::from_evaluator(eval)?.config_setting(
+            name.to_owned(),
+            values,
+            visibility.map(list),
+        )?;
+        Ok(NoneType)
+    }
+
+    fn package_group(
+        #[starlark(this)] _native: Value,
+        name: &str,
+        #[starlark(default=UnpackListOrTuple::default())] packages: UnpackListOrTuple<&str>,
+        #[starlark(default=UnpackListOrTuple::default())] includes: UnpackListOrTuple<&str>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        PackageRecorder::from_evaluator(eval)?.package_group(
+            name.to_owned(),
+            list(packages),
+            list(includes),
+        )?;
+        Ok(NoneType)
     }
 
     fn glob<'v>(

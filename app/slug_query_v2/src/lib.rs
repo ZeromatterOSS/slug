@@ -40,6 +40,8 @@ pub use expr::loading_query_functions;
 pub use expr::parse_query_expression;
 pub use expr::validate_loading_query;
 pub use graph::QueryAttribute;
+pub use graph::QueryEdge;
+pub use graph::QueryEdgeKind;
 pub use graph::QueryError;
 pub use graph::QueryLabel;
 pub use graph::QueryNode;

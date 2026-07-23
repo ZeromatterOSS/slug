@@ -40,6 +40,136 @@ struct QueryOracleCase {
     error_fragments: &'static [&'static str],
 }
 
+struct NamedQueryOracleCase {
+    name: &'static str,
+    case: QueryOracleCase,
+}
+
+fn visibility_stage4_oracle_cases() -> [NamedQueryOracleCase; 12] {
+    [
+        NamedQueryOracleCase {
+            name: "deps_package_group_include_cycle_retains_graph",
+            case: QueryOracleCase {
+                args: &["deps(//owner:cycle_visible)"],
+                expected_labels: &[
+                    "//owner:cycle_a",
+                    "//owner:cycle_b",
+                    "//owner:cycle_visible",
+                ],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "misspelled_special_visibility_label_diagnostic",
+            case: QueryOracleCase {
+                args: &["//errors/misspelled:target"],
+                expected_labels: &[],
+                error_fragments: &[
+                    "Invalid visibility label '//visibility:plubic'; did you mean //visibility:public or //visibility:private?",
+                    "Evaluation of query",
+                ],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "malformed_package_specification_diagnostic",
+            case: QueryOracleCase {
+                args: &["//errors/malformed_spec:target"],
+                expected_labels: &[],
+                error_fragments: &[
+                    "invalid package name 'not-a-package': must start with '//', '@', or be 'public' or 'private'",
+                    "Evaluation of query",
+                ],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "labels_visibility_explicit_group_projects_raw_target",
+            case: QueryOracleCase {
+                args: &["labels(visibility, //owner:base_only)"],
+                expected_labels: &["//owner:base"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "labels_visibility_omitted_default_group_is_empty",
+            case: QueryOracleCase {
+                args: &["labels(visibility, //default_group:omitted)"],
+                expected_labels: &[],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "labels_visibility_explicit_direct_specs_fail_non_loadable_lookup",
+            case: QueryOracleCase {
+                args: &["labels(visibility, //owner:direct_specs)"],
+                expected_labels: &[],
+                error_fragments: &[
+                    "in 'visibility' of rule //owner:direct_specs: no such target '//viewer:__pkg__': target '__pkg__' not declared in package 'viewer'",
+                ],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "labels_visibility_omitted_default_direct_specs_is_empty",
+            case: QueryOracleCase {
+                args: &["labels(visibility, //default_direct:omitted)"],
+                expected_labels: &[],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "deps_explicit_visibility_group_edge",
+            case: QueryOracleCase {
+                args: &["deps(//owner:base_only)"],
+                expected_labels: &["//owner:base", "//owner:base_only"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "deps_transitive_package_group_include_edges",
+            case: QueryOracleCase {
+                args: &["deps(//owner:top_reallow)"],
+                expected_labels: &[
+                    "//owner:base",
+                    "//owner:middle",
+                    "//owner:reallow",
+                    "//owner:top",
+                    "//owner:top_reallow",
+                ],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "deps_inherited_group_edges_for_rule_and_source",
+            case: QueryOracleCase {
+                args: &["deps(set(//default_group:omitted //default_group:data.txt))"],
+                expected_labels: &[
+                    "//default_group:data.txt",
+                    "//default_group:omitted",
+                    "//owner:exact",
+                ],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "deps_direct_package_specs_are_not_targets",
+            case: QueryOracleCase {
+                args: &["deps(//owner:direct_specs)"],
+                expected_labels: &["//owner:direct_specs"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "labels_visibility_explicit_subpackages_spec_fails_non_loadable_lookup",
+            case: QueryOracleCase {
+                args: &["labels(visibility, //owner:direct_subpackages_only)"],
+                expected_labels: &[],
+                error_fragments: &[
+                    "in 'visibility' of rule //owner:direct_subpackages_only: no such target '//viewer:__subpackages__': target '__subpackages__' not declared in package 'viewer'",
+                ],
+            },
+        },
+    ]
+}
+
 fn tests_function_oracle_cases() -> [QueryOracleCase; 21] {
     [
         QueryOracleCase {
@@ -374,6 +504,18 @@ fn tests_query_expansion_fixture_matches_exact_twenty_seven_non_build_rows_one_s
     assert_eq!(function_cases.len() + non_function_cases.len(), 27);
     for case in function_cases.into_iter().chain(non_function_cases) {
         assert_query_oracle_case(&workspace, None, case);
+    }
+}
+
+#[test]
+fn visibility_stage4_fixture_matches_exact_twelve_non_visible_rows() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-visible-visibility/workspace");
+    let cases = visibility_stage4_oracle_cases();
+    assert_eq!(cases.len(), 12);
+    for named in cases {
+        assert!(!named.name.starts_with("visible_"), "{}", named.name);
+        assert_query_oracle_case(&workspace, None, named.case);
     }
 }
 

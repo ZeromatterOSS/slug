@@ -11,6 +11,8 @@ use dice::DetectCycles;
 use dice::Dice;
 use dice::DynKey;
 use dice::UserComputationData;
+use slug_loading_v2::RuleVisibility;
+use slug_loading_v2::VisibilitySource;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
@@ -19,6 +21,7 @@ use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_query_v2::QueryEdgeKind;
 use slug_query_v2::QueryNodeKind;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryPolicy;
@@ -896,9 +899,185 @@ async fn package_graph_has_one_zero_edge_build_file_node_synthesized_or_coalesce
             .collect::<Vec<_>>();
         assert_eq!(build_nodes.len(), 1, "{package_path}");
         assert_eq!(build_nodes[0].label.to_string(), expected_build);
-        assert!(build_nodes[0].dependencies.is_empty(), "{package_path}");
+        assert!(build_nodes[0].edges.is_empty(), "{package_path}");
         assert!(!build_nodes[0].kind.is_rule(), "{package_path}");
     }
+}
+
+#[tokio::test]
+async fn visibility_graph_projects_raw_effective_and_ordered_tagged_edges() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nemit = rule(implementation = _impl, attrs = {\"out\": attr.output(mandatory = True)})\n",
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        r#"
+load(":defs.bzl", "emit")
+package(default_visibility = [":default_group"])
+package_group(name = "default_group", packages = ["//viewer"], includes = [":included", ":missing_include"])
+package_group(name = "included", packages = ["//other"])
+exports_files(["public.txt"])
+filegroup(name = "omitted", srcs = ["implicit.txt"])
+filegroup(name = "declared", srcs = [":default_group"], visibility = [":default_group", "//viewer:__pkg__"])
+filegroup(name = "ordinary_missing", srcs = [":missing_ordinary"])
+filegroup(name = "visibility_missing", visibility = [":missing_visibility"])
+config_setting(name = "config_public", values = {"define": "visibility_probe=1"})
+config_setting(name = "config_restricted", values = {"define": "visibility_probe=1"}, visibility = [":default_group"])
+emit(name = "generator", out = "generated.txt", visibility = [":default_group"])
+"#,
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace,
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    let node = |name: &str| {
+        graph
+            .nodes
+            .values()
+            .find(|node| node.label.target() == name)
+            .unwrap()
+    };
+
+    let visibility = |name: &str| {
+        node(name)
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "visibility")
+            .unwrap()
+    };
+    assert!(!visibility("omitted").explicit);
+    assert!(visibility("omitted").labels.is_empty());
+    assert!(matches!(
+        node("omitted").effective_visibility,
+        RuleVisibility::Restricted(_)
+    ));
+    assert_eq!(
+        node("omitted").visibility_source,
+        VisibilitySource::PackageDefault
+    );
+    assert!(visibility("declared").explicit);
+    assert_eq!(
+        visibility("declared")
+            .labels
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:default_group", "//viewer:__pkg__"]
+    );
+    assert_eq!(
+        node("declared")
+            .edges
+            .iter()
+            .map(|edge| (edge.kind, edge.target.to_string()))
+            .collect::<Vec<_>>(),
+        [
+            (
+                QueryEdgeKind::VisibilityNodep,
+                "//pkg:default_group".to_owned(),
+            ),
+            (QueryEdgeKind::Ordinary, "//pkg:default_group".to_owned(),),
+        ]
+    );
+    assert_eq!(
+        node("default_group")
+            .edges
+            .iter()
+            .map(|edge| (edge.kind, edge.target.to_string()))
+            .collect::<Vec<_>>(),
+        [
+            (
+                QueryEdgeKind::PackageGroupInclude,
+                "//pkg:included".to_owned(),
+            ),
+            (
+                QueryEdgeKind::PackageGroupInclude,
+                "//pkg:missing_include".to_owned(),
+            ),
+        ]
+    );
+    assert_eq!(node("default_group").kind, QueryNodeKind::PackageGroup);
+    assert!(node("default_group").package_group_contents.is_some());
+    assert_eq!(
+        node("implicit.txt")
+            .edges
+            .iter()
+            .map(|edge| (edge.kind, edge.target.to_string()))
+            .collect::<Vec<_>>(),
+        [(
+            QueryEdgeKind::VisibilityNodep,
+            "//pkg:default_group".to_owned(),
+        )]
+    );
+    assert!(node("public.txt").edges.is_empty());
+    assert_eq!(
+        node("public.txt").effective_visibility,
+        RuleVisibility::Public
+    );
+    assert_eq!(
+        node("config_public").effective_visibility,
+        RuleVisibility::Public
+    );
+    assert_eq!(
+        node("config_public").visibility_source,
+        VisibilitySource::AlwaysPublic
+    );
+    assert!(matches!(
+        node("config_restricted").effective_visibility,
+        RuleVisibility::Restricted(_)
+    ));
+    assert!(matches!(
+        node("config_restricted").visibility_source,
+        VisibilitySource::Declared(_)
+    ));
+    assert_eq!(
+        node("generated.txt")
+            .edges
+            .iter()
+            .map(|edge| (edge.kind, edge.target.to_string()))
+            .collect::<Vec<_>>(),
+        [
+            (QueryEdgeKind::GeneratingRule, "//pkg:generator".to_owned(),),
+            (
+                QueryEdgeKind::VisibilityNodep,
+                "//pkg:default_group".to_owned(),
+            ),
+        ]
+    );
+    assert_eq!(
+        node("generated.txt").visibility_source,
+        VisibilitySource::GeneratingRule
+    );
+    assert_eq!(
+        node("generated.txt").effective_visibility,
+        node("generator").effective_visibility
+    );
+    assert!(
+        graph
+            .nodes
+            .keys()
+            .any(|label| label.target() == "missing_ordinary")
+    );
+    assert!(
+        !graph
+            .nodes
+            .keys()
+            .any(|label| label.target() == "missing_visibility")
+    );
+    assert!(
+        !graph
+            .nodes
+            .keys()
+            .any(|label| label.target() == "missing_include")
+    );
 }
 
 #[tokio::test]
@@ -925,7 +1104,7 @@ async fn config_setting_is_a_loading_rule_without_configuration_evaluation() {
         .find(|node| node.label.to_string() == "//pkg:linux")
         .unwrap();
     assert_eq!(node.kind, QueryNodeKind::Rule("config_setting rule".into()));
-    assert!(node.dependencies.is_empty());
+    assert!(node.edges.is_empty());
 
     let output =
         evaluate_loading_query(&mut transaction, workspace, "//pkg:linux", QueryOrder::Auto)
@@ -1153,7 +1332,7 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
         .values()
         .find(|node| node.label.to_string() == "//pkg:rule")
         .unwrap();
-    assert!(rule.dependencies.is_empty());
+    assert!(rule.edges.is_empty());
     for output in ["//pkg:dir/one.out", "//pkg:two.out", "//pkg:three.out"] {
         let output = graph
             .nodes
@@ -1163,9 +1342,9 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
         assert_eq!(output.kind, QueryNodeKind::GeneratedFile);
         assert_eq!(
             output
-                .dependencies
+                .edges
                 .iter()
-                .map(ToString::to_string)
+                .map(|edge| edge.target.to_string())
                 .collect::<Vec<_>>(),
             ["//pkg:rule"]
         );
@@ -1271,9 +1450,9 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
     );
     assert_eq!(
         node("attrs")
-            .dependencies
+            .edges
             .iter()
-            .filter(|label| label.to_string() == "//pkg:dupe.txt")
+            .filter(|edge| edge.target.to_string() == "//pkg:dupe.txt")
             .count(),
         1
     );
@@ -1310,17 +1489,17 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
     );
     assert_eq!(
         node("explicit_suite")
-            .dependencies
+            .edges
             .iter()
-            .map(ToString::to_string)
+            .map(|edge| edge.target.to_string())
             .collect::<Vec<_>>(),
         ["//pkg:auto", "//pkg:manual_test"]
     );
     assert_eq!(
         node("implicit")
-            .dependencies
+            .edges
             .iter()
-            .map(ToString::to_string)
+            .map(|edge| edge.target.to_string())
             .collect::<Vec<_>>(),
         ["//pkg:auto"]
     );
@@ -1540,9 +1719,9 @@ async fn native_label_canonicalization_reuses_rejects_duplicates_and_recovers() 
     );
     assert_eq!(
         group
-            .dependencies
+            .edges
             .iter()
-            .map(ToString::to_string)
+            .map(|edge| edge.target.to_string())
             .collect::<Vec<_>>(),
         ["//pkg:two.txt", "//pkg:one.txt"]
     );

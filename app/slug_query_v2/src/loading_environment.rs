@@ -127,13 +127,13 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                 continue;
             }
             self.evaluation_graph.record_node(node.label.clone());
-            for dependency in node
-                .dependencies
+            for edge in node
+                .edges
                 .iter()
-                .filter(|dependency| selected.contains(dependency))
+                .filter(|edge| selected.contains(&edge.target))
             {
                 self.evaluation_graph
-                    .record_edge(node.label.clone(), dependency.clone());
+                    .record_edge(node.label.clone(), edge.target.clone());
             }
         }
     }
@@ -389,13 +389,13 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             return Ok(Arc::from([]));
         };
         let node = self.resolve_single(label.clone()).await?;
-        let mut dependencies = Vec::with_capacity(node.dependencies.len());
-        for dependency in node.dependencies.iter() {
+        let mut dependencies = Vec::with_capacity(node.edges.len());
+        for edge in node.edges.iter() {
             self.evaluation_graph
-                .record_edge(label.clone(), dependency.clone());
+                .record_edge(label.clone(), edge.target.clone());
             dependencies.push(
                 self.candidates
-                    .intern(QueryCandidate::real(dependency.clone())),
+                    .intern(QueryCandidate::real(edge.target.clone())),
             );
         }
         Ok(dependencies.into())
@@ -426,14 +426,14 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             let graph = self.package_graph(&package).await?;
             for node in graph.nodes.values() {
                 self.evaluation_graph.record_node(node.label.clone());
-                for dependency in node.dependencies.iter() {
+                for edge in node.edges.iter() {
                     self.evaluation_graph
-                        .record_edge(node.label.clone(), dependency.clone());
+                        .record_edge(node.label.clone(), edge.target.clone());
                 }
                 if node
-                    .dependencies
+                    .edges
                     .iter()
-                    .any(|dependency| package_targets.contains(dependency))
+                    .any(|edge| package_targets.contains(&edge.target))
                 {
                     result.insert(
                         self.candidates

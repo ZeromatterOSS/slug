@@ -24,9 +24,12 @@ use dice::Key;
 use dupe::Dupe;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::AttributeProvenance;
+use slug_loading_v2::PackageGroupContents;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::RuleCapability;
+use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestMetadata;
+use slug_loading_v2::VisibilitySource;
 use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectoryKey;
@@ -83,6 +86,7 @@ pub enum QueryNodeKind {
     BuildFile,
     SourceFile,
     GeneratedFile,
+    PackageGroup,
     Rule(CompactString),
 }
 
@@ -101,8 +105,25 @@ pub struct QueryNode {
     pub rule_capability: Option<RuleCapability>,
     pub test_metadata: Option<TestMetadata>,
     pub build_file: CompactString,
-    pub dependencies: Arc<[QueryLabel]>,
+    pub effective_visibility: RuleVisibility,
+    pub visibility_source: VisibilitySource,
+    pub package_group_contents: Option<Arc<PackageGroupContents>>,
+    pub edges: Arc<[QueryEdge]>,
     pub attributes: Arc<[QueryAttribute]>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative, Dupe)]
+pub enum QueryEdgeKind {
+    GeneratingRule,
+    VisibilityNodep,
+    Ordinary,
+    PackageGroupInclude,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct QueryEdge {
+    pub kind: QueryEdgeKind,
+    pub target: QueryLabel,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -289,12 +310,27 @@ async fn compute_package_graph(
             }
             _ => label_in_package(&package_name, &target.name)?,
         };
-        let (kind, dependencies, attributes) = match &target.kind {
+        let effective_visibility = effective_visibility(loaded, target)?;
+        let visibility_source = target.visibility.clone();
+        let package_group_contents = match &target.kind {
+            PackageTargetKind::PackageGroup { contents, .. } => Some(contents.clone()),
+            _ => None,
+        };
+        let visibility_edges = effective_visibility
+            .dependency_labels()
+            .iter()
+            .cloned()
+            .map(|label| QueryEdge {
+                kind: QueryEdgeKind::VisibilityNodep,
+                target: QueryLabel::from_canonical(label),
+            })
+            .collect::<Vec<_>>();
+        let (kind, edges, mut attributes) = match &target.kind {
             PackageTargetKind::ExportedFile if target.name == build_basename => {
-                (QueryNodeKind::BuildFile, Arc::from([]), Arc::from([]))
+                (QueryNodeKind::BuildFile, visibility_edges, Vec::new())
             }
             PackageTargetKind::ExportedFile => {
-                (QueryNodeKind::SourceFile, Arc::from([]), Arc::from([]))
+                (QueryNodeKind::SourceFile, visibility_edges, Vec::new())
             }
             PackageTargetKind::Filegroup {
                 srcs,
@@ -306,38 +342,48 @@ async fn compute_package_graph(
                     .map(QueryLabel::from_canonical)
                     .collect::<Vec<_>>();
                 let mut seen = SmallSet::new();
-                let dependencies = labels
+                let ordinary = labels
                     .iter()
                     .filter(|label| seen.insert((*label).dupe()))
                     .map(QueryLabel::dupe)
                     .collect::<Vec<_>>();
-                let attributes = Arc::from([QueryAttribute {
+                let attributes = vec![QueryAttribute {
                     name: CompactString::new("srcs"),
                     labels: labels.into(),
                     explicit: *srcs_explicit,
-                }]);
+                }];
+                let mut edges = visibility_edges;
+                edges.extend(ordinary.into_iter().map(|target| QueryEdge {
+                    kind: QueryEdgeKind::Ordinary,
+                    target,
+                }));
                 (
                     QueryNodeKind::Rule(CompactString::new("filegroup rule")),
-                    dependencies.into(),
+                    edges,
                     attributes,
                 )
             }
             PackageTargetKind::Alias { actual } => {
                 let actual = QueryLabel::from_canonical(actual.clone());
+                let mut edges = visibility_edges;
+                edges.push(QueryEdge {
+                    kind: QueryEdgeKind::Ordinary,
+                    target: actual.dupe(),
+                });
                 (
                     QueryNodeKind::Rule(CompactString::new("alias rule")),
-                    Arc::from([actual.dupe()]),
-                    Arc::from([QueryAttribute {
+                    edges,
+                    vec![QueryAttribute {
                         name: CompactString::new("actual"),
                         labels: Arc::from([actual]),
                         explicit: true,
-                    }]),
+                    }],
                 )
             }
             PackageTargetKind::ConfigSetting { .. } => (
                 QueryNodeKind::Rule(CompactString::new("config_setting rule")),
-                Arc::from([]),
-                Arc::from([]),
+                visibility_edges,
+                Vec::new(),
             ),
             PackageTargetKind::TestSuite { membership, .. } => {
                 let tests = membership
@@ -353,16 +399,21 @@ async fn compute_package_graph(
                     .map(QueryLabel::from_canonical)
                     .collect::<Vec<_>>();
                 let mut seen = SmallSet::new();
-                let dependencies = tests
+                let ordinary = tests
                     .iter()
                     .chain(implicit_tests.iter())
                     .filter(|label| seen.insert((*label).dupe()))
                     .map(QueryLabel::dupe)
                     .collect::<Vec<_>>();
+                let mut edges = visibility_edges;
+                edges.extend(ordinary.into_iter().map(|target| QueryEdge {
+                    kind: QueryEdgeKind::Ordinary,
+                    target,
+                }));
                 (
                     QueryNodeKind::Rule(CompactString::new("test_suite rule")),
-                    dependencies.into(),
-                    Arc::from([
+                    edges,
+                    vec![
                         QueryAttribute {
                             name: CompactString::new("tests"),
                             labels: tests.into(),
@@ -373,31 +424,53 @@ async fn compute_package_graph(
                             labels: implicit_tests.into(),
                             explicit: true,
                         },
-                    ]),
+                    ],
                 )
             }
             PackageTargetKind::StarlarkRule(implementation) => {
-                let dependencies = implementation
+                let ordinary = implementation
                     .dependencies()
                     .iter()
                     .cloned()
                     .map(QueryLabel::from_canonical)
-                    .collect::<Vec<_>>()
-                    .into();
+                    .collect::<Vec<_>>();
+                let mut edges = visibility_edges;
+                edges.extend(ordinary.into_iter().map(|target| QueryEdge {
+                    kind: QueryEdgeKind::Ordinary,
+                    target,
+                }));
                 (
                     QueryNodeKind::Rule(CompactString::new("rule")),
-                    dependencies,
-                    project_attributes(implementation),
+                    edges,
+                    project_attributes(implementation).to_vec(),
                 )
             }
             PackageTargetKind::GeneratedFile {
                 generating_rule, ..
-            } => (
-                QueryNodeKind::GeneratedFile,
-                Arc::from([label_in_package(&package_name, generating_rule)?]),
-                Arc::from([]),
+            } => {
+                let mut edges = vec![QueryEdge {
+                    kind: QueryEdgeKind::GeneratingRule,
+                    target: label_in_package(&package_name, generating_rule)?,
+                }];
+                edges.extend(visibility_edges);
+                (QueryNodeKind::GeneratedFile, edges, Vec::new())
+            }
+            PackageTargetKind::PackageGroup { includes, .. } => (
+                QueryNodeKind::PackageGroup,
+                includes
+                    .iter()
+                    .cloned()
+                    .map(|label| QueryEdge {
+                        kind: QueryEdgeKind::PackageGroupInclude,
+                        target: QueryLabel::from_canonical(label),
+                    })
+                    .collect(),
+                Vec::new(),
             ),
         };
+        if kind.is_rule() {
+            attributes.push(project_visibility_attribute(target));
+        }
         if target.name == build_basename && !matches!(kind, QueryNodeKind::BuildFile) {
             return Err(QueryError::evaluation(format!(
                 "target '{}' collides with active BUILD file",
@@ -412,8 +485,11 @@ async fn compute_package_graph(
                 rule_capability,
                 test_metadata,
                 build_file: build_file.clone(),
-                dependencies,
-                attributes,
+                effective_visibility,
+                visibility_source,
+                package_group_contents,
+                edges: edges.into(),
+                attributes: attributes.into(),
             },
         );
     }
@@ -428,7 +504,10 @@ async fn compute_package_graph(
                 rule_capability: None,
                 test_metadata: None,
                 build_file: build_file.clone(),
-                dependencies: Arc::from([]),
+                effective_visibility: loaded.default_visibility.clone(),
+                visibility_source: VisibilitySource::PackageDefault,
+                package_group_contents: None,
+                edges: visibility_query_edges(&loaded.default_visibility),
                 attributes: Arc::from([]),
             },
         );
@@ -439,7 +518,9 @@ async fn compute_package_graph(
     // graph is loaded only if traversal demands it.
     let referenced_sources = nodes
         .values()
-        .flat_map(|node| node.dependencies.iter())
+        .flat_map(|node| node.edges.iter())
+        .filter(|edge| edge.kind == QueryEdgeKind::Ordinary)
+        .map(|edge| &edge.target)
         .filter(|label| label.is_root_repository() && label.package() == package_name)
         .filter(|label| nodes.get(*label).is_none())
         .map(QueryLabel::dupe)
@@ -454,7 +535,10 @@ async fn compute_package_graph(
                     rule_capability: None,
                     test_metadata: None,
                     build_file: build_file.clone(),
-                    dependencies: Arc::from([]),
+                    effective_visibility: loaded.default_visibility.clone(),
+                    visibility_source: VisibilitySource::PackageDefault,
+                    package_group_contents: None,
+                    edges: visibility_query_edges(&loaded.default_visibility),
                     attributes: Arc::from([]),
                 },
             );
@@ -465,6 +549,53 @@ async fn compute_package_graph(
         package: package_name,
         nodes,
     })
+}
+
+fn effective_visibility(
+    loaded: &slug_loading_v2::LoadedPackage,
+    target: &slug_loading_v2::PackageTarget,
+) -> Result<RuleVisibility, QueryError> {
+    loaded.effective_visibility(target).ok_or_else(|| {
+        QueryError::evaluation(format!(
+            "target '{}' has invalid visibility provenance",
+            target.name
+        ))
+    })
+}
+
+fn visibility_query_edges(visibility: &RuleVisibility) -> Arc<[QueryEdge]> {
+    visibility
+        .dependency_labels()
+        .iter()
+        .cloned()
+        .map(|label| QueryEdge {
+            kind: QueryEdgeKind::VisibilityNodep,
+            target: QueryLabel::from_canonical(label),
+        })
+        .collect::<Vec<_>>()
+        .into()
+}
+
+fn project_visibility_attribute(target: &slug_loading_v2::PackageTarget) -> QueryAttribute {
+    let (labels, explicit) = match &target.visibility {
+        VisibilitySource::Declared(visibility) => (
+            visibility
+                .raw_declared_labels()
+                .iter()
+                .cloned()
+                .map(QueryLabel::from_canonical)
+                .collect::<Vec<_>>(),
+            true,
+        ),
+        VisibilitySource::PackageDefault
+        | VisibilitySource::GeneratingRule
+        | VisibilitySource::AlwaysPublic => (Vec::new(), false),
+    };
+    QueryAttribute {
+        name: CompactString::new("visibility"),
+        labels: labels.into(),
+        explicit,
+    }
 }
 
 fn project_attributes(implementation: &StarlarkRuleImplementation) -> Arc<[QueryAttribute]> {

@@ -19,6 +19,7 @@ pub mod load_label;
 pub mod package;
 #[doc(hidden)]
 pub mod provider;
+pub mod visibility;
 
 pub use attrs::AttributeKind;
 pub use attrs::AttributeProvenance;
@@ -41,3 +42,7 @@ pub use package::RuleCapability;
 pub use package::TestMetadata;
 pub use package::TestRuleKind;
 pub use package::TestSuiteMembership;
+pub use visibility::PackageGroupContents;
+pub use visibility::RestrictedVisibility;
+pub use visibility::RuleVisibility;
+pub use visibility::VisibilitySource;

@@ -1105,6 +1105,73 @@ fn same_dice_config_setting_values_are_package_semantics() {
 }
 
 #[test]
+fn same_dice_visibility_and_package_groups_are_semantic_and_recreate_cleanly() {
+    let workspace = scratch("visibility-package-group-transitions");
+    let package = workspace.join("pkg");
+    let build = package.join("BUILD.bazel");
+    let defs = package.join("defs.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let schema_v1 = r#"
+def declare():
+    native.filegroup(
+        name = "from_bzl",
+        srcs = [],
+        visibility = [":friends"],
+    )
+"#;
+    let build_v1 = r#"
+load(":defs.bzl", "declare")
+package(default_visibility = [":defaults"])
+package_group(name = "defaults", packages = ["//pkg"])
+package_group(
+    name = "friends",
+    packages = ["//viewer/...", "-//viewer/blocked/..."],
+    includes = [":one", ":two"],
+)
+package_group(name = "other", packages = ["//other"])
+package_group(name = "one", packages = ["//one"])
+package_group(name = "two", packages = ["//two"])
+declare()
+"#;
+    write(&defs, schema_v1);
+    write(&build, build_v1);
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let initial = load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+
+    write(&build, &format!("# formatting only\n{build_v1}"));
+    let formatted = load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_eq!(initial, formatted);
+
+    let schema_v2 = schema_v1.replace(":friends", ":other");
+    write(&defs, &schema_v2);
+    write(&build, build_v1);
+    let visibility_changed =
+        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_ne!(formatted, visibility_changed);
+
+    let build_v2 = build_v1
+        .replace("-//viewer/blocked/...", "-//viewer/private/...")
+        .replace(
+            "includes = [\":one\", \":two\"]",
+            "includes = [\":two\", \":one\"]",
+        );
+    write(&build, &build_v2);
+    let package_group_changed =
+        load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+    assert_ne!(visibility_changed, package_group_changed);
+
+    fs::remove_file(&defs).unwrap();
+    assert!(load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).is_err());
+    write(&defs, &schema_v2);
+    let recreated = load_package(&dice, &runtime, &workspace, &package, &[defs]).unwrap();
+    assert_eq!(package_group_changed, recreated);
+}
+
+#[test]
 fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
     let workspace = scratch("package-context-labels");
     let package = workspace.join("consumer");

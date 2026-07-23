@@ -14,7 +14,9 @@ use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::PackageTarget;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::RuleCapability;
+use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestSuiteMembership;
+use slug_loading_v2::VisibilitySource;
 use slug_loading_v2::file_discovery::BUILD_FILE_FALLBACK;
 use slug_loading_v2::file_discovery::BUILD_FILE_PRIMARY;
 use slug_loading_v2::file_discovery::MODULE_FILE;
@@ -321,6 +323,7 @@ fn config_setting_retains_values_and_rejects_unmodeled_arguments() {
                 ]
                 .into(),
             },
+            visibility: VisibilitySource::AlwaysPublic,
         }]
     );
 
@@ -333,6 +336,279 @@ fn config_setting_retains_values_and_rejects_unmodeled_arguments() {
         .unwrap_err()
         .to_string();
     assert!(error.contains("define_values"), "{error}");
+}
+
+#[test]
+fn visibility_and_package_group_shapes_retain_bazel_producer_provenance() {
+    let workspace = scratch("typed-visibility");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"def _impl(ctx):
+    return [DefaultInfo()]
+
+emit = rule(implementation = _impl, attrs = {"out": attr.output(mandatory = True)})
+
+def native_configs():
+    native.config_setting(
+        name = "native_config_default_public",
+        values = {"define": "native_default=1"},
+    )
+    native.config_setting(
+        name = "native_config_declared",
+        values = {"define": "native_declared=1"},
+        visibility = [":friends"],
+    )
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+load(":defs.bzl", "emit", "native_configs")
+package(default_visibility = ["//visibility:private"])
+package_group(
+    name = "friends",
+    packages = ["//viewer", "//viewer/...", "-//viewer/exact_blocked", "-//viewer/blocked/...", "public", "private"],
+    includes = [":more", ":later"],
+)
+filegroup(name = "defaulted")
+filegroup(name = "declared", visibility = [":friends", "//viewer:__pkg__", "//viewer:__subpackages__"])
+filegroup(name = "explicit_public", visibility = ["//visibility:public", ":friends"])
+filegroup(name = "explicit_private", visibility = ["//visibility:private"])
+config_setting(name = "config_default_public", values = {"define": "visibility_probe=1"})
+config_setting(name = "config_declared", values = {"define": "visibility_probe=1"}, visibility = [":friends"])
+exports_files(["public.txt"])
+exports_files(["restricted.txt"], visibility = [":friends"])
+emit(name = "generator", out = "generated.txt", visibility = [":friends"])
+emit(name = "default_generator", out = "default_generated.txt")
+native_configs()
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    assert_eq!(loaded.default_visibility, RuleVisibility::Private);
+
+    let target = |name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap()
+    };
+    assert_eq!(
+        target("defaulted").visibility,
+        VisibilitySource::PackageDefault
+    );
+    assert_eq!(
+        target("config_default_public").visibility,
+        VisibilitySource::AlwaysPublic
+    );
+    assert_eq!(
+        target("native_config_default_public").visibility,
+        VisibilitySource::AlwaysPublic
+    );
+    assert!(
+        target("native_config_default_public")
+            .raw_visibility_labels()
+            .is_empty()
+    );
+    assert_eq!(
+        target("public.txt").visibility,
+        VisibilitySource::AlwaysPublic
+    );
+    assert_eq!(
+        target("generated.txt").visibility,
+        VisibilitySource::GeneratingRule
+    );
+    assert_eq!(
+        target("default_generator").visibility,
+        VisibilitySource::PackageDefault
+    );
+    assert_eq!(
+        target("default_generated.txt").visibility,
+        VisibilitySource::GeneratingRule
+    );
+    assert!(matches!(
+        target("declared").visibility,
+        VisibilitySource::Declared(RuleVisibility::Restricted(_))
+    ));
+    assert!(matches!(
+        target("config_declared").visibility,
+        VisibilitySource::Declared(RuleVisibility::Restricted(_))
+    ));
+    assert!(matches!(
+        target("native_config_declared").visibility,
+        VisibilitySource::Declared(RuleVisibility::Restricted(_))
+    ));
+    assert_eq!(
+        target("native_config_declared")
+            .raw_visibility_labels()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["@@//pkg:friends"]
+    );
+    assert!(matches!(
+        target("restricted.txt").visibility,
+        VisibilitySource::Declared(RuleVisibility::Restricted(_))
+    ));
+    assert_eq!(
+        target("explicit_public").visibility,
+        VisibilitySource::Declared(RuleVisibility::Public)
+    );
+    assert!(target("explicit_public").visibility_explicit());
+    assert!(target("explicit_public").raw_visibility_labels().is_empty());
+    assert_eq!(
+        target("explicit_private").visibility,
+        VisibilitySource::Declared(RuleVisibility::Private)
+    );
+    assert!(
+        target("explicit_private")
+            .raw_visibility_labels()
+            .is_empty()
+    );
+    assert_eq!(
+        loaded.effective_visibility(target("generator")),
+        loaded.effective_visibility(target("generated.txt"))
+    );
+    assert_eq!(
+        loaded.effective_visibility(target("default_generator")),
+        loaded.effective_visibility(target("default_generated.txt"))
+    );
+    assert_eq!(
+        loaded.effective_visibility(target("config_default_public")),
+        Some(RuleVisibility::Public)
+    );
+    assert_eq!(
+        loaded.effective_visibility(target("native_config_default_public")),
+        Some(RuleVisibility::Public)
+    );
+    assert_eq!(
+        loaded.effective_visibility(target("native_config_declared")),
+        loaded.effective_visibility(target("config_declared"))
+    );
+    assert!(matches!(
+        loaded.effective_visibility(target("native_config_declared")),
+        Some(RuleVisibility::Restricted(_))
+    ));
+
+    let PackageTargetKind::PackageGroup { contents, includes } = &target("friends").kind else {
+        panic!("friends must be a first-class package group");
+    };
+    assert!(contents.positive_all());
+    assert!(contents.has_private());
+    assert_eq!(contents.exact_positive().len(), 1);
+    assert_eq!(contents.exact_negative().len(), 1);
+    assert_eq!(contents.subtree_positive().len(), 1);
+    assert_eq!(contents.subtree_negative().len(), 1);
+    assert_eq!(
+        includes.as_ref(),
+        [
+            CanonicalLabel::parse("@@//pkg:more").unwrap(),
+            CanonicalLabel::parse("@@//pkg:later").unwrap(),
+        ]
+    );
+    assert_eq!(target("friends").visibility, VisibilitySource::AlwaysPublic);
+    assert_eq!(
+        loaded.effective_visibility(target("friends")),
+        Some(RuleVisibility::Public)
+    );
+    let viewer = CanonicalLabel::parse("@@//viewer:probe")
+        .unwrap()
+        .package()
+        .clone();
+    let viewer_child = CanonicalLabel::parse("@@//viewer/child:probe")
+        .unwrap()
+        .package()
+        .clone();
+    let blocked = CanonicalLabel::parse("@@//viewer/blocked/reallowed:probe")
+        .unwrap()
+        .package()
+        .clone();
+    let blocked_subtree = CanonicalLabel::parse("@@//viewer/blocked:probe")
+        .unwrap()
+        .package()
+        .clone();
+    let exact_blocked = CanonicalLabel::parse("@@//viewer/exact_blocked:probe")
+        .unwrap()
+        .package()
+        .clone();
+    assert!(contents.exact_positive().contains(&viewer));
+    assert!(contents.exact_negative().contains(&exact_blocked));
+    assert_eq!(contents.subtree_positive(), [viewer.clone()]);
+    assert_eq!(contents.subtree_negative(), [blocked_subtree]);
+    assert!(contents.contains_package(&viewer));
+    assert!(contents.contains_package(&viewer_child));
+    assert!(!contents.contains_package(&exact_blocked));
+    assert!(!contents.contains_package(&blocked));
+
+    let VisibilitySource::Declared(RuleVisibility::Restricted(visibility)) =
+        &target("declared").visibility
+    else {
+        unreachable!()
+    };
+    assert_eq!(
+        visibility
+            .declared_labels()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        [
+            "@@//pkg:friends",
+            "@@//viewer:__pkg__",
+            "@@//viewer:__subpackages__",
+        ]
+    );
+    assert_eq!(
+        visibility
+            .package_groups()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["@@//pkg:friends"]
+    );
+}
+
+#[test]
+fn visibility_parsing_reports_pinned_bazel_diagnostics() {
+    let workspace = scratch("visibility-diagnostics");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "filegroup(name = \"bad\", visibility = [\"//visibility:plubic\"])\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains(
+            "Invalid visibility label '//visibility:plubic'; did you mean //visibility:public or //visibility:private?"
+        ),
+        "{error}"
+    );
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "package_group(name = \"bad\", packages = [\"not-a-package\"])\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains(
+            "invalid package name 'not-a-package': must start with '//', '@', or be 'public' or 'private'"
+        ),
+        "{error}"
+    );
 }
 
 #[test]
@@ -354,13 +630,14 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
 
     let loaded = load_package(&workspace, &package);
 
-    assert_eq!(loaded.default_visibility, vec!["//visibility:public"]);
+    assert_eq!(loaded.default_visibility, RuleVisibility::Public);
     assert_eq!(
         loaded.targets,
         vec![
             PackageTarget {
                 name: "data.txt".to_owned(),
                 kind: PackageTargetKind::ExportedFile,
+                visibility: VisibilitySource::AlwaysPublic,
             },
             PackageTarget {
                 name: "fg".to_owned(),
@@ -368,16 +645,19 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
                     srcs: vec![CanonicalLabel::parse("@@//pkg:data.txt").unwrap()].into(),
                     srcs_explicit: true,
                 },
+                visibility: VisibilitySource::PackageDefault,
             },
             PackageTarget {
                 name: "alias_fg".to_owned(),
                 kind: PackageTargetKind::Alias {
                     actual: CanonicalLabel::parse("@@//pkg:fg").unwrap(),
                 },
+                visibility: VisibilitySource::PackageDefault,
             },
             PackageTarget {
                 name: "macro.txt".to_owned(),
                 kind: PackageTargetKind::ExportedFile,
+                visibility: VisibilitySource::AlwaysPublic,
             },
             PackageTarget {
                 name: "macro_file".to_owned(),
@@ -385,6 +665,7 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
                     srcs: vec![CanonicalLabel::parse("@@//pkg:macro.txt").unwrap()].into(),
                     srcs_explicit: true,
                 },
+                visibility: VisibilitySource::PackageDefault,
             },
         ]
     );
