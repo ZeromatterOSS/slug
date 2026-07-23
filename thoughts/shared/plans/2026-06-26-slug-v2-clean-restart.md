@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 Java ordering review is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 Java ordering review is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 25-command Bazel oracle including suite provenance/source members and 37-command labels oracle accepted through `3621b3e7`; total query-attribute explicitness and tests-loading designs Sol-accepted; exact target identity and package-context loading normalization accepted through `40ac1cd2`; three Gate A attempts closed `REPLAN`, most recently with no code retained on Java-ordering mismatch | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, exact order-independent string/label ordering, Gate A metadata implementation, strict policy/`tests()` activation, and remaining command breadth | design and oracle Java UTF-16/label ordering before Gate A retries |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 ordering/duplicate-label oracle is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 ordering/duplicate-label oracle is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 25-command Bazel oracle including suite provenance/source members and 37-command labels oracle accepted through `3621b3e7`; total query-attribute explicitness and tests-loading designs Sol-accepted; exact target identity and package-context loading normalization accepted through `40ac1cd2`; three Gate A attempts closed `REPLAN`; the follow-up audit proved valid BUILD strings already match Rust UTF-8 byte order and exposed missing generic direct label-list duplicate rejection | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, direct label-list duplicate rejection, structural label ordering, Gate A metadata implementation, strict policy/`tests()` activation, and remaining command breadth | oracle ordering plus filegroup/Starlark/suite duplicate errors before any loading fix |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,27 +33,28 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Review the exact Bazel ordering boundary that blocks `tests` metadata Gate A.
-Pinned `BuildType#convertFromBuildLangType` sorts order-independent values with
-Guava `Ordering.natural()`, while Java `String.compareTo` compares UTF-16 code
-units. Rust `str`/`CompactString` ordering compares Unicode scalar bytes, so
-supplementary versus BMP values can reverse.
+Add oracle evidence only for the corrected ordering and duplicate-label
+boundary. Bazel reads valid UTF-8 BUILD text as internal byte strings, so
+native Rust `str`/`CompactString` order already matches. Pin duplicate-preserving
+BMP/supplementary ordering for inherited Starlark tags and native suite tags.
+Pin structural label order with both `//a:b/c` before `//a/b:a` and BMP before
+supplementary target names; do not sort rendered labels.
 
-Audit every Gate A order-independent value: inherited Starlark `tags`, native
-suite `tags`, explicit suite label members, and derived implicit suite labels.
-Trace Bazel `Label.compareTo`, package/repository comparison, and target-name
-comparison rather than assuming labels sort by display strings. Decide one
-small reusable V2 comparator boundary, its allocation behavior, and whether
-strings and canonical labels require separate comparators.
+In `query-labels-attribute-metadata`, add exact loading-error rows for
+post-conversion duplicate canonical labels in native `filegroup.srcs` and one
+direct/unconditional Starlark `label_list`, using equivalent spellings such as
+`member` and `:member`. In `tests-query-expansion`, add the corresponding
+native `test_suite.tests` error. Also pin successful explicit and implicit
+suite label ordering. Cite `BuildType`, the internal byte-string parser path,
+`Label.compareTo`, and `RuleClass`/`AggregatingAttributeMapper`.
 
-Design a Bazel 9.2 oracle discriminator using BMP/supplementary Unicode and
-duplicates for both string and label lists. New implementation work must add
-or strengthen that oracle before retrying Gate A.
-
-This is design/review only. Do not restore the reverted metadata code, change
-identity ordering globally, add UTF-16 storage, activate `tests()`, plumb
-strict mode, edit formatters, or add DICE state. Stop if exact label ordering
-requires a broader identity packet.
+This packet changes fixtures and expected Bazel output only. Do not change
+loading or identity code, claim configurable selector duplicate parity,
+restore metadata code, add UTF-16 storage, activate `tests()`, plumb strict
+mode, edit Slug formatters, or add DICE state. After oracle acceptance, design
+and implement an allocation-free structural label comparator plus generic
+direct-list duplicate validation before Gate A retries. Invalid BUILD bytes
+remain a separate parity boundary.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.

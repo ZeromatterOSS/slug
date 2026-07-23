@@ -1299,7 +1299,8 @@ representation-only; five ordinary query functions and M3 remain open.
 Status: 25-command tests oracle, total explicitness design, and 37-command
 labels/package-context oracle accepted; exact identity and package-context
 loading foundation accepted through `40ac1cd2`; third Gate A attempt closed
-`REPLAN` with no code retained; Java UTF-16/string/label ordering design next
+`REPLAN` with no code retained; corrected ordering and three-surface
+duplicate-label oracle next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1418,3 +1419,13 @@ Sol found Rust ordering diverges from Java UTF-16 natural order for
 supplementary Unicode, affecting both string tags and labels. The next packet
 must design and oracle the V2 comparator boundary; no V1/Buck ordering
 semantics are authorized by this replan.
+
+The follow-up source/executable audit disproved that UTF-16 premise for valid
+BUILD literals: Bazel's default internal byte-string path and Rust strings
+both compare UTF-8 bytes. It instead found generic post-conversion duplicate
+label-list rejection, contradicting retained native filegroup and Starlark
+duplicate behavior. Sol accepted the structural comparator design but
+required oracle coverage for filegroup, direct Starlark label-list, and suite
+errors before implementation. No V1/Buck duplicate or ordering behavior is
+authorized; configurable selector duplicates and malformed bytes remain
+separate.

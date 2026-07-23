@@ -2515,3 +2515,31 @@ replacement packet is design/oracle-only: establish exact Bazel string and
 label comparators, including BMP/supplementary and duplicate discriminators,
 before Gate A retries. Strict policy, function activation, and formatters
 remain deferred.
+
+## Order-independent value audit replanned to broader oracle (2026-07-23)
+
+Pinned source and Bazel 9.2 executable evidence disproved the preceding
+UTF-16 premise for BUILD values. Bazel's hidden UTF-8-byte-string mode is on
+by default, and the parser maps each source byte to a Java character before
+`Ordering.natural()` runs. Valid literal order is therefore UTF-8 byte order:
+ASCII, U+E000, then U+10000. Rust string ordering already matches, and
+duplicate string tags remain present.
+
+Labels sort structurally by canonical repository, package path, then target
+name; rendered-label sorting is observably wrong because `//a:b/c` precedes
+`//a/b:a`. An allocation-free identity-owned comparator may ignore V2
+`mapping_id` without changing global `Ord`, `Eq`, or `Hash`.
+
+The same audit exposed a real prerequisite. `RuleClass` rejects duplicate
+canonical labels in every direct `LABEL_LIST` after conversion, so `member`
+and `:member` collide. Current V2 tests instead preserve native filegroup and
+Starlark label-list duplicates. Sol accepted the comparator boundary but
+returned `REPLAN` because a suite-only duplicate oracle would not cover those
+already exposed surfaces.
+
+The replacement packet is oracle-only. Extend the labels fixture with exact
+native-filegroup and direct/unconditional Starlark-label-list duplicate
+errors, and the tests fixture with suite duplicate rejection plus successful
+string and structural-label ordering. Configurable selector duplicate
+semantics, malformed input bytes, loading fixes, Gate A metadata, strict
+policy, function activation, and formatters remain separate.
