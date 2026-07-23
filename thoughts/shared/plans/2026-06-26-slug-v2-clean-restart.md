@@ -33,40 +33,47 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Audit and design only the Stage 8 request-local
-`visible(PREDICATE, INPUT)` activation against the remaining 22 future-Slug
-rows in `query-visible-visibility`. Reconfirm pinned `VisibleFunction`,
-`QueryVisibility`, `BlazeQueryVisibility`, and `BlazeTargetAccessor` behavior:
-evaluate the predicate once; retain an input only when every predicate target
-can see it; treat an empty predicate as vacuously true; preserve candidate
-delivery/provenance without adding query graph edges for the filtering act.
+Correct only the Stage 8 `visible(PREDICATE, INPUT)` Bazel oracle before any
+production edit. The design audit found that the accepted 22 `visible()` rows
+do not discriminate three required ownership paths. Append exactly three
+future-Slug rows before the two Bazel-only structure rows:
 
-Specify one iterative accessor-owned visibility walk over the accepted
-`QueryNode.effective_visibility`, direct `PackageGroupContents`, and tagged
-package-group include edges. Direct package specifications and each resolved
-group/include are OR alternatives. Negatives override positives only within
-one `PackageGroupContents`, so another direct or included positive may
-re-allow. Use one request-local `SmallSet<QueryLabel>` per walk for cycle
-suppression. Resolve labels through existing package-graph DICE ownership;
-missing top-level or included labels must retain the exact oracle diagnostics,
-while wrong-kind references are ignored. Do not add a key, cache, lock, or
-post-DICE registry.
+1. a target whose cross-package top-level visibility group includes a second
+   cross-package group that grants `//viewer`;
+2. a real-first input union of private real `//loads:defs.bzl` and the public
+   fake candidate from `loadfiles(//loads:consumer)`, which must still return
+   `//loads:defs.bzl`; and
+3. two fake predicate callers with the same printed `.bzl` label but different
+   consuming packages, where only the first package can see the restricted
+   input, so universal visibility must reject it.
 
-Include unconditional same-package access and the one-way Bazel Java
-compatibility rule where `//javatests/X` may see private `//java/X`. Public,
-private, exact/subtree, generated/source/BUILD, package-group, and fake-load
-behavior must consume the Stage 4 representation rather than reclassifying
-strings. The design must explain multiple predicate callers, real versus fake
-candidate lookup, output inheritance, cross-package group loading, and
-missing/wrong-kind/cycle termination.
+Use only `query-visible-visibility` fixture metadata, generated expected
+output, minimal new fixture BUILD files, and compact plan/routing evidence.
+Regenerate and clean-verify with Bazel 9.2.0, independently verify again, prove
+all prior 36 normalized records are unchanged, and keep all source anchors
+resolving. The corrected count is 39 total: 25 `visible()` rows, 12 Stage 4
+non-`visible()` rows, and two final Bazel-only rows. This packet does not
+activate `visible()` or edit Rust.
 
-Fix the exact implementation allowlist, generic evaluator/accessor seam,
-diagnostic ownership, focused unit/integration tests, counted 22-row CLI gate,
-and same-DICE reuse evidence before any production edit. Keep the final two
-flag-structure rows Bazel-only. Do not change loading representation, DICE
-keys, command policy, formatters, graph flags, repository mapping, configured
-query, alternate visibility flags, V1, or Cargo manifests. This packet is
-read-only until independent source/ownership review returns `ACCEPT`.
+After that oracle is accepted, re-review the corrected activation design:
+generic evaluation passes both once-evaluated, unmaterialized sets through
+`visible(&Self::Set, &Self::Set)` because Slug's current `eval_all` collapses
+by printed label while Bazel fake-target equality includes the consuming
+package. The request-local loading accessor deduplicates callers by full
+candidate ID, uses `owner_package`, preserves every passing input ID as a
+singleton delivery, and treats fake inputs as public. Real inputs use a
+non-recording package-graph lookup and the accepted typed visibility graph.
+Restricted visibility fully walks every top-level group even after a positive
+match, with a fresh `SmallSet` per top-level root, depth-first include order,
+local negatives, wrong-kind ignore, and missing errors wrapped by the original
+top-level label. Empty callers perform no visibility lookup. Same-package and
+the one-way `javatests/X` caller to `java/X` rule remain unconditional.
+
+The future activation allowlist is only query `expr`, generic evaluator,
+loading environment, their query/loading tests, CLI tests, and compact plan
+evidence. It adds no query edge, loading representation, DICE key, cache,
+lock, graph/provenance representation change, formatter, flag, repository
+mapping, configured query, V1 code, or Cargo manifest.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine

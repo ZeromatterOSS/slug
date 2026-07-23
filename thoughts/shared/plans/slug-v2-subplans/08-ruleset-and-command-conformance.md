@@ -2784,8 +2784,17 @@ passed formatting, diff, and archive checks. Sol required one focused
 correction for `native.config_setting` in loaded macros, then returned final
 `ACCEPT`.
 
-The next packet is design-only for the remaining 22 future-Slug rows. It must
-place universal caller filtering and iterative group resolution in the generic
-function/request-local loading accessor, retain exact missing versus wrong-kind
-behavior and per-walk cycle suppression, and reuse the existing DICE package
-graphs. The final two flag-structure rows stay Bazel-only.
+The first Stage 8 design audit returned `REPLAN` only for missing executable
+discriminators. Append three Bazel rows before activation: cross-package
+top-level plus included-group resolution, real-first real/fake same-label input
+identity, and universal filtering over two same-label fake callers with
+different consuming packages. The corrected fixture count is 39: 25
+`visible()` rows, 12 accepted Stage 4 rows, and two final Bazel-only rows.
+
+The corrected activation seam passes both once-evaluated sets unmaterialized to
+the request-local accessor; it must not use the current printed-label
+`eval_all` for predicate callers. The accessor deduplicates full candidate IDs,
+uses fake consuming-package ownership, emits singleton passing deliveries,
+resolves groups without recording query topology, and reuses existing DICE
+package graphs. Production work remains blocked until the three-row oracle is
+generated, independently verified, and accepted.

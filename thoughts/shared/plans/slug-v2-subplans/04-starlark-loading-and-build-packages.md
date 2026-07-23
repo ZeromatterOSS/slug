@@ -787,3 +787,23 @@ semantic equality, visibility and package-group edits, definition deletion,
 and recreation. Sol's one correction added the missing
 `native.config_setting` macro producer and its omitted-public versus
 explicit-restricted regression; final review returned `ACCEPT`.
+
+### Stage 8 visible activation design audit replan
+
+The read-only source and ownership audit accepted the Stage 4 representation
+and the future request-local accessor boundary, but stopped activation on a
+narrow oracle gap. Pinned Bazel materializes predicate targets by full target
+equality; `FakeLoadTarget` equality and package metadata preserve the
+consuming BUILD package. Slug's current generic `eval_all` instead
+materializes by printed label, so Stage 8 must pass both once-evaluated sets
+unmaterialized to the loading accessor and deduplicate callers by full
+candidate ID.
+
+Before any Rust edit, append three Bazel rows: cross-package top-level and
+included-group traversal, real-first real/fake same-label input identity, and
+two same-label fake callers from different consuming packages under universal
+visibility. This makes the fixture 39 rows: 25 Stage 8 `visible()` rows, the
+accepted 12 Stage 4 rows, and two Bazel-only rows. The activation design
+otherwise passed review: non-recording existing-key lookup, singleton passing
+deliveries, full error-discovering group walks, fresh compact cycle state per
+top-level root, exact diagnostics, and no loading/graph/DICE redesign.

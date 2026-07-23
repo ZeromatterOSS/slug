@@ -1535,7 +1535,14 @@ registry, target-pattern parser, permissive fallback, recursive evaluator,
 global lock, or command implementation was imported. The only extracted shape
 remains the already approved Buck-derived compact collection pattern.
 
-Stage 8 may now design request-local iterative resolution and generic
-`visible()` filtering against the 22 accepted rows. That future work must
-consume the typed V2 graph and retain per-walk state locally; it must not
-revive V1 ownership or semantics.
+Stage 8's first design audit retained the V2-only ownership and rejected any V1
+import, but found three missing Bazel discriminators before activation:
+cross-package group/include lookup, real-first real/fake same-label input
+identity, and two same-label fake callers with distinct consuming packages.
+The fixture must grow from 22 to 25 `visible()` rows first.
+
+The corrected design uses the existing candidate arena, compact request-local
+sets, typed visibility graph, and package-graph DICE keys. It passes predicate
+and input sets unmaterialized to preserve full fake identity, performs no
+query-topology recording during visibility lookup, and imports no V1 registry,
+pattern parser, fallback, evaluator, lock, or cache.
