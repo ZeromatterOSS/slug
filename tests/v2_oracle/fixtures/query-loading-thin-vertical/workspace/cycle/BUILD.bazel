@@ -1,0 +1,2 @@
+filegroup(name = "a", srcs = [":b"])
+filegroup(name = "b", srcs = [":a"])

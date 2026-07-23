@@ -1,0 +1,246 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "'//pkg:bin'"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "'//pkg:bin'"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "quoted_literal",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:bin",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 18be4a48-7c4a-4ea5-97d8-85cabedac750\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:bin\n"
+    },
+    {
+      "argv": [
+        "query",
+        "let x = set(//pkg:bin //pkg:lib) in (deps($x) intersect //pkg:all)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "let x = set(//pkg:bin //pkg:lib) in (deps($x) intersect //pkg:all)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "let_parentheses_and_set",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:bin\n//pkg:lib",
+      "stderr": "INFO: Invocation ID: 813c5479-47c0-4ea0-b256-57a5395e74c4\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:bin\n//pkg:lib\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//pkg:bin union //pkg:lib except //pkg:bin intersect //pkg:data.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:bin union //pkg:lib except //pkg:bin intersect //pkg:data.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "operator_precedence_and_associativity",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 673d3249-0c02-4a49-9bd6-239e3933de8d\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "set(//pkg:bin //pkg:bin //pkg:lib) + //pkg:bin - //pkg:lib ^ //pkg:bin"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "set(//pkg:bin //pkg:bin //pkg:lib) + //pkg:bin - //pkg:lib ^ //pkg:bin"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "symbolic_operators_and_duplicate_elimination",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:bin",
+      "stderr": "INFO: Invocation ID: 3c7ca7a3-9151-4e6f-8f4a-e160e325a863\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:bin\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//pkg:bin, 1, 2)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//pkg:bin, 1, 2)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_wrong_arity",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'deps(//pkg:bin, 1, 2)': too many arguments to function 'deps' at ', 2 )'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 991343c2-9423-4cf1-9402-f8c29357a80e\nLoading: 0 packages loaded\nERROR: Error while parsing 'deps(//pkg:bin, 1, 2)': too many arguments to function 'deps' at ', 2 )'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//pkg:bin"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//pkg:bin"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "syntax_error",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'deps(//pkg:bin': premature end of input",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: f2f581e8-3f30-496e-9aca-1098bcb250e9\nLoading: 0 packages loaded\nERROR: Error while parsing 'deps(//pkg:bin': premature end of input\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "not_a_bazel_query_function(//pkg:bin)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "not_a_bazel_query_function(//pkg:bin)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "unknown_function",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'not_a_bazel_query_function(//pkg:bin)': unknown function 'not_a_bazel_query_function' at 'not_a_bazel_query_function ( //pkg:bin'; expected one of ['allpaths', 'attr', 'buildfiles', 'deps', 'executables', 'filter', 'kind', 'labels', 'loadfiles', 'rdeps', 'same_pkg_direct_rdeps', 'siblings', 'some', 'somepath', 'tests', 'visible']",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 39a1ad5e-b216-4b57-8eac-98aeb079657c\nLoading: 0 packages loaded\nERROR: Error while parsing 'not_a_bazel_query_function(//pkg:bin)': unknown function 'not_a_bazel_query_function' at 'not_a_bazel_query_function ( //pkg:bin'; expected one of ['allpaths', 'attr', 'buildfiles', 'deps', 'executables', 'filter', 'kind', 'labels', 'loadfiles', 'rdeps', 'same_pkg_direct_rdeps', 'siblings', 'some', 'somepath', 'tests', 'visible']\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//pkg:bin)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//pkg:bin)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "default_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:bin\n//pkg:data.txt\n//pkg:lib",
+      "stderr": "INFO: Invocation ID: 9982d009-9af0-4791-a90c-44b7008243e9\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:bin\n//pkg:data.txt\n//pkg:lib\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "deps(//pkg:bin)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "deps(//pkg:bin)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "auto_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:bin\n//pkg:data.txt\n//pkg:lib",
+      "stderr": "INFO: Invocation ID: f446468c-dc45-4bef-94a2-bce5e3dc53a0\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:bin\n//pkg:data.txt\n//pkg:lib\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "deps(//pkg:bin)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "deps(//pkg:bin)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:bin\n//pkg:lib\n//pkg:data.txt",
+      "stderr": "INFO: Invocation ID: 05a5cdff-6378-461e-ab03-8935a84c5b74\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:bin\n//pkg:lib\n//pkg:data.txt\n"
+    }
+  ],
+  "fixture": "query-parser-and-sets",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

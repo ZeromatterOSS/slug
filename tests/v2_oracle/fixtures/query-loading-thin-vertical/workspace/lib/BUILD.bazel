@@ -1,0 +1,6 @@
+exports_files(["explicit.txt"])
+
+filegroup(
+    name = "leaf",
+    srcs = ["implicit.txt", ":explicit.txt", "missing_input.txt"],
+)

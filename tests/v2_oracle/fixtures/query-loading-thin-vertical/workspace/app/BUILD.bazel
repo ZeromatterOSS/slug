@@ -1,0 +1,11 @@
+load("//rules:defs.bzl", "passthrough")
+
+alias(
+    name = "via_alias",
+    actual = "//lib:leaf",
+)
+
+passthrough(
+    name = "app",
+    deps = [":via_alias", "//nested:branch"],
+)

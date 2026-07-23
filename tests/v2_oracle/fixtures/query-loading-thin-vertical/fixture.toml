@@ -1,0 +1,94 @@
+[fixture]
+name = "query-loading-thin-vertical"
+description = "Bazel 9.2 root-repository unconfigured query oracle over filegroups, aliases, source files, custom-rule label deps, nested packages, and a dependency cycle."
+comparison = "message_shape"
+oracle_notes = "Root-only loading-query slice. The cycle is queried structurally, not built or analyzed. lib/missing_input.txt is intentionally absent but is addressable because filegroup.srcs names it. The fixture establishes Bazel's literal, :all, recursive-pattern, alias, source-file, custom-rule-dependency, set-operation, and missing-target/package behavior before Slug wiring."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryEnvironment.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/GraphlessBlazeQueryEnvironment.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryEnvironment.java",
+  "src/main/java/com/google/devtools/build/lib/cmdline/TargetPattern.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/TargetPatternFunction.java",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java",
+]
+translation_notes = "The workspace contains only the root repository. filegroup/alias/native source-file edges and a Starlark rule attrs.label_list edge exercise the loading graph without configured analysis. lib/missing_input.txt is intentionally absent: its filegroup.srcs reference makes its source label query-addressable and traversable. A filegroup cycle is included only after Bazel query accepts it; commands do not build it."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-loading-thin-vertical --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-loading-thin-vertical --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "literal_rule"
+argv = ["query", "//app:app"]
+expected_exit = 0
+stdout_patterns = ["\\A//app:app\\Z"]
+
+[[commands]]
+name = "literal_implicit_source"
+argv = ["query", "//lib:implicit.txt"]
+expected_exit = 0
+stdout_patterns = ["\\A//lib:implicit\\.txt\\Z"]
+
+[[commands]]
+name = "literal_exported_source"
+argv = ["query", "//lib:explicit.txt"]
+expected_exit = 0
+stdout_patterns = ["\\A//lib:explicit\\.txt\\Z"]
+
+[[commands]]
+name = "literal_absent_attr_created_source"
+argv = ["query", "//lib:missing_input.txt"]
+expected_exit = 0
+stdout_patterns = ["\\A//lib:missing_input\\.txt\\Z"]
+
+[[commands]]
+name = "package_all"
+argv = ["query", "//lib:all"]
+expected_exit = 0
+stdout_patterns = ["\\A//lib:leaf\\Z"]
+
+[[commands]]
+name = "recursive_root_packages"
+argv = ["query", "//..."]
+expected_exit = 0
+stdout_patterns = ["\\A//:root\\n//app:app\\n//app:via_alias\\n//cycle:a\\n//cycle:b\\n//lib:leaf\\n//nested:branch\\n//nested/child:child\\Z"]
+
+[[commands]]
+name = "alias_deps"
+argv = ["query", "deps(//app:via_alias)"]
+expected_exit = 0
+stdout_patterns = ["\\A//app:via_alias\\n//lib:explicit\\.txt\\n//lib:implicit\\.txt\\n//lib:leaf\\n//lib:missing_input\\.txt\\Z"]
+
+[[commands]]
+name = "custom_rule_deps"
+argv = ["query", "deps(//app:app)"]
+expected_exit = 0
+stdout_patterns = ["\\A//app:app\\n//app:via_alias\\n//lib:explicit\\.txt\\n//lib:implicit\\.txt\\n//lib:leaf\\n//lib:missing_input\\.txt\\n//nested:branch\\n//nested/child:child\\.txt\\Z"]
+
+[[commands]]
+name = "cycle_deps"
+argv = ["query", "deps(//cycle:a)"]
+expected_exit = 0
+stdout_patterns = ["\\A//cycle:a\\n//cycle:b\\Z"]
+
+[[commands]]
+name = "set_operations"
+argv = ["query", "deps(//app:app) except //lib:explicit.txt intersect //..."]
+expected_exit = 0
+stdout_patterns = ["\\A//app:app\\n//app:via_alias\\n//lib:leaf\\n//nested:branch\\Z"]
+
+[[commands]]
+name = "missing_target"
+argv = ["query", "//lib:missing"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//lib:missing': target 'missing' not declared in package 'lib'"]
+
+[[commands]]
+name = "missing_package"
+argv = ["query", "//missing:target"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such package 'missing': BUILD file not found"]

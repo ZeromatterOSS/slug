@@ -1,0 +1,288 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//app:app"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//app:app"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "literal_rule",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//app:app",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-loading-thin-vertical/20260722-232937-347143-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-loading-thin-vertical/20260722-233015-348322-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 853ee4b2-981c-49d4-9c92-1e0c6a7896ef\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//app:app\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//lib:implicit.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//lib:implicit.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "literal_implicit_source",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//lib:implicit.txt",
+      "stderr": "INFO: Invocation ID: 3606e283-37d3-454b-ba23-637a978bfaba\nLoading: 0 packages loaded\n",
+      "stdout": "//lib:implicit.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//lib:explicit.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//lib:explicit.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "literal_exported_source",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//lib:explicit.txt",
+      "stderr": "INFO: Invocation ID: 2eb7d92b-11f7-4309-bff2-3701bef83693\nLoading: 0 packages loaded\n",
+      "stdout": "//lib:explicit.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//lib:missing_input.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//lib:missing_input.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "literal_absent_attr_created_source",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//lib:missing_input.txt",
+      "stderr": "INFO: Invocation ID: 99d4eda8-5fe1-467b-8f4b-cc404adb774f\nLoading: 0 packages loaded\n",
+      "stdout": "//lib:missing_input.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//lib:all"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//lib:all"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "package_all",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//lib:leaf",
+      "stderr": "INFO: Invocation ID: e9a8f71e-1538-4dbf-82c2-afcdea70cfce\nLoading: 0 packages loaded\n",
+      "stdout": "//lib:leaf\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//..."
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//..."
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "recursive_root_packages",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:root\n//app:app\n//app:via_alias\n//cycle:a\n//cycle:b\n//lib:leaf\n//nested:branch\n//nested/child:child",
+      "stderr": "INFO: Invocation ID: 8331fdb4-3e8f-4dcd-a44a-40bad96eaa5a\nLoading: 0 packages loaded\n",
+      "stdout": "//:root\n//app:app\n//app:via_alias\n//cycle:a\n//cycle:b\n//lib:leaf\n//nested:branch\n//nested/child:child\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//app:via_alias)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//app:via_alias)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "alias_deps",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//app:via_alias\n//lib:explicit.txt\n//lib:implicit.txt\n//lib:leaf\n//lib:missing_input.txt",
+      "stderr": "INFO: Invocation ID: 10f79366-adfb-4d89-ad2b-86fd40556a96\nLoading: 0 packages loaded\n",
+      "stdout": "//app:via_alias\n//lib:explicit.txt\n//lib:implicit.txt\n//lib:leaf\n//lib:missing_input.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//app:app)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//app:app)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "custom_rule_deps",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//app:app\n//app:via_alias\n//lib:explicit.txt\n//lib:implicit.txt\n//lib:leaf\n//lib:missing_input.txt\n//nested:branch\n//nested/child:child.txt",
+      "stderr": "INFO: Invocation ID: 5fb35916-1dd0-433a-968d-6bc48cefd4e6\nLoading: 0 packages loaded\n",
+      "stdout": "//app:app\n//app:via_alias\n//lib:explicit.txt\n//lib:implicit.txt\n//lib:leaf\n//lib:missing_input.txt\n//nested:branch\n//nested/child:child.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//cycle:a)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//cycle:a)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cycle_deps",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//cycle:a\n//cycle:b",
+      "stderr": "INFO: Invocation ID: 6e09e4e6-d1c0-4a5d-8cd9-007c43fbace5\nLoading: 0 packages loaded\n",
+      "stdout": "//cycle:a\n//cycle:b\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//app:app) except //lib:explicit.txt intersect //..."
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//app:app) except //lib:explicit.txt intersect //..."
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "set_operations",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//app:app\n//app:via_alias\n//lib:leaf\n//nested:branch",
+      "stderr": "INFO: Invocation ID: 9e263ebe-979c-49fd-8720-e7f5af6280e6\nLoading: 0 packages loaded\n",
+      "stdout": "//app:app\n//app:via_alias\n//lib:leaf\n//nested:branch\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//lib:missing"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//lib:missing"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_target",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//lib:missing': target 'missing' not declared in package 'lib' defined by <workspace>/lib/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 4ee3725e-c5a5-4b56-b2cd-a20cf3ab02fe\nLoading: 0 packages loaded\nERROR: no such target '//lib:missing': target 'missing' not declared in package 'lib' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-loading-thin-vertical/20260722-233015-348322-bazel/workspace/lib/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//missing:target"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//missing:target"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_package",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 46491656-fd14-4358-9210-0b9917629f93\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "query-loading-thin-vertical",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

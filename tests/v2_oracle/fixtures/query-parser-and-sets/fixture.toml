@@ -1,0 +1,81 @@
+[fixture]
+name = "query-parser-and-sets"
+description = "Bazel 9.2 query CLI oracle for parser-visible expression grammar, operators, errors, duplicate elimination, and text ordering."
+comparison = "message_shape"
+oracle_notes = "CLI evidence only: it records evaluation, diagnostics, duplicate elimination, and text ordering. AST shape and source spans remain Rust unit-test obligations because Bazel CLI does not expose them."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryParser.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryEnvironment.java",
+  "src/test/java/com/google/devtools/build/lib/query2/engine/QueryParserTest.java",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java",
+]
+translation_notes = "A root-only filegroup graph makes quote handling, let bindings, parentheses, set(), union/+ except/- intersect/^, duplicate elimination, deps arity, syntax errors, unknown functions, and default/auto/full text ordering CLI-observable. Diagnostics are compared by stable message fragments; AST/spans are intentionally not claimed here."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-parser-and-sets --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-parser-and-sets --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "quoted_literal"
+argv = ["query", "'//pkg:bin'"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:bin\\Z"]
+
+[[commands]]
+name = "let_parentheses_and_set"
+argv = ["query", "let x = set(//pkg:bin //pkg:lib) in (deps($x) intersect //pkg:all)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:bin\\n//pkg:lib\\Z"]
+
+[[commands]]
+name = "operator_precedence_and_associativity"
+argv = ["query", "//pkg:bin union //pkg:lib except //pkg:bin intersect //pkg:data.txt"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "symbolic_operators_and_duplicate_elimination"
+argv = ["query", "set(//pkg:bin //pkg:bin //pkg:lib) + //pkg:bin - //pkg:lib ^ //pkg:bin"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:bin\\Z"]
+
+[[commands]]
+name = "deps_wrong_arity"
+argv = ["query", "deps(//pkg:bin, 1, 2)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too many arguments to function 'deps'"]
+
+[[commands]]
+name = "syntax_error"
+argv = ["query", "deps(//pkg:bin"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["premature end of input"]
+
+[[commands]]
+name = "unknown_function"
+argv = ["query", "not_a_bazel_query_function(//pkg:bin)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["unknown function 'not_a_bazel_query_function'", "expected one of \\['allpaths'.*'visible'\\]"]
+
+[[commands]]
+name = "default_order"
+argv = ["query", "deps(//pkg:bin)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:bin\\n//pkg:data\\.txt\\n//pkg:lib\\Z"]
+
+[[commands]]
+name = "auto_order"
+argv = ["query", "--order_output=auto", "deps(//pkg:bin)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:bin\\n//pkg:data\\.txt\\n//pkg:lib\\Z"]
+
+[[commands]]
+name = "full_order"
+argv = ["query", "--order_output=full", "deps(//pkg:bin)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:bin\\n//pkg:lib\\n//pkg:data\\.txt\\Z"]
