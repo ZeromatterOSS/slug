@@ -920,3 +920,81 @@ returned `ACCEPT`.
 
 Implementation and DICE activation evidence remain pending. Do not mark this
 packet or M3 complete from the oracle alone.
+
+#### Implementation evidence landed (2026-07-23)
+
+Implementation commit `cdc5af41` completes
+`WP-8-m3-reverse-deps-subtree-patterns`. It does not complete M3 or loading
+query.
+
+Reuse and graph ownership:
+
+- `ResolvedGraph` directly adapts Buck2 commit
+  `088c75c7e36805df99c3de29062baa95db700b8b`
+  `query/graph/graph.rs` stable DFS remapping, integer-indexed edges,
+  `reverse`, breadth-limited retention, and DFS postorder. It uses structural
+  `QueryLabel`, `SmallMap`, and `SmallSet`; only dependency lookup is
+  serialized because V2 owns mutable `DiceComputations`.
+- `RdepsFunction` follows Buck2 `query/environment.rs` and
+  `syntax/simple/functions/deps.rs`: the generic registry evaluates the
+  universe and seed expressions, constructs the forward universe closure,
+  reverses it request-locally, filters out-of-universe seeds, and applies the
+  optional depth. No persistent reverse key/cache, string-keyed adjacency,
+  second DICE/runtime, or central name dispatch was added.
+- `SubtreePackageSetKey { workspace, prefix }` starts exactly at
+  `workspace/prefix` and consumes descendant `WorkspaceDirectoryKey`s. Root
+  `//...` uses the empty prefix; non-root patterns never compute/filter a
+  whole-workspace package set.
+- `same_pkg_direct_rdeps` groups exact operand labels by package, loads only
+  those `UnconfiguredPackageGraphKey`s, and matches the full dependency label
+  inside that package. Cross-package and criss-cross-only parents are
+  excluded without implementing `siblings`.
+
+Integrated behavior:
+
+- root-repository `//pkg/...`, `rdeps`, and
+  `same_pkg_direct_rdeps` match all 26 generated oracle rows through the real
+  CLI/daemon boundary, including missing/empty subtree exit 7, source and rule
+  seeds, aliases/custom rules, duplicate seeds, cycles, universe exclusion,
+  depth zero/one/two, distinct full ordering, arity errors, and integer
+  expression operands resolved as `//:1`;
+- only those two registry entries moved from deferred to implemented. Build
+  requests, query protocol fields, cquery/aquery placeholders, and command flag
+  policy remain unchanged; and
+- a retained-daemon regression observes an `rdeps` edge loss and subtree
+  package creation without restarting the runtime.
+
+Exact activation evidence:
+
+- initial `//tree/...`: `tree/base Evaluated`,
+  `SubtreePackageSet(tree) Evaluated`; identical revision: no events;
+- unrelated BUILD edit: `tree/base Reused`, no subtree event;
+- package create/delete/recreate outside the prefix: `tree/base Reused`,
+  `SubtreePackageSet(tree) Reused`, never evaluated;
+- create/recreate inside the prefix: `tree/base Reused`,
+  `tree/dynamic Evaluated`, `SubtreePackageSet(tree) Evaluated`; delete:
+  `tree/base Reused`, `SubtreePackageSet(tree) Evaluated`;
+- initial `rdeps(//app:top, //leaf:item)`: `app Evaluated`,
+  `leaf Evaluated`; redirecting the universe edge evaluates `app` and the
+  newly demanded `other`, reuses `leaf`, and removes the result; restoring the
+  edge evaluates `app`, reuses `leaf`, and restores the result; and
+- initial `same_pkg_direct_rdeps(//left:source.txt)` evaluates only `left`;
+  editing a cross-package reverse dependent reuses only `left` and leaves the
+  result unchanged.
+
+Validation:
+
+- the serial six-crate suite passed 71 tests under
+  `CARGO_TARGET_DIR=/tmp/slug-m3-rdeps-target CARGO_BUILD_JOBS=1`;
+- `slug_cli_v2` rebuilt successfully, and root independently passed
+  `query-parser-and-sets`, `query-loading-thin-vertical`, and
+  `query-rdeps-and-subtree-patterns` through the absolute rebuilt V2 binary;
+- formatting, diff, direct-filesystem/runtime/cache/lock/default-collection/
+  configured-action ownership scans, and stale-daemon checks passed; and
+- Sol-low accepted both the early source-reuse audit and the complete
+  post-validation diff.
+
+Residual scope: external repositories and mapping, the other 13 loading
+functions, broader target patterns and Sky Query, non-text formatters and
+remaining ordering modes, configured/action environments, `cquery`, and
+`aquery` remain open.

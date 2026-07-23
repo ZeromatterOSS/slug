@@ -232,8 +232,10 @@ the remaining functions, repositories and patterns, ordering modes, and
 formatters; this checkpoint must not be described as full query parity.
 Oracle commit `5b7806d7` now pins the next accepted behavior packet for
 root-repository subtree patterns, `rdeps`, and
-`same_pkg_direct_rdeps`; its Slug implementation and invalidation evidence
-remain pending.
+`same_pkg_direct_rdeps`. Implementation commit `cdc5af41` passes that oracle
+through the retained daemon with prefix-local package enumeration and
+Buck2-derived reverse traversal. M3 remains open for the other 13 loading
+functions, repository/pattern breadth, ordering modes, and formatters.
 
 ## Two-Tier Work-Packet Contract
 

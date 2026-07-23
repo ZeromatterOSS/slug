@@ -745,7 +745,7 @@ configuration/action environments, and non-text formatters remain open.
 
 ### Stage 8 reverse-deps/subtree-pattern packet — approved extraction plan
 
-Status: Oracle landed; implementation pending
+Status: Packet landed; full loading query remains open
 
 Source ref/commit(s): Buck2
 `088c75c7e36805df99c3de29062baa95db700b8b`
@@ -778,6 +778,8 @@ Bazel oracle: commit `5b7806d7`, generated and independently verified with
 
 V2 fixture: `query-rdeps-and-subtree-patterns`
 
+V2 commit(s): oracle `5b7806d7`; implementation `cdc5af41`
+
 Expected evidence artifact: `5b7806d7` exact root-subtree expansion/failure,
 `rdeps` universe/depth/cycle/seed/order behavior, package-local/criss-cross
 direct reverse-dependency behavior, and arity/expression-operand diagnostics
@@ -787,14 +789,24 @@ lookup to the existing retained DICE transaction and compact V2 labels; reject
 V1 implementation/output and all Buck/Bazel semantics outside the reviewed
 Stage 8 packet
 
-Validation: generation plus worker and root independent no-update reruns passed
-with `/usr/bin/bazel` 9.2.0; fixture discovery,
-provenance/generated/assertion/whitespace and candidate credential checks
-passed; Sol-low oracle review `ACCEPT`. Implementation still requires the
-serial six-crate suite, rebuilt V2 CLI, Slug fixture run, exact activation
-multisets, ownership/reuse inspection, formatting/diff checks, and Sol-low
-post-review.
+Implementation summary: Ported Buck2's request-local integer graph, stable DFS
+remap, reversal, bounded retention, postorder, universe filtering, and generic
+invoke around V2 structural labels and serial mutable-DICE lookup. Added
+prefix-local `SubtreePackageSetKey` and operand-package-local direct reverse
+lookup. No V1 graph/server/output implementation, persistent reverse cache,
+whole-workspace subtree filter, Buck cell/label semantics, or `siblings`
+surface was imported.
 
-Residual risk: the oracle is not yet implemented by Slug. External
-repositories, Sky Query, the other loading functions, non-text formatters,
-`cquery`, and `aquery` remain open.
+Validation: generation plus worker and root independent Bazel no-update reruns
+passed; fixture provenance/generated/assertion/whitespace and credential checks
+passed. The serial six-crate implementation suite passed 71 tests; the rebuilt
+V2 CLI passed the complete 26-command fixture and both preceding query
+fixtures. Exact DICE events cover prefix-local outside/inside
+create/delete/recreate, universe edge closure loss/regain, and operand-local
+same-package reverse lookup. Ownership/reuse, formatting/diff, daemon, and
+scope checks passed. Sol-low oracle, early reuse, and final implementation
+reviews returned `ACCEPT`.
+
+Residual risk: external repositories, Sky Query, the other 13 loading
+functions, non-text formatters, remaining ordering modes, `cquery`, and
+`aquery` remain open.

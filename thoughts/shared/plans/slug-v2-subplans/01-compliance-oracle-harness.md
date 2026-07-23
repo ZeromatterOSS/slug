@@ -637,5 +637,10 @@ with `generated: false` is not acceptance evidence.
   inspection tool read its contents, and no external RC or BuildBuddy
   credential content was copied, logged into project files, or committed.
   Sol-low reviewed the complete fixture and returned `ACCEPT`.
-- This is oracle evidence only. Slug does not yet implement the two functions
-  or subtree patterns, and M3 remains open.
+- Implementation commit `cdc5af41` now passes all 26 commands through the
+  rebuilt Slug V2 CLI and retained daemon. Its focused tests also preserve the
+  preceding two loading-query fixtures, exact prefix/operand-local DICE
+  activation, and same-daemon edge/subtree transitions. The serial six-crate
+  suite passed 71 tests, root independently reran all three Slug fixtures, and
+  Sol-low returned final `ACCEPT`. M3 remains open for the residual registry,
+  repositories, patterns, order modes, and formatters.
