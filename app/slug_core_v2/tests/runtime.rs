@@ -1,8 +1,12 @@
 use std::fs;
+use std::sync::Arc;
 
+use slug_core_v2::runtime::WorkspaceFileObservation;
+use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_core_v2::runtime::evaluate_workspace;
 use slug_core_v2::runtime::evaluate_workspace_targets;
 use slug_identity_v2::TargetPattern;
+use slug_loading_v2::keys::WorkspaceFileValue;
 
 #[test]
 fn root_module_and_build_are_evaluated_through_dice_and_starlark() {
@@ -71,4 +75,107 @@ fn loaded_custom_rule_reaches_analysis_and_declares_an_action() {
     let analysis = result.packages[0].analysis.as_ref().unwrap();
     assert_eq!(analysis.declared_outputs(), &["pkg/write_file.txt"]);
     assert_eq!(analysis.actions().len(), 1);
+}
+
+#[test]
+fn root_and_package_share_one_committed_revision_across_module_edit_and_delete() {
+    let workspace = tempfile::tempdir().unwrap();
+    let package = workspace.path().join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"before\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        "filegroup(name = \"probe\", srcs = [])\n",
+    )
+    .unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let target = TargetPattern::parse("//pkg:probe").unwrap();
+    let observe = || {
+        [
+            "MODULE.bazel",
+            "BUILD.bazel",
+            "pkg/BUILD.bazel",
+            "pkg/BUILD",
+        ]
+        .into_iter()
+        .map(|path| WorkspaceFileObservation::read(workspace.path().join(path)))
+        .collect::<Vec<_>>()
+    };
+
+    let first = runtime.evaluate(observe(), &[target.clone()]).unwrap();
+    assert_eq!(first.revision, first.workspace.revision);
+    assert_eq!(first.revision, first.packages[0].revision);
+
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"after\")\n",
+    )
+    .unwrap();
+    let edited = runtime.evaluate(observe(), &[target.clone()]).unwrap();
+    assert_eq!(edited.revision, edited.workspace.revision);
+    assert_eq!(edited.revision, edited.packages[0].revision);
+
+    fs::write(workspace.path().join("MODULE.bazel"), "module(name = )\n").unwrap();
+    let invalid = runtime.evaluate(observe(), &[target.clone()]);
+    assert!(invalid.unwrap_err().to_string().contains("MODULE.bazel"));
+
+    fs::remove_file(workspace.path().join("MODULE.bazel")).unwrap();
+    let deleted = runtime.evaluate(observe(), &[target]);
+    assert!(deleted.unwrap_err().to_string().contains("MODULE.bazel"));
+}
+
+#[test]
+fn retained_runtime_uses_root_build_when_build_bazel_is_deleted() {
+    let workspace = tempfile::tempdir().unwrap();
+    let module = workspace.path().join("MODULE.bazel");
+    let primary = workspace.path().join("BUILD.bazel");
+    let fallback = workspace.path().join("BUILD");
+    fs::write(&module, "module(name = \"root\")\n").unwrap();
+    fs::write(&primary, "primary = True\n").unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let observe = || {
+        [&module, &primary, &fallback]
+            .into_iter()
+            .map(WorkspaceFileObservation::read)
+            .collect::<Vec<_>>()
+    };
+
+    let first = runtime.evaluate(observe(), &[]).unwrap();
+    assert!(first.workspace.build.path.ends_with("BUILD.bazel"));
+
+    fs::remove_file(&primary).unwrap();
+    fs::write(&fallback, "fallback = True\n").unwrap();
+    let second = runtime.evaluate(observe(), &[]).unwrap();
+    assert!(second.workspace.build.path.ends_with("/BUILD"));
+}
+
+#[test]
+fn read_error_observation_is_not_treated_as_file_absence() {
+    let workspace = tempfile::tempdir().unwrap();
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"root\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let error = runtime
+        .evaluate(
+            [
+                WorkspaceFileObservation::read(workspace.path().join("MODULE.bazel")),
+                WorkspaceFileObservation {
+                    path: workspace.path().join("BUILD.bazel"),
+                    value: WorkspaceFileValue::ReadError(Arc::new("permission denied".to_owned())),
+                },
+            ],
+            &[],
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("permission denied"), "{error}");
 }

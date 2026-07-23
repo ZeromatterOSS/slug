@@ -14,11 +14,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use anyhow::Context;
 use async_trait::async_trait;
-use dice::DetectCycles;
-use dice::Dice;
 use dice::DiceComputations;
+use dice::DiceTransaction;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
@@ -30,26 +28,26 @@ use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 
-use crate::file_discovery::MODULE_FILE;
-use crate::file_discovery::find_build_file;
 use crate::keys::BzlModuleEvalKey;
 use crate::keys::BzlParseKey;
 use crate::keys::LoadLabelResolutionKey;
 use crate::keys::PackageLoadKey;
+use crate::keys::WorkspaceFileKey;
+use crate::keys::WorkspaceFileValue;
+use crate::keys::WorkspaceSnapshotKey;
 use crate::load_label::LoadLabel;
 use crate::package::LoadedPackage;
 use crate::package::PackageRecorder;
 use crate::package::loading_globals;
 
-/// A DICE-backed evaluator for local `.bzl` load graphs.
+/// Local-root loading operations over a caller-owned DICE transaction.
 ///
-/// This owns only local-root label resolution and Starlark module evaluation.
-/// Repository mappings, package globals, and BUILD-file construction remain
-/// owned by later Stage 4 slices.
+/// This intentionally owns no DICE instance or asynchronous runtime. The
+/// workspace runtime supplies one committed transaction containing all file
+/// observations for root and package loading.
 #[derive(Clone)]
 pub struct BzlModuleEvaluator {
     workspace: PathBuf,
-    dice: Arc<Dice>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,13 +60,26 @@ pub struct EvaluatedBzlModule {
 #[doc(hidden)]
 pub struct LoadingError {
     message: String,
+    absent: bool,
 }
 
 impl LoadingError {
     fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
+            absent: false,
         }
+    }
+
+    fn absent(path: &Path) -> Self {
+        Self {
+            message: format!("workspace file is absent: {}", path.display()),
+            absent: true,
+        }
+    }
+
+    fn is_absent(&self) -> bool {
+        self.absent
     }
 }
 
@@ -79,6 +90,62 @@ impl fmt::Display for LoadingError {
 }
 
 impl std::error::Error for LoadingError {}
+
+#[async_trait]
+impl Key for WorkspaceFileKey {
+    type Value = WorkspaceFileValue;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match ctx
+            .compute(&WorkspaceSnapshotKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(snapshot) => snapshot
+                .files
+                .get(&self.path)
+                .cloned()
+                .unwrap_or(WorkspaceFileValue::Absent),
+            Err(error) => WorkspaceFileValue::ReadError(Arc::new(format!(
+                "reading workspace snapshot for {}: {error}",
+                self.path.display()
+            ))),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+async fn observed_file(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+    path: &Path,
+) -> Result<Arc<String>, LoadingError> {
+    let value = ctx
+        .compute(&WorkspaceFileKey {
+            workspace: workspace.to_path_buf(),
+            path: path.to_path_buf(),
+        })
+        .await
+        .map_err(|error| {
+            LoadingError::new(format!("reading {} through DICE: {error}", path.display()))
+        })?;
+    match value {
+        WorkspaceFileValue::Present(source) => Ok(source.clone()),
+        WorkspaceFileValue::Absent => Err(LoadingError::absent(path)),
+        WorkspaceFileValue::ReadError(error) => Err(LoadingError::new(format!(
+            "reading {}: {error}",
+            path.display()
+        ))),
+    }
+}
 
 #[derive(Allocative, Clone, PartialEq, Eq)]
 #[doc(hidden)]
@@ -112,159 +179,86 @@ impl BzlModuleEvaluator {
     pub fn new(workspace: impl Into<PathBuf>) -> anyhow::Result<Self> {
         let workspace = workspace.into();
         let original_workspace = workspace.clone();
-        let workspace = workspace.canonicalize().with_context(|| {
-            format!(
-                "canonicalizing workspace for .bzl loading: {}",
+        let workspace = workspace.canonicalize().map_err(|error| {
+            anyhow::anyhow!(
+                "canonicalizing workspace for .bzl loading: {}: {error}",
                 original_workspace.display()
             )
         })?;
-        if !workspace.join(MODULE_FILE).is_file() {
-            anyhow::bail!("missing {MODULE_FILE}; Slug V2 requires Bazel 9 bzlmod workspaces");
-        }
-        Ok(Self {
-            workspace,
-            dice: Dice::builder().build(DetectCycles::Enabled),
-        })
+        Ok(Self { workspace })
     }
 
     /// Evaluate a Bazel local load label from one package directory.
     ///
-    /// The DICE graph retains the parsed source and every transitive loaded
-    /// module. Call [`Self::invalidate_path`] after a watched file change to
-    /// advance the graph to the new source state.
-    pub fn evaluate_load(
+    pub async fn evaluate_load(
         &self,
+        transaction: &mut DiceTransaction,
         requesting_package: impl AsRef<Path>,
         load: impl AsRef<str>,
     ) -> anyhow::Result<EvaluatedBzlModule> {
-        let requesting_package = requesting_package
-            .as_ref()
-            .canonicalize()
-            .with_context(|| {
-                format!(
-                    "canonicalizing requesting package {}",
-                    requesting_package.as_ref().display()
-                )
-            })?;
+        let requesting_package = requesting_package.as_ref().to_path_buf();
+        self.ensure_package(&requesting_package)?;
         let workspace = self.workspace.clone();
         let load = load.as_ref().to_owned();
-        let dice = self.dice.clone();
-        self.runtime().block_on(async move {
-            let mut transaction = dice.updater().commit().await;
-            let path = transaction
-                .compute(&LoadLabelResolutionKey {
-                    workspace: workspace.clone(),
-                    requesting_package,
-                    load,
-                })
-                .await
-                .context("resolving local .bzl load through DICE")?;
-            let path = path
-                .as_ref()
-                .as_ref()
-                .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-            let module = transaction
-                .compute(&BzlModuleEvalKey {
-                    workspace,
-                    path: path.clone(),
-                })
-                .await
-                .context("evaluating local .bzl load through DICE")?;
-            let module = module
-                .as_ref()
-                .as_ref()
-                .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-            Ok(EvaluatedBzlModule {
-                path: module.path.clone(),
-                loads: module.loads.clone(),
+        let path = transaction
+            .compute(&LoadLabelResolutionKey {
+                workspace: workspace.clone(),
+                requesting_package,
+                load,
             })
+            .await
+            .map_err(|error| anyhow::anyhow!("resolving local .bzl load through DICE: {error}"))?;
+        let path = path
+            .as_ref()
+            .as_ref()
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        let module = transaction
+            .compute(&BzlModuleEvalKey {
+                workspace,
+                path: path.clone(),
+            })
+            .await
+            .map_err(|error| anyhow::anyhow!("evaluating local .bzl load through DICE: {error}"))?;
+        let module = module
+            .as_ref()
+            .as_ref()
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        Ok(EvaluatedBzlModule {
+            path: module.path.clone(),
+            loads: module.loads.clone(),
         })
     }
 
     /// Evaluate a package BUILD file with the currently supported Bazel globals
     /// and the same DICE-backed local `.bzl` graph used by [`Self::evaluate_load`].
-    pub fn evaluate_package(&self, package: impl AsRef<Path>) -> anyhow::Result<LoadedPackage> {
-        let package = package
+    pub async fn evaluate_package(
+        &self,
+        transaction: &mut DiceTransaction,
+        package: impl AsRef<Path>,
+    ) -> anyhow::Result<LoadedPackage> {
+        let package = package.as_ref().to_path_buf();
+        self.ensure_package(&package)?;
+        let workspace = self.workspace.clone();
+        let package = transaction
+            .compute(&PackageLoadKey { workspace, package })
+            .await
+            .map_err(|error| anyhow::anyhow!("loading BUILD package through DICE: {error}"))?;
+        package
             .as_ref()
-            .canonicalize()
-            .with_context(|| format!("canonicalizing package {}", package.as_ref().display()))?;
-        if !package.starts_with(&self.workspace) {
-            anyhow::bail!(
-                "package is outside workspace {}: {}",
-                self.workspace.display(),
-                package.display()
-            );
-        }
-        let workspace = self.workspace.clone();
-        let dice = self.dice.clone();
-        self.runtime().block_on(async move {
-            let mut transaction = dice.updater().commit().await;
-            let package = transaction
-                .compute(&PackageLoadKey { workspace, package })
-                .await
-                .context("loading BUILD package through DICE")?;
-            package
-                .as_ref()
-                .as_ref()
-                .map(Clone::clone)
-                .map_err(|error| anyhow::anyhow!(error.to_string()))
-        })
+            .as_ref()
+            .map(Clone::clone)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
     }
 
-    /// Mark one watched `.bzl` file dirty before the next DICE transaction.
-    pub fn invalidate_path(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
-        let path = path.as_ref();
-        if !path.is_absolute() || !path.starts_with(&self.workspace) {
-            anyhow::bail!(
-                "changed .bzl path must be absolute and inside workspace {}: {}",
-                self.workspace.display(),
-                path.display()
-            );
-        }
-        let path = path.to_path_buf();
-        let workspace = self.workspace.clone();
-        let dice = self.dice.clone();
-        self.runtime().block_on(async move {
-            let mut updater = dice.updater();
-            updater
-                .changed(vec![BzlParseKey { workspace, path }])
-                .context("invalidating parsed .bzl source")?;
-            updater.commit().await;
-            Ok(())
-        })
-    }
-
-    /// Mark a watched package directory dirty after its `BUILD.bazel` or
-    /// `BUILD` file changes. Loaded `.bzl` changes should use
-    /// [`Self::invalidate_path`], which naturally propagates through the DICE
-    /// dependency edge into each dependent package.
-    pub fn invalidate_package(&self, package: impl AsRef<Path>) -> anyhow::Result<()> {
-        let package = package.as_ref();
+    fn ensure_package(&self, package: &Path) -> anyhow::Result<()> {
         if !package.is_absolute() || !package.starts_with(&self.workspace) {
             anyhow::bail!(
-                "changed package path must be absolute and inside workspace {}: {}",
+                "package must be absolute and inside workspace {}: {}",
                 self.workspace.display(),
                 package.display()
             );
         }
-        let package = package.to_path_buf();
-        let workspace = self.workspace.clone();
-        let dice = self.dice.clone();
-        self.runtime().block_on(async move {
-            let mut updater = dice.updater();
-            updater
-                .changed(vec![PackageLoadKey { workspace, package }])
-                .context("invalidating BUILD package source")?;
-            updater.commit().await;
-            Ok(())
-        })
-    }
-
-    fn runtime(&self) -> tokio::runtime::Runtime {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("creating a one-shot runtime for synchronous loading API")
+        Ok(())
     }
 }
 
@@ -274,22 +268,23 @@ impl Key for BzlParseKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        let source = match observed_file(ctx, &self.workspace, &self.path).await {
+            Ok(source) => source,
+            Err(error) => return Arc::new(Err(error)),
+        };
         Arc::new((|| {
-            let source = std::fs::read_to_string(&self.path).map_err(|error| {
-                LoadingError::new(format!("reading {}: {error}", self.path.display()))
-            })?;
             let ast = AstModule::parse(
                 &self.path.display().to_string(),
-                source.clone(),
+                source.as_ref().clone(),
                 &Dialect::Standard,
             )
             .map_err(|error| LoadingError::new(error.to_string()))?;
             Ok(ParsedBzl {
                 source_digest: digest(&source),
-                source,
+                source: source.as_ref().clone(),
                 loads: ast
                     .loads()
                     .into_iter()
@@ -443,27 +438,27 @@ impl Key for PackageLoadKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let build_file = match find_build_file(&self.package) {
-            Some(build_file) => build_file,
-            None => {
-                return Arc::new(Err(LoadingError::new(format!(
-                    "no BUILD.bazel or BUILD file in package {}",
-                    self.package.display()
-                ))));
+        let primary_build = self.package.join("BUILD.bazel");
+        let fallback_build = self.package.join("BUILD");
+        let (build_file, source) = match observed_file(ctx, &self.workspace, &primary_build).await {
+            Ok(source) => (primary_build, source),
+            Err(error) if error.is_absent() => {
+                match observed_file(ctx, &self.workspace, &fallback_build).await {
+                    Ok(source) => (fallback_build, source),
+                    Err(error) if error.is_absent() => {
+                        return Arc::new(Err(LoadingError::new(format!(
+                            "no BUILD.bazel or BUILD file in package {}",
+                            self.package.display()
+                        ))));
+                    }
+                    Err(error) => return Arc::new(Err(error)),
+                }
             }
-        };
-        let source = match std::fs::read_to_string(&build_file) {
-            Ok(source) => source,
-            Err(error) => {
-                return Arc::new(Err(LoadingError::new(format!(
-                    "reading {}: {error}",
-                    build_file.display()
-                ))));
-            }
+            Err(error) => return Arc::new(Err(error)),
         };
         let ast = match AstModule::parse(
             &build_file.display().to_string(),
-            source,
+            source.as_ref().clone(),
             &Dialect::Standard,
         ) {
             Ok(ast) => ast,
@@ -504,12 +499,9 @@ impl Key for PackageLoadKey {
         }
 
         Arc::new((|| {
-            let source = std::fs::read_to_string(&build_file).map_err(|error| {
-                LoadingError::new(format!("reading {}: {error}", build_file.display()))
-            })?;
             let ast = AstModule::parse(
                 &build_file.display().to_string(),
-                source,
+                source.as_ref().clone(),
                 &Dialect::Standard,
             )
             .map_err(|error| LoadingError::new(error.to_string()))?;

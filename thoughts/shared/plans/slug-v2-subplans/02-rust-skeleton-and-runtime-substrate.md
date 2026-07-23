@@ -130,6 +130,59 @@ Their narrow `load-invalidation` result is a regression test, not acceptance of
 this gate; an implementation packet may replace them rather than preserve their
 shape.
 
+#### Reviewed next packet — `WP-2-m1-workspace-runtime` (2026-07-22)
+
+A Terra-medium source audit followed by Sol-low ownership review revised the
+first M1 packet. Root evaluation and loading must be unified immediately; merely
+adding file inputs around the existing fresh root DICE and private loading DICE
+would preserve the split ownership bug.
+
+- Add a V2-owned `WorkspaceRuntime` under `slug_core_v2::runtime` containing
+  canonical workspace identity and the sole retained DICE instance.
+- Add an injected workspace-file key whose value distinguishes present content
+  from absence. Batch all observed create/edit/delete changes through
+  `DiceTransactionUpdater::changed_to`, commit once, and use that transaction
+  for root plus package/loading evaluation.
+- Make loading compute over the supplied transaction. Remove its private
+  `Dice::builder()`, private synchronous runtimes, and direct filesystem reads
+  from DICE key computations.
+- Remove daemon digest/scanner ownership after an explicit observation adapter
+  feeds the new update API. The adapter must report absence and read errors; it
+  cannot decide semantic freshness.
+- Leave analysis as the current post-loading scaffold consuming results from
+  the same request revision. Do not add bzlmod, configured-target, query,
+  environment, lockfile, or repository-mapping keys in this packet.
+- Run the Buck2 utility audit before choosing the immutable source-content
+  representation; do not introduce repeated owned `String` copies into file
+  keys/results by default.
+
+Write failing tests first for unchanged reuse; loaded `.bzl` create/edit/delete;
+root `MODULE.bazel` edit/delete; `BUILD.bazel` deletion with absent/present
+`BUILD`; one root/package revision; and no per-build `Dice::builder()` or
+semantic scanner. Stop if a computation would inject while computing, a lock
+would cross a compute/Starlark await, or the implementation requires a Stage
+4/5/6/8 public-interface decision.
+
+Current worktree evidence (2026-07-22):
+
+- `WorkspaceRuntime` now retains the workspace's sole DICE instance and commits
+  one injected immutable file snapshot before root and loading computations.
+  Loading accepts the caller's transaction and no longer owns a private DICE
+  graph, Tokio runtime, filesystem read, or invalidation scanner.
+- Focused regressions cover loaded `.bzl` create/edit/delete, read errors,
+  `MODULE.bazel` edit/invalid/delete, root and package
+  `BUILD.bazel`-to-`BUILD` fallback, one request revision, the production
+  one-shot wrapper, and the retained daemon path.
+- Root validation passed
+  `CARGO_TARGET_DIR=/tmp/slug-m1-runtime-target CARGO_BUILD_JOBS=1 cargo test
+  -p slug_core_v2 -p slug_loading_v2 -p slug_server_v2 -p slug_analysis_v2
+  -p slug_cli_v2`.
+- This is the correctness-first file-input spine, not M1 completion. The
+  observation adapter currently injects a full
+  `Arc<starlark_map::SortedMap<...>>` workspace snapshot, so unchanged
+  downstream reuse is not yet instrumented and fine-grained watcher/directory
+  inputs remain an explicit performance follow-up.
+
 ### 2.6 First-Real-Build Promotion
 
 Before Stage 5-8 work can advance beyond scaffold status:

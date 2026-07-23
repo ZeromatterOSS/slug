@@ -126,3 +126,61 @@ fn third_build_after_no_edit_invalidates_zero() {
     let third = daemon.build(&[target("//pkg:message")], &remote_disabled(), &[]);
     assert_eq!(third.invalidated_files, 0);
 }
+
+#[test]
+fn missing_loaded_bzl_is_absent_then_create_is_observed_without_a_key_panic() {
+    let workspace = scratch("missing-then-create-bzl");
+    let package = workspace.join("pkg");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(&workspace.join("BUILD.bazel"), "");
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"declare\")\ndeclare()\n",
+    );
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let missing = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
+    assert!(
+        missing.stderr.contains("workspace file is absent"),
+        "{missing:?}"
+    );
+
+    write(
+        &package.join("defs.bzl"),
+        "def declare():\n    native.filegroup(name = \"probe\", srcs = [])\n",
+    );
+    let created = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
+    assert_eq!(created.invalidated_files, 1);
+    assert!(
+        !created.stderr.contains("build_runtime_error"),
+        "{created:?}"
+    );
+    assert!(created.stderr.contains("dice_starlark_package_loading"));
+}
+
+#[test]
+fn retained_runtime_switches_from_build_bazel_to_build_fallback() {
+    let workspace = scratch("build-fallback-transition");
+    let package = workspace.join("pkg");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(&workspace.join("BUILD.bazel"), "");
+    let primary = package.join("BUILD.bazel");
+    write(&primary, "filegroup(name = \"primary\", srcs = [])\n");
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let first = daemon.build(&[target("//pkg:primary")], &remote_disabled(), &[]);
+    assert!(!first.stderr.contains("build_runtime_error"), "{first:?}");
+
+    fs::remove_file(&primary).unwrap();
+    write(
+        &package.join("BUILD"),
+        "filegroup(name = \"fallback\", srcs = [])\n",
+    );
+    let fallback = daemon.build(&[target("//pkg:fallback")], &remote_disabled(), &[]);
+    assert_eq!(fallback.invalidated_files, 2);
+    assert!(
+        !fallback.stderr.contains("build_runtime_error"),
+        "{fallback:?}"
+    );
+    assert!(fallback.stderr.contains("dice_starlark_package_loading"));
+}

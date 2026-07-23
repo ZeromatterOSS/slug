@@ -15,9 +15,12 @@ pub mod starlark;
 
 pub use dice::WorkspaceBuildEvaluation;
 pub use dice::WorkspaceEvaluation;
-pub use dice::evaluate_packages_with;
+pub use dice::WorkspaceFileObservation;
+pub use dice::WorkspaceRevision;
+pub use dice::WorkspaceRuntime;
 pub use dice::evaluate_workspace;
 pub use dice::evaluate_workspace_targets;
+pub use dice::observe_workspace_files;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeMode {

@@ -7,39 +7,34 @@
  * select, at your option, one of the above-listed licenses.
  */
 
-//! Same-daemon DICE invalidation for the load-invalidation gate clause.
+//! Same-daemon workspace runtime requests.
 //!
-//! The daemon retains a [`BzlModuleEvaluator`] across builds. Before each
-//! build it rescans the workspace for `.bzl` and `BUILD.bazel` files, compares
-//! their SHA-256 digests to the previous build, and calls
-//! [`BzlModuleEvaluator::invalidate_path`] / [`BzlModuleEvaluator::invalidate_package`]
-//! for every changed path. The DICE graph then replays only the affected
-//! computations.
+//! The daemon owns one [`WorkspaceRuntime`]. A filesystem observation adapter
+//! supplies complete present, absent, and failed-read values before each
+//! request; DICE, not the adapter, determines semantic reuse.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
-use anyhow::Context;
-use sha2::Digest;
-use sha2::Sha256;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::WorkspaceEvaluation;
-use slug_core_v2::runtime::evaluate_packages_with;
-use slug_core_v2::runtime::evaluate_workspace;
+use slug_core_v2::runtime::WorkspaceFileObservation;
+use slug_core_v2::runtime::WorkspaceRuntime;
+use slug_core_v2::runtime::observe_workspace_files;
 use slug_identity_v2::TargetPattern;
-use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
 use crate::reapi::run_reapi_build;
 
-/// The retained daemon state: a DICE-backed `.bzl`/BUILD evaluator and a cache
-/// of file digests from the previous build.
+/// The retained daemon state: one workspace runtime and a non-semantic
+/// observation adapter. The adapter's previous values are used only to report
+/// the compatibility metric; every observation is injected into DICE.
 pub struct Daemon {
     workspace: PathBuf,
-    evaluator: BzlModuleEvaluator,
-    file_digests: HashMap<PathBuf, String>,
+    runtime: WorkspaceRuntime,
+    observations: FilesystemObservationAdapter,
 }
 
 impl Daemon {
@@ -47,42 +42,16 @@ impl Daemon {
     /// an empty digest cache, so every file is treated as new (no invalidation
     /// needed on the first build).
     pub fn new(workspace: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let workspace = workspace.as_ref().to_path_buf();
-        let evaluator = BzlModuleEvaluator::new(&workspace)?;
+        let runtime = WorkspaceRuntime::new(workspace.as_ref().to_path_buf())?;
+        let workspace = runtime.workspace().to_path_buf();
         Ok(Self {
             workspace,
-            evaluator,
-            file_digests: HashMap::new(),
+            runtime,
+            observations: FilesystemObservationAdapter::default(),
         })
     }
 
-    /// Detect changed `.bzl` and `BUILD.bazel` files since the previous build
-    /// and invalidate them through the DICE graph. Returns the number of
-    /// invalidated paths.
-    pub fn invalidate_changed(&mut self) -> anyhow::Result<usize> {
-        let current = scan_workspace_files(&self.workspace)?;
-        let mut invalidated = 0;
-        for (path, digest) in &current {
-            let changed = match self.file_digests.get(path) {
-                Some(prev) => prev != digest,
-                None => false,
-            };
-            if changed {
-                if is_build_file(path) {
-                    if let Some(package) = path.parent() {
-                        self.evaluator.invalidate_package(package)?;
-                    }
-                } else {
-                    self.evaluator.invalidate_path(path)?;
-                }
-                invalidated += 1;
-            }
-        }
-        self.file_digests = current;
-        Ok(invalidated)
-    }
-
-    /// Run one build: invalidate changed files, evaluate packages, analyze
+    /// Run one build: observe files, inject one DICE batch, evaluate packages, analyze
     /// targets, and (if REAPI execute mode) execute actions. Returns the JSON
     /// evidence line for stderr.
     pub fn build(
@@ -91,26 +60,13 @@ impl Daemon {
         remote: &RemoteConfig,
         argv: &[String],
     ) -> BuildResult {
-        let invalidated = match self.invalidate_changed() {
-            Ok(count) => count,
+        let (observations, invalidated) = match self.observations.observe(&self.workspace) {
+            Ok(observations) => observations,
             Err(error) => {
                 return BuildResult::error("build_runtime_error", &error.to_string());
             }
         };
-
-        let workspace_evaluation: WorkspaceEvaluation = match evaluate_workspace(&self.workspace) {
-            Ok(eval) => eval,
-            Err(error) => {
-                return BuildResult::error("build_runtime_error", &error.to_string());
-            }
-        };
-
-        let evaluation = match evaluate_packages_with(
-            &self.workspace,
-            &workspace_evaluation,
-            &self.evaluator,
-            targets,
-        ) {
+        let evaluation = match self.runtime.evaluate(observations, targets) {
             Ok(eval) => eval,
             Err(error) => {
                 return BuildResult::error("build_runtime_error", &error.to_string());
@@ -196,64 +152,34 @@ impl BuildResult {
     }
 }
 
-/// Walk the workspace and hash every `.bzl` and `BUILD.bazel` / `BUILD` file.
-fn scan_workspace_files(workspace: &Path) -> anyhow::Result<HashMap<PathBuf, String>> {
-    let mut result = HashMap::new();
-    let workspace = workspace.canonicalize().with_context(|| {
-        format!(
-            "canonicalizing workspace for file scan: {}",
-            workspace.display()
-        )
-    })?;
-    scan_dir(&workspace, &workspace, &mut result)?;
-    Ok(result)
+#[derive(Default)]
+struct FilesystemObservationAdapter {
+    previous: Option<BTreeMap<PathBuf, WorkspaceFileValue>>,
 }
 
-fn scan_dir(
-    workspace: &Path,
-    dir: &Path,
-    out: &mut HashMap<PathBuf, String>,
-) -> anyhow::Result<()> {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(_) => return Ok(()),
-    };
-    for entry in entries {
-        let entry = entry?;
-        let path = entry.path();
-        let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            // Skip hidden directories and common build output dirs.
-            let name = entry.file_name();
-            let name = name.to_string_lossy();
-            if name.starts_with('.') || name == "bazel-bin" || name == "bazel-out" {
-                continue;
-            }
-            let _ = workspace;
-            scan_dir(workspace, &path, out)?;
-        } else if file_type.is_file() {
-            if is_build_file(&path) || path.extension().is_some_and(|ext| ext == "bzl") {
-                if let Ok(content) = std::fs::read(&path) {
-                    let digest = hex_digest(&content);
-                    out.insert(path, digest);
-                }
-            }
-        }
+impl FilesystemObservationAdapter {
+    fn observe(
+        &mut self,
+        workspace: &Path,
+    ) -> anyhow::Result<(Vec<WorkspaceFileObservation>, usize)> {
+        let observations = observe_workspace_files(workspace)?;
+        let current = observations
+            .iter()
+            .map(|observation| (observation.path.clone(), observation.value.clone()))
+            .collect::<BTreeMap<_, _>>();
+        let invalidated = self.previous.as_ref().map_or(0, |previous| {
+            previous
+                .iter()
+                .filter(|(path, value)| current.get(*path) != Some(*value))
+                .count()
+                + current
+                    .keys()
+                    .filter(|path| !previous.contains_key(*path))
+                    .count()
+        });
+        self.previous = Some(current);
+        Ok((observations, invalidated))
     }
-    Ok(())
-}
-
-fn is_build_file(path: &Path) -> bool {
-    matches!(
-        path.file_name().and_then(|n| n.to_str()),
-        Some("BUILD.bazel") | Some("BUILD")
-    )
-}
-
-fn hex_digest(bytes: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    format!("{:x}", hasher.finalize())
 }
 
 mod reapi;

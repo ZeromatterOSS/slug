@@ -13,3 +13,7 @@ slug_build_api_v2 = { workspace = true }
 slug_identity_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }
 starlark = { workspace = true }
+
+[dev-dependencies]
+dice = { workspace = true }
+tokio = { workspace = true }

@@ -1,11 +1,15 @@
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::SystemTime;
 
+use dice::DetectCycles;
+use dice::Dice;
 use slug_loading_v2::BzlModuleEvaluator;
-use slug_loading_v2::PackageTarget;
-use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::keys::WorkspaceFileValue;
+use slug_loading_v2::keys::WorkspaceSnapshot;
+use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_loading_v2::load_label::LoadLabel;
 
 fn scratch(name: &str) -> PathBuf {
@@ -25,6 +29,52 @@ fn write(path: &Path, content: &str) {
     fs::write(path, content).unwrap();
 }
 
+fn load_package(
+    dice: &Arc<Dice>,
+    runtime: &tokio::runtime::Runtime,
+    workspace: &Path,
+    package: &Path,
+    bzl_paths: &[PathBuf],
+) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+    let paths = [
+        vec![
+            workspace.join("MODULE.bazel"),
+            workspace.join("BUILD.bazel"),
+            package.join("BUILD.bazel"),
+            package.join("BUILD"),
+        ],
+        bzl_paths.to_vec(),
+    ]
+    .concat();
+    let files = paths
+        .into_iter()
+        .map(|path| {
+            let value = match fs::read_to_string(&path) {
+                Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    WorkspaceFileValue::Absent
+                }
+                Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
+            };
+            (path, value)
+        })
+        .collect();
+    let evaluator = BzlModuleEvaluator::new(workspace)?;
+    runtime.block_on(async {
+        let mut updater = dice.updater();
+        updater.changed_to(vec![(
+            (WorkspaceSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            }),
+            Arc::new(WorkspaceSnapshot {
+                files: Arc::new(files),
+            }),
+        )])?;
+        let mut transaction = updater.commit().await;
+        evaluator.evaluate_package(&mut transaction, package).await
+    })
+}
+
 #[test]
 fn load_label_must_point_to_bzl_file() {
     let load = LoadLabel::parse("//pkg:defs.bzl").unwrap();
@@ -34,109 +84,79 @@ fn load_label_must_point_to_bzl_file() {
 }
 
 #[test]
-fn evaluator_requires_a_bzlmod_workspace_root() {
-    let workspace = scratch("missing-module");
-    let error = BzlModuleEvaluator::new(&workspace).err().unwrap();
-    assert!(error.to_string().contains("missing MODULE.bazel"));
-}
-
-#[test]
-fn transitive_bzl_load_is_cached_then_invalidated_through_dice() {
-    let workspace = scratch("invalidation");
+fn injected_bzl_create_edit_delete_replays_the_loaded_package() {
+    let workspace = scratch("workspace-file-input");
     let package = workspace.join("pkg");
-    write(
-        &workspace.join("MODULE.bazel"),
-        "module(name = \"loading\")\n",
-    );
-    write(
-        &package.join("defs.bzl"),
-        "load(\":dep.bzl\", \"value\")\nanswer = value\n",
-    );
-    let dependency = package.join("dep.bzl");
-    write(&dependency, "value = 1\n");
-
-    let loader = BzlModuleEvaluator::new(&workspace).unwrap();
-    let evaluated = loader.evaluate_load(&package, ":defs.bzl").unwrap();
-    assert_eq!(evaluated.path, package.join("defs.bzl"));
-    assert_eq!(evaluated.loads, vec![":dep.bzl"]);
-
-    write(&dependency, "value = (\n");
-    assert!(loader.evaluate_load(&package, ":defs.bzl").is_ok());
-
-    loader.invalidate_path(&dependency).unwrap();
-    let error = loader.evaluate_load(&package, ":defs.bzl").unwrap_err();
-    assert!(error.to_string().contains("error"));
-}
-
-#[test]
-fn invalidating_a_loaded_bzl_recomputes_its_dependent_package() {
-    let workspace = scratch("package-invalidation");
-    let package = workspace.join("pkg");
-    write(
-        &workspace.join("MODULE.bazel"),
-        "module(name = \"loading\")\n",
-    );
     let definitions = package.join("defs.bzl");
     write(
-        &definitions,
-        "def declare():\n    native.filegroup(name = \"before\", srcs = [])\n",
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
     );
     write(
         &package.join("BUILD.bazel"),
         "load(\":defs.bzl\", \"declare\")\ndeclare()\n",
     );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let loader = BzlModuleEvaluator::new(&workspace).unwrap();
-    let initial = loader.evaluate_package(&package).unwrap();
-    assert_eq!(
-        initial.targets,
-        vec![PackageTarget {
-            name: "before".to_owned(),
-            kind: PackageTargetKind::Filegroup { srcs: Vec::new() },
-        }]
+    let missing = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
     );
+    assert!(missing.unwrap_err().to_string().contains("absent"));
+
+    write(
+        &definitions,
+        "def declare():\n    native.filegroup(name = \"before\", srcs = [])\n",
+    );
+    let initial = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
+    )
+    .unwrap();
+    assert_eq!(initial.targets[0].name, "before");
 
     write(
         &definitions,
         "def declare():\n    native.filegroup(name = \"after\", srcs = [])\n",
     );
-    loader.invalidate_path(&definitions).unwrap();
-    let recomputed = loader.evaluate_package(&package).unwrap();
-    assert_eq!(
-        recomputed.targets,
-        vec![PackageTarget {
-            name: "after".to_owned(),
-            kind: PackageTargetKind::Filegroup { srcs: Vec::new() },
-        }]
-    );
+    let edited = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
+    )
+    .unwrap();
+    assert_eq!(edited.targets[0].name, "after");
+
+    fs::remove_file(&definitions).unwrap();
+    let deleted = load_package(&dice, &runtime, &workspace, &package, &[definitions]);
+    assert!(deleted.unwrap_err().to_string().contains("absent"));
 }
 
 #[test]
-fn invalidating_a_package_recomputes_its_build_file() {
-    let workspace = scratch("build-file-invalidation");
+fn injected_build_primary_absence_selects_build_fallback() {
+    let workspace = scratch("build-fallback");
     let package = workspace.join("pkg");
     write(
         &workspace.join("MODULE.bazel"),
         "module(name = \"loading\")\n",
     );
-    let build_file = package.join("BUILD.bazel");
-    write(&build_file, "filegroup(name = \"before\", srcs = [])\n");
-
-    let loader = BzlModuleEvaluator::new(&workspace).unwrap();
-    let initial = loader.evaluate_package(&package).unwrap();
-    assert_eq!(initial.targets[0].name, "before");
-
-    write(&build_file, "filegroup(name = \"after\", srcs = [])\n");
-    assert_eq!(
-        loader.evaluate_package(&package).unwrap().targets[0].name,
-        "before"
+    write(
+        &package.join("BUILD"),
+        "filegroup(name = \"fallback\", srcs = [])\n",
     );
-
-    loader.invalidate_package(&package).unwrap();
-    assert_eq!(
-        loader.evaluate_package(&package).unwrap().targets[0].name,
-        "after"
-    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let loaded = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+    assert_eq!(loaded.targets[0].name, "fallback");
 }
 
 #[test]
@@ -147,11 +167,14 @@ fn local_loader_rejects_external_repository_before_mapping_exists() {
         &workspace.join("MODULE.bazel"),
         "module(name = \"loading\")\n",
     );
-    fs::create_dir_all(&package).unwrap();
-
-    let loader = BzlModuleEvaluator::new(&workspace).unwrap();
-    let error = loader
-        .evaluate_load(&package, "@other//:defs.bzl")
-        .unwrap_err();
-    assert!(error.to_string().contains("external repository load"));
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\"@other//:defs.bzl\", \"declare\")\ndeclare()\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let error = load_package(&dice, &runtime, &workspace, &package, &[])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("external repository load"), "{error}");
 }

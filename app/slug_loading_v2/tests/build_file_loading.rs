@@ -1,7 +1,11 @@
 use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::SystemTime;
 
+use dice::DetectCycles;
+use dice::Dice;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::PackageTarget;
 use slug_loading_v2::PackageTargetKind;
@@ -12,6 +16,9 @@ use slug_loading_v2::file_discovery::find_build_file;
 use slug_loading_v2::file_discovery::find_workspace_root;
 use slug_loading_v2::file_discovery::is_bazel_build_file;
 use slug_loading_v2::file_discovery::is_bzl_file;
+use slug_loading_v2::keys::WorkspaceFileValue;
+use slug_loading_v2::keys::WorkspaceSnapshot;
+use slug_loading_v2::keys::WorkspaceSnapshotKey;
 
 fn scratch(name: &str) -> PathBuf {
     let nanos = SystemTime::now()
@@ -21,6 +28,57 @@ fn scratch(name: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("slug-loading-v2-{name}-{nanos}"));
     fs::create_dir_all(&root).unwrap();
     root
+}
+
+fn load_package(workspace: &Path, package: &Path) -> slug_loading_v2::LoadedPackage {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut paths = vec![
+        workspace.join(MODULE_FILE),
+        workspace.join(BUILD_FILE_PRIMARY),
+        workspace.join(BUILD_FILE_FALLBACK),
+        package.join(BUILD_FILE_PRIMARY),
+        package.join(BUILD_FILE_FALLBACK),
+    ];
+    for entry in fs::read_dir(package).unwrap() {
+        let path = entry.unwrap().path();
+        if is_bzl_file(&path) {
+            paths.push(path);
+        }
+    }
+    let files = paths
+        .into_iter()
+        .map(|path| {
+            let value = match fs::read_to_string(&path) {
+                Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    WorkspaceFileValue::Absent
+                }
+                Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
+            };
+            (path, value)
+        })
+        .collect();
+    let evaluator = BzlModuleEvaluator::new(workspace).unwrap();
+    tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(async move {
+            let mut updater = dice.updater();
+            updater
+                .changed_to(vec![(
+                    (WorkspaceSnapshotKey {
+                        workspace: workspace.to_path_buf(),
+                    }),
+                    Arc::new(WorkspaceSnapshot {
+                        files: Arc::new(files),
+                    }),
+                )])
+                .unwrap();
+            let mut transaction = updater.commit().await;
+            evaluator
+                .evaluate_package(&mut transaction, package)
+                .await
+                .unwrap()
+        })
 }
 
 #[test]
@@ -79,8 +137,7 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
     )
     .unwrap();
 
-    let evaluator = BzlModuleEvaluator::new(&workspace).unwrap();
-    let loaded = evaluator.evaluate_package(&package).unwrap();
+    let loaded = load_package(&workspace, &package);
 
     assert_eq!(loaded.default_visibility, vec!["//visibility:public"]);
     assert_eq!(
@@ -133,8 +190,7 @@ fn package_load_registers_a_generic_starlark_rule_without_executing_it() {
     )
     .unwrap();
 
-    let evaluator = BzlModuleEvaluator::new(&workspace).unwrap();
-    let loaded = evaluator.evaluate_package(&package).unwrap();
+    let loaded = load_package(&workspace, &package);
 
     assert_eq!(loaded.targets.len(), 1,);
     assert_eq!(loaded.targets[0].name, "registered");

@@ -9,10 +9,69 @@
  */
 
 use std::fmt;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use allocative::Allocative;
+use dice::InjectedKey;
+use dupe::Dupe;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::PackageIdentifier;
+use starlark_map::sorted_map::SortedMap;
+
+/// An observation supplied to the workspace DICE graph before loading begins.
+///
+/// The value deliberately distinguishes a file that does not exist from a
+/// read failure.  A missing BUILD file is meaningful to package loading, while
+/// a permission or I/O failure must be reported instead of being cached as an
+/// absence.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum WorkspaceFileValue {
+    Present(Arc<String>),
+    Absent,
+    ReadError(Arc<String>),
+}
+
+/// Immutable, externally observed workspace state for one DICE revision.
+///
+/// A snapshot lets `WorkspaceFileKey` answer for any requested path: files not
+/// represented in the observed state are explicitly absent rather than an
+/// uninitialized injected key. `Arc` keeps the long-lived input cheap to clone.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct WorkspaceSnapshot {
+    pub files: Arc<SortedMap<PathBuf, WorkspaceFileValue>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct WorkspaceSnapshotKey {
+    pub workspace: PathBuf,
+}
+
+impl fmt::Display for WorkspaceSnapshotKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "workspace-snapshot:{}", self.workspace.display())
+    }
+}
+
+impl InjectedKey for WorkspaceSnapshotKey {
+    type Value = Arc<WorkspaceSnapshot>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct WorkspaceFileKey {
+    pub workspace: PathBuf,
+    pub path: PathBuf,
+}
+
+impl fmt::Display for WorkspaceFileKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "workspace-file:{}", self.path.display())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct BzlParseKey {

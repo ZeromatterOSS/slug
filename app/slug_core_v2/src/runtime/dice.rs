@@ -12,6 +12,8 @@ use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use anyhow::Context;
@@ -29,6 +31,10 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::LoadedPackage;
+use slug_loading_v2::keys::WorkspaceFileKey;
+use slug_loading_v2::keys::WorkspaceFileValue;
+use slug_loading_v2::keys::WorkspaceSnapshot;
+use slug_loading_v2::keys::WorkspaceSnapshotKey;
 
 use super::RuntimeMode;
 use super::starlark::evaluate_file;
@@ -54,6 +60,82 @@ impl IncrementalEngine for OneShotIncrementalEngine {
 pub struct WorkspaceEvaluation {
     pub module: EvaluatedFile,
     pub build: EvaluatedFile,
+    pub revision: WorkspaceRevision,
+}
+
+/// The one committed request revision shared by root and package loading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+pub struct WorkspaceRevision(u64);
+
+/// A complete external observation of one workspace file.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct WorkspaceFileObservation {
+    pub path: PathBuf,
+    pub value: WorkspaceFileValue,
+}
+
+impl WorkspaceFileObservation {
+    /// Read one path outside DICE and retain missing and failed reads distinctly.
+    pub fn read(path: impl Into<PathBuf>) -> Self {
+        let path = path.into();
+        let value = match std::fs::read_to_string(&path) {
+            Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                WorkspaceFileValue::Absent
+            }
+            Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
+        };
+        Self { path, value }
+    }
+}
+
+/// Read a complete workspace snapshot outside DICE.
+///
+/// This initial M1 adapter observes every regular file, including hidden
+/// paths, so a missing requested `.bzl` is represented by `Absent` rather than
+/// an uninitialized DICE input. It deliberately makes no freshness decision;
+/// `WorkspaceRuntime` owns that through `changed_to` equality.
+pub fn observe_workspace_files(workspace: &Path) -> anyhow::Result<Vec<WorkspaceFileObservation>> {
+    let mut paths = Vec::new();
+    collect_workspace_paths(workspace, &mut paths)?;
+    Ok(paths
+        .into_iter()
+        .map(WorkspaceFileObservation::read)
+        .collect())
+}
+
+fn collect_workspace_paths(workspace: &Path, paths: &mut Vec<PathBuf>) -> anyhow::Result<()> {
+    let entries = std::fs::read_dir(workspace).map_err(|error| {
+        anyhow::anyhow!(
+            "reading workspace directory {}: {error}",
+            workspace.display()
+        )
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|error| {
+            anyhow::anyhow!(
+                "reading directory entry in {}: {error}",
+                workspace.display()
+            )
+        })?;
+        let path = entry.path();
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            collect_workspace_paths(&path, paths)?;
+        } else if file_type.is_file() {
+            paths.push(path);
+        }
+    }
+    Ok(())
+}
+
+/// The sole DICE owner for one canonical workspace identity.
+pub struct WorkspaceRuntime {
+    workspace: PathBuf,
+    dice: Arc<Dice>,
+    loader: BzlModuleEvaluator,
+    runtime: tokio::runtime::Runtime,
+    next_revision: AtomicU64,
 }
 
 /// Stage 4 package-loading evidence attached to a requested target pattern.
@@ -62,6 +144,7 @@ pub struct RequestedPackageEvaluation {
     pub target_pattern: String,
     pub package: LoadedPackage,
     pub analysis: Option<AnalysisResult>,
+    pub revision: WorkspaceRevision,
 }
 
 /// The V2 runtime result after the first configured-rule analysis packet.
@@ -69,6 +152,7 @@ pub struct RequestedPackageEvaluation {
 pub struct WorkspaceBuildEvaluation {
     pub workspace: WorkspaceEvaluation,
     pub packages: Vec<RequestedPackageEvaluation>,
+    pub revision: WorkspaceRevision,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -106,12 +190,12 @@ impl WorkspaceEvaluation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 struct WorkspaceEvaluationKey {
-    workspace: String,
+    workspace: PathBuf,
 }
 
 impl fmt::Display for WorkspaceEvaluationKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "workspace-evaluation:{}", self.workspace)
+        write!(f, "workspace-evaluation:{}", self.workspace.display())
     }
 }
 
@@ -121,10 +205,10 @@ impl Key for WorkspaceEvaluationKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Arc::new(evaluate_workspace_files(Path::new(&self.workspace)))
+        Arc::new(evaluate_workspace_files(ctx, &self.workspace).await)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -132,48 +216,190 @@ impl Key for WorkspaceEvaluationKey {
     }
 }
 
-fn evaluate_workspace_files(workspace: &Path) -> WorkspaceEvaluation {
+async fn evaluate_workspace_files(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+) -> WorkspaceEvaluation {
     let module_path = workspace.join("MODULE.bazel");
-    let build_path = workspace.join("BUILD.bazel");
     WorkspaceEvaluation {
-        module: evaluate_workspace_file(&module_path, true),
-        build: evaluate_workspace_file(&build_path, false),
+        module: evaluate_workspace_file(ctx, workspace, &module_path, true).await,
+        build: evaluate_workspace_build_file(ctx, workspace).await,
+        revision: WorkspaceRevision(0),
     }
 }
 
-fn evaluate_workspace_file(path: &Path, is_module: bool) -> EvaluatedFile {
-    let source = match std::fs::read_to_string(path) {
-        Ok(source) => source,
+async fn evaluate_workspace_build_file(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+) -> EvaluatedFile {
+    let primary = workspace.join("BUILD.bazel");
+    let observed = match ctx
+        .compute(&WorkspaceFileKey {
+            workspace: workspace.to_path_buf(),
+            path: primary.clone(),
+        })
+        .await
+    {
+        Ok(observed) => observed,
+        Err(error) => return EvaluatedFile::failure(&primary, error),
+    };
+    match observed {
+        WorkspaceFileValue::Present(source) => evaluate_workspace_source(&primary, &source, false),
+        WorkspaceFileValue::Absent => {
+            let fallback = workspace.join("BUILD");
+            evaluate_workspace_file(ctx, workspace, &fallback, false).await
+        }
+        WorkspaceFileValue::ReadError(error) => EvaluatedFile::failure(&primary, error),
+    }
+}
+
+async fn evaluate_workspace_file(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+    path: &Path,
+    is_module: bool,
+) -> EvaluatedFile {
+    let observed = match ctx
+        .compute(&WorkspaceFileKey {
+            workspace: workspace.to_path_buf(),
+            path: path.to_path_buf(),
+        })
+        .await
+    {
+        Ok(observed) => observed,
         Err(error) => return EvaluatedFile::failure(path, error),
     };
-    match evaluate_file(path, &source, is_module) {
+    let source = match observed {
+        WorkspaceFileValue::Present(source) => source,
+        WorkspaceFileValue::Absent => {
+            return EvaluatedFile::failure(path, "workspace file is absent");
+        }
+        WorkspaceFileValue::ReadError(error) => return EvaluatedFile::failure(path, error),
+    };
+    evaluate_workspace_source(path, &source, is_module)
+}
+
+fn evaluate_workspace_source(path: &Path, source: &str, is_module: bool) -> EvaluatedFile {
+    match evaluate_file(path, source, is_module) {
         Ok(()) => EvaluatedFile::success(path),
         Err(error) => EvaluatedFile::failure(path, error),
     }
 }
 
-/// Open a real DICE transaction and evaluate the root module and package file
-/// through the retained starlark-rust evaluator.
+impl WorkspaceRuntime {
+    pub fn new(workspace: impl Into<PathBuf>) -> anyhow::Result<Self> {
+        let workspace = workspace.into();
+        let workspace = workspace
+            .canonicalize()
+            .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
+        let loader = BzlModuleEvaluator::new(&workspace)?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .context("creating workspace DICE runtime")?;
+        Ok(Self {
+            workspace,
+            dice: Dice::builder().build(DetectCycles::Enabled),
+            loader,
+            runtime,
+            next_revision: AtomicU64::new(1),
+        })
+    }
+
+    pub fn workspace(&self) -> &Path {
+        &self.workspace
+    }
+
+    /// Commit all external file observations as one DICE version, then evaluate
+    /// root files and packages from that exact transaction.
+    pub fn evaluate(
+        &self,
+        observations: impl IntoIterator<Item = WorkspaceFileObservation>,
+        targets: &[TargetPattern],
+    ) -> anyhow::Result<WorkspaceBuildEvaluation> {
+        let observations = observations
+            .into_iter()
+            .map(|observation| self.validate_observation(observation))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let files = observations
+            .into_iter()
+            .map(|observation| (observation.path, observation.value))
+            .collect();
+        let snapshot = Arc::new(WorkspaceSnapshot {
+            files: Arc::new(files),
+        });
+        let revision = WorkspaceRevision(self.next_revision.fetch_add(1, Ordering::Relaxed));
+        self.runtime.block_on(async {
+            let mut updater = self.dice.updater();
+            updater
+                .changed_to(vec![(
+                    (WorkspaceSnapshotKey {
+                        workspace: self.workspace.clone(),
+                    }),
+                    snapshot,
+                )])
+                .context("injecting workspace-file observations")?;
+            let mut transaction = updater.commit().await;
+            let mut workspace = transaction
+                .compute(&WorkspaceEvaluationKey {
+                    workspace: self.workspace.clone(),
+                })
+                .await
+                .context("computing root workspace evaluation through DICE")?
+                .as_ref()
+                .clone()
+                .into_result()?;
+            workspace.revision = revision;
+            let mut packages = Vec::with_capacity(targets.len());
+            for target in targets {
+                let package_path = package_path_for_target(&self.workspace, target)?;
+                let package = self
+                    .loader
+                    .evaluate_package(&mut transaction, package_path)
+                    .await?;
+                let analysis = analysis_for_target(target, &package)?;
+                packages.push(RequestedPackageEvaluation {
+                    target_pattern: target.to_string(),
+                    package,
+                    analysis,
+                    revision,
+                });
+            }
+            Ok(WorkspaceBuildEvaluation {
+                workspace,
+                packages,
+                revision,
+            })
+        })
+    }
+
+    fn validate_observation(
+        &self,
+        mut observation: WorkspaceFileObservation,
+    ) -> anyhow::Result<WorkspaceFileObservation> {
+        if !observation.path.is_absolute() {
+            observation.path = self.workspace.join(observation.path);
+        }
+        if !observation.path.starts_with(&self.workspace) {
+            anyhow::bail!(
+                "workspace observation is outside {}: {}",
+                self.workspace.display(),
+                observation.path.display()
+            );
+        }
+        Ok(observation)
+    }
+}
+
+/// Open a one-shot workspace runtime and evaluate injected root observations.
 pub fn evaluate_workspace(workspace: impl Into<PathBuf>) -> anyhow::Result<WorkspaceEvaluation> {
     let workspace = workspace.into();
     let workspace = workspace
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .context("creating one-shot DICE runtime")?;
-    runtime.block_on(async move {
-        let dice = Dice::builder().build(DetectCycles::Enabled);
-        let mut transaction = dice.updater().commit().await;
-        let evaluation = transaction
-            .compute(&WorkspaceEvaluationKey {
-                workspace: workspace.display().to_string(),
-            })
-            .await
-            .context("computing root workspace evaluation through DICE")?;
-        Arc::unwrap_or_clone(evaluation).into_result()
-    })
+    let runtime = WorkspaceRuntime::new(&workspace)?;
+    let evaluation = runtime.evaluate(observe_workspace_files(&workspace)?, &[])?;
+    Ok(evaluation.workspace)
 }
 
 /// Evaluate root files and each requested root-repository BUILD package.
@@ -188,40 +414,8 @@ pub fn evaluate_workspace_targets(
     let workspace = workspace
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
-    let workspace_evaluation = evaluate_workspace(workspace.clone())?;
-    let package_evaluator = BzlModuleEvaluator::new(&workspace)?;
-    evaluate_packages_with(
-        &workspace,
-        &workspace_evaluation,
-        &package_evaluator,
-        targets,
-    )
-}
-
-/// Evaluate packages using a pre-existing [`BzlModuleEvaluator`]. The daemon
-/// calls this with its retained evaluator so DICE state persists and
-/// invalidation across builds is honored.
-pub fn evaluate_packages_with(
-    workspace: &Path,
-    workspace_evaluation: &WorkspaceEvaluation,
-    package_evaluator: &BzlModuleEvaluator,
-    targets: &[TargetPattern],
-) -> anyhow::Result<WorkspaceBuildEvaluation> {
-    let mut packages = Vec::with_capacity(targets.len());
-    for target in targets {
-        let package = package_path_for_target(workspace, target)?;
-        let loaded_package = package_evaluator.evaluate_package(package)?;
-        let analysis = analysis_for_target(target, &loaded_package)?;
-        packages.push(RequestedPackageEvaluation {
-            target_pattern: target.to_string(),
-            package: loaded_package,
-            analysis,
-        });
-    }
-    Ok(WorkspaceBuildEvaluation {
-        workspace: workspace_evaluation.clone(),
-        packages,
-    })
+    let runtime = WorkspaceRuntime::new(&workspace)?;
+    runtime.evaluate(observe_workspace_files(&workspace)?, targets)
 }
 
 /// Analyze a single target within a loaded package.
