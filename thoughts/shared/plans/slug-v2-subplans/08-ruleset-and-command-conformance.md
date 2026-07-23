@@ -38,16 +38,14 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
-### Live packet: `WP-8-m3-tests-loading-metadata-replan`
+### Live packet: `WP-8-m3-tests-suite-provenance-oracle`
 
-Replan the loading-owned test/suite metadata and graph projection after the
-broader representation review exhausted its correction budget. Pin Bazel's
-order-independent canonicalization with duplicate preservation, inherited
-common/test attrs, invariant-safe explicit-versus-implicit suite membership,
-derived `manual`, semantic equality, and lifecycle invalidation. This remains
-design/review only: strict request plumbing and `tests` activation are later
-packets. Do not add DICE state or locks, begin `visible`, or add a regex engine.
-Live Status in the canonical plan owns scheduling.
+Extend only `tests-query-expansion` with Bazel 9.2.0 rows that distinguish
+omitted `tests` from explicit `tests=[]`. Pin that both forms receive identical
+implicit membership while formatter/proto output retains explicit attribute
+provenance. This is oracle-only: do not add loading/query representation, DICE
+state, strict plumbing, function activation, `visible`, or a regex engine. Live
+Status in the canonical plan owns scheduling.
 
 ### Query engine reuse policy
 
@@ -2265,3 +2263,21 @@ material correction, orchestration closed it as `REPLAN`. No implementation
 or worktree change entered. The replacement packet is limited to an
 invariant-safe loading metadata design; strict plumbing and activation remain
 separate.
+
+## `tests` loading-metadata replan stopped on attribute provenance (2026-07-23)
+
+The narrower design resolved canonical order with duplicate preservation,
+common/test inherited attrs, one explicit-or-implicit membership source,
+derived `manual`, native suite graph edges, exact suite capability, and suite
+tag projection without adding a DICE key or lock. Sol then identified a
+remaining parity contradiction: Bazel uses omitted and explicit-empty `tests`
+equally for implicit membership, but retains
+`isAttributeValueExplicitlySpecified` for build/proto formatter semantics.
+Collapsing both into equal final package state would lose observable
+provenance.
+
+The packet closed `REPLAN` before implementation. The next packet adds only a
+Bazel oracle discriminator for this explicitness boundary. A later design must
+store explicitness orthogonally to one membership source, make package equality
+distinguish it, and still derive identical implicit membership for both forms.
+Strict plumbing and `tests` activation remain separate.

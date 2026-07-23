@@ -1296,7 +1296,7 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: Oracle accepted in `8212afd6`; first representation review `REPLAN`
+Status: Oracle accepted in `8212afd6`; provenance discriminator required
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1328,3 +1328,7 @@ sorting with duplicate preservation, common `tags` on all Starlark rules, and
 one invariant-safe explicit-or-implicit membership source with derived
 `manual`. It closed `REPLAN` without implementation. The replacement review is
 loading-metadata-only; strict plumbing and activation remain later packets.
+That narrower review also closed `REPLAN`: omitted and explicit-empty `tests`
+produce the same implicit membership but Bazel retains their different
+attribute explicitness for formatter output. The next oracle-only packet pins
+that distinction before another representation proposal.
