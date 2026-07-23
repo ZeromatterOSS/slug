@@ -141,11 +141,36 @@ fn query_request_parses_expression_and_output_format() {
 }
 
 #[test]
+fn query_request_parses_graph_output_and_factoring_flags() {
+    let default = QueryRequest::parse(&["--output=graph", "//pkg:bin"]).unwrap();
+    assert_eq!(default.output, QueryOutputFormat::Graph);
+    assert!(default.graph_factored);
+
+    for (flag, expected) in [
+        ("--graph:factored", true),
+        ("--graph:factored=true", true),
+        ("--graph:factored=false", false),
+        ("--nograph:factored", false),
+    ] {
+        let request = QueryRequest::parse(&["--output=graph", flag, "//pkg:bin"]).unwrap();
+        assert_eq!(request.graph_factored, expected, "{flag}");
+    }
+
+    assert!(
+        QueryRequest::parse(&["--output=graph", "--graph:node_limit=512", "//pkg:bin",]).is_ok()
+    );
+    let error = QueryRequest::parse(&["--output=graph", "--graph:node_limit=513", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("other than 512 is deferred"), "{error}");
+}
+
+#[test]
 fn query_request_rejects_deferred_output_and_order_modes_before_runtime() {
     let output = QueryRequest::parse(&["--output=label_kind", "//pkg:bin"])
         .unwrap_err()
         .to_string();
-    assert!(output.contains("only text is implemented"));
+    assert!(output.contains("only text and graph are implemented"));
 
     for order in ["deps", "no"] {
         let error =
@@ -159,8 +184,8 @@ fn query_request_rejects_deferred_output_and_order_modes_before_runtime() {
 #[test]
 fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
     for (flag, expected) in [
-        ("--output", "expected text"),
-        ("--output=", "expected text"),
+        ("--output", "expected text or graph"),
+        ("--output=", "expected text or graph"),
         ("--order_output", "expected auto or full"),
         ("--order_output=", "expected auto or full"),
         ("--output_base", "expected a non-empty path"),

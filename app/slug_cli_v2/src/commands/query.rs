@@ -9,6 +9,7 @@
  */
 
 use slug_commands_v2::CommandKind;
+use slug_commands_v2::QueryOutputFormat;
 use slug_commands_v2::query::QueryRequest;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::evaluate_workspace_query;
@@ -27,7 +28,14 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     match evaluate_workspace_query(&workspace, &request.expression, request.order) {
         Ok(output) => {
-            print!("{}", output.stdout());
+            let stdout = match request.output {
+                QueryOutputFormat::Text => output.stdout(),
+                QueryOutputFormat::Graph => {
+                    output.graph_stdout(request.graph_factored, request.order.is_full())
+                }
+                _ => unreachable!("query parser rejects deferred output formats"),
+            };
+            print!("{stdout}");
             0
         }
         Err(error) => emit_error(error.exit_code, &error.to_string(), "one-shot"),
@@ -54,6 +62,8 @@ fn run_daemon_query(argv: &[String], output_base: &str) -> i32 {
     let request = slug_server_v2::QueryRequest {
         expression: request.expression,
         order_output: request.order.to_string(),
+        output: request.output.to_string(),
+        graph_factored: request.graph_factored,
     };
     match slug_server_v2::send_query_request(&socket, &request) {
         Ok(response) => {

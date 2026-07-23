@@ -19,6 +19,7 @@ use crate::common::QueryOutputFormat;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::output_format;
+use crate::common::parse_bool_flag;
 use crate::common::parse_query_expression_for;
 use crate::common::split_args;
 
@@ -27,6 +28,7 @@ pub struct QueryRequest {
     pub expression: String,
     pub output: QueryOutputFormat,
     pub order: QueryOrder,
+    pub graph_factored: bool,
     pub flags: Vec<ParsedFlag>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
@@ -45,16 +47,18 @@ pub(crate) fn parse_query_like(
     let parsed = split_args(args);
     let expression = parse_query_expression_for(command, &parsed.positionals)?;
     let output = output_format(&parsed.flags);
-    let (order, bzlmod_policy, lockfile_mode) = if command == CommandKind::Query {
-        let order = validate_query_flags(&parsed.flags)?;
+    let (order, graph_factored, bzlmod_policy, lockfile_mode) = if command == CommandKind::Query {
+        let (order, graph_factored) = validate_query_flags(&parsed.flags)?;
         (
             order,
+            graph_factored,
             bzlmod_command_policy(&[])?,
             bzlmod_lockfile_mode(&[])?,
         )
     } else {
         (
             QueryOrder::Auto,
+            true,
             bzlmod_command_policy(&parsed.flags)?,
             bzlmod_lockfile_mode(&parsed.flags)?,
         )
@@ -63,23 +67,25 @@ pub(crate) fn parse_query_like(
         expression,
         output,
         order,
+        graph_factored,
         flags: parsed.flags,
         bzlmod_policy,
         lockfile_mode,
     })
 }
 
-fn validate_query_flags(flags: &[ParsedFlag]) -> Result<QueryOrder, CommandParseError> {
+fn validate_query_flags(flags: &[ParsedFlag]) -> Result<(QueryOrder, bool), CommandParseError> {
     let mut order = QueryOrder::Auto;
+    let mut graph_factored = true;
     for flag in flags {
         match flag.name.as_str() {
             "output" => {
-                let value = required_query_flag_value(flag, "text")?;
-                if value != "text" {
+                let value = required_query_flag_value(flag, "text or graph")?;
+                if value != "text" && value != "graph" {
                     return Err(CommandParseError::InvalidFlagValue {
                         flag: flag.raw.clone(),
                         message: format!(
-                            "output format '{value}' is recognized but deferred; only text is implemented"
+                            "output format '{value}' is recognized but deferred; only text and graph are implemented"
                         ),
                     });
                 }
@@ -96,6 +102,28 @@ fn validate_query_flags(flags: &[ParsedFlag]) -> Result<QueryOrder, CommandParse
             "output_base" => {
                 required_query_flag_value(flag, "a non-empty path")?;
             }
+            "graph:factored" => {
+                graph_factored = parse_bool_flag(flag, false)?;
+            }
+            "nograph:factored" => {
+                graph_factored = parse_bool_flag(flag, true)?;
+            }
+            "graph:node_limit" => {
+                let value = required_query_flag_value(flag, "the default value 512")?;
+                let limit =
+                    value
+                        .parse::<i32>()
+                        .map_err(|_| CommandParseError::InvalidFlagValue {
+                            flag: flag.raw.clone(),
+                            message: "expected an integer".to_owned(),
+                        })?;
+                if limit != 512 {
+                    return Err(CommandParseError::InvalidFlagValue {
+                        flag: flag.raw.clone(),
+                        message: "--graph:node_limit other than 512 is deferred".to_owned(),
+                    });
+                }
+            }
             _ => {
                 return Err(CommandParseError::InvalidFlagValue {
                     flag: flag.raw.clone(),
@@ -104,7 +132,7 @@ fn validate_query_flags(flags: &[ParsedFlag]) -> Result<QueryOrder, CommandParse
             }
         }
     }
-    Ok(order)
+    Ok((order, graph_factored))
 }
 
 fn required_query_flag_value<'a>(

@@ -193,16 +193,55 @@ fn retained_runtime_switches_from_build_bazel_to_build_fallback() {
 }
 
 #[test]
-fn tagged_query_protocol_carries_only_raw_expression_and_order() {
+fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
     let request = DaemonRequest::Query(QueryRequest {
         expression: "deps(//pkg:bin)".to_owned(),
         order_output: "full".to_owned(),
+        output: "graph".to_owned(),
+        graph_factored: false,
     });
     let json = serde_json::to_value(request).unwrap();
     assert_eq!(json["kind"], "query");
     assert_eq!(json["request"]["expression"], "deps(//pkg:bin)");
     assert_eq!(json["request"]["order_output"], "full");
-    assert_eq!(json["request"].as_object().unwrap().len(), 2);
+    assert_eq!(json["request"]["output"], "graph");
+    assert_eq!(json["request"]["graph_factored"], false);
+    assert_eq!(json["request"].as_object().unwrap().len(), 4);
+
+    let old: DaemonRequest = serde_json::from_str(
+        r#"{"kind":"query","request":{"expression":"//pkg:bin","order_output":"auto"}}"#,
+    )
+    .unwrap();
+    let DaemonRequest::Query(old) = old else {
+        panic!("expected query request");
+    };
+    assert_eq!(old.output, "text");
+    assert!(old.graph_factored);
+}
+
+#[test]
+fn retained_daemon_formats_graph_from_the_same_query_result_path() {
+    let workspace = scratch("query-graph-output");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(&workspace.join("shared/defs.bzl"), "VALUE = 1\n");
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\"//shared:defs.bzl\", \"VALUE\")\nfilegroup(name = \"probe\", srcs = [])\n",
+    );
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let graph = daemon.query_with_output("loadfiles(//pkg:probe)", QueryOrder::Full, "graph", true);
+    assert_eq!(graph.exit_code, 0, "{graph:?}");
+    assert!(graph.stderr.is_empty(), "{graph:?}");
+    assert_eq!(
+        graph.stdout,
+        concat!(
+            "digraph mygraph {\n",
+            "  node [shape=box];\n",
+            "  \"//shared:defs.bzl\"\n",
+            "}\n",
+        )
+    );
 }
 
 #[test]

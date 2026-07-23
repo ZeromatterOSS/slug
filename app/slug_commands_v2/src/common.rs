@@ -42,6 +42,7 @@ pub struct ParsedFlag {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QueryOutputFormat {
     Text,
+    Graph,
     StreamedJsonProto,
     LabelKind,
     Build,
@@ -127,6 +128,7 @@ impl fmt::Display for QueryOutputFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Text => f.write_str("text"),
+            Self::Graph => f.write_str("graph"),
             Self::StreamedJsonProto => f.write_str("streamed_jsonproto"),
             Self::LabelKind => f.write_str("label_kind"),
             Self::Build => f.write_str("build"),
@@ -296,6 +298,7 @@ pub(crate) fn output_format(flags: &[ParsedFlag]) -> QueryOutputFormat {
     };
     match value {
         "text" => QueryOutputFormat::Text,
+        "graph" => QueryOutputFormat::Graph,
         "streamed_jsonproto" => QueryOutputFormat::StreamedJsonProto,
         "label_kind" => QueryOutputFormat::LabelKind,
         "build" => QueryOutputFormat::Build,
@@ -303,7 +306,7 @@ pub(crate) fn output_format(flags: &[ParsedFlag]) -> QueryOutputFormat {
     }
 }
 
-fn parse_bool_flag(flag: &ParsedFlag, negated: bool) -> Result<bool, CommandParseError> {
+pub(crate) fn parse_bool_flag(flag: &ParsedFlag, negated: bool) -> Result<bool, CommandParseError> {
     let parsed = match flag.value.as_deref() {
         Some(value) => parse_bool_value(&flag.raw, value)?,
         None => true,
@@ -342,6 +345,9 @@ fn classify_flag(name: &str) -> FlagDisposition {
         "output"
         | "order_output"
         | "output_base"
+        | "graph:factored"
+        | "nograph:factored"
+        | "graph:node_limit"
         | "config"
         | "allow_yanked_versions"
         | "ignore_dev_dependency"

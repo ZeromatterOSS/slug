@@ -135,6 +135,18 @@ impl Daemon {
     /// Run one loading query against the same retained runtime and observation
     /// adapter used by builds.
     pub fn query(&mut self, expression: &str, order: QueryOrder) -> QueryResult {
+        self.query_with_output(expression, order, "text", true)
+    }
+
+    /// Output selection formats the retained query result only. It does not
+    /// create another DICE transaction or evaluate the expression again.
+    pub fn query_with_output(
+        &mut self,
+        expression: &str,
+        order: QueryOrder,
+        output_format: &str,
+        graph_factored: bool,
+    ) -> QueryResult {
         let (observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
@@ -145,12 +157,24 @@ impl Daemon {
             .runtime
             .query_observations(observations, expression, order)
         {
-            Ok(output) => QueryResult {
-                exit_code: 0,
-                stdout: output.stdout(),
-                stderr: String::new(),
-                invalidated_files: invalidated,
-            },
+            Ok(output) => {
+                let stdout = match output_format {
+                    "text" => output.stdout(),
+                    "graph" => output.graph_stdout(graph_factored, order.is_full()),
+                    other => {
+                        return QueryResult::error(
+                            2,
+                            &format!("output format '{other}' is not supported by loading query"),
+                        );
+                    }
+                };
+                QueryResult {
+                    exit_code: 0,
+                    stdout,
+                    stderr: String::new(),
+                    invalidated_files: invalidated,
+                }
+            }
             Err(error) => QueryResult {
                 exit_code: error.exit_code,
                 stdout: String::new(),

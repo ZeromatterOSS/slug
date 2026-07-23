@@ -39,6 +39,18 @@ pub struct BuildRequest {
 pub struct QueryRequest {
     pub expression: String,
     pub order_output: String,
+    #[serde(default = "default_query_output")]
+    pub output: String,
+    #[serde(default = "default_graph_factored")]
+    pub graph_factored: bool,
+}
+
+fn default_query_output() -> String {
+    "text".to_owned()
+}
+
+const fn default_graph_factored() -> bool {
+    true
 }
 
 /// Tagged command request. The envelope is deliberately small; query syntax
@@ -142,7 +154,12 @@ fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
                     };
                 }
             };
-            let result = daemon.query(&request.expression, order);
+            let result = daemon.query_with_output(
+                &request.expression,
+                order,
+                &request.output,
+                request.graph_factored,
+            );
             DaemonResponse {
                 exit_code: result.exit_code,
                 stdout: result.stdout,
@@ -213,6 +230,8 @@ pub fn send_query_request(
     let json = serde_json::to_string(&DaemonRequest::Query(QueryRequest {
         expression: request.expression.clone(),
         order_output: request.order_output.clone(),
+        output: request.output.clone(),
+        graph_factored: request.graph_factored,
     }))
     .context("serializing query request for daemon")?;
     write!(stream, "{json}\n").context("sending query request to daemon")?;
