@@ -1732,7 +1732,10 @@ The worker Slug gate passed 91/91 and six fixtures passed 176/176 at
 
 ### Reviewed next packet: `WP-4-8-m3-build-load-files`
 
-Status: Gate A accepted in `791e26b2`; Gate B activation remains pending.
+Status: Gate A accepted in `791e26b2`; B1 query-core activation landed in
+`ba457999`, but Gate B remains incomplete. B1.5 still owes exhaustive
+text-oracle and retained-daemon evidence, and seven factored-graph rows await the
+separately reviewed B2 packet. The full 64-row fixture is not yet accepted.
 
 The parent packet has two acceptance gates and one oracle-first artifact:
 
@@ -1741,8 +1744,8 @@ The parent packet has two acceptance gates and one oracle-first artifact:
    request-local fake-target identity and consumer ownership. The function
    registry remains deferred.
 2. Gate B activates exactly `buildfiles(EXPR)` and `loadfiles(EXPR)` after A
-   receives Sol acceptance. No other of the nine remaining ordinary functions
-   may ride this change.
+   receives Sol acceptance. B1 has now made that core activation without
+   admitting any other function; B1.5 and B2 remain acceptance requirements.
 3. Before either gate, create one combined generated Bazel 9.2 fixture. It is
    the proof for both the substrate and eventual command activation.
 
@@ -1832,8 +1835,10 @@ fake-left survivor was unmatched transitive `two.bzl`, not asymmetric
 real/fake semantics. Fake nodes are zero-edge; direct FULL
 `buildfiles` omits the selected real package BUILD unless another graph
 observer materializes it, while `deps(buildfiles(...))` includes result nodes.
-This oracle evidence is now realized only by Gate A's substrate; Gate B
-activation remains pending and all nine ordinary functions remain deferred.
+This oracle evidence is partially realized by Gate A plus B1 core. Exactly
+`buildfiles` and `loadfiles` are active and seven ordinary functions remain
+deferred, but the exhaustive text/retained-daemon and graph-output evidence
+still blocks Gate B acceptance.
 
 #### Gate A Stage 4 half evidence (2026-07-23)
 
@@ -1866,3 +1871,41 @@ therefore remain deferred. Worker and root independently passed
 `CARGO_BUILD_JOBS=1 cargo test -p slug_query_v2`: 32 tests total (10 new
 provenance, 16 loading-query, 6 parser/registry). Sol-low final review returned
 `ACCEPT` with no rework.
+
+#### Gate B B1 query core landed (2026-07-23)
+
+Commit `ba457999` activates only `buildfiles` and `loadfiles` inside
+`slug_query_v2`. The crate-private generic evaluator now carries an associated
+`E::Set`; loading queries bind it to request-local candidate IDs in the Gate A
+arena and preserve callback batches across variables, set literals, operators,
+and function results. A dedicated `eval_set_arg` keeps that associated-set
+path separate from scalar argument conversion. Unused public evaluator
+reexports were removed.
+
+The loading adapter keys `seenPackages` by the candidate's printed package,
+then uses its retained owner package for `PackageLoad` and transitive-load
+visitation. `.bzl` label uniqueness and final output-label uniqueness use
+separate sets. Companion discovery is DICE-only and receives the absolute
+workspace package path. Fake candidates return no dependencies; `siblings`
+consults every preserved batch; and FULL output chooses the first representative
+per printed label before projecting only recorded real edges. No new DICE key,
+global `QueryLabel` identity, filesystem boundary, protocol, or other crate
+entered B1.
+
+The Terra-high worker and root independently passed
+`CARGO_BUILD_JOBS=1 cargo test -p slug_query_v2`: 34 tests (10 unit, 18 loading,
+6 registry/parser). Root additionally passed, serially,
+`cargo test -p slug_commands_v2 -p slug_server_v2 -p slug_cli_v2
+--no-fail-fast`: 11 command, 12 server, and 14 CLI unit/integration tests
+(13 integration plus 1 unit), with zero doc tests. Sol-low final review returned
+`ACCEPT`; its two live corrections were already incorporated, so no
+post-final-review rework was required. Root also removed one transient
+candidate-package `String` allocation before the final tests.
+
+Gate B remains incomplete. B1.5 must still run and record the exhaustive
+text-oracle and retained-daemon matrix. B2 remains pending for the seven
+`--output=graph --graph:factored` rows; its approved boundary requires both
+true and false factoring, Bazel's minimal always-quoted label serialization
+without a general DOT escaper, and a structural selected graph carried to the
+renderer without reevaluation. Do not mark the 64-row fixture accepted until
+both residuals pass.

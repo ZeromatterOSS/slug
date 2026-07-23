@@ -451,12 +451,20 @@ in this plan, Stage 0, Stage 9, and `V1_ARCHIVE.md`, not in the prompt.
 
 ## Reviewed Next M3 Direction: Build and Load Files (2026-07-23)
 
-M3 has nine deferred ordinary loading-query functions. The reviewed parent
+Status: Gate A is accepted, and B1 core activation landed in `ba457999`.
+Gate B remains incomplete: B1.5 still owes exhaustive text-oracle and
+retained-daemon evidence, while the seven factored-graph rows require the separately
+reviewed B2 formatter/protocol packet. The 64-row fixture is not yet accepted
+under Slug.
+
+M3 began with nine deferred ordinary loading-query functions. The reviewed
+parent
 packet is `WP-4-8-m3-build-load-files`, but it is deliberately split into two
 commit gates: (A) `load-provenance-fake-target-substrate`, then (B) activation
 of `buildfiles()` and `loadfiles()` only after A is accepted. One combined,
 immutable Bazel 9.2 oracle fixture must be generated before either code gate.
-After both gates land, seven ordinary functions remain deferred; `filter` stays
+The B1 core now activates only those two functions, leaving seven ordinary
+functions deferred; `filter` stays
 blocked on exact Java `Pattern` compatibility, and attribute/kind/label,
 test, visibility, and executable functions remain blocked on their missing
 metadata surfaces.
@@ -509,7 +517,8 @@ package loading only `//shared:two.bzl`. Update `051423-694832`, Terra clean
 `051521-700085`, and root clean `051644-705470` passed; Sol-low returned final
 `ACCEPT`. At that oracle checkpoint, nine functions remained deferred and
 neither implementation gate had landed. Gate A subsequently landed in
-`791e26b2`; Gate B remains pending. The oracle proves selected active
+`791e26b2`, and B1 core activation landed in `ba457999`; Gate B is not yet
+accepted. The oracle proves selected active
 BUILD/transitive-load/active-companion `buildfiles`, loads-only `loadfiles`,
 fallback/dual/diamond/multi-package/empty/idempotent/deps/failure cases, and
 broken companion discovery without package loading.
@@ -526,9 +535,20 @@ operator rule.
 
 Within one invocation `seenBzlLabels` label-deduplicates; across separately
 evaluated functions one printed fake label can have different consuming
-packages. Gate A retains `(printed label, consuming package, real/fake)`;
-Gate B may not use a request-global winner or `QueryLabel`-only result
-identity, and must apply the corrected label-keyed set/batch semantics above.
+packages. Gate A retains `(printed label, consuming package, real/fake)`.
+B1 applies the corrected label-keyed set/batch semantics through a crate-private
+generic evaluator with associated `E::Set`: the loading environment owns one
+request-local candidate arena and evaluates IDs in callback-preserving batches.
+Its `seenPackages` key is the printed candidate package, while `PackageLoad`
+and load visitation use the retained owner package; `.bzl` uniqueness and
+final-output uniqueness are separate sets. Companion discovery receives the
+workspace-root absolute package path and remains DICE-only.
+
+Fake candidates have no dependencies, `siblings` scans every callback batch,
+and FULL output selects the first label representative before projecting only
+recorded real edges. The change activates exactly `buildfiles` and `loadfiles`,
+removes unused public evaluator reexports, and adds no DICE key, global label
+identity, filesystem seam, or change outside `slug_query_v2`.
 Factored FULL uses `--output=graph --graph:factored`: fake nodes are zero-edge,
 direct `buildfiles` omits the selected real BUILD unless another graph observer
 materializes it, `deps(buildfiles(...))` includes result nodes, and no
@@ -536,8 +556,9 @@ synthetic projection edge is allowed.
 
 Stage 4 half evidence landed in `b0670e33` (`feat: retain load provenance
 manifests`), and Stage 8 completes Gate A in `791e26b2` (`feat: add fake target
-provenance algebra`). The registry and all nine deferred functions remain
-unchanged; Gate B is still pending. Public `BzlLoadManifest`/`BzlModuleIdentity` retain canonical
+provenance algebra`). B1 core landed in `ba457999`; seven ordinary functions
+remain deferred, and Gate B is still incomplete. Public
+`BzlLoadManifest`/`BzlModuleIdentity` retain canonical
 label/normalized path, source-order label-first direct IDs, first-seen closure,
 and `[u8; 32]` SHA-256 fingerprint. `LoadedPackage` equality now includes
 direct roots/reachable closure/fingerprint: BUILD comment/format edits remain
@@ -555,3 +576,14 @@ key/cache/lock/filesystem/package-load boundary. Worker/root loading tests had
 `slug_query_v2` integrations. Sol-low accepted corrections for symlinks,
 shared validation, non-truncating alignment, edge lifecycle/BUILD
 non-over-invalidation, and memory accounting.
+
+For B1, the Terra-high worker and root independently passed
+`CARGO_BUILD_JOBS=1 cargo test -p slug_query_v2`: 34 tests (10 unit, 18 loading,
+6 registry/parser). Root also passed the serial downstream
+`slug_commands_v2`, `slug_server_v2`, and `slug_cli_v2` suite: 11 command,
+12 server, and 14 CLI tests, with zero doc tests. Sol-low final review returned
+`ACCEPT`. Root removed one transient candidate-package `String` allocation
+before the final tests. This is not the Gate B acceptance point: B1.5 must still prove the
+exhaustive text rows and retained-daemon behavior, and B2 must implement both
+factored and unfactored structural graph rendering without reevaluation before
+the 64-row fixture can be accepted.

@@ -1015,8 +1015,10 @@ accepted Slug semantics in this packet.
 
 ### Stage 4/8 load-provenance and fake-target packet — reviewed extraction plan
 
-Status: approved next direction; no source has been imported and no behavior
-is accepted yet.
+Status: Gate A and B1 query-core activation are accepted in `791e26b2` and
+`ba457999`, respectively. Gate B remains incomplete: B1.5 still owes exhaustive
+text-oracle and retained-daemon evidence, and the separately reviewed B2 graph
+packet still owes seven factored rows. The 64-row fixture is not yet accepted.
 
 Parent: `WP-4-8-m3-build-load-files`. Gate A is a V2-owned
 `load-provenance-fake-target-substrate`; Gate B activates only `buildfiles`
@@ -1082,9 +1084,10 @@ removes in both directions, and union sends distinct callback batches to
 `siblings`; the older fake-left survivor is unmatched transitive `two.bzl`, not
 an asymmetric real/fake operation. Factored FULL
 (`--output=graph --graph:factored`) confirms zero fake edges and forbids
-synthetic projection edges. The Stage 8 half of Gate A and Gate B remain
-unimplemented; no functions are activated and nine ordinary functions remain
-deferred.
+synthetic projection edges. Gate A and the B1 query core now implement this
+boundary. Exactly `buildfiles` and `loadfiles` are active, seven ordinary
+functions remain deferred, and Gate B acceptance still awaits B1.5 downstream
+evidence plus B2 graph output.
 
 #### Stage 4 Gate A half landed (2026-07-23)
 
@@ -1117,9 +1120,43 @@ retains the LHS representative, and equal-label `except` is symmetric.
 deduplicates labels. Fake `evaluation_graph_label` is `None`, while fake labels
 remain printable and zero-edge for future activation.
 
-No V1/Buck evaluator, graph, registry, DICE, or function surface was imported
-or activated: this module is deliberately disconnected, so Gate B and all nine
-ordinary functions remain deferred. Worker and root independently passed
+At the Gate A checkpoint no V1/Buck evaluator, graph, registry, DICE, or
+function surface was imported or activated: this module was deliberately
+disconnected. Worker and root independently passed
 `CARGO_BUILD_JOBS=1 cargo test -p slug_query_v2` with 32 tests (10 provenance,
 16 loading-query, 6 parser/registry); Sol-low final review was `ACCEPT` with no
 rework.
+
+#### Stage 8 Gate B B1 query-core activation landed (2026-07-23)
+
+Commit `ba457999` is a V2-owned integration of the Gate A algebra, not an
+import of V1/Buck query semantics. A crate-private associated `E::Set` makes
+the generic evaluator preserve request-local candidate-ID batches end to end;
+the loading environment owns the arena and binds only `buildfiles` and
+`loadfiles`. The implementation removed unused public evaluator reexports and
+added no DICE key, global label identity, filesystem/protocol boundary, other
+crate, or additional ordinary function.
+
+The Bazel-derived split is explicit: `seenPackages` keys on the printed
+candidate package, while `PackageLoad` and transitive load visitation use the
+candidate owner. `.bzl` uniqueness and output uniqueness remain separate;
+companion discovery uses the absolute package path through the existing
+DICE-only helper. Fake candidates have zero dependencies, `siblings` scans all
+preserved deliveries, and FULL rendering takes the first printed-label
+representative before retaining only recorded real edges.
+
+Worker and root independently passed
+`CARGO_BUILD_JOBS=1 cargo test -p slug_query_v2` with 34 tests (10 unit,
+18 loading, 6 registry/parser). Root also passed the serial command/server/CLI
+suite: 11, 12, and 14 tests respectively, with zero doc tests. Sol-low final
+review returned `ACCEPT`; the dedicated `eval_set_arg` seam and the
+printed-package/owner/separate-set/absolute-companion corrections were made
+live before final review, with no post-final-review rework. Root also removed
+one transient candidate-package `String` allocation before the final tests.
+
+This is B1 core evidence, not Gate B completion. B1.5 must still supply
+exhaustive text-oracle and retained-daemon evidence. The pending, separately
+approved B2 must carry a structural selected graph without reevaluation,
+implement both factored and unfactored modes, and match Bazel's minimal
+always-quoted labels without a general DOT escaper for the seven graph rows.
+Until both land, the shared 64-row fixture remains unaccepted.
