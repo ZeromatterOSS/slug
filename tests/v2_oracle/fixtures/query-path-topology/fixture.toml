@@ -1,0 +1,288 @@
+[fixture]
+name = "query-path-topology"
+description = "Bazel 9.2 root-repository loading-query oracle for allpaths and somepath over source and rule topology."
+comparison = "message_shape"
+oracle_notes = "Root-only, text-only loading-query slice. The workspace has no generated/output nodes, analysis, external repositories, or filesystem-sensitive query functions. somepath is arbitrary by Bazel contract: the bounded alternatives below admit only complete forward shortest paths. QueryCommand deliberately preserves a top-level somepath's forward path for default/auto rather than applying lexicographic AUTO sorting."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/AllPathsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/SomePathFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryEnvironment.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/commands/QueryCommand.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryExpression.java#isTopLevelSomePathFunction",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSomePathOperator",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSomePathOperatorOrdering",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testAllPathsOperator",
+]
+translation_notes = "Migrates the AbstractQueryTest path themes to a minimal root-only filegroup/alias/custom-label-list graph. Generated/output-file topology from testPathOperatorsWithOutputFile is intentionally omitted. Integer operands are expression-position target patterns and retain the existing //:1 missing-target exit-7 behavior. QueryCommand's top-level-somepath exception preserves forward shortest-path order for default and auto output, requiring a dedicated V2 ordering seam rather than ordinary auto sorting."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-path-topology --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-path-topology --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "allpaths_linear_default"
+argv = ["query", "allpaths(//:linear_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_end\\n//:linear_mid\\n//:linear_start\\Z"]
+
+[[commands]]
+name = "allpaths_linear_auto"
+argv = ["query", "--order_output=auto", "allpaths(//:linear_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_end\\n//:linear_mid\\n//:linear_start\\Z"]
+
+[[commands]]
+name = "allpaths_linear_full"
+argv = ["query", "--order_output=full", "allpaths(//:linear_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "somepath_linear_default"
+argv = ["query", "somepath(//:linear_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "somepath_linear_auto"
+argv = ["query", "--order_output=auto", "somepath(//:linear_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "somepath_union_default_lexical_order"
+argv = ["query", "somepath(//:linear_start, //:linear_end) union //:disconnected"]
+expected_exit = 0
+stdout_patterns = ["\\A//:disconnected\\n//:linear_end\\n//:linear_mid\\n//:linear_start\\Z"]
+
+[[commands]]
+name = "somepath_union_auto_lexical_order"
+argv = ["query", "--order_output=auto", "somepath(//:linear_start, //:linear_end) union //:disconnected"]
+expected_exit = 0
+stdout_patterns = ["\\A//:disconnected\\n//:linear_end\\n//:linear_mid\\n//:linear_start\\Z"]
+
+[[commands]]
+name = "somepath_linear_full"
+argv = ["query", "--order_output=full", "somepath(//:linear_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "allpaths_diamond"
+argv = ["query", "allpaths(//:diamond_start, //:diamond_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:diamond_end\\n//:diamond_left\\n//:diamond_right\\n//:diamond_split\\n//:diamond_start\\Z"]
+
+[[commands]]
+name = "somepath_diamond_bounded_shortest_branch"
+argv = ["query", "--order_output=full", "somepath(//:diamond_start, //:diamond_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?://:diamond_start\\n//:diamond_split\\n//:diamond_left\\n//:diamond_end|//:diamond_start\\n//:diamond_split\\n//:diamond_right\\n//:diamond_end)\\Z"]
+
+[[commands]]
+name = "allpaths_cycle"
+argv = ["query", "allpaths(//:cycle_a, //:cycle_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:cycle_a\\n//:cycle_b\\n//:cycle_end\\Z"]
+
+[[commands]]
+name = "somepath_cycle_shortest"
+argv = ["query", "--order_output=full", "somepath(//:cycle_a, //:cycle_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:cycle_a\\n//:cycle_b\\n//:cycle_end\\Z"]
+
+[[commands]]
+name = "allpaths_zero_length"
+argv = ["query", "allpaths(//:linear_mid, //:linear_mid)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_mid\\Z"]
+
+[[commands]]
+name = "somepath_zero_length"
+argv = ["query", "somepath(//:linear_mid, //:linear_mid)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_mid\\Z"]
+
+[[commands]]
+name = "allpaths_no_path"
+argv = ["query", "allpaths(//:linear_start, //:disconnected)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "somepath_no_path"
+argv = ["query", "somepath(//:linear_start, //:disconnected)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "allpaths_empty_from"
+argv = ["query", "allpaths(set(), //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "allpaths_empty_to"
+argv = ["query", "allpaths(//:linear_start, set())"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "somepath_empty_from"
+argv = ["query", "somepath(set(), //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "somepath_empty_to"
+argv = ["query", "somepath(//:linear_start, set())"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "allpaths_multiple_origins_destinations"
+argv = ["query", "allpaths(set(//:multi_a //:multi_b), set(//:multi_end_a //:multi_end_b))"]
+expected_exit = 0
+stdout_patterns = ["\\A//:multi_a\\n//:multi_b\\n//:multi_end_a\\n//:multi_end_b\\Z"]
+
+[[commands]]
+name = "somepath_one_reachable_pair"
+argv = ["query", "--order_output=full", "somepath(set(//:one_pair_origin //:one_pair_other_origin), set(//:one_pair_destination //:one_pair_other_destination))"]
+expected_exit = 0
+stdout_patterns = ["\\A//:one_pair_origin\\n//:one_pair_destination\\Z"]
+
+[[commands]]
+name = "somepath_ambiguous_multi_pair_bounded_shortest_branch"
+argv = ["query", "--order_output=full", "somepath(set(//:ambiguous_a //:ambiguous_b), set(//:ambiguous_a_end //:ambiguous_b_end))"]
+expected_exit = 0
+stdout_patterns = ["\\A(?://:ambiguous_a\\n//:ambiguous_a_left\\n//:ambiguous_a_end|//:ambiguous_a\\n//:ambiguous_a_right\\n//:ambiguous_a_end|//:ambiguous_b\\n//:ambiguous_b_left\\n//:ambiguous_b_end|//:ambiguous_b\\n//:ambiguous_b_right\\n//:ambiguous_b_end)\\Z"]
+
+[[commands]]
+name = "allpaths_destination_outside_forward_closure"
+argv = ["query", "allpaths(//:linear_start, set(//:linear_end //:disconnected))"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_end\\n//:linear_mid\\n//:linear_start\\Z"]
+
+[[commands]]
+name = "somepath_destination_outside_forward_closure"
+argv = ["query", "somepath(//:linear_start, set(//:linear_end //:disconnected))"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "allpaths_duplicate_operands"
+argv = ["query", "allpaths(set(//:linear_start //:linear_start), set(//:linear_end //:linear_end))"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_end\\n//:linear_mid\\n//:linear_start\\Z"]
+
+[[commands]]
+name = "somepath_duplicate_operands"
+argv = ["query", "somepath(set(//:linear_start //:linear_start), set(//:linear_end //:linear_end))"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "allpaths_rule_to_source"
+argv = ["query", "allpaths(//:source_parent, //:source.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:source\\.txt\\n//:source_parent\\Z"]
+
+[[commands]]
+name = "somepath_rule_to_source"
+argv = ["query", "somepath(//:source_parent, //:source.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:source_parent\\n//:source\\.txt\\Z"]
+
+[[commands]]
+name = "allpaths_source_to_rule_no_path"
+argv = ["query", "allpaths(//:source.txt, //:source_parent)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "somepath_source_to_rule_no_path"
+argv = ["query", "somepath(//:source.txt, //:source_parent)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "allpaths_alias"
+argv = ["query", "allpaths(//:alias_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:alias_start\\n//:linear_end\\n//:linear_mid\\n//:linear_start\\Z"]
+
+[[commands]]
+name = "somepath_alias"
+argv = ["query", "somepath(//:alias_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:alias_start\\n//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "allpaths_custom_label_list"
+argv = ["query", "allpaths(//:custom_start, //:custom_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:custom_end\\n//:custom_mid\\n//:custom_start\\Z"]
+
+[[commands]]
+name = "somepath_custom_label_list"
+argv = ["query", "somepath(//:custom_start, //:custom_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:custom_start\\n//:custom_mid\\n//:custom_end\\Z"]
+
+[[commands]]
+name = "allpaths_too_few_arguments"
+argv = ["query", "allpaths()"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too few arguments to function 'allpaths'"]
+
+[[commands]]
+name = "allpaths_too_many_arguments"
+argv = ["query", "allpaths(//:linear_start, //:linear_end, //:linear_mid)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too many arguments to function 'allpaths'"]
+
+[[commands]]
+name = "somepath_too_few_arguments"
+argv = ["query", "somepath()"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too few arguments to function 'somepath'"]
+
+[[commands]]
+name = "somepath_too_many_arguments"
+argv = ["query", "somepath(//:linear_start, //:linear_end, //:linear_mid)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too many arguments to function 'somepath'"]
+
+[[commands]]
+name = "allpaths_integer_from"
+argv = ["query", "allpaths(1, //:linear_end)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:1': target '1' not declared in package ''"]
+
+[[commands]]
+name = "allpaths_integer_to"
+argv = ["query", "allpaths(//:linear_start, 1)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:1': target '1' not declared in package ''"]
+
+[[commands]]
+name = "somepath_integer_from"
+argv = ["query", "somepath(1, //:linear_end)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:1': target '1' not declared in package ''"]
+
+[[commands]]
+name = "somepath_integer_to"
+argv = ["query", "somepath(//:linear_start, 1)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:1': target '1' not declared in package ''"]
