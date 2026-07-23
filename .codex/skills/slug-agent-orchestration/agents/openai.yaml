@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slug Agent Orchestration"
+  short_description: "Route Slug work by complexity and cost"
+  default_prompt: "Use $slug-agent-orchestration to split and route this Slug task to the least-cost capable agents."

@@ -50,6 +50,10 @@ Start from the live checkout, not from memory.
   Buck2-derived data structures, interning, hashing, compact collections, or
   memory-accounting work, read
   `.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing.
+- When splitting work across agents or choosing a lower-cost model, read
+  `.codex/skills/slug-agent-orchestration/SKILL.md`. Route each bounded packet
+  to the least-cost capable agent, keep context forks small, verify delegated
+  diffs in the root, and update its routing log after meaningful results.
 - Check `git status --short` and inspect dirty diffs before making changes.
   Treat dirty files as active user/agent state unless the user says otherwise.
 - Prefer focused owning-abstraction tests before broad SDK or repo-wide smokes.
