@@ -1,0 +1,23 @@
+[fixture]
+name = "java-pattern-utf16"
+description = "Bazel 9.2 OpenJDK Pattern.find oracle for an ASCII surrogate escape against NUL and an unpaired UTF-16 surrogate."
+comparison = "message_shape"
+oracle_notes = "Oracle-only UTF-16 boundary evidence. The helper constructs char[] values directly so neither source encoding nor Rust UTF-8 can erase the unpaired surrogate."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/RegexFilterExpression.java",
+  "src/MODULE.tools",
+]
+translation_notes = "RegexFilterExpression compiles Pattern once and uses Matcher.find for each candidate; this fixture isolates the Java UTF-16 behavior that a matching substrate must preserve. The portable Bazel command selects remotejdk_25 and asserts the Java 25 major line. Root also ran the same Bazel-compiled oracle.jar with Bazel 9.2.0's embedded OpenJDK 25.0.2 and observed the identical two rows."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture java-pattern-utf16 --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture java-pattern-utf16 --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "utf16_surrogate_escape_find"
+argv = ["run", "--java_runtime_version=remotejdk_25", "--tool_java_runtime_version=remotejdk_25", "//:regex_utf16_oracle"]
+expected_exit = 0
+stdout_patterns = ["\\Apattern=ascii_high_surrogate_escape subject=nul find=false\\npattern=ascii_high_surrogate_escape subject=unpaired_high_surrogate find=true\\Z"]
+stderr_patterns = ["java\\.runtime\\.version=25(?:\\.|\\+)"]

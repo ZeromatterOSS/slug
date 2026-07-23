@@ -1,0 +1,39 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "run",
+        "--java_runtime_version=remotejdk_25",
+        "--tool_java_runtime_version=remotejdk_25",
+        "//:regex_utf16_oracle"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "run",
+        "--java_runtime_version=remotejdk_25",
+        "--tool_java_runtime_version=remotejdk_25",
+        "//:regex_utf16_oracle"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "utf16_surrogate_escape_find",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:regex_utf16_oracle (5 packages loaded, 6 targets configured)\nAnalyzing: target //:regex_utf16_oracle (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:regex_utf16_oracle (100 packages loaded, 3358 targets configured).\n[5 / 10] [Prepa] JavaToolchainCompileClasses external/rules_java+/toolchains/platformclasspath_classes\n[5 / 10] JavaToolchainCompileClasses external/rules_java+/toolchains/platformclasspath_classes; <duration> remote, remote-cache\n[6 / 10] [Prepa] JavaToolchainCompileBootClasspath external/rules_java+/toolchains/platformclasspath_unstripped.jar\n[6 / 10] JavaToolchainCompileBootClasspath external/rules_java+/toolchains/platformclasspath_unstripped.jar; <duration> remote, remote-cache\n[8 / 10] Building regex_utf16_oracle.jar (1 source file); <duration> remote, remote-cache\n[8 / 10] [Sched] Building regex_utf16_oracle.jar (1 source file)\n[8 / 10] Building regex_utf16_oracle.jar (1 source file); <duration> remote, remote-cache\nINFO: From Building regex_utf16_oracle.jar (1 source file):\nWARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/buildbuddy-execroot/external/rules_java++toolchains+remote_java_tools/java_tools/JavaBuilder_deploy.jar)\nWARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\nWARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n[9 / 10] [Prepa] runfiles for //:regex_utf16_oracle\nINFO: Found 1 target...\nTarget //:regex_utf16_oracle up-to-date:\n  bazel-bin/regex_utf16_oracle\n  bazel-bin/regex_utf16_oracle.jar\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 10 processes: 1 remote cache hit, 6 internal, 3 remote.\nINFO: Build completed successfully, 10 total actions\nINFO: \nINFO: Running command line: bazel-bin/regex_utf16_oracle\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\njava.runtime.version=25.0.1+8-LTS",
+      "normalized_stdout": "pattern=ascii_high_surrogate_escape subject=nul find=false\npattern=ascii_high_surrogate_escape subject=unpaired_high_surrogate find=true",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/java-pattern-utf16/20260723-104111-962936-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/java-pattern-utf16/20260723-104139-963443-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: c1d4dad9-1899-44a4-a86e-0c519c30e229\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/c1d4dad9-1899-44a4-a86e-0c519c30e229\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:regex_utf16_oracle (5 packages loaded, 6 targets configured)\nAnalyzing: target //:regex_utf16_oracle (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:regex_utf16_oracle (100 packages loaded, 3358 targets configured).\n[5 / 10] [Prepa] JavaToolchainCompileClasses external/rules_java+/toolchains/platformclasspath_classes\n[5 / 10] JavaToolchainCompileClasses external/rules_java+/toolchains/platformclasspath_classes; 0s remote, remote-cache\n[6 / 10] [Prepa] JavaToolchainCompileBootClasspath external/rules_java+/toolchains/platformclasspath_unstripped.jar\n[6 / 10] JavaToolchainCompileBootClasspath external/rules_java+/toolchains/platformclasspath_unstripped.jar; 1s remote, remote-cache\n[8 / 10] Building regex_utf16_oracle.jar (1 source file); 0s remote, remote-cache\n[8 / 10] [Sched] Building regex_utf16_oracle.jar (1 source file)\n[8 / 10] Building regex_utf16_oracle.jar (1 source file); 1s remote, remote-cache\nINFO: From Building regex_utf16_oracle.jar (1 source file):\nWARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::arrayBaseOffset has been called by com.google.protobuf.UnsafeUtil$MemoryAccessor (file:/buildbuddy-execroot/external/rules_java++toolchains+remote_java_tools/java_tools/JavaBuilder_deploy.jar)\nWARNING: Please consider reporting this to the maintainers of class com.google.protobuf.UnsafeUtil$MemoryAccessor\nWARNING: sun.misc.Unsafe::arrayBaseOffset will be removed in a future release\n[9 / 10] [Prepa] runfiles for //:regex_utf16_oracle\nINFO: Found 1 target...\nTarget //:regex_utf16_oracle up-to-date:\n  bazel-bin/regex_utf16_oracle\n  bazel-bin/regex_utf16_oracle.jar\nINFO: Elapsed time: 19.527s, Critical Path: 13.33s\nINFO: 10 processes: 1 remote cache hit, 6 internal, 3 remote.\nINFO: Build completed successfully, 10 total actions\nINFO: \nINFO: Running command line: bazel-bin/regex_utf16_oracle\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/c1d4dad9-1899-44a4-a86e-0c519c30e229\njava.runtime.version=25.0.1+8-LTS\n",
+      "stdout": "pattern=ascii_high_surrogate_escape subject=nul find=false\npattern=ascii_high_surrogate_escape subject=unpaired_high_surrogate find=true\n"
+    }
+  ],
+  "fixture": "java-pattern-utf16",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

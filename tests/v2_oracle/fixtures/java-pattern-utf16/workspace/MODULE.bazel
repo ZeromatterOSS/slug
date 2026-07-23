@@ -1,0 +1,3 @@
+module(name = "java_pattern_utf16")
+
+bazel_dep(name = "rules_java", version = "9.1.0")

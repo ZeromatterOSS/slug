@@ -1,0 +1,7 @@
+load("@rules_java//java:defs.bzl", "java_binary")
+
+java_binary(
+    name = "regex_utf16_oracle",
+    srcs = ["RegexUtf16Oracle.java"],
+    main_class = "RegexUtf16Oracle",
+)
