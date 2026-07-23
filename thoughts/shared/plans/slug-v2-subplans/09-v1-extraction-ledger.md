@@ -1249,3 +1249,9 @@ equality, same-DICE tracker, and preactivation guard. No V1/Buck semantics
 entered. Root passed fmt/diff, loading 35/query 39/analysis 11; Sol corrected
 six blockers then `ACCEPT`. Next is Stage 8's 29 CLI rows plus two
 generated-kind assertions.
+
+`f3e8ad48` is accepted V2-owned prerequisite evidence: sorted compact native
+`config_setting` values, zero-edge rule kind, semantic reorder/change tests,
+load-only behavior, and fail-closed unsupported attrs. No configuration
+evaluation or V1/Buck semantics entered; Sol `ACCEPT`. Define/flag/constraint/
+common attrs and matching remain deferred; Stage 8 remains 29+2.

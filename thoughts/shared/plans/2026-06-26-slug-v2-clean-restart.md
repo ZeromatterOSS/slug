@@ -688,3 +688,12 @@ prevents leakage. Root passed fmt/diff, loading 35/query 39/analysis 11. Sol
 corrected six initial blockers and rereviewed `ACCEPT`; root added nested
 repeated-prefix ordering regression. Next is Stage 8: 29 CLI plus two
 generated-kind assertions, never Slug 31/31 prematurely.
+
+Prerequisite `f3e8ad48` (`feat: load config setting values`) is accepted:
+the immutable labels fixture required native `config_setting` keys. The narrow
+load-only representation retains sorted compact `values`, gives
+`config_setting rule` correct zero edges, and has semantic reorder/change
+tests; it performs no configuration evaluation and unsupported attrs fail
+closed. Sol `ACCEPT`. Define/flag/constraint/common attrs and matching remain
+deferred. Stage 8 `labels` now resumes unchanged at 29 CLI plus two
+generated-kind assertions.

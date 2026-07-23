@@ -2003,3 +2003,9 @@ immutable metadata, generated owner identity, equality, same-DICE tracker, and
 preactivation guard are the loading substrate. Stage 8 `labels` is next:
 exactly 29 CLI rows plus two focused `QueryNodeKind::GeneratedFile` assertions;
 never claim Slug 31/31 before its formatter boundary.
+
+Prerequisite `f3e8ad48` is accepted: fixture-native `config_setting` values
+now load as sorted compact zero-edge `config_setting rule` metadata, without
+configuration evaluation; unsupported attrs fail closed. Sol `ACCEPT`.
+Define/flag/constraint/common attrs and matching remain deferred. Resume
+Stage 8 labels at the unchanged 29 CLI plus two generated-kind boundary.

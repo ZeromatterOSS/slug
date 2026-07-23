@@ -814,3 +814,9 @@ outputs outside ordinary deps, semantic equality, same-DICE
 `BzlModuleEval`→`PackageLoad`→consumer/observer tracking, and a preactivation
 guard. Root passed fmt/diff, loading 35/query 39/analysis 11; Sol corrected six
 blockers then `ACCEPT`. Stage 8 remains 29 CLI plus two generated-kind rows.
+
+`f3e8ad48` supplies the fixture prerequisite: native `config_setting` retains
+sorted compact `values` as a load-only zero-edge `config_setting rule`, with
+semantic reorder/change tests and fail-closed unsupported attrs. It does not
+evaluate configuration. Sol `ACCEPT`; define/flag/constraint/common attrs and
+matching remain deferred. The Stage 8 29+2 boundary is unchanged.

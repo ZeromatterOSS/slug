@@ -610,3 +610,11 @@ preactivation query guard forbids leakage. Root passed fmt/diff, loading
 35/query 39/analysis 11. Sol's six initial blockers were corrected; rereview
 `ACCEPT`, including root's nested repeated-prefix order regression. Next Stage
 8 is limited to 29 CLI rows plus two generated-kind assertions.
+
+`f3e8ad48` is accepted as a narrow fixture prerequisite: native
+`config_setting(values=...)` retains sorted compact values, is a zero-edge
+`config_setting rule`, reuses reordered-equal maps, and invalidates on value
+changes. It is
+load-only, does not evaluate configuration, and fails closed for unsupported
+attrs. Sol `ACCEPT`. Define/flag/constraint/common attrs and matching remain
+deferred; Stage 8 labels resumes without changing its 29+2 claim.
