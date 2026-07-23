@@ -12,6 +12,7 @@ pub mod evaluator;
 pub mod expr;
 pub mod graph;
 mod parser;
+pub(crate) mod provenance;
 
 pub use evaluator::LoadingQueryEnvironment;
 pub use evaluator::QueryEnvironment;
