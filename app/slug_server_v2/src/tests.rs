@@ -361,6 +361,62 @@ fn retained_daemon_reverse_query_observes_edge_and_subtree_transitions() {
 }
 
 #[test]
+fn retained_daemon_siblings_observes_build_file_and_priority_transitions() {
+    let workspace = scratch("siblings-build-file-transitions");
+    let package = workspace.join("pkg");
+    let modern = package.join("BUILD.bazel");
+    let fallback = package.join("BUILD");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(&modern, "filegroup(name = \"one\")\n");
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let initial = daemon.query("siblings(//pkg:BUILD.bazel)", QueryOrder::Auto);
+    assert_eq!(initial.exit_code, 0, "{initial:?}");
+    assert_eq!(initial.stdout, "//pkg:BUILD.bazel\n//pkg:one\n");
+    assert_eq!(initial.invalidated_files, 0);
+
+    write(
+        &modern,
+        "filegroup(name = \"one\")\nfilegroup(name = \"two\")\n",
+    );
+    let edited = daemon.query("siblings(//pkg:BUILD.bazel)", QueryOrder::Auto);
+    assert_eq!(edited.exit_code, 0, "{edited:?}");
+    assert_eq!(edited.stdout, "//pkg:BUILD.bazel\n//pkg:one\n//pkg:two\n");
+    assert_eq!(edited.invalidated_files, 1);
+
+    fs::rename(&modern, &fallback).unwrap();
+    let fallback_only = daemon.query("siblings(//pkg:BUILD)", QueryOrder::Auto);
+    assert_eq!(fallback_only.exit_code, 0, "{fallback_only:?}");
+    assert_eq!(fallback_only.stdout, "//pkg:BUILD\n//pkg:one\n//pkg:two\n");
+    assert_eq!(fallback_only.invalidated_files, 2);
+
+    write(&modern, "filegroup(name = \"preferred\")\n");
+    let dual = daemon.query("siblings(//pkg:BUILD.bazel)", QueryOrder::Auto);
+    assert_eq!(dual.exit_code, 0, "{dual:?}");
+    assert_eq!(dual.stdout, "//pkg:BUILD.bazel\n//pkg:preferred\n");
+    assert_eq!(dual.invalidated_files, 1);
+
+    write(&fallback, "filegroup(name = \"ignored\")\n");
+    let ignored_edit = daemon.query("siblings(//pkg:BUILD.bazel)", QueryOrder::Auto);
+    assert_eq!(ignored_edit.exit_code, 0, "{ignored_edit:?}");
+    assert_eq!(ignored_edit.stdout, "//pkg:BUILD.bazel\n//pkg:preferred\n");
+    assert_eq!(ignored_edit.invalidated_files, 1);
+
+    fs::remove_file(&modern).unwrap();
+    fs::remove_file(&fallback).unwrap();
+    let missing = daemon.query("siblings(//pkg:BUILD.bazel)", QueryOrder::Auto);
+    assert_eq!(missing.exit_code, 7, "{missing:?}");
+    assert!(missing.stdout.is_empty());
+    assert_eq!(missing.invalidated_files, 2);
+
+    write(&fallback, "filegroup(name = \"recreated\")\n");
+    let recreated = daemon.query("siblings(//pkg:BUILD)", QueryOrder::Auto);
+    assert_eq!(recreated.exit_code, 0, "{recreated:?}");
+    assert_eq!(recreated.stdout, "//pkg:BUILD\n//pkg:recreated\n");
+    assert_eq!(recreated.invalidated_files, 1);
+}
+
+#[test]
 fn retained_daemon_path_query_observes_edge_and_reachable_package_transitions() {
     let workspace = scratch("path-query-transitions");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

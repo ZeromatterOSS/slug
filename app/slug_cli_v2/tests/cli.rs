@@ -160,6 +160,200 @@ fn query_prints_text_labels_in_auto_and_full_order() {
 }
 
 #[test]
+fn siblings_build_file_node_fixture_matches_all_oracle_rows() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-siblings-build-file-node/workspace");
+    const MODERN: &str = "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n";
+    const MODERN_FULL: &str = "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel\n";
+    let successful = [
+        (
+            vec!["query", "//modern:BUILD.bazel"],
+            "//modern:BUILD.bazel\n",
+        ),
+        (vec!["query", "//fallback:BUILD"], "//fallback:BUILD\n"),
+        (
+            vec!["query", "siblings(//fallback:BUILD)"],
+            "//fallback:BUILD\n//fallback:only\n",
+        ),
+        (vec!["query", "//:BUILD.bazel"], "//:BUILD.bazel\n"),
+        (
+            vec!["query", "siblings(//:BUILD.bazel)"],
+            "//:BUILD.bazel\n//:root_rule\n",
+        ),
+        (vec!["query", "//dual:preferred"], "//dual:preferred\n"),
+        (vec!["query", "//dual:BUILD.bazel"], "//dual:BUILD.bazel\n"),
+        (
+            vec!["query", "siblings(//dual:BUILD.bazel)"],
+            "//dual:BUILD.bazel\n//dual:preferred\n",
+        ),
+        (vec!["query", "siblings(//modern:BUILD.bazel)"], MODERN),
+        (vec!["query", "siblings(//modern:rule)"], MODERN),
+        (vec!["query", "siblings(//modern:explicit.txt)"], MODERN),
+        (vec!["query", "siblings(//modern:implicit.txt)"], MODERN),
+        (vec!["query", "siblings(//modern:alias)"], MODERN),
+        (vec!["query", "siblings(//modern:custom)"], MODERN),
+        (
+            vec!["query", "siblings(//namedall:BUILD.bazel)"],
+            "//namedall:BUILD.bazel\n//namedall:all\n//namedall:other\n",
+        ),
+        (
+            vec![
+                "query",
+                "siblings(set(//modern:rule //modern:alias //modern:rule))",
+            ],
+            MODERN,
+        ),
+        (
+            vec!["query", "siblings(set(//modern:rule //fallback:only))"],
+            "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n",
+        ),
+        (vec!["query", "siblings(set())"], ""),
+        (
+            vec!["query", "siblings(//modern:rule) union //fallback:only"],
+            "//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n",
+        ),
+        (
+            vec!["query", "siblings(set(//modern:rule //fallback:only))"],
+            "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n",
+        ),
+        (
+            vec![
+                "query",
+                "siblings(//modern:rule) intersect set(//modern:BUILD.bazel //modern:rule //fallback:only)",
+            ],
+            "//modern:BUILD.bazel\n//modern:rule\n",
+        ),
+        (
+            vec![
+                "query",
+                "siblings(//modern:rule) except set(//modern:BUILD.bazel //modern:implicit.txt)",
+            ],
+            "//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:leaf\n//modern:rule\n",
+        ),
+        (
+            vec!["query", "deps(//modern:BUILD.bazel)"],
+            "//modern:BUILD.bazel\n",
+        ),
+        (
+            vec![
+                "query",
+                "rdeps(siblings(//modern:rule), //modern:BUILD.bazel)",
+            ],
+            "//modern:BUILD.bazel\n",
+        ),
+        (
+            vec!["query", "same_pkg_direct_rdeps(//modern:BUILD.bazel)"],
+            "",
+        ),
+        (
+            vec!["query", "--order_output=auto", "siblings(//modern:rule)"],
+            MODERN,
+        ),
+        (
+            vec!["query", "--order_output=full", "siblings(//modern:rule)"],
+            MODERN_FULL,
+        ),
+        (
+            vec!["query", "--order_output=full", "siblings(//modern:cycle_a)"],
+            MODERN_FULL,
+        ),
+        (
+            vec!["query", "--order_output=full", "siblings(//provenance:a)"],
+            "//provenance:zz\n//provenance:z\n//provenance:y\n//provenance:a\n//provenance:BUILD.bazel\n",
+        ),
+        (
+            vec![
+                "query",
+                "--order_output=full",
+                "siblings(//provenance:a) union set()",
+            ],
+            "//provenance:zz\n//provenance:z\n//provenance:y\n//provenance:a\n//provenance:BUILD.bazel\n",
+        ),
+        (
+            vec![
+                "query",
+                "--order_output=full",
+                "siblings(deps(//provenance:a))",
+            ],
+            "//provenance:z\n//provenance:y\n//provenance:a\n//provenance:zz\n//provenance:BUILD.bazel\n",
+        ),
+    ];
+    let failures = [
+        (
+            vec!["query", "//modern:BUILD"],
+            7,
+            "no such target '//modern:BUILD'",
+        ),
+        (
+            vec!["query", "//fallback:BUILD.bazel"],
+            7,
+            "no such target '//fallback:BUILD.bazel'",
+        ),
+        (vec!["query", "//:BUILD"], 7, "no such target '//:BUILD'"),
+        (
+            vec!["query", "//dual:BUILD"],
+            7,
+            "no such target '//dual:BUILD'",
+        ),
+        (
+            vec!["query", "//dual:ignored"],
+            7,
+            "no such target '//dual:ignored'",
+        ),
+        (
+            vec!["query", "siblings()"],
+            2,
+            "too few arguments to function 'siblings'",
+        ),
+        (
+            vec!["query", "siblings(//modern:rule, //fallback:only)"],
+            2,
+            "too many arguments to function 'siblings'",
+        ),
+        (vec!["query", "siblings("], 2, "premature end of input"),
+        (
+            vec!["query", "siblings(//modern:missing)"],
+            7,
+            "no such target '//modern:missing'",
+        ),
+        (
+            vec!["query", "siblings(//missing:target)"],
+            7,
+            "no such package 'missing': BUILD file not found",
+        ),
+        (
+            vec!["query", "siblings(//modern:rule union //modern:missing)"],
+            7,
+            "no such target '//modern:missing'",
+        ),
+        (
+            vec!["query", "siblings(//modern:rule union //missing:target)"],
+            7,
+            "no such package 'missing': BUILD file not found",
+        ),
+    ];
+    assert_eq!(successful.len() + failures.len(), 43);
+
+    for (argv, expected_stdout) in successful {
+        let output = slug().current_dir(&workspace).args(&argv).output().unwrap();
+        assert!(output.status.success(), "{argv:?}: {output:?}");
+        assert!(output.stderr.is_empty(), "{argv:?}: {output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            expected_stdout,
+            "{argv:?}"
+        );
+    }
+    for (argv, expected_exit, expected_message) in failures {
+        let output = slug().current_dir(&workspace).args(&argv).output().unwrap();
+        assert_eq!(output.status.code(), Some(expected_exit), "{argv:?}");
+        assert!(output.stdout.is_empty(), "{argv:?}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(expected_message), "{argv:?}: {stderr}");
+    }
+}
+
+#[test]
 fn loading_query_fixture_matches_full_bazel_semantic_slice() {
     let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/v2_oracle/fixtures/query-loading-thin-vertical/workspace");

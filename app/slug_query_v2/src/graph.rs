@@ -76,6 +76,7 @@ impl fmt::Display for QueryLabel {
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum QueryNodeKind {
+    BuildFile,
     SourceFile,
     Rule(CompactString),
 }
@@ -210,17 +211,25 @@ async fn compute_package_graph(
         .as_ref()
         .map_err(|error| QueryError::evaluation(error.to_string()))?;
     let package_name = path_to_package(package)?;
+    let build_basename = loaded
+        .build_file
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| QueryError::evaluation("loaded BUILD file has no UTF-8 basename"))?;
     let build_file = loaded
         .build_file
         .strip_prefix(workspace)
         .unwrap_or(&loaded.build_file)
         .to_string_lossy();
     let build_file = CompactString::new(&build_file);
-    let mut nodes = SmallMap::with_capacity(loaded.targets.len());
+    let mut nodes = SmallMap::with_capacity(loaded.targets.len() + 1);
 
     for target in &loaded.targets {
         let label = label_in_package(&package_name, &target.name)?;
         let (kind, dependencies) = match &target.kind {
+            PackageTargetKind::ExportedFile if target.name == build_basename => {
+                (QueryNodeKind::BuildFile, Arc::from([]))
+            }
             PackageTargetKind::ExportedFile => (QueryNodeKind::SourceFile, Arc::from([])),
             PackageTargetKind::Filegroup { srcs } => {
                 let dependencies = srcs
@@ -247,6 +256,12 @@ async fn compute_package_graph(
                     .into(),
             ),
         };
+        if target.name == build_basename && !matches!(kind, QueryNodeKind::BuildFile) {
+            return Err(QueryError::evaluation(format!(
+                "target '{}' collides with active BUILD file",
+                label
+            )));
+        }
         nodes.insert(
             label.dupe(),
             QueryNode {
@@ -254,6 +269,19 @@ async fn compute_package_graph(
                 kind,
                 build_file: build_file.clone(),
                 dependencies,
+            },
+        );
+    }
+
+    let build_label = label_in_package(&package_name, build_basename)?;
+    if nodes.get(&build_label).is_none() {
+        nodes.insert(
+            build_label.dupe(),
+            QueryNode {
+                label: build_label,
+                kind: QueryNodeKind::BuildFile,
+                build_file: build_file.clone(),
+                dependencies: Arc::from([]),
             },
         );
     }

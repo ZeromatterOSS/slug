@@ -66,6 +66,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             "deps",
             "rdeps",
             "same_pkg_direct_rdeps",
+            "siblings",
             "some",
             "somepath",
         ]
@@ -101,6 +102,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
         &QueryExpression::parse("same_pkg_direct_rdeps(//tree/left:leaf)").unwrap(),
     )
     .unwrap();
+    validate_loading_query(&QueryExpression::parse("siblings(//pkg:bin)").unwrap()).unwrap();
     validate_loading_query(
         &QueryExpression::parse("allpaths(//:linear_start, //:linear_end)").unwrap(),
     )

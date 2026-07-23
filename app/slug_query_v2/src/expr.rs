@@ -139,7 +139,12 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
         argument_kinds: &[EXPR],
         status: QueryFunctionStatus::Implemented,
     },
-    deferred("siblings", 1, &[EXPR]),
+    QueryFunctionSpec {
+        name: "siblings",
+        mandatory_arguments: 1,
+        argument_kinds: &[EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     QueryFunctionSpec {
         name: "some",
         mandatory_arguments: 1,

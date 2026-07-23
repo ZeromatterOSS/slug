@@ -161,6 +161,11 @@ pub trait QueryEnvironment {
         &mut self,
         targets: &TargetSet<Self::Target>,
     ) -> Result<TargetSet<Self::Target>, QueryError>;
+
+    async fn siblings(
+        &mut self,
+        targets: &TargetSet<Self::Target>,
+    ) -> Result<TargetSet<Self::Target>, QueryError>;
 }
 
 pub struct QueryEvaluator<E> {
@@ -278,6 +283,7 @@ pub struct LoadingQueryFunctions;
 static DEPS_FUNCTION: DepsFunction = DepsFunction;
 static RDEPS_FUNCTION: RdepsFunction = RdepsFunction;
 static SAME_PKG_DIRECT_RDEPS_FUNCTION: SamePkgDirectRdepsFunction = SamePkgDirectRdepsFunction;
+static SIBLINGS_FUNCTION: SiblingsFunction = SiblingsFunction;
 static ALLPATHS_FUNCTION: AllPathsFunction = AllPathsFunction;
 static SOME_FUNCTION: SomeFunction = SomeFunction;
 static SOMEPATH_FUNCTION: SomePathFunction = SomePathFunction;
@@ -296,6 +302,7 @@ where
             &DEPS_FUNCTION as &dyn QueryFunction<E>,
             &RDEPS_FUNCTION as &dyn QueryFunction<E>,
             &SAME_PKG_DIRECT_RDEPS_FUNCTION as &dyn QueryFunction<E>,
+            &SIBLINGS_FUNCTION as &dyn QueryFunction<E>,
             &SOME_FUNCTION as &dyn QueryFunction<E>,
             &SOMEPATH_FUNCTION as &dyn QueryFunction<E>,
         ]
@@ -449,6 +456,30 @@ struct AllPathsFunction;
 
 struct SomeFunction;
 
+struct SiblingsFunction;
+
+impl<E> QueryFunction<E> for SiblingsFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("siblings").expect("siblings is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        async move {
+            let targets: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            evaluator.environment.siblings(&targets).await
+        }
+        .boxed()
+    }
+}
+
 impl<E> QueryFunction<E> for SomeFunction
 where
     E: QueryEnvironment + Send,
@@ -589,29 +620,51 @@ impl<T> ResolvedGraph<T>
 where
     T: Clone + Eq + Hash,
 {
-    async fn build_selected_induced<E>(
-        environment: &mut E,
-        selected: &TargetSet<T>,
-    ) -> Result<Self, QueryError>
+    fn new() -> Self {
+        Self {
+            nodes: Vec::new(),
+            target_to_index: SmallMap::new(),
+        }
+    }
+
+    fn record_node(&mut self, target: T) {
+        self.get_or_create(target);
+    }
+
+    fn record_edge(&mut self, from: T, to: T) {
+        let (from, _) = self.get_or_create(from);
+        let (to, _) = self.get_or_create(to);
+        let children = &mut self.nodes[from as usize].children;
+        if !children.contains(&to) {
+            children.push(to);
+        }
+    }
+
+    fn selected_induced(&self, selected: &TargetSet<T>) -> Self
     where
-        E: QueryEnvironment<Target = T> + Send,
         T: Ord,
     {
         let mut targets = selected.iter().cloned().collect::<Vec<_>>();
         targets.sort_unstable();
-        let mut graph = Self {
-            nodes: Vec::with_capacity(targets.len()),
-            target_to_index: SmallMap::with_capacity(targets.len()),
-        };
+        let mut graph = Self::new();
+        graph.nodes.reserve(targets.len());
+        graph.target_to_index.reserve(targets.len());
         for target in targets {
             graph.get_or_create(target);
         }
         for index in 0..graph.nodes.len() {
             let target = graph.nodes[index].target.clone();
-            let dependencies = environment.dependencies(&target).await?;
-            let mut children = dependencies
-                .iter()
-                .filter_map(|dependency| graph.target_to_index.get(dependency).copied())
+            let mut children = self
+                .target_to_index
+                .get(&target)
+                .into_iter()
+                .flat_map(|recorded| self.nodes[*recorded as usize].children.iter())
+                .filter_map(|child| {
+                    graph
+                        .target_to_index
+                        .get(&self.nodes[*child as usize].target)
+                        .copied()
+                })
                 .collect::<Vec<_>>();
             children.sort_unstable_by(|left, right| {
                 graph.nodes[*left as usize]
@@ -621,7 +674,7 @@ where
             children.dedup();
             graph.nodes[index].children = children;
         }
-        Ok(graph)
+        graph
     }
 
     fn deterministic_topological_order(&self) -> Vec<T> {
@@ -975,11 +1028,16 @@ where
 pub struct LoadingQueryEnvironment<'a, 'd> {
     ctx: &'a mut DiceComputations<'d>,
     workspace: PathBuf,
+    evaluation_graph: ResolvedGraph<QueryLabel>,
 }
 
 impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
     pub fn new(ctx: &'a mut DiceComputations<'d>, workspace: PathBuf) -> Self {
-        Self { ctx, workspace }
+        Self {
+            ctx,
+            workspace,
+            evaluation_graph: ResolvedGraph::new(),
+        }
     }
 
     async fn package_graph(
@@ -1015,14 +1073,37 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                 error
             }
         })?;
-        graph.nodes.get(&label).cloned().ok_or_else(|| {
+        let node = graph.nodes.get(&label).cloned().ok_or_else(|| {
             QueryError::evaluation(format!(
                 "no such target '{}': target '{}' not declared in package '{}'",
                 label,
                 label.target(),
                 label.package()
             ))
-        })
+        })?;
+        self.evaluation_graph.record_node(label);
+        Ok(node)
+    }
+
+    fn record_pattern_graph(
+        &mut self,
+        graph: &UnconfiguredPackageGraph,
+        selected: &TargetSet<QueryLabel>,
+    ) {
+        for node in graph.nodes.values() {
+            if !selected.contains(&node.label) {
+                continue;
+            }
+            self.evaluation_graph.record_node(node.label.clone());
+            for dependency in node
+                .dependencies
+                .iter()
+                .filter(|dependency| selected.contains(dependency))
+            {
+                self.evaluation_graph
+                    .record_edge(node.label.clone(), dependency.clone());
+            }
+        }
     }
 
     async fn resolve_recursive(
@@ -1039,6 +1120,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             .map_err(|error| QueryError::evaluation(error.to_string()))?;
         let packages = packages.as_ref().as_ref().map_err(|error| error.clone())?;
         let mut result = TargetSet::default();
+        let mut graphs = Vec::with_capacity(packages.packages.len());
         for package in packages.packages.iter() {
             let graph = self.package_graph(package).await?;
             for (label, node) in graph.nodes.iter() {
@@ -1046,11 +1128,15 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                     result.insert(label.clone());
                 }
             }
+            graphs.push(graph);
         }
         if result.iter().next().is_none() {
             return Err(QueryError::evaluation(format!(
                 "no targets found beneath '{prefix}'"
             )));
+        }
+        for graph in graphs {
+            self.record_pattern_graph(&graph, &result);
         }
         Ok(result)
     }
@@ -1088,6 +1174,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                         result.insert(label.clone());
                     }
                 }
+                self.record_pattern_graph(&graph, &result);
                 Ok(result)
             }
             TargetPattern::Recursive { repo, package } => {
@@ -1105,9 +1192,12 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         &mut self,
         target: &Self::Target,
     ) -> Result<Arc<[Self::Target]>, QueryError> {
-        self.resolve_single(target.clone())
-            .await
-            .map(|node| node.dependencies)
+        let node = self.resolve_single(target.clone()).await?;
+        for dependency in node.dependencies.iter() {
+            self.evaluation_graph
+                .record_edge(target.clone(), dependency.clone());
+        }
+        Ok(node.dependencies)
     }
 
     async fn same_pkg_direct_rdeps(
@@ -1126,6 +1216,11 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         for (package, package_targets) in by_package {
             let graph = self.package_graph(&package).await?;
             for node in graph.nodes.values() {
+                self.evaluation_graph.record_node(node.label.clone());
+                for dependency in node.dependencies.iter() {
+                    self.evaluation_graph
+                        .record_edge(node.label.clone(), dependency.clone());
+                }
                 if node
                     .dependencies
                     .iter()
@@ -1133,6 +1228,25 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                 {
                     result.insert(node.label.clone());
                 }
+            }
+        }
+        Ok(result)
+    }
+
+    async fn siblings(
+        &mut self,
+        targets: &TargetSet<Self::Target>,
+    ) -> Result<TargetSet<Self::Target>, QueryError> {
+        let packages = targets
+            .iter()
+            .map(|target| CompactString::new(target.package()))
+            .collect::<SmallSet<_>>();
+        let mut result = TargetSet::default();
+        for package in packages {
+            let graph = self.package_graph(&package).await?;
+            for label in graph.nodes.keys() {
+                self.evaluation_graph.record_node(label.clone());
+                result.insert(label.clone());
             }
         }
         Ok(result)
@@ -1151,8 +1265,10 @@ pub async fn evaluate_loading_query(
     let mut evaluator = QueryEvaluator::new(LoadingQueryEnvironment::new(ctx, workspace));
     let targets = evaluator.evaluate(&expression).await?;
     let mut labels = if order == QueryOrder::Full {
-        ResolvedGraph::build_selected_induced(&mut evaluator.environment, &targets)
-            .await?
+        evaluator
+            .environment
+            .evaluation_graph
+            .selected_induced(&targets)
             .deterministic_topological_order()
     } else {
         targets.iter().cloned().collect::<Vec<_>>()

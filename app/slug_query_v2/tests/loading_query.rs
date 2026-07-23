@@ -19,6 +19,7 @@ use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_query_v2::QueryNodeKind;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::SubtreePackageSetKey;
 use slug_query_v2::UnconfiguredPackageGraphKey;
@@ -214,6 +215,425 @@ fn subtree(prefix: &str, kind: ActivationKind) -> (QueryKeyIdentity, ActivationK
         QueryKeyIdentity::SubtreePackageSet(PathBuf::from(prefix)),
         kind,
     )
+}
+
+#[tokio::test]
+async fn siblings_exposes_only_the_active_build_file_node_and_all_package_nodes() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("BUILD.bazel"),
+        "filegroup(name = \"root_rule\")\n",
+    );
+    write(
+        workspace.join("modern/BUILD.bazel"),
+        "exports_files([\"BUILD.bazel\"])\nfilegroup(name = \"rule\")\n",
+    );
+    write(
+        workspace.join("fallback/BUILD"),
+        "filegroup(name = \"only\")\n",
+    );
+    write(
+        workspace.join("dual/BUILD.bazel"),
+        "filegroup(name = \"preferred\")\n",
+    );
+    write(
+        workspace.join("dual/BUILD"),
+        "filegroup(name = \"ignored\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    for (expression, order, expected) in [
+        (
+            "//modern:BUILD.bazel",
+            QueryOrder::Auto,
+            "//modern:BUILD.bazel\n",
+        ),
+        ("//fallback:BUILD", QueryOrder::Auto, "//fallback:BUILD\n"),
+        ("//:BUILD.bazel", QueryOrder::Auto, "//:BUILD.bazel\n"),
+        (
+            "siblings(//fallback:BUILD)",
+            QueryOrder::Auto,
+            "//fallback:BUILD\n//fallback:only\n",
+        ),
+        (
+            "deps(//modern:BUILD.bazel)",
+            QueryOrder::Auto,
+            "//modern:BUILD.bazel\n",
+        ),
+        (
+            "siblings(//dual:BUILD.bazel)",
+            QueryOrder::Auto,
+            "//dual:BUILD.bazel\n//dual:preferred\n",
+        ),
+    ] {
+        let output = evaluate_loading_query(&mut transaction, workspace.clone(), expression, order)
+            .await
+            .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+    let package_all = evaluate_loading_query(
+        &mut transaction,
+        workspace.clone(),
+        "//modern:all",
+        QueryOrder::Auto,
+    )
+    .await
+    .unwrap();
+    assert!(!package_all.stdout().contains("BUILD.bazel"));
+    let recursive = evaluate_loading_query(
+        &mut transaction,
+        workspace.clone(),
+        "//...",
+        QueryOrder::Auto,
+    )
+    .await
+    .unwrap();
+    assert!(!recursive.stdout().contains(":BUILD"));
+    assert!(recursive.stdout().contains("//modern:rule"));
+    assert!(recursive.stdout().contains("//fallback:only"));
+    for expression in ["//modern:BUILD", "//fallback:BUILD.bazel", "//dual:BUILD"] {
+        assert_eq!(
+            evaluate_loading_query(
+                &mut transaction,
+                workspace.clone(),
+                expression,
+                QueryOrder::Auto,
+            )
+            .await
+            .unwrap_err()
+            .exit_code,
+            7
+        );
+    }
+}
+
+#[tokio::test]
+async fn package_graph_has_one_zero_edge_build_file_node_synthesized_or_coalesced() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("modern/BUILD.bazel"),
+        "exports_files([\"BUILD.bazel\"])\nfilegroup(name = \"rule\")\n",
+    );
+    write(
+        workspace.join("fallback/BUILD"),
+        "filegroup(name = \"only\")\n",
+    );
+    write(
+        workspace.join("dual/BUILD.bazel"),
+        "filegroup(name = \"preferred\")\n",
+    );
+    write(
+        workspace.join("dual/BUILD"),
+        "filegroup(name = \"ignored\")\n",
+    );
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    for (package_path, expected_build, expected_labels) in [
+        (
+            "modern",
+            "//modern:BUILD.bazel",
+            vec!["//modern:BUILD.bazel", "//modern:rule"],
+        ),
+        (
+            "fallback",
+            "//fallback:BUILD",
+            vec!["//fallback:BUILD", "//fallback:only"],
+        ),
+        (
+            "dual",
+            "//dual:BUILD.bazel",
+            vec!["//dual:BUILD.bazel", "//dual:preferred"],
+        ),
+    ] {
+        let graph = transaction
+            .compute(&UnconfiguredPackageGraphKey {
+                workspace: workspace.clone(),
+                package: PathBuf::from(package_path),
+            })
+            .await
+            .unwrap();
+        let graph = graph.as_ref().as_ref().unwrap();
+        let mut labels = graph
+            .nodes
+            .keys()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        labels.sort();
+        assert_eq!(labels, expected_labels, "{package_path}");
+        let build_nodes = graph
+            .nodes
+            .values()
+            .filter(|node| node.kind == QueryNodeKind::BuildFile)
+            .collect::<Vec<_>>();
+        assert_eq!(build_nodes.len(), 1, "{package_path}");
+        assert_eq!(build_nodes[0].label.to_string(), expected_build);
+        assert!(build_nodes[0].dependencies.is_empty(), "{package_path}");
+        assert!(!build_nodes[0].kind.is_rule(), "{package_path}");
+    }
+}
+
+#[tokio::test]
+async fn active_build_basename_non_export_target_collision_is_a_query_error() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("collision/BUILD.bazel"),
+        "filegroup(name = \"BUILD.bazel\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace,
+            package: PathBuf::from("collision"),
+        })
+        .await
+        .unwrap();
+    let error = graph.as_ref().as_ref().unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "target '//collision:BUILD.bazel' collides with active BUILD file"
+    );
+}
+
+#[tokio::test]
+async fn build_file_zero_edges_and_full_siblings_order_match_bazel_oracle() {
+    let workspace = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/v2_oracle/fixtures/query-siblings-build-file-node/workspace"),
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, order, expected) in [
+        (
+            "rdeps(siblings(//modern:rule), //modern:BUILD.bazel)",
+            QueryOrder::Auto,
+            "//modern:BUILD.bazel\n",
+        ),
+        (
+            "same_pkg_direct_rdeps(//modern:BUILD.bazel)",
+            QueryOrder::Auto,
+            "",
+        ),
+        (
+            "siblings(//modern:rule)",
+            QueryOrder::Full,
+            "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel\n",
+        ),
+        (
+            "siblings(//modern:cycle_a)",
+            QueryOrder::Full,
+            "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel\n",
+        ),
+    ] {
+        let output = evaluate_loading_query(&mut transaction, workspace.clone(), expression, order)
+            .await
+            .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+}
+
+#[tokio::test]
+async fn full_siblings_uses_only_edges_recorded_while_evaluating_the_operand() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("provenance/BUILD.bazel"),
+        "filegroup(name = \"z\", srcs = [\":a\"])\n\
+         filegroup(name = \"a\", srcs = [\":zz\"])\n\
+         filegroup(name = \"zz\")\n\
+         filegroup(name = \"y\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, expected) in [
+        (
+            "siblings(//provenance:a)",
+            "//provenance:zz\n//provenance:z\n//provenance:y\n//provenance:a\n//provenance:BUILD.bazel\n",
+        ),
+        (
+            "siblings(//provenance:a) union set()",
+            "//provenance:zz\n//provenance:z\n//provenance:y\n//provenance:a\n//provenance:BUILD.bazel\n",
+        ),
+        (
+            "siblings(deps(//provenance:a))",
+            "//provenance:z\n//provenance:y\n//provenance:a\n//provenance:zz\n//provenance:BUILD.bazel\n",
+        ),
+    ] {
+        let output = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Full,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+}
+
+#[tokio::test]
+async fn siblings_has_exact_dice_target_and_build_content_lifecycle() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    let build = workspace.join("cand/BUILD.bazel");
+    write(&build, "filegroup(name = \"one\")\n");
+    write(
+        workspace.join("outside/BUILD.bazel"),
+        "filegroup(name = \"unrelated\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "siblings(//cand:BUILD.bazel)";
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        initial.unwrap().labels.as_ref(),
+        ["//cand:BUILD.bazel", "//cand:one"]
+    );
+    assert_eq!(events, [package("cand", ActivationKind::Evaluated)]);
+
+    let (identical, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        identical.unwrap().labels.as_ref(),
+        ["//cand:BUILD.bazel", "//cand:one"]
+    );
+    assert!(events.is_empty(), "{events:?}");
+
+    write(
+        workspace.join("outside/BUILD.bazel"),
+        "filegroup(name = \"changed\")\n",
+    );
+    let (unrelated, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        unrelated.unwrap().labels.as_ref(),
+        ["//cand:BUILD.bazel", "//cand:one"]
+    );
+    assert_eq!(events, [package("cand", ActivationKind::Reused)]);
+
+    for (content, expected) in [
+        (
+            "filegroup(name = \"one\")\nfilegroup(name = \"two\")\n",
+            vec!["//cand:BUILD.bazel", "//cand:one", "//cand:two"],
+        ),
+        (
+            "filegroup(name = \"one\")\nfilegroup(name = \"middle\")\n",
+            vec!["//cand:BUILD.bazel", "//cand:middle", "//cand:one"],
+        ),
+        (
+            "filegroup(name = \"one\")\n",
+            vec!["//cand:BUILD.bazel", "//cand:one"],
+        ),
+        (
+            "filegroup(name = \"one\")\nfilegroup(name = \"zeta\")\n",
+            vec!["//cand:BUILD.bazel", "//cand:one", "//cand:zeta"],
+        ),
+    ] {
+        write(&build, content);
+        let (result, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+        assert_eq!(result.unwrap().labels.as_ref(), expected, "{content}");
+        assert_eq!(
+            events,
+            [package("cand", ActivationKind::Evaluated)],
+            "{content}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn siblings_has_exact_dice_build_basename_priority_and_package_lifecycle() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    let package_dir = workspace.join("pkg");
+    let modern = package_dir.join("BUILD.bazel");
+    let fallback = package_dir.join("BUILD");
+    write(&modern, "filegroup(name = \"modern\")\n");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(QueryTracker::default());
+
+    let (initial, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD.bazel)").await;
+    assert_eq!(
+        initial.unwrap().labels.as_ref(),
+        ["//pkg:BUILD.bazel", "//pkg:modern"]
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    fs::rename(&modern, &fallback).unwrap();
+    let (to_fallback, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD)").await;
+    assert_eq!(
+        to_fallback.unwrap().labels.as_ref(),
+        ["//pkg:BUILD", "//pkg:modern"]
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    fs::rename(&fallback, &modern).unwrap();
+    let (to_modern, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD.bazel)").await;
+    assert_eq!(
+        to_modern.unwrap().labels.as_ref(),
+        ["//pkg:BUILD.bazel", "//pkg:modern"]
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&fallback, "filegroup(name = \"ignored\")\n");
+    let (dual, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD.bazel)").await;
+    assert_eq!(
+        dual.unwrap().labels.as_ref(),
+        ["//pkg:BUILD.bazel", "//pkg:modern"]
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+
+    write(&fallback, "filegroup(name = \"still_ignored\")\n");
+    let (ignored_edit, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD.bazel)").await;
+    assert_eq!(
+        ignored_edit.unwrap().labels.as_ref(),
+        ["//pkg:BUILD.bazel", "//pkg:modern"]
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+
+    fs::remove_file(&modern).unwrap();
+    let (priority_fallback, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD)").await;
+    assert_eq!(
+        priority_fallback.unwrap().labels.as_ref(),
+        ["//pkg:BUILD", "//pkg:still_ignored"]
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&modern, "filegroup(name = \"restored\")\n");
+    let (priority_restored, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD.bazel)").await;
+    assert_eq!(
+        priority_restored.unwrap().labels.as_ref(),
+        ["//pkg:BUILD.bazel", "//pkg:restored"]
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    fs::remove_file(&modern).unwrap();
+    fs::remove_file(&fallback).unwrap();
+    let (missing, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD.bazel)").await;
+    assert_eq!(missing.unwrap_err().exit_code, 7);
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&fallback, "filegroup(name = \"recreated\")\n");
+    let (recreated, events) =
+        query_revision(&dice, &tracker, &workspace, "siblings(//pkg:BUILD)").await;
+    assert_eq!(
+        recreated.unwrap().labels.as_ref(),
+        ["//pkg:BUILD", "//pkg:recreated"]
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
 }
 
 #[tokio::test]
@@ -529,7 +949,10 @@ async fn implicit_sources_remain_package_owned_across_filegroup_edges() {
         .keys()
         .map(ToString::to_string)
         .collect::<Vec<_>>();
-    assert_eq!(labels, ["//app:bin", "//app:local.txt"]);
+    assert_eq!(
+        labels,
+        ["//app:bin", "//app:BUILD.bazel", "//app:local.txt"]
+    );
 
     let output = evaluate_loading_query(
         &mut transaction,
