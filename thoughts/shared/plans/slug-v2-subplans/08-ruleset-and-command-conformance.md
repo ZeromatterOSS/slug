@@ -2717,25 +2717,28 @@ positives only inside one group, so a separate direct or included positive can
 re-allow a package.
 
 The prerequisite is a Stage 4 typed visibility/package-group representation.
-Bazel distinguishes raw declared visibility from effective package defaults,
-but `labels(visibility, rule)` projects effective declared labels, including an
-inherited group or direct `__pkg__`/`__subpackages__` values. Only loadable
-group labels are rule visibility dependencies. Default ordinary query includes
-those NODEP edges, while package-group includes are separate structural edges.
-Generated files inherit their rule; real source and BUILD targets use real
-visibility; package groups and fake query `.bzl` load targets are public.
+Bazel distinguishes raw declared visibility from effective package defaults.
+`labels(visibility, rule)` projects the stored raw rule attribute: explicit
+loadable group labels project, omitted visibility stays empty even when a
+package default applies, and explicit direct `__pkg__`/`__subpackages__`
+values fail target lookup as non-loadable pseudo-labels. Ordinary `deps`
+instead projects effective loadable group labels, including inherited groups.
+Those rule edges are NODEP; package-group includes are separate structural
+edges. Generated files inherit their rule; real source and BUILD targets use
+real visibility; package groups and fake query `.bzl` load targets are public.
 
-The first draft incorrectly made inherited `labels(visibility, ...)` empty and
-treated `--noimplicit_deps` as removing explicit visibility edges. Root
-corrected both from `AggregatingAttributeMapper` and dependency-filter source.
-Sol-low then returned `REPLAN` for missing include-cycle termination and direct
-package-specification projection discriminators. The corrected design adds both
-and keeps `--noimplicit_deps`/`--nonodep_deps` as Bazel-only structural
-evidence; final re-review returned `ACCEPT`.
+The design review first misclassified inherited `labels(visibility, ...)` by
+following the mapper's general visit-attribute special case. The executable
+oracle exposed the actual `LabelsFunction` → `TargetAccessor` →
+`BlazeTargetAccessor` → `getReachableLabels` path and corrected the contract.
+Sol also required include-cycle termination and independent `__pkg__` and
+`__subpackages__` lookup failures. Commit `3ecfbfce` now accepts 34 commands:
+32 future Slug rows plus two Bazel-only `--noimplicit_deps`/
+`--nonodep_deps` structure rows. Worker and root clean Bazel runs passed; final
+source/evidence review returned `ACCEPT`.
 
-The current packet creates only
-`tests/v2_oracle/fixtures/query-visible-visibility/`. After accepted oracle
-evidence, separately design and implement the Stage 4 representation before
-reviewing Stage 8 activation. External repositories/mapping, symbolic macros,
-special `bind`/`config_setting` defaults, alternate visibility flags,
-keep-going, configured query, formatters, and production Rust remain excluded.
+The current packet separately audits and designs the Stage 4 representation;
+it does not implement or activate `visible()`. External repositories/mapping,
+symbolic macros, special `bind`/`config_setting` defaults, alternate visibility
+flags, keep-going, configured query, formatters, and production Rust remain
+excluded until that design is accepted.

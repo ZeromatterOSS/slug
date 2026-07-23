@@ -1494,3 +1494,17 @@ and set patterns remain reference material only. The accepted next packet is a
 new Bazel oracle fixture; only after it lands may a reviewed Stage 4 design
 choose V2-native compact storage. No V1/Buck visibility code or global
 registry is authorized.
+
+Commit `3ecfbfce` lands that fixture with 32 future Slug rows and two
+Bazel-only structural rows. The executable evidence corrected the earlier
+`labels(visibility)` interpretation: raw explicit loadable group labels
+project, omitted/default visibility is empty, and raw direct
+`__pkg__`/`__subpackages__` values fail non-loadable lookup; effective
+loadable group labels remain ordinary `deps` edges. Independent clean Bazel
+runs and final Sol review accepted the corrected 34-command matrix.
+
+The next extraction decision remains design-only and V2-native. Audit current
+Stage 4 target/package/default/provenance/equality/edge ownership and specify
+typed visibility and package-group storage before implementation. V1/Buck may
+inform compact immutable collection shapes only; no registry, string-pattern
+semantics, fallback, DICE ownership, or query behavior is authorized.

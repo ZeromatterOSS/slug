@@ -671,3 +671,39 @@ compilation, fmt, and diff; Sol final review returned `ACCEPT`. No production
 DICE key or Stage 8/query path changed. Archive-status still reports the
 documented unrelated missing `v1-archive` branch and stale orchestration/server
 allowlists. Stage 8 Gate B may now start.
+
+## WP-4-8-m3-visible-visibility: Stage 4 representation design (2026-07-23)
+
+Oracle commit `3ecfbfce` accepts 34 Bazel 9.2 commands: 32 future Slug
+representation/`visible()` gates and two explicitly Bazel-only flag-structure
+rows. Worker regeneration and clean verification, root clean verification, and
+final Sol evidence review passed. Review added a standalone
+`__subpackages__` lookup failure and corrected the pinned Java call-path
+provenance before `ACCEPT`.
+
+The executable oracle corrected the pre-fixture design. `labels(visibility,
+rule)` reaches `AggregatingAttributeMapper.getReachableLabels` through
+`LabelsFunction` → `TargetAccessor` → `BlazeTargetAccessor`; it projects the
+stored raw rule attribute. Explicit loadable group labels project, omitted
+visibility stays empty despite package defaults, and explicit direct
+`__pkg__`/`__subpackages__` values fail non-loadable target lookup. Ordinary
+`deps` separately uses effective loadable visibility labels, including
+inherited groups, while direct package specifications are values rather than
+dependency targets.
+
+The current packet is read-only. Audit current Stage 4 producers, immutable
+package/target values, package defaults, attribute provenance, target variants,
+query-node edges, DICE equality, and invalidation against the pinned Bazel
+visibility/package-group sources. Design the smallest typed root-repository
+representation for raw/effective visibility, exact/subtree/all/negative
+package specifications, recursive package-group includes with cycle-safe
+resolution, source/BUILD/default behavior, generated inheritance, public
+package-group/fake targets, distinct NODEP/include edges, compact storage,
+`Allocative`, semantic equality, and same-DICE lifecycle evidence.
+
+Do not implement the design, activate `visible()`, add a DICE key, or enter
+repository mapping, symbolic macros, configured analysis/query, formatters, or
+alternate flags. V1's global locked string-pattern registry and permissive
+fallback remain rejected. Stage 8 will separately own universal filtering,
+same-package/Java access, recursive diagnostics, and command activation after
+the Stage 4 design and implementation are independently reviewed.
