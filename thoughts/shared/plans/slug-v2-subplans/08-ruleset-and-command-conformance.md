@@ -1732,7 +1732,7 @@ The worker Slug gate passed 91/91 and six fixtures passed 176/176 at
 
 ### Reviewed next packet: `WP-4-8-m3-build-load-files`
 
-Status: approved direction only; it records no implementation evidence.
+Status: Gate A accepted in `791e26b2`; Gate B activation remains pending.
 
 The parent packet has two acceptance gates and one oracle-first artifact:
 
@@ -1832,17 +1832,37 @@ fake-left survivor was unmatched transitive `two.bzl`, not asymmetric
 real/fake semantics. Fake nodes are zero-edge; direct FULL
 `buildfiles` omits the selected real package BUILD unless another graph
 observer materializes it, while `deps(buildfiles(...))` includes result nodes.
-This is oracle evidence only: the remaining Stage 8 half of Gate A and all
-activation remain pending; nine ordinary functions remain deferred.
+This oracle evidence is now realized only by Gate A's substrate; Gate B
+activation remains pending and all nine ordinary functions remain deferred.
 
 #### Gate A Stage 4 half evidence (2026-07-23)
 
-`b0670e33` accepts the Stage 4 manifest/lifetime/companion-helper half only.
-The Stage 8 fake-target algebra needed to realize `(printed label, consuming
-package, real/fake)` remains pending, so neither function registry entry moves
-and all nine ordinary functions remain deferred. `LoadedPackage` now has
+`b0670e33` accepts the Stage 4 manifest/lifetime/companion-helper half.
+`791e26b2` now accepts the Stage 8 fake-target algebra, without moving either
+function registry entry; Gate B and all nine ordinary functions remain
+deferred. `LoadedPackage` now has
 semantic direct-root/reachable/fingerprint equality with aligned retained
 frozen-module lifetimes; the helper is DICE-observation-only and
 parse-independent. Root passed 27 loading, 11 analysis, and 22 query
 integrations; Sol-low final `ACCEPT` required the symlink, validation,
 alignment, lifecycle/non-over-invalidation, and memory-accounting corrections.
+
+#### Gate A Stage 8 provenance algebra landed (2026-07-23)
+
+Commit `791e26b2` adds crate-private
+`app/slug_query_v2/src/provenance.rs` and its one-line module declaration.
+Its checked-`u32` `Vec`/`SmallMap` arena records full symmetric real/fake
+identity without an `Arc` per candidate. Each callback delivery is one nonempty
+`Arc`-ID batch with a label-first representative; union preserves batches,
+`eval_all`/intersection/`except` materialize labels, intersection retains the
+LHS representative, and equal-label `except` is symmetric. `siblings` scans
+all batches for consuming-package ownership, while delayed output
+label-deduplicates. Fake `evaluation_graph_label` is `None`, but fake labels
+remain printable and zero-edge for later evaluation/graph work.
+
+The module is intentionally disconnected: no evaluator, graph, registry,
+DICE, or function activation changed. Gate B and all nine ordinary functions
+therefore remain deferred. Worker and root independently passed
+`CARGO_BUILD_JOBS=1 cargo test -p slug_query_v2`: 32 tests total (10 new
+provenance, 16 loading-query, 6 parser/registry). Sol-low final review returned
+`ACCEPT` with no rework.

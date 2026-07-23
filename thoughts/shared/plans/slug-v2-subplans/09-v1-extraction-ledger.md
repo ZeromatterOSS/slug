@@ -1096,9 +1096,30 @@ equality, and separately retained opaque frozen modules. It also reuses the
 existing `WorkspaceDirectoryKey` for parse-independent primary/fallback
 companion discovery, including symlinks and explicit missing/read-error paths.
 
-Stage 4 is accepted but Gate A remains partial: no Stage 8 fake-target
-algebra, no function activation, and nine deferred functions. Root validation
+Stage 4 plus Stage 8 are accepted as Gate A: `791e26b2` supplies the
+fake-target algebra. There is still no function activation; Gate B and nine
+ordinary functions remain deferred. Root validation
 passed 27 loading, 11 analysis, and 22 query integrations; Sol-low `ACCEPT`
 followed corrections for shared validation, alignment truncation, direct/
 transitive edge lifecycle plus BUILD non-over-invalidation, and memory
 accounting.
+
+#### Stage 8 Gate A fake-target provenance algebra landed (2026-07-23)
+
+Commit `791e26b2` is V2-owned, crate-private query substrate rather than a V1
+or Buck semantic import: it adds `app/slug_query_v2/src/provenance.rs` and one
+module declaration. A checked-`u32` `Vec`/`SmallMap` arena avoids an `Arc` per
+candidate while retaining full symmetric real/fake identity. A callback delivery
+is one nonempty `Arc`-ID batch with label-first representation; union preserves
+batches, `eval_all`/intersection/`except` materialize labels, intersection
+retains the LHS representative, and equal-label `except` is symmetric.
+`siblings` scans every batch for consuming-package ownership and delayed output
+deduplicates labels. Fake `evaluation_graph_label` is `None`, while fake labels
+remain printable and zero-edge for future activation.
+
+No V1/Buck evaluator, graph, registry, DICE, or function surface was imported
+or activated: this module is deliberately disconnected, so Gate B and all nine
+ordinary functions remain deferred. Worker and root independently passed
+`CARGO_BUILD_JOBS=1 cargo test -p slug_query_v2` with 32 tests (10 provenance,
+16 loading-query, 6 parser/registry); Sol-low final review was `ACCEPT` with no
+rework.

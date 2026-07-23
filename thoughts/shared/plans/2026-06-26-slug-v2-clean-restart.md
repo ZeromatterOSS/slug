@@ -280,6 +280,20 @@ query fixtures passed 176/176: worker `040407-626548`, `040411-626572`,
 `filter` remains deferred pending exact Java `Pattern` parity. `buildfiles`
 and `loadfiles` remain separate transitive-load/fake-target work.
 
+Gate A of `WP-4-8-m3-build-load-files` is now accepted in `791e26b2`.
+The crate-private `app/slug_query_v2/src/provenance.rs` plus its one-line
+module declaration provide symmetric real/fake request-local identity in a
+checked-`u32` `Vec`/`SmallMap` arena. Each callback delivery is one nonempty
+`Arc`-ID batch with a label-first representative; union preserves batches,
+intersection retains the left representative, and label-materialized `except`
+is symmetric. `siblings` scans every batch for ownership and delayed output
+deduplicates labels. Fake `evaluation_graph_label` is `None`; fake nodes remain
+printable and zero-edge for later activation. The module is disconnected: no
+evaluator, graph, registry, DICE, or function activation changed, so Gate B and
+all nine ordinary functions remain deferred. Worker and root independently ran
+`CARGO_BUILD_JOBS=1 cargo test -p slug_query_v2` (32 total: 10 provenance, 16
+loading-query, 6 parser/registry); Sol-low final review returned `ACCEPT`.
+
 ## Two-Tier Work-Packet Contract
 
 Use role boundaries rather than relying on a particular model to infer project
@@ -493,8 +507,9 @@ algebra`): `query-build-load-files-provenance` has 64 Bazel 9.2 commands.
 The base 58-row evidence is `8f6f02b3`; the correction adds a singleton
 package loading only `//shared:two.bzl`. Update `051423-694832`, Terra clean
 `051521-700085`, and root clean `051644-705470` passed; Sol-low returned final
-`ACCEPT`. This accepts only the oracle: nine functions remain deferred and
-neither full Gate A nor Gate B is implemented. It proves selected active
+`ACCEPT`. At that oracle checkpoint, nine functions remained deferred and
+neither implementation gate had landed. Gate A subsequently landed in
+`791e26b2`; Gate B remains pending. The oracle proves selected active
 BUILD/transitive-load/active-companion `buildfiles`, loads-only `loadfiles`,
 fallback/dual/diamond/multi-package/empty/idempotent/deps/failure cases, and
 broken companion discovery without package loading.
@@ -505,13 +520,13 @@ The source basis is `BinaryOperatorExpression`'s `evalPlus`, `evalMinus`, and
 representative; equal printed-label `except` removes in both directions; and
 union streams both provenance callback batches to `siblings`. The older
 fake-left `except` real-`one.bzl` row remains nonempty only for unmatched
-transitive `two.bzl`, not asymmetric equality. Stage 8 must use symmetric
+transitive `two.bzl`, not asymmetric equality. Stage 8 uses symmetric
 label removal and explicit callback batches, never an asymmetric `Eq` or
 operator rule.
 
 Within one invocation `seenBzlLabels` label-deduplicates; across separately
 evaluated functions one printed fake label can have different consuming
-packages. Gate A must retain `(printed label, consuming package, real/fake)`;
+packages. Gate A retains `(printed label, consuming package, real/fake)`;
 Gate B may not use a request-global winner or `QueryLabel`-only result
 identity, and must apply the corrected label-keyed set/batch semantics above.
 Factored FULL uses `--output=graph --graph:factored`: fake nodes are zero-edge,
@@ -520,9 +535,9 @@ materializes it, `deps(buildfiles(...))` includes result nodes, and no
 synthetic projection edge is allowed.
 
 Stage 4 half evidence landed in `b0670e33` (`feat: retain load provenance
-manifests`). Gate A is partial: Stage 4 is accepted, while Stage 8 fake-target
-algebra remains pending; the registry and all nine deferred functions are
-unchanged. Public `BzlLoadManifest`/`BzlModuleIdentity` retain canonical
+manifests`), and Stage 8 completes Gate A in `791e26b2` (`feat: add fake target
+provenance algebra`). The registry and all nine deferred functions remain
+unchanged; Gate B is still pending. Public `BzlLoadManifest`/`BzlModuleIdentity` retain canonical
 label/normalized path, source-order label-first direct IDs, first-seen closure,
 and `[u8; 32]` SHA-256 fingerprint. `LoadedPackage` equality now includes
 direct roots/reachable closure/fingerprint: BUILD comment/format edits remain
