@@ -1354,3 +1354,11 @@ currently stores only the normalized list. This was the packet's second
 material correction, so it closed `REPLAN`. No V1/Buck extraction decision
 changes. A design-only replacement must close provenance for every current
 native and Starlark query-attribute producer before suite metadata is retried.
+
+The replacement design is now Sol-accepted. `QueryAttribute.explicit` has one
+total Bazel meaning. Loading retains the missing native filegroup input bit;
+mandatory alias and retained Starlark provenance project exact values; suite
+`tests` and generated `$implicit_tests` keep the already accepted semantics.
+No V1/Buck implementation is imported and no new DICE owner is introduced.
+The next packet is oracle-only: add exact filegroup omitted/explicit-empty
+build-output rows before retrying Gate A.

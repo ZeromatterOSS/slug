@@ -2340,3 +2340,27 @@ attribute producers and choose a provenance representation that is exact for
 filegroup, alias, Starlark attrs, suite `tests`, and generated
 `$implicit_tests`. Strict request plumbing and `tests()` activation remain
 separate.
+
+## Total query-attribute explicitness design accepted (2026-07-23)
+
+The replacement design gives every projected `QueryAttribute` one total
+`explicit` boolean with exactly Bazel
+`Rule.isAttributeValueExplicitlySpecified(attribute)` semantics. It is not
+inferred from label presence. Native `filegroup` loading must retain whether
+`srcs` was supplied; omitted is false, while explicit empty and nonempty are
+true. Mandatory native alias `actual` is true. Retained Starlark
+`AttributeProvenance::Explicit` is true and `Default`/`Implicit` are false.
+Future suite `tests` retains its input bit orthogonally to exclusive
+membership, and materialized `$implicit_tests` is true.
+
+The exact bit participates in loaded-package and unconfigured-graph equality
+without changing empty dependency edges or adding a DICE key. Attribute label
+ordering and multiplicity remain separate from ordinary-edge deduplication.
+The field is future formatter input, not formatter acceptance.
+
+Terra-medium audited every current producer against pinned `FilegroupRule`,
+`Alias`, `RuleOrMacroInstance`, `AttributeProvider`, `BuildOutputFormatter`,
+and `ProtoOutputFormatter`; root verified the sources; Sol-low returned
+`ACCEPT`. Before implementation retry, add only the missing filegroup
+omitted-versus-explicit-empty build-output discriminator to
+`query-labels-attribute-metadata`.

@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 query-attribute provenance review is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 query-attribute provenance review is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0`; loading-metadata design Sol-accepted; first Gate A implementation closed `REPLAN` with no code retained | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, native/query attribute-provenance closure, and remaining command breadth | review the total query-attribute explicitness boundary before retrying Gate A; do not plumb strict mode or activate `tests` |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 filegroup provenance oracle is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 filegroup provenance oracle is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0`; total query-attribute explicitness design Sol-accepted after the first Gate A implementation closed `REPLAN` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, the native filegroup provenance discriminator, and remaining command breadth | add the filegroup omitted-versus-explicit-empty oracle only; do not retry Gate A yet |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,25 +33,18 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Review the total query-attribute explicitness boundary before retrying the
-Sol-accepted test-suite loading metadata Gate A. The first implementation
-correctly exposed that suite provenance cannot be added as a supposedly
-general `QueryAttribute` boolean while native `filegroup.srcs` still collapses
-omitted and explicit-empty values.
+Extend only `query-labels-attribute-metadata` with the missing native
+filegroup attribute-provenance discriminator. Add sibling filegroups whose
+`srcs` values are omitted and explicitly `[]`, then add exact Bazel 9.2
+`--output=build` rows proving that only the explicit-empty rule prints a
+`srcs = []` stanza. Cite `FilegroupRule`, `RuleOrMacroInstance`,
+`BuildOutputFormatter`, and `ProtoOutputFormatter`.
 
-Audit every existing producer of query attributes against pinned Bazel 9.2
-attribute storage and formatter explicitness. Decide whether the query
-projection has a total exact explicitness value, a typed/optional
-not-yet-retained state, or requires loading to retain the missing native
-provenance. The replacement design must cover filegroup omitted versus
-explicit empty, mandatory alias `actual`, Starlark default/implicit/explicit
-values, suite `tests`, and generated `$implicit_tests`, with package/graph
-equality and downstream formatter claims stated exactly.
-
-This is a design/review packet only. Do not restore the rejected implementation,
-add a DICE key or lock, plumb `--strict_test_suite`, edit the generic
-evaluator/registry, activate `tests`, implement build/proto formatters, begin
-`visible`, or add a regex engine.
+This is an oracle-only packet. Do not restore the rejected implementation or
+edit Rust, DICE state, the generic evaluator/registry, command plumbing, or
+formatters. After worker and root independently pass the generated fixture,
+review the evidence and only then reschedule loading/query metadata Gate A
+with the accepted total explicitness design.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.
