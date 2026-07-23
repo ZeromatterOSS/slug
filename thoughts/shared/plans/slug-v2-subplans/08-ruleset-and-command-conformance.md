@@ -998,3 +998,180 @@ Residual scope: external repositories and mapping, the other 13 loading
 functions, broader target patterns and Sky Query, non-text formatters and
 remaining ordering modes, configured/action environments, `cquery`, and
 `aquery` remain open.
+
+### Reviewed next packet — `WP-8-m3-path-topology` (2026-07-23)
+
+Work packet ID: `WP-8-m3-path-topology`
+
+Owner stage and plan: Stage 8,
+`thoughts/shared/plans/slug-v2-subplans/08-ruleset-and-command-conformance.md`.
+
+Goal and gate link: implement only `allpaths(from, to)` and
+`somepath(from, to)` over the landed loading-query graph. Both functions share
+one request-local forward topology: `allpaths` projects every node on any
+valid route, while `somepath` reconstructs one shortest valid route. This
+packet remains root-repository, text-only, and `auto|full`; it does not
+complete M3.
+
+Why this vertical:
+
+- `allpaths` is exactly the unbounded reverse-dependency operation over the
+  forward closure of `from`, so it reuses the accepted `rdeps` substrate;
+- `somepath` adds a compact integer-index BFS/parent map to the same
+  `ResolvedGraph`, without new semantic graph state;
+- `some` is deliberately arbitrary and has separate empty-set semantics;
+- `siblings` requires Bazel's `//pkg:BUILD` pseudo-target, which V2 does not
+  represent;
+- `filter` is isolated label-regex work; and
+- `kind` requires real rule-class/target-kind metadata rather than the current
+  generic custom-rule kind.
+
+Oracle-first artifact:
+
+1. Add `tests/v2_oracle/fixtures/query-path-topology/` with a unique linear
+   chain, branching/merge diamond, cycle, disconnected target, duplicate
+   operands, multiple origins/destinations, source-file endpoints, an alias,
+   and a custom label-list rule.
+2. Generate and independently rerun with `/usr/bin/bazel` 9.2.0 and cite
+   immutable Bazel commit
+   `8220c6198837d5c13d53fea211cf3282aa12408a`. Bazel may use ordinary RC
+   discovery and the user's external BuildBuddy configuration; agents and
+   inspection tools must never read, copy, print, log, or commit
+   `~/.bazelrc` or credentials.
+3. Cover:
+   - `allpaths` for a unique linear path, full diamond, cycle, zero-length
+     path, no path, empty `from`, empty `to`, multiple `from` roots, multiple
+     `to` roots, an endpoint outside the forward closure, duplicates,
+     rule-to-source and source-to-rule direction, alias, and custom-rule edges;
+   - `somepath` for the same topology classes, with a unique shortest path
+     where exact path/order is asserted;
+   - a multi-pair ambiguous case where only one root/endpoint pair is
+     reachable, and a genuinely ambiguous multi-pair case checked through
+     bounded complete-path alternatives rather than root precedence;
+   - default, `auto`, and `full` output for `allpaths` and unique-path
+     `somepath`; and
+   - too few/too many arguments for both functions plus integer expression
+     operands in both positions across the pair. Integers retain the existing
+     `//:1` missing-target exit-7 behavior; they are not type errors.
+4. Bazel defines `somepath` branch choice as arbitrary.
+   `testSomePathOperatorOrdering` accepts either diamond branch. The fixture
+   may use a regex bounded to exactly the two complete valid branches, and
+   Slug tests may accept the same two alternatives. Reject mixed branches,
+   missing endpoints, extra nodes, or claims that one branch/root wins.
+5. Do not include generated/output-file path cases. Their reverse generating
+   edge belongs to the Stage 6/loading-representation boundary and is an
+   explicit residual, not a source-file substitute.
+
+Bazel 9.2 source anchors:
+
+- `query2/engine/{AllPathsFunction,SomePathFunction}.java`;
+- `query2/query/BlazeQueryEnvironment.java` and graph shortest-path support
+  used by `getNodesOnPath`; and
+- `src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java`
+  `testSomePathOperator`, `testSomePathOperatorOrdering`, and
+  `testAllPathsOperator`. Deliberately omit
+  `testPathOperatorsWithOutputFile`.
+
+Reuse audit and approved decisions:
+
+- for `allpaths`, call the landed
+  `reverse_dependencies(environment, from, to, None)` directly. This matches
+  Buck2 commit `088c75c7e36805df99c3de29062baa95db700b8b`
+  `query/environment.rs::allpaths` delegating to unbounded `rdeps` and Bazel's
+  forward-closure/reverse-closure intersection. Do not add another traversal,
+  reverse adjacency, DICE key, or cache;
+- for `somepath`, directly adapt Buck2
+  `app/buck2_query/src/query/graph/async_bfs.rs` parent-map/path
+  reconstruction and
+  `query/syntax/simple/functions/deps.rs::invoke_somepath`. Extend the landed
+  `ResolvedGraph` with one integer-index BFS shortest-path method over its
+  existing compact adjacency. Build the forward closure once; do not add a
+  parallel environment-level dependency walk;
+- preserve stable structural `QueryLabel`, `SmallMap`, `SmallSet`, and
+  request-local integer graph state. Preserve the accepted serial
+  dependency-lookup adaptation required by mutable `DiceComputations`; and
+- use V1
+  `e218054d4c796655939b968d90208b185decb352`
+  `tests/core/query/test_bazel_compat_query.py` only as scenario inventory.
+  Reject V1 cells, graph/server context, labels, algorithms, printers, and
+  expected output.
+
+Required implementation:
+
+1. Transition only `allpaths` and `somepath` from deferred to implemented in
+   the generic callable registry. Each function owns typed two-expression
+   invocation; evaluator dispatch stays generic.
+2. `allpaths` evaluates both arguments and calls the existing unbounded
+   reverse-dependency helper with `from` as universe roots and `to` as reverse
+   seeds. Endpoints outside the forward closure are excluded; zero-length
+   intersections are retained; cycles terminate.
+3. `somepath` evaluates both arguments, builds one stable forward
+   `ResolvedGraph` from all origins, then runs integer-index BFS with a parent
+   map. Return one shortest path for one reachable pair, a one-node path when
+   an origin is also a destination, or empty success when none exists.
+   Multiple-root/endpoint choice remains unspecified.
+4. Reuse the exact existing `QueryEnvironment::dependencies`/DICE transaction.
+   Add no QueryNode/loading representation, DICE key, protocol, runtime, cache,
+   filesystem, lock, configured/action import, function, target pattern,
+   formatter, or order-mode change.
+5. Add focused graph/evaluator tests, a full CLI fixture regression including
+   bounded diamond alternatives, and retained-daemon edge/package transition
+   coverage. Preserve all three preceding query fixtures.
+
+DICE acceptance must compare complete relevant activation multisets:
+
+- initial, identical, and unrelated-edit requests, distinguishing honest
+  `Reused` validation from evaluation;
+- adding/removing/restoring a reachable branch evaluates its owning source
+  graph and only newly demanded/lost closure packages;
+- removing/restoring an intermediate edge makes the path empty or removes the
+  affected `allpaths` branch, then restores it;
+- edits in packages outside every `from` closure never broaden traversal;
+- a `to` literal outside the closure is evaluated as an operand package but
+  never enters the graph/result;
+- literal-only cases activate no `SubtreePackageSetKey`; and
+- the retained daemon observes edge loss/regain and reachable package
+  gain/loss without restart.
+
+Focused validation:
+
+```bash
+CARGO_TARGET_DIR=/tmp/slug-m3-path-target CARGO_BUILD_JOBS=1 cargo test \
+  -p slug_query_v2 -p slug_loading_v2 -p slug_core_v2 \
+  -p slug_commands_v2 -p slug_server_v2 -p slug_cli_v2
+CARGO_TARGET_DIR=/tmp/slug-m3-path-target CARGO_BUILD_JOBS=1 \
+  cargo build -p slug_cli_v2
+python3 -B -m tools.v2_oracle run \
+  --fixture query-path-topology --tool bazel --bazel /usr/bin/bazel
+python3 -B -m tools.v2_oracle run \
+  --fixture query-path-topology --tool slug --slug <absolute-rebuilt-v2-slug>
+cargo fmt --all -- --check
+git diff --check
+```
+
+Also rerun the three preceding Slug query fixtures and inspect for duplicate
+graph discovery, direct filesystem access, extra DICE/runtime/cache creation,
+string adjacency/default hash collections, locks across DICE, configured or
+action imports, unrelated registry changes, and build/cquery/aquery
+protocol/placeholder drift.
+
+Evidence and completion boundary: land and review the generated oracle before
+Rust changes. Require Sol-low approval of the shared graph/parent-map port
+before broad validation and a complete post-validation review before recording
+implementation evidence. Update Stage 1, Stage 8, Stage 9, and the routing log
+with exact commits, alternatives, activation events, validation, and residuals.
+
+Sol-low accepted this revised architecture after requiring direct unbounded
+reverse-dependency reuse, one shared `ResolvedGraph` parent-map BFS, honest
+bounded alternatives for arbitrary paths, the complete endpoint/order/error
+matrix, and exact DICE demand evidence.
+
+Stop conditions: an unstable diamond oracle that cannot be bounded to complete
+valid alternatives; behavior contradicting generated Bazel 9.2; any need for
+generated/output nodes, attrs/visibility/tests/executable/load/build/configured
+or action state, external repositories, Sky Query flags, filters, non-text
+formats, a duplicated dependency traversal, persistent graph/reverse cache,
+new DICE/runtime, direct filesystem read, lock across DICE, protocol expansion,
+or changes to build/cquery/aquery behavior. Defer `some`, `siblings`, `filter`,
+`kind`, `attr`, `labels`, `buildfiles`, `loadfiles`, `tests`, `visible`,
+`executables`, remaining patterns/order modes/formats, `cquery`, and `aquery`.

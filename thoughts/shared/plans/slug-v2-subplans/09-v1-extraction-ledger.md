@@ -810,3 +810,57 @@ reviews returned `ACCEPT`.
 Residual risk: external repositories, Sky Query, the other 13 loading
 functions, non-text formatters, remaining ordering modes, `cquery`, and
 `aquery` remain open.
+
+### Stage 8 path-topology packet — approved extraction plan
+
+Status: Reviewed packet; oracle and implementation pending
+
+Source ref/commit(s): Buck2
+`088c75c7e36805df99c3de29062baa95db700b8b`
+`app/buck2_query/src/query/graph/async_bfs.rs`,
+`query/environment.rs`, and
+`query/syntax/simple/functions/deps.rs`; V1
+`e218054d4c796655939b968d90208b185decb352`
+`tests/core/query/test_bazel_compat_query.py`
+
+Source class: reuse the landed Buck2-derived unbounded reverse traversal
+directly for `allpaths`; directly port Buck2's compact BFS parent-map path
+reconstruction into the landed `ResolvedGraph`; use V1 only as scenario
+inventory
+
+Reusable primitive or lesson: one request-local forward closure supports both
+all-path reverse projection and one shortest-path reconstruction without a
+second semantic graph or dependency walk
+
+V2 wrapper/boundary: V2 owns Bazel argument evaluation, root-repository
+structural labels, arbitrary multi-root/endpoint choice, exact
+default/auto/full rendering where stable, bounded diamond alternatives,
+diagnostics, and serial mutable-DICE lookup. No generated/output nodes,
+persistent cache, new DICE key, Buck label/cell/general environment,
+configured/action state, filter, or printer is imported.
+
+Bazel oracle: must be generated and independently verified with
+`/usr/bin/bazel` 9.2.0 at commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+
+V2 fixture: `query-path-topology`
+
+Expected evidence artifact: exact all-path sets; unique shortest paths; bounded
+complete diamond/multi-pair alternatives; zero/no-path, cycle, source
+direction, multiple/duplicate/empty operands; stable order modes; arity and
+integer-literal diagnostics
+
+Decision: call the landed unbounded reverse-dependency helper for `allpaths`;
+port only Buck2's integer BFS/parent reconstruction for `somepath`; adapt both
+to the existing compact V2 graph and retained DICE transaction. Reject V1
+implementation/output and all semantics outside the reviewed Stage 8 packet.
+
+Validation: pending oracle-first implementation; require Bazel generation plus
+independent rerun, the serial six-crate suite, rebuilt V2 CLI, all four query
+fixture runs, exact activation multisets, ownership/reuse scans,
+formatting/diff checks, daemon cleanup, and Sol-low reviews
+
+Residual risk: Bazel's arbitrary diamond/multi-pair choice must be expressible
+as bounded complete alternatives. Generated/output-file reverse edges, the
+other 11 loading functions after this packet, repositories, patterns, order
+modes, non-text formatters, `cquery`, and `aquery` remain open.
