@@ -46,6 +46,7 @@ use crate::load_label::LoadLabel;
 use crate::package::LoadedPackage;
 use crate::package::PackageRecorder;
 use crate::package::loading_globals;
+use crate::provider::BzlEvaluationContext;
 
 /// Local-root loading operations over a caller-owned DICE transaction.
 ///
@@ -564,8 +565,13 @@ impl Key for BzlModuleEvalKey {
                     .map(|(load, module)| (*load, module.module.dupe()))
                     .collect(),
             };
+            let evaluation_context = BzlEvaluationContext::new(
+                bzl_source_label(&self.workspace, &self.path)
+                    .map_err(|error| LoadingError::new(error.to_string()))?,
+            );
             {
                 let mut evaluator = Evaluator::new(&module);
+                evaluator.extra = Some(&evaluation_context);
                 evaluator.set_loader(&loader);
                 evaluator
                     .eval_module(ast, &loading_globals())
@@ -681,7 +687,18 @@ impl Key for PackageLoadKey {
                 &Dialect::Standard,
             )
             .map_err(|error| LoadingError::new(error.to_string()))?;
-            let recorder = PackageRecorder::new(listing);
+            let package_label = self
+                .package
+                .strip_prefix(&self.workspace)
+                .map_err(|_| {
+                    LoadingError::new(format!(
+                        "package is outside workspace: {}",
+                        self.package.display()
+                    ))
+                })?
+                .to_string_lossy()
+                .replace('\\', "/");
+            let recorder = PackageRecorder::new(listing, package_label);
             let module = Module::new();
             let loader = LocalBzlLoader {
                 modules: loaded_modules
@@ -758,6 +775,28 @@ fn resolve_local_load(
         .join(package)
         .join(label.label().target().as_str());
     ensure_within_workspace(workspace, path, load)
+}
+
+fn bzl_source_label(workspace: &Path, path: &Path) -> Result<String, LoadingError> {
+    let relative = path.strip_prefix(workspace).map_err(|_| {
+        LoadingError::new(format!(
+            ".bzl source is outside workspace {}: {}",
+            workspace.display(),
+            path.display()
+        ))
+    })?;
+    let target = relative
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            LoadingError::new(format!("invalid .bzl source path: {}", path.display()))
+        })?;
+    let package = relative
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .to_string_lossy()
+        .replace('\\', "/");
+    Ok(format!("//{package}:{target}"))
 }
 
 fn ensure_within_workspace(

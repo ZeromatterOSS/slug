@@ -8,19 +8,22 @@
  * above-listed licenses.
  */
 
+use std::sync::Arc;
+
+use allocative::Allocative;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ProviderCollection;
 
 use crate::key::ConfiguredTargetKey;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum DiagnosticSeverity {
     Info,
     Warning,
     Error,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct AnalysisDiagnostic {
     severity: DiagnosticSeverity,
     message: String,
@@ -43,12 +46,13 @@ impl AnalysisDiagnostic {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct AnalysisResult {
     key: ConfiguredTargetKey,
     providers: ProviderCollection,
     actions: Vec<ActionSpec>,
     declared_outputs: Vec<String>,
+    direct_dependencies: Arc<[ConfiguredTargetKey]>,
     diagnostics: Vec<AnalysisDiagnostic>,
 }
 
@@ -59,6 +63,7 @@ impl AnalysisResult {
             providers,
             actions: Vec::new(),
             declared_outputs: Vec::new(),
+            direct_dependencies: Arc::from([]),
             diagnostics: Vec::new(),
         }
     }
@@ -79,6 +84,10 @@ impl AnalysisResult {
         &self.declared_outputs
     }
 
+    pub fn direct_dependencies(&self) -> &[ConfiguredTargetKey] {
+        &self.direct_dependencies
+    }
+
     pub fn diagnostics(&self) -> &[AnalysisDiagnostic] {
         &self.diagnostics
     }
@@ -90,6 +99,14 @@ impl AnalysisResult {
 
     pub fn with_declared_outputs(mut self, declared_outputs: Vec<String>) -> Self {
         self.declared_outputs = declared_outputs;
+        self
+    }
+
+    pub fn with_direct_dependencies(
+        mut self,
+        direct_dependencies: Vec<ConfiguredTargetKey>,
+    ) -> Self {
+        self.direct_dependencies = direct_dependencies.into();
         self
     }
 

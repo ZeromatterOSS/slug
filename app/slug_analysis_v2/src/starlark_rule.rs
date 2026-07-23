@@ -13,15 +13,18 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::CtxActions;
-use slug_build_api_v2::DefaultInfo;
-use slug_build_api_v2::Depset;
-use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
+use slug_build_api_v2::UserProvider;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::provider::FrozenUserProviderCallable;
+use slug_loading_v2::provider::StarlarkDefaultInfo;
+use slug_loading_v2::provider::StarlarkDepset;
+use slug_loading_v2::provider::StarlarkUserProvider;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -33,6 +36,7 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
@@ -45,6 +49,7 @@ struct AnalysisContext {
     actions: Arc<Mutex<CtxActions>>,
     target_name: String,
     package_path: String,
+    dependencies: Arc<[PreparedDependency]>,
 }
 
 impl fmt::Display for AnalysisContext {
@@ -66,8 +71,82 @@ impl<'v> StarlarkValue<'v> for AnalysisContext {
                 actions: self.actions.clone(),
                 package_path: self.package_path.clone(),
             })),
+            "attr" => Some(heap.alloc_simple(AnalysisAttributes {
+                dependencies: self.dependencies.clone(),
+            })),
             _ => None,
         }
+    }
+}
+
+#[derive(Debug, Clone, Allocative)]
+pub(crate) struct PreparedDependency {
+    pub(crate) key: ConfiguredTargetKey,
+    pub(crate) providers: ProviderCollection,
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisAttributes {
+    dependencies: Arc<[PreparedDependency]>,
+}
+
+impl fmt::Display for AnalysisAttributes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<ctx.attr>")
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisAttributes);
+
+#[starlark_value(type = "analysis_attrs")]
+impl<'v> StarlarkValue<'v> for AnalysisAttributes {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        (attribute == "deps").then(|| {
+            heap.alloc(
+                self.dependencies
+                    .iter()
+                    .cloned()
+                    .map(AnalysisDependency)
+                    .collect::<Vec<_>>(),
+            )
+        })
+    }
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisDependency(PreparedDependency);
+
+impl fmt::Display for AnalysisDependency {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0.key, f)
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisDependency);
+
+#[starlark_value(type = "configured_target")]
+impl<'v> StarlarkValue<'v> for AnalysisDependency {
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let callable = FrozenUserProviderCallable::from_value(index).ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!(
+                "dependency provider lookup requires an exported provider constructor"
+            ))
+        })?;
+        let provider = self.0.providers.user(callable.id()).ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!(
+                "dependency {} does not provide {}",
+                self.0.key,
+                callable.id()
+            ))
+        })?;
+        Ok(heap.alloc_simple(StarlarkUserProvider::new(
+            provider.id.dupe(),
+            provider.fields.clone(),
+        )))
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        (attribute == "label").then(|| heap.alloc_str(&self.0.key.label().to_string()).to_value())
     }
 }
 
@@ -108,7 +187,6 @@ starlark::starlark_simple_value!(AnalysisActions);
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct DeclaredFile {
-    #[allocative(skip)]
     output: ActionOutput,
 }
 
@@ -216,15 +294,14 @@ impl<'v> StarlarkValue<'v> for AnalysisActions {
     }
 }
 
-/// Evaluate one previously loaded custom rule using a prepared analysis
-/// context. This is deliberately limited to the first vertical's `ctx.label`,
-/// `ctx.actions.declare_file`, and `ctx.actions.write` surface; target
-/// configuration and package loading remain DICE-owned inputs at the caller.
-pub fn analyze_loaded_rule(
+/// Synchronously evaluate one loaded rule after DICE has prepared all direct
+/// dependency providers. No graph lookup or asynchronous work occurs here.
+pub(crate) fn evaluate_loaded_rule(
     package: &LoadedPackage,
     target_name: &str,
     key: ConfiguredTargetKey,
     package_path: &str,
+    dependencies: Vec<PreparedDependency>,
 ) -> Result<AnalysisResult, String> {
     let target = package
         .targets
@@ -237,34 +314,78 @@ pub fn analyze_loaded_rule(
 
     let actions = Arc::new(Mutex::new(CtxActions::new()));
     let module = Module::new();
+    let direct_dependencies = dependencies
+        .iter()
+        .map(|dependency| dependency.key.clone())
+        .collect();
     let context = module.heap().alloc_simple(AnalysisContext {
         actions: actions.clone(),
         target_name: target.name.clone(),
         package_path: package_path.to_owned(),
+        dependencies: dependencies.into(),
     });
-    Evaluator::new(&module)
+    let returned = Evaluator::new(&module)
         .eval_function(implementation.frozen_value().to_value(), &[context], &[])
         .map_err(|error| error.to_string())?;
 
+    let returned = ListRef::from_value(returned)
+        .ok_or_else(|| "rule implementation must return a list of providers".to_owned())?;
+    let mut provider_values = Vec::with_capacity(returned.len());
+    for value in returned.iter() {
+        if let Some(files) = StarlarkDefaultInfo::files_from_value(value) {
+            let files = StarlarkDepset::direct_from_value(files).ok_or_else(|| {
+                "DefaultInfo.files must be the result of depset([...])".to_owned()
+            })?;
+            let declared_outputs = files
+                .iter()
+                .map(|value| {
+                    DeclaredFile::from_value(*value)
+                        .map(|file| file.output.path().to_owned())
+                        .ok_or_else(|| {
+                            "DefaultInfo.files depset must contain declared files".to_owned()
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let files = slug_build_api_v2::Depset::from_direct(
+                slug_build_api_v2::DepsetOrder::Default,
+                declared_outputs,
+            )
+            .map_err(|error| error.to_string())?;
+            provider_values.push(ProviderValue::DefaultInfo(
+                slug_build_api_v2::DefaultInfo::from_files(files),
+            ));
+        } else if let Some(provider) = StarlarkUserProvider::from_value(value) {
+            provider_values.push(ProviderValue::User(
+                UserProvider::with_id(
+                    provider.id().dupe(),
+                    provider
+                        .fields()
+                        .iter()
+                        .map(|(name, value)| (name.clone(), value.clone())),
+                )
+                .map_err(|error| error.to_string())?,
+            ));
+        } else {
+            return Err(format!(
+                "rule implementation returned non-provider value `{}`",
+                value.to_repr()
+            ));
+        }
+    }
+    let providers = ProviderCollection::new(provider_values).map_err(|error| error.to_string())?;
+    let declared_outputs = providers
+        .default_info()
+        .expect("ProviderCollection validated DefaultInfo")
+        .files
+        .to_list();
     let actions = actions
         .lock()
         .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?
         .registry()
         .actions()
         .to_vec();
-    let declared_outputs = actions
-        .iter()
-        .flat_map(|action| action.outputs())
-        .map(|output| output.path().to_owned())
-        .collect::<Vec<_>>();
-    let files = Depset::from_direct(DepsetOrder::Default, declared_outputs.clone())
-        .map_err(|error| error.to_string())?;
-    let providers = ProviderCollection::new(vec![ProviderValue::DefaultInfo(
-        DefaultInfo::from_files(files),
-    )])
-    .map_err(|error| error.to_string())?;
-
     Ok(AnalysisResult::new(key, providers)
+        .with_direct_dependencies(direct_dependencies)
         .with_actions(actions)
         .with_declared_outputs(declared_outputs))
 }

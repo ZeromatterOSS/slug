@@ -10,13 +10,15 @@
 
 use std::collections::BTreeMap;
 
+use allocative::Allocative;
+
 use crate::repo::ApparentRepoName;
 use crate::repo::CanonicalRepoName;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
 pub struct RepositoryMappingId(String);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RepositoryMapping {
     id: RepositoryMappingId,
     entries: BTreeMap<ApparentRepoName, CanonicalRepoName>,

@@ -14,11 +14,13 @@ use std::hash::Hash;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use allocative::Allocative;
+use dupe::Dupe;
 use fxhash::FxHashSet;
 
 pub const MAX_DEPTH: usize = 3500;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum DepsetOrder {
     Default,
     Postorder,
@@ -94,7 +96,7 @@ impl fmt::Display for DepsetError {
 
 impl Error for DepsetError {}
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Dupe, Eq, PartialEq, Allocative)]
 pub struct Depset<T> {
     node: Arc<DepsetNode<T>>,
 }
@@ -104,7 +106,7 @@ pub struct Depset<T> {
 /// Composition only clones `Arc` pointers to child nodes. Flattening is the
 /// explicit consuming operation in [`Depset::to_list`], matching the V1
 /// nested-set traversal lesson without retaining its Buck-facing types.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Allocative)]
 struct DepsetNode<T> {
     order: DepsetOrder,
     direct: Arc<[T]>,

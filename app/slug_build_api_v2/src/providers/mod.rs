@@ -11,13 +11,22 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::sync::Arc;
+
+use allocative::Allocative;
+use compact_str::CompactString;
+use dupe::Dupe;
+use starlark_map::Equivalent;
+use starlark_map::small_map::SmallMap;
 
 use crate::depset::Depset;
 
 pub type FileDepset = Depset<String>;
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ProviderName(String);
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub struct ProviderName(CompactString);
 
 impl ProviderName {
     pub fn new(name: impl Into<String>) -> Result<Self, ProviderError> {
@@ -25,7 +34,7 @@ impl ProviderName {
         if name.is_empty() {
             return Err(ProviderError::EmptyProviderName);
         }
-        Ok(Self(name))
+        Ok(Self(name.into()))
     }
 
     pub fn as_str(&self) -> &str {
@@ -68,7 +77,56 @@ impl fmt::Display for ProviderError {
 
 impl Error for ProviderError {}
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+/// Structural identity of one exported user provider constructor.
+///
+/// The source label and exported variable name are both semantic. The shared
+/// allocation makes graph-value copies pointer-sized while equality and
+/// hashing remain structural.
+#[derive(Debug, Clone, Dupe, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub struct ProviderId(Arc<ProviderIdData>);
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+struct ProviderIdData {
+    source_label: CompactString,
+    exported_name: CompactString,
+}
+
+impl ProviderId {
+    pub fn new(
+        source_label: impl Into<CompactString>,
+        exported_name: impl Into<CompactString>,
+    ) -> Result<Self, ProviderError> {
+        let source_label = source_label.into();
+        let exported_name = exported_name.into();
+        if exported_name.is_empty() {
+            return Err(ProviderError::EmptyProviderName);
+        }
+        Ok(Self(Arc::new(ProviderIdData {
+            source_label,
+            exported_name,
+        })))
+    }
+
+    pub fn unqualified(exported_name: impl Into<CompactString>) -> Result<Self, ProviderError> {
+        Self::new("<unqualified>", exported_name)
+    }
+
+    pub fn source_label(&self) -> &str {
+        &self.0.source_label
+    }
+
+    pub fn exported_name(&self) -> &str {
+        &self.0.exported_name
+    }
+}
+
+impl fmt::Display for ProviderId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}%{}", self.source_label(), self.exported_name())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct Runfiles {
     pub files: FileDepset,
     pub symlinks: BTreeMap<String, String>,
@@ -85,7 +143,7 @@ impl Runfiles {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct FilesToRunProvider {
     pub executable: Option<String>,
     pub runfiles_manifest: Option<String>,
@@ -102,7 +160,7 @@ impl FilesToRunProvider {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct DefaultInfo {
     pub files: FileDepset,
     pub default_runfiles: Runfiles,
@@ -130,7 +188,7 @@ impl DefaultInfo {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct OutputGroupInfo {
     pub groups: BTreeMap<String, FileDepset>,
 }
@@ -141,7 +199,7 @@ impl OutputGroupInfo {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct RunEnvironmentInfo {
     pub environment: BTreeMap<String, String>,
     pub inherited_environment: Vec<String>,
@@ -156,7 +214,7 @@ impl RunEnvironmentInfo {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct PlatformInfo {
     pub label: String,
     pub constraints: BTreeMap<String, String>,
@@ -173,10 +231,10 @@ impl PlatformInfo {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct UserProvider {
-    pub name: ProviderName,
-    pub fields: BTreeMap<String, String>,
+    pub id: ProviderId,
+    pub fields: SmallMap<CompactString, CompactString>,
 }
 
 impl UserProvider {
@@ -184,14 +242,29 @@ impl UserProvider {
         name: impl Into<String>,
         fields: BTreeMap<String, String>,
     ) -> Result<Self, ProviderError> {
+        let id = ProviderId::unqualified(name.into())?;
+        Self::with_id(id, fields)
+    }
+
+    pub fn with_id(
+        id: ProviderId,
+        fields: impl IntoIterator<Item = (impl Into<CompactString>, impl Into<CompactString>)>,
+    ) -> Result<Self, ProviderError> {
         Ok(Self {
-            name: ProviderName::new(name)?,
-            fields,
+            id,
+            fields: fields
+                .into_iter()
+                .map(|(name, value)| (name.into(), value.into()))
+                .collect(),
         })
+    }
+
+    pub fn field(&self, name: &str) -> Option<&str> {
+        self.fields.get(name).map(CompactString::as_str)
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum ProviderValue {
     DefaultInfo(DefaultInfo),
     OutputGroupInfo(OutputGroupInfo),
@@ -204,19 +277,47 @@ pub enum ProviderValue {
 impl ProviderValue {
     pub fn name(&self) -> ProviderName {
         match self {
-            Self::DefaultInfo(_) => ProviderName("DefaultInfo".to_owned()),
-            Self::OutputGroupInfo(_) => ProviderName("OutputGroupInfo".to_owned()),
-            Self::RunEnvironmentInfo(_) => ProviderName("RunEnvironmentInfo".to_owned()),
-            Self::FilesToRunProvider(_) => ProviderName("FilesToRunProvider".to_owned()),
-            Self::PlatformInfo(_) => ProviderName("PlatformInfo".to_owned()),
-            Self::User(provider) => provider.name.clone(),
+            Self::DefaultInfo(_) => ProviderName("DefaultInfo".into()),
+            Self::OutputGroupInfo(_) => ProviderName("OutputGroupInfo".into()),
+            Self::RunEnvironmentInfo(_) => ProviderName("RunEnvironmentInfo".into()),
+            Self::FilesToRunProvider(_) => ProviderName("FilesToRunProvider".into()),
+            Self::PlatformInfo(_) => ProviderName("PlatformInfo".into()),
+            Self::User(provider) => ProviderName(provider.id.exported_name().into()),
+        }
+    }
+
+    fn key(&self) -> ProviderKey {
+        match self {
+            Self::User(provider) => ProviderKey::User(provider.id.dupe()),
+            _ => ProviderKey::Builtin(self.name()),
         }
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct ProviderCollection {
-    providers: BTreeMap<ProviderName, ProviderValue>,
+    providers: SmallMap<ProviderKey, ProviderValue>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+enum ProviderKey {
+    Builtin(ProviderName),
+    User(ProviderId),
+}
+
+impl Hash for ProviderKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Builtin(name) => name.hash(state),
+            Self::User(id) => id.hash(state),
+        }
+    }
+}
+
+impl Equivalent<ProviderKey> for ProviderId {
+    fn equivalent(&self, key: &ProviderKey) -> bool {
+        matches!(key, ProviderKey::User(id) if id == self)
+    }
 }
 
 impl ProviderCollection {
@@ -228,34 +329,44 @@ impl ProviderCollection {
         values: Vec<ProviderValue>,
         require_default_info: bool,
     ) -> Result<Self, ProviderError> {
-        let mut providers = BTreeMap::new();
+        let mut providers = SmallMap::with_capacity(values.len());
         for value in values {
             let name = value.name();
-            if providers.insert(name.clone(), value).is_some() {
+            if providers.insert(value.key(), value).is_some() {
                 return Err(ProviderError::DuplicateProvider { name });
             }
         }
-        let default_info = ProviderName("DefaultInfo".to_owned());
-        if require_default_info && !providers.contains_key(&default_info) {
+        if require_default_info
+            && !providers.keys().any(
+                |key| matches!(key, ProviderKey::Builtin(name) if name.as_str() == "DefaultInfo"),
+            )
+        {
             return Err(ProviderError::MissingDefaultInfo);
         }
         Ok(Self { providers })
     }
 
     pub fn contains(&self, name: &ProviderName) -> bool {
-        self.providers.contains_key(name)
+        self.providers.values().any(|value| value.name() == *name)
     }
 
     pub fn get(&self, name: &ProviderName) -> Option<&ProviderValue> {
-        self.providers.get(name)
+        self.providers.values().find(|value| value.name() == *name)
     }
 
-    pub fn names(&self) -> impl Iterator<Item = &ProviderName> {
-        self.providers.keys()
+    pub fn names(&self) -> impl Iterator<Item = ProviderName> + '_ {
+        self.providers.values().map(ProviderValue::name)
+    }
+
+    pub fn user(&self, id: &ProviderId) -> Option<&UserProvider> {
+        match self.providers.get(id) {
+            Some(ProviderValue::User(provider)) => Some(provider),
+            _ => None,
+        }
     }
 
     pub fn default_info(&self) -> Option<&DefaultInfo> {
-        match self.get(&ProviderName("DefaultInfo".to_owned())) {
+        match self.get(&ProviderName("DefaultInfo".into())) {
             Some(ProviderValue::DefaultInfo(info)) => Some(info),
             _ => None,
         }

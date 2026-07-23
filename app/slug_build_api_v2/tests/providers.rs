@@ -17,6 +17,7 @@ use slug_build_api_v2::OutputGroupInfo;
 use slug_build_api_v2::PlatformInfo;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderError;
+use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::ProviderName;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RunEnvironmentInfo;
@@ -77,21 +78,48 @@ fn provider_collection_exposes_bazel_native_and_user_providers() {
 
     let names = collection
         .names()
-        .map(ProviderName::as_str)
+        .map(|name| name.as_str().to_owned())
         .collect::<Vec<_>>();
     assert_eq!(
         names,
         vec![
-            "DefaultInfo",
-            "MyInfo",
-            "PlatformInfo",
-            "RunEnvironmentInfo"
+            "DefaultInfo".to_owned(),
+            "MyInfo".to_owned(),
+            "RunEnvironmentInfo".to_owned(),
+            "PlatformInfo".to_owned(),
         ]
     );
     assert!(collection.contains(&ProviderName::new("MyInfo").unwrap()));
     assert_eq!(
         collection.default_info().unwrap().files.to_list(),
         vec!["pkg/custom.txt".to_owned()]
+    );
+}
+
+#[test]
+fn provider_collection_looks_up_user_providers_by_structural_export_identity() {
+    let constructor_id = ProviderId::new("//rules:defs.bzl", "MyInfo").unwrap();
+    let independently_reconstructed_id = ProviderId::new("//rules:defs.bzl", "MyInfo").unwrap();
+    let collection = ProviderCollection::new(vec![
+        ProviderValue::DefaultInfo(DefaultInfo::empty()),
+        ProviderValue::User(
+            UserProvider::with_id(constructor_id, [("value".to_owned(), "custom".to_owned())])
+                .unwrap(),
+        ),
+    ])
+    .unwrap();
+
+    assert_eq!(
+        collection
+            .user(&independently_reconstructed_id)
+            .unwrap()
+            .field("value"),
+        Some("custom")
+    );
+    assert!(
+        collection
+            .user(&ProviderId::new("//other:defs.bzl", "MyInfo").unwrap())
+            .is_none()
     );
 }
 

@@ -26,8 +26,8 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
+use slug_analysis_v2::ConfiguredTargetAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
-use slug_analysis_v2::analyze_loaded_rule;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
@@ -520,7 +520,53 @@ impl WorkspaceRuntime {
                     .loader
                     .evaluate_package(&mut transaction, package_path)
                     .await?;
-                let analysis = analysis_for_target(target, &package)?;
+                let analysis = match target {
+                    TargetPattern::Single(label) => {
+                        let package_target = package
+                            .targets
+                            .iter()
+                            .find(|candidate| candidate.name == label.target().as_str())
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "target `{target}` was not found in {}",
+                                    package.build_file.display()
+                                )
+                            })?;
+                        if matches!(
+                            package_target.kind,
+                            slug_loading_v2::PackageTargetKind::StarlarkRule(_)
+                        ) {
+                            let canonical = CanonicalLabel::parse(&format!(
+                                "@@//{}:{}",
+                                label.package().as_str(),
+                                label.target().as_str()
+                            ))
+                            .map_err(anyhow::Error::msg)?;
+                            let configured_target = ConfiguredTargetKey::new(
+                                canonical,
+                                ConfigurationKey::target("first-build")
+                                    .map_err(anyhow::Error::msg)?,
+                            );
+                            let value = transaction
+                                .compute(&ConfiguredTargetAnalysisKey {
+                                    workspace: self.workspace.clone(),
+                                    configured_target,
+                                })
+                                .await
+                                .context("computing configured-target analysis through DICE")?;
+                            Some(
+                                value
+                                    .as_ref()
+                                    .as_ref()
+                                    .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                                    .clone(),
+                            )
+                        } else {
+                            None
+                        }
+                    }
+                    TargetPattern::PackageAll { .. } | TargetPattern::Recursive { .. } => None,
+                };
                 packages.push(RequestedPackageEvaluation {
                     target_pattern: target.to_string(),
                     package,
@@ -617,8 +663,9 @@ pub fn evaluate_workspace(workspace: impl Into<PathBuf>) -> anyhow::Result<Works
 
 /// Evaluate root files and each requested root-repository BUILD package.
 ///
-/// Rule analysis remains outside this boundary, but package loading uses the
-/// Stage 4 DICE-owned `.bzl` graph instead of a CLI-side parser shortcut.
+/// Single custom-rule targets are analyzed through the retained DICE
+/// configured-target graph in the same committed transaction as package
+/// loading. Package-wide and recursive patterns remain loading-only.
 pub fn evaluate_workspace_targets(
     workspace: impl Into<PathBuf>,
     targets: &[TargetPattern],
@@ -629,46 +676,6 @@ pub fn evaluate_workspace_targets(
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
     let runtime = WorkspaceRuntime::new(&workspace)?;
     runtime.evaluate_observations(observe_workspace(&workspace)?, targets)
-}
-
-/// Analyze a single target within a loaded package.
-pub fn analysis_for_target(
-    target: &TargetPattern,
-    package: &LoadedPackage,
-) -> anyhow::Result<Option<AnalysisResult>> {
-    let TargetPattern::Single(label) = target else {
-        return Ok(None);
-    };
-    let target_name = label.target().as_str();
-    let Some(package_target) = package
-        .targets
-        .iter()
-        .find(|candidate| candidate.name == target_name)
-    else {
-        anyhow::bail!(
-            "target `{target}` was not found in {}",
-            package.build_file.display()
-        );
-    };
-    if !matches!(
-        package_target.kind,
-        slug_loading_v2::PackageTargetKind::StarlarkRule(_)
-    ) {
-        return Ok(None);
-    }
-    let canonical = CanonicalLabel::parse(&format!(
-        "@@//{}:{}",
-        label.package().as_str(),
-        label.target().as_str()
-    ))
-    .map_err(anyhow::Error::msg)?;
-    let key = ConfiguredTargetKey::new(
-        canonical,
-        ConfigurationKey::target("first-build").map_err(anyhow::Error::msg)?,
-    );
-    analyze_loaded_rule(package, target_name, key, label.package().as_str())
-        .map(Some)
-        .map_err(anyhow::Error::msg)
 }
 
 /// Resolve a target pattern to its workspace-relative package directory.

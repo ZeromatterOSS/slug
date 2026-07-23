@@ -9,11 +9,16 @@ version = "0.1.0"
 [dependencies]
 allocative = { workspace = true }
 anyhow = { workspace = true }
+async-trait = { workspace = true }
+dice = { workspace = true }
+dice_futures = { workspace = true }
+dupe = { workspace = true }
+futures = { workspace = true }
 slug_build_api_v2 = { workspace = true }
 slug_identity_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }
 starlark = { workspace = true }
+starlark_map = { workspace = true }
 
 [dev-dependencies]
-dice = { workspace = true }
 tokio = { workspace = true }

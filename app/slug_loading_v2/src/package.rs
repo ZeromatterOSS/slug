@@ -11,8 +11,11 @@
 use std::cell::RefCell;
 use std::fmt;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use allocative::Allocative;
+use compact_str::CompactString;
+use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackageIdentifier;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::FrozenModule;
@@ -35,6 +38,7 @@ use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::list::ListRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
@@ -43,6 +47,8 @@ use starlark_map::small_map::SmallMap;
 use crate::glob::GlobSpec;
 use crate::glob::PackageListing;
 use crate::glob::expand_glob;
+use crate::provider::AnalysisBuiltinCallable;
+use crate::provider::UserProviderCallable;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageFile {
@@ -106,11 +112,16 @@ pub enum PackageTargetKind {
 pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
+    dependencies: Arc<[CanonicalLabel]>,
 }
 
 impl StarlarkRuleImplementation {
     pub fn frozen_value(&self) -> FrozenValue {
         self.implementation
+    }
+
+    pub fn dependencies(&self) -> &[CanonicalLabel] {
+        &self.dependencies
     }
 }
 
@@ -124,13 +135,15 @@ struct PackageState {
 #[derive(Debug, ProvidesStaticType)]
 pub(crate) struct PackageRecorder {
     listing: PackageListing,
+    package: CompactString,
     state: RefCell<PackageState>,
 }
 
 impl PackageRecorder {
-    pub(crate) fn new(listing: PackageListing) -> Self {
+    pub(crate) fn new(listing: PackageListing, package: impl Into<CompactString>) -> Self {
         Self {
             listing,
+            package: package.into(),
             state: RefCell::new(PackageState::default()),
         }
     }
@@ -168,11 +181,37 @@ impl PackageRecorder {
         self.record_target(name, PackageTargetKind::Alias { actual })
     }
 
-    fn starlark_rule(&self, name: String, implementation: FrozenValue) -> anyhow::Result<()> {
+    fn starlark_rule(
+        &self,
+        name: String,
+        implementation: FrozenValue,
+        dependencies: Vec<CanonicalLabel>,
+    ) -> anyhow::Result<()> {
         self.record_target(
             name,
-            PackageTargetKind::StarlarkRule(StarlarkRuleImplementation { implementation }),
+            PackageTargetKind::StarlarkRule(StarlarkRuleImplementation {
+                implementation,
+                dependencies: dependencies.into(),
+            }),
         )
+    }
+
+    fn dependency_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
+        if value.starts_with('@') {
+            anyhow::bail!(
+                "external repository dependency labels are not supported in this analysis packet: {value}"
+            );
+        }
+        let canonical = if let Some(target) = value.strip_prefix(':') {
+            format!("@@//{}:{target}", self.package)
+        } else if let Some(absolute) = value.strip_prefix("//") {
+            format!("@@//{absolute}")
+        } else {
+            anyhow::bail!(
+                "dependency label must be package-relative `:name` or root `//pkg:name`: {value}"
+            );
+        };
+        CanonicalLabel::parse(&canonical).map_err(anyhow::Error::msg)
     }
 
     fn record_target(&self, name: String, kind: PackageTargetKind) -> anyhow::Result<()> {
@@ -280,6 +319,7 @@ fn glob_global<'v>(
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 struct RuleDefinitionGen<V> {
     implementation: V,
+    has_deps: bool,
 }
 
 type RuleDefinition<'v> = RuleDefinitionGen<Value<'v>>;
@@ -299,49 +339,48 @@ impl<'v> Freeze for RuleDefinition<'v> {
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
         Ok(FrozenRuleDefinition {
             implementation: self.implementation.freeze(freezer)?,
+            has_deps: self.has_deps,
         })
     }
 }
 
-/// A name that Starlark resolves while compiling a rule implementation but
-/// that has no loading-stage behavior. Providers and depsets become real
-/// analysis values in Stage 6.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct AnalysisPlaceholder {
-    name: &'static str,
-}
+struct LabelListAttr;
 
-impl fmt::Display for AnalysisPlaceholder {
+starlark::starlark_simple_value!(LabelListAttr);
+
+impl fmt::Display for LabelListAttr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.name)
+        f.write_str("attr.label_list()")
     }
 }
 
-starlark::starlark_simple_value!(AnalysisPlaceholder);
+#[starlark_value(type = "label_list_attr")]
+impl<'v> StarlarkValue<'v> for LabelListAttr {}
 
-#[starlark_value(type = "analysis_placeholder")]
-impl<'v> StarlarkValue<'v> for AnalysisPlaceholder {
-    fn invoke(
-        &self,
-        _me: Value<'v>,
-        _args: &Arguments<'v, '_>,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<Value<'v>> {
-        if eval
-            .extra
-            .and_then(|extra| extra.downcast_ref::<PackageRecorder>())
-            .is_some()
-        {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "{} is not available during BUILD package loading; configured-target analysis is not implemented",
-                self.name
-            )));
-        }
-        // Rule implementations capture their `.bzl` globals while loading.
-        // Stage 6 supplies their prepared context in a separate evaluator, so
-        // this placeholder must remain callable until provider/depset values
-        // are fully represented as Starlark values there.
-        Ok(Value::new_none())
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct AttrModule;
+
+starlark::starlark_simple_value!(AttrModule);
+
+impl fmt::Display for AttrModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("attr")
+    }
+}
+
+#[starlark_module]
+fn attr_methods(builder: &mut MethodsBuilder) {
+    fn label_list(#[starlark(this)] _attr: Value) -> anyhow::Result<LabelListAttr> {
+        Ok(LabelListAttr)
+    }
+}
+
+#[starlark_value(type = "attr")]
+impl<'v> StarlarkValue<'v> for AttrModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(attr_methods)
     }
 }
 
@@ -368,6 +407,40 @@ where
                 "a target declared by rule() requires a string `name`"
             ))
         })?;
+        for attribute in names.keys() {
+            if !matches!(attribute.as_str(), "name" | "deps" | "visibility") {
+                return Err(starlark::Error::new_other(anyhow::anyhow!(
+                    "target `{name}` received unknown attribute `{}`",
+                    attribute.as_str()
+                )));
+            }
+        }
+        if names.contains_key("deps") && !self.has_deps {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "target `{name}` received unknown attribute `deps`"
+            )));
+        }
+        if let Some(visibility) = names.get("visibility") {
+            let visibility = ListRef::from_value(*visibility).ok_or_else(|| {
+                starlark::Error::new_other(anyhow::anyhow!(
+                    "attribute `visibility` must be a list of strings"
+                ))
+            })?;
+            if visibility.iter().any(|value| value.unpack_str().is_none()) {
+                return Err(starlark::Error::new_other(anyhow::anyhow!(
+                    "attribute `visibility` must be a list of strings"
+                )));
+            }
+        }
+        let dependency_values = match names.get("deps") {
+            Some(value) => ListRef::from_value(*value).ok_or_else(|| {
+                starlark::Error::new_other(anyhow::anyhow!(
+                    "attribute `deps` must be a list of labels"
+                ))
+            })?,
+            None => ListRef::from_value(eval.heap().alloc(Vec::<Value>::new()))
+                .expect("allocated empty list"),
+        };
         let implementation = self
             .implementation
             .to_value()
@@ -378,7 +451,18 @@ where
                 ))
             })?;
         PackageRecorder::from_evaluator(eval)
-            .and_then(|recorder| recorder.starlark_rule(name.to_owned(), implementation))
+            .and_then(|recorder| {
+                let dependencies = dependency_values
+                    .iter()
+                    .map(|value| {
+                        let value = value.unpack_str().ok_or_else(|| {
+                            anyhow::anyhow!("attribute `deps` must contain only string labels")
+                        })?;
+                        recorder.dependency_label(value)
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                recorder.starlark_rule(name.to_owned(), implementation, dependencies)
+            })
             .map_err(starlark::Error::new_other)?;
         Ok(Value::new_none())
     }
@@ -422,8 +506,33 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         glob_global(include, exclude, exclude_directories, allow_empty, eval)
     }
 
-    fn rule<'v>(implementation: Value<'v>) -> anyhow::Result<RuleDefinition<'v>> {
-        Ok(RuleDefinition { implementation })
+    fn rule<'v>(
+        implementation: Value<'v>,
+        attrs: Option<SmallMap<String, Value<'v>>>,
+    ) -> anyhow::Result<RuleDefinition<'v>> {
+        let mut has_deps = false;
+        if let Some(attrs) = attrs {
+            for (name, value) in attrs {
+                if name != "deps" {
+                    anyhow::bail!("rule() received unsupported attribute schema `{name}`");
+                }
+                if LabelListAttr::from_value(value).is_none() {
+                    anyhow::bail!("rule attribute `deps` must use attr.label_list()");
+                }
+                has_deps = true;
+            }
+        }
+        Ok(RuleDefinition {
+            implementation,
+            has_deps,
+        })
+    }
+
+    fn provider(
+        #[starlark(require = named)] fields: SmallMap<String, String>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<UserProviderCallable> {
+        UserProviderCallable::from_evaluator(fields, eval)
     }
 }
 
@@ -493,12 +602,8 @@ impl AllocFrozenValue for NativeModule {
 pub(crate) fn loading_globals() -> Globals {
     let mut globals = GlobalsBuilder::standard().with(package_globals);
     globals.set("native", NativeModule);
-    globals.set(
-        "DefaultInfo",
-        AnalysisPlaceholder {
-            name: "DefaultInfo",
-        },
-    );
-    globals.set("depset", AnalysisPlaceholder { name: "depset" });
+    globals.set("attr", AttrModule);
+    globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
+    globals.set("depset", AnalysisBuiltinCallable::new("depset"));
     globals.build()
 }

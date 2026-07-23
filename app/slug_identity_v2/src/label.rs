@@ -10,6 +10,8 @@
 
 use std::fmt;
 
+use allocative::Allocative;
+
 use crate::package::PackageIdentifier;
 use crate::package::PackagePath;
 use crate::package::TargetName;
@@ -18,14 +20,14 @@ use crate::repo::CanonicalRepoName;
 use crate::repo_mapping::RepositoryMapping;
 use crate::repo_mapping::RepositoryMappingId;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
 pub struct ApparentLabel {
     repo: ApparentRepoName,
     package: PackagePath,
     target: TargetName,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
 pub struct CanonicalLabel {
     package: PackageIdentifier,
     target: TargetName,

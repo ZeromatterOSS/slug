@@ -10,14 +10,16 @@
 
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+use allocative::Allocative;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum ActionOutputKind {
     File,
     Directory,
     Symlink,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct ActionOutput {
     path: String,
     kind: ActionOutputKind,
@@ -40,7 +42,7 @@ impl ActionOutput {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct ActionInput {
     path: String,
     digest: Option<String>,
@@ -63,13 +65,13 @@ impl ActionInput {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum ParamFileFormat {
     Multiline,
     ShellQuoted,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct ParamFile {
     path: String,
     args: Vec<String>,
@@ -98,7 +100,7 @@ impl ParamFile {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum ActionKind {
     Write {
         content: String,
@@ -120,7 +122,7 @@ pub enum ActionKind {
     },
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct ActionSpec {
     kind: ActionKind,
     mnemonic: String,

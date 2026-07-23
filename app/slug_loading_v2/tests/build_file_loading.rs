@@ -6,6 +6,7 @@ use std::time::SystemTime;
 
 use dice::DetectCycles;
 use dice::Dice;
+use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::PackageTarget;
 use slug_loading_v2::PackageTargetKind;
@@ -233,7 +234,7 @@ fn package_load_registers_a_generic_starlark_rule_without_executing_it() {
     .unwrap();
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
-        "load(\":defs.bzl\", \"example\")\nexample(name = \"registered\", arbitrary_attribute = \"kept for analysis\")\n",
+        "load(\":defs.bzl\", \"example\")\nexample(name = \"registered\")\n",
     )
     .unwrap();
 
@@ -245,6 +246,101 @@ fn package_load_registers_a_generic_starlark_rule_without_executing_it() {
         loaded.targets[0].kind,
         PackageTargetKind::StarlarkRule(_)
     ));
+    let PackageTargetKind::StarlarkRule(implementation) = &loaded.targets[0].kind else {
+        unreachable!()
+    };
+    assert!(implementation.dependencies().is_empty());
+}
+
+#[test]
+fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
+    let workspace = scratch("rule-deps");
+    let package = workspace.join("parent");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\n\nwith_deps = rule(implementation = _impl, attrs = {\"deps\": attr.label_list()})\nwithout_deps = rule(implementation = _impl)\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"with_deps\")\nwith_deps(name = \"ordered\", deps = [\"//leaf:second\", \":local\", \"//leaf:first\"], visibility = [\"//visibility:public\"])\nwith_deps(name = \"omitted\")\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let dependencies = loaded
+        .targets
+        .iter()
+        .find_map(|target| match &target.kind {
+            PackageTargetKind::StarlarkRule(implementation) if target.name == "ordered" => {
+                Some(implementation.dependencies())
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(
+        dependencies,
+        [
+            CanonicalLabel::parse("@@//leaf:second").unwrap(),
+            CanonicalLabel::parse("@@//parent:local").unwrap(),
+            CanonicalLabel::parse("@@//leaf:first").unwrap(),
+        ]
+    );
+    let omitted = loaded
+        .targets
+        .iter()
+        .find_map(|target| match &target.kind {
+            PackageTargetKind::StarlarkRule(implementation) if target.name == "omitted" => {
+                Some(implementation.dependencies())
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert!(omitted.is_empty());
+
+    let bad_builds = [
+        (
+            "with_deps(name = \"bad\", unknown = [])\n",
+            "unknown attribute `unknown`",
+        ),
+        (
+            "without_deps(name = \"bad\", deps = [])\n",
+            "unknown attribute `deps`",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = (\":one\",))\n",
+            "attribute `deps` must be a list of labels",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [1])\n",
+            "attribute `deps` must contain only string labels",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"relative\"])\n",
+            "dependency label must be package-relative",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"@repo//leaf:one\"])\n",
+            "external repository dependency labels are not supported",
+        ),
+        (
+            "with_deps(name = \"bad\", deps = [\"@@repo//leaf:one\"])\n",
+            "external repository dependency labels are not supported",
+        ),
+    ];
+    for (invocation, expected) in bad_builds {
+        fs::write(
+            package.join(BUILD_FILE_PRIMARY),
+            format!("load(\":defs.bzl\", \"with_deps\", \"without_deps\")\n{invocation}"),
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "error: {error}");
+    }
 }
 
 #[test]

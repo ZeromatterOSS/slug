@@ -41,6 +41,7 @@ pub use providers::OutputGroupInfo;
 pub use providers::PlatformInfo;
 pub use providers::ProviderCollection;
 pub use providers::ProviderError;
+pub use providers::ProviderId;
 pub use providers::ProviderName;
 pub use providers::ProviderValue;
 pub use providers::RunEnvironmentInfo;

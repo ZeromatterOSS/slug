@@ -11,11 +11,10 @@
 use std::collections::BTreeMap;
 
 use slug_analysis_v2::AnalysisDiagnostic;
-use slug_analysis_v2::AnalysisDiceInputs;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredDependency;
-use slug_analysis_v2::ConfiguredTargetDiceKey;
+use slug_analysis_v2::ConfiguredTargetAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::DiagnosticSeverity;
 use slug_analysis_v2::TransitionEdge;
@@ -77,22 +76,22 @@ fn configured_target_key_serializes_label_mapping_and_configuration() {
 }
 
 #[test]
-fn dice_key_changes_when_semantic_inputs_change() {
+fn configured_analysis_key_has_one_workspace_and_target_identity() {
     let target = ConfiguredTargetKey::new(canonical("@@//pkg:target"), target_config());
-    let base_inputs = AnalysisDiceInputs::new("cmd1", "settings1", "repos1", "tools1").unwrap();
-    let changed_settings =
-        AnalysisDiceInputs::new("cmd1", "settings2", "repos1", "tools1").unwrap();
-    let changed_repos = AnalysisDiceInputs::new("cmd1", "settings1", "repos2", "tools1").unwrap();
-
-    let base = ConfiguredTargetDiceKey::new(target.clone(), base_inputs);
-    let settings = ConfiguredTargetDiceKey::new(target.clone(), changed_settings);
-    let repos = ConfiguredTargetDiceKey::new(target, changed_repos);
-
-    assert_ne!(base, settings);
-    assert_ne!(base, repos);
-    assert!(base.stable_serialize().contains("settings=settings1"));
-    assert!(settings.stable_serialize().contains("settings=settings2"));
-    assert!(repos.stable_serialize().contains("repos=repos2"));
+    let first = ConfiguredTargetAnalysisKey {
+        workspace: "/workspace".into(),
+        configured_target: target.clone(),
+    };
+    let same = ConfiguredTargetAnalysisKey {
+        workspace: "/workspace".into(),
+        configured_target: target,
+    };
+    let other_workspace = ConfiguredTargetAnalysisKey {
+        workspace: "/other".into(),
+        configured_target: same.configured_target.clone(),
+    };
+    assert_eq!(first, same);
+    assert_ne!(first, other_workspace);
 }
 
 #[test]

@@ -10,10 +10,11 @@
 
 use std::fmt;
 
+use allocative::Allocative;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::serialization::StableSerialize;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum ConfigurationKind {
     Target,
     Exec,
@@ -36,7 +37,7 @@ impl fmt::Display for ConfigurationKind {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct ConfigurationChecksum(String);
 
 impl ConfigurationChecksum {
@@ -65,7 +66,7 @@ impl fmt::Display for ConfigurationChecksum {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct ConfigurationKey {
     kind: ConfigurationKind,
     checksum: ConfigurationChecksum,
@@ -116,7 +117,7 @@ impl fmt::Display for ConfigurationKey {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct ConfiguredTargetKey {
     label: CanonicalLabel,
     configuration: ConfigurationKey,

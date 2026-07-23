@@ -10,15 +10,17 @@
 
 use std::fmt;
 
+use allocative::Allocative;
+
 use crate::repo::CanonicalRepoName;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
 pub struct PackagePath(String);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
 pub struct TargetName(String);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
 pub struct PackageIdentifier {
     repo: CanonicalRepoName,
     package: PackagePath,
