@@ -354,6 +354,8 @@ through key-specific activation data.
 
 Accepted implementation evidence (2026-07-22):
 
+- Accepted implementation commit: `de835cdc` (`feat: add DICE-backed Starlark
+  glob`).
 - `PackageListingKey` now recursively consumes only
   `WorkspaceDirectoryKey`, stops before traversing nested packages, and returns
   sorted immutable package-relative `CompactString` slices for files,

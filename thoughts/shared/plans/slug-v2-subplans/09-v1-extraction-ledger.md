@@ -498,11 +498,58 @@ Decision: adopt the retained DICE/Starlark primitives and Buck2's compact,
 sorted directory-value lesson behind V2 identities. The first eager
 all-directory evidence API was rejected in review; production now computes no
 directory key until a semantic consumer requests it.
-Residual risk: the migration observer still scans the full workspace, existing
-Starlark glob expansion still reads the filesystem directly, and glob/package
-consumers plus unchanged-computation evidence remain for the next reviewed
-packet. Bazel-shaped globals, configured-target/action coverage, and REAPI
-execution remain incomplete beyond their owning partial packets.
+Residual risk: the migration observer still scans the full workspace. The
+Stage 4 package-listing consumer and activation evidence landed separately in
+`de835cdc`; fine-grained watcher input remains open. Bazel-shaped configured
+target/action coverage and REAPI execution remain incomplete beyond their
+owning partial packets.
+
+### Stage 4 DICE-prepared package listing and Starlark glob packet
+
+Status: Partially landed
+Source ref/commit(s): retained active-tree DICE and starlark-rust; Buck2
+`088c75c7e36805df99c3de29062baa95db700b8b`
+`app/buck2_common/src/package_listing/{dice.rs,interpreter.rs,listing.rs}` and
+`app/buck2_interpreter_for_build/src/interpreter/{module_internals.rs,globspec.rs,functions/path.rs}`;
+V1 `e218054d4c796655939b968d90208b185decb352` globspec, calculation delegate,
+and watcher inspected only as rejection/reference material
+V2 commit(s): oracle `19451b23`; implementation `de835cdc`
+Source class: selectively ported Buck2 prepared-listing architecture and
+compact immutable utility shapes behind V2-owned Bazel package identities;
+V1 behavior reference only
+Reusable primitive or lesson: gather a package listing asynchronously through
+DICE, then synchronously filter it during Starlark evaluation; retain
+`CompactString`, immutable `Arc` slices, `Dupe`, `Allocative`, sorted values,
+and key-specific `ActivationTracker` evidence
+V2 wrapper/boundary: `PackageListingKey` recursively consumes only
+`WorkspaceDirectoryKey`, prunes nested BUILD package boundaries, and feeds one
+prepared listing to `PackageLoadKey`; global and native glob calls never read
+the filesystem or suspend the evaluator
+Bazel oracle: Bazel 9.2.0 generated `glob-callable-contract` and
+`glob-directory-invalidation` fixtures at Bazel commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`; semantic source anchors are
+recorded in the Stage 4 owner plan
+V2 fixture: exact callable defaults, list/tuple inputs, explicit excludes,
+directory inclusion, macro context, empty-match/type errors, and retained-DICE
+create/rename/delete plus package-boundary transitions
+Implementation summary: replaced the unused data-only glob key and direct
+filesystem glob traversal with a compact sorted package listing. Implemented
+global `glob()` and `native.glob()`, recorded used specs in loaded packages,
+rejected unreviewed syntax and participating symlinks explicitly, and proved
+that package loads consume the listing through one async DICE boundary.
+Validation:
+`CARGO_TARGET_DIR=/tmp/slug-m1-glob-target CARGO_BUILD_JOBS=1 cargo test
+-p slug_loading_v2 -p slug_core_v2 -p slug_server_v2 -p slug_analysis_v2
+-p slug_cli_v2`; `cargo fmt --all -- --check`; ownership and forbidden-surface
+greps; `git diff --check`; Sol-low post-review `ACCEPT`
+Decision: adopt Buck2's prepared-listing architecture and retained compact
+utilities, but keep Bazel callable semantics and V2 key identity authoritative.
+Activation evidence distinguishes no activation for an untouched cached key
+from `Reused` after dependency validation.
+Residual risk: the observer is still a full-workspace migration scanner;
+symlink resolution, full Bazel glob syntax, ignored-path policy,
+repository-aware identity, query exposure, and configured analysis remain
+owned by later packets.
 
 ### Stage 6 depset/provider/rule context tests
 
