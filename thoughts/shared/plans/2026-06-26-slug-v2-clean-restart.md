@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 residual-function ranking is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 residual-function ranking is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | rank the non-regex `tests` then `visible` functions with a read-only oracle/reuse audit |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 `tests` oracle packet is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 `tests` oracle packet is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; read-only residual ranking selected `tests` before `visible` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | add the oracle-only `tests-query-expansion` fixture; do not activate `tests` |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,14 +33,24 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run a read-only oracle/source/reuse ranking of the two non-regex residual
-functions: `tests` first and `visible` second. For `tests`, map Bazel 9.2.0
-test-rule and `test_suite` expansion, tags/size filtering, current retained rule
-capability reuse, and the minimum missing loading representation. For
-`visible`, map exact target visibility, package-group inclusion/exclusion,
-same-package and `javatests` rules, and the minimum missing representation.
-Compare Bazel, Buck2, and V1 sources, identify the smallest oracle-first
-vertical, and obtain Sol-low adjudication before selecting implementation.
+Add only the `tests-query-expansion` Bazel 9.2.0 oracle fixture selected by
+`WP-8-m3-tests-visible-feasibility-ranking`. Cover direct test/non-test
+partitioning; empty-suite implicit same-package tests and `manual` exclusion;
+explicit, nested, and cross-package suites; cycles and deduplication; required,
+excluded, `manual`, and size tags; default versus `--strict_test_suite`
+non-test handling; missing members; and ordinary/full output. Record exact
+stdout or stable diagnostics without inferring order from Bazel's asynchronous
+suite callbacks.
+
+This packet is oracle-only. Do not activate `tests`, add native `test_suite`,
+change loading/query representations, or begin `visible`. The subsequent
+representation packet must retain suite members, scalar tags/size, implicit
+membership in immutable loading/query semantics with same-daemon invalidation,
+and plumb strict mode separately as request/query-environment policy; rule
+executability is not test classification.
+`visible` remains second because a truthful first slice already requires
+explicit/default target visibility, package groups and includes/excludes,
+same-package handling, and the asymmetric `javatests` to `java` rule.
 
 Do not react to the rejected regex candidate by starting a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; a V2-owned engine is

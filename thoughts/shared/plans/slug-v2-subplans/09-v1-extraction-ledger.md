@@ -1293,3 +1293,33 @@ classification. It filters retained delivery IDs in place, adds no edges or
 DICE key, and passes all 32 semantic oracle rows plus same-DICE and
 same-daemon lifecycle evidence. The eight `label_kind` rows remain
 representation-only; five ordinary query functions and M3 remain open.
+
+### Stage 8 `tests` / `visible` feasibility ranking
+
+Status: Reviewed; `tests` ranked first, oracle-only packet authorized
+
+Source ref/commit(s): Bazel
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+`TestsFunction`, `VisibleFunction`, `TargetUtils`,
+`TestSuiteImplicitTestsAccumulator`, `QueryVisibility`, `RuleVisibility`,
+`PackageSpecification`, and the named `AbstractQueryTest` themes; Buck2
+`088c75c7e36805df99c3de29062baa95db700b8b` generic query environment,
+target-set, and simple-function shapes; V1
+`e218054d4c796655939b968d90208b185decb352` query test accessors, native
+`test_suite` storage, and visibility registry.
+
+Decision: Reuse V2 `RuleCapability.rule_class`, typed Starlark values, DICE
+package graph, and Buck2 compact request-local evaluator patterns. Reference
+only V1's accessor/storage shapes. Reject Buck2/V1 test semantics as incomplete
+for Bazel suite expansion, and reject V1 visibility semantics and global
+package-group registry. The next packet checks in only the
+`tests-query-expansion` Bazel oracle. No query activation or representation
+change is authorized.
+
+Required later boundary: immutable loading/query metadata for native
+`test_suite`, explicit and implicit members, scalar tags/size/manual state, and
+semantic equality with same-daemon invalidation. Plumb strict mode separately
+as request/query-environment policy. `visible` follows only after a separate
+design covers explicit/default visibility, package-group
+packages/includes/excludes, same-package access, and the `javatests`/`java`
+asymmetry. Terra-medium audited; Sol-low returned `ACCEPT`.

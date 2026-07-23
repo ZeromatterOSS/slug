@@ -38,16 +38,15 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
-### Live packet: `WP-8-m3-tests-visible-feasibility-ranking`
+### Live packet: `WP-8-m3-tests-query-expansion-oracle`
 
-Perform a read-only Bazel/Buck2/V1/oracle audit of the two non-regex residual
-functions, ranking `tests` first and `visible` second. Map exact Bazel 9.2.0
-test-rule and `test_suite` expansion, tags/size behavior, visibility and
-package-group semantics, the accepted V2 metadata that can be reused, and the
-minimum missing loading representation. Select one smallest oracle-first
-vertical for Sol-low adjudication. Do not edit code, add a UTF-16 regex engine,
-or activate any query function. Live Status in the canonical plan owns
-scheduling.
+Add one Bazel 9.2.0 oracle fixture for `tests(EXPR)`. It must cover direct
+test/non-test partitioning; implicit and explicit suite membership; nested,
+cross-package, cyclic, and duplicate suites; tags and size; `manual`;
+default/strict invalid members; missing members; and ordinary/full output.
+This is fixture-only: do not activate `tests`, add loading/query
+representations, begin `visible`, or add a regex engine. Live Status in the
+canonical plan owns scheduling.
 
 ### Query engine reuse policy
 
@@ -2115,7 +2114,7 @@ final `ACCEPT` after full-diff review.
 
 Five ordinary query functions remain deferred. The completed Java `Pattern`
 feasibility and rejected `java_regex` qualification are recorded below; the
-next packet ranks the non-regex `tests` then `visible` functions.
+completed residual ranking after them selects `tests` before `visible`.
 
 ## Java `Pattern` feasibility audit accepted (2026-07-23)
 
@@ -2185,4 +2184,46 @@ comparison probe entered the repository.
 
 `filter`, `attr`, and regex-based `kind` remain deferred. A V2-owned UTF-16
 engine is an unapproved future architecture proposal, not the next packet. The
-next read-only audit ranks `tests` then `visible`.
+completed read-only ranking is recorded below.
+
+## `tests` / `visible` feasibility ranking accepted (2026-07-23)
+
+Bazel 9.2.0 `TestsFunction` is the smaller truthful residual query vertical.
+It partitions direct inputs by rule class (`*_test`, exact `test_suite`, or
+other), recursively expands explicit suite members, adds same-package
+`$implicit_tests` for suites without explicit members, deduplicates and
+terminates cycles, and never emits suites or non-tests. Suite required/bare/`+`
+and excluded/`-` tags filter against each test's tags plus size; suite tag
+`manual` is not a filter, while implicit membership excludes manual tests.
+Missing members retain the `couldn't expand 'tests' attribute...` prefix.
+Non-test members are dropped by default and produce
+`INVALID_LABEL_IN_TEST_SUITE` under `--strict_test_suite`.
+
+V2 can reuse `RuleCapability.rule_class` for the `_test` predicate and its
+retained typed Starlark attribute values. It cannot activate the function yet:
+there is no native `test_suite`, scalar query projection for tags/size, implicit
+test membership, or strict-setting plumbing. The next packet therefore adds
+only `tests-query-expansion`, a Bazel oracle spanning direct and implicit tests,
+explicit/nested/cross-package suites, cycles/deduplication, tags/size/manual,
+default/strict invalid members, missing members, and ordinary/full output.
+Activation is a hard stop until a later reviewed representation packet stores
+these facts as immutable package/query semantics and proves same-daemon
+create/edit/delete invalidation. Executability is not a test predicate.
+
+`visible` remains second. Although `LoadedPackage` retains package default
+visibility, explicit rule visibility is currently validated then discarded.
+There is no canonical per-target visibility, native `package_group`, package
+specification/include/exclude graph, cross-package lookup, or query visibility
+accessor. A public/private-only slice would be a false parity claim because
+Bazel also requires same-package access, `__pkg__`, `__subpackages__`,
+recursive package-group alternatives with exclusions, and asymmetric
+`//javatests/X` access to private `//java/X`.
+
+Buck2 contributes only its generic evaluator, target-set, deduplication, and
+compact-collection patterns; its test query semantics are not Bazel suite
+semantics. V1's generic test accessor and stored suite-label shape are
+reference-only because they omit Bazel filtering, implicit, and strict
+behavior. Reject V1 visibility semantics and its process-global package-group
+registry. Terra-medium produced the read-only source/reuse audit, root checked
+the pinned Bazel sources and current V2 representation, and Sol-low returned
+`ACCEPT` for the oracle-only next packet.
