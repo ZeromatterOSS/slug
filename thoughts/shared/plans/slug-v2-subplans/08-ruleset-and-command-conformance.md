@@ -2586,3 +2586,27 @@ Gate A may now reuse the comparison and duplicate helper for native suite
 members. String tags use native Rust byte ordering with duplicates retained.
 Strict policy, function activation, formatters, selector duplicate semantics,
 and malformed bytes remain separate.
+
+## `tests` loading/query metadata Gate A accepted (2026-07-23)
+
+Commit `7abcbdce` adds native `test_suite`, invariant-safe explicit or implicit
+membership with orthogonal input provenance, typed inherited Starlark
+`tags`/test `size`, exact test-versus-suite capability, per-suite implicit
+filtering, and total query-attribute explicitness. Package-context suite labels
+reject canonical duplicates before structural sorting; tag strings retain
+duplicates in UTF-8 byte order. The unconfigured graph projects distinct
+`tests` and `$implicit_tests` attributes, scalar test metadata, and deduplicated
+ordinary edges without collapsing stored label values.
+
+Focused loading 16, bzl invalidation 21, glob invalidation 2, and query 29 tests
+passed independently. Full `slug_loading_v2` and `slug_query_v2` suites passed,
+`slug_cli_v2` rebuilt, and formatting, archive, and diff checks were clean.
+Same-DICE evidence covers semantic reorder reuse, metadata changes, duplicate
+error and recovery, omitted/explicit-empty transitions, deletion, and
+recreation. Sol-low returned `ACCEPT` without correction and confirmed that
+`tests()` activation, strict policy, formatters, repository behavior, and
+V1/Buck semantics did not enter Gate A.
+
+The next packet is design-only: review request-local
+`--strict_test_suite` ownership and the bounded evaluator/diagnostic seam for
+activating the already accepted 29-command `tests(EXPR)` oracle.

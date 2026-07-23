@@ -1441,3 +1441,12 @@ direct native/Starlark duplicate rejection after 70 focused tests and Sol
 review. No V1/Buck test model or selector behavior was imported. Native suite
 metadata may now reuse these foundations in the next Gate A retry; strict
 policy and function activation remain separate.
+
+Commit `7abcbdce` accepts the V2-owned tests loading/query metadata Gate A.
+Native suite membership, typed Starlark test metadata, exact capability,
+implicit filtering, query provenance, and ordinary graph edges use the
+existing V2 package/query DICE owners plus compact `Arc`/`SmallSet` storage.
+Full owning-crate tests and independent Sol review passed. No V1/Buck test
+evaluator, registry, graph, DICE key, or policy semantics were imported.
+Request-local strict-suite plumbing and `tests()` activation remain a separate
+design and implementation boundary.
