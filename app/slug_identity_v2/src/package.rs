@@ -63,19 +63,65 @@ impl PackagePath {
 impl TargetName {
     pub fn parse(value: &str) -> Result<Self, String> {
         if value.is_empty() {
-            return Err("target name must not be empty".to_owned());
+            return Err("empty target name".to_owned());
         }
-        if value.starts_with('/') || value.contains("//") {
-            return Err(format!("invalid target name: {value}"));
+        if value.starts_with('/') {
+            return Err("target names may not start with '/'".to_owned());
         }
-        for segment in value.split('/') {
-            if matches!(segment, "." | "..") {
-                return Err(format!(
-                    "invalid target name segment {segment:?} in {value}"
-                ));
+        if value == ".." || value.starts_with("../") {
+            return Err("target names may not contain up-level references '..'".to_owned());
+        }
+        if value == "." {
+            return Ok(Self(value.to_owned()));
+        }
+        if value.starts_with("./") {
+            return Err("target names may not contain '.' as a path segment".to_owned());
+        }
+        if value.ends_with('\r') {
+            return Err(
+                "target names may not end with carriage returns (perhaps the input source is CRLF-terminated)"
+                    .to_owned(),
+            );
+        }
+
+        for (index, character) in value.char_indices() {
+            match character {
+                '.' => {}
+                '/' => {
+                    let suffix = &value[index..];
+                    if suffix.starts_with("/../") {
+                        return Err(
+                            "target names may not contain up-level references '..'".to_owned()
+                        );
+                    }
+                    if suffix.starts_with("/./") {
+                        return Err("target names may not contain '.' as a path segment".to_owned());
+                    }
+                    if suffix.starts_with("//") {
+                        return Err("target names may not contain '//' path separators".to_owned());
+                    }
+                }
+                '\0'..='\u{1f}' | '\u{7f}' => {
+                    return Err(format!(
+                        "target names may not contain non-printable characters: '\\x{:02X}'",
+                        character as u32
+                    ));
+                }
+                ':' | '\\' => {
+                    return Err(format!("target names may not contain '{character}'"));
+                }
+                _ => {}
             }
         }
-        Ok(Self(value.to_owned()))
+
+        if value.ends_with("/..") {
+            return Err("target names may not contain up-level references '..'".to_owned());
+        }
+        if value.ends_with('/') {
+            return Err("target names may not end with '/'".to_owned());
+        }
+
+        Ok(Self(value.strip_suffix("/.").unwrap_or(value).to_owned()))
     }
 
     pub fn as_str(&self) -> &str {

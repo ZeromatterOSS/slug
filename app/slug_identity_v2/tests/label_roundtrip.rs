@@ -1,9 +1,14 @@
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
+
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
+use slug_identity_v2::TargetName;
 use slug_identity_v2::serialization::StableSerialize;
 
 #[test]
@@ -105,4 +110,134 @@ fn rejects_invalid_labels() {
         assert!(ApparentLabel::parse(label).is_err(), "{label}");
     }
     assert!(CanonicalLabel::parse("@repo//pkg:target").is_err());
+}
+
+fn hash(value: &TargetName) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
+#[test]
+fn target_names_match_bazel_validation_and_preserve_printable_unicode() {
+    // Bazel 9.2 LabelValidator.validateTargetName accepts every printable
+    // ASCII punctuation character except its structural ':' and '\\'.
+    for value in [
+        "name",
+        "dir/name",
+        ".",
+        ".hidden",
+        "..hidden",
+        "dir/.hidden",
+        "dir/..hidden",
+        " !\"#$%&'()*+,-.;<=>?@[]^_`{|}~ ",
+        "目标/éclair-λ.文件",
+    ] {
+        let parsed = TargetName::parse(value).unwrap();
+        assert_eq!(parsed.as_str(), value);
+        assert_eq!(parsed.to_string(), value);
+    }
+
+    for (value, expected) in [
+        ("", "empty target name"),
+        ("/name:bad", "target names may not start with '/'"),
+        (
+            "name:\r",
+            "target names may not end with carriage returns (perhaps the input source is CRLF-terminated)",
+        ),
+        (
+            "name\u{1}:bad",
+            "target names may not contain non-printable characters: '\\x01'",
+        ),
+        (
+            "name\u{7f}:bad",
+            "target names may not contain non-printable characters: '\\x7F'",
+        ),
+        ("name:with\\slash", "target names may not contain ':'"),
+        ("name\\with\u{1}", "target names may not contain '\\'"),
+        (
+            "dir//../name",
+            "target names may not contain '//' path separators",
+        ),
+        (
+            "./../name",
+            "target names may not contain '.' as a path segment",
+        ),
+        (
+            "dir/./../name",
+            "target names may not contain '.' as a path segment",
+        ),
+        (
+            ".././name",
+            "target names may not contain up-level references '..'",
+        ),
+        (
+            "dir/.././name",
+            "target names may not contain up-level references '..'",
+        ),
+        (
+            "dir/..",
+            "target names may not contain up-level references '..'",
+        ),
+        ("dir/", "target names may not end with '/'"),
+    ] {
+        assert_eq!(TargetName::parse(value).unwrap_err(), expected, "{value:?}");
+    }
+}
+
+#[test]
+fn trailing_current_directory_normalizes_target_identity_and_labels() {
+    let normalized = TargetName::parse("dir/name/.").unwrap();
+    let direct = TargetName::parse("dir/name").unwrap();
+    assert_eq!(normalized, direct);
+    assert_eq!(normalized.cmp(&direct), std::cmp::Ordering::Equal);
+    assert_eq!(hash(&normalized), hash(&direct));
+    assert_eq!(normalized.as_str(), "dir/name");
+    assert_eq!(normalized.to_string(), "dir/name");
+
+    let apparent_normalized = ApparentLabel::parse("//pkg:dir/name/.").unwrap();
+    let apparent_direct = ApparentLabel::parse("//pkg:dir/name").unwrap();
+    assert_eq!(apparent_normalized, apparent_direct);
+    assert_eq!(apparent_normalized.to_string(), "//pkg:dir/name");
+
+    let canonical_normalized = CanonicalLabel::parse("@@repo//pkg:dir/name/.").unwrap();
+    let canonical_direct = CanonicalLabel::parse("@@repo//pkg:dir/name").unwrap();
+    assert_eq!(canonical_normalized, canonical_direct);
+    assert_eq!(
+        canonical_normalized.cmp(&canonical_direct),
+        std::cmp::Ordering::Equal
+    );
+    assert_eq!(canonical_normalized.to_string(), "@@repo//pkg:dir/name");
+    assert_eq!(
+        canonical_normalized.stable_serialize(),
+        canonical_direct.stable_serialize()
+    );
+    assert_eq!(
+        canonical_normalized.stable_serialize(),
+        "@@repo//pkg:dir/name"
+    );
+}
+
+#[test]
+fn labels_reject_invalid_target_name_characters_and_segments() {
+    for label in [
+        "//pkg:pkg:target",
+        "//pkg:dir\\name",
+        "//pkg:dir//name",
+        "//pkg:dir/../name",
+        "//pkg:dir/./name",
+        "//pkg:name\u{7f}",
+    ] {
+        assert!(ApparentLabel::parse(label).is_err(), "{label:?}");
+    }
+    for label in [
+        "@@repo//pkg:pkg:target",
+        "@@repo//pkg:dir\\name",
+        "@@repo//pkg:dir//name",
+        "@@repo//pkg:dir/../name",
+        "@@repo//pkg:dir/./name",
+        "@@repo//pkg:name\u{7f}",
+    ] {
+        assert!(CanonicalLabel::parse(label).is_err(), "{label:?}");
+    }
 }
