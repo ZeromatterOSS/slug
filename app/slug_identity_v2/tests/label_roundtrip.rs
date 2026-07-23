@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -95,6 +96,40 @@ fn canonical_labels_and_mapping_serialization_distinguish_mappings() {
     assert_ne!(
         first_label.stable_serialize(),
         second_label.stable_serialize()
+    );
+}
+
+#[test]
+fn bazel_natural_label_order_is_structural_byte_order_without_mapping_provenance() {
+    let shorter_package = CanonicalLabel::parse("@@//a:b/c").unwrap();
+    let longer_package = CanonicalLabel::parse("@@//a/b:a").unwrap();
+    assert_eq!(
+        shorter_package.bazel_natural_cmp(&longer_package),
+        Ordering::Less
+    );
+    assert!(shorter_package.to_string() > longer_package.to_string());
+
+    let bmp = CanonicalLabel::parse("@@//pkg:\u{e000}").unwrap();
+    let supplementary = CanonicalLabel::parse("@@//pkg:\u{10000}").unwrap();
+    assert_eq!(bmp.bazel_natural_cmp(&supplementary), Ordering::Less);
+
+    let apparent = ApparentLabel::parse("@dep//pkg:target").unwrap();
+    let mut first = RepositoryMapping::new(RepositoryMappingId::new("first").unwrap());
+    first.insert(
+        ApparentRepoName::new("dep").unwrap(),
+        CanonicalRepoName::new("canonical").unwrap(),
+    );
+    let mut second = RepositoryMapping::new(RepositoryMappingId::new("second").unwrap());
+    second.insert(
+        ApparentRepoName::new("dep").unwrap(),
+        CanonicalRepoName::new("canonical").unwrap(),
+    );
+    let first_label = apparent.resolve(&first);
+    let second_label = apparent.resolve(&second);
+    assert_ne!(first_label, second_label);
+    assert_eq!(
+        first_label.bazel_natural_cmp(&second_label),
+        Ordering::Equal
     );
 }
 

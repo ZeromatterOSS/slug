@@ -46,6 +46,7 @@ use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
+use starlark_map::small_set::SmallSet;
 
 use crate::attrs::AttributeKind;
 use crate::attrs::AttributeProvenance;
@@ -276,8 +277,9 @@ impl PackageRecorder {
         let srcs = srcs
             .iter()
             .map(|src| self.dependency_label(src))
-            .collect::<anyhow::Result<Vec<_>>>()?
-            .into();
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        reject_duplicate_canonical_labels(&srcs, "srcs", &name)?;
+        let srcs = srcs.into();
         self.record_target(name, PackageTargetKind::Filegroup { srcs })
     }
 
@@ -310,6 +312,9 @@ impl PackageRecorder {
     ) -> anyhow::Result<()> {
         let mut dependencies = Vec::new();
         for value in values.iter() {
+            if let CoercedAttributeValue::LabelList(labels) = value.value.as_ref() {
+                reject_duplicate_canonical_labels(labels, &value.declaration_name, &name)?;
+            }
             let schema = schema
                 .iter()
                 .find(|schema| schema.declaration_name() == value.declaration_name);
@@ -321,7 +326,7 @@ impl PackageRecorder {
         }
         // Existing analysis/query consumers use this aggregate. It is derived
         // after structured values are retained, and selector keys never enter.
-        let mut seen = starlark_map::small_set::SmallSet::new();
+        let mut seen = SmallSet::new();
         dependencies.retain(|label| seen.insert(label.clone()));
         self.record_target(
             name,
@@ -391,6 +396,34 @@ impl PackageRecorder {
             retained_bzl_modules,
         }
     }
+}
+
+fn reject_duplicate_canonical_labels(
+    labels: &[CanonicalLabel],
+    attribute: &str,
+    rule: &str,
+) -> anyhow::Result<()> {
+    let mut seen = SmallSet::new();
+    for label in labels {
+        let package = label.package();
+        let identity = (
+            package.repo().as_str(),
+            package.package().as_str(),
+            label.target().as_str(),
+        );
+        if seen.insert(identity) {
+            continue;
+        }
+        let display = if package.repo().is_root() {
+            format!("//{}:{}", package.package(), label.target())
+        } else {
+            label.to_string()
+        };
+        anyhow::bail!(
+            "Label '{display}' is duplicated in the '{attribute}' attribute of rule '{rule}'"
+        );
+    }
+    Ok(())
 }
 
 fn list(items: UnpackListOrTuple<&str>) -> Vec<String> {

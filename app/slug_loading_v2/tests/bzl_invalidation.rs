@@ -1125,10 +1125,7 @@ fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
             "load(\"//definitions:defs.bzl\", \"probe\")\nprobe(name = \"rule\")\nfilegroup(name = \"group\", srcs = {srcs})\nalias(name = \"redirect\", actual = \"{actual}\")\n"
         )
     };
-    write(
-        &build,
-        &build_for("[\"one.txt\", \":two.txt\", \"one.txt\"]", "group"),
-    );
+    write(&build, &build_for("[\"one.txt\", \":two.txt\"]", "group"));
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -1140,10 +1137,7 @@ fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
         &[definitions.clone()],
     )
     .unwrap();
-    write(
-        &build,
-        &build_for("[\":one.txt\", \"two.txt\", \":one.txt\"]", ":group"),
-    );
+    write(&build, &build_for("[\":one.txt\", \"two.txt\"]", ":group"));
     let equivalent = load_package(
         &dice,
         &runtime,
@@ -1154,10 +1148,7 @@ fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
     .unwrap();
     assert_eq!(initial, equivalent);
 
-    write(
-        &build,
-        &build_for("[\"two.txt\", \"one.txt\", \"one.txt\"]", "group"),
-    );
+    write(&build, &build_for("[\"two.txt\", \"one.txt\"]", "group"));
     let reordered = load_package(
         &dice,
         &runtime,
@@ -1167,8 +1158,29 @@ fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
     )
     .unwrap();
     assert_ne!(equivalent, reordered);
+
+    write(
+        &build,
+        &build_for("[\"two.txt\", \"one.txt\", \":one.txt\"]", "group"),
+    );
+    let duplicate = load_package(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[definitions.clone()],
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(
+        duplicate.contains(
+            "Label '//consumer:one.txt' is duplicated in the 'srcs' attribute of rule 'group'"
+        ),
+        "{duplicate}"
+    );
+
     write(&build, &build_for("[\"two.txt\", \"one.txt\"]", "group"));
-    let duplicate_removed = load_package(
+    let recovered = load_package(
         &dice,
         &runtime,
         &workspace,
@@ -1176,7 +1188,7 @@ fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
         &[definitions.clone()],
     )
     .unwrap();
-    assert_ne!(reordered, duplicate_removed);
+    assert_eq!(reordered, recovered);
 
     write(&definitions, &schema("two.txt"));
     let default_changed = load_package(
@@ -1187,7 +1199,7 @@ fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
         &[definitions.clone()],
     )
     .unwrap();
-    assert_ne!(duplicate_removed, default_changed);
+    assert_ne!(recovered, default_changed);
 
     fs::remove_file(&definitions).unwrap();
     assert!(

@@ -842,7 +842,7 @@ async fn labels_projects_supported_native_filegroup_and_alias_attributes() {
 }
 
 #[tokio::test]
-async fn native_label_canonicalization_reuses_and_preserves_attribute_multiplicity() {
+async fn native_label_canonicalization_reuses_rejects_duplicates_and_recovers() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
     let build = workspace.join("pkg/BUILD.bazel");
@@ -873,19 +873,19 @@ async fn native_label_canonicalization_reuses_and_preserves_attribute_multiplici
         &build_for("[\"one.txt\", \"two.txt\", \":one.txt\"]", "group"),
     );
     let (duplicate, events) = query_revision(&dice, &tracker, &workspace, expression).await;
-    assert_eq!(
-        duplicate.unwrap().stdout(),
-        "//pkg:one.txt\n//pkg:two.txt\n"
+    let duplicate = duplicate.unwrap_err().to_string();
+    assert!(
+        duplicate.contains(
+            "Label '//pkg:one.txt' is duplicated in the 'srcs' attribute of rule 'group'"
+        ),
+        "{duplicate}"
     );
     assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
 
-    write(
-        &build,
-        &build_for("[\"two.txt\", \"one.txt\", \":one.txt\"]", "group"),
-    );
-    let (reordered, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    write(&build, &build_for("[\"two.txt\", \"one.txt\"]", "group"));
+    let (recovered, events) = query_revision(&dice, &tracker, &workspace, expression).await;
     assert_eq!(
-        reordered.unwrap().stdout(),
+        recovered.unwrap().stdout(),
         "//pkg:one.txt\n//pkg:two.txt\n"
     );
     assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
@@ -910,7 +910,7 @@ async fn native_label_canonicalization_reuses_and_preserves_attribute_multiplici
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>(),
-        ["//pkg:two.txt", "//pkg:one.txt", "//pkg:one.txt"]
+        ["//pkg:two.txt", "//pkg:one.txt"]
     );
     assert_eq!(
         group
@@ -924,10 +924,7 @@ async fn native_label_canonicalization_reuses_and_preserves_attribute_multiplici
     fs::remove_file(&build).unwrap();
     let (deleted, _) = query_revision(&dice, &tracker, &workspace, expression).await;
     assert!(deleted.is_err());
-    write(
-        &build,
-        &build_for("[\"two.txt\", \"one.txt\", \":one.txt\"]", "group"),
-    );
+    write(&build, &build_for("[\"two.txt\", \"one.txt\"]", "group"));
     let (recreated, events) = query_revision(&dice, &tracker, &workspace, expression).await;
     assert_eq!(
         recreated.unwrap().stdout(),

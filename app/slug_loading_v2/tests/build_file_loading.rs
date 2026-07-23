@@ -385,7 +385,7 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
 }
 
 #[test]
-fn native_labels_canonicalize_spelling_but_preserve_order_and_duplicates() {
+fn native_labels_canonicalize_spelling_preserve_order_and_reject_duplicates() {
     let workspace = scratch("native-label-canonicalization");
     let package = workspace.join("pkg");
     fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
@@ -403,11 +403,11 @@ fn native_labels_canonicalize_spelling_but_preserve_order_and_duplicates() {
     };
 
     let initial = write_build(
-        "[\"one.txt\", \":two.txt\", \"dir/name.txt\", \"//other:cross.txt\", \"one.txt\"]",
+        "[\"one.txt\", \":two.txt\", \"dir/name.txt\", \"//other:cross.txt\"]",
         "group",
     );
     let equivalent = write_build(
-        "[\":one.txt\", \"two.txt\", \":dir/name.txt\", \"//other:cross.txt\", \":one.txt\"]",
+        "[\":one.txt\", \"two.txt\", \":dir/name.txt\", \"//other:cross.txt\"]",
         ":group",
     );
     assert_eq!(initial, equivalent);
@@ -422,7 +422,6 @@ fn native_labels_canonicalize_spelling_but_preserve_order_and_duplicates() {
             CanonicalLabel::parse("@@//pkg:two.txt").unwrap(),
             CanonicalLabel::parse("@@//pkg:dir/name.txt").unwrap(),
             CanonicalLabel::parse("@@//other:cross.txt").unwrap(),
-            CanonicalLabel::parse("@@//pkg:one.txt").unwrap(),
         ]
     );
     assert!(matches!(
@@ -432,15 +431,99 @@ fn native_labels_canonicalize_spelling_but_preserve_order_and_duplicates() {
     ));
 
     let reordered = write_build(
-        "[\"two.txt\", \"one.txt\", \"dir/name.txt\", \"//other:cross.txt\", \"one.txt\"]",
-        "group",
-    );
-    assert_ne!(equivalent, reordered);
-    let duplicate_removed = write_build(
         "[\"two.txt\", \"one.txt\", \"dir/name.txt\", \"//other:cross.txt\"]",
         "group",
     );
-    assert_ne!(reordered, duplicate_removed);
+    assert_ne!(equivalent, reordered);
+
+    fs::write(
+        &build,
+        "filegroup(name = \"group\", srcs = [\"one.txt\", \"two.txt\", \":two.txt\", \":one.txt\"])\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains(
+            "Label '//pkg:two.txt' is duplicated in the 'srcs' attribute of rule 'group'"
+        ),
+        "{error}"
+    );
+
+    let recovered = write_build(
+        "[\"two.txt\", \"one.txt\", \"dir/name.txt\", \"//other:cross.txt\"]",
+        "group",
+    );
+    assert_eq!(reordered, recovered);
+}
+
+#[test]
+fn direct_starlark_label_lists_reject_explicit_and_materialized_default_duplicates() {
+    let workspace = scratch("starlark-label-list-duplicates");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    let definitions = package.join("defs.bzl");
+    let build = package.join(BUILD_FILE_PRIMARY);
+    let definition = |default: &str| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {{\"deps\": attr.label_list(default = {default})}})\n"
+        )
+    };
+
+    fs::write(&definitions, definition("[\":default.txt\"]")).unwrap();
+    fs::write(
+        &build,
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"explicit\", deps = [\"one.txt\", \":one.txt\"])\n",
+    )
+    .unwrap();
+    let explicit = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        explicit.contains(
+            "Label '//pkg:one.txt' is duplicated in the 'deps' attribute of rule 'explicit'"
+        ),
+        "{explicit}"
+    );
+
+    fs::write(
+        &definitions,
+        definition("[\"default.txt\", \":default.txt\"]"),
+    )
+    .unwrap();
+    fs::write(
+        &build,
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"defaulted\")\n",
+    )
+    .unwrap();
+    let defaulted = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        defaulted.contains(
+            "Label '//pkg:default.txt' is duplicated in the 'deps' attribute of rule 'defaulted'"
+        ),
+        "{defaulted}"
+    );
+
+    fs::write(
+        &definitions,
+        definition("[\"default.txt\", \":other.txt\"]"),
+    )
+    .unwrap();
+    let recovered = try_load_package(&workspace, &package).unwrap();
+    let PackageTargetKind::StarlarkRule(rule) = &recovered.targets[0].kind else {
+        panic!("expected Starlark rule")
+    };
+    assert_eq!(
+        rule.dependencies(),
+        [
+            CanonicalLabel::parse("@@//pkg:default.txt").unwrap(),
+            CanonicalLabel::parse("@@//pkg:other.txt").unwrap(),
+        ]
+    );
 }
 
 #[test]

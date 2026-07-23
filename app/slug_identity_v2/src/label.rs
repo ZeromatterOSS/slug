@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::cmp::Ordering;
 use std::fmt;
 
 use allocative::Allocative;
@@ -87,6 +88,23 @@ impl CanonicalLabel {
 
     pub fn mapping_id(&self) -> Option<&RepositoryMappingId> {
         self.mapping_id.as_ref()
+    }
+
+    /// Bazel's natural `Label` order compares canonical repository, package,
+    /// then target identity. Repository-mapping provenance is not part of a
+    /// resolved Bazel label and is intentionally ignored here.
+    pub fn bazel_natural_cmp(&self, other: &Self) -> Ordering {
+        self.package
+            .repo()
+            .as_str()
+            .cmp(other.package.repo().as_str())
+            .then_with(|| {
+                self.package
+                    .package()
+                    .as_str()
+                    .cmp(other.package.package().as_str())
+            })
+            .then_with(|| self.target.as_str().cmp(other.target.as_str()))
     }
 }
 
