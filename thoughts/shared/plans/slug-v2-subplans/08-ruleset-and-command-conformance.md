@@ -2737,8 +2737,13 @@ Sol also required include-cycle termination and independent `__pkg__` and
 `--nonodep_deps` structure rows. Worker and root clean Bazel runs passed; final
 source/evidence review returned `ACCEPT`.
 
-The current packet separately audits and designs the Stage 4 representation;
-it does not implement or activate `visible()`. External repositories/mapping,
-symbolic macros, special `bind`/`config_setting` defaults, alternate visibility
-flags, keep-going, configured query, formatters, and production Rust remain
-excluded until that design is accepted.
+The first Stage 4 design review returned `REPLAN`. V2 exposes `config_setting`,
+and pinned Bazel 9 defaults make an omitted visibility effectively public while
+honoring explicit restrictions. The current packet appends two oracle rows for
+that producer before design re-review. It also replaces proposed edge buckets
+with one ordered tagged slice matching `LabelVisitationUtils` visitation order.
+
+This correction does not implement or activate `visible()`. External
+repositories/mapping, symbolic macros, `bind`, alternate visibility flags,
+keep-going, configured query, formatters, and production Rust remain excluded
+until the corrected design is accepted.

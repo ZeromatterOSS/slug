@@ -1508,3 +1508,10 @@ Stage 4 target/package/default/provenance/equality/edge ownership and specify
 typed visibility and package-group storage before implementation. V1/Buck may
 inform compact immutable collection shapes only; no registry, string-pattern
 semantics, fallback, DICE ownership, or query behavior is authorized.
+
+The first Stage 4 design review returned `REPLAN` for uncovered Bazel 9
+`config_setting` default-public behavior and for unordered edge buckets. The
+next packet adds only two oracle rows; the corrected design will use one
+ordered tagged immutable edge slice. Neither correction authorizes V1/Buck
+visibility semantics. Buck-derived compact sets/slices remain utility shapes
+only.

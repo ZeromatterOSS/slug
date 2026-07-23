@@ -707,3 +707,20 @@ alternate flags. V1's global locked string-pattern registry and permissive
 fallback remain rejected. Stage 8 will separately own universal filtering,
 same-package/Java access, recursive diagnostics, and command activation after
 the Stage 4 design and implementation are independently reviewed.
+
+### Stage 4 design review replan
+
+Sol found two material corrections before this design can be accepted. V2
+already exposes `config_setting`, so it cannot stop on that rule's Bazel 9
+special default: with visibility enforcement on and private-default visibility
+off by default, omitted `config_setting.visibility` is effectively public
+while an explicit restriction remains enforced. Add two oracle rows before
+representing this producer; `bind` remains excluded because V2 does not expose
+it.
+
+The graph representation must also use one ordered immutable tagged edge slice,
+not independent buckets. Tags distinguish ordinary, visibility NODEP,
+package-group include, and generating-rule edges while preserving pinned
+`LabelVisitationUtils` order and allowing source synthesis from ordinary edges
+only. The remaining typed visibility/group model, existing-key DICE ownership,
+12-command Stage 4 gate, and bounded allowlist were accepted in principle.
