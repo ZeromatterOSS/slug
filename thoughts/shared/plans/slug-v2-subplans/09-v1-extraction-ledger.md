@@ -1296,7 +1296,7 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: 23-command oracle accepted through `fd4c5da0`; metadata review next
+Status: 23-command oracle and loading-metadata design accepted; Gate A next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1335,3 +1335,11 @@ that distinction before another representation proposal. Commit `fd4c5da0`
 now proves the same membership and distinct `--output=build` provenance. The
 next design must retain an explicitness bit orthogonally within one exclusive
 membership representation; no V1/Buck extraction decision changes.
+
+The accepted third design does so: nonempty explicit membership is one variant;
+implicit membership carries the omitted-versus-explicit-empty bit. Typed
+inherited attrs remain the only Starlark test metadata source, and graph
+capability, scalar metadata, attributes, provenance, and edges derive from
+finished target state. Existing DICE keys and compact utilities are sufficient.
+Sol-low returned `ACCEPT`; implementation Gate A imports no V1/Buck test
+semantics and leaves strict policy/function activation later.

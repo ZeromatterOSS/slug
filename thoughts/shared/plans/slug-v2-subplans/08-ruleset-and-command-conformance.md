@@ -38,15 +38,14 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
-### Live packet: `WP-8-m3-tests-loading-metadata-review-v3`
+### Live packet: `WP-8-m3-tests-loading-metadata-gate-a`
 
-Review a provenance-safe loading metadata and graph projection design against
-the accepted 23-command oracle. One exclusive membership representation must
-retain nonempty explicit members or implicit members plus omitted-versus-empty
-explicitness. Include canonical order/duplicates, inherited tags/size, derived
-manual, suite capability/tags, equality, and lifecycle invalidation. This is
-design/review only; strict plumbing and function activation remain later.
-Live Status in the canonical plan owns scheduling.
+Implement the Sol-accepted loading metadata and unconfigured-graph projection.
+Cover typed inherited attrs, invariant-safe suite membership/provenance,
+implicit finalization, capability/scalar metadata, label attributes, ordinary
+edges, semantic equality, and lifecycle invalidation. Keep `tests()` inactive;
+strict request plumbing and activation are later packets. Live Status in the
+canonical plan owns scheduling.
 
 ### Query engine reuse policy
 
@@ -2298,3 +2297,22 @@ acceptance. Root inspected the `AttributeProvider`, `Rule`,
 23 commands. No loading/query code, DICE state, strict policy, or function
 activation changed. The next design must retain this explicitness
 orthogonally to invariant-safe membership.
+
+## `tests` loading metadata design accepted (2026-07-23)
+
+The accepted design retains naturally sorted order-independent lists without
+deduplicating stored values; inherited `tags=[]` on every Starlark rule and
+test-only `size="medium"`; test tags/size/manual derived from retained typed
+values; and one native suite membership enum. Nonempty explicit members occupy
+one variant. Omitted and explicit-empty suites occupy the implicit variant with
+an orthogonal explicitness bit, so they share finalized members but remain
+unequal for formatter provenance.
+
+The unconfigured graph derives capability, test/suite scalar metadata,
+distinct `tests`/`$implicit_tests` label attributes, explicitness, and
+deduplicated ordinary edges in one match over finished package state. Existing
+package and graph DICE keys own equality and invalidation; no lock, discovery,
+global state, or fresh graph is needed. V1/Buck test semantics remain rejected;
+only compact collection and Arc-slice patterns are reused. Terra-medium
+audited, root resolved provenance against `fd4c5da0`, and Sol-low returned
+`ACCEPT`. Gate A may now implement loading/graph metadata only.
