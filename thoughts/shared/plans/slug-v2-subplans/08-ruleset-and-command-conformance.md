@@ -1997,3 +1997,9 @@ non-`label_kind` Stage 1 names; never claim Slug 31/31. Two Bazel label-kind
 rows constrain generated-file representation only and require focused
 `QueryNodeKind::GeneratedFile` assertions. Preserve output→own-generator,
 select-key exclusion, valid dedup, and fail-fast contracts.
+
+Stage 4 Gate A `1b7c179c` is accepted without function activation. Its ordered
+immutable metadata, generated owner identity, equality, same-DICE tracker, and
+preactivation guard are the loading substrate. Stage 8 `labels` is next:
+exactly 29 CLI rows plus two focused `QueryNodeKind::GeneratedFile` assertions;
+never claim Slug 31/31 before its formatter boundary.

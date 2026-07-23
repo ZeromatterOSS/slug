@@ -677,3 +677,14 @@ errors are pinned. Worker `…/20260723-071512-784968-bazel` and root
 diff/provenance/generated/credential-pattern checks; pytest unavailable; Sol
 `ACCEPT`. This is Bazel evidence only: 29 rows are eventual Slug CLI gate and
 two `label_kind` rows require focused `QueryNodeKind::GeneratedFile` assertions.
+
+Stage 4 Gate A is accepted in `1b7c179c` (`feat: retain loading attribute
+metadata`) with no `labels` activation: ordered immutable `Allocative`
+seven-label-kind-plus-String schema/values retain defaults, configurability,
+provenance/select structure, canonical generated identity/owner, outputs
+outside ordinary deps, and semantic equality. Same-DICE tracker proves
+`BzlModuleEval` → `PackageLoad` → consumer/observer; a preactivation guard
+prevents leakage. Root passed fmt/diff, loading 35/query 39/analysis 11. Sol
+corrected six initial blockers and rereviewed `ACCEPT`; root added nested
+repeated-prefix ordering regression. Next is Stage 8: 29 CLI plus two
+generated-kind assertions, never Slug 31/31 prematurely.

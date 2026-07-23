@@ -806,3 +806,11 @@ covered; dormant attrs excluded. 29 rows are future CLI; two `label_kind` rows
 are Bazel-only generated-file representation evidence pending
 `QueryNodeKind::GeneratedFile`. Worker/root runs and all fixture checks passed;
 pytest unavailable; Sol `ACCEPT`.
+
+Gate A implementation `1b7c179c` is accepted with no query activation. It
+retains ordered immutable `Allocative` seven-label-kind-plus-String metadata,
+defaults/configurability/provenance/selectors, canonical generated owner,
+outputs outside ordinary deps, semantic equality, same-DICE
+`BzlModuleEval`→`PackageLoad`→consumer/observer tracking, and a preactivation
+guard. Root passed fmt/diff, loading 35/query 39/analysis 11; Sol corrected six
+blockers then `ACCEPT`. Stage 8 remains 29 CLI plus two generated-kind rows.

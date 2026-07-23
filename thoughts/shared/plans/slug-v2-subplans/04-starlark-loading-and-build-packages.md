@@ -598,3 +598,15 @@ label-bearing attrs, dormant exclusion, select-key false, valid dedup, two
 output producers with distinct generated-file owners/edges, and fail-fast
 missing/mandatory errors. 29 normal rows are future CLI evidence; two
 label-kind rows require focused `QueryNodeKind::GeneratedFile` tests first.
+
+### Gate A implementation accepted (2026-07-23)
+
+`1b7c179c` lands the substrate without activating `labels`: ordered immutable
+`Allocative` seven-label-kind-plus-String schemas/values, exact
+defaults/configurability/provenance/select structure, canonical generated
+identity/owner, outputs excluded from ordinary deps, and semantic equality.
+Same-DICE tracker covers `BzlModuleEval`→`PackageLoad`→consumer/observer; a
+preactivation query guard forbids leakage. Root passed fmt/diff, loading
+35/query 39/analysis 11. Sol's six initial blockers were corrected; rereview
+`ACCEPT`, including root's nested repeated-prefix order regression. Next Stage
+8 is limited to 29 CLI rows plus two generated-kind assertions.

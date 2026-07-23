@@ -1241,3 +1241,11 @@ distinct output generators, generated kind, and fail-fast errors. 29 rows are
 eventual Slug CLI evidence; two `label_kind` rows remain Bazel-only until
 focused `QueryNodeKind::GeneratedFile` assertions. No extraction decision
 changes.
+
+Gate A `1b7c179c` is accepted and V2-owned: ordered immutable `Allocative`
+seven-label-kind-plus-String schemas/values, defaults/configurability,
+provenance/select structure, canonical generated owner, outputs outside deps,
+equality, same-DICE tracker, and preactivation guard. No V1/Buck semantics
+entered. Root passed fmt/diff, loading 35/query 39/analysis 11; Sol corrected
+six blockers then `ACCEPT`. Next is Stage 8's 29 CLI rows plus two
+generated-kind assertions.
