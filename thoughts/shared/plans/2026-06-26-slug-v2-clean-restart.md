@@ -622,3 +622,48 @@ server, 14 existing CLI integration, 2 graph integration, and 1 CLI unit
 tests. Sol-low accepted the final comparator correction. Gate B is complete;
 the next M3 packet must address one of the seven still-deferred ordinary query
 functions rather than extending this formatter.
+
+## Authoritative Next M3 Packet: Labels Metadata Foundation (2026-07-23)
+
+`WP-4-8-m3-labels-metadata-foundation` is next. It supersedes tentative
+`filter()`: Bazel `RegexFilterExpression` uses Java `Pattern.compile` and
+`Matcher.find`, and no exact implementation/reusable dependency is known.
+Finite oracle or `fancy-regex`/Rust `regex` agreement is not parity, so filter
+remains blocked.
+
+The packet has three serial commits: immutable Bazel oracle, Stage 4 metadata
+substrate with no activation, then Stage 8 `labels` activation. Stage 4 replaces
+`RuleDefinitionGen::has_deps` with ordered immutable, `Allocative` schema and
+coerced-value structures. They retain exact attribute kind/name, query spelling
+(`_implicit` becomes `$implicit`), mandatory/default/configurability state,
+`Explicit | Default | Implicit` provenance, scalar/list labels, non-label
+values, and unevaluated `select()` branches/default/concatenation. Canonical
+labels are coerced during package construction; values are not flattened to
+the aggregate dependency edge list. Output/output-list attributes retain their
+exact label form and create Bazel-shaped generated targets owned by the
+declaring rule before query activation. All semantic state participates in
+`LoadedPackage` equality.
+
+Stage 8 adds a separate compact attribute projection to `QueryNode` and then
+activates only `labels`: rule prerequisites resolve through the existing
+demand-loaded package graph, absent/non-label attributes and non-rules are
+empty, and label uniqueness follows the query set. Authority is Bazel 9.2
+`LabelsFunction`, `BlazeTargetAccessor#getPrerequisites`,
+`AggregatingAttributeMapper#getReachableLabels`, and
+`AbstractQueryTest#testLabelsOperator` at `8220c619…`. The oracle covers
+scalar/list, explicit/default/implicit, missing/non-label, every configurable
+branch and default, accepted concatenation, source and generated output labels,
+cross-package resolution, order/dedup, compositions, and missing prerequisites.
+The attribute projection and generated nodes participate in
+`QueryNode`/`UnconfiguredPackageGraph` equality. Same-daemon edits cover each
+semantic form while semantically equal/non-semantic formatting reuses values.
+
+Own `slug_loading_v2/{attrs,package}.rs`, then query
+`{expr,evaluator,graph}.rs`; add no key, scan, global identity, guessed
+configuration, visibility, executable, or tests surface. The only generated
+surface admitted is the exact output/output-list target representation required
+by `labels`; its ownership, kind, and graph edges must be oracle-backed. Stop
+before activation for any missing reachable-label form, output-target
+ambiguity, coercion/provenance ambiguity, or query-time Starlark/filesystem
+work. Reuse only Buck2 compact utility and traversal shapes; V1/Buck2 `labels`
+is unimplemented and reference-only.

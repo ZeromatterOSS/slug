@@ -547,3 +547,48 @@ root also passed analysis 11 and query 22 integrations. Sol-low accepted
 symlink, validator, alignment, lifecycle/non-over-invalidation, and memory
 accounting corrections. Stage 8 algebra and registry activation remain
 pending; nine functions remain deferred.
+
+## WP-4-8-m3-labels-metadata-foundation: Stage 4 Gate A (2026-07-23)
+
+Authoritative next packet; oracle/implementation pending; Gate A activates no
+query function. Replace `RuleDefinitionGen::has_deps` with a V2-owned ordered
+immutable schema. Each entry retains declaration/query names (`_foo`/`$foo`),
+an extensible exact attribute-kind enum, mandatory/default/configurability
+state, and dependency reachability. Each `PackageTarget` rule instance retains
+an ordered immutable value map with `Explicit | Default | Implicit`
+provenance. Coerced values preserve scalar labels, label lists, explicit
+non-label kinds, and `select()` branches/default/accepted concatenation;
+canonicalize labels during package construction. Do not flatten the structure
+to dependencies or a reachable-label list. Add exact output and output-list
+attribute kinds: their coerced values create generated-file package targets
+with retained declaring-rule ownership. Do not infer output identity or edges
+from filenames.
+
+Use compact `SmallMap`/`SmallSet` and immutable shared slices/strings where
+appropriate, derive `Allocative`, and include schema, provenance, value
+structure, selector order/defaults, and labels in `LoadedPackage` equality
+(never frozen-module pointer identity). Prefer a new
+`app/slug_loading_v2/src/attrs.rs` owned by the package loader.
+
+Oracle: Bazel 9.2 `BlazeTargetAccessor#getPrerequisites` and
+`AggregatingAttributeMapper#getReachableLabels`, and
+`AbstractQueryTest#testLabelsOperator` at `8220c619…`: `attr.label`,
+`attr.label_list`, explicit/omitted/empty/mandatory values, absent and existing
+non-label attrs, `_implicit` versus `$implicit`, every configurable branch and
+default, accepted selector concatenation, `attr.output`/`attr.output_list`,
+duplicate/source/generated/cross-package labels, and missing prerequisites.
+Fixture evidence decides whether condition keys enter each attribute's
+reachable-label contract and fixes generated target kind, owner, and graph
+edges.
+
+Same-daemon edits cover explicit BUILD values, `.bzl` schema/default and
+implicit-default changes, selector branch/default/type/name changes, deletion
+and recreation, and unrelated/non-semantic edits. They prove the existing
+`BzlModuleEvalKey` → `PackageLoadKey` → package-graph invalidation path; add no
+DICE key, direct read, global interner, or configuration evaluator. Stop on
+coercion/provenance ambiguity, unsupported exposed label-bearing forms, or any
+attempt to evaluate only a guessed/default selector branch. A generated target
+representation beyond the exact output/output-list surface required here is a
+stop. Buck2 attribute files supply utility/traversal shapes only; reject Buck
+cell, select, attr, and provider semantics. V1 `labels` is
+unimplemented/reference-only.

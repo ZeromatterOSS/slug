@@ -1209,3 +1209,28 @@ loading-query, 6 parser/registry, 15 server, 14 existing CLI integration, 2
 graph integration, and 1 CLI unit tests. Sol-low returned final `ACCEPT`.
 Seven ordinary query functions remain deferred; B2 adds no new function,
 DICE key, filesystem boundary, or global state.
+
+### WP-4-8-m3-labels-metadata-foundation — reviewed extraction decision
+
+Authoritative next packet; pending. Sol-low rejected Terra's initial `filter`
+recommendation: Java `Pattern.compile`/`Matcher.find` has no exact reusable
+path; finite oracle, fancy-regex, and Rust regex are not parity.
+
+Port no V1 labels code: `slug-v1-archive:app/slug_query/src/query/syntax/simple/
+functions.rs#labels` is unimplemented. Buck2
+`buck2_node/src/attrs/{attr,attr_type,coerced_attr,traversal,spec}.rs` and
+`app/buck2_query/src/query/syntax/simple/eval/set.rs` provide compact
+map/set/shared-slice/string and traversal shapes only. Reject Buck
+cells/labels, attribute kinds, provider labels, select/configured-dependency,
+visibility/plugin, and regex/query semantics. Stage 4 owns ordered immutable
+schema, structured coerced values/provenance/selectors, and canonical labels;
+Stage 4 also owns the exact output/output-list generated-target representation
+required by upstream `labels(outs, ...)`. Stage 8 owns only the separate
+reachable-label projection and `labels` function. `LoadedPackage`,
+`QueryNode`, and `UnconfiguredPackageGraph` equality include their semantic
+structures, never frozen lifetimes.
+Authority:
+`LabelsFunction`, `BlazeTargetAccessor#getPrerequisites`,
+`AggregatingAttributeMapper#getReachableLabels`, and
+`AbstractQueryTest#testLabelsOperator` at `8220c619…`. Add formal ledger entry
+after implementation with source/mode, oracle, validation, and residual risk.

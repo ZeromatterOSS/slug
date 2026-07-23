@@ -1962,3 +1962,32 @@ server, 14 existing CLI integration, 2 graph integration, and 1 CLI unit
 tests. Sol-low's focused correction review returned `ACCEPT`. Exactly
 `buildfiles` and `loadfiles` are active; seven ordinary loading-query
 functions remain deferred.
+
+## WP-4-8-m3-labels-metadata-foundation: Stage 8 Gate B (2026-07-23)
+
+After Gate A acceptance activate only `labels(attr, expr)`. Bazel authority:
+`LabelsFunction.java`, `BlazeTargetAccessor#getPrerequisites`, and
+`AggregatingAttributeMapper#getReachableLabels`; evaluate the operand once,
+ignore non-rules, return named reachable labels, and retain normal query-set
+dedup. Absent/non-label is empty; explicit, implicit `$`, default, and every
+`select()` branch are required. `QueryNode` owns a compact immutable attribute
+projection separate from `dependencies`; never infer an attr by filtering the
+aggregate edge list. Cross-package/source prerequisites resolve through the
+existing demand-loaded `UnconfiguredPackageGraphKey` path. Output/output-list
+values resolve to the Stage 4 generated-file nodes required by Bazel's
+`labels(outs, ...)` rows; their kind, owner, and edges follow the oracle rather
+than inference. The projection and generated nodes participate in
+`QueryNode`/`UnconfiguredPackageGraph` semantic equality.
+
+Reuse the immutable oracle and add exact CLI nesting/set/composition,
+AUTO/FULL order/dedup, missing-prerequisite diagnostics, and retained-daemon
+mutation coverage. Own query
+`{expr,evaluator,graph}.rs` and focused command/server tests. Do not activate
+`attr` or `filter`: both await exact Java Pattern; fancy-regex/Rust regex and
+finite evidence are rejected. No DICE state, filesystem, configured analysis,
+visibility, executable, or test-suite scope. Generated-file scope is limited to
+the exact output/output-list representation required for `labels`. Hard-stop
+rather than activate when a known unconfigured reachable-label form is
+unsupported. Same-daemon schema/value/select/default/output edits must activate
+the demand-loaded package graph, while semantically equal and non-semantic edits
+reuse it.
