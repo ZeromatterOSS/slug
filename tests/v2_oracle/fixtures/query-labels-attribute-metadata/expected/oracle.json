@@ -1,0 +1,741 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "labels(one, //pkg:explicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(one, //pkg:explicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "scalar_explicit",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:source.txt",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-071405-782758-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-071512-784968-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: ccf08d7c-c798-4b84-828e-3190a2b00a8a\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(many, //pkg:explicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(many, //pkg:explicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "label_list_explicit_cross_package",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
+      "stderr": "INFO: Invocation ID: d0b691c6-44e0-4791-a648-a85f6c3e4d62\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(with_default, //pkg:omitted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(with_default, //pkg:omitted)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "label_list_omitted_default",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:default.txt",
+      "stderr": "INFO: Invocation ID: 2eb8a53b-5d26-47be-a6a9-06252f7c60c7\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:default.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(many, //pkg:empty)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(many, //pkg:empty)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "label_list_explicit_empty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 207f415e-f9e2-4cfe-92f3-2f05fa26310c\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels(note, //pkg:explicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(note, //pkg:explicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "existing_non_label_attribute",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e972e48f-6e7a-472c-80be-144b158e480d\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels(no_such_attr, //pkg:explicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(no_such_attr, //pkg:explicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "absent_attribute",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: dac305d0-191d-434a-a827-63e7c43deeeb\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels($implicit, //pkg:implicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels($implicit, //pkg:implicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "implicit_attribute_dollar_spelling",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:implicit.txt",
+      "stderr": "INFO: Invocation ID: f9564bc7-3f24-4c39-80ea-d10bd106754d\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:implicit.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(_implicit, //pkg:implicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(_implicit, //pkg:implicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "implicit_attribute_wrong_spelling",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 88be2275-f645-44d0-8a3b-a843d7a5ec4c\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels(chosen, //pkg:selecting)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(chosen, //pkg:selecting)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "selector_all_branches_default_no_keys",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt",
+      "stderr": "INFO: Invocation ID: af6f9ef6-ac0b-4129-a26f-256337135b86\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(combined, //pkg:selecting)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(combined, //pkg:selecting)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "selector_concatenation_deduplicates",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt\n//pkg:shared.txt",
+      "stderr": "INFO: Invocation ID: f4ceec7a-c6a7-49c7-a21a-26e8641b43cd\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt\n//pkg:shared.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(out, //pkg:outputs)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(out, //pkg:outputs)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "output_scalar_generated_target",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:one.out",
+      "stderr": "INFO: Invocation ID: aacad3ba-c63e-4cf2-bfca-cbdd30596515\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:one.out\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "labels(out, //pkg:outputs)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "labels(out, //pkg:outputs)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "output_scalar_generated_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "generated file //pkg:one.out",
+      "stderr": "INFO: Invocation ID: eb6b9aa2-6b75-43c0-8f0f-e4a8999bc8d5\nLoading: 0 packages loaded\n",
+      "stdout": "generated file //pkg:one.out\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(outs, //pkg:outputs)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(outs, //pkg:outputs)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "output_list_generated_targets",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:three.out\n//pkg:two.out",
+      "stderr": "INFO: Invocation ID: 30ebd6f9-1ca6-4eee-ad68-c0074cb2aae2\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:three.out\n//pkg:two.out\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "labels(outs, //pkg:outputs)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "labels(outs, //pkg:outputs)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "output_list_generated_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "generated file //pkg:three.out\ngenerated file //pkg:two.out",
+      "stderr": "INFO: Invocation ID: 998499bb-fbe7-43a5-aa74-7798ea884823\nLoading: 0 packages loaded\n",
+      "stdout": "generated file //pkg:three.out\ngenerated file //pkg:two.out\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(outs, //pkg:outputs_two)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(outs, //pkg:outputs_two)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "second_output_producer_generated_targets",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:five.out\n//pkg:six.out",
+      "stderr": "INFO: Invocation ID: d37a38f7-315c-46cf-8bf1-d3a82a5ab332\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:five.out\n//pkg:six.out\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(labels(outs, //pkg:outputs))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(labels(outs, //pkg:outputs))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "outputs_reach_generating_rule",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:outputs\n//pkg:three.out\n//pkg:two.out",
+      "stderr": "INFO: Invocation ID: d4de9890-20e7-4dba-8f4b-79905e2b6b99\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:outputs\n//pkg:three.out\n//pkg:two.out\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "deps(labels(outs, //pkg:outputs) union //pkg:outputs)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "deps(labels(outs, //pkg:outputs) union //pkg:outputs)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "outputs_and_generating_rule_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:three.out/n//pkg:two.out\"\n  \"//pkg:three.out/n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}",
+      "stderr": "INFO: Invocation ID: 35147415-700e-4c19-b97b-f92f8af67536\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:three.out\\n//pkg:two.out\"\n  \"//pkg:three.out\\n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(labels(outs, //pkg:outputs) union //pkg:outputs)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(labels(outs, //pkg:outputs) union //pkg:outputs)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "outputs_and_generating_rule_deps",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:outputs\n//pkg:three.out\n//pkg:two.out",
+      "stderr": "INFO: Invocation ID: 3b45b148-3ead-4c0a-852a-f46fa1978f96\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:outputs\n//pkg:three.out\n//pkg:two.out\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(labels(outs, //pkg:outputs) union labels(outs, //pkg:outputs_two) union //pkg:outputs union //pkg:outputs_two)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(labels(outs, //pkg:outputs) union labels(outs, //pkg:outputs_two) union //pkg:outputs union //pkg:outputs_two)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "distinct_output_generators_deps",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:five.out\n//pkg:outputs\n//pkg:outputs_two\n//pkg:six.out\n//pkg:three.out\n//pkg:two.out",
+      "stderr": "INFO: Invocation ID: b1e78171-35f4-421e-b046-e5535f425544\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:five.out\n//pkg:outputs\n//pkg:outputs_two\n//pkg:six.out\n//pkg:three.out\n//pkg:two.out\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "deps(labels(outs, //pkg:outputs) union labels(outs, //pkg:outputs_two) union //pkg:outputs union //pkg:outputs_two)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "deps(labels(outs, //pkg:outputs) union labels(outs, //pkg:outputs_two) union //pkg:outputs union //pkg:outputs_two)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "distinct_output_generators_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:six.out/n//pkg:five.out\"\n  \"//pkg:six.out/n//pkg:five.out\" -> \"//pkg:outputs_two\"\n  \"//pkg:outputs_two\"\n  \"//pkg:three.out/n//pkg:two.out\"\n  \"//pkg:three.out/n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}",
+      "stderr": "INFO: Invocation ID: 2502d88c-94de-4066-89a9-129830626cf1\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:six.out\\n//pkg:five.out\"\n  \"//pkg:six.out\\n//pkg:five.out\" -> \"//pkg:outputs_two\"\n  \"//pkg:outputs_two\"\n  \"//pkg:three.out\\n//pkg:two.out\"\n  \"//pkg:three.out\\n//pkg:two.out\" -> \"//pkg:outputs\"\n  \"//pkg:outputs\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(string_labels, //pkg:dicts)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(string_labels, //pkg:dicts)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "string_keyed_label_dict_values",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
+      "stderr": "INFO: Invocation ID: a7453795-ad56-4a06-a6f9-08385a333940\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(label_strings, //pkg:dicts)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(label_strings, //pkg:dicts)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "label_keyed_string_dict_keys",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:default.txt",
+      "stderr": "INFO: Invocation ID: 2ebac9ee-981f-4a60-8de7-0d0597d9caa8\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:default.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(label_lists, //pkg:dicts)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(label_lists, //pkg:dicts)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "label_list_dict_values",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:implicit.txt\n//pkg:source.txt",
+      "stderr": "INFO: Invocation ID: 7d3594a9-a2c2-4eb1-bf42-e99620f40de7\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:implicit.txt\n//pkg:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(many, set(//pkg:source.txt //pkg:alias //pkg:BUILD.bazel))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(many, set(//pkg:source.txt //pkg:alias //pkg:BUILD.bazel))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "source_alias_and_build_operands",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 98ab3aac-006f-4a46-ad98-8a25a5c51e8e\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "labels(many, set(//pkg:explicit //pkg:explicit //other:consumer))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(many, set(//pkg:explicit //pkg:explicit //other:consumer))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "duplicate_and_cross_package_composition",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
+      "stderr": "INFO: Invocation ID: 12b96d4c-940c-44bb-b087-b2bc57d40389\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(one, //pkg:explicit) union labels(with_default, //pkg:omitted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(one, //pkg:explicit) union labels(with_default, //pkg:omitted)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "union_composition",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:default.txt\n//pkg:source.txt",
+      "stderr": "INFO: Invocation ID: 44ab15d5-8db2-4119-ab91-f07a6968fdbe\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:default.txt\n//pkg:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(many, //pkg:explicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(many, //pkg:explicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "default_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
+      "stderr": "INFO: Invocation ID: 62b587cf-07fc-41bb-9e09-306741b390ed\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "labels(many, //pkg:explicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "labels(many, //pkg:explicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "auto_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//other:cross.txt\n//pkg:source.txt",
+      "stderr": "INFO: Invocation ID: 4471067d-d01b-452d-bc35-72957572d89d\nLoading: 0 packages loaded\n",
+      "stdout": "//other:cross.txt\n//pkg:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "labels(many, //pkg:explicit)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "labels(many, //pkg:explicit)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:source.txt\n//other:cross.txt",
+      "stderr": "INFO: Invocation ID: 9ff54fa3-ca3b-4d9d-bf4f-59d975da1668\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:source.txt\n//other:cross.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(many, //pkg:missing_ref)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(many, //pkg:missing_ref)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_referenced_target",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('many', //pkg:missing_ref)\" failed: in 'many' of rule //pkg:missing_ref: no such package 'does_not_exist': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - does_not_exist",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 6221a5c1-2a3f-48a8-bd73-c3438c502283\nLoading: 0 packages loaded\nERROR: Evaluation of query \"labels('many', //pkg:missing_ref)\" failed: in 'many' of rule //pkg:missing_ref: no such package 'does_not_exist': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - does_not_exist\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//broken:must"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//broken:must"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "mandatory_attribute_package_error",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/broken/BUILD.bazel:3:10: //broken:must: missing value for mandatory attribute 'required' in 'must_rule' rule\nERROR: Evaluation of query \"//broken:must\" failed",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 03a16f3a-01c2-4980-93ad-e1d84e22da1c\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-071512-784968-bazel/workspace/broken/BUILD.bazel:3:10: //broken:must: missing value for mandatory attribute 'required' in 'must_rule' rule\nERROR: Evaluation of query \"//broken:must\" failed\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "query-labels-attribute-metadata",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

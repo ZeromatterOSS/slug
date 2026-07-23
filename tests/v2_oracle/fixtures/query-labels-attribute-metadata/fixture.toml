@@ -1,0 +1,218 @@
+[fixture]
+name = "query-labels-attribute-metadata"
+description = "Bazel 9.2 ordinary-query oracle for labels() attribute metadata, selector reachability, and output targets."
+comparison = "message_shape"
+oracle_notes = "Root-repository ordinary-query metadata gate only. This fixture establishes loading-owned attribute schema/coercion/provenance and the later labels() projection; it accepts neither regex, configured-query, visibility, executable, nor test semantics."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/LabelsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeTargetAccessor.java#getPrerequisites",
+  "src/main/java/com/google/devtools/build/lib/packages/AggregatingAttributeMapper.java#getReachableLabels",
+  "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkAttrModuleApi.java#labelAttribute",
+  "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkAttrModuleApi.java#labelListAttribute",
+  "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkAttrModuleApi.java#stringKeyedLabelDictAttribute",
+  "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkAttrModuleApi.java#labelKeyedStringDictAttribute",
+  "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkAttrModuleApi.java#labelListDictAttribute",
+  "src/main/java/com/google/devtools/build/lib/packages/BuildType.java#LABEL_DICT_UNARY",
+  "src/main/java/com/google/devtools/build/lib/packages/BuildType.java#LABEL_KEYED_STRING_DICT",
+  "src/main/java/com/google/devtools/build/lib/packages/BuildType.java#LABEL_LIST_DICT",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryEnvironment.java#getTargetsMatchingPatternImpl",
+  "src/main/java/com/google/devtools/build/lib/query2/query/LabelVisitor.java#visitTargetNode",
+  "src/main/java/com/google/devtools/build/lib/packages/OutputFile.java#getGeneratingRule",
+  "src/main/java/com/google/devtools/build/lib/packages/OutputFile.java#getTargetKind",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testLabelsOperator",
+]
+translation_notes = "The public unconfigured label-bearing attr set audited from StarlarkAttrModuleApi/BuildType is label, label_list, string_keyed_label_dict, label_keyed_string_dict, label_list_dict, output, and output_list; dormant_label variants are experimental/documented false and excluded. BlazeTargetAccessor calls getReachableLabels(attribute, false): selector condition keys are excluded. Direct labels(outs, ...) returns generated targets; output graph/deps observers distinguish each producer. Mandatory-attribute and fail-fast missing-prerequisite rows retain observed Bazel behavior."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-labels-attribute-metadata --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-labels-attribute-metadata --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "scalar_explicit"
+argv = ["query", "labels(one, //pkg:explicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:source\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "label_list_explicit_cross_package"
+argv = ["query", "labels(many, //pkg:explicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A//other:cross\\.txt\\n//pkg:source\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "label_list_omitted_default"
+argv = ["query", "labels(with_default, //pkg:omitted)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:default\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "label_list_explicit_empty"
+argv = ["query", "labels(many, //pkg:empty)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "existing_non_label_attribute"
+argv = ["query", "labels(note, //pkg:explicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "absent_attribute"
+argv = ["query", "labels(no_such_attr, //pkg:explicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "implicit_attribute_dollar_spelling"
+argv = ["query", "labels($implicit, //pkg:implicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:implicit\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "implicit_attribute_wrong_spelling"
+argv = ["query", "labels(_implicit, //pkg:implicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "selector_all_branches_default_no_keys"
+argv = ["query", "labels(chosen, //pkg:selecting)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:branch_arm\\.txt\\n//pkg:branch_default\\.txt\\n//pkg:branch_linux\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "selector_concatenation_deduplicates"
+argv = ["query", "labels(combined, //pkg:selecting)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:branch_arm\\.txt\\n//pkg:branch_default\\.txt\\n//pkg:branch_linux\\.txt\\n//pkg:shared\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "output_scalar_generated_target"
+argv = ["query", "labels(out, //pkg:outputs)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:one\\.out\\n?\\Z"]
+
+[[commands]]
+name = "output_scalar_generated_label_kind"
+argv = ["query", "--output=label_kind", "labels(out, //pkg:outputs)"]
+expected_exit = 0
+stdout_patterns = ["\\Agenerated file //pkg:one\\.out\\n?\\Z"]
+
+[[commands]]
+name = "output_list_generated_targets"
+argv = ["query", "labels(outs, //pkg:outputs)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:three\\.out\\n//pkg:two\\.out\\n?\\Z"]
+
+[[commands]]
+name = "output_list_generated_label_kind"
+argv = ["query", "--output=label_kind", "labels(outs, //pkg:outputs)"]
+expected_exit = 0
+stdout_patterns = ["\\Agenerated file //pkg:three\\.out\\ngenerated file //pkg:two\\.out\\n?\\Z"]
+
+[[commands]]
+name = "second_output_producer_generated_targets"
+argv = ["query", "labels(outs, //pkg:outputs_two)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:five\\.out\\n//pkg:six\\.out\\n?\\Z"]
+
+[[commands]]
+name = "outputs_reach_generating_rule"
+argv = ["query", "deps(labels(outs, //pkg:outputs))"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:outputs\\n//pkg:three\\.out\\n//pkg:two\\.out\\n?\\Z"]
+
+[[commands]]
+name = "outputs_and_generating_rule_graph"
+argv = ["query", "--output=graph", "--graph:factored", "deps(labels(outs, //pkg:outputs) union //pkg:outputs)"]
+expected_exit = 0
+stdout_patterns = ["\\\"//pkg:(?:two\\.out/n//pkg:three\\.out|three\\.out/n//pkg:two\\.out)\\\" -> \\\"//pkg:outputs\\\""]
+
+[[commands]]
+name = "outputs_and_generating_rule_deps"
+argv = ["query", "deps(labels(outs, //pkg:outputs) union //pkg:outputs)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:outputs\\n//pkg:three\\.out\\n//pkg:two\\.out\\n?\\Z"]
+
+[[commands]]
+name = "distinct_output_generators_deps"
+argv = ["query", "deps(labels(outs, //pkg:outputs) union labels(outs, //pkg:outputs_two) union //pkg:outputs union //pkg:outputs_two)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:five\\.out\\n//pkg:outputs\\n//pkg:outputs_two\\n//pkg:six\\.out\\n//pkg:three\\.out\\n//pkg:two\\.out\\n?\\Z"]
+
+[[commands]]
+name = "distinct_output_generators_graph"
+argv = ["query", "--output=graph", "--graph:factored", "deps(labels(outs, //pkg:outputs) union labels(outs, //pkg:outputs_two) union //pkg:outputs union //pkg:outputs_two)"]
+expected_exit = 0
+stdout_patterns = ["\\\"//pkg:(?:two\\.out/n//pkg:three\\.out|three\\.out/n//pkg:two\\.out)\\\" -> \\\"//pkg:outputs\\\"", "\\\"//pkg:(?:five\\.out/n//pkg:six\\.out|six\\.out/n//pkg:five\\.out)\\\" -> \\\"//pkg:outputs_two\\\""]
+
+[[commands]]
+name = "string_keyed_label_dict_values"
+argv = ["query", "labels(string_labels, //pkg:dicts)"]
+expected_exit = 0
+stdout_patterns = ["\\A//other:cross\\.txt\\n//pkg:source\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "label_keyed_string_dict_keys"
+argv = ["query", "labels(label_strings, //pkg:dicts)"]
+expected_exit = 0
+stdout_patterns = ["\\A//other:cross\\.txt\\n//pkg:default\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "label_list_dict_values"
+argv = ["query", "labels(label_lists, //pkg:dicts)"]
+expected_exit = 0
+stdout_patterns = ["\\A//other:cross\\.txt\\n//pkg:implicit\\.txt\\n//pkg:source\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "source_alias_and_build_operands"
+argv = ["query", "labels(many, set(//pkg:source.txt //pkg:alias //pkg:BUILD.bazel))"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "duplicate_and_cross_package_composition"
+argv = ["query", "labels(many, set(//pkg:explicit //pkg:explicit //other:consumer))"]
+expected_exit = 0
+stdout_patterns = ["\\A//other:cross\\.txt\\n//pkg:source\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "union_composition"
+argv = ["query", "labels(one, //pkg:explicit) union labels(with_default, //pkg:omitted)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:default\\.txt\\n//pkg:source\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "default_order"
+argv = ["query", "labels(many, //pkg:explicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A//other:cross\\.txt\\n//pkg:source\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "auto_order"
+argv = ["query", "--order_output=auto", "labels(many, //pkg:explicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A//other:cross\\.txt\\n//pkg:source\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "full_order"
+argv = ["query", "--order_output=full", "labels(many, //pkg:explicit)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:source\\.txt\\n//other:cross\\.txt\\n?\\Z"]
+
+[[commands]]
+name = "missing_referenced_target"
+argv = ["query", "labels(many, //pkg:missing_ref)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["in 'many' of rule //pkg:missing_ref: no such package 'does_not_exist'", "Evaluation of query"]
+
+[[commands]]
+name = "mandatory_attribute_package_error"
+argv = ["query", "//broken:must"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["missing value for mandatory attribute 'required'", "Evaluation of query"]

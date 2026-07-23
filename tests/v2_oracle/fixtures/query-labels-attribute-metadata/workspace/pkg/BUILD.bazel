@@ -1,0 +1,48 @@
+load(":defs.bzl", "must_rule", "output_rule", "probe_rule")
+
+config_setting(name = "linux", values = {"cpu": "k8"})
+config_setting(name = "arm", values = {"cpu": "arm"})
+
+exports_files([
+    "BUILD.bazel",
+    "source.txt",
+    "default.txt",
+    "implicit.txt",
+    "branch_linux.txt",
+    "branch_arm.txt",
+    "branch_default.txt",
+    "shared.txt",
+])
+
+probe_rule(
+    name = "explicit",
+    one = ":source.txt",
+    many = [":source.txt", "//other:cross.txt"],
+)
+
+probe_rule(name = "omitted")
+probe_rule(name = "empty", many = [])
+probe_rule(name = "implicit")
+probe_rule(
+    name = "selecting",
+    chosen = select({
+        ":linux": [":branch_linux.txt"],
+        ":arm": [":branch_arm.txt"],
+        "//conditions:default": [":branch_default.txt"],
+    }),
+    combined = [":shared.txt"] + select({
+        ":linux": [":branch_linux.txt", ":shared.txt"],
+        ":arm": [":branch_arm.txt"],
+        "//conditions:default": [":branch_default.txt", ":shared.txt"],
+    }),
+)
+output_rule(name = "outputs", out = "one.out", outs = ["two.out", "three.out"])
+output_rule(name = "outputs_two", out = "four.out", outs = ["five.out", "six.out"])
+probe_rule(
+    name = "dicts",
+    string_labels = {"first": ":source.txt", "cross": "//other:cross.txt"},
+    label_strings = {":default.txt": "default", "//other:cross.txt": "cross"},
+    label_lists = {"local": [":implicit.txt", ":source.txt"], "cross": ["//other:cross.txt"]},
+)
+alias(name = "alias", actual = ":explicit")
+probe_rule(name = "missing_ref", many = ["//does_not_exist:nope"])
