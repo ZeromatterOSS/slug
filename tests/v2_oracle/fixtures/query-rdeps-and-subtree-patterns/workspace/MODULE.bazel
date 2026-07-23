@@ -1,0 +1,1 @@
+module(name = "query_rdeps_and_subtree_patterns", version = "0.1.0")

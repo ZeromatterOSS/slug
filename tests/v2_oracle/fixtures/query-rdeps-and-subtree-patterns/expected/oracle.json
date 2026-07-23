@@ -1,0 +1,614 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//tree/left/..."
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//tree/left/..."
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "subtree_existing_nested_rule_only",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:cross_only\n//tree/left:custom_parent\n//tree/left:cycle_a\n//tree/left:cycle_b\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:via_alias\n//tree/left/nested:nested",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-rdeps-and-subtree-patterns/20260723-004133-413804-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-rdeps-and-subtree-patterns/20260723-004211-416202-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: b1737391-5c22-4195-a49c-d25d92ae941b\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:cross_only\n//tree/left:custom_parent\n//tree/left:cycle_a\n//tree/left:cycle_b\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:via_alias\n//tree/left/nested:nested\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//nonpackage/..."
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//nonpackage/..."
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "subtree_nonpackage_prefix",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//nonpackage/desc:desc",
+      "stderr": "INFO: Invocation ID: 0ff68854-4911-4358-9b58-8636a809aed6\nLoading: 0 packages loaded\n",
+      "stdout": "//nonpackage/desc:desc\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//empty/..."
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//empty/..."
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "subtree_empty_prefix",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no targets found beneath 'empty'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 2bb33525-8577-48df-b542-ffb11e49bd9f\nLoading: 0 packages loaded\nERROR: no targets found beneath 'empty'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//missing/..."
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//missing/..."
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "subtree_missing_prefix",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no targets found beneath 'missing'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 14413494-f771-48fb-be82-b5d66242d0e7\nLoading: 0 packages loaded\nERROR: no targets found beneath 'missing'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//..., //tree/left:source.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//..., //tree/left:source.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_unbounded_source_seed",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only",
+      "stderr": "INFO: Invocation ID: 44b6057b-560f-469d-90f6-1473005e7aa3\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//..., //tree/left:source.txt, 0)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//..., //tree/left:source.txt, 0)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_depth_zero",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:source.txt",
+      "stderr": "INFO: Invocation ID: 150132a1-fc78-4dd7-9ee4-eb2fc962f593\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//..., //tree/left:source.txt, 1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//..., //tree/left:source.txt, 1)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_depth_one",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/right:right_both\n//tree/right:right_cross_only",
+      "stderr": "INFO: Invocation ID: 927371ea-7e9d-483e-89e9-131b1b144242\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/right:right_both\n//tree/right:right_cross_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//..., //tree/left:source.txt, 2)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//..., //tree/left:source.txt, 2)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_depth_two",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only",
+      "stderr": "INFO: Invocation ID: 22cd980c-69fa-4c77-9ab8-e83b24410a85\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//tree/right:right_parent, //tree/left:source.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//tree/right:right_parent, //tree/left:source.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_seed_outside_universe_closure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 88ac8693-9782-447e-b68a-ef297094b0be\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(set(//tree/left:parent_one //tree/right:right_parent), //tree/left:source.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(set(//tree/left:parent_one //tree/right:right_parent), //tree/left:source.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_multiple_universe_roots",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:parent_one\n//tree/left:source.txt",
+      "stderr": "INFO: Invocation ID: bfcee843-b3c3-4ab5-af27-368d87cbaddb\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:parent_one\n//tree/left:source.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//..., set(//tree/left:source.txt //tree/left:source.txt))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//..., set(//tree/left:source.txt //tree/left:source.txt))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_duplicate_seeds",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only",
+      "stderr": "INFO: Invocation ID: 5620eaf8-c864-4bd5-b3be-f4b9de2135e0\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//tree/left:cycle_a, //tree/left:cycle_b)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//tree/left:cycle_a, //tree/left:cycle_b)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_cycle",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:cycle_a\n//tree/left:cycle_b",
+      "stderr": "INFO: Invocation ID: a5d91f78-a600-4d48-be8f-7e01a7568a79\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:cycle_a\n//tree/left:cycle_b\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//..., //tree/left:leaf)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//..., //tree/left:leaf)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_rule_alias_and_custom_edges",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias",
+      "stderr": "INFO: Invocation ID: 5a364e27-3cc4-4a0b-8d5e-95940e9aa210\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//tree/right:right_parent, //tree/left:leaf)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//tree/right:right_parent, //tree/left:leaf)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_empty_result",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e201b1a8-f489-40ae-88c4-e5d971c9abf5\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//tree/..., //tree/left:leaf)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//tree/..., //tree/left:leaf)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_default_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias",
+      "stderr": "INFO: Invocation ID: ab5283ba-a444-4164-90d2-6054532f5afe\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "rdeps(//tree/..., //tree/left:leaf)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "rdeps(//tree/..., //tree/left:leaf)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_auto_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias",
+      "stderr": "INFO: Invocation ID: fc005136-3713-4919-b807-874f7837edd4\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "rdeps(//tree/..., //tree/left:leaf)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "rdeps(//tree/..., //tree/left:leaf)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_full_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:custom_parent\n//tree/left:via_alias\n//tree/left:leaf",
+      "stderr": "INFO: Invocation ID: a531ec34-cb2c-4d3f-9d5e-6c97fc48735a\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:custom_parent\n//tree/left:via_alias\n//tree/left:leaf\n"
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps(//tree/left:source.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps(//tree/left:source.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_source_multiple_parents",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two",
+      "stderr": "INFO: Invocation ID: 8da1ca49-938b-474d-a307-ae6babeca8b1\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/left:source.txt))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/left:source.txt))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_duplicate_source",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two",
+      "stderr": "INFO: Invocation ID: e57d8f39-8e17-4ca0-a64e-6518ba33b87a\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps(//tree/left:leaf)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps(//tree/left:leaf)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_alias_and_custom_parents",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:via_alias",
+      "stderr": "INFO: Invocation ID: 87b3ac4f-d9ec-40f7-bcb9-73f9755b5dc2\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:via_alias\n"
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps(//tree/left:via_alias)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps(//tree/left:via_alias)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_custom_parent",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:custom_parent",
+      "stderr": "INFO: Invocation ID: ddfeeec7-4879-4a8b-8ccc-f83d80b3731a\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:custom_parent\n"
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/right:right_source.txt))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/right:right_source.txt))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_cross_package_criss_cross",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/right:right_both\n//tree/right:right_parent",
+      "stderr": "INFO: Invocation ID: 1e27bbd0-66af-454d-8e0f-704a9c826c0d\nLoading: 0 packages loaded\n",
+      "stdout": "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/right:right_both\n//tree/right:right_parent\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//..., //tree/left:leaf, 1, 2)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//..., //tree/left:leaf, 1, 2)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_wrong_arity",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'rdeps(//..., //tree/left:leaf, 1, 2)': too many arguments to function 'rdeps' at ', 2 )'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: f50c65a5-b244-43e0-8383-08966d817369\nLoading: 0 packages loaded\nERROR: Error while parsing 'rdeps(//..., //tree/left:leaf, 1, 2)': too many arguments to function 'rdeps' at ', 2 )'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(//..., 1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(//..., 1)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_wrong_type",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//:1': target '1' not declared in package '' defined by <workspace>/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ca69e34f-cb98-4ce8-9e02-99f440199ca3\nLoading: 0 packages loaded\nERROR: no such target '//:1': target '1' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-rdeps-and-subtree-patterns/20260723-004211-416202-bazel/workspace/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps()"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps()"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_wrong_arity",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'same_pkg_direct_rdeps()': too few arguments to function 'same_pkg_direct_rdeps' at ')'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 5a35bc1b-15cd-4173-8d42-8b306ce5752c\nLoading: 0 packages loaded\nERROR: Error while parsing 'same_pkg_direct_rdeps()': too few arguments to function 'same_pkg_direct_rdeps' at ')'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps(1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps(1)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_wrong_type",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//:1': target '1' not declared in package '' defined by <workspace>/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 93a99e0b-ba75-4428-a0b9-3ab7e3b7a888\nLoading: 0 packages loaded\nERROR: no such target '//:1': target '1' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-rdeps-and-subtree-patterns/20260723-004211-416202-bazel/workspace/BUILD.bazel\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "query-rdeps-and-subtree-patterns",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

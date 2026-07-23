@@ -1,0 +1,181 @@
+[fixture]
+name = "query-rdeps-and-subtree-patterns"
+description = "Bazel 9.2 root-repository loading-query oracle for subtree patterns, reverse dependencies, and same-package direct reverse dependencies."
+comparison = "message_shape"
+oracle_notes = "Root repository only. The graph deliberately includes nested packages, a non-package prefix, an empty prefix, aliases, custom label-list edges, source labels, multiple parents, a cycle, duplicate inputs, and cross-package criss-cross edges."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/RdepsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/SamePkgDirectRdepsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/cmdline/TargetPattern.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/TargetPatternFunction.java",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSiblings_samePackageRdeps",
+]
+translation_notes = "The command matrix records Bazel-visible forward-universe restriction, bounded reverse traversal, duplicate elimination, cycle termination, source/rule/alias/custom edges, package-local edge-specific same_pkg_direct_rdeps filtering, and subtree pattern diagnostics. No configured targets, external repositories, actions, or non-text formatters are used."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-rdeps-and-subtree-patterns --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-rdeps-and-subtree-patterns --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "subtree_existing_nested_rule_only"
+argv = ["query", "//tree/left/..."]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:cross_only\\n//tree/left:custom_parent\\n//tree/left:cycle_a\\n//tree/left:cycle_b\\n//tree/left:leaf\\n//tree/left:parent_one\\n//tree/left:parent_two\\n//tree/left:via_alias\\n//tree/left/nested:nested\\Z"]
+
+[[commands]]
+name = "subtree_nonpackage_prefix"
+argv = ["query", "//nonpackage/..."]
+expected_exit = 0
+stdout_patterns = ["\\A//nonpackage/desc:desc\\Z"]
+
+[[commands]]
+name = "subtree_empty_prefix"
+argv = ["query", "//empty/..."]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no targets found beneath 'empty'"]
+
+[[commands]]
+name = "subtree_missing_prefix"
+argv = ["query", "//missing/..."]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no targets found beneath 'missing'"]
+
+[[commands]]
+name = "rdeps_unbounded_source_seed"
+argv = ["query", "rdeps(//..., //tree/left:source.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:custom_parent\\n//tree/left:leaf\\n//tree/left:parent_one\\n//tree/left:parent_two\\n//tree/left:source\\.txt\\n//tree/left:via_alias\\n//tree/right:right_both\\n//tree/right:right_cross_only\\Z"]
+
+[[commands]]
+name = "rdeps_depth_zero"
+argv = ["query", "rdeps(//..., //tree/left:source.txt, 0)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:source\\.txt\\Z"]
+
+[[commands]]
+name = "rdeps_depth_one"
+argv = ["query", "rdeps(//..., //tree/left:source.txt, 1)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:leaf\\n//tree/left:parent_one\\n//tree/left:parent_two\\n//tree/left:source\\.txt\\n//tree/right:right_both\\n//tree/right:right_cross_only\\Z"]
+
+[[commands]]
+name = "rdeps_depth_two"
+argv = ["query", "rdeps(//..., //tree/left:source.txt, 2)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:leaf\\n//tree/left:parent_one\\n//tree/left:parent_two\\n//tree/left:source\\.txt\\n//tree/left:via_alias\\n//tree/right:right_both\\n//tree/right:right_cross_only\\Z"]
+
+[[commands]]
+name = "rdeps_seed_outside_universe_closure"
+argv = ["query", "rdeps(//tree/right:right_parent, //tree/left:source.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "rdeps_multiple_universe_roots"
+argv = ["query", "rdeps(set(//tree/left:parent_one //tree/right:right_parent), //tree/left:source.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:parent_one\\n//tree/left:source\\.txt\\Z"]
+
+[[commands]]
+name = "rdeps_duplicate_seeds"
+argv = ["query", "rdeps(//..., set(//tree/left:source.txt //tree/left:source.txt))"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:custom_parent\\n//tree/left:leaf\\n//tree/left:parent_one\\n//tree/left:parent_two\\n//tree/left:source\\.txt\\n//tree/left:via_alias\\n//tree/right:right_both\\n//tree/right:right_cross_only\\Z"]
+
+[[commands]]
+name = "rdeps_cycle"
+argv = ["query", "rdeps(//tree/left:cycle_a, //tree/left:cycle_b)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:cycle_a\\n//tree/left:cycle_b\\Z"]
+
+[[commands]]
+name = "rdeps_rule_alias_and_custom_edges"
+argv = ["query", "rdeps(//..., //tree/left:leaf)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:custom_parent\\n//tree/left:leaf\\n//tree/left:via_alias\\Z"]
+
+[[commands]]
+name = "rdeps_empty_result"
+argv = ["query", "rdeps(//tree/right:right_parent, //tree/left:leaf)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "rdeps_default_order"
+argv = ["query", "rdeps(//tree/..., //tree/left:leaf)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:custom_parent\\n//tree/left:leaf\\n//tree/left:via_alias\\Z"]
+
+[[commands]]
+name = "rdeps_auto_order"
+argv = ["query", "--order_output=auto", "rdeps(//tree/..., //tree/left:leaf)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:custom_parent\\n//tree/left:leaf\\n//tree/left:via_alias\\Z"]
+
+[[commands]]
+name = "rdeps_full_order"
+argv = ["query", "--order_output=full", "rdeps(//tree/..., //tree/left:leaf)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:custom_parent\\n//tree/left:via_alias\\n//tree/left:leaf\\Z"]
+
+[[commands]]
+name = "same_pkg_source_multiple_parents"
+argv = ["query", "same_pkg_direct_rdeps(//tree/left:source.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:leaf\\n//tree/left:parent_one\\n//tree/left:parent_two\\Z"]
+
+[[commands]]
+name = "same_pkg_duplicate_source"
+argv = ["query", "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/left:source.txt))"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:leaf\\n//tree/left:parent_one\\n//tree/left:parent_two\\Z"]
+
+[[commands]]
+name = "same_pkg_alias_and_custom_parents"
+argv = ["query", "same_pkg_direct_rdeps(//tree/left:leaf)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:via_alias\\Z"]
+
+[[commands]]
+name = "same_pkg_custom_parent"
+argv = ["query", "same_pkg_direct_rdeps(//tree/left:via_alias)"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:custom_parent\\Z"]
+
+[[commands]]
+name = "same_pkg_cross_package_criss_cross"
+argv = ["query", "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/right:right_source.txt))"]
+expected_exit = 0
+stdout_patterns = ["\\A//tree/left:leaf\\n//tree/left:parent_one\\n//tree/left:parent_two\\n//tree/right:right_both\\n//tree/right:right_parent\\Z"]
+
+[[commands]]
+name = "rdeps_wrong_arity"
+argv = ["query", "rdeps(//..., //tree/left:leaf, 1, 2)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too many arguments to function 'rdeps'"]
+
+[[commands]]
+name = "rdeps_wrong_type"
+argv = ["query", "rdeps(//..., 1)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:1': target '1' not declared in package ''"]
+
+[[commands]]
+name = "same_pkg_wrong_arity"
+argv = ["query", "same_pkg_direct_rdeps()"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too few arguments to function 'same_pkg_direct_rdeps'"]
+
+[[commands]]
+name = "same_pkg_wrong_type"
+argv = ["query", "same_pkg_direct_rdeps(1)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:1': target '1' not declared in package ''"]
