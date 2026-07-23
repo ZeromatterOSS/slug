@@ -43,6 +43,8 @@ enum AttributeKeyIdentity {
     PackageLoad(PathBuf),
     Consumer(PathBuf),
     Observer(PathBuf),
+    RuleCapabilityConsumer(PathBuf),
+    RuleCapabilityObserver(PathBuf),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -119,6 +121,89 @@ impl Key for AttributeObserverKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct RuleCapabilityConsumerKey {
+    workspace: PathBuf,
+    package: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct RuleCapabilityObserverKey(RuleCapabilityConsumerKey);
+
+impl std::fmt::Display for RuleCapabilityConsumerKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "rule-capability-consumer:{}", self.package.display())
+    }
+}
+
+impl std::fmt::Display for RuleCapabilityObserverKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "rule-capability-observer:{}", self.0.package.display())
+    }
+}
+
+type RuleCapabilityProjection = Arc<[Option<slug_loading_v2::RuleCapability>]>;
+
+#[async_trait]
+impl Key for RuleCapabilityConsumerKey {
+    type Value = Arc<Result<RuleCapabilityProjection, String>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let value = ctx
+            .compute(&PackageLoadKey {
+                workspace: self.workspace.clone(),
+                package: self.package.clone(),
+            })
+            .await
+            .map_err(|error| error.to_string())
+            .and_then(|value| {
+                value
+                    .as_ref()
+                    .as_ref()
+                    .map(|package| {
+                        package
+                            .targets
+                            .iter()
+                            .map(|target| target.rule_capability().cloned())
+                            .collect::<Vec<_>>()
+                            .into()
+                    })
+                    .map_err(ToString::to_string)
+            });
+        Arc::new(value)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[async_trait]
+impl Key for RuleCapabilityObserverKey {
+    type Value = Arc<Result<RuleCapabilityProjection, String>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.compute(&self.0)
+            .await
+            .expect("rule capability consumer")
+            .as_ref()
+            .clone()
+            .into()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[derive(Default)]
 struct AttributeTracker {
     events: Mutex<Vec<(AttributeKeyIdentity, LoadActivation)>>,
@@ -151,6 +236,14 @@ impl ActivationTracker for AttributeTracker {
             .or_else(|| {
                 key.downcast_ref::<AttributeObserverKey>()
                     .map(|key| AttributeKeyIdentity::Observer(key.0.package.clone()))
+            })
+            .or_else(|| {
+                key.downcast_ref::<RuleCapabilityConsumerKey>()
+                    .map(|key| AttributeKeyIdentity::RuleCapabilityConsumer(key.package.clone()))
+            })
+            .or_else(|| {
+                key.downcast_ref::<RuleCapabilityObserverKey>()
+                    .map(|key| AttributeKeyIdentity::RuleCapabilityObserver(key.0.package.clone()))
             });
         if let Some(identity) = identity {
             let activation = match activation {
@@ -286,6 +379,68 @@ async fn load_package_request(
         }
     } else {
         evaluator.evaluate_package(&mut transaction, package).await
+    }
+}
+
+async fn load_rule_capability_request(
+    dice: &Arc<Dice>,
+    workspace: &Path,
+    package: &Path,
+    bzl_paths: &[PathBuf],
+    tracker: Arc<dyn ActivationTracker>,
+) -> anyhow::Result<RuleCapabilityProjection> {
+    let paths = [
+        vec![
+            workspace.join("MODULE.bazel"),
+            workspace.join("BUILD.bazel"),
+            package.join("BUILD.bazel"),
+            package.join("BUILD"),
+        ],
+        bzl_paths.to_vec(),
+    ]
+    .concat();
+    let files: starlark_map::sorted_map::SortedMap<PathBuf, WorkspaceFileValue> = paths
+        .into_iter()
+        .map(|path| {
+            let value = match fs::read_to_string(&path) {
+                Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    WorkspaceFileValue::Absent
+                }
+                Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
+            };
+            (path, value)
+        })
+        .collect();
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(bzl_load_cycle_detector()),
+        activation_tracker: Some(tracker),
+        ..Default::default()
+    });
+    updater.changed_to(vec![(
+        WorkspaceSnapshotKey {
+            workspace: workspace.to_path_buf(),
+        },
+        Arc::new(WorkspaceSnapshot {
+            files: Arc::new(files),
+        }),
+    )])?;
+    updater.changed_to(vec![(
+        WorkspaceDirectorySnapshotKey {
+            workspace: workspace.to_path_buf(),
+        },
+        Arc::new(directory_snapshot(workspace)),
+    )])?;
+    let mut transaction = updater.commit().await;
+    let value = transaction
+        .compute(&RuleCapabilityObserverKey(RuleCapabilityConsumerKey {
+            workspace: workspace.to_path_buf(),
+            package: package.to_path_buf(),
+        }))
+        .await?;
+    match value.as_ref().as_ref() {
+        Ok(projection) => Ok(projection.clone()),
+        Err(error) => Err(anyhow::anyhow!("{error}")),
     }
 }
 
@@ -1133,6 +1288,215 @@ fn retained_attribute_metadata_loads_activate_or_reuse_by_semantics() {
     write(&defs, &schema.replace(":one", ":two"));
     let recreated = load(tracker.clone()).unwrap();
     assert_eq!(changed, recreated);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Reused,
+            LoadActivation::Evaluated,
+            LoadActivation::Reused,
+            LoadActivation::Reused,
+        )
+    );
+}
+
+#[test]
+fn retained_rule_capabilities_activate_or_reuse_by_semantics() {
+    let workspace = scratch("rule-capability-activation");
+    let package = workspace.join("pkg");
+    let defs = package.join("defs.bzl");
+    let build = package.join("BUILD.bazel");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let definitions = |rule_name: &str, options: &str| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\n{rule_name} = rule(implementation = _impl{options})\n"
+        )
+    };
+    let build_for = |rule_name: &str, target_name: &str| {
+        format!("load(\":defs.bzl\", \"{rule_name}\")\n{rule_name}(name = \"{target_name}\")\n")
+    };
+    write(&defs, &definitions("plain_rule", ""));
+    write(&build, &build_for("plain_rule", "ordinary_target"));
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let tracker = Arc::new(AttributeTracker::default());
+    let expected = |bzl_module, package_load, consumer, observer| {
+        vec![
+            (
+                AttributeKeyIdentity::BzlModuleEval(defs.clone()),
+                bzl_module,
+            ),
+            (
+                AttributeKeyIdentity::PackageLoad(package.clone()),
+                package_load,
+            ),
+            (
+                AttributeKeyIdentity::RuleCapabilityConsumer(package.clone()),
+                consumer,
+            ),
+            (
+                AttributeKeyIdentity::RuleCapabilityObserver(package.clone()),
+                observer,
+            ),
+        ]
+    };
+    let load = |tracker: Arc<AttributeTracker>| {
+        runtime.block_on(load_rule_capability_request(
+            &dice,
+            &workspace,
+            &package,
+            &[defs.clone()],
+            tracker,
+        ))
+    };
+    let capability = |projection: &RuleCapabilityProjection| {
+        projection[0]
+            .as_ref()
+            .expect("Starlark rule capability")
+            .clone()
+    };
+
+    let initial = load(tracker.clone()).unwrap();
+    assert_eq!(capability(&initial).rule_class, "plain_rule");
+    assert!(!capability(&initial).executable);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+
+    write(&defs, &definitions("plain_rule", ", executable = True"));
+    let executable = load(tracker.clone()).unwrap();
+    assert_ne!(initial, executable);
+    assert_eq!(capability(&executable).rule_class, "plain_rule");
+    assert!(capability(&executable).executable);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+
+    write(&defs, &definitions("plain_rule", ""));
+    let non_executable = load(tracker.clone()).unwrap();
+    assert_ne!(executable, non_executable);
+    assert_eq!(capability(&non_executable).rule_class, "plain_rule");
+    assert!(!capability(&non_executable).executable);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+
+    write(
+        &defs,
+        &definitions("plain_rule_test", ", test = True, executable = False"),
+    );
+    write(&build, &build_for("plain_rule_test", "ordinary_target"));
+    let test_rule = load(tracker.clone()).unwrap();
+    assert_ne!(non_executable, test_rule);
+    assert_eq!(capability(&test_rule).rule_class, "plain_rule_test");
+    assert!(capability(&test_rule).executable);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+
+    write(&defs, &definitions("renamed_rule", ", executable = True"));
+    write(&build, &build_for("renamed_rule", "ordinary_target"));
+    let renamed = load(tracker.clone()).unwrap();
+    assert_ne!(test_rule, renamed);
+    assert_eq!(capability(&renamed).rule_class, "renamed_rule");
+    assert!(capability(&renamed).executable);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+
+    let renamed_package = load_package(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &runtime,
+        &workspace,
+        &package,
+        &[defs.clone()],
+    )
+    .unwrap();
+    write(&build, &build_for("renamed_rule", "target_test"));
+    let target_renamed_package = load_package(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &runtime,
+        &workspace,
+        &package,
+        &[defs.clone()],
+    )
+    .unwrap();
+    let target_renamed = load(tracker.clone()).unwrap();
+    assert_ne!(renamed_package, target_renamed_package);
+    assert_eq!(renamed, target_renamed);
+    assert_eq!(capability(&renamed), capability(&target_renamed));
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Reused,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Reused,
+        )
+    );
+
+    let formatted_definitions = "# formatting only\ndef _impl(ctx):\n    return [DefaultInfo()]\n\nrenamed_rule = rule( implementation = _impl, executable = True )\n";
+    write(&defs, formatted_definitions);
+    let formatted = load(tracker.clone()).unwrap();
+    assert_eq!(target_renamed, formatted);
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Reused,
+        )
+    );
+
+    fs::remove_file(&defs).unwrap();
+    assert!(load(tracker.clone()).is_err());
+    assert_eq!(
+        tracker.take(),
+        expected(
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+            LoadActivation::Evaluated,
+        )
+    );
+
+    write(&defs, formatted_definitions);
+    let recreated = load(tracker.clone()).unwrap();
+    assert_eq!(formatted, recreated);
     assert_eq!(
         tracker.take(),
         expected(

@@ -37,3 +37,4 @@ pub use glob::PackageListing;
 pub use package::LoadedPackage;
 pub use package::PackageTarget;
 pub use package::PackageTargetKind;
+pub use package::RuleCapability;

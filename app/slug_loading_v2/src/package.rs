@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::cell::OnceCell;
 use std::cell::RefCell;
 use std::fmt;
 use std::path::PathBuf;
@@ -28,6 +29,7 @@ use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::AllocFrozenValue;
 use starlark::values::Freeze;
+use starlark::values::FreezeError;
 use starlark::values::FreezeResult;
 use starlark::values::Freezer;
 use starlark::values::FrozenHeap;
@@ -106,6 +108,36 @@ pub struct PackageTarget {
     pub kind: PackageTargetKind,
 }
 
+impl PackageTarget {
+    /// Returns the retained capability for a loadable rule. Native classes are
+    /// fixed, compact values; non-rules intentionally have no capability.
+    pub fn rule_capability(&self) -> Option<&RuleCapability> {
+        self.kind.rule_capability()
+    }
+}
+
+/// Immutable loading-time classification used by the deferred Stage 8
+/// `executables()` projection. The class is the exported `.bzl` binding for a
+/// Starlark rule, never a BUILD target name or implementation identity.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RuleCapability {
+    pub rule_class: CompactString,
+    pub executable: bool,
+}
+
+static FILEGROUP_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("filegroup"),
+    executable: false,
+};
+static ALIAS_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("alias"),
+    executable: false,
+};
+static CONFIG_SETTING_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("config_setting"),
+    executable: false,
+};
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum PackageTargetKind {
     ExportedFile,
@@ -134,6 +166,20 @@ pub enum PackageTargetKind {
     StarlarkRule(StarlarkRuleImplementation),
 }
 
+impl PackageTargetKind {
+    /// Stage 8's future projection boundary. `alias` remains a fixed native
+    /// rule capability and never inherits the actual target's capability.
+    fn rule_capability(&self) -> Option<&RuleCapability> {
+        match self {
+            Self::Filegroup { .. } => Some(&FILEGROUP_RULE_CAPABILITY),
+            Self::Alias { .. } => Some(&ALIAS_RULE_CAPABILITY),
+            Self::ConfigSetting { .. } => Some(&CONFIG_SETTING_RULE_CAPABILITY),
+            Self::StarlarkRule(rule) => Some(&rule.capability),
+            Self::ExportedFile | Self::GeneratedFile { .. } => None,
+        }
+    }
+}
+
 /// The frozen rule implementation retained for configured-target analysis.
 /// The containing package keeps its source `.bzl` module alive.
 #[derive(Debug, Clone, Allocative)]
@@ -143,6 +189,7 @@ pub struct StarlarkRuleImplementation {
     dependencies: Arc<[CanonicalLabel]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
+    capability: Arc<RuleCapability>,
 }
 
 impl PartialEq for StarlarkRuleImplementation {
@@ -152,6 +199,7 @@ impl PartialEq for StarlarkRuleImplementation {
         self.dependencies == other.dependencies
             && self.schema == other.schema
             && self.values == other.values
+            && self.capability == other.capability
     }
 }
 
@@ -249,6 +297,7 @@ impl PackageRecorder {
         &self,
         name: String,
         implementation: FrozenValue,
+        capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
     ) -> anyhow::Result<()> {
@@ -274,6 +323,7 @@ impl PackageRecorder {
                 dependencies: dependencies.into(),
                 schema,
                 values,
+                capability,
             }),
         )
     }
@@ -697,12 +747,30 @@ fn coerce_starlark_value(
 struct RuleDefinitionGen<V> {
     implementation: V,
     schema: Arc<[RuleAttributeSchema]>,
+    executable: bool,
+    test: bool,
+    #[trace(unsafe_ignore)]
+    rule_class: OnceCell<CompactString>,
+}
+
+/// The frozen definition contains no export-time interior mutability. Its
+/// shared capability is cloned into every package instance of this rule.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct FrozenRuleDefinition {
+    implementation: FrozenValue,
+    schema: Arc<[RuleAttributeSchema]>,
+    capability: Arc<RuleCapability>,
 }
 
 type RuleDefinition<'v> = RuleDefinitionGen<Value<'v>>;
-type FrozenRuleDefinition = RuleDefinitionGen<FrozenValue>;
 
 impl<V> fmt::Display for RuleDefinitionGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("rule")
+    }
+}
+
+impl fmt::Display for FrozenRuleDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("rule")
     }
@@ -714,10 +782,51 @@ impl<'v> Freeze for RuleDefinition<'v> {
     type Frozen = FrozenRuleDefinition;
 
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        let Some(rule_class) = self.rule_class.into_inner() else {
+            return Err(FreezeError::new(
+                "the result of rule() must be assigned to a top-level variable".to_owned(),
+            ));
+        };
         Ok(FrozenRuleDefinition {
             implementation: self.implementation.freeze(freezer)?,
             schema: self.schema,
+            capability: Arc::new(RuleCapability {
+                rule_class,
+                executable: self.executable || self.test,
+            }),
         })
+    }
+}
+
+#[starlark_value(type = "rule")]
+impl<'v> StarlarkValue<'v> for RuleDefinition<'v> {
+    type Canonical = FrozenRuleDefinition;
+
+    fn export_as(
+        &self,
+        variable_name: &str,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<()> {
+        if self.test != variable_name.ends_with("_test") {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "Invalid rule class name '{variable_name}', test rule class names must end with '_test' and other rule classes must not"
+            )));
+        }
+        if self.rule_class.get().is_none() {
+            let _ = self.rule_class.set(variable_name.into());
+        }
+        Ok(())
+    }
+
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &Arguments<'v, '_>,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Err(starlark::Error::new_other(anyhow::anyhow!(
+            "rule() definitions may only be called after their .bzl module is frozen"
+        )))
     }
 }
 
@@ -1032,10 +1141,9 @@ impl<'v> StarlarkValue<'v> for AttrModule {
 }
 
 #[starlark_value(type = "rule")]
-impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for RuleDefinitionGen<V>
-where
-    Self: ProvidesStaticType<'v>,
-{
+impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
+    type Canonical = Self;
+
     fn invoke(
         &self,
         _me: Value<'v>,
@@ -1080,15 +1188,8 @@ where
                 )));
             }
         }
-        let implementation = self
-            .implementation
-            .to_value()
-            .unpack_frozen()
-            .ok_or_else(|| {
-                starlark::Error::new_other(anyhow::anyhow!(
-                    "rule() definitions may only be called after their .bzl module is frozen"
-                ))
-            })?;
+        let implementation = self.implementation;
+        let capability = self.capability.clone();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
                 let mut schema = Vec::with_capacity(self.schema.len());
@@ -1158,7 +1259,13 @@ where
                 }
                 let schema: Arc<[AttributeSchema]> = schema.into();
                 let values: Arc<[AttributeValue]> = values.into();
-                recorder.starlark_rule(name.to_owned(), implementation, schema, values)?;
+                recorder.starlark_rule(
+                    name.to_owned(),
+                    implementation,
+                    capability,
+                    schema,
+                    values,
+                )?;
                 for output in generated {
                     recorder.generated_file(output, name)?;
                 }
@@ -1223,6 +1330,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn rule<'v>(
         implementation: Value<'v>,
         attrs: Option<SmallMap<String, Value<'v>>>,
+        #[starlark(default = false)] executable: bool,
+        #[starlark(default = false)] test: bool,
     ) -> anyhow::Result<RuleDefinition<'v>> {
         let mut schema = Vec::new();
         if let Some(attrs) = attrs {
@@ -1241,6 +1350,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         Ok(RuleDefinition {
             implementation,
             schema: schema.into(),
+            executable,
+            test,
+            rule_class: OnceCell::new(),
         })
     }
 

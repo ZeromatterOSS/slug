@@ -13,6 +13,7 @@ use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::PackageTarget;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::RuleCapability;
 use slug_loading_v2::file_discovery::BUILD_FILE_FALLBACK;
 use slug_loading_v2::file_discovery::BUILD_FILE_PRIMARY;
 use slug_loading_v2::file_discovery::MODULE_FILE;
@@ -169,6 +170,118 @@ fn build_file_discovery_is_bazel_only() {
 fn recognizes_bzl_extension_only() {
     assert!(is_bzl_file(&PathBuf::from("defs.bzl")));
     assert!(!is_bzl_file(&PathBuf::from("defs.star")));
+}
+
+#[test]
+fn rule_capabilities_use_exported_class_names_and_keep_native_rules_non_executable() {
+    let workspace = scratch("rule-capabilities");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+def _impl(ctx):
+    return [DefaultInfo()]
+
+exec_arbitrary = rule(implementation = _impl, executable = True)
+plain_rule = rule(implementation = _impl)
+implicit_test_test = rule(implementation = _impl, test = True)
+explicit_test_test = rule(implementation = _impl, test = True, executable = False)
+output_rule = rule(implementation = _impl, attrs = {"outs": attr.output_list()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        r#"
+load(":defs.bzl", "exec_arbitrary", "explicit_test_test", "implicit_test_test", "output_rule", "plain_rule")
+
+exports_files(["BUILD.bazel", "data.txt"])
+exec_arbitrary(name = "arbitrary_target")
+exec_arbitrary(name = "target_test")
+plain_rule(name = "plain")
+implicit_test_test(name = "ordinary_target")
+explicit_test_test(name = "explicit_test_target")
+output_rule(name = "generated_owner", outs = ["generated.txt"])
+filegroup(name = "files", srcs = [":data.txt"])
+alias(name = "alias_exec", actual = ":arbitrary_target")
+config_setting(name = "setting", values = {"cpu": "k8"})
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let capability = |name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .and_then(|target| target.rule_capability())
+            .cloned()
+    };
+    let expected = |rule_class: &str, executable| {
+        Some(RuleCapability {
+            rule_class: rule_class.into(),
+            executable,
+        })
+    };
+
+    assert_eq!(
+        capability("arbitrary_target"),
+        expected("exec_arbitrary", true)
+    );
+    assert_eq!(capability("target_test"), expected("exec_arbitrary", true));
+    assert_eq!(capability("plain"), expected("plain_rule", false));
+    assert_eq!(
+        capability("ordinary_target"),
+        expected("implicit_test_test", true)
+    );
+    assert_eq!(
+        capability("explicit_test_target"),
+        expected("explicit_test_test", true)
+    );
+    assert_eq!(
+        capability("generated_owner"),
+        expected("output_rule", false)
+    );
+    assert_eq!(capability("files"), expected("filegroup", false));
+    assert_eq!(capability("alias_exec"), expected("alias", false));
+    assert_eq!(capability("setting"), expected("config_setting", false));
+    assert_eq!(capability("BUILD.bazel"), None);
+    assert_eq!(capability("data.txt"), None);
+    assert_eq!(capability("generated.txt"), None);
+}
+
+#[test]
+fn rule_export_rejects_test_suffix_mismatches_with_bazel_shape() {
+    let cases = [
+        ("not_test_suffix", "test = True"),
+        ("suffix_test", "test = False"),
+    ];
+    for (class_name, test) in cases {
+        let workspace = scratch(class_name);
+        let package = workspace.join("pkg");
+        fs::create_dir_all(&package).unwrap();
+        fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+        fs::write(
+            package.join("defs.bzl"),
+            format!(
+                "def _impl(ctx):\n    return [DefaultInfo()]\n{class_name} = rule(implementation = _impl, {test})\n"
+            ),
+        )
+        .unwrap();
+        fs::write(
+            package.join("BUILD.bazel"),
+            format!("load(\":defs.bzl\", \"{class_name}\")\n"),
+        )
+        .unwrap();
+
+        let error = try_load_package(&workspace, &package).unwrap_err();
+        assert!(error.to_string().contains(&format!(
+            "Invalid rule class name '{class_name}', test rule class names must end with '_test' and other rule classes must not"
+        )));
+    }
 }
 
 #[test]
