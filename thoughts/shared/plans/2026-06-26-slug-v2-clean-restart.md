@@ -21,15 +21,15 @@ and advances the **Current packet**, not an older `next` paragraph.
 
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
-| M0: archive and baseline health | **blocked** | `slug-v1-archive` tag and clean-root shape | local `v1-archive` branch is absent; archive checker allowlists reject `slug_server_v2`, the orchestration skill, and the current root prompt | run `WP-0-baseline-repair` before another feature packet |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | reassess after M0; do not infer completion from the narrow verticals |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet before M0 baseline repair |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | pause feature work for `WP-0-baseline-repair` |
+| M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | reassess after the serialized packet-validation wrapper |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet before the validation wrapper |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | pause feature work for the serialized packet-validation wrapper |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | a separate disjoint developer-graph packet may be proposed after M0 |
+| M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
 ### Operating-remediation queue
 
@@ -39,12 +39,12 @@ cleanup:
 1. Accepted: `WP-4-8-m3-executables-rule-capability` landed in `69565a29`
    against all 32 semantic oracle rows; the eight `label_kind` rows remain
    formatter-only constraints.
-2. Current: run `WP-0-baseline-repair`: create the recorded local archive
-   branch after read-only verification, update only truthful checker
-   allowlists, and make `scripts/v2_archive_status.sh` green.
-3. Add a root-owned serialized packet-validation wrapper around the existing
-   `tools/v2_oracle` Slug comparison path. It must not weaken daemon tests when
-   the current sandbox lacks Unix-socket binding.
+2. Accepted: `WP-0-baseline-repair` restored local `v1-archive` at the exact
+   recorded V1 commit and landed the narrow checker allowlists in `9897e940`;
+   the required-clean checker passes.
+3. Current: add a root-owned serialized packet-validation wrapper around the
+   existing `tools/v2_oracle` Slug comparison path. It must not weaken daemon
+   tests when the current sandbox lacks Unix-socket binding.
 4. Run an oracle-neutral `slug_query_v2` module-extraction packet that separates
    output formatting, traversal, function dispatch, and the loading
    environment from `evaluator.rs`; preserve every accepted fixture and obtain
@@ -180,6 +180,14 @@ resolves to `e218054d4c796655939b968d90208b185decb352`, but the local
 `v1-archive` branch is absent and the archive checker allowlist predates
 `app/slug_server_v2`. Stage 0 is therefore not green in the live checkout; its
 owner plan records the bounded repair before M0 acceptance.
+
+2026-07-23 baseline-repair acceptance: after a clean read-only ref audit, local
+branch `v1-archive` was restored directly at the recorded commit without
+moving or replacing any ref. Commit `9897e940` added only the exact
+`slug_server_v2`, `slug-agent-orchestration`, and current root-prompt
+allowlists. The normal checker, two negative ref-override probes, and
+`V2_ARCHIVE_STATUS_REQUIRE_CLEAN=1 scripts/v2_archive_status.sh` all passed;
+Sol-low returned `ACCEPT`. M0 is green.
 
 ## Non-Negotiables
 
@@ -773,5 +781,5 @@ export rename, target rename crossing `_test` without classification change,
 formatting reuse, and delete/recreate. Root validation passed 45 query tests,
 50 downstream CLI/commands/server tests, formatting, diff checks, and a clean
 `slug_cli_v2` build; Sol-low returned final `ACCEPT`. M3 remains open with five
-ordinary functions deferred. The scheduling authority now returns to
-`WP-0-baseline-repair` before another feature packet.
+ordinary functions deferred. `WP-0-baseline-repair` subsequently passed; the
+Live Status table now owns scheduling.

@@ -161,17 +161,16 @@ queue, not an accepted trunk.
 
 ## Archive Record
 
-This record was verified in the local clean-root remediation checkout on
-2026-06-29.
+This record was reverified in the live `main` checkout on 2026-07-23.
 
 | Field | Value |
 |-------|-------|
 | V1 commit | `e218054d4c796655939b968d90208b185decb352` verified locally on 2026-06-29 |
-| V1 tag | `slug-v1-archive` is an annotated tag resolving to the V1 commit; reverified in the live checkout on 2026-07-22 |
-| V1 archive branch | Recorded as created on 2026-06-29, but absent from the live checkout on 2026-07-22; repair remains required |
+| V1 tag | `slug-v1-archive` is an annotated tag resolving to the V1 commit; reverified in the live checkout on 2026-07-23 |
+| V1 archive branch | `v1-archive` resolves directly to the V1 commit; restored and reverified in the live checkout on 2026-07-23 |
 | Physical archive directory | none by default |
 | Dirty files intentionally excluded | archive action excluded active V2 remediation docs and prompt only; later root-metadata cleanup changed `Cargo.toml`; no V1 implementation files |
-| Current verification status | tag and commit verified; archive branch missing; clean-root checker allowlist stale for `app/slug_server_v2`; Stage 0 is not currently green |
+| Current verification status | both refs match; exact V2 allowlists are current; required-clean archive checker passes; Stage 0 accepted |
 
 ## 2026-07-22 Live-Checkout Recheck
 
@@ -188,11 +187,26 @@ that time. It is not current-state authority. In the live `main` checkout:
   It is not evidence of a clean or dirty V1 archive and must not be confused
   with `~/.bazelrc`, which agents must never read or commit.
 
-Before M0 is accepted, create the missing archive branch at the recorded V1
-commit after a normal read-only ref check, update the checker to recognize
-owned V2 crates without weakening its V1 exclusions, and rerun the validation
-below. This plan update records the repair packet; it does not silently create
-the branch or modify the checker while the task scope is documentation.
+At that checkpoint, M0 acceptance required creating the missing archive branch
+at the recorded V1 commit after a normal read-only ref check, updating the
+checker to recognize owned V2 crates without weakening its V1 exclusions, and
+rerunning the validation below. The following acceptance entry supersedes that
+live-state description.
+
+## 2026-07-23 Baseline Repair Acceptance
+
+The bounded `WP-0-baseline-repair` restored local `v1-archive` at
+`e218054d4c796655939b968d90208b185decb352` only after confirming that no local,
+remote, or worktree-owned archive branch existed and that the annotated tag
+peeled to the same recorded commit. No existing ref was moved or overwritten.
+
+Commit `9897e940` updates only three exact checker pathspecs for active V2-owned
+surfaces: `app/slug_server_v2/**`,
+`.codex/skills/slug-agent-orchestration/**`, and the current root-orchestrator
+prompt. It does not broaden any sibling, V1 root, test, tool, docs, or
+physical-archive exclusion. The checker passes with a clean worktree and
+retains negative coverage for a mismatched branch and a missing tag. Sol-low
+returned final `ACCEPT`; M0 is accepted.
 
 ## 2026-06-29 Clean-Root Evidence
 
