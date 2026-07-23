@@ -24,7 +24,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 strict-suite policy review is current |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 strict-suite policy review is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` oracle has 32 commands through `1edb2775` and labels metadata 39 through `57192df9`; identity, package-context normalization, structural label comparison, and direct duplicate rejection accepted through `5bbc4604`; tests loading/query metadata Gate A accepted in `7abcbdce` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, strict policy/`tests()` activation, and remaining command breadth | re-review the corrected request-local strict-suite and `tests()` activation design |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` oracle has 32 commands through `1edb2775` and labels metadata 39 through `57192df9`; identity, package-context normalization, structural label comparison, and direct duplicate rejection accepted through `5bbc4604`; tests loading/query metadata Gate A accepted in `7abcbdce`; request-local activation design Sol-accepted | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, `tests()` activation, and remaining command breadth | implement only the accepted strict-suite/`tests()` activation packet |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,10 +33,10 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Review only the corrected request-local policy and evaluator seam for
-activating `tests(EXPR)` on top of `7abcbdce` and the 32-command oracle
-`1edb2775`. The Slug gate is exactly 27 non-build rows: 21 `tests()` rows plus
-six already-supported labels/deps/loading rows. The five `--output=build` rows
+Implement only the accepted request-local policy and evaluator seam for
+`tests(EXPR)` on top of `7abcbdce` and the 32-command oracle `1edb2775`. The
+Slug gate is exactly 27 non-build rows: 21 `tests()` rows plus six
+already-supported labels/deps/loading rows. The five `--output=build` rows
 remain Bazel-only formatter evidence.
 
 Add one cheap copyable `QueryPolicy { strict_test_suite }`, default false, and
@@ -64,11 +64,29 @@ command/wire tests, focused algorithm regressions, all 21 function rows through
 one-shot and daemon paths, the exact 27-row non-build gate, and unchanged-workspace
 false/true/false strict toggles with zero file invalidations and graph reuse.
 
-This is still design/review only. Do not edit Rust or fixtures, activate the
-function, implement build/proto formatting, broaden diagnostics, start
-`visible`, add repository mapping/keep-going/cquery/aquery policy, or import
-V1/Buck test semantics. Stop if any row requires new loading metadata or DICE
-identity.
+Strengthen tests before production code. Cover command boolean parsing and
+ordinary-query isolation; old and new daemon wire forms; fake candidates;
+suite-local filters; filter-before-uniqueness; literal `-+tag`; explicit-only
+strictness; cycles/dedup; missing-member prefixes; and suite edge recording.
+Run all 21 function rows through one-shot and daemon paths, then the exact 27
+non-build set. Prove an unchanged-workspace false/true/false strict sequence
+changes the result with zero file invalidations and reuses the existing graph
+keys.
+
+Production allowlist:
+`app/slug_commands_v2/src/{common.rs,query.rs}`,
+`app/slug_cli_v2/src/commands/query.rs`,
+`app/slug_server_v2/src/{lib.rs,server.rs}`,
+`app/slug_core_v2/src/runtime/{mod.rs,dice.rs}`, and
+`app/slug_query_v2/src/{lib.rs,evaluator.rs,expr.rs,generic.rs,loading_environment.rs,graph.rs}`.
+Tests may change only the matching command, server, core runtime, query loading,
+and CLI integration files named by the accepted design. Keep the fixture
+read-only.
+
+Do not implement build/proto formatting, broaden public diagnostics, start
+`visible`, add repository mapping/keep-going/cquery/aquery policy, add a DICE
+key or semantic input, change loading metadata, or import V1/Buck test
+semantics. Stop if any accepted row requires work outside this allowlist.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.

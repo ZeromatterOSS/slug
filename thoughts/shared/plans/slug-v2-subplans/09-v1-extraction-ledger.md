@@ -1463,3 +1463,8 @@ Commit `1edb2775` accepts the three source-critical Bazel rows without changing
 the extraction decision. The future activation remains V2 generic evaluator
 and request-local policy work; Buck2 contributes only compact set/worklist
 shapes, and V1 test-suite evaluation remains rejected.
+
+The corrected activation design is Sol-accepted with the same decision:
+implement the Bazel algorithm in V2's generic evaluator and request-local
+loading accessor, reuse only compact set/worklist shapes, and import no
+V1/Buck test semantics or DICE ownership.

@@ -2648,3 +2648,26 @@ run `20260723-144341-1175813-bazel`. All original 29 command definitions and
 expected records remain unchanged; Sol-low returned `ACCEPT`. The corrected
 activation design may now be re-reviewed. Its eventual Slug gate is 27
 non-build rows; five exact build-format rows remain Bazel-only evidence.
+
+## Corrected strict-suite and `tests()` activation design accepted (2026-07-23)
+
+The re-reviewed implementation boundary adds one copyable request-local
+`QueryPolicy`, ordinary-query-only Bazel boolean parsing, and a serde-defaulted
+daemon field. Policy flows by value through the authoritative one-shot and
+retained-daemon paths into the loading environment and never enters package,
+graph, DICE key/equality, or user-data identity.
+
+A generic iterative `TestsFunction` evaluates once, materializes by label, and
+uses separate compact test/suite uniquifiers. Loading supplies only
+accessor-shaped classification, metadata, and named suite-attribute resolution
+while recording ordinary evaluation edges. Filtering precedes test uniqueness;
+nested suites use their own filters; strict applies only to explicit non-test
+members; implicit members accept only tests. Lookup retains crate-private
+missing-target versus package-loading cause, while the generic function owns
+the exact prefix and strict text. No public/general error-code API is added.
+
+Sol-low returned `ACCEPT` after `1edb2775`. Implementation is limited to the
+named command, CLI, server, core-runtime, query, and matching test files. The
+acceptance gate is 21 function rows through one-shot and daemon paths plus the
+exact 27 non-build fixture set, request-toggle reuse evidence, full owning and
+downstream tests, CLI rebuild, and format/archive/diff checks.
