@@ -23,9 +23,13 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/query2/query/LabelVisitor.java#visitTargetNode",
   "src/main/java/com/google/devtools/build/lib/packages/OutputFile.java#getGeneratingRule",
   "src/main/java/com/google/devtools/build/lib/packages/OutputFile.java#getTargetKind",
+  "src/main/java/com/google/devtools/build/lib/rules/filegroup/FilegroupRule.java",
+  "src/main/java/com/google/devtools/build/lib/packages/RuleOrMacroInstance.java#isAttributeValueExplicitlySpecified",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/BuildOutputFormatter.java#outputRule",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/ProtoOutputFormatter.java#shouldIncludeAttribute",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testLabelsOperator",
 ]
-translation_notes = "The public unconfigured label-bearing attr set audited from StarlarkAttrModuleApi/BuildType is label, label_list, string_keyed_label_dict, label_keyed_string_dict, label_list_dict, output, and output_list; dormant_label variants are experimental/documented false and excluded. BlazeTargetAccessor calls getReachableLabels(attribute, false): selector condition keys are excluded. Direct labels(outs, ...) returns generated targets; output graph/deps observers distinguish each producer. Mandatory-attribute and fail-fast missing-prerequisite rows retain observed Bazel behavior."
+translation_notes = "The public unconfigured label-bearing attr set audited from StarlarkAttrModuleApi/BuildType is label, label_list, string_keyed_label_dict, label_keyed_string_dict, label_list_dict, output, and output_list; dormant_label variants are experimental/documented false and excluded. BlazeTargetAccessor calls getReachableLabels(attribute, false): selector condition keys are excluded. Direct labels(outs, ...) returns generated targets; output graph/deps observers distinguish each producer. FilegroupRule supplies native srcs while RuleOrMacroInstance retains whether it was explicitly specified; BuildOutputFormatter/ProtoOutputFormatter consume that provenance. The two native-filegroup build rows are representation-only: they require explicitness to remain distinct in state, but grant no Slug formatter acceptance. Mandatory-attribute and fail-fast missing-prerequisite rows retain observed Bazel behavior."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture query-labels-attribute-metadata --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture query-labels-attribute-metadata --tool bazel --bazel /usr/bin/bazel"
 
@@ -52,6 +56,18 @@ name = "label_list_explicit_empty"
 argv = ["query", "labels(many, //pkg:empty)"]
 expected_exit = 0
 stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "filegroup_srcs_omitted_build_lacks_srcs"
+argv = ["query", "--output=build", "//pkg:filegroup_srcs_omitted"]
+expected_exit = 0
+stdout_patterns = ["\\A#[^\\n]*/pkg/BUILD\\.bazel:26:10\\nfilegroup\\(\\n  name = \"filegroup_srcs_omitted\",\\n(?![\\s\\S]*\\n  srcs = )\\)\\n# Rule filegroup_srcs_omitted instantiated at \\(most recent call last\\):\\n#   [^\\n]*/pkg/BUILD\\.bazel:26:10 in <toplevel>\\Z"]
+
+[[commands]]
+name = "filegroup_srcs_explicit_empty_build_has_srcs"
+argv = ["query", "--output=build", "//pkg:filegroup_srcs_explicit_empty"]
+expected_exit = 0
+stdout_patterns = ["\\A#[^\\n]*/pkg/BUILD\\.bazel:27:10\\nfilegroup\\(\\n  name = \"filegroup_srcs_explicit_empty\",\\n  srcs = \\[\\],\\n\\)\\n# Rule filegroup_srcs_explicit_empty instantiated at \\(most recent call last\\):\\n#   [^\\n]*/pkg/BUILD\\.bazel:27:10 in <toplevel>\\Z"]
 
 [[commands]]
 name = "existing_non_label_attribute"

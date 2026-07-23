@@ -23,6 +23,8 @@ probe_rule(
 probe_rule(name = "omitted")
 probe_rule(name = "empty", many = [])
 probe_rule(name = "implicit")
+filegroup(name = "filegroup_srcs_omitted")
+filegroup(name = "filegroup_srcs_explicit_empty", srcs = [])
 probe_rule(
     name = "selecting",
     chosen = select({
