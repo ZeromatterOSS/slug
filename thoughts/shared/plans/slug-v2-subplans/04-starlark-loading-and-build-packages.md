@@ -40,7 +40,8 @@ Implement DICE keys for:
 - resolving a `load()` label through the current repo mapping;
 - evaluating a `.bzl` module with prepared dependencies;
 - package-file parsing and package construction;
-- glob expansion with watched directory inputs.
+- package listing with watched directory inputs; individual `glob()` calls are
+  pure filters over that prepared listing.
 
 Each key records the file digest or watched directory state that invalidates it.
 
@@ -52,8 +53,11 @@ Initial concrete files:
 - `app/slug_loading_v2/tests/{build_file_loading.rs,bzl_invalidation.rs,glob_boundaries.rs,native_removed_rules.rs}`
 
 The first DICE keys are `BzlParseKey`, `LoadLabelResolutionKey`,
-`BzlModuleEvalKey`, `PackageLoadKey`, and `GlobExpansionKey`. Use
-`slug_identity_v2` labels and repo mappings only; `CellPath`,
+`BzlModuleEvalKey`, `PackageListingKey`, and `PackageLoadKey`. The reviewed M1
+bridge replaces the unused data-only `GlobExpansionKey` scaffold:
+`PackageListingKey` owns watched-directory dependencies, while concrete glob
+calls are recorded in `LoadedPackage` and resolved synchronously from its
+listing. Use `slug_identity_v2` labels and repo mappings only; `CellPath`,
 `CellAliasResolver`, and V1 `PackageLabel` do not enter the V2 loading API.
 
 ### 4.3 Globals and Native Module
@@ -172,6 +176,175 @@ Stage 4 local package-loading packet (pending review and commit):
   digests. Changed paths call `invalidate_path`/`invalidate_package` (the
   Stage 4 DICE invalidation boundaries proven above) before each build. The
   `load-invalidation` oracle fixture passes end-to-end (gate clause 5).
+
+### Reviewed next packet — `WP-4-m1-dice-glob-bridge` (2026-07-22)
+
+Work packet ID: `WP-4-m1-dice-glob-bridge`
+
+Owner stage and plan: Stage 4,
+`thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`;
+consumes the Stage 2 directory boundary landed in `35612655`.
+
+Goal and gate link: make BUILD-file `glob()` consume a DICE-prepared,
+subpackage-aware package listing and prove retained-runtime invalidation/reuse.
+This is the semantic consumer half of the M1 directory packet. It does not
+claim full Bazel glob syntax, symlink, repository, query, or analysis parity.
+
+Prerequisites and oracle:
+
+- `3659b0f9` supplies the single retained workspace DICE transaction;
+- `35612655` supplies explicit compact directory values and the demand-driven
+  `WorkspaceDirectoryKey`;
+- `5ebf8db1` supplies the Bazel 9.2.0
+  `glob-directory-invalidation` create/rename/delete oracle generated at Bazel
+  commit `8220c6198837d5c13d53fea211cf3282aa12408a`; and
+- `app/slug_loading_v2/src/glob.rs` is currently test-only substrate with
+  direct filesystem reads, while no production Starlark `glob` global exists.
+
+Reuse audit:
+
+- selectively port Buck2 commit
+  `088c75c7e36805df99c3de29062baa95db700b8b`
+  `app/buck2_common/src/package_listing/{dice.rs,interpreter.rs,listing.rs}`:
+  gather a shared sorted package listing asynchronously through DICE;
+- selectively port Buck2
+  `app/buck2_interpreter_for_build/src/interpreter/{module_internals.rs,globspec.rs,functions/path.rs}`:
+  filter the prepared listing synchronously from the Starlark global;
+- retain V2 `WorkspaceDirectoryKey`, `CompactString`, `Arc` slices,
+  `starlark_map` sorted collections, `Allocative`, `Dupe`, and DICE
+  `ActivationTracker`;
+- use Bazel 9.2.0
+  `DirectoryListingValue.java`,
+  `GlobFunctionWithMultipleRecursiveFunctions.java`, and
+  `PackageFunctionWithMultipleGlobDeps.java` as semantic authority. The latter
+  explicitly documents why static/two-pass discovery misses dynamic and
+  dependent glob calls; and
+- reject V1 commit `e218054d4c796655939b968d90208b185decb352`
+  globspec, calculation delegate, and watcher beyond their package-listing
+  lesson because they import Buck identity, global interpreter state, and
+  crawler freshness policy.
+
+Reviewed architecture:
+
+1. Replace the unused data-only `GlobExpansionKey` scaffold with an internal
+   `PackageListingKey { workspace, package }`. Its compute recursively requests
+   `WorkspaceDirectoryKey`, stops at nested `BUILD.bazel`/`BUILD` boundaries,
+   and returns one immutable sorted listing of package-relative files,
+   directories, watched directories, and subpackages.
+2. `PackageLoadKey` awaits that listing before creating the synchronous
+   evaluator. The listing is held by `PackageRecorder` for that evaluator
+   lifetime. This deliberately follows Buck2's prepared-listing design; no
+   Starlark native call suspends or reaches DICE.
+3. Add global `glob()` and `native.glob()` using Bazel's include, exclude,
+   `exclude_directories`, and `allow_empty` argument shape. Pattern compilation
+   and matching are pure over the prepared listing, results are naturally
+   sorted, and used specs are recorded in the loaded package.
+4. Remove direct filesystem access from the production glob substrate.
+   Directory absence/read errors remain explicit failures. Any symlink that
+   could participate as a file, directory, or BUILD boundary produces a
+   deterministic unsupported-symlink loading error; it is never followed or
+   silently omitted in this packet.
+5. `PackageLoadKey` depends on the package listing even for BUILD files that do
+   not call `glob()`. This correctness-first Buck2 shape avoids speculative
+   Starlark replay. Measure before designing a lazy Bazel-hybrid optimization.
+
+Listing identity is exact for this packet:
+
+- the key uses canonical workspace identity plus a normalized absolute
+  root-repository package path;
+- the value contains no absolute paths, only sorted package-relative
+  `CompactString` paths for regular files, directories, watched directories,
+  and nested package boundaries, retained through immutable shared slices;
+- every traversed directory requests its `WorkspaceDirectoryKey`;
+- a non-root directory with a direct regular entry named `BUILD.bazel` or
+  `BUILD` is retained as a package boundary and never traversed below; and
+- an absent/read-error value for any required directory fails the listing
+  instead of becoming an empty directory.
+
+The exact Starlark callable for both global and native forms is:
+
+```text
+glob(include, exclude=[], exclude_directories=1, allow_empty=True)
+```
+
+Accept list or tuple string arguments and preserve Starlark type errors and
+defaults. The M1 pattern subset is normalized UTF-8 forward-relative patterns
+made of literal path segments and `*` wildcards within a segment, including
+the existing oracle's `*.txt` and nested `sub/*.txt` forms. Reject empty,
+absolute, dot/uplevel, doubled-separator, trailing-separator, backslash,
+`**`, `?`, character-class, brace, and escape forms until a Bazel 9 oracle
+packet approves their exact semantics. `exclude_directories=0` filters both
+regular files and non-boundary directories; the default filters files only.
+Per-include `allow_empty=False` remains required. A `.bzl` macro invoked from a
+BUILD file uses that caller's package listing; a top-level `.bzl` call without
+package context errors.
+
+The outer `PackageLoadKey` is the only async bridge. Prohibit a nested runtime,
+blocking channel, injected input during compute, lock across DICE/evaluator
+work, AST-only glob discovery, or speculative Starlark re-evaluation.
+
+Exact scope:
+
+- `app/slug_loading_v2/src/{keys.rs,glob.rs,bzl_module.rs,package.rs,lib.rs}`;
+- `app/slug_loading_v2/tests/{glob_boundaries.rs,glob_invalidation.rs}` and
+  focused compile fixes;
+- `app/slug_core_v2/src/runtime/dice.rs` and
+  `app/slug_core_v2/tests/runtime.rs` only if the production-wrapper proof
+  needs a narrow API/test change; and
+- this plan, the Stage 2 residual, and Stage 9 evidence after acceptance.
+
+Exclude repository mappings, external repositories, symlink resolution,
+ignored-path policy, filesystem watcher replacement, `subpackages()`, query,
+configured analysis, execution, and unrelated Starlark globals.
+
+Implementation and test order:
+
+1. Add pure package-listing/glob tests for deterministic files/directories,
+   excludes, per-pattern `allow_empty = False`, nested package boundaries,
+   absence/read errors, unsupported symlinks, and the exact Bazel argument
+   surface. Capture Bazel 9.2.0 behavior for defaults, type errors, and
+   `exclude_directories` before encoding assertions.
+2. Add `PackageListingKey` and compact immutable listing values using only
+   injected directory observations.
+3. Pass the listing through package evaluation and implement global plus
+   `native.glob`; a loaded macro calling `native.glob` must use the BUILD
+   package's listing.
+4. Add a retained-DICE regression using `ActivationTracker`, not process-global
+   atomics. Assert events by concrete key identity and activation kind:
+   identical observations reuse the tested `PackageListingKey` and
+   `PackageLoadKey`; an unrelated sibling-package mutation reuses both; a
+   mutation below an established subpackage reuses both; matching
+   create/rename/delete evaluates the affected directory key, listing key, and
+   package key; and adding/removing a child BUILD boundary evaluates the parent
+   listing/package exactly once in that committed revision. Assert filegroup
+   `srcs` at each semantic transition.
+5. Add or strengthen the production `WorkspaceRuntime` regression, then run
+   the owning and downstream suites serially through one Cargo target.
+
+Focused validation:
+
+- `CARGO_TARGET_DIR=/tmp/slug-m1-glob-target CARGO_BUILD_JOBS=1 cargo test
+  -p slug_loading_v2 -p slug_core_v2 -p slug_server_v2 -p slug_analysis_v2
+  -p slug_cli_v2`;
+- `cargo fmt --all -- --check`;
+- ownership greps showing `glob.rs`, `PackageListingKey`, and Starlark glob
+  globals contain no filesystem read, runtime creation, blocking bridge, or
+  injected-input mutation;
+- forbidden Buck-surface grep from this plan; and
+- `scripts/v2_archive_status.sh` plus `git diff --check`.
+
+Evidence and completion boundary: require Sol-low design approval before
+implementation and Sol-low post-review before commit. Record exact activation
+events, mutation results, utility reuse, validation, accepted commit, and
+residual symlink/full-scanner behavior here and in Stage 9. The generated oracle
+remains the parity authority until Stage 8 query can execute it under Slug.
+
+Stop on external-repository identity, symlink traversal/resolution, a need for
+Stage 5 mapping, evaluator suspension/blocking, a nested runtime, injection
+during compute, a lock across DICE/Starlark work, swallowed directory errors,
+silent omission of a participating symlink, unsupported pattern behavior
+without a Bazel 9 oracle, or inability to distinguish sibling/subpackage reuse
+through key-specific activation data.
 
 ## Exact Test Criteria
 
