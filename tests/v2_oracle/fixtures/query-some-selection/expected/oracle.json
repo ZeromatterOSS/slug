@@ -1,0 +1,990 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "some(//:early union //:missing_target, 1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:early union //:missing_target, 1)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "stop_union_missing_target_after_early_candidate",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\nERROR: no such target '//:missing_target': target 'missing_target' not declared in package '' defined by <workspace>/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-some-selection/20260723-022405-516789-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-some-selection/20260723-022513-519324-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: ec24f711-5294-4ef9-ae22-f140e184440d\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\nERROR: no such target '//:missing_target': target 'missing_target' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-some-selection/20260723-022513-519324-bazel/workspace/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(//:early //:missing_target), 1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(//:early //:missing_target), 1)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "stop_set_missing_target_after_early_candidate",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//:missing_target': target 'missing_target' not declared in package '' defined by <workspace>/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: beec3122-ae07-4950-8f7e-2e7aee3283f2\nLoading: 0 packages loaded\nERROR: no such target '//:missing_target': target 'missing_target' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-some-selection/20260723-022513-519324-bazel/workspace/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:early union //missing:target, 1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:early union //missing:target, 1)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "stop_union_missing_package_after_early_candidate",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: f2da403d-55d1-4dae-abe5-b30853becfea\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(//:early //missing:target), 1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(//:early //missing:target), 1)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "stop_set_missing_package_after_early_candidate",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 05f092a0-e898-4dbe-ab16-8346954fc736\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:single)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:single)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "singleton_default",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:single",
+      "stderr": "INFO: Invocation ID: 81deacea-98ad-4b97-81b3-336aac325035\nLoading: 0 packages loaded\n",
+      "stdout": "//:single\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "some(//:single)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "some(//:single)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "singleton_auto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:single",
+      "stderr": "INFO: Invocation ID: e55b9109-0729-47fe-b17d-50bfd54455b4\nLoading: 0 packages loaded\n",
+      "stdout": "//:single\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "some(//:single)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "some(//:single)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "singleton_full",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:single",
+      "stderr": "INFO: Invocation ID: b75d92b4-8960-4153-a17c-6a87c224975c\nLoading: 0 packages loaded\n",
+      "stdout": "//:single\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(//:zeta //:alpha //:middle))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(//:zeta //:alpha //:middle))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "one_of_three_default",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:zeta",
+      "stderr": "INFO: Invocation ID: 542b87d3-3eee-4383-ba0d-f4dea1581753\nLoading: 0 packages loaded\n",
+      "stdout": "//:zeta\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "some(set(//:zeta //:alpha //:middle), 2)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "some(set(//:zeta //:alpha //:middle), 2)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "two_of_three_auto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:alpha\n//:zeta",
+      "stderr": "INFO: Invocation ID: 1007dfde-6962-436a-951d-186d5eb9ff72\nLoading: 0 packages loaded\n",
+      "stdout": "//:alpha\n//:zeta\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "some(set(//:zeta //:alpha //:middle), 2)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "some(set(//:zeta //:alpha //:middle), 2)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "two_of_three_full",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:zeta\n//:alpha",
+      "stderr": "INFO: Invocation ID: dd8e1e2b-6b4f-4c87-9fa8-88271caecc04\nLoading: 0 packages loaded\n",
+      "stdout": "//:zeta\n//:alpha\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "some(set(//:zeta //:alpha //:middle), 3)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "some(set(//:zeta //:alpha //:middle), 3)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "equal_count_auto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:alpha\n//:middle\n//:zeta",
+      "stderr": "INFO: Invocation ID: 673cc164-4c70-4e02-9e23-e8df8146b76a\nLoading: 0 packages loaded\n",
+      "stdout": "//:alpha\n//:middle\n//:zeta\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "some(set(//:zeta //:alpha //:middle), 3)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "some(set(//:zeta //:alpha //:middle), 3)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "equal_count_full",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:zeta\n//:middle\n//:alpha",
+      "stderr": "INFO: Invocation ID: 846703d1-de81-4c6f-82c4-ba5c2f7038dd\nLoading: 0 packages loaded\n",
+      "stdout": "//:zeta\n//:middle\n//:alpha\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(//:zeta //:alpha //:middle), 5)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(//:zeta //:alpha //:middle), 5)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "excess_count",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:alpha\n//:middle\n//:zeta",
+      "stderr": "INFO: Invocation ID: 560aba98-9897-44b3-837d-b1d7ee52e217\nLoading: 0 packages loaded\n",
+      "stdout": "//:alpha\n//:middle\n//:zeta\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(//:zeta //:zeta //:alpha), 5)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(//:zeta //:zeta //:alpha), 5)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "duplicate_operands",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:alpha\n//:zeta",
+      "stderr": "INFO: Invocation ID: bfb8bbcb-7f16-4a0c-9b19-d7e10f63054f\nLoading: 0 packages loaded\n",
+      "stdout": "//:alpha\n//:zeta\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(some(set(//:zeta //:alpha), 2) union some(set(//:alpha //:middle), 2), 5)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(some(set(//:zeta //:alpha), 2) union some(set(//:alpha //:middle), 2), 5)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "nested_some",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:alpha\n//:middle\n//:zeta",
+      "stderr": "INFO: Invocation ID: 3192e6f8-bc12-4bf1-98e0-e37becd68a0e\nLoading: 0 packages loaded\n",
+      "stdout": "//:alpha\n//:middle\n//:zeta\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(set())"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set())"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "empty_input",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(set())\" failed: argument set is empty",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 87b6fced-a92d-4c91-8735-d7e6c86cdecd\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(set())\" failed: argument set is empty\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:single, 0)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:single, 0)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "zero_nonempty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(//:single, 0)\" failed: argument set is empty",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1e550d39-703b-408e-89d5-fb1cf919fdc5\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(//:single, 0)\" failed: argument set is empty\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(), 0)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(), 0)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "zero_empty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(set(), 0)\" failed: argument set is empty",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: f70fa7c1-4b53-4785-9999-38adc4289ffb\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(set(), 0)\" failed: argument set is empty\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:single, '-1')"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:single, '-1')"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "negative_nonempty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(//:single, -1)\" failed: argument set is empty",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 3c83dd66-4217-45b4-a956-1512732a0a75\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(//:single, -1)\" failed: argument set is empty\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(), '-1')"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(), '-1')"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "negative_empty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(set(), -1)\" failed: argument set is empty",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 102d1e66-6857-42b2-8770-3f3709bf2d65\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(set(), -1)\" failed: argument set is empty\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:single, '-2147483648')"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:single, '-2147483648')"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "negative_min_nonempty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(//:single, -2147483648)\" failed: argument set is empty",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: dacfb87c-d615-4d3f-a72c-748abc693716\nLoading: 0 packages loaded\nERROR: Evaluation of query \"some(//:single, -2147483648)\" failed: argument set is empty\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:single, -1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:single, -1)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "bare_negative_syntax",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//:single, -1)': syntax error at '- 1 )'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 082cdd63-1678-478b-aab7-22786630626e\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//:single, -1)': syntax error at '- 1 )'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:single, 2147483647)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:single, 2147483647)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "max_count_accepted",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:single",
+      "stderr": "INFO: Invocation ID: 8044e214-335b-41a3-b65b-d04bb203cfdd\nLoading: 0 packages loaded\n",
+      "stdout": "//:single\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(//missing:target, 2147483648)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//missing:target, 2147483648)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "overflow_positive_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//missing:target, 2147483648)': expected an integer literal: '2147483648'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 372e13ad-3c35-4d41-b008-257ebc674368\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//missing:target, 2147483648)': expected an integer literal: '2147483648'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//missing:target, '-2147483649')"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//missing:target, '-2147483649')"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "overflow_negative_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//missing:target, '-2147483649')': expected an integer literal: '-2147483649'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 48b0e053-235b-45e2-9ca3-c276e29143a0\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//missing:target, '-2147483649')': expected an integer literal: '-2147483649'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//missing:target, 2_147_483_647)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//missing:target, 2_147_483_647)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "underscore_integer_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//missing:target, 2_147_483_647)': expected an integer literal: '2_147_483_647'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 03e06298-f522-4c90-97cf-12f7dc250807\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//missing:target, 2_147_483_647)': expected an integer literal: '2_147_483_647'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:single, nope)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:single, nope)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "noninteger_word",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//:single, nope)': expected an integer literal: 'nope'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 03b6fa3d-4037-4c6f-ad2f-15698d48e232\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//:single, nope)': expected an integer literal: 'nope'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some()"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some()"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "too_few_arguments",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'some()': too few arguments to function 'some' at ')'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 5923a3b7-20a5-4b81-987b-c15720fcf6ac\nLoading: 0 packages loaded\nERROR: Error while parsing 'some()': too few arguments to function 'some' at ')'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(//:single, 1, 2)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//:single, 1, 2)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "too_many_arguments",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//:single, 1, 2)': too many arguments to function 'some' at ', 2 )'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 3425e4ed-3d24-41bf-bf56-0fc56d5392c6\nLoading: 0 packages loaded\nERROR: Error while parsing 'some(//:single, 1, 2)': too many arguments to function 'some' at ', 2 )'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(2147483648)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(2147483648)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "expression_integer_above_i32",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//:2147483648': target '2147483648' not declared in package '' defined by <workspace>/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 5b52e045-bb24-4344-8965-92f380920406\nLoading: 0 packages loaded\nERROR: no such target '//:2147483648': target '2147483648' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-some-selection/20260723-022513-519324-bazel/workspace/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "some(deps(//:cycle_a), 5)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(deps(//:cycle_a), 5)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cycle_closure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:cycle_a\n//:cycle_b",
+      "stderr": "INFO: Invocation ID: 60623f3d-cc3e-4a38-a772-3995a340ead8\nLoading: 0 packages loaded\n",
+      "stdout": "//:cycle_a\n//:cycle_b\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(//:early //other:later), 1)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(//:early //other:later), 1)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cross_package_one_of_two",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:early",
+      "stderr": "INFO: Invocation ID: b9e72844-bc85-4491-9889-e2ada3989159\nLoading: 0 packages loaded\n",
+      "stdout": "//:early\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(set(//:early //other:later), 5)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(set(//:early //other:later), 5)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "cross_package_all_selected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:early\n//other:later",
+      "stderr": "INFO: Invocation ID: 3070e9f9-fe4a-4de8-9f1f-25adf85657bb\nLoading: 0 packages loaded\n",
+      "stdout": "//:early\n//other:later\n"
+    },
+    {
+      "argv": [
+        "query",
+        "some(//recursive/..., 5)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "some(//recursive/..., 5)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "recursive_input",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//recursive:rec_zeta\n//recursive/nested:rec_alpha",
+      "stderr": "INFO: Invocation ID: 6c8e7a89-b8fd-417f-b79c-f442211590e9\nLoading: 0 packages loaded\n",
+      "stdout": "//recursive:rec_zeta\n//recursive/nested:rec_alpha\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//:depth_root, 2147483647)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//:depth_root, 2147483647)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_max_depth",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:depth_child\n//:depth_root",
+      "stderr": "INFO: Invocation ID: 3614f871-8fce-4293-9bf9-c86c08ae22db\nLoading: 0 packages loaded\n",
+      "stdout": "//:depth_child\n//:depth_root\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//:depth_root, '-1')"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//:depth_root, '-1')"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_negative_depth",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: f0723259-05b5-4562-88a2-b5f6283daa80\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//:depth_root, '-2147483648')"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//:depth_root, '-2147483648')"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_min_depth",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 18dc9fc0-fe19-4ebf-a052-e0d6998d74b5\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "deps(//:depth_root, 2147483648)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(//:depth_root, 2147483648)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_overflow_depth",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'deps(//:depth_root, 2147483648)': expected an integer literal: '2147483648'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: c7555f1e-1efd-4fc8-bd3a-88fea9b58bd4\nLoading: 0 packages loaded\nERROR: Error while parsing 'deps(//:depth_root, 2147483648)': expected an integer literal: '2147483648'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(set(//:depth_root //:depth_child), //:depth_child, '-1')"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(set(//:depth_root //:depth_child), //:depth_child, '-1')"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_negative_depth",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 77f225dc-c2b9-4385-833c-a550d86e5cc8\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(set(//:depth_root //:depth_child), //:depth_child, '-2147483648')"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(set(//:depth_root //:depth_child), //:depth_child, '-2147483648')"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_min_depth",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e648b7b7-d5f2-493c-864b-2d7d3764e30e\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483647)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483647)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_max_depth",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:depth_child\n//:depth_root",
+      "stderr": "INFO: Invocation ID: ee7c6fb5-cf35-4a9e-9695-e99e5f4e9411\nLoading: 0 packages loaded\n",
+      "stdout": "//:depth_child\n//:depth_root\n"
+    },
+    {
+      "argv": [
+        "query",
+        "rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483648)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483648)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_overflow_depth",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483648)': expected an integer literal: '2147483648'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ef57b24d-5b0f-46ae-9081-c38f5b168ef0\nLoading: 0 packages loaded\nERROR: Error while parsing 'rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483648)': expected an integer literal: '2147483648'\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "query-some-selection",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

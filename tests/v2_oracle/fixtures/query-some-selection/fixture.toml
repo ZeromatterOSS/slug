@@ -1,0 +1,299 @@
+[fixture]
+name = "query-some-selection"
+description = "Bazel 9.2 ordinary-query oracle for some() arbitrary selection, signed Java-int counts, and complete operand demand."
+comparison = "message_shape"
+oracle_notes = "Root-only ordinary-query slice. The fixture contains no generated/output nodes, external repositories, configured state, or Sky Query flags. some() alternatives are bounded only to complete valid members/subsets and never claim a winning label."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/SomeFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryEnvironment.java#EvaluateExpression",
+  "src/main/java/com/google/devtools/build/lib/query2/common/AbstractBlazeQueryEnvironment.java#AbstractBlazeQueryEvaluateExpressionImpl",
+  "src/main/java/com/google/devtools/build/lib/query2/SkyQueryEnvironment.java#SkyQueryEvaluateExpressionImpl",
+  "src/main/java/com/google/devtools/build/lib/query2/QueryEnvironmentFactory.java#canUseSkyQuery",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryParser.java#consumeIntLiteral",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/Lexer.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/commands/QueryCommand.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/QueryOutputUtils.java",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSomeOperator_noCountParameter",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSomeOperator_countParameterNotEqualActualCount",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSomeOperator_nestedSomeTest",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testUnconditionalQueryException",
+]
+translation_notes = "Migrates Bazel SomeFunction and AbstractQueryTest themes into a root-only filegroup graph. Stop probes prove ordinary query evaluates later union/set operands despite an early selectable node and emits no partial stdout on the resulting failure. Java signed-int parsing is exercised both for some() and existing deps/rdeps depth arguments; expression-position integers remain target literals."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-some-selection --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-some-selection --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "stop_union_missing_target_after_early_candidate"
+argv = ["query", "some(//:early union //:missing_target, 1)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:missing_target'"]
+
+[[commands]]
+name = "stop_set_missing_target_after_early_candidate"
+argv = ["query", "some(set(//:early //:missing_target), 1)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:missing_target'"]
+
+[[commands]]
+name = "stop_union_missing_package_after_early_candidate"
+argv = ["query", "some(//:early union //missing:target, 1)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such package 'missing': BUILD file not found"]
+
+[[commands]]
+name = "stop_set_missing_package_after_early_candidate"
+argv = ["query", "some(set(//:early //missing:target), 1)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such package 'missing': BUILD file not found"]
+
+[[commands]]
+name = "singleton_default"
+argv = ["query", "some(//:single)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:single\\Z"]
+
+[[commands]]
+name = "singleton_auto"
+argv = ["query", "--order_output=auto", "some(//:single)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:single\\Z"]
+
+[[commands]]
+name = "singleton_full"
+argv = ["query", "--order_output=full", "some(//:single)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:single\\Z"]
+
+[[commands]]
+name = "one_of_three_default"
+argv = ["query", "some(set(//:zeta //:alpha //:middle))"]
+expected_exit = 0
+stdout_patterns = ["\\A(?://:alpha|//:middle|//:zeta)\\Z"]
+
+[[commands]]
+name = "two_of_three_auto"
+argv = ["query", "--order_output=auto", "some(set(//:zeta //:alpha //:middle), 2)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?://:alpha\\n//:middle|//:alpha\\n//:zeta|//:middle\\n//:zeta)\\Z"]
+
+[[commands]]
+name = "two_of_three_full"
+argv = ["query", "--order_output=full", "some(set(//:zeta //:alpha //:middle), 2)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?://:alpha\\n//:middle|//:alpha\\n//:zeta|//:middle\\n//:alpha|//:middle\\n//:zeta|//:zeta\\n//:alpha|//:zeta\\n//:middle)\\Z"]
+
+[[commands]]
+name = "equal_count_auto"
+argv = ["query", "--order_output=auto", "some(set(//:zeta //:alpha //:middle), 3)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:alpha\\n//:middle\\n//:zeta\\Z"]
+
+[[commands]]
+name = "equal_count_full"
+argv = ["query", "--order_output=full", "some(set(//:zeta //:alpha //:middle), 3)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:zeta\\n//:middle\\n//:alpha\\Z"]
+
+[[commands]]
+name = "excess_count"
+argv = ["query", "some(set(//:zeta //:alpha //:middle), 5)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:alpha\\n//:middle\\n//:zeta\\Z"]
+
+[[commands]]
+name = "duplicate_operands"
+argv = ["query", "some(set(//:zeta //:zeta //:alpha), 5)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:alpha\\n//:zeta\\Z"]
+
+[[commands]]
+name = "nested_some"
+argv = ["query", "some(some(set(//:zeta //:alpha), 2) union some(set(//:alpha //:middle), 2), 5)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:alpha\\n//:middle\\n//:zeta\\Z"]
+
+[[commands]]
+name = "empty_input"
+argv = ["query", "some(set())"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "zero_nonempty"
+argv = ["query", "some(//:single, 0)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "zero_empty"
+argv = ["query", "some(set(), 0)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "negative_nonempty"
+argv = ["query", "some(//:single, '-1')"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "negative_empty"
+argv = ["query", "some(set(), '-1')"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "negative_min_nonempty"
+argv = ["query", "some(//:single, '-2147483648')"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "bare_negative_syntax"
+argv = ["query", "some(//:single, -1)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["syntax error at '- 1 \\)'"]
+
+[[commands]]
+name = "max_count_accepted"
+argv = ["query", "some(//:single, 2147483647)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:single\\Z"]
+
+[[commands]]
+name = "overflow_positive_rejected"
+argv = ["query", "some(//missing:target, 2147483648)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["expected an integer literal: '2147483648'"]
+
+[[commands]]
+name = "overflow_negative_rejected"
+argv = ["query", "some(//missing:target, '-2147483649')"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["expected an integer literal: '-2147483649'"]
+
+[[commands]]
+name = "underscore_integer_rejected"
+argv = ["query", "some(//missing:target, 2_147_483_647)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["expected an integer literal: '2_147_483_647'"]
+
+[[commands]]
+name = "noninteger_word"
+argv = ["query", "some(//:single, nope)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["expected an integer literal: 'nope'"]
+
+[[commands]]
+name = "too_few_arguments"
+argv = ["query", "some()"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too few arguments to function 'some'"]
+
+[[commands]]
+name = "too_many_arguments"
+argv = ["query", "some(//:single, 1, 2)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too many arguments to function 'some'"]
+
+[[commands]]
+name = "expression_integer_above_i32"
+argv = ["query", "some(2147483648)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//:2147483648'"]
+
+[[commands]]
+name = "cycle_closure"
+argv = ["query", "some(deps(//:cycle_a), 5)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:cycle_a\\n//:cycle_b\\Z"]
+
+[[commands]]
+name = "cross_package_one_of_two"
+argv = ["query", "some(set(//:early //other:later), 1)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?://:early|//other:later)\\Z"]
+
+[[commands]]
+name = "cross_package_all_selected"
+argv = ["query", "some(set(//:early //other:later), 5)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:early\\n//other:later\\Z"]
+
+[[commands]]
+name = "recursive_input"
+argv = ["query", "some(//recursive/..., 5)"]
+expected_exit = 0
+stdout_patterns = ["\\A//recursive:rec_zeta\\n//recursive/nested:rec_alpha\\Z"]
+
+[[commands]]
+name = "deps_max_depth"
+argv = ["query", "deps(//:depth_root, 2147483647)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:depth_child\\n//:depth_root\\Z"]
+
+[[commands]]
+name = "deps_negative_depth"
+argv = ["query", "deps(//:depth_root, '-1')"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "deps_min_depth"
+argv = ["query", "deps(//:depth_root, '-2147483648')"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "deps_overflow_depth"
+argv = ["query", "deps(//:depth_root, 2147483648)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["expected an integer literal: '2147483648'"]
+
+[[commands]]
+name = "rdeps_negative_depth"
+argv = ["query", "rdeps(set(//:depth_root //:depth_child), //:depth_child, '-1')"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "rdeps_min_depth"
+argv = ["query", "rdeps(set(//:depth_root //:depth_child), //:depth_child, '-2147483648')"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "rdeps_max_depth"
+argv = ["query", "rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483647)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:depth_child\\n//:depth_root\\Z"]
+
+[[commands]]
+name = "rdeps_overflow_depth"
+argv = ["query", "rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483648)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["expected an integer literal: '2147483648'"]
