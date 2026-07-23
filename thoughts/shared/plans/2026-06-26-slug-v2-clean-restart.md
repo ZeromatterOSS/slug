@@ -16,48 +16,48 @@ implementation from the first architectural boundary.
 
 This table is the scheduling authority for a clean root agent. Historical
 checkpoint sections below are evidence only. A request such as
-`/goal follow the implementation plan` starts with the root-orchestrator prompt
-and advances the **Current packet**, not an older `next` paragraph.
+`/goal follow the implementation plan` uses the repo orchestration skill and
+advances the **Current packet**, not an older `next` paragraph.
 
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 Java `Pattern` audit is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 Java `Pattern` audit is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | run the read-only Java `Pattern` feasibility/reuse audit before selecting another function |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 Java `Pattern` qualification is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 Java `Pattern` qualification is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility audit completed | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | run the oracle/read-only `java_regex` substrate qualification packet; activate no function or dependency |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-### Operating-remediation queue
+### Current packet
 
-Complete these as separate accepted packets; do not combine them into one broad
-cleanup:
+Run one oracle/read-only Java-Pattern-substrate qualification packet.
+Bazel 9.2.0 compiles Java `Pattern` once for `filter`, regex-based `kind`, and
+`attr`, applies `Matcher.find`, and embeds OpenJDK 25.0.2. The accepted
+feasibility audit rejected Rust `regex`, `fancy-regex`, PCRE, and Onig as
+dialect substitutions. `java_regex` 0.1.0 at upstream commit
+`ed518dc23dacbe1a88d7cb3f26f0cfe31cc91393` is a qualification candidate only:
+its published crate identity/checksum, license, and MSRV are not independently
+pinned; its current find path copies every subject to `Vec<char>` and allocates
+match/group/map state; diagnostics use scalar rather than Java UTF-16 offsets;
+and unpaired surrogate escapes may collapse to NUL. No query function
+activates from this audit.
 
-1. Accepted: `WP-4-8-m3-executables-rule-capability` landed in `69565a29`
-   against all 32 semantic oracle rows; the eight `label_kind` rows remain
-   formatter-only constraints.
-2. Accepted: `WP-0-baseline-repair` restored local `v1-archive` at the exact
-   recorded V1 commit and landed the narrow checker allowlists in `9897e940`;
-   the required-clean checker passes.
-3. Accepted: `0618a007` adds the root-owned serialized packet-validation
-   wrapper around the existing `tools/v2_oracle` Slug comparison path. It
-   fails closed on daemon/socket and cleanup failures rather than skipping
-   them.
-4. Accepted: `65c6c54f` completes
-   `WP-8-query-evaluator-module-extraction`. The oracle-neutral split preserves
-   both public evaluator paths while separating output formatting, generic
-   evaluation/function dispatch, traversal, and the DICE-backed loading
-   environment behind crate-private seams.
-5. Current: run a read-only Java `Pattern` feasibility/reuse audit and Sol
-   adjudication before implementing `filter`, `attr`, or regex-based `kind`.
-   Finite fixture agreement or substituting Rust/fancy regex is not Bazel
-   parity.
+Independently pin the published crate source/checksum, upstream commit,
+`MIT OR Apache-2.0` license files, and MSRV; generate an exact OpenJDK
+25.0.2/Bazel 9.2.0 differential corpus for compile success/failure and
+diagnostics, `Matcher.find`, Unicode/UTF-16, supplementary characters,
+unpaired surrogates, NUL, Java-only constructs, and bounded resource behavior;
+then measure the subject-copy/allocation path and design an allocation-free
+boolean-find API. Stop and reject the candidate on any semantic mismatch,
+immutable-source failure, uncontrolled resource behavior, or unacceptable
+hot-path allocation boundary.
 
-The root owns Live Status updates. Implementation workers return source/test
-patches and evidence; they do not append checkpoint prose or create commits.
+This packet adds no production dependency or lockfile entry,
+registry/evaluator/query-graph activation, DICE state, or representation
+substrate. `attr` and `kind` retain their independent representation gates.
 
 ## Operating Decision
 
@@ -158,9 +158,8 @@ restart. Before implementation proceeds as V2 trunk, do this sequence:
 5. Run `scripts/v2_archive_status.sh`, `git diff --check`, and the touched
    stage validation before calling the root clean.
 
-Use the current root-orchestrator prompt at
-[thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md](../prompts/2026-07-23-slug-v2-root-orchestrator.md)
-for sessions that continue this remediation.
+Plan-following sessions use
+`.codex/skills/slug-agent-orchestration/SKILL.md`.
 
 2026-06-29 execution update: the missing local archive refs have been repaired;
 `slug-v1-archive^{commit}` and `v1-archive` now both resolve to
@@ -351,38 +350,9 @@ loading-query, 6 parser/registry); Sol-low final review returned `ACCEPT`.
 
 ## Two-Tier Work-Packet Contract
 
-The current operating contract lives in
-`.codex/skills/slug-agent-orchestration/SKILL.md`. A clean plan-following root
-must also read
-`thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md`.
-
-The default roles are:
-
-- one persistent high-capability Sol root for critical-path selection,
-  architecture, integration, validation, status/evidence, and commits;
-- Terra medium for bounded audits, fixtures, focused tests, and
-  one-abstraction implementation;
-- Terra high for difficult but already-approved multi-file implementation; and
-- Sol low for concise pre-implementation adjudication and final risky-patch
-  review. Sol high review is an escalation after concrete unresolved evidence,
-  not a standing second orchestrator.
-
-Every Stage 2-8 and Stage 10 packet still begins with required reuse discovery.
-Any architecture, public/cross-crate interface, DICE key/ownership/locking,
-stage-boundary, formatter-identity, regex-engine, or V1/Buck2 reuse decision
-requires recorded Sol review before implementation.
-
-Use the stored templates:
-
-- `.codex/skills/slug-agent-orchestration/references/implementation-worker.md`
-- `.codex/skills/slug-agent-orchestration/references/design-reviewer.md`
-
-Workers normally edit only exact source/test/fixture scope and run focused
-tests. The root inspects the actual diff, adds a source-derived adversarial
-regression, owns downstream and broad serialized validation, obtains the
-terminal `ACCEPT`/`REVISE`/`REPLAN` verdict, and updates Live Status plus compact
-owner evidence once. One focused correction is allowed; a second material miss
-requires `REPLAN`.
+`.codex/skills/slug-agent-orchestration/SKILL.md` is the sole operating
+contract. It owns routing, packet/reviewer templates, validation ownership, and
+bounded logging. This plan owns only milestone state and acceptance evidence.
 
 ## Retained First Real Bazel Build Integration Gate
 
@@ -462,12 +432,11 @@ git diff --check -- AGENTS.md README.md thoughts/shared/plans
 For the first real implementation slice, use the validation command in that
 slice's subplan and record compact evidence in the owning V2 plan.
 
-## Next Agent Prompt
+## Plan Execution
 
-Use
-[thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md](../prompts/2026-07-23-slug-v2-root-orchestrator.md)
-for plan-following sessions. The split-specific remediation instructions live
-in this plan, Stage 0, Stage 9, and `V1_ARCHIVE.md`, not in the prompt.
+Plan-following sessions use
+`.codex/skills/slug-agent-orchestration/SKILL.md`; Live Status above owns
+scheduling.
 
 ## Reviewed Next M3 Direction: Build and Load Files (2026-07-23)
 

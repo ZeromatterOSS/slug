@@ -38,6 +38,20 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
+### Live packet: `WP-8-m3-java-pattern-substrate-qualification`
+
+Perform an oracle/read-only qualification of `java_regex` 0.1.0 only.
+Independently pin its immutable published-crate source/checksum, upstream
+commit, license files, and MSRV; compare it against exact OpenJDK 25.0.2/Bazel
+9.2.0 compile diagnostics, `Matcher.find`, Java-only constructs,
+Unicode/UTF-16, supplementary characters, unpaired surrogates, NUL, and
+bounded resource behavior; and measure/design an allocation-free boolean-find
+boundary. Reject on any semantic mismatch, unverifiable source, uncontrolled
+resource behavior, or unacceptable hot-path allocation boundary. Add no
+production dependency, lockfile entry, query activation, DICE state, or
+representation substrate. `attr` and `kind` retain independent representation
+gates. Live Status in the canonical plan owns scheduling.
+
 ### Query engine reuse policy
 
 Do not grow the current `slug_query_v2` subset parser into a second query
@@ -2102,6 +2116,42 @@ query fixtures; the archive checker passed; and no daemon/socket marker
 remained. Sol-low approved the boundary before implementation and returned
 final `ACCEPT` after full-diff review.
 
-Five ordinary query functions remain deferred. The next packet is the
-read-only Java `Pattern` feasibility/reuse audit required before selecting
-`filter`, `attr`, or regex-based `kind`.
+Five ordinary query functions remain deferred. The completed Java `Pattern`
+feasibility audit is recorded below; the next packet is the oracle/read-only
+`java_regex` substrate qualification.
+
+## Java `Pattern` feasibility audit accepted (2026-07-23)
+
+Bazel 9.2.0 `RegexFilterExpression` compiles `java.util.regex.Pattern` once
+and applies `Matcher.find` to each candidate string for `filter`, regex-based
+`kind`, and `attr`; the installed Bazel runtime embeds OpenJDK 25.0.2. Rust
+`regex`, `fancy-regex`, PCRE, and Onig are rejected as non-Java dialect
+substitutions. Buck2 and V1 provide useful query-evaluator structure but no
+exact matching substrate.
+
+`java_regex` 0.1.0 at upstream commit
+`ed518dc23dacbe1a88d7cb3f26f0cfe31cc91393` is the sole qualification
+candidate found, not an accepted dependency. Its immutable published crate
+identity/checksum, license files, and MSRV remain unverified; its current
+boolean-search route copies every subject into `Vec<char>` and allocates match,
+group, and map state; error positions use scalar-character rather than Java
+UTF-16 indexes; and its unpaired-surrogate escape fallback may change boolean
+results by mapping to NUL.
+
+The next discrete packet is oracle/read-only qualification only. It must pin
+the published source and independently compare exact OpenJDK 25.0.2/Bazel
+9.2.0 compile acceptance, failure diagnostics, `Matcher.find`, Java-only
+constructs, Unicode/UTF-16, supplementary characters, unpaired surrogates,
+NUL, and bounded resource behavior. It must also measure the existing
+subject-copy/allocation path and design an allocation-free boolean-find
+boundary. Any mismatch, unverifiable immutable source, uncontrolled resource
+behavior, or unacceptable allocation boundary rejects the candidate.
+
+This qualification adds no production dependency or lockfile entry,
+registry/evaluator/query-graph activation, DICE state, or representation
+substrate. `filter`, `attr`, and regex-based `kind` remain deferred. Successful
+regex qualification would unblock only their shared matching substrate;
+`attr` still requires exact stringified/configurable attribute projection and
+`kind` still requires exact target-kind representation. Terra-medium produced
+the source audit; Sol-low required this bounded qualification direction before
+any implementation authorization.

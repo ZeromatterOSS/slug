@@ -1,197 +1,103 @@
 ---
 name: slug-agent-orchestration
-description: Orchestrate Slug plan execution across lower-cost Codex agents while preserving Bazel parity, plan ownership, and validation quality. Use whenever a user asks to follow or continue the implementation plan or roadmap (including a simple `/goal follow the implementation plan`), and when splitting work into agent packets, choosing Terra medium/high or Sol review, validating delegated work, or recording routing outcomes.
+description: Run Slug V2 implementation-plan or roadmap goals through bounded, reviewed work packets. Use for `/goal follow the implementation plan`, next-packet selection, delegation, model routing, integration, or routing records.
 ---
 
 # Slug Agent Orchestration
 
-Route each bounded packet to the least-cost model likely to complete it once.
-Keep the root agent responsible for architecture, dirty-worktree safety,
-integration, validation, commits, plan state, and final user communication.
+The root owns priority, architecture, worktree safety, integration, status, and
+commits. Delegate bounded work to the least-cost capable agent.
 
-For an open-ended plan-following goal, the root is the persistent orchestrator.
-Use a high-capability Sol root when the surface permits choosing the root model.
-Do not spawn a second standing Sol-high orchestrator. Use Terra workers for
-bounded work and Sol low as an on-demand independent reviewer.
+## Start a Plan Goal
 
-## Required Context
+1. Read `AGENTS.md` and the canonical plan's **Live Status** plus current
+   packet. Historical plan prose is evidence, not scheduling state.
+2. Read only the current owner plan's goal/current-priority/acceptance sections
+   and the exact active packet heading. Search for the packet ID; do not load an
+   entire long evidence history by default.
+3. Use the routing table below. Search `references/routing-log.md` for an
+   analogous packet and read only the matching recent rows.
+4. Check `git status --short --branch` and dirty diffs. Inspect live
+   agent/Cargo/slugd processes only before overlapping work, retry, or
+   daemon-sensitive validation.
+5. Continue a clearly owned active packet; otherwise select exactly one packet
+   from Live Status. Clear a red M0 or other named baseline blocker before
+   beginning another feature packet. Read only matching Stage 9 rows unless
+   reuse scope expands.
 
-1. Read `AGENTS.md`,
-   `thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md`, the
-   canonical V2 plan, its **Live Status** table, and the owning subplan.
-2. Read `references/routing-log.md` before choosing a model when it contains an
-   analogous task.
-3. Read any task-triggered repo skill in the root agent before delegating.
-4. Check `git status --short --branch`, inspect dirty diffs, and identify files
-   other agents own.
-5. Inspect live agent and Cargo/slugd processes before retrying validation or
-   assigning overlapping work.
-6. Select exactly one packet from Live Status or the current owner gate. Do not
-   reconstruct priority from older checkpoint prose.
+## Routing
 
-## Root Orchestrator Policy
+| Route | Use |
+|-------|-----|
+| Root only | Small read-only or mechanical work where delegation costs more |
+| Terra medium | Default audit, oracle fixture, focused tests, one abstraction |
+| Terra high | Approved difficult multi-file Rust, DICE, Starlark, or query work |
+| Sol low | Pre-review of reserved decisions and final risky-patch review |
+| Sol high review | Concrete unresolved miss or genuinely new architecture |
 
-The root:
+For long autonomous runs, keep one high-capability Sol root when selectable;
+do not add a standing second orchestrator. Explicit worker overrides use
+`gpt-5.6-terra` at medium/high or `gpt-5.6-sol` at low, with
+`fork_turns="none"` or a small task-local fork.
 
-- chooses the critical-path packet and writes its exact contract;
-- owns architecture, public/cross-crate interfaces, DICE ownership and locks,
-  stage boundaries, destructive actions, and dirty-worktree integration;
-- inspects the actual worker diff and source/oracle anchors;
-- adds a source-derived adversarial regression for ordering, identity,
-  equality, invalidation, provenance, or formatting changes;
-- runs downstream and broad validation serially;
-- requests terminal review where required;
-- edits Live Status, owner-plan evidence, and the routing log once; and
-- commits only an accepted packet.
+Default to one write worker. Additional workers must be read-only or own
+disjoint files. Never run parallel Cargo commands against one target directory.
 
-Normal implementation workers do not edit `AGENTS.md`, the canonical plan,
-owner subplans, prompts, skills, the routing log, or Git commits. A packet may
-delegate those files only when its sole purpose is a named documentation or
-process change.
+## Packet Contract
 
-When a packet has already begun and owns cleanly identified dirty files, finish
-or preserve it to a safe boundary. Otherwise, a red M0 or another baseline
-blocker in Live Status precedes new feature work.
+Use `references/implementation-worker.md`. Every packet has:
 
-## Route by Complexity
+- one owner gate and observable result;
+- exact allowed files and exclusions;
+- Bazel 9.2 oracle/source anchors;
+- relevant Stage 9/Buck2/V1 reuse decisions;
+- focused validation and stop conditions; and
+- a residual-risk report.
 
-Use this table as the default, then adjust from logged evidence.
+The root retains new DICE keys/locks, public or cross-crate APIs, identity and
+ownership models, formatter semantics, regex engines, stage boundaries, and
+destructive actions. Obtain Sol review before implementing such a decision.
 
-| Route | Best fit | Avoid |
-|-------|----------|-------|
-| Root only | Tiny read-only checks, one-file mechanical edits, tasks where coordination costs more than execution | Using delegation merely because a slot is available |
-| Terra medium | Default bounded worker: source archaeology, fixtures, focused tests, one-abstraction Rust changes | Unresolved cross-crate architecture, subtle DICE ownership, or routine plan editing |
-| Terra high | Difficult but bounded implementation/debugging: multi-file Rust, Starlark/query graph work, async invalidation, complex test migration | Open-ended redesign without an approved boundary |
-| Sol low | Architecture/parity review, Bazel-source adjudication, cross-stage interface review, independent review of a risky patch, diagnosis after a concrete worker miss | Routine implementation that Terra can finish directly |
-| Sol high review | Escalation after a concrete unresolved reviewer/root miss or a genuinely new architecture boundary | Standing second orchestrator or speculative routine review |
+Workers normally edit only named source/test/fixture files and run focused
+tests. The root inspects the diff, verifies the oracle, adds a discriminating
+case when identity/equality/invalidation/ordering/formatting is involved, and
+owns downstream and broad validation plus documentation and commits.
 
-Prefer one Terra-medium worker. Use Terra high only when the packet itself is
-complex, not because the overall project is complex. Use Sol low as a concise
-reviewer or adjudicator, not as a standing second implementation team.
+## Acceptance
 
-When the orchestration surface accepts explicit overrides, use
-`model="gpt-5.6-terra"` with `reasoning_effort="medium"` or `"high"`, and
-`model="gpt-5.6-sol"` with `reasoning_effort="low"`. Pair an explicit model
-override with `fork_turns="none"` or a small positive turn count.
+Check the applicable behavior, not every item mechanically:
 
-## Partition Work
+- exact Bazel success/failure, diagnostics, ordering, and output;
+- identity, ownership, semantic equality, reuse, and invalidation;
+- create/edit/delete/recreate and unsupported/external/generated boundaries;
+- DICE-owned discovery without filesystem or fresh-graph bypass;
+- activation limited to the named surface and compact hot-path utilities; and
+- downstream coverage for changed interfaces.
 
-Delegate only concrete, independent packets. Give each packet:
+Use `references/design-reviewer.md` for reserved or risky boundaries. The
+verdict is `ACCEPT`, `REVISE`, or `REPLAN`. Allow one focused correction after
+a concrete miss. A second material correction ends the packet in `REPLAN`.
 
-- one outcome and owner plan;
-- exact allowed files or a read-only scope;
-- source/oracle anchors;
-- explicit exclusions and stop conditions;
-- focused validation and expected evidence; and
-- a request to report residual risk, not to expand scope.
+## Root Validation and Closeout
 
-Do not delegate two write packets that may edit the same files. Do not run
-parallel Cargo commands against one target directory. Keep architecture,
-cross-crate API choices, DICE ownership/locking decisions, destructive actions,
-and final integration with the root unless the plan explicitly delegates the
-decision.
+Run only what the risk requires, serially:
 
-Use `references/implementation-worker.md` as the worker template. It requires
-exact allowed files, a Bazel oracle/source contract, semantic and invalidation
-checks, focused validation, and hard stop conditions.
+1. focused owner tests;
+2. downstream/public-wrapper tests for changed interfaces;
+3. named comparisons through `tools/v2_oracle`;
+4. risk-appropriate broad Cargo suites, serialized against the shared target
+   directory;
+5. `cargo fmt --check` and `git diff --check`; and
+6. daemon tests in a socket-capable environment, with stale `slugd` cleanup
+   before and after.
 
-Use `references/design-reviewer.md` for independent review. A reviewer returns
-exactly `ACCEPT`, `REVISE`, or `REPLAN`, with concrete blockers only.
+Do not weaken environment-limited tests. After a terminal result, update Live
+Status and compact owner evidence once, append one terminal packet rollup to
+the bounded routing log, and commit only accepted work.
 
-## Acceptance Checklist
+## Log Use
 
-The packet contract and root review must address, where applicable:
-
-- exact Bazel success, failure, diagnostics, exit status, ordering, and output;
-- representation identity, ownership, semantic equality, and invalidation;
-- semantically equal reuse plus create/edit/delete/recreate transitions;
-- external labels, generated targets, negative boundaries, and unsupported
-  forms;
-- DICE-owned discovery with no direct-filesystem or fresh-graph bypass;
-- activation of only the named surface;
-- compact Buck2-derived utilities on hot paths;
-- production-wrapper and downstream coverage for interface changes; and
-- at least one discriminating adversarial case not implied by happy-path rows.
-
-Passing Cargo tests or matching a nondiscriminating fixture is not enough.
-
-## Minimize Tokens and Cost
-
-- Spawn with `fork_turns="none"` or the smallest useful recent-turn count.
-  Supply task-local paths and facts instead of duplicating the conversation.
-- Reference local files; do not paste source that the worker can read.
-- Start one worker. Add parallel workers only for genuinely independent work
-  that shortens the critical path.
-- Ask for compact findings, exact paths/lines, commands, and a patch or decision.
-- Allow one focused correction after a concrete miss. A second material
-  correction ends the packet in `REPLAN`; do not continue open-ended repair.
-  Escalate Terra medium to Terra high, or Sol low to Sol high, only with the
-  failed evidence.
-- Stop agents that drift, duplicate another packet, or cannot advance the
-  acceptance gate.
-- Never invent token counts. Record exact usage when exposed; otherwise write
-  `not exposed` and use the qualitative cost band.
-
-## Validation Ownership
-
-Workers run only the focused commands named by their packet. The root owns:
-
-- `cargo fmt --check` and `git diff --check`;
-- downstream/public-wrapper compilation and tests;
-- accepted-fixture comparisons through `tools/v2_oracle`;
-- daemon-sensitive tests in an environment that permits Unix sockets;
-- broad serialized Cargo suites; and
-- process cleanup before and after daemon-sensitive validation.
-
-Never retry a broad validation until the previous process/session is known to
-have ended. Do not weaken a test because the current sandbox lacks a required
-capability; record the environment limitation and run the required lane where
-the capability exists.
-
-## Orchestration Loop
-
-1. Read Live Status and choose the smallest packet that advances or unblocks
-   the critical path.
-2. Complete a Terra-medium reuse/source/oracle audit when the boundary is not
-   already approved.
-3. Obtain Sol-low pre-review before any reserved architecture/parity choice.
-4. Spawn one bounded Terra worker with `fork_turns="none"` and the stored
-   implementation template.
-5. Inspect the actual diff; verify the source/oracle and add an adversarial
-   regression.
-6. Run focused, downstream, and fixture validation serially.
-7. Obtain Sol-low final review for reserved or risky boundaries.
-8. Permit one focused correction and revalidation. On a second material miss,
-   stop and replan.
-9. After `ACCEPT`, update Live Status, compact owner evidence, and one routing
-   rollup, then commit.
-10. Re-read worktree and process ownership before choosing another packet.
-
-## Stored Prompts
-
-- Root session:
-  `thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md`
-- Implementation worker: `references/implementation-worker.md`
-- Independent reviewer: `references/design-reviewer.md`
-
-Do not shorten a worker packet by removing required fields. Fill `none` with a
-reason where a field does not apply.
-
-## Record Outcomes
-
-Update `references/routing-log.md` once after a packet reaches `ACCEPT`,
-`REPLAN`, or a genuine stop. Do not add a row for every audit, review round, or
-worker message. Record:
-
-- task class and packet;
-- model and reasoning effort;
-- context strategy and parallelism;
-- exact tokens/cost if exposed, otherwise `not exposed` plus a cost band;
-- start/end time or wall time;
-- oracle rows and focused/downstream test counts;
-- outcome, review rounds, root corrections, rework, and escalation;
-- recommendation for the next analogous task.
-
-Keep event rows append-only. Update the short recommendations section when at
-least two results support a routing change or one result exposes a serious
-failure mode.
+`references/routing-log.md` is append-only evidence, not routine startup
+context. Search it for an analogous packet and read only the relevant rows.
+When it needs archival, preserve old rows under a dated history file before
+trimming the active log.
