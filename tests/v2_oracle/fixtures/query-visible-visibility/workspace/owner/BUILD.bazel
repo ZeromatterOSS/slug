@@ -47,6 +47,17 @@ package_group(
     includes = [":cycle_a"],
 )
 
+config_setting(
+    name = "config_omitted",
+    values = {"define": "visibility_probe=1"},
+)
+
+config_setting(
+    name = "config_exact",
+    values = {"define": "visibility_probe=1"},
+    visibility = [":exact"],
+)
+
 filegroup(
     name = "explicit_public",
     visibility = ["//visibility:public"],
