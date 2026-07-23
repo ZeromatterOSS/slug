@@ -2,14 +2,17 @@
 
 ## Goal
 
-Prove Slug V2 works with modern Bazel 9+ rulesets and user commands after the
-core loading, bzlmod, analysis, and REAPI surfaces exist.
+First prove Slug V2 exposes Bazel 9's loading, configured-target, and action
+graphs through `query`, `cquery`, and `aquery`. After exact action-query parity,
+prove modern rulesets and execution-oriented commands on those same graphs.
 
 ## Scope
 
 - rules_cc, rules_rust, rules_python, protobuf, bazel_skylib, and rules_oci
   public smoke fixtures.
 - `build`, `test`, `run`, `query`, `cquery`, and `aquery` command slices.
+- complete Bazel 9 query grammar, function registries, target-pattern behavior,
+  graph traversal, ordering, diagnostics, and command-specific output formats.
 - BEP and event output needed by common integrations.
 - diagnostics and exit-code compatibility where rulesets depend on them.
 
@@ -18,6 +21,44 @@ core loading, bzlmod, analysis, and REAPI surfaces exist.
 - Native language-rule fallbacks removed from Bazel 9.
 - Android/iOS breadth before the core public rulesets are stable.
 - Private workspace-specific fixtures as the only proof for a behavior.
+- A separately invented Slug query language or a command-owned mock analysis
+  graph.
+
+## Current Priority: Query Command Gates
+
+Implement new command work in this order:
+
+1. `query` over the Stage 4/5 unconfigured loading graph;
+2. `cquery` over the accepted Stage 6 configured-target DICE keys;
+3. `aquery` over the exact actions retained by those analysis results;
+4. only then broaden `build`, `run`, `test`, BEP, public ruleset execution, and
+   cache behavior.
+
+`aquery` is the formal Stage 6-to-Stage 7 handoff. The normalized
+`ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
+execution/cache breadth becomes the project priority.
+
+### Query engine reuse policy
+
+Do not grow the current `slug_query_v2` subset parser into a second query
+engine without first extracting the mature generic machinery. Audit and prefer:
+
+- Buck2 commit `088c75c7e36805df99c3de29062baa95db700b8b`:
+  `../buck2/app/buck2_query_parser/src/lib.rs`,
+  `../buck2/app/buck2_query/src/query/{environment.rs,graph.rs,traversal.rs}`,
+  and `../buck2/app/buck2_query_impls/src/{uquery,cquery,aquery}/`;
+- V1 archive crates `app/slug_query_parser`, `app/slug_query`,
+  `app/slug_query_impls`, and `app/slug_cmd_query_server`; and
+- V1 Bazel-compatibility test themes under
+  `tests/core/query/test_bazel_compat_query.py`.
+
+Reuse parser spans, generic evaluation, graph traversal, deterministic sets,
+and separated uquery/cquery/aquery environments where they remain
+Bazel-neutral. Replace Buck literals, cells, target patterns, functions,
+attributes, configurations, actions, diagnostics, and printers with Bazel 9
+semantics. Stage 9 records an explicit port/reference/reject decision before
+implementation. The current seven-function parser and command placeholders are
+scaffolding and may be removed.
 
 ## Implementation Slices
 
@@ -57,13 +98,23 @@ Initial fixture names:
 
 Implement command slices in this order:
 
-1. `build` with target patterns and output reporting.
-2. `query` for `deps`, `rdeps`, `kind`, `attr`, `filter`, `buildfiles`, and
-   `tests`.
-3. `run` with executable target and runfiles.
-4. `test` with test result reporting and exit code semantics.
-5. `cquery` and `aquery` after configured-target and action IR are stable.
-6. BEP JSON subset for build/test integrations.
+1. `query`: full Bazel expression grammar, target patterns, set operations, and
+   the Bazel 9 function registry including `allpaths`, `attr`, `buildfiles`,
+   `deps`, `executables`, `filter`, `kind`, `labels`, `loadfiles`, `rdeps`,
+   `same_pkg_direct_rdeps`, `siblings`, `some`, `somepath`, `tests`, and
+   `visible`. Add Sky Query-only functions such as `allrdeps` and
+   `rbuildfiles` only with their Sky Query universe semantics.
+2. `cquery`: reuse the same evaluator over configured nodes, adding Bazel's
+   configuration-aware functions/options, transitions, provider/Starlark
+   output, and ambiguity/error behavior.
+3. `aquery`: reuse the evaluator over Stage 6 actions, adding the Bazel action
+   filters (`inputs`, `outputs`, `mnemonic`) and emitting `text`, `commands`,
+   `summary`, `textproto`, `proto`, `streamed_proto`, and `jsonproto` from one
+   IR. Match the Bazel 9.2.0 include-commandline/artifact/pruned-input/
+   param-file/file-write flags and `skyframe_state` restrictions.
+4. `build` with target patterns and output reporting, then `run` with executable
+   target/runfiles and `test` with test results/exit semantics.
+5. BEP JSON for accepted build/test integrations.
 
 Initial modules:
 
@@ -71,8 +122,10 @@ Initial modules:
 - `app/slug_query_v2`
 - `app/slug_bep_v2`
 
+For each query command, derive the supported output-format matrix from Bazel
+9.2.0 options/source and cover every accepted format plus invalid combinations.
 Compare exit code, normalized stdout/stderr, output manifest, selected BEP
-events, query output, cquery provider output, and aquery action shape. Missing
+events, query output, cquery provider output, and aquery action graph. Missing
 Stage 6 or Stage 7 semantics must stay expected-failing with explicit owner
 backreferences; Stage 8 should not add local workarounds for analysis or
 execution gaps.
@@ -80,7 +133,7 @@ execution gaps.
 ### 8.3 Diagnostics and Compatibility Gates
 
 - Version checks through `native.bazel_version` and `bazel_features` must report
-  Bazel 9+.
+  Bazel 9.
 - Removed native language rules must fail in the same shape as Bazel 9.
 - Unsupported flags should be classified as parse, ignored-compatible, or
   planned, never silently accepted as behavior.
@@ -93,6 +146,9 @@ execution gaps.
   smoke status is upgraded.
 - Private or organization-specific target labels must not enter persistent
   tests or plans.
+- `../llvm-project` is an optional complex-project stress corpus after it has a
+  valid checkout and the focused gates pass. It is not acceptance evidence and
+  was incomplete during the 2026-07-22 review.
 
 ## Exact Test Criteria
 
@@ -110,9 +166,24 @@ execution gaps.
 - `bazel-skylib-basic` loads common macros used by public rulesets.
 - `rules-oci-basic-no-daemon` builds a minimal image/package flow without
   relying on a background daemon.
-- `query-basic` compares text and JSON output for a small graph against Bazel.
-- `cquery-provider-starlark` compares configured provider output.
-- `aquery-action-shape` compares stable action text/JSON fields.
+- `query-parser-and-sets` ports Bazel `QueryParserTest` themes for precedence,
+  parentheses, quoting, variables, set literals/operators, function arity,
+  spans, and syntax diagnostics.
+- `query-functions-and-patterns` ports focused `AbstractQueryTest` themes for
+  the complete Bazel 9 function registry, target patterns, keep-going behavior,
+  ordering, and command output formats.
+- `query-basic` compares text and structured output for a small graph against
+  Bazel and proves the command uses the loaded DICE graph rather than a fixture
+  graph.
+- `cquery-provider-starlark` compares configured identity, transitions,
+  provider/Starlark output, and diagnostics using the Stage 6 graph.
+- `aquery-action-shape` and an expanded action matrix compare normalized
+  `ActionGraphContainer` facts plus all seven Bazel 9.2.0 formatter renderings:
+  argv, environment, inputs, outputs/tree artifacts, dep sets, configurations,
+  mnemonic, execution platform/properties, paramfiles, aspects, and toolchains
+  where applicable.
+- A structural regression proves `aquery` and Stage 7 receive the same action
+  object/digest projection rather than independently rebuilding actions.
 - `run-basic` executes a binary with runfiles and compares stdout/stderr.
 - `test-basic` reports pass/fail and returns Bazel-compatible exit codes.
 - `bep-minimal-build-test` emits configured target, action completed, test, and
@@ -126,11 +197,19 @@ execution gaps.
   harness.
 - Real-world stress projects supplement, but do not replace, repo-owned focused
   fixtures.
+- `query`, then `cquery`, then exact `aquery` are accepted in that order over
+  the shared loading/analysis graph before new execution-oriented command
+  breadth is scheduled.
+- The current subset parser and `planned_placeholder` command results have been
+  replaced or deliberately retained only for unsupported, explicitly diagnosed
+  cases.
 
 ## Validation
 
 ```bash
 cargo test -p slug_commands_v2 -p slug_query_v2 -p slug_bep_v2
+slug-v2-oracle run --fixture query-parser-and-sets
+slug-v2-oracle run --fixture query-functions-and-patterns
 slug-v2-oracle run --fixture rules-cc-basic --compare exit,outputs,bep,aquery
 slug-v2-oracle run --fixture rules-cc-run-env --compare exit,stdout,stderr
 slug-v2-oracle run --fixture rules-cc-test-env-inherit --compare exit,testlog,bep
@@ -182,6 +261,13 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   preservation is pinned in `slug_commands_v2` unit tests; full runfiles and
   platform-specific argv parity remain follow-up work once the command runner is
   connected to Stage 7 materialization.
+
+2026-07-22 qualification: this section records parser/CLI scaffolding and
+Bazel-side fixture generation, not a query implementation. `query`, `cquery`,
+and `aquery` currently return planned placeholders because the package,
+configured-target, and action graphs are not wired. The current subset parser
+lacks Bazel's complete grammar/functions and should be replaced or refactored
+through the reuse policy above before adding more ad hoc cases.
 
 Validation run:
 

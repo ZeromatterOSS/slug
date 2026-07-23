@@ -99,7 +99,38 @@ CLI contract does not have to change when the daemon appears.
   `clear-dice` or `new-transaction` control so oracle fixtures can assert warm
   behavior.
 
-### 2.5 First-Real-Build Promotion
+### 2.5 Unified DICE Semantic Spine Gate
+
+The accepted architecture is one long-lived DICE instance per daemon/workspace,
+not a fresh `Dice::builder()` for each root evaluation and not a daemon-side
+file scanner wrapped around separate evaluator caches.
+
+- Inject file contents/absence, directory listings, relevant environment,
+  command policy, repository mapping, lockfile policy, and materialization
+  observations as explicit DICE inputs.
+- Loading, bzlmod, configured-target analysis, query, cquery, and aquery must
+  compute from the same transaction or a clearly related transaction on that
+  graph. Do not reconstruct semantic subgraphs in command handlers.
+- Create, edit, and delete transitions are first-class. The invalidation input
+  names both the changed and deleted paths; iterating only files that still
+  exist is incorrect.
+- Recursive workspace scans may discover test inputs during migration, but
+  cannot own production semantics, swallow read failures, or decide that a
+  graph is current.
+- DICE computations may not hold a blocking or re-entrant lock across
+  `ctx.compute`, `try_compute_join`, Starlark evaluation, or another
+  computation. Follow `docs/developers/dice.md`.
+- Same-daemon tests must explain why unchanged state is reused and why each
+  changed input invalidates. Instrumentation counts are evidence only when the
+  key/dependency graph supplies the reason.
+
+The existing `WorkspaceEvaluationKey` first-build path and
+`slug_server_v2::Daemon::invalidate_changed()` scanner are retained scaffolds.
+Their narrow `load-invalidation` result is a regression test, not acceptance of
+this gate; an implementation packet may replace them rather than preserve their
+shape.
+
+### 2.6 First-Real-Build Promotion
 
 Before Stage 5-8 work can advance beyond scaffold status:
 
@@ -174,6 +205,9 @@ Stage 2 skeleton checkpoint:
 - Before the First Real Bazel Build gate, `cargo tree` for the V2 runtime shows
   `dice` and `starlark`; a focused test proves an actual `DiceComputations`
   path, not a capability trait alone.
+- A focused same-daemon test covers file create, edit, and delete without a
+  production fallback scan, and proves loading plus analysis/query observe the
+  same injected revision.
 - `slug version` exits 0 and prints `Slug V2` plus `Bazel compatibility: >=9.0.0`.
 - `slug help` does not mention `buck`, `BUCK`, `TARGETS`, `cell`, or
   `.buckconfig`.
@@ -190,6 +224,9 @@ Stage 2 skeleton checkpoint:
 - The codegraph sees V2 crates as separate from any archived V1 code.
 - `build` has crossed the DICE and starlark-rust runtime boundaries for the
   canonical first-build fixture.
+- One daemon-owned DICE graph is the semantic owner for module/loading,
+  analysis, and query state; no per-request graph or scanner cache is counted
+  as final architecture.
 
 ### `WP-2.4-slug-server-v2-daemon` — accepted 2026-07-16
 
@@ -210,6 +247,13 @@ Stage 2 skeleton checkpoint:
   `message.txt` digest `2c8b08da.../4` (mode 0o555); after_bzl_edit invalidates
   1 file and produces `27dd8ed4.../4` (mode 0o555) — both match the Bazel 9.2.0
   oracle.
+
+2026-07-22 qualification: this acceptance records the narrow fixture and
+daemon transport only. The retained evaluator plus digest scanner does not
+satisfy Section 2.5 because root evaluation can create a new DICE graph,
+directory deletion is not an explicit input, and loading/analysis/query do not
+yet share one semantic transaction. Keep the tests; replace the ownership
+shape before M1 is accepted.
 
 ## Validation
 

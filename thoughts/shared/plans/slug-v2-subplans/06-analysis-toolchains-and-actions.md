@@ -61,6 +61,66 @@ import mode, oracle, and validation.
 - `AspectFunction.java` and `ToplevelStarlarkAspectFunction.java` for aspect
   propagation after base analysis is stable.
 
+Migrate focused themes from Bazel 9.2.0 tests including
+`RuleConfiguredTargetTest`, `StarlarkRuleContextTest`,
+`StarlarkRuleClassFunctionsTest`,
+`StarlarkRuleImplementationFunctionsTest`, `DepsetTest`, and the owning
+platform/toolchain tests. Every fixture records its exact class/method in the
+Stage 1 provenance manifest.
+
+## Current Priority: Analysis Graph Integration Gate
+
+Stage 6 is the current implementation owner. Existing provider/depset/action
+helpers and the `analyze_loaded_rule` first-rule slice are useful scaffolding,
+but do not constitute configured-target analysis until this gate passes.
+
+1. `ConfiguredTargetKey` is a real DICE key over a Stage 3 label,
+   configuration, transition inputs, repository mapping, toolchain/platform
+   policy, and the loaded target revision.
+2. Its computation obtains the loaded package from the shared Stage 2 graph,
+   resolves configured attributes, and recursively computes configured
+   dependencies. Use DICE parallelism such as `try_compute_join` for
+   independent edges while preserving deterministic Bazel ordering.
+3. The rule implementation runs through the real analysis registry/context.
+   `ctx.attr`, files, executables, configuration, toolchains, and dependency
+   provider collections are prepared inputs; Starlark-visible getters perform
+   no filesystem or graph discovery.
+4. The returned provider collection is authoritative. Do not synthesize
+   `DefaultInfo` from declared outputs or infer providers from action side
+   effects. Validate Bazel's required-provider and duplicate-provider errors.
+5. Action declarations are registered during that rule evaluation and retained
+   in `AnalysisResult`. Stage 6 computes deterministic action ownership and
+   conflicts but performs no execution.
+6. `cquery` reads these configured-target results and `aquery` reads these exact
+   action objects. Separate command-only mock graphs are forbidden.
+7. Same-daemon dependency, `.bzl`, configuration, toolchain, and repository
+   mapping edits invalidate through named DICE dependencies, including create
+   and delete transitions.
+
+The current single-rule path may be rewritten to satisfy this gate. Preserve
+focused behavior tests, not accidental scaffold interfaces.
+
+### Buck2 and V1 reuse anchors
+
+Before implementing this gate, inspect Buck2 commit
+`088c75c7e36805df99c3de29062baa95db700b8b` at:
+
+- `../buck2/app/buck2_analysis/src/analysis/calculation.rs` for the analysis
+  key and recursive dependency-compute pattern;
+- `../buck2/app/buck2_analysis/src/analysis/env.rs` and
+  `../buck2/app/buck2_build_api/src/analysis/registry.rs` for analysis context
+  and action/provider registry ownership; and
+- `../buck2/app/buck2_interpreter_for_build/` for attribute coercion,
+  interning, and prepared Starlark values.
+
+Inspect the equivalent V1 archive paths as behavior/test sources where Stage 9
+records them. Port the DICE/registry/compact-data patterns behind V2 Bazel
+labels, configurations, providers, and output paths; reject cells, Buck labels,
+Buck configurations, and Buck output semantics. Hot graph structures require
+the repo utility audit: prefer retained `SmallMap`/`SmallSet`, Fx hashing,
+`Hashed`, `ArcStr`/`ThinArcStr`, `Dupe`, and `Allocative` where their measured
+shape fits instead of default owned `String`, `Vec`, or std hash collections.
+
 ## Implementation Slices
 
 ### 6.1 Configured Target Key and Configuration
@@ -77,6 +137,9 @@ import mode, oracle, and validation.
   `slug-v1-archive:app/slug_analysis/src/analysis/calculation.rs` and
   `slug-v1-archive:app/slug_analysis/src/analysis/toolchain_resolution.rs` only
   as pattern sources; do not port Buck labels or V1 configuration identity.
+- Implement this as the DICE computation defined by the current-priority gate;
+  a key-shaped serializable struct without `Key::compute` integration is only
+  substrate.
 
 ### 6.2 Providers and Depsets
 
@@ -156,8 +219,8 @@ import mode, oracle, and validation.
 - A focused structural test proves that combining nested depsets preserves
   shared child-node identity and does not flatten or recursively clone the DAG.
 - `actions-api-basic` fixture declares write, run, run_shell, symlink, and
-  expand_template actions and compares action IR to Bazel aquery where
-  available.
+  expand_template actions and compares action IR to Bazel's normalized
+  `ActionGraphContainer`.
 - `action-declare-file-package-boundary`, `action-run-shell-basic`,
   `action-run-tool-exec-cfg`, and `action-conflicting-output` compare output
   paths, mnemonic, argv, env, tools, inputs, outputs, and diagnostics.
@@ -183,6 +246,14 @@ import mode, oracle, and validation.
 - Action declarations produce REAPI-ready command/input/output structures.
 - No analysis shortcut depends on Buck cells or direct filesystem scans outside
   DICE-tracked inputs.
+- A multi-target fixture proves recursive dependency analysis, provider flow,
+  shared subdependency reuse, and deterministic action ownership in one
+  same-daemon DICE graph.
+- `AnalysisResult` contains the providers actually returned by each rule and
+  the actions actually registered during its implementation; no output-derived
+  provider synthesis or command-specific mock graph remains.
+- Stage 8 `cquery` and `aquery` consume this graph without re-evaluating rules
+  in separate command-owned state.
 
 ## Validation
 

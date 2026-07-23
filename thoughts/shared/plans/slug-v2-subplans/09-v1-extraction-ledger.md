@@ -35,6 +35,19 @@ fixture or Bazel source citation. V1-only source/test trees and the unwrapped
 `remote_execution` source candidate are reference material through archive refs,
 not active-root content.
 
+## Immutable Source Baselines
+
+Record a new row before consuming a later revision. Sibling checkout `HEAD`s are
+convenience locations, not semantic versions.
+
+| Source | Required baseline | Use |
+|--------|-------------------|-----|
+| Bazel | tag `9.2.0`, commit `8220c6198837d5c13d53fea211cf3282aa12408a` in `../bazel` | Sole parity oracle for new/acceptance fixtures. |
+| Buck2 | commit `088c75c7e36805df99c3de29062baa95db700b8b` in `../buck2` | Rust architecture and selective infrastructure/query/analysis utility reuse. |
+| Slug V1 | commit `e218054d4c796655939b968d90208b185decb352` via `slug-v1-archive` | Test themes, useful implementation lessons, and explicitly approved ports. |
+| actiond | commit `ca39423bbd78916457f3225dcab826283c18f412` in `../actiond` | Local REAPI backend reference/testbed; no direct Slug-core integration. |
+| llvm-project | no valid `HEAD` during the 2026-07-22 review | Optional future stress corpus only after the checkout is populated. |
+
 ## Workflow
 
 1. Open the V2 owner plan and identify the exact behavior needed.
@@ -84,6 +97,10 @@ this baseline implicitly.
 | Proposed | Stage 4 | Retained evaluator `starlark-rust/starlark/src/eval.rs`; V1 loading lessons in `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/calculation.rs`, `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs`, `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/interpreter_for_dir.rs` | Rewrite the `BUILD.bazel`/`.bzl` load boundary around Stage 3 labels and Stage 4 DICE keys; reject Buck file/cell semantics | Generate and check in `build-file-loading` and `load-invalidation` with Bazel first; then compare the Slug package/load results |
 | Proposed | Stage 5 | Retained evaluator `starlark-rust/starlark/src/eval.rs`; V1 module-evaluation lessons in `slug-v1-archive:app/slug_bzlmod/src/parser.rs`, `slug-v1-archive:app/slug_bzlmod/src/globals.rs` | Rewrite `MODULE.bazel` evaluation with V2-owned globals and Stage 5 DICE keys; retain directive recording only as scaffold | Generate and check in `module-file-directives` and `simple-rule-action` with Bazel first; then compare Slug module evaluation and invalidation |
 | Proposed | Stages 3 / 6 | V1 utility wrappers `slug-v1-archive:app/slug_core/src/target/label/interner.rs`, `slug-v1-archive:app/slug_util/src/arc_str.rs`, `slug-v1-archive:app/slug_util/src/hash.rs`; retained Buck2-derived utilities `starlark-rust/starlark_map/src/small_map.rs`, `starlark-rust/starlark_map/src/small_set.rs`, `shed/static_interner/src/lib.rs`, `gazebo/dupe/src/lib.rs`, `allocative/allocative/src/lib.rs`, `gazebo/strong_hash/src/lib.rs` | Selective port or retained dependency by measured hot-path need; keep wrappers V2-owned | Generate `labels-and-output-paths`, `custom-rule-analysis-basic`, or `depset-orders-and-rejections` first as appropriate; then add focused allocation and determinism tests |
+| Proposed | Stage 6 | Buck2 `../buck2/app/buck2_analysis/src/analysis/calculation.rs`, `analysis/env.rs`, `../buck2/app/buck2_build_api/src/analysis/registry.rs`, and attribute coercion/interning under `../buck2/app/buck2_interpreter_for_build/`; V1 counterparts `slug-v1-archive:app/slug_analysis/src/analysis/calculation.rs`, `slug-v1-archive:app/slug_analysis/src/analysis/env.rs`, `slug-v1-archive:app/slug_build_api/src/actions/registry.rs`, and `slug-v1-archive:app/slug_interpreter_for_build/src/attrs/coerce/` | Port the DICE analysis-key, recursive dependency, prepared environment, registry, and compact attribute patterns behind V2 Bazel types; reject Buck cells/labels/configurations/output paths | Bazel 9.2.0 `RuleConfiguredTargetTest`, Starlark rule-context/implementation tests, plus multi-target provider/action and same-daemon invalidation fixtures |
+| Proposed | Stage 8 | Buck2 generic query parser/evaluator/graph machinery in `../buck2/app/buck2_query_parser`, `../buck2/app/buck2_query`, and `../buck2/app/buck2_query_impls`; matching V1 crates `slug-v1-archive:app/slug_query_parser`, `slug-v1-archive:app/slug_query`, `slug-v1-archive:app/slug_query_impls`, and `slug-v1-archive:app/slug_cmd_query_server` | Port parser spans, generic evaluator, traversal, compact deterministic sets, and uquery/cquery/aquery environment separation; replace every Buck literal, cell, pattern, function registry, configured node, action, diagnostic, and printer with Bazel 9 behavior | Bazel 9.2.0 `QueryParserTest`, `AbstractQueryTest`, `ConfiguredTargetQuerySemanticsTest`, `ProtoOutputFormatterCallbackTest`, `ActionGraphQueryTest`, and exact `ActionGraphContainer` fixtures |
+| Proposed | Stage 8 | V1 `slug-v1-archive:tests/core/query/test_bazel_compat_query.py` plus focused `tests/core/query/{uquery,cquery,aquery}` themes | Migrate useful graph/function/set/format scenarios, rewriting fixture metadata and expected results against Bazel 9.2.0; V1 golden output is not the oracle | Stage 1 `query-parser-and-sets`, `query-functions-and-patterns`, `cquery-provider-starlark`, and expanded `aquery-action-shape` fixtures |
+| Reference only | Stage 10 | V1 root `MODULE.bazel`, `BUILD.bazel`, and Buck-generated build metadata | Reject as the bootstrap graph because it encodes V1/Buck-shaped ownership; inspect only for source inventory | Fresh Bazel 9.2.0 bzlmod/rules_rust graph; Bazel/BuildBuddy build and stage0→stage1→stage2 fixed-point proof |
 | Proposed | Stage 6 | V1 shared-DAG sources `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/nested_set.rs`, `slug-v1-archive:app/slug_build_api/src/interpreter/rule_defs/transitive_set/traversal.rs`; archived design record `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/54-depset-transitive-set-shared-core.md` | Port shared node/traversal concepts; keep the Bazel depset facade V2-owned and reject implicit `transitive_set` coercion | Generate `depset-orders-and-rejections` first; then prove shared child identity and no implicit flattening |
 | Proposed | Stage 7 | V1 input-tree source `slug-v1-archive:app/slug_execute/src/execute/inputs_directory.rs`; V1 protocol source `slug-v1-archive:remote_execution/oss/re_grpc_proto/proto/build/bazel/remote/execution/v2/remote_execution.proto` | Port the protobuf/Merkle contract behind V2 action types; reject Buck paths and executor configuration | Generate serialized `Command`/`Directory`/`Action` expectations first; then run `shell-action-reapi` and `reapi-paramfile-input-tree` through NativeLink |
 | Proposed | Stage 5 | `slug-v1-archive:app/slug_bzlmod/src/parser.rs` | Rewrite through starlark-rust; retain directive recording only as scaffold | `MODULE.bazel` evaluation fixtures against Bazel |
@@ -96,7 +113,7 @@ this baseline implicitly.
 | Proposed | Stage 7 | `slug-v1-archive:app/slug_execute_impl/src/sqlite/action_cache_db.rs`, `slug-v1-archive:app/slug_execute_impl/src/sqlite/tables/action_cache_table.rs`, `slug-v1-archive:app/slug_execute_impl/src/executors/action_cache.rs`, `slug-v1-archive:app/slug_execute_impl/src/executors/caching.rs`, `slug-v1-archive:app/slug_server/src/daemon/state.rs`, `slug-v1-archive:tests/plan31/test_persistent_re_action_cache.py`, `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/31-bazel-perf-parity.md` | Port schema/value semantics, normal materializer-path reuse, and stale-entry behavior; Stage 3 owns output/cache layout | durable RE `ActionDigest -> ActionResult` hit/stale-entry fixtures |
 | Proposed | Stage 7 / Stage 8 | archived fixture trees `slug-v1-archive:tests/plan34/fixtures/cc_actions` and `slug-v1-archive:tests/plan34/fixtures/rules_cc`; evidence owner `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/34-sandboxed-execution-strategy.md` | Stage 7 owns execution evidence; Stage 8 owns ruleset conformance breadth | `rules-cc-reapi-basic` plus Stage 8 rules_cc fixtures |
 | Reference only | Stage 7 | NativeLink source checkout | Backend contract reference, not Slug import | same REAPI evidence with `remote_service=nativelink` |
-| Reference only | Stage 7 | actiond source checkout | Optional REAPI backend validation only | same REAPI evidence with `remote_service=local_actiond` |
+| Reference only | Stage 7 | actiond source checkout at `ca39423bbd78916457f3225dcab826283c18f412` | Preferred local REAPI conformance backend; no source import or Slug-core shortcut | same mandatory backend-neutral REAPI evidence with `remote_service=local_actiond` plus focused actiond health/e2e validation |
 | Partially landed | Stage 6 | `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/depset.rs`; `slug-v1-archive:app/slug_build_api_tests/src/interpreter/rule_defs/provider/collection.rs` | Rewrite behavior only; shared-DAG extraction remains proposed | V2 commits `9e519f97`, `ed636308`, `aa9b820f`; fixtures `depset-orders-and-rejections`, `custom-rule-analysis-basic`, `ctx-attrs-files-executable`, `default-info-runfiles-executable`, `provider-output-group-basic`; validation in Stage 6 plan |
 | Proposed | Stage 3 | `slug-v1-archive:app/slug_core/src/target/label/interner.rs`, `slug-v1-archive:app/slug_bzlmod/src/repo_mapping.rs`, and `slug-v1-archive:thoughts/shared/plans/slug-bazel-subplans/26-string-interning.md` | Rewrite label/repository semantics; selectively reuse typed interning utilities | Bazel label/output path oracle fixtures plus allocation/determinism tests |
 | Proposed | Stage 4 | `slug-v1-archive:app/slug_interpreter_for_build/src/interpreter/globals.rs`, `slug-v1-archive:app/slug_interpreter_for_build_tests/src/interpreter.rs`, `slug-v1-archive:app/slug_interpreter_for_build_tests/src/functions/load_symbols.rs` | Port focused tests and rewrite the loading boundary | Bazel `PackageFunction`/`BzlLoadFunction` fixtures |
@@ -135,9 +152,9 @@ Validation:
 Residual risk:
 ```
 
-## First-Real-Build Reuse Order
+## Current Analysis/Query Integration Reuse Order
 
-Use this order for every packet in the canonical integration gate before
+Use this order for every packet in the current M1-M5 integration path before
 expanding standalone substrates:
 
 1. Stage 1 adds or strengthens the narrow fixture and its comparison fields.
@@ -152,9 +169,15 @@ expanding standalone substrates:
    bzlmod DICE keys; a directive recorder is not this integration.
 6. Stage 6 carries the evaluated rule through providers, shared-DAG depsets,
    and the declared action IR.
-7. Stage 7 serializes the real REAPI `Command`, `Directory`, and `Action`,
-   constructs the input Merkle tree, and executes through NativeLink.
+7. Stage 8 exposes the loaded/configured/action graph through `query`,
+   `cquery`, or `aquery` as appropriate, using the generic query extraction
+   decisions recorded above.
 8. Stage 1 runs the same fixture with Slug, compares it with the checked-in
+   Bazel graph result, and records the accepted analysis/query evidence.
+9. Only after exact `aquery`, Stage 7 serializes the same real action to REAPI,
+   constructs the input Merkle tree, and executes through BuildBuddy or
+   actiond, with NativeLink retained for regression coverage.
+10. Stage 1 compares execution/materialization/cache results with the checked-in
    Bazel result, validates REAPI and same-daemon evidence where applicable,
    and only then records landed evidence here and in each owner plan.
 

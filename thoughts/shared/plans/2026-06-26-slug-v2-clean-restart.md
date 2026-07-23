@@ -7,7 +7,7 @@ The January roadmap and numbered V1 subplans remain valuable reference material,
 but new implementation work should start from this plan and the V2 subplans
 under [slug-v2-subplans](./slug-v2-subplans/).
 
-Slug keeps its name and repository. The current implementation is V1: a Buck2
+Slug keeps its name and repository. The archived V1 implementation is a Buck2
 fork migrated toward Bazel compatibility. V2 keeps the proven lessons and
 selected code from V1, but the active trunk is a Bazel-shaped Rust
 implementation from the first architectural boundary.
@@ -20,10 +20,58 @@ shape:
 1. Preserve V1 through a tag and archive branch before root-level replacement.
 2. Keep V1 source as extraction/reference material, not as the default build
    graph for V2.
-3. Build V2 around Bazel 9+ semantics, Bazel source/test oracle fixtures, DICE,
+3. Build V2 around Bazel 9 semantics, Bazel source/test oracle fixtures, DICE,
    starlark-rust, and REAPI-first execution.
 4. Import V1 code only after a small oracle fixture or focused regression proves
    the behavior matches the V2 boundary.
+
+## 2026-07-22 Direction Reset
+
+The immediate goal is not broader build execution. It is one trustworthy,
+incremental semantic graph that can reproduce Bazel 9 analysis and expose that
+graph through `query`, `cquery`, and `aquery` in increasing order of depth.
+
+The governing order is:
+
+1. Pin all new oracle work to Bazel 9.2.0 at
+   `8220c6198837d5c13d53fea211cf3282aa12408a`. The sibling `../bazel`
+   checkout may move to Bazel 10 or later; use the tag/commit, not its current
+   `HEAD`, for parity evidence.
+2. Replace split one-shot evaluation and fallback workspace scanning with one
+   daemon-owned DICE graph whose injected inputs cover files, directory
+   listings, environment and command policy, repository mapping, loading,
+   configured targets, and action declarations.
+3. Make configured-target analysis real: recursively analyze dependencies,
+   execute rule implementations with prepared Bazel-shaped contexts, consume
+   returned providers, and retain declared actions without executing them.
+4. Implement full unconfigured `query` over the loading graph, then `cquery`
+   over configured targets, then exact `aquery` over the same action graph
+   Stage 6 produces.
+5. Treat matching `aquery` output as the execution handoff. Only after this
+   gate should new execution/cache breadth, `run`, `test`, or broad ruleset
+   conformance control the next milestone.
+6. Maintain a Bazel 9 build graph for Slug itself so Bazel plus BuildBuddy can
+   accelerate development. After analysis, action graph, and execution are
+   correct, prove a Bazel-built Slug can build Slug and then reach a Slug-built
+   fixed point.
+
+The already-landed first-build and NativeLink-backed REAPI fixtures remain
+valuable regression tests. They prove a narrow vertical slice; they do not
+prove the DICE ownership, configured-target graph, query surface, or bootstrap
+architecture described above.
+
+### Integration-first freeze
+
+- Do not expand Stage 5 with more standalone parser/key/value substrate unless
+  the packet is required by the analysis/query/aquery path.
+- Do not expand Stage 7 cache, materializer, or backend breadth until the
+  `aquery` gate is accepted, except to preserve an already-landed regression or
+  to enable the Bazel/BuildBuddy developer build.
+- Do not use a real-world build as structural acceptance evidence. Convert each
+  discovered gap into a focused Bazel 9 oracle first.
+- Historical checkpoint sections remain evidence of what landed. The latest
+  priority/gate section in this plan and each owning subplan is authoritative
+  when older checkpoint prose says `pending`, `next`, or `first`.
 
 Do not physically move the whole V1 tree into `v1-archive/` unless the tag and
 branch archive is not enough. A full in-tree archive makes search, codegraph
@@ -83,17 +131,27 @@ infrastructure crates listed in `V1_ARCHIVE.md`. V1 and rejected mixed-root
 surfaces remain available through `slug-v1-archive`, `v1-archive`, and
 `codex/slugv2` for staged extraction only.
 
+2026-07-22 live-checkout correction: the annotated `slug-v1-archive` tag still
+resolves to `e218054d4c796655939b968d90208b185decb352`, but the local
+`v1-archive` branch is absent and the archive checker allowlist predates
+`app/slug_server_v2`. Stage 0 is therefore not green in the live checkout; its
+owner plan records the bounded repair before M0 acceptance.
+
 ## Non-Negotiables
 
-- Bazel 9+ only. No pre-Bazel-9 behavior, no WORKSPACE support, and no legacy
+- Bazel 9 only. No pre-Bazel-9 behavior, no WORKSPACE support, and no legacy
   toolchain-resolution compatibility.
 - Bazel source and Bazel tests are the compliance oracle. A parity claim needs
   a local Bazel source citation or an oracle fixture result.
 - DICE owns semantic build state. Do not hide semantic discovery inside
   synchronous Starlark-visible APIs.
-- REAPI is the execution boundary. Local execution is useful only as a REAPI
-  service backend, with NativeLink first and actiond optional behind the same
-  boundary.
+- REAPI is the execution boundary. BuildBuddy is the primary scaled remote
+  development/CI lane; sibling `../actiond` is the preferred hermetic local
+  conformance backend; NativeLink remains a useful regression backend. All sit
+  behind the same REAPI boundary.
+- Slug-local sandbox implementation is deferred until after analysis, exact
+  `aquery`, remote execution, and cache correctness. Backend isolation supplied
+  by BuildBuddy or actiond does not count as a Slug sandbox implementation.
 - Progress is demonstrated by a vertical Bazel-shaped build, not by independent
   identity, parser, DICE-shaped, action, or REAPI data models. A wrapper trait
   or stable-serialization helper is scaffolding until the owner fixture drives
@@ -140,8 +198,26 @@ Do not import these V1 surfaces without redesign:
 | 5 | [05-bzlmod-and-repository-graph.md](./slug-v2-subplans/05-bzlmod-and-repository-graph.md) | Parallel after Stage 3 basics | Starlark-evaluated `MODULE.bazel`, registry, repo mapping, extensions, repo specs, and lockfile policy are DICE-owned. |
 | 6 | [06-analysis-toolchains-and-actions.md](./slug-v2-subplans/06-analysis-toolchains-and-actions.md) | Parallel after Stages 4/5 | Configured-target analysis, toolchains, providers, depsets, and action declarations pass focused oracle fixtures. |
 | 7 | [07-reapi-native-execution.md](./slug-v2-subplans/07-reapi-native-execution.md) | Parallel with synthetic actions, then after Stage 6 | Shell and ruleset actions execute through REAPI with upload, AC, materialization, and zero direct-local proof. |
-| 8 | [08-ruleset-and-command-conformance.md](./slug-v2-subplans/08-ruleset-and-command-conformance.md) | Parallel after Stages 4-7 | Modern rules_cc, rules_rust, rules_python, protobuf, query, run, test, and BEP slices pass public fixtures. |
+| 8 | [08-ruleset-and-command-conformance.md](./slug-v2-subplans/08-ruleset-and-command-conformance.md) | Query after loading/analysis; execution commands after aquery | `query`, `cquery`, and exact `aquery` pass before ruleset, run, test, and BEP breadth. |
 | 9 | [09-v1-extraction-ledger.md](./slug-v2-subplans/09-v1-extraction-ledger.md) | Continuous | Every V1 or Buck2-derived extraction has an owner, oracle proof, and cleanup decision. |
+| 10 | [10-bazel-build-and-bootstrap.md](./slug-v2-subplans/10-bazel-build-and-bootstrap.md) | Bazel developer graph may start now; self-hosting follows exact aquery and execution | Bazel 9 builds/tests Slug through BuildBuddy, then Slug reaches a stage1/stage2 self-build fixed point. |
+
+## Current Milestone Overlay
+
+The numbered stage files are ownership boundaries, not the implementation
+order. Use this overlay for scheduling new packets:
+
+| Milestone | Required result | Owning stages | Exit gate |
+|-----------|-----------------|---------------|-----------|
+| M0: archive and baseline health | V1 refs and clean-root checker are truthful; Bazel/Buck2/actiond sources are pinned | 0, 1, 9 | Archive status is green and every new fixture carries immutable provenance. |
+| M1: one semantic spine | One daemon-owned DICE instance and explicit create/edit/delete inputs serve loading, bzlmod, analysis, and commands | 2, 4, 5 | Same-daemon tests explain invalidation without a fallback scanner or fresh per-request graph. |
+| M2: analysis graph | Recursive configured targets return real providers and deterministic declared actions without execution | 3, 4, 5, 6 | Focused Bazel analysis fixtures and upstream test themes match. |
+| M3: `query` | Full Bazel 9 unconfigured query language evaluates the loading graph | 8, 9 | Parser, function, set-operation, pattern, ordering, and formatter fixtures match. |
+| M4: `cquery` | Configured query reads the same configured-target graph as analysis | 6, 8 | Configuration identity, transitions, providers, and Starlark output match. |
+| M5: `aquery` | Action query reads the same Stage 6 action graph and implements Bazel 9.2.0's text, commands, summary, textproto, proto, streamed_proto, and jsonproto formatters | 6, 8 | Normalized `ActionGraphContainer` content and human-readable renderings are identical for the gate matrix. |
+| M6: execution and caching | Stage 6 actions execute and replay only through REAPI | 7 | BuildBuddy and local actiond evidence prove upload, execute, AC, and materialization with zero direct-local actions. |
+| M7: command/ruleset breadth | `build`, `run`, `test`, BEP, and public rulesets use the accepted graph and executor | 8 | Focused public fixtures match; stress projects remain supplemental. |
+| M8: bootstrap | Bazel-built Slug builds Slug and reaches a self-hosted fixed point | 10 | Stage1 and stage2 action graphs and declared outputs match. |
 
 ## Two-Tier Work-Packet Contract
 
@@ -157,8 +233,9 @@ model may fill either role only if it follows the same contract.
   cross-crate interfaces, DICE keys/ownership/invalidation/locking, stage
   boundaries, or V1/Buck2 reuse and adaptation boundaries. Read-only discovery
   may precede review, but implementation of such a choice may not.
-- Every Stage 2-8 packet begins with reuse discovery, even when its request does
-  not mention an import. Before new implementation, the worker must inspect the
+- Every Stage 2-8 and Stage 10 packet begins with reuse discovery, even when
+  its request does not mention an import. Before new implementation, the worker
+  must inspect the
   owner plan, the matching Stage 9 candidates, relevant retained Buck2-derived
   crates, and the V1 and mixed-root refs documented by `V1_ARCHIVE.md`, then
   obtain Sol approval for the recorded reuse decisions.
@@ -174,10 +251,10 @@ the packet without reconstructing its design.
 ```text
 Work packet ID: WP-<stage>-<short-name>
 Owner stage and plan: <stage number and exact V2 subplan path>
-Goal and gate link: <one result; First Real Bazel Build clause or narrow independent oracle reason>
+Goal and gate link: <one result; current milestone exit gate or narrow independent oracle reason>
 Prerequisites and current state: <required prior packets; branch/HEAD; relevant dirty paths; observed baseline>
 Oracle-first artifact: <fixture and expected artifact path, or exact local Bazel source citation, created/verified before implementation>
-Reuse audit (required for Stages 2-8):
+Reuse audit (required for Stages 2-8 and 10):
 - Candidates checked: <owner-plan sections and exact Stage 9 rows>
 - Sources inspected: <exact retained paths; archive or mixed-root ref@commit:path>
 - Prior evidence inspected: <tests, oracle/evidence paths, and relevant results>
@@ -192,7 +269,7 @@ Evidence and plan update: <owner-plan section; oracle/result/diff facts to recor
 Stop conditions: <state mismatch, missing oracle, dirty overlap, scope growth, reserved decision, changed failure class, or other packet-specific stop>
 ```
 
-For every Stage 2-8 packet, reuse discovery is required before new
+For every Stage 2-8 and Stage 10 packet, reuse discovery is required before new
 implementation, including apparently greenfield work. The worker records the
 Stage 9 rows and owner-plan candidates checked; the exact retained active-tree
 paths and archive or mixed-root refs, commits, and paths inspected; prior tests
@@ -212,11 +289,13 @@ scoped diff, oracle or Bazel citation, command results, and residual risks.
 and requires a replacement packet. Record the accepted result and reviewer
 outcome compactly in the owner plan before starting another packet.
 
-## First Real Bazel Build Integration Gate
+## Retained First Real Bazel Build Integration Gate
 
-The first implementation milestone after the Stage 2 skeleton is a small but
-complete Bazel-shaped build. It is owned here because it crosses the Stage 1-7
-boundaries; implementation and detailed evidence remain in their stage owners.
+This was the first integrated implementation proof after the Stage 2 skeleton.
+It is owned here because it crosses the Stage 1-7 boundaries; implementation
+and detailed evidence remain in their stage owners. As of the 2026-07-22
+direction reset it is a retained regression gate, not the current scheduling
+gate. The Current Milestone Overlay controls new work.
 
 The gate is:
 
@@ -238,10 +317,9 @@ initial fixture chain. A missing-module probe is separate: Bazel 9 creates an
 empty `MODULE.bazel` with a warning, so V2 must not treat a missing module file
 as a generic WORKSPACE-only failure.
 
-Do not mark Stages 5-8 accepted, or add broad new substrate-only checkpoints in
-those stages, until a change either advances this gate or has a narrow oracle
-reason to remain independent. Stage 9 records the concrete V1/Buck2 reuse that
-makes each segment real.
+Do not use this narrow build as proof that Stages 5-8 are structurally accepted.
+Stage 9 records the concrete V1/Buck2 reuse that made each segment real, and the
+analysis/query/aquery overlay now determines what may advance next.
 
 This integration gate is not one implementation packet. Each packet names the
 single numbered gate clause and owner stage it advances; detailed evidence

@@ -8,11 +8,30 @@ Make REAPI the primary and routine execution boundary for Slug V2.
 
 - REAPI `Command`, input tree, CAS upload, `Action`, AC lookup/update,
   `Execute`, output materialization, and evidence logging.
-- NativeLink local service bootstrap for local and CI validation.
-- actiond as an optional backend behind the same REAPI surface.
+- BuildBuddy as the primary scaled remote build/cache lane for Bazel-built and
+  Slug-built development/CI workloads.
+- sibling `../actiond` as the preferred local REAPI conformance backend, with
+  NativeLink retained for already-landed regression coverage.
 - direct-local execution only for narrowly scoped debugging, never as parity
   proof.
 - remote cache identity as `ActionDigest -> ActionResult`.
+- no Slug-local sandbox implementation until the post-aquery execution/cache
+  gate is stable.
+
+## Current Priority Hold After Aquery
+
+The landed NativeLink write/shell action proofs remain required regressions,
+but new Stage 7 breadth does not control the next milestone. Freeze new cache,
+materializer, retry/TLS, and backend feature work unless it:
+
+- preserves an already-landed regression;
+- enables the Stage 10 Bazel/BuildBuddy developer build without changing Slug
+  execution semantics; or
+- begins after Stage 8 has accepted exact `aquery` for the gate matrix.
+
+Once the hold lifts, consume the exact Stage 6/`aquery` action objects. Do not
+maintain a second executor-only action description that can drift from query
+output.
 
 ## V1 Extraction Candidates
 
@@ -63,16 +82,18 @@ import mode, oracle, and validation.
   `slug-v1-archive:tests/plan34/test_reapi_local_executor_smoke.py` into Stage 1
   oracle fixtures: NativeLink config writing, process startup, evidence
   validation, what-ran checks, upload checks, and remote AC-hit assertions.
-- NativeLink is the mandatory hosted-Linux baseline for CAS, AC, Execution,
-  ByteStream, Capabilities, and WorkerApi.
+- NativeLink is the retained baseline for the already-landed CAS, AC,
+  Execution, ByteStream, Capabilities, and WorkerApi fixtures. New scaled CI
+  proof uses BuildBuddy and new local backend conformance should also run
+  against actiond.
 - Use
   `slug-v1-archive:.github/actions/setup_plan34_nativelink/action.yml`,
   `slug-v1-archive:.github/actions/run_plan34_reapi/action.yml`,
   `slug-v1-archive:.github/workflows/plan34-reapi.yml`, and
   `slug-v1-archive:tests/plan34/test_ci_gate.py` as shape references, but move
   the V2 proof into `slug-v2-oracle`.
-- CI must fail hard if NativeLink setup or the evidence validator is absent on
-  hosted Linux.
+- A lane that declares NativeLink conformance must fail hard if setup or the
+  evidence validator is absent; it is not mandatory for unrelated lanes.
 
 ### 7.2 Remote Configuration
 
@@ -142,15 +163,27 @@ import mode, oracle, and validation.
 - Stage 8 may depend on these fixtures but must not redefine executor-boundary
   evidence.
 
-### 7.7 NativeLink and actiond Local Backends
+### 7.7 BuildBuddy, actiond, and NativeLink Backends
 
-- NativeLink is the first local REAPI backend. The harness should discover
-  `SLUG_V2_NATIVELINK_BIN` first, then a documented sibling checkout path.
-- actiond is optional and must sit behind REAPI; no Slug-core actiond shortcut.
-- Hosted Linux CI must fail if the configured local REAPI backend is missing
-  for mandatory REAPI smoke tests.
-- actiond acceptance uses the same Stage 7 evidence with
-  `remote_service=local_actiond`, plus supplemental actiond e2e commands.
+- BuildBuddy is the primary hosted/scaled backend. Repository configuration may
+  name endpoints and non-secret options; credentials remain in the user's
+  `~/.bazelrc` or injected CI secrets and must never be read, copied into
+  evidence, or committed.
+- actiond at sibling commit
+  `ca39423bbd78916457f3225dcab826283c18f412` is the preferred local REAPI
+  testbed. It must sit behind REAPI with no Slug-core shortcut. Its acceptance
+  uses the same evidence with `remote_service=local_actiond` plus its own
+  focused e2e health command.
+- NativeLink remains a supported regression backend for the existing fixture
+  chain. The harness may discover `SLUG_V2_NATIVELINK_BIN` and a documented
+  sibling path, but future design must not be coupled to NativeLink-specific
+  worker APIs.
+- Every mandatory backend lane fails hard when its configured service or
+  evidence validator is absent; optional lanes report skipped without being
+  counted as parity proof.
+- Isolation implemented inside actiond or BuildBuddy is backend behavior. Slug
+  sandboxing remains explicitly deferred rather than being inferred from a
+  successful remote action.
 
 ### 7.8 Evidence Surface
 
@@ -161,7 +194,7 @@ Every REAPI execution fixture must record:
 - upload records and aggregate uploaded bytes/digests;
 - AC query/update/hit/miss counts;
 - output materialization paths and digests;
-- backend identity (`nativelink`, hosted, or actiond).
+- backend identity (`buildbuddy`, `actiond`, or `nativelink`).
 - `executor_boundary: "reapi"` for every execution row.
 - nonempty action digests and expected platform properties.
 - no `Local`, `LocalWorker`, `Worker`, or `WorkerInit` what-ran entries.
@@ -210,6 +243,11 @@ Every REAPI execution fixture must record:
 - Remote Action Cache hit proof survives Slug daemon restart and local persistent
   cache deletion.
 - Hosted CI cannot silently skip the local REAPI proof on Linux.
+- The accepted matrix includes BuildBuddy for scaled RBE/cache and actiond for
+  local REAPI conformance; NativeLink continues to run the historical
+  regression subset.
+- The protobuf action shown by accepted `aquery` is the action uploaded to
+  CAS/Execution, modulo only REAPI envelope fields that Stage 7 owns and tests.
 
 ## Validation
 

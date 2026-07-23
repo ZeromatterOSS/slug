@@ -55,6 +55,27 @@ mode, oracle, validation, and residual-risk decision.
 - Bazel lockfile tests under `src/test/py/bazel/bzlmod/` are the first oracle
   source for replay/error-mode behavior.
 
+## Current Priority Hold: Integrate Before Expanding
+
+Stage 5 has substantial landed parser/value/key substrate. Until M5 exact
+`aquery` is accepted, add no new standalone bzlmod breadth unless it is the
+smallest missing dependency for the shared DICE spine, configured-target
+analysis, or a query/cquery/aquery oracle.
+
+The immediate Stage 5 work is integration:
+
+- make module, lockfile, environment, repository mapping, and materialization
+  inputs real keys/dependencies in the single daemon-owned DICE graph;
+- remove fresh per-request graph construction and scanner/marker ownership;
+- feed the resolved repository mapping and toolchain/platform registration
+  order into Stage 4 loading and Stage 6 analysis; and
+- prove create/edit/delete and command/environment changes in the same daemon.
+
+Existing Stage 5 evidence remains a regression inventory. A `*DiceKey` input
+record, parser result, or isolated policy helper is not completion until the
+analysis/query path computes through it. Refresh any fixture used for current
+acceptance from historical Bazel 9.1.1 to the Stage 1 Bazel 9.2.0 baseline.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

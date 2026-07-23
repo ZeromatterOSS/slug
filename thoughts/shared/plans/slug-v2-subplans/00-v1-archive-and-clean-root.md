@@ -167,11 +167,32 @@ This record was verified in the local clean-root remediation checkout on
 | Field | Value |
 |-------|-------|
 | V1 commit | `e218054d4c796655939b968d90208b185decb352` verified locally on 2026-06-29 |
-| V1 tag | `slug-v1-archive` created as an annotated tag on 2026-06-29 |
-| V1 archive branch | `v1-archive` created on 2026-06-29 |
+| V1 tag | `slug-v1-archive` is an annotated tag resolving to the V1 commit; reverified in the live checkout on 2026-07-22 |
+| V1 archive branch | Recorded as created on 2026-06-29, but absent from the live checkout on 2026-07-22; repair remains required |
 | Physical archive directory | none by default |
 | Dirty files intentionally excluded | archive action excluded active V2 remediation docs and prompt only; later root-metadata cleanup changed `Cargo.toml`; no V1 implementation files |
-| Current verification status | archive refs, Cargo root metadata, and tracked clean-root cleanup verified locally; final validation commands are recorded in this plan |
+| Current verification status | tag and commit verified; archive branch missing; clean-root checker allowlist stale for `app/slug_server_v2`; Stage 0 is not currently green |
+
+## 2026-07-22 Live-Checkout Recheck
+
+The historical 2026-06-29 evidence above describes the remediation checkout at
+that time. It is not current-state authority. In the live `main` checkout:
+
+- annotated tag `slug-v1-archive^{commit}` resolves to
+  `e218054d4c796655939b968d90208b185decb352`;
+- local branch `v1-archive` is missing;
+- `scripts/v2_archive_status.sh` exits 1 for that missing branch and because
+  its V2 app allowlist has not been updated for the tracked
+  `app/slug_server_v2` crate; and
+- the untracked workspace `.bazelrc` is active user state and must be preserved.
+  It is not evidence of a clean or dirty V1 archive and must not be confused
+  with `~/.bazelrc`, which agents must never read or commit.
+
+Before M0 is accepted, create the missing archive branch at the recorded V1
+commit after a normal read-only ref check, update the checker to recognize
+owned V2 crates without weakening its V1 exclusions, and rerun the validation
+below. This plan update records the repair packet; it does not silently create
+the branch or modify the checker while the task scope is documentation.
 
 ## 2026-06-29 Clean-Root Evidence
 

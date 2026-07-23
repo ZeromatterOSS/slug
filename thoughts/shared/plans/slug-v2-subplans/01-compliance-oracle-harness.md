@@ -17,6 +17,46 @@ Use the local Bazel checkout as the source of truth:
 - execution: `RemoteActionContextProvider`, `RemoteSpawnStrategy`,
   `GrpcRemoteExecutor`, remote cache tests, and REAPI protos.
 
+### Canonical Bazel 9 baseline
+
+All new or regenerated parity evidence uses Bazel 9.2.0 at immutable commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Resolve sources from
+`../bazel` with `git show 9.2.0:<path>` or a detached worktree at that commit.
+Do not take the sibling checkout's current `HEAD` as the oracle: on the
+2026-07-22 review it was newer than Bazel 9.
+
+Older checked-in Bazel 9.1.1 results remain historical evidence until a packet
+touches them. Any fixture used to accept M1-M8 must first be regenerated and
+verified with the canonical 9.2.0 baseline. A packet may deliberately advance
+the Bazel 9 baseline only through a plan update that records the new release
+and immutable commit.
+
+### Fixture provenance contract
+
+Every new or refreshed fixture must record, in `fixture.toml` or a companion
+manifest consumed by the harness:
+
+- the Bazel release and immutable source commit;
+- the exact Bazel source path and, for migrated tests, test class/method;
+- translation notes for platform normalization or reduced fixture scope;
+- the comparison mode for each artifact (`exact`, `message_shape`, or
+  structured semantic comparison); and
+- the command used to generate and then independently verify the expected
+  result.
+
+A generated JSON blob without this provenance is a probe, not acceptance
+evidence. Migrate upstream test themes rather than paraphrasing them from
+memory. Initial source families are:
+
+- analysis: `RuleConfiguredTargetTest`, `StarlarkRuleContextTest`,
+  `StarlarkRuleClassFunctionsTest`,
+  `StarlarkRuleImplementationFunctionsTest`, `DepsetTest`, and focused
+  platform/toolchain tests;
+- query: `QueryParserTest`, `AbstractQueryTest`,
+  `ConfiguredTargetQuerySemanticsTest`, `ProtoOutputFormatterCallbackTest`,
+  `ActionGraphQueryTest`, and `src/test/shell/integration/bazel_aquery_test.sh`;
+- execution: focused remote shell tests and REAPI proto identity fixtures.
+
 ## Initial Fixture Classes
 
 - `version`, `help`, and incompatible pre-Bazel-9 configuration errors.
@@ -92,7 +132,7 @@ Create these fixtures first:
 
 | Fixture | Command | Comparison |
 |---------|---------|------------|
-| `version-bazel9` | `version` or `info release` | message shape includes Bazel 9+ policy |
+| `version-bazel9` | `version` or `info release` | message shape includes Bazel 9 policy |
 | `empty-module-build` | `build //:all` | exact success, no outputs |
 | `exports-and-filegroup` | `query //pkg:all` and `build //pkg:fg` | semantic target/output manifest |
 | `simple-rule-action` | `build //pkg:write_file` | exact declared output digest |
@@ -114,13 +154,18 @@ implementation attempts to match them.
 
 Keep the fixture mapping tied to local Bazel source:
 
-- loading: `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java`
+- loading: `../bazel/src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java`
   and `BzlLoadFunction.java`;
-- bzlmod: `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java`,
+- bzlmod: `../bazel/src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java`,
   `BazelModuleResolutionFunction.java`, and `BazelLockFileFunction.java`;
-- analysis: `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/skyframe/ConfiguredTargetFunction.java`;
-- execution: `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteActionContextProvider.java`
+- analysis: `../bazel/src/main/java/com/google/devtools/build/lib/skyframe/ConfiguredTargetFunction.java`;
+- query: `../bazel/src/main/java/com/google/devtools/build/lib/query2/engine/QueryParser.java`,
+  `QueryEnvironment.java`, and the `query2/{cquery,aquery}` implementations;
+- execution: `../bazel/src/main/java/com/google/devtools/build/lib/remote/RemoteActionContextProvider.java`
   and `GrpcRemoteExecutor.java`.
+
+Resolve every path at the canonical 9.2.0 commit rather than assuming the
+working-tree contents match that tag.
 
 ### 1.5 Generated-Oracle Policy
 
@@ -132,6 +177,28 @@ Keep the fixture mapping tied to local Bazel source:
 - The First Real Bazel Build gate requires generated Bazel results for
   `simple-rule-action`, `shell-action-reapi`, and `load-invalidation` before a
   Slug result can be called parity evidence.
+
+### 1.6 Analysis and query artifact contract
+
+- Analysis fixtures compare structured labels, configurations, providers,
+  depsets, toolchains, transitions, and declared actions. A build's final file
+  digest cannot substitute for these facts.
+- `query` and `cquery` fixtures compare exit status, ordering where Bazel
+  defines it, selected output format, and structured target/configuration
+  identity.
+- `aquery` fixtures capture Bazel's `ActionGraphContainer` through `proto` or
+  `jsonproto`, normalize only unstable ids/paths, and compare command lines,
+  environment, inputs, outputs and tree artifacts, dep sets, configuration
+  ids, mnemonics, execution platform/properties, paramfiles, aspects, and
+  toolchains when present.
+- The aquery matrix covers every Bazel 9.2.0 formatter: `text`, `commands`,
+  `summary`, `textproto`, `proto`, `streamed_proto`, and `jsonproto`, including
+  `include_commandline`, `include_artifacts`, `include_pruned_inputs`,
+  `include_param_files`, `include_file_write_contents`, `skyframe_state`, and
+  invalid combinations.
+- Text `aquery` output must render from the same Slug action-query IR as the
+  proto formats. `stdout_contains` or a separately assembled debug view is not
+  parity evidence.
 
 ## Acceptance Criteria
 
@@ -156,7 +223,7 @@ current checkout: the two missing-module replacement fixtures are the next
 fixture packet, and `shell-action-reapi` remains gated on the Stage 7
 NativeLink-backed harness.
 
-- `tools/v2_oracle run --fixture empty-module-build --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev`
+- `tools/v2_oracle run --fixture empty-module-build --bazel "$BAZEL_9_BIN"`
   succeeds against upstream Bazel.
 - `tools/v2_oracle run --fixture simple-rule-action --update-expected` writes
   a manifest containing exactly the declared output and no undeclared source
@@ -241,7 +308,7 @@ with the standard-library Python environment; they do not require Bazel, Slug
 V2, or the two absent fixture directories.
 
 ```bash
-cd /var/mnt/dev/slug
+cd "$(git rev-parse --show-toplevel)"
 python3 -B -m tools.v2_oracle list
 git diff --check -- tools/v2_oracle tools/v2_oracle_lib tests/v2_oracle thoughts/shared/plans/slug-v2-subplans/01-compliance-oracle-harness.md
 ```
@@ -250,18 +317,20 @@ Where the test environment includes `pytest`, also run the current focused
 harness suite; it does not require Bazel or Slug V2:
 
 ```bash
-cd /var/mnt/dev/slug
+cd "$(git rev-parse --show-toplevel)"
 python3 -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py
 ```
 
 When a local Bazel 9 source binary is available, the existing oracle-first
-fixture chain is generated with these exact commands:
+fixture chain is generated with these exact commands. Set `BAZEL_9_BIN` to a
+verified Bazel 9.2.0 binary first; do not point it at the sibling checkout's
+newer `HEAD` build:
 
 ```bash
-cd /var/mnt/dev/slug
-python3 -B -m tools.v2_oracle run --tool bazel --fixture empty-module-build --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
-python3 -B -m tools.v2_oracle run --tool bazel --fixture simple-rule-action --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
-python3 -B -m tools.v2_oracle run --tool bazel --fixture load-invalidation --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
+cd "$(git rev-parse --show-toplevel)"
+python3 -B -m tools.v2_oracle run --tool bazel --fixture empty-module-build --bazel "$BAZEL_9_BIN" --update-expected
+python3 -B -m tools.v2_oracle run --tool bazel --fixture simple-rule-action --bazel "$BAZEL_9_BIN" --update-expected
+python3 -B -m tools.v2_oracle run --tool bazel --fixture load-invalidation --bazel "$BAZEL_9_BIN" --update-expected
 ```
 
 ### Next Fixture Packet And Target-State Validation
@@ -274,11 +343,11 @@ block becomes mandatory and replaces any use of `negative-no-workspace` as
 parity evidence:
 
 ```bash
-cd /var/mnt/dev/slug
-python3 -B -m tools.v2_oracle run --tool bazel --fixture workspace-file-ignored --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
-python3 -B -m tools.v2_oracle run --tool bazel --fixture missing-module-warning --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
-python3 -B -m tools.v2_oracle run --tool bazel --fixture workspace-file-ignored --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev
-python3 -B -m tools.v2_oracle run --tool bazel --fixture missing-module-warning --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev
+cd "$(git rev-parse --show-toplevel)"
+python3 -B -m tools.v2_oracle run --tool bazel --fixture workspace-file-ignored --bazel "$BAZEL_9_BIN" --update-expected
+python3 -B -m tools.v2_oracle run --tool bazel --fixture missing-module-warning --bazel "$BAZEL_9_BIN" --update-expected
+python3 -B -m tools.v2_oracle run --tool bazel --fixture workspace-file-ignored --bazel "$BAZEL_9_BIN"
+python3 -B -m tools.v2_oracle run --tool bazel --fixture missing-module-warning --bazel "$BAZEL_9_BIN"
 python3 -B -m pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py
 git diff --check -- tools/v2_oracle tools/v2_oracle_lib tests/v2_oracle thoughts/shared/plans/slug-v2-subplans/01-compliance-oracle-harness.md
 ```
@@ -289,8 +358,8 @@ harness, injects its remote endpoint into the fixture command, and records the
 required REAPI evidence, generate the Bazel result with:
 
 ```bash
-cd /var/mnt/dev/slug
-python3 -B -m tools.v2_oracle run --tool bazel --fixture shell-action-reapi --bazel /var/mnt/dev/bazel/bazel-bin/src/bazel-dev --update-expected
+cd "$(git rev-parse --show-toplevel)"
+python3 -B -m tools.v2_oracle run --tool bazel --fixture shell-action-reapi --bazel "$BAZEL_9_BIN" --update-expected
 ```
 
 That command must replace the placeholder at
