@@ -146,7 +146,9 @@ fn missing_loaded_bzl_is_absent_then_create_is_observed_without_a_key_panic() {
     let mut daemon = Daemon::new(&workspace).unwrap();
     let missing = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
     assert!(
-        missing.stderr.contains("workspace file is absent"),
+        missing
+            .stderr
+            .contains("cannot load '//pkg:defs.bzl': no such file"),
         "{missing:?}"
     );
 
@@ -490,4 +492,169 @@ fn retained_daemon_path_query_observes_edge_and_reachable_package_transitions() 
         recreated.stdout,
         "//origin:top\n//branch:item\n//dest:end\n"
     );
+}
+
+#[test]
+fn retained_daemon_loadfiles_observes_leaf_and_load_edge_transitions() {
+    let workspace = scratch("loadfiles-transitions");
+    let app_build = workspace.join("app/BUILD.bazel");
+    let root_bzl = workspace.join("root/root.bzl");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &app_build,
+        "load(\"//root:root.bzl\", \"ROOT\")\nfilegroup(name = \"app\")\n",
+    );
+    write(
+        &root_bzl,
+        "load(\"//leaf:one.bzl\", \"VALUE\")\nROOT = VALUE\n",
+    );
+    write(&workspace.join("leaf/one.bzl"), "VALUE = 1\n");
+    write(&workspace.join("leaf/two.bzl"), "VALUE = 2\n");
+    write(
+        &workspace.join("alternate/alternate.bzl"),
+        "load(\"//leaf:two.bzl\", \"VALUE\")\nROOT = VALUE\n",
+    );
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let expression = "loadfiles(//app:app)";
+
+    let initial = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(initial.exit_code, 0, "{initial:?}");
+    assert_eq!(initial.stdout, "//leaf:one.bzl\n//root:root.bzl\n");
+    assert_eq!(initial.invalidated_files, 0);
+
+    write(&workspace.join("leaf/one.bzl"), "VALUE = 11\n");
+    let leaf_edit = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(leaf_edit.exit_code, 0, "{leaf_edit:?}");
+    assert_eq!(leaf_edit.stdout, initial.stdout);
+    assert_eq!(leaf_edit.invalidated_files, 1);
+
+    write(
+        &root_bzl,
+        "load(\"//leaf:two.bzl\", \"VALUE\")\nROOT = VALUE\n",
+    );
+    let transitive_switch = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(transitive_switch.exit_code, 0, "{transitive_switch:?}");
+    assert_eq!(
+        transitive_switch.stdout,
+        "//leaf:two.bzl\n//root:root.bzl\n"
+    );
+    assert_eq!(transitive_switch.invalidated_files, 1);
+
+    write(&root_bzl, "ROOT = 0\n");
+    let transitive_deleted = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(transitive_deleted.exit_code, 0, "{transitive_deleted:?}");
+    assert_eq!(transitive_deleted.stdout, "//root:root.bzl\n");
+    assert_eq!(transitive_deleted.invalidated_files, 1);
+
+    write(
+        &root_bzl,
+        "load(\"//leaf:one.bzl\", \"VALUE\")\nROOT = VALUE\n",
+    );
+    let transitive_recreated = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(
+        transitive_recreated.exit_code, 0,
+        "{transitive_recreated:?}"
+    );
+    assert_eq!(
+        transitive_recreated.stdout,
+        "//leaf:one.bzl\n//root:root.bzl\n"
+    );
+    assert_eq!(transitive_recreated.invalidated_files, 1);
+
+    write(
+        &app_build,
+        "load(\"//alternate:alternate.bzl\", \"ROOT\")\nfilegroup(name = \"app\")\n",
+    );
+    let direct_switch = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(direct_switch.exit_code, 0, "{direct_switch:?}");
+    assert_eq!(
+        direct_switch.stdout,
+        "//alternate:alternate.bzl\n//leaf:two.bzl\n"
+    );
+    assert_eq!(direct_switch.invalidated_files, 1);
+
+    write(&app_build, "filegroup(name = \"app\")\n");
+    let direct_deleted = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(direct_deleted.exit_code, 0, "{direct_deleted:?}");
+    assert!(direct_deleted.stdout.is_empty(), "{direct_deleted:?}");
+    assert_eq!(direct_deleted.invalidated_files, 1);
+
+    write(
+        &app_build,
+        "load(\"//root:root.bzl\", \"ROOT\")\nfilegroup(name = \"app\")\n",
+    );
+    let direct_recreated = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(direct_recreated.exit_code, 0, "{direct_recreated:?}");
+    assert_eq!(direct_recreated.stdout, "//leaf:one.bzl\n//root:root.bzl\n");
+    assert_eq!(direct_recreated.invalidated_files, 1);
+}
+
+#[test]
+fn retained_daemon_buildfiles_tracks_loaded_companion_priority_only() {
+    let workspace = scratch("buildfiles-companion-transitions");
+    let loaded = workspace.join("loaded");
+    let primary = loaded.join("BUILD.bazel");
+    let fallback = loaded.join("BUILD");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("app/BUILD.bazel"),
+        "load(\"//loaded:defs.bzl\", \"DEFS\")\nfilegroup(name = \"app\")\n",
+    );
+    write(&loaded.join("defs.bzl"), "DEFS = 1\n");
+    write(&primary, "this is deliberately not valid(\n");
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let initial_buildfiles = daemon.query("buildfiles(//app:app)", QueryOrder::Auto);
+    assert_eq!(initial_buildfiles.exit_code, 0, "{initial_buildfiles:?}");
+    assert_eq!(
+        initial_buildfiles.stdout,
+        "//app:BUILD.bazel\n//loaded:BUILD.bazel\n//loaded:defs.bzl\n"
+    );
+    assert_eq!(initial_buildfiles.invalidated_files, 0);
+
+    let initial_loadfiles = daemon.query("loadfiles(//app:app)", QueryOrder::Auto);
+    assert_eq!(initial_loadfiles.exit_code, 0, "{initial_loadfiles:?}");
+    assert_eq!(initial_loadfiles.stdout, "//loaded:defs.bzl\n");
+    assert_eq!(initial_loadfiles.invalidated_files, 0);
+
+    fs::rename(&primary, &fallback).unwrap();
+    let fallback_buildfiles = daemon.query("buildfiles(//app:app)", QueryOrder::Auto);
+    assert_eq!(fallback_buildfiles.exit_code, 0, "{fallback_buildfiles:?}");
+    assert_eq!(
+        fallback_buildfiles.stdout,
+        "//app:BUILD.bazel\n//loaded:BUILD\n//loaded:defs.bzl\n"
+    );
+    assert_eq!(fallback_buildfiles.invalidated_files, 2);
+
+    let fallback_loadfiles = daemon.query("loadfiles(//app:app)", QueryOrder::Auto);
+    assert_eq!(fallback_loadfiles.exit_code, 0, "{fallback_loadfiles:?}");
+    assert_eq!(fallback_loadfiles.stdout, initial_loadfiles.stdout);
+    assert_eq!(fallback_loadfiles.invalidated_files, 0);
+
+    write(&primary, "this primary is also deliberately not valid(\n");
+    let preferred_buildfiles = daemon.query("buildfiles(//app:app)", QueryOrder::Auto);
+    assert_eq!(
+        preferred_buildfiles.exit_code, 0,
+        "{preferred_buildfiles:?}"
+    );
+    assert_eq!(
+        preferred_buildfiles.stdout,
+        "//app:BUILD.bazel\n//loaded:BUILD.bazel\n//loaded:defs.bzl\n"
+    );
+    assert_eq!(preferred_buildfiles.invalidated_files, 1);
+
+    let preferred_loadfiles = daemon.query("loadfiles(//app:app)", QueryOrder::Auto);
+    assert_eq!(preferred_loadfiles.exit_code, 0, "{preferred_loadfiles:?}");
+    assert_eq!(preferred_loadfiles.stdout, initial_loadfiles.stdout);
+    assert_eq!(preferred_loadfiles.invalidated_files, 0);
+
+    fs::remove_file(&primary).unwrap();
+    let restored_fallback = daemon.query("buildfiles(//app:app)", QueryOrder::Auto);
+    assert_eq!(restored_fallback.exit_code, 0, "{restored_fallback:?}");
+    assert_eq!(
+        restored_fallback.stdout,
+        "//app:BUILD.bazel\n//loaded:BUILD\n//loaded:defs.bzl\n"
+    );
+    assert_eq!(restored_fallback.invalidated_files, 1);
 }

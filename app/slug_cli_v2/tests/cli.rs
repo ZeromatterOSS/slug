@@ -160,6 +160,385 @@ fn query_prints_text_labels_in_auto_and_full_order() {
 }
 
 #[test]
+fn build_load_files_provenance_fixture_matches_all_fifty_seven_text_bazel_rows_through_cli() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-build-load-files-provenance/workspace");
+    let successes: &[(&str, &[&str], &str)] = &[
+        (
+            "buildfiles_direct_primary",
+            &["query", "buildfiles(//a:one)"],
+            "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "loadfiles_direct_primary",
+            &["query", "loadfiles(//a:one)"],
+            "//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "siblings_fake_a",
+            &["query", "siblings(loadfiles(//a:one))"],
+            "//a:BUILD.bazel\n//a:one\n",
+        ),
+        (
+            "siblings_fake_b",
+            &["query", "siblings(loadfiles(//b:two))"],
+            "//b:BUILD.bazel\n//b:two\n",
+        ),
+        (
+            "siblings_two_consumers_ab",
+            &[
+                "query",
+                "siblings(loadfiles(//a:one) union loadfiles(//b:two))",
+            ],
+            "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n",
+        ),
+        (
+            "siblings_two_consumers_ba",
+            &[
+                "query",
+                "siblings(loadfiles(//b:two) union loadfiles(//a:one))",
+            ],
+            "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n",
+        ),
+        (
+            "siblings_real_fake_order",
+            &["query", "siblings(//a:one union loadfiles(//b:two))"],
+            "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n",
+        ),
+        (
+            "siblings_fake_real_order",
+            &["query", "siblings(loadfiles(//b:two) union //a:one)"],
+            "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n",
+        ),
+        (
+            "real_exported_bzl_siblings",
+            &["query", "siblings(//shared:one.bzl)"],
+            "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n",
+        ),
+        (
+            "siblings_real_fake_same_label",
+            &[
+                "query",
+                "siblings(//shared:one.bzl union loadfiles(//a:one))",
+            ],
+            "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n",
+        ),
+        (
+            "siblings_fake_real_same_label",
+            &[
+                "query",
+                "siblings(loadfiles(//a:one) union //shared:one.bzl)",
+            ],
+            "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n",
+        ),
+        (
+            "siblings_buildfiles_companions",
+            &["query", "siblings(buildfiles(//a:one))"],
+            "//a:BUILD.bazel\n//a:one\n",
+        ),
+        (
+            "buildfiles_diamond",
+            &["query", "buildfiles(//diamond:probe)"],
+            "//diamond:BUILD.bazel\n//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl\n",
+        ),
+        (
+            "loadfiles_diamond",
+            &["query", "loadfiles(//diamond:probe)"],
+            "//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl\n",
+        ),
+        (
+            "buildfiles_fallback",
+            &["query", "buildfiles(//fallback:only)"],
+            "//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "loadfiles_fallback",
+            &["query", "loadfiles(//fallback:only)"],
+            "//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "buildfiles_dual_primary",
+            &["query", "buildfiles(//dual:preferred)"],
+            "//dual:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "buildfiles_root",
+            &["query", "buildfiles(//:root)"],
+            "//:BUILD.bazel\n",
+        ),
+        (
+            "buildfiles_multiple_packages",
+            &["query", "buildfiles(set(//a:one //fallback:only))"],
+            "//a:BUILD.bazel\n//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "loadfiles_multiple_packages",
+            &["query", "loadfiles(set(//a:one //fallback:only))"],
+            "//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "buildfiles_duplicate_operand",
+            &["query", "buildfiles(set(//a:one //a:one))"],
+            "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        ("loadfiles_empty", &["query", "loadfiles(set())"], ""),
+        ("buildfiles_empty", &["query", "buildfiles(set())"], ""),
+        (
+            "buildfiles_idempotent",
+            &["query", "buildfiles(buildfiles(//a:one))"],
+            "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "buildfiles_union",
+            &["query", "buildfiles(//a:one) union //fallback:only"],
+            "//a:BUILD.bazel\n//fallback:only\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "buildfiles_intersect",
+            &[
+                "query",
+                "buildfiles(//a:one) intersect set(//a:BUILD.bazel //shared:one.bzl //fallback:only)",
+            ],
+            "//a:BUILD.bazel\n//shared:one.bzl\n",
+        ),
+        (
+            "loadfiles_except",
+            &["query", "loadfiles(//a:one) except //shared:two.bzl"],
+            "//shared:one.bzl\n",
+        ),
+        (
+            "deps_function_fake_nodes",
+            &["query", "deps(loadfiles(//a:one))"],
+            "//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "deps_buildfiles_fake_nodes",
+            &["query", "deps(buildfiles(//a:one))"],
+            "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "default_direct",
+            &["query", "buildfiles(//a:one)"],
+            "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "auto_direct",
+            &["query", "--order_output=auto", "buildfiles(//a:one)"],
+            "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n",
+        ),
+        (
+            "full_direct",
+            &["query", "--order_output=full", "buildfiles(//a:one)"],
+            "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel\n",
+        ),
+        (
+            "full_wrapped_union",
+            &[
+                "query",
+                "--order_output=full",
+                "buildfiles(//a:one) union set()",
+            ],
+            "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel\n",
+        ),
+        (
+            "buildfiles_broken_companions",
+            &["query", "buildfiles(//consumer_bad:probe)"],
+            "//broken_load:BUILD.bazel\n//broken_load:good.bzl\n//broken_syntax:BUILD.bazel\n//broken_syntax:good.bzl\n//consumer_bad:BUILD.bazel\n",
+        ),
+        (
+            "loadfiles_broken_companions",
+            &["query", "loadfiles(//consumer_bad:probe)"],
+            "//broken_load:good.bzl\n//broken_syntax:good.bzl\n",
+        ),
+        (
+            "siblings_loadfiles_intersect_ab",
+            &[
+                "query",
+                "siblings(loadfiles(//a:one) intersect loadfiles(//b:two))",
+            ],
+            "//a:BUILD.bazel\n//a:one\n",
+        ),
+        (
+            "siblings_loadfiles_intersect_ba",
+            &[
+                "query",
+                "siblings(loadfiles(//b:two) intersect loadfiles(//a:one))",
+            ],
+            "//b:BUILD.bazel\n//b:two\n",
+        ),
+        (
+            "siblings_loadfiles_except_ab",
+            &[
+                "query",
+                "siblings(loadfiles(//a:one) except loadfiles(//b:two))",
+            ],
+            "",
+        ),
+        (
+            "siblings_loadfiles_except_ba",
+            &[
+                "query",
+                "siblings(loadfiles(//b:two) except loadfiles(//a:one))",
+            ],
+            "",
+        ),
+        (
+            "siblings_real_fake_intersect",
+            &[
+                "query",
+                "siblings(//shared:one.bzl intersect loadfiles(//a:one))",
+            ],
+            "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n",
+        ),
+        (
+            "siblings_fake_real_intersect",
+            &[
+                "query",
+                "siblings(loadfiles(//a:one) intersect //shared:one.bzl)",
+            ],
+            "//a:BUILD.bazel\n//a:one\n",
+        ),
+        (
+            "siblings_real_fake_except",
+            &[
+                "query",
+                "siblings(//shared:one.bzl except loadfiles(//a:one))",
+            ],
+            "",
+        ),
+        (
+            "siblings_fake_real_except",
+            &[
+                "query",
+                "siblings(loadfiles(//a:one) except //shared:one.bzl)",
+            ],
+            "//a:BUILD.bazel\n//a:one\n",
+        ),
+        (
+            "siblings_single_fake_real_intersect",
+            &[
+                "query",
+                "siblings(loadfiles(//single:only) intersect //shared:two.bzl)",
+            ],
+            "//single:BUILD.bazel\n//single:only\n",
+        ),
+        (
+            "siblings_single_real_fake_intersect",
+            &[
+                "query",
+                "siblings(//shared:two.bzl intersect loadfiles(//single:only))",
+            ],
+            "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n",
+        ),
+        (
+            "siblings_single_fake_real_except",
+            &[
+                "query",
+                "siblings(loadfiles(//single:only) except //shared:two.bzl)",
+            ],
+            "",
+        ),
+        (
+            "siblings_single_real_fake_except",
+            &[
+                "query",
+                "siblings(//shared:two.bzl except loadfiles(//single:only))",
+            ],
+            "",
+        ),
+        (
+            "siblings_single_fake_real_union",
+            &[
+                "query",
+                "siblings(loadfiles(//single:only) union //shared:two.bzl)",
+            ],
+            "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n//single:BUILD.bazel\n//single:only\n",
+        ),
+        (
+            "siblings_single_real_fake_union",
+            &[
+                "query",
+                "siblings(//shared:two.bzl union loadfiles(//single:only))",
+            ],
+            "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n//single:BUILD.bazel\n//single:only\n",
+        ),
+    ];
+    let failures: &[(&str, &[&str], i32, &str)] = &[
+        (
+            "missing_load_failure",
+            &["query", "buildfiles(//missing_load:probe)"],
+            7,
+            "cannot load '//missing_load:missing.bzl': no such file",
+        ),
+        (
+            "broken_bzl_failure",
+            &["query", "loadfiles(//broken_bzl:probe)"],
+            7,
+            "compilation of module 'broken_bzl/bad.bzl' failed",
+        ),
+        (
+            "bzl_cycle_failure",
+            &["query", "loadfiles(//bzl_cycle:probe)"],
+            7,
+            "cycle detected in extension files",
+        ),
+        (
+            "buildfiles_too_few_arguments",
+            &["query", "buildfiles()"],
+            2,
+            "too few arguments to function 'buildfiles'",
+        ),
+        (
+            "loadfiles_too_many_arguments",
+            &["query", "loadfiles(//a:one, //b:two)"],
+            2,
+            "too many arguments to function 'loadfiles'",
+        ),
+        (
+            "buildfiles_syntax_failure",
+            &["query", "buildfiles("],
+            2,
+            "premature end of input",
+        ),
+        (
+            "buildfiles_missing_target",
+            &["query", "buildfiles(//a:missing)"],
+            7,
+            "no such target '//a:missing'",
+        ),
+        (
+            "buildfiles_later_error",
+            &["query", "buildfiles(//a:one union //missing:target)"],
+            7,
+            "no such package 'missing': BUILD file not found",
+        ),
+    ];
+    assert_eq!(successes.len() + failures.len(), 57);
+
+    for (name, args, expected_stdout) in successes {
+        let output = slug().current_dir(&workspace).args(*args).output().unwrap();
+        assert!(output.status.success(), "{name} {args:?}: {output:?}");
+        assert!(output.stderr.is_empty(), "{name} {args:?}: {output:?}");
+        assert_eq!(
+            std::str::from_utf8(&output.stdout).unwrap(),
+            *expected_stdout,
+            "{name} {args:?}"
+        );
+    }
+    for (name, args, exit, diagnostic) in failures {
+        let output = slug().current_dir(&workspace).args(*args).output().unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(*exit),
+            "{name} {args:?}: {output:?}"
+        );
+        assert!(output.stdout.is_empty(), "{name} {args:?}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(diagnostic), "{name} {args:?}: {stderr}");
+    }
+}
+
+#[test]
 fn siblings_build_file_node_fixture_matches_all_oracle_rows() {
     let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/v2_oracle/fixtures/query-siblings-build-file-node/workspace");
