@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 visibility oracle correction is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 visibility oracle correction is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 12 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; visibility audit and 34-command Bazel oracle through `3ecfbfce` | four functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, `config_setting` visibility evidence, visibility representation, and remaining command breadth | add only two `config_setting` visibility rows to the accepted oracle |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 visibility representation is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 visibility representation is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 12 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; visibility audit and 36-command Bazel oracle through `a11b43da`; typed visibility/package-group design accepted | four functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, visibility representation, and remaining command breadth | implement only the accepted Stage 4 typed visibility/package-group representation |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,34 +33,60 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Append exactly two future-Slug commands to
-`tests/v2_oracle/fixtures/query-visible-visibility/`, preserving all 34
-existing definitions and expected records. The worker may edit only
-`fixture.toml`, `expected/oracle.json`, and `workspace/owner/BUILD.bazel`.
-Keep the two `bazel_only_structure_*` commands last.
+Implement only the accepted Stage 4 typed visibility/package-group
+representation. Add a loading-owned `visibility.rs` with immutable,
+`Allocative` public/private/restricted rule visibility; direct exact/subtree/
+positive/negative package contents use Buck-derived `SmallSet` and shared
+slice shapes. Restricted visibility retains direct contents plus unresolved
+top-level package-group labels in source order. A first-class package-group
+target retains only its direct contents and unresolved includes. Add explicit
+visibility provenance for declared, package-default, generating-rule, and
+always-public producers.
 
-Under `//owner`'s private package default, add one omitted-visibility
-`config_setting` and one explicitly `:exact`-visible `config_setting`. One new
-`visible()` row must show that `//viewer:caller` sees both; a second must show
-that `//other:caller` sees only the omitted target. This jointly proves Bazel
-9's default `ConfigSettingVisibilityPolicy::DEFAULT_PUBLIC`, positive explicit
-group visibility, and enforcement of that explicit restriction.
+Ordinary omitted rules and real source/BUILD targets use the package default.
+Omitted `config_setting` visibility is effectively public under Bazel 9's
+default policy while an explicit restriction remains declared and enforced.
+Omitted `exports_files` is public, outputs inherit their generating rule, and
+package groups are public. Keep raw rule visibility separate: every rule
+projects a built-in `visibility` query attribute whose exact declared labels
+and explicit bit are retained; omitted/default visibility is empty, and direct
+`__pkg__`/`__subpackages__` spellings remain raw values.
 
-Pin the policy to `PackageOptions` defaults
-`incompatible_enforce_config_setting_visibility=true` and
-`incompatible_config_setting_private_default_visibility=false`, plus
-`SkyframeExecutor` policy selection and `Rule.getDefaultVisibility`. Update the
-future-Slug count from 32 to 34 without changing the exact 12-command Stage 4
-non-`visible()` gate. Generate and clean-verify with `/usr/bin/bazel`, require
-an independent root run and source/evidence review, and commit no Rust, harness,
-manifest, other fixture, or plan change in the oracle commit.
+Replace flat query dependencies with one ordered immutable tagged edge slice.
+Tags distinguish generating-rule, visibility NODEP, ordinary, and
+package-group-include edges. Preserve pinned `LabelVisitationUtils` order:
+rule visibility before ordinary, output generator before visibility, source
+visibility, and package-group includes. Preserve the same destination under
+different tags; synthesize implicit source nodes from ordinary edges only.
+Direct package specifications never become target edges.
 
-After acceptance, re-review the Stage 4 design with a pinned special
-`config_setting` producer and one ordered immutable tagged edge slice. The
-tagged slice must preserve rule visibility-before-ordinary, generated
-owner-before-visibility, source visibility, and package-group include order
-while distinguishing NODEP/include/source-synthesis behavior. `bind` stays
-excluded because V2 does not expose it.
+Do not resolve group labels or recursively walk includes in `PackageLoadKey`
+or `UnconfiguredPackageGraphKey`. Missing and wrong-kind references and cycles
+must remain graph data. Stage 8 will own request-local iterative resolution,
+per-walk cycle suppression, and missing-target diagnostics across the existing
+DICE-owned package graphs. Add no key, cache, lock, registry, or cross-package
+compute recursion.
+
+The exact acceptance gate is these 12 non-`visible()` commands from
+`query-visible-visibility`: package-group include-cycle deps, misspelled
+special and malformed package-spec diagnostics, all five raw
+`labels(visibility)` group/default/direct-spec cases, and all four effective
+visibility/include `deps` cases. The remaining 22 future-Slug `visible()`
+commands belong to Stage 8; the final two flag-structure rows remain Bazel-only.
+Add focused loading, same-DICE invalidation, graph, and exact CLI-table tests
+before production changes.
+
+Production edits are limited to
+`app/slug_loading_v2/src/{visibility.rs,package.rs,lib.rs}` and
+`app/slug_query_v2/src/{graph.rs,loading_environment.rs,lib.rs}`. Focused tests
+are limited to
+`app/slug_loading_v2/tests/{build_file_loading.rs,bzl_invalidation.rs}`,
+`app/slug_query_v2/tests/loading_query.rs`, and
+`app/slug_cli_v2/tests/cli.rs`. Downstream exhaustive matches may change only
+when compilation proves necessary. Do not edit DICE keys, `bzl_module.rs`,
+`attrs.rs`, generic query evaluation/parser/formatters, Cargo manifests, V1,
+repository mapping, persisted formats, or activate `visible()`. `bind` and
+alternate visibility flags remain excluded.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine

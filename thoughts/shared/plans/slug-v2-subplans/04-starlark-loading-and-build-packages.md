@@ -724,3 +724,38 @@ package-group include, and generating-rule edges while preserving pinned
 `LabelVisitationUtils` order and allowing source synthesis from ordinary edges
 only. The remaining typed visibility/group model, existing-key DICE ownership,
 12-command Stage 4 gate, and bounded allowlist were accepted in principle.
+
+### Corrected Stage 4 visibility design accepted
+
+Commit `a11b43da` extends the executable evidence to 36 commands: 34
+future-Slug rows and two final Bazel-only structure rows. Its two new
+`config_setting` cases pin Bazel 9's default-public omitted visibility and
+enforcement of an explicit package-group restriction under a private package
+default. Generation plus two clean verification runs passed, including root
+run `20260723-160559-1242065-bazel`; all 26 pinned source anchors resolve and
+the prior 34 normalized records are unchanged. Sol accepted the correction.
+
+The re-reviewed Stage 4 representation is implementation-ready. Loading owns
+typed raw/effective visibility, direct package contents, unresolved top-level
+group labels, first-class package-group direct contents/includes, and explicit
+producer provenance. `config_setting`, `exports_files`, source/BUILD,
+generated, and package-group special cases follow the pinned Bazel producers.
+Compact `SmallSet`/shared-slice storage is immutable, `Allocative`, and part of
+package equality.
+
+The query graph uses one ordered tagged immutable edge slice in exact target
+visitation order. Visibility NODEP and package-group include edges never
+synthesize source nodes; direct package specifications never become edges.
+Neither package loading nor unconfigured graph construction dereferences
+group labels or recursively resolves includes. Missing/wrong-kind references
+and cycles remain stored topology. Stage 8 will later resolve them iteratively
+and request-locally across existing DICE-owned package graphs with a per-walk
+compact cycle set and exact diagnostics.
+
+The Stage 4 gate is exactly 12 non-`visible()` oracle commands. The other 22
+future-Slug rows belong to Stage 8 and the two flag rows remain Bazel-only.
+Implementation is bounded to the loading visibility/package owners, query
+graph/loading-environment projection, and their focused loading, invalidation,
+query, and CLI-table tests. No new DICE key, global registry/interner, V1
+semantics, repository mapping, formatter, generic evaluator, or command
+activation is authorized.

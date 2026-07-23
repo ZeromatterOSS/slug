@@ -1515,3 +1515,16 @@ next packet adds only two oracle rows; the corrected design will use one
 ordered tagged immutable edge slice. Neither correction authorizes V1/Buck
 visibility semantics. Buck-derived compact sets/slices remain utility shapes
 only.
+
+Commit `a11b43da` accepts the two `config_setting` discriminators and preserves
+all earlier normalized evidence. The corrected Stage 4 design is now
+Sol-accepted: implement V2-owned typed visibility, direct package contents,
+unresolved group/include labels, explicit provenance, and one ordered tagged
+edge slice using compact Buck-derived utility shapes only.
+
+The accepted ownership deliberately rejects eager recursive resolution in
+package or unconfigured-graph DICE computes. Missing/wrong-kind references and
+include cycles remain graph data; Stage 8's future request-local accessor owns
+iterative cross-package resolution, diagnostics, and per-walk cycle state. No
+V1 registry, string-pattern semantics, fallback, group evaluator, DICE owner,
+or query-command implementation is imported.

@@ -2747,3 +2747,23 @@ This correction does not implement or activate `visible()`. External
 repositories/mapping, symbolic macros, `bind`, alternate visibility flags,
 keep-going, configured query, formatters, and production Rust remain excluded
 until the corrected design is accepted.
+
+## Config-setting visibility evidence and Stage 4 design accepted (2026-07-23)
+
+Commit `a11b43da` extends `query-visible-visibility` to 36 Bazel commands:
+34 future Slug gates followed by the same two Bazel-only flag-structure rows.
+The new cases prove that an omitted `config_setting.visibility` remains public
+under Bazel 9's default policy despite a private package default, while an
+explicit package-group restriction is honored. Worker generation/clean runs
+and root clean run `20260723-160559-1242065-bazel` passed; prior normalized
+records were preserved and Sol returned `ACCEPT`.
+
+The corrected Stage 4 design also passed review. It stores typed raw/effective
+visibility, direct package contents, unresolved group/include labels, producer
+provenance, and one ordered tagged edge slice. Loading and graph construction
+do not recursively resolve groups: missing/wrong-kind references and cycles
+remain topology for Stage 8's future request-local accessor. The exact Stage 4
+gate is 12 non-`visible()` rows; Stage 8 owns the remaining 22 future-Slug
+`visible()` rows and command activation. No new DICE key, V1 visibility
+registry, repository mapping, formatter, or alternate flag support enters the
+representation packet.
