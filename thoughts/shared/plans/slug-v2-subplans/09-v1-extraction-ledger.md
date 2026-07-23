@@ -1397,3 +1397,8 @@ The loading foundation then stopped cleanly before implementation because the
 V2 `TargetName` type permits extra colons. A loading-local workaround is
 rejected; Stage 3 must first make the central target-name validator Bazel-shaped.
 No V1/Buck extraction decision changes and no code was retained.
+
+The Stage 3 design is now accepted: implement the pinned Bazel target-name
+matrix and trailing `/.` normalization centrally, without importing V1/Buck
+identity code. `PackagePath` and package-context raw-label classification stay
+outside this packet; loading resumes after the identity boundary is accepted.

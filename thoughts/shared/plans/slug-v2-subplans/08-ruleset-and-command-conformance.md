@@ -2465,3 +2465,9 @@ The worktree remained clean and no tests were needed. Stage 3 now owns a
 central target-name validation review and implementation. Package-context
 loading normalization, native suite metadata, strict policy, and `tests()`
 activation remain blocked behind that accepted identity boundary.
+
+The Stage 3 review accepted exact validation and trailing `/.` normalization
+inside `TargetName::parse` only. Package-path grammar and raw label-part
+classification do not move into this identity packet. After its focused tests
+and downstream consumers pass, the shared loading converter resumes and owns
+Bazel's package-context rejection of non-absolute `pkg:target`.

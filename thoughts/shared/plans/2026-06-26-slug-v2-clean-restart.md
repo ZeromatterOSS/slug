@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the Stage 3 target-name validation review is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the Stage 3 target-name validation review is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 25-command Bazel oracle including suite provenance/source members and 37-command labels oracle accepted through `3621b3e7`; total query-attribute explicitness and package-context label-normalization designs Sol-accepted; two Gate A attempts closed `REPLAN`; loading foundation stopped cleanly on core identity validation | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, exact target-name validation, package-context label foundation, Gate A metadata implementation, and remaining command breadth | review the core Stage 3 `TargetName` validator before loading resumes |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the Stage 3 target-name implementation is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the Stage 3 target-name implementation is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 25-command Bazel oracle including suite provenance/source members and 37-command labels oracle accepted through `3621b3e7`; total query-attribute explicitness and package-context label-normalization designs Sol-accepted; two Gate A attempts closed `REPLAN`; exact central target-name design Sol-accepted | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, exact target-name validation, package-context label foundation, Gate A metadata implementation, and remaining command breadth | implement exact central `TargetName` validation, then resume loading |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,23 +33,26 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Review the core Stage 3 `TargetName` validator against pinned Bazel 9.2
-`LabelValidator.validateTargetName` and `LabelParser.Parts.parse`. The loading
-foundation stopped before editing because V2 accepts extra `:` characters in a
-target name; a loading-local rejection of only `pkg:target` would be a partial
-grammar.
+Implement the accepted Stage 3 `TargetName::parse` packet against pinned Bazel
+9.2 `LabelValidator.validateTargetName` and
+`LabelParser.validateAndProcessTargetName`. Reject empty names, colon,
+backslash, ASCII controls/DEL, leading/trailing slash, doubled slash, exact
+up-level segments, and exact interior/leading current-directory segments.
+Accept printable punctuation and Unicode, Bazel's temporary target `.`, and
+trailing `/.`; normalize the last form before storage so equality, ordering,
+hashing, display, and stable label serialization match its stripped spelling.
 
-Decide the smallest exact central validation packet. At minimum cover colon,
-backslash, controls, leading/trailing slash, doubled slash, up-level/current
-segments, Bazel's temporarily accepted `.` and trailing `/.`, Unicode, and
-stable display/serialization. Determine whether `PackagePath` or label splitting
-also requires change for the accepted 37-row loading oracle.
+Add source-derived table tests at the value boundary plus apparent/canonical
+label regressions for invalid characters and normalization. Validate
+`cargo test -p slug_identity_v2` and direct downstream identity/pattern
+consumers. No new oracle is needed: this packet is fully discriminated by
+pinned source and the accepted 37-row fixture remains the subsequent loading
+converter's gate.
 
-This is design/review only. Do not edit identity/loading/query code, invent a
-loading-local label parser, add repository mapping, or restore test metadata.
-The accepted invalid-relative-label oracle is the implementation gate; add a
-new oracle only if source-derived unit coverage cannot discriminate the required
-public behavior.
+Do not change `PackagePath`, label splitting, loading/query code, repository
+mapping, interning, DICE ownership, or persisted formats. Raw relative
+`pkg:target` classification belongs to the next package-context loading parser,
+not `TargetName`.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.

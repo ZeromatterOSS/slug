@@ -153,3 +153,20 @@ Reject a loading-local special case. The next packet reviews the central
 `LabelValidator.validateTargetName` and `LabelParser.Parts.parse`, including
 colon/backslash/control/path-segment rules and Bazel's temporary `.`/`/.`
 exceptions. Loading resumes only after the core identity boundary is exact.
+
+## Exact target-name validation design accepted (2026-07-23)
+
+Pinned Bazel `LabelValidator.validateTargetName` and
+`LabelParser.validateAndProcessTargetName` establish one central value
+boundary. `TargetName::parse` must reject colon, backslash, ASCII controls/DEL,
+leading/trailing slash, doubled slash, and exact `.`/`..` path segments except
+for Bazel's temporarily accepted target `.` and trailing `/.`. The trailing
+form is normalized before storage; printable punctuation and Unicode remain
+accepted.
+
+Terra's source/V2 audit and root verification found no need to change
+`PackagePath` or `split_package_and_target`; Sol accepted that boundary. Raw
+relative `pkg:target` classification remains the next loading parser's job.
+The implementation packet changes only `package.rs` and focused identity tests,
+with no new oracle, interner, repository mapping, DICE owner, or persisted
+format.
