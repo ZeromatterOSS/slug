@@ -227,6 +227,24 @@ expected_exit = 0
 stdout_patterns = ["\\A//modern:rule\\n//modern:leaf\\n//modern:implicit.txt\\n//modern:explicit.txt\\n//modern:cycle_b\\n//modern:cycle_a\\n//modern:custom\\n//modern:alias\\n//modern:BUILD\\.bazel\\Z"]
 
 [[commands]]
+name = "siblings_full_provenance_direct_literal"
+argv = ["query", "--order_output=full", "siblings(//provenance:a)"]
+expected_exit = 0
+stdout_patterns = ["\\A//provenance:zz\\n//provenance:z\\n//provenance:y\\n//provenance:a\\n//provenance:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "siblings_full_provenance_wrapped_union"
+argv = ["query", "--order_output=full", "siblings(//provenance:a) union set()"]
+expected_exit = 0
+stdout_patterns = ["\\A//provenance:zz\\n//provenance:z\\n//provenance:y\\n//provenance:a\\n//provenance:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "siblings_full_provenance_dependency_derived"
+argv = ["query", "--order_output=full", "siblings(deps(//provenance:a))"]
+expected_exit = 0
+stdout_patterns = ["\\A//provenance:z\\n//provenance:y\\n//provenance:a\\n//provenance:zz\\n//provenance:BUILD\\.bazel\\Z"]
+
+[[commands]]
 name = "siblings_too_few_arguments"
 argv = ["query", "siblings()"]
 expected_exit = 2

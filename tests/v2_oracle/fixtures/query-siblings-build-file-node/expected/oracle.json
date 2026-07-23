@@ -20,7 +20,7 @@
       "name": "modern_actual_build_bazel",
       "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel",
-      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-033329-578427-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-034446-589899-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: ecbff0a5-3e4f-4d11-9d12-116894dc4f1a\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035638-609525-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035734-612675-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a4618ee6-0d83-4079-990b-16d1fbdfe318\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n"
     },
     {
@@ -43,7 +43,7 @@
       "name": "modern_wrong_build_missing",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//modern:BUILD': target 'BUILD' not declared in package 'modern' defined by <workspace>/modern/BUILD.bazel",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: aba746f9-41df-4936-bd0f-3c7496d8b3a8\nLoading: 0 packages loaded\nERROR: no such target '//modern:BUILD': target 'BUILD' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-034446-589899-bazel/workspace/modern/BUILD.bazel\n",
+      "stderr": "INFO: Invocation ID: 15cbd37e-1a61-4adf-8c6d-8ea07e6c6fc7\nLoading: 0 packages loaded\nERROR: no such target '//modern:BUILD': target 'BUILD' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035734-612675-bazel/workspace/modern/BUILD.bazel\n",
       "stdout": ""
     },
     {
@@ -66,7 +66,7 @@
       "name": "fallback_actual_build",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//fallback:BUILD",
-      "stderr": "INFO: Invocation ID: 00e09ba4-8fb2-4b46-8937-577a2ddd7b57\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: c94ed53d-8aae-4378-b9f5-ed02eff37258\nLoading: 0 packages loaded\n",
       "stdout": "//fallback:BUILD\n"
     },
     {
@@ -89,7 +89,7 @@
       "name": "fallback_wrong_build_bazel_missing",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//fallback:BUILD.bazel': target 'BUILD.bazel' not declared in package 'fallback' defined by <workspace>/fallback/BUILD",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: edbfc29b-6ef3-435a-bca7-ce32eb7d876f\nLoading: 0 packages loaded\nERROR: no such target '//fallback:BUILD.bazel': target 'BUILD.bazel' not declared in package 'fallback' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-034446-589899-bazel/workspace/fallback/BUILD\n",
+      "stderr": "INFO: Invocation ID: cd93657b-a170-43be-888e-a7b84384b912\nLoading: 0 packages loaded\nERROR: no such target '//fallback:BUILD.bazel': target 'BUILD.bazel' not declared in package 'fallback' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035734-612675-bazel/workspace/fallback/BUILD\n",
       "stdout": ""
     },
     {
@@ -112,7 +112,7 @@
       "name": "siblings_fallback_actual_build_once",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//fallback:BUILD\n//fallback:only",
-      "stderr": "INFO: Invocation ID: 35f70223-9090-443c-9c27-65230b5f53f6\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 58f1a418-5a30-4cbf-b4c1-8e55dcc446e7\nLoading: 0 packages loaded\n",
       "stdout": "//fallback:BUILD\n//fallback:only\n"
     },
     {
@@ -135,7 +135,7 @@
       "name": "root_actual_build_bazel",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: aa0dc435-5203-4a0a-bb70-55bb22795a6d\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: c24e7aa4-eca9-4961-a8de-5c227bb9f612\nLoading: 0 packages loaded\n",
       "stdout": "//:BUILD.bazel\n"
     },
     {
@@ -158,7 +158,7 @@
       "name": "root_wrong_build_missing",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//:BUILD': target 'BUILD' not declared in package '' defined by <workspace>/BUILD.bazel",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 088adcee-7f1f-455c-8251-85d0c1bad76f\nLoading: 0 packages loaded\nERROR: no such target '//:BUILD': target 'BUILD' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-034446-589899-bazel/workspace/BUILD.bazel\n",
+      "stderr": "INFO: Invocation ID: ad2054ca-6c0c-4e3c-bcbc-fd5b981bc225\nLoading: 0 packages loaded\nERROR: no such target '//:BUILD': target 'BUILD' not declared in package '' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035734-612675-bazel/workspace/BUILD.bazel\n",
       "stdout": ""
     },
     {
@@ -181,7 +181,7 @@
       "name": "siblings_root_actual_build_bazel_once",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//:BUILD.bazel\n//:root_rule",
-      "stderr": "INFO: Invocation ID: 0821d9ce-fabd-4873-99f3-8ddf8ea80a55\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: ded6dd4e-2768-4b94-a90d-59e5d8ec23a1\nLoading: 0 packages loaded\n",
       "stdout": "//:BUILD.bazel\n//:root_rule\n"
     },
     {
@@ -204,7 +204,7 @@
       "name": "dual_build_bazel_priority_target",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//dual:preferred",
-      "stderr": "INFO: Invocation ID: eb343ace-7d84-4d42-8a30-57ef422d6bdb\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 9d6a6a0d-73a4-4f28-b55e-9d0532b09b8d\nLoading: 0 packages loaded\n",
       "stdout": "//dual:preferred\n"
     },
     {
@@ -227,7 +227,7 @@
       "name": "dual_build_file_is_build_bazel",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//dual:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: 6aff9999-058e-49e1-be56-edfbabee0903\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: ed569bc4-4eda-4cc8-81ed-6a12015e7b9a\nLoading: 0 packages loaded\n",
       "stdout": "//dual:BUILD.bazel\n"
     },
     {
@@ -250,7 +250,7 @@
       "name": "dual_wrong_build_missing_despite_ignored_build_file",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//dual:BUILD': target 'BUILD' not declared in package 'dual' defined by <workspace>/dual/BUILD.bazel; however, a source file of this name exists.  (Perhaps add 'exports_files([\"BUILD\"])' to dual/BUILD.bazel?)",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 2330e93a-5328-4f09-939d-e6fcd06c695d\nLoading: 0 packages loaded\nERROR: no such target '//dual:BUILD': target 'BUILD' not declared in package 'dual' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-034446-589899-bazel/workspace/dual/BUILD.bazel; however, a source file of this name exists.  (Perhaps add 'exports_files([\"BUILD\"])' to dual/BUILD.bazel?)\n",
+      "stderr": "INFO: Invocation ID: 174ae8fa-73b5-4055-a318-3db04caf30ae\nLoading: 0 packages loaded\nERROR: no such target '//dual:BUILD': target 'BUILD' not declared in package 'dual' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035734-612675-bazel/workspace/dual/BUILD.bazel; however, a source file of this name exists.  (Perhaps add 'exports_files([\"BUILD\"])' to dual/BUILD.bazel?)\n",
       "stdout": ""
     },
     {
@@ -273,7 +273,7 @@
       "name": "siblings_dual_actual_build_bazel_excludes_ignored_build",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//dual:BUILD.bazel\n//dual:preferred",
-      "stderr": "INFO: Invocation ID: b49ddb77-e1b4-49f5-b61d-def09369c7e9\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 252da496-76ab-4518-a65c-fb47cddb1e11\nLoading: 0 packages loaded\n",
       "stdout": "//dual:BUILD.bazel\n//dual:preferred\n"
     },
     {
@@ -296,7 +296,7 @@
       "name": "dual_ignored_build_target_missing",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//dual:ignored': target 'ignored' not declared in package 'dual' defined by <workspace>/dual/BUILD.bazel",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 13b82375-fcb0-4562-b0b9-189c393273ee\nLoading: 0 packages loaded\nERROR: no such target '//dual:ignored': target 'ignored' not declared in package 'dual' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-034446-589899-bazel/workspace/dual/BUILD.bazel\n",
+      "stderr": "INFO: Invocation ID: 0bf610ec-915b-4f3d-814c-4ee70b081eb5\nLoading: 0 packages loaded\nERROR: no such target '//dual:ignored': target 'ignored' not declared in package 'dual' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035734-612675-bazel/workspace/dual/BUILD.bazel\n",
       "stdout": ""
     },
     {
@@ -319,7 +319,7 @@
       "name": "modern_exported_active_build_once",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: a5b4b39c-330d-4359-a917-73f19d38a271\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 77f208b7-a77d-406e-b856-856c63976b28\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -342,7 +342,7 @@
       "name": "siblings_rule_default",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: cc1ffc59-8812-4b6e-8317-075650e10d39\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 9b43cf8b-19bb-466e-9239-7dc11e943a4d\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -365,7 +365,7 @@
       "name": "siblings_explicit_source",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: 6689c44d-59d5-471d-b37a-a82349bf073f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 30a69979-bd6f-4efc-995c-76e5e717b353\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -388,7 +388,7 @@
       "name": "siblings_attribute_created_source",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: b273601e-8cde-4a20-b5a8-53e7f09cd597\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 4d4243b3-9b32-4292-8faa-8ce033c66ad4\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -411,7 +411,7 @@
       "name": "siblings_alias",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: 2223a311-af1b-48ca-9a5e-c045c856481c\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 2801bf23-460e-4572-bd46-cf3421c57d1f\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -434,7 +434,7 @@
       "name": "siblings_custom_rule",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: 78876ab8-2d4f-40b3-b30f-9220f099cd44\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 7f683b72-30d7-4a02-865f-309467df3e2a\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -457,7 +457,7 @@
       "name": "siblings_target_named_all_via_actual_build",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//namedall:BUILD.bazel\n//namedall:all\n//namedall:other",
-      "stderr": "INFO: Invocation ID: 1853e5f6-1aa6-4abf-a39e-a0b842f20219\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 325b3bc5-ce5f-46ab-95f4-d500d5279e8a\nLoading: 0 packages loaded\n",
       "stdout": "//namedall:BUILD.bazel\n//namedall:all\n//namedall:other\n"
     },
     {
@@ -480,7 +480,7 @@
       "name": "siblings_duplicate_same_package",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: e8c8e4a1-e514-40a8-8a7a-d6bca824cbe4\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: a02ed849-134f-4021-a3bc-a1c35acb5590\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -503,7 +503,7 @@
       "name": "siblings_multiple_packages",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: 11b185ee-9eaf-4539-b1b5-c561b8a98867\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 937bf756-ec64-4866-b5d3-b8b5f9712efc\nLoading: 0 packages loaded\n",
       "stdout": "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -526,7 +526,7 @@
       "name": "siblings_empty_set",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: ace237c9-1acd-43be-a493-ad8f34a62e70\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 6eb90a11-4f68-4995-a5ac-55395546ba47\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -549,7 +549,7 @@
       "name": "siblings_union",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: 5ac8f739-7ec8-45cb-aced-f434f82fb261\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: bef86ed0-1fa1-427d-be5d-20366c981760\nLoading: 0 packages loaded\n",
       "stdout": "//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -572,7 +572,7 @@
       "name": "siblings_set",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: 45cc2de7-36a5-47e7-bb0f-2357a83fd03d\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 6b43fce5-73db-4913-9776-81e51f23b8cf\nLoading: 0 packages loaded\n",
       "stdout": "//fallback:BUILD\n//fallback:only\n//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -595,7 +595,7 @@
       "name": "siblings_intersect",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:rule",
-      "stderr": "INFO: Invocation ID: 0e40a852-fc4d-4ede-90ff-8cb66d77afbb\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 04cad469-14da-4fa7-86cb-ef78a9e1b877\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:rule\n"
     },
     {
@@ -618,7 +618,7 @@
       "name": "siblings_except",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: ca4273d7-33f5-4d3b-ac3a-e1a01103932a\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 5464940c-2dcc-483a-b8e2-a9f6ea18d1be\nLoading: 0 packages loaded\n",
       "stdout": "//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -641,7 +641,7 @@
       "name": "deps_actual_build_is_self",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: ea9c73fb-6d84-4e29-86d9-584c6080bc26\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: b873dac7-db59-4af2-a247-d9cc10a68376\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n"
     },
     {
@@ -664,7 +664,7 @@
       "name": "rdeps_build_zero_edge",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: e22baad1-d4cd-4dc8-94c3-29a7c4d1e37f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 8b9b6c08-bc5a-4602-83c3-6a8ab7eee28d\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n"
     },
     {
@@ -687,7 +687,7 @@
       "name": "same_pkg_direct_rdeps_build_zero_edge",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 347cecae-ae06-4863-b988-3c323f104a95\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 3c4a65b9-903b-4a87-a6c2-98a84266c3fd\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -712,7 +712,7 @@
       "name": "siblings_auto_chain",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule",
-      "stderr": "INFO: Invocation ID: 6b9cfcf5-644f-42ab-a5f0-c80d28f347f4\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 2674075c-785c-4c1c-8742-42ab1c88d5c7\nLoading: 0 packages loaded\n",
       "stdout": "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n"
     },
     {
@@ -737,7 +737,7 @@
       "name": "siblings_full_chain",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: 1e30d4e8-1a82-41a3-b9f7-1bfd53a88ce9\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 8df86cc8-4b89-4f56-9e96-c8694681b6b0\nLoading: 0 packages loaded\n",
       "stdout": "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel\n"
     },
     {
@@ -762,8 +762,83 @@
       "name": "siblings_full_cycle",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: 25f24a77-ca7a-40c1-becf-371ea3391634\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 3a35bbed-3690-44fc-b47e-1831f028292d\nLoading: 0 packages loaded\n",
       "stdout": "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "siblings(//provenance:a)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "siblings(//provenance:a)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_full_provenance_direct_literal",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//provenance:zz\n//provenance:z\n//provenance:y\n//provenance:a\n//provenance:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 970d6c26-5765-474a-9e26-e10625cc282a\nLoading: 0 packages loaded\n",
+      "stdout": "//provenance:zz\n//provenance:z\n//provenance:y\n//provenance:a\n//provenance:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "siblings(//provenance:a) union set()"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "siblings(//provenance:a) union set()"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_full_provenance_wrapped_union",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//provenance:zz\n//provenance:z\n//provenance:y\n//provenance:a\n//provenance:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 660a0097-5f98-463a-8e0e-7ba5ce02b4af\nLoading: 0 packages loaded\n",
+      "stdout": "//provenance:zz\n//provenance:z\n//provenance:y\n//provenance:a\n//provenance:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "siblings(deps(//provenance:a))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "siblings(deps(//provenance:a))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_full_provenance_dependency_derived",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//provenance:z\n//provenance:y\n//provenance:a\n//provenance:zz\n//provenance:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: bde1f4fb-f6c6-4366-aba7-10ec1dd90ced\nLoading: 0 packages loaded\n",
+      "stdout": "//provenance:z\n//provenance:y\n//provenance:a\n//provenance:zz\n//provenance:BUILD.bazel\n"
     },
     {
       "argv": [
@@ -785,7 +860,7 @@
       "name": "siblings_too_few_arguments",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings()': too few arguments to function 'siblings' at ')'",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: f6a74f21-987f-4f95-90b0-73d1b5b3274f\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings()': too few arguments to function 'siblings' at ')'\n",
+      "stderr": "INFO: Invocation ID: dfe8f737-0d20-4a37-af69-7d2371990d9e\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings()': too few arguments to function 'siblings' at ')'\n",
       "stdout": ""
     },
     {
@@ -808,7 +883,7 @@
       "name": "siblings_too_many_arguments",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(//modern:rule, //fallback:only)': too many arguments to function 'siblings' at ', //fallback:only )'",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 292dedb9-5232-49b0-8892-87234dd6b909\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(//modern:rule, //fallback:only)': too many arguments to function 'siblings' at ', //fallback:only )'\n",
+      "stderr": "INFO: Invocation ID: 2b462bec-2033-4432-bc95-23fb4d7e45bd\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(//modern:rule, //fallback:only)': too many arguments to function 'siblings' at ', //fallback:only )'\n",
       "stdout": ""
     },
     {
@@ -831,7 +906,7 @@
       "name": "siblings_premature_syntax",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(': premature end of input",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 2c05f4ad-4610-4442-ac82-701e07dd3205\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(': premature end of input\n",
+      "stderr": "INFO: Invocation ID: 6bee1e97-6f75-41a0-92d4-f40ffe96d4dc\nLoading: 0 packages loaded\nERROR: Error while parsing 'siblings(': premature end of input\n",
       "stdout": ""
     },
     {
@@ -854,7 +929,7 @@
       "name": "siblings_missing_target",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by <workspace>/modern/BUILD.bazel",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 5d16c7ed-05f3-4f0f-85d1-dfed51d55070\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-034446-589899-bazel/workspace/modern/BUILD.bazel\n",
+      "stderr": "INFO: Invocation ID: 6611c327-8b0f-43c1-b89f-b9f97112753a\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035734-612675-bazel/workspace/modern/BUILD.bazel\n",
       "stdout": ""
     },
     {
@@ -877,7 +952,7 @@
       "name": "siblings_missing_package",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 2f9c4749-4385-4716-a2a1-c63fd1a5eb38\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stderr": "INFO: Invocation ID: 36fee594-5eed-4d76-b374-5f2384bba887\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
       "stdout": ""
     },
     {
@@ -900,7 +975,7 @@
       "name": "siblings_later_missing_target_no_partial_stdout",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by <workspace>/modern/BUILD.bazel",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 863b22cb-c6f9-4307-a30f-84c525aa27d8\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-034446-589899-bazel/workspace/modern/BUILD.bazel\n",
+      "stderr": "INFO: Invocation ID: 9127ac43-c76c-48eb-8bb2-53750bbaa792\nLoading: 0 packages loaded\nERROR: no such target '//modern:missing': target 'missing' not declared in package 'modern' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-siblings-build-file-node/20260723-035734-612675-bazel/workspace/modern/BUILD.bazel\n",
       "stdout": ""
     },
     {
@@ -923,7 +998,7 @@
       "name": "siblings_later_missing_package_no_partial_stdout",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: cd1b1926-4e3a-48bc-8c49-80167edd518c\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stderr": "INFO: Invocation ID: 8eb1aec1-450e-400c-a8ec-e0981f7ed89d\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
       "stdout": ""
     }
   ],
