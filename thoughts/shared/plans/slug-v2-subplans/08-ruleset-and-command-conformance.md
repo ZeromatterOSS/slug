@@ -2402,3 +2402,33 @@ and test files were restored; no implementation was committed. The replacement
 packet is design-only and must settle shared versus native-only bare-label
 coercion, source-node projection, errors, and oracle scope before Gate A is
 retried. Strict plumbing and function activation remain separate.
+
+## Package-context loading label-normalization design accepted (2026-07-23)
+
+A suite-only bare-label converter is rejected. Bazel uses one package-context
+label conversion model: bare `name` and `dir/name` are target names in the
+base package; `:name` is equivalent; root-absolute labels retain their package;
+and repository spellings require mapping that remains out of scope.
+
+The accepted foundation uses one crate-private converter for all loading-time
+dependency labels. Explicit BUILD/Starlark values and native rules use the
+instantiated target package. Starlark attribute defaults must instead
+canonicalize at rule-definition time against the defining `.bzl` package,
+matching `StarlarkAttrModule` and `LabelConverter.forBzlEvaluatingThread`.
+Native filegroup and alias storage also canonicalizes so equivalent spellings
+have equal loaded-package values. Outputs wrap the same conversion with their
+same-target-package ownership check and remain generated nodes, not source
+edges.
+
+No new DICE key, lock, repository mapping, filesystem discovery, or public
+identity API is needed. If current identity validation cannot reproduce a
+required invalid-label class, implementation stops for a separate identity
+packet rather than inventing local grammar. Terra-medium audited the pinned
+`LabelParser`, `Label`, `LabelConverter`, `BuildType`,
+`StarlarkAttrModule`, and `AbstractQueryTest` sources; root verified the key
+paths; Sol-low returned `ACCEPT`.
+
+Before implementation, extend the labels fixture for explicit bare/slash
+values, source edges, defining-`.bzl` default ownership, and invalid relative
+package syntax; extend the tests fixture for native suite bare/slash members
+and their ordinary dependency edges.

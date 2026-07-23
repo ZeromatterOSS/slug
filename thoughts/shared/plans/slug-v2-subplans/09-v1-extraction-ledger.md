@@ -1298,7 +1298,8 @@ representation-only; five ordinary query functions and M3 remain open.
 
 Status: 23-command tests oracle, total explicitness design, and 33-command
 labels/filegroup provenance oracle accepted; second Gate A attempt closed
-`REPLAN` with no code retained; bare-label coercion review next
+`REPLAN` with no code retained; package-context label design accepted; two
+oracle extensions next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1376,3 +1377,11 @@ bare source spelling (`tests = ["a.txt"]`). The same restriction exists for
 Starlark label-bearing attrs. This second material correction closed the packet
 `REPLAN`. No V1/Buck decision changes; the next design must choose the exact
 shared loading label-coercion boundary and oracle before metadata work resumes.
+
+The replacement foundation design is Sol-accepted and remains V2-owned. One
+package-context converter serves native and Starlark dependency labels;
+explicit values use the target package, while label defaults are canonicalized
+against the defining `.bzl` package. Native filegroup/alias storage becomes
+canonical, and output ownership remains a wrapper. No Buck/V1 grammar,
+repository mapping, or DICE owner is imported. Two focused oracle extensions
+are next before this foundation is implemented.

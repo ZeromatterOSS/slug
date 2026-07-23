@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 bare-label coercion review is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 bare-label coercion review is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0`; total query-attribute explicitness design Sol-accepted; filegroup provenance oracle accepted in `e1d3f910`; two Gate A attempts closed `REPLAN` with no code retained | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, bare package-relative label coercion, Gate A metadata implementation, and remaining command breadth | review bare source-label coercion across native suite and Starlark label attrs before another Gate A retry |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 package-context label oracle is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 package-context label oracle is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0`; total query-attribute explicitness and package-context label-normalization designs Sol-accepted; filegroup provenance oracle accepted in `e1d3f910`; two Gate A attempts closed `REPLAN` with no code retained | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, package-context label oracle/foundation, Gate A metadata implementation, and remaining command breadth | add the shared Starlark/native-suite package-context label oracle only |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,24 +33,26 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Review the bare package-relative label coercion boundary before another Gate A
-retry. Bazel accepts native suite members such as `tests = ["a.txt"]`; ordinary
-query retains that source edge even though `tests()` later drops it by default
-or diagnoses it in strict mode. Current V2 `dependency_label` rejects that
-spelling and an existing Starlark label-list test encodes the same non-Bazel
-restriction.
+Add only the accepted package-context label oracle across the two owning
+fixtures.
 
-Audit pinned Bazel label conversion and `AbstractQueryTest#testTestSuiteWithFile`
-to decide whether the correct boundary is one shared loading label coercer for
-native suite and Starlark label-bearing attrs or a narrower native-only path.
-Cover bare filenames and slash-containing target names, `:name`, absolute root
-labels, the existing external-repository stop, output-label ownership, error
-shape, package/graph equality, and source-node projection. Decide what oracle
-extension is required before implementation.
+Extend `query-labels-attribute-metadata` with explicit Starlark label values
+using bare filename, slash-containing target, `:name`, and root-absolute forms;
+`deps` evidence that local bare/slash values become same-package source nodes;
+a rule defined in one `.bzl` package and instantiated in another whose bare
+default remains rooted at the defining package; and invalid relative
+`pkg:target` conversion diagnostics.
 
-This is a design/review packet only. Do not restore either rejected Gate A
-patch, change Rust, activate `tests`, plumb strict mode, add DICE state, or
-broaden into repository mapping.
+Extend `tests-query-expansion` with a native suite whose explicit members are
+bare filename and slash-containing target spellings. Prove `labels(tests, ...)`
+returns canonical same-package labels and `deps(...)` contains the suite plus
+both source nodes. Do not add another `tests()` row; existing default/strict
+invalid-member evidence already owns filtering.
+
+This is oracle-only. Do not change Rust, identity parsing, repository mapping,
+DICE state, strict plumbing, function activation, or formatters. Worker and
+root must independently pass both Bazel 9.2 fixtures before the loading
+label-normalization foundation is scheduled.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.
