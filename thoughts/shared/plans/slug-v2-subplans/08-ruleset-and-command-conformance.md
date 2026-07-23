@@ -2565,3 +2565,24 @@ The next prerequisite adds the allocation-free structural canonical-label
 comparison and corrects direct native/Starlark label-list duplicate behavior.
 Selectors, malformed bytes, suite implementation, strict policy, function
 activation, and formatters remain deferred.
+
+## Structural label and direct duplicate prerequisite accepted (2026-07-23)
+
+Commit `5bbc4604` adds `CanonicalLabel::bazel_natural_cmp` over borrowed
+canonical repository, package, and target strings while leaving global
+mapping-sensitive equality, hashing, and derived order unchanged. Loading now
+uses a Buck-derived compact set of borrowed identity tuples to reject the
+first repeated canonical label in native filegroup and direct Starlark
+label-list values, including materialized defaults.
+
+The six-file patch preserves all nonduplicate list order, formats root
+diagnostics as Bazel `//pkg:target`, and does not descend into selectors,
+concatenations, dictionaries, or outputs. Focused identity, loading,
+same-DICE invalidation, and query suites passed 70 tests; formatting, archive
+integrity, and diff checks passed. Sol accepted both semantics and hot-path
+utility reuse without correction.
+
+Gate A may now reuse the comparison and duplicate helper for native suite
+members. String tags use native Rust byte ordering with duplicates retained.
+Strict policy, function activation, formatters, selector duplicate semantics,
+and malformed bytes remain separate.

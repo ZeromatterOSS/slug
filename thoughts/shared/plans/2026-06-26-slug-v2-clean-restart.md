@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 direct label-list prerequisite is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 direct label-list prerequisite is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` oracle now has 29 commands and labels metadata 39 through `57192df9`; total query-attribute explicitness and tests-loading designs Sol-accepted; exact target identity and package-context loading normalization accepted through `40ac1cd2`; three Gate A attempts closed `REPLAN`; valid BUILD strings match Rust UTF-8 byte order and structural/duplicate-label behavior is oracle-pinned | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, direct label-list duplicate rejection, structural label ordering, Gate A metadata implementation, strict policy/`tests()` activation, and remaining command breadth | implement structural comparison plus direct native/Starlark duplicate rejection before Gate A |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 tests-metadata Gate A retry is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 tests-metadata Gate A retry is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` oracle now has 29 commands and labels metadata 39 through `57192df9`; total query-attribute explicitness and tests-loading designs Sol-accepted; exact target identity, package-context normalization, structural label comparison, and direct duplicate rejection accepted through `5bbc4604`; three earlier Gate A attempts closed `REPLAN` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, Gate A metadata implementation, strict policy/`tests()` activation, and remaining command breadth | retry loading/query metadata Gate A only |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,28 +33,36 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Implement the accepted direct-list prerequisite against `57192df9`. Add one
-identity-owned, borrowed, allocation-free `CanonicalLabel` comparison method
-that compares canonical repository name, package path, then target name with
-native byte order and ignores `mapping_id`. Keep global derived `Ord`, `Eq`,
-and `Hash` unchanged; pin the display-order discriminator, BMP/supplementary
-target order, and equal canonical identity from different mapping provenance.
+Retry only the accepted `tests` loading/query metadata Gate A on top of
+`5bbc4604`. Add native `test_suite` with one invariant-safe membership
+representation: nonempty explicit `tests` is explicit membership; omitted and
+explicit-empty both use implicit same-package membership with an orthogonal
+input-explicitness bit. Convert suite members with the accepted package-context
+helper, reject canonical duplicates with Bazel's diagnostic, then structurally
+sort labels using `bazel_natural_cmp`. Derived implicit members use the same
+ordering. Sort order-independent tag strings with native UTF-8 byte order and
+preserve duplicate strings.
 
-Reject post-conversion duplicates in native `filegroup.srcs` and direct
-unconditional Starlark `label_list` values, including defaults materialized
-for a rule. Compare canonical identity rather than raw spelling or
-`CanonicalLabel` provenance. Match Bazel's diagnostic core:
-`Label '<label>' is duplicated in the '<attribute>' attribute of rule
-'<rule>'`. Replace the retained duplicate-preservation regressions with exact
-failure and same-DICE recovery coverage. Preserve nonduplicate input order;
-these attributes are not order-independent.
+Retain common `tags=[]` on every Starlark rule and test-only `size="medium"`.
+Derive test tags, size, and manual state from retained typed values. Extend the
+unconfigured graph once to project exact test/suite capability, scalar metadata,
+distinct `tests` and `$implicit_tests` attributes, and ordinary suite edges.
+`QueryAttribute.explicit` has total Bazel
+`isAttributeValueExplicitlySpecified` meaning: native filegroup retains its
+input bit, alias `actual` is true, Starlark Explicit is true while
+Default/Implicit are false, suite `tests` uses its input bit, and materialized
+`$implicit_tests` is true. Preserve label-list storage separately from ordinary
+edge deduplication. Keep the corrected `-+tag` exclusion behavior.
 
-Do not validate across selectors or concatenated selector permutations, sort
-filegroup/Starlark label lists, alter other label-bearing types, change global
-identity ordering, add malformed-byte support, restore test metadata, activate
-`tests()`, plumb strict mode, edit formatters, or add a DICE key/lock. Gate A
-will reuse the comparator and duplicate helper for native suite members after
-this prerequisite is accepted.
+Strengthen focused loading, same-DICE create/edit/error/recover/delete/recreate,
+and query graph tests before implementation. Use the existing package-load and
+graph DICE keys and V2 compact/Arc storage only.
+
+Do not activate `tests()`, add strict-suite request policy, edit build/proto
+formatters, add repository mapping or filesystem discovery, validate selector
+duplicate permutations, change global identity ordering, or import V1/Buck
+test semantics. Stop on a representation conflict rather than extending the
+packet.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.
