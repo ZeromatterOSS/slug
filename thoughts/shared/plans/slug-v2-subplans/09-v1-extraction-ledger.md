@@ -1458,3 +1458,8 @@ oracle discriminators before implementation—nested filter isolation,
 filter-before-uniqueness, and literal `-+tag`. No V1/Buck test evaluator or
 error taxonomy is authorized by this `REPLAN`; the next packet changes only
 the Bazel fixture.
+
+Commit `1edb2775` accepts the three source-critical Bazel rows without changing
+the extraction decision. The future activation remains V2 generic evaluator
+and request-local policy work; Buck2 contributes only compact set/worklist
+shapes, and V1 test-suite evaluation remains rejected.

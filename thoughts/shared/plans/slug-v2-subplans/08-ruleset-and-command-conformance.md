@@ -2633,3 +2633,18 @@ design is reviewed again. Error work is narrowed: lookup retains crate-private
 missing-target versus package-loading detail, the function adds exact
 suite/attribute or strict text, and no unused public/general failure-code API
 is introduced.
+
+## Source-critical `tests()` oracle discriminators accepted (2026-07-23)
+
+Commit `1edb2775` extends `tests-query-expansion` from 29 to 32 Bazel 9.2.0
+commands. One isolated package now proves that parent filters do not propagate
+to nested suites, an excluded direct route does not consume global test
+uniqueness before a valid nested route, and `-+tag` excludes literal `+tag`
+rather than `tag`. Each wrong algorithm yields an empty or different
+single-label result.
+
+Worker generation and clean verification passed, and root independently passed
+run `20260723-144341-1175813-bazel`. All original 29 command definitions and
+expected records remain unchanged; Sol-low returned `ACCEPT`. The corrected
+activation design may now be re-reviewed. Its eventual Slug gate is 27
+non-build rows; five exact build-format rows remain Bazel-only evidence.
