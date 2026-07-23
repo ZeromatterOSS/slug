@@ -451,11 +451,12 @@ in this plan, Stage 0, Stage 9, and `V1_ARCHIVE.md`, not in the prompt.
 
 ## Reviewed Next M3 Direction: Build and Load Files (2026-07-23)
 
-Status: Gate A is accepted, and B1 core activation landed in `ba457999`.
-Gate B remains incomplete: B1.5 still owes exhaustive text-oracle and
-retained-daemon evidence, while the seven factored-graph rows require the separately
-reviewed B2 formatter/protocol packet. The 64-row fixture is not yet accepted
-under Slug.
+Status: Gate A, B1 core, and B1.5 are accepted. B1.5 landed exact load
+diagnostics in `4428df22`, recoverable DICE load-cycle handling in `237e7cac`,
+and the exhaustive non-graph CLI/retained-daemon evidence in `d25bc8c0`.
+Gate B remains incomplete solely on the separately reviewed B2
+formatter/protocol packet and its seven graph rows. The full 64-row fixture is
+not yet accepted under Slug.
 
 M3 began with nine deferred ordinary loading-query functions. The reviewed
 parent
@@ -583,7 +584,23 @@ For B1, the Terra-high worker and root independently passed
 `slug_commands_v2`, `slug_server_v2`, and `slug_cli_v2` suite: 11 command,
 12 server, and 14 CLI tests, with zero doc tests. Sol-low final review returned
 `ACCEPT`. Root removed one transient candidate-package `String` allocation
-before the final tests. This is not the Gate B acceptance point: B1.5 must still prove the
-exhaustive text rows and retained-daemon behavior, and B2 must implement both
-factored and unfactored structural graph rendering without reevaluation before
-the 64-row fixture can be accepted.
+before the final tests.
+
+`4428df22` gives missing loads Bazel's
+`cannot load '<label>': no such file` diagnostic and appends
+`compilation of module '<path>' failed` to malformed `.bzl` errors.
+`237e7cac` adapts Buck2's lazy cycle-detector pattern into a request-scoped
+DICE user detector for `BzlModuleEvalKey`. Its typed result retains both the
+acyclic BUILD-to-cycle path and the cycle, renders Bazel's multi-node and
+self-edge diagram, poisons the cycle computation so a repair invalidates it,
+and proves same-DICE recovery plus a non-cycle diamond. Sol-low required the
+blocking path-to-cycle result and returned `ACCEPT`.
+
+`d25bc8c0` accepts B1.5: one CLI regression matches all 57 non-graph oracle
+rows exactly, including exit/stdout/stderr behavior, and retained-daemon tests
+cover leaf edits, direct/transitive edge switch-delete-recreate, and companion
+BUILD priority without over-invalidating `loadfiles`. The full CLI suite passed
+14 integration plus 1 unit test; the server suite passed 14 tests; Sol-low
+returned `ACCEPT`. B2 must still implement both factored and unfactored
+structural graph rendering without reevaluation. Its seven rows are the sole
+Gate B residual, so the 64-row fixture remains unaccepted.

@@ -1732,10 +1732,11 @@ The worker Slug gate passed 91/91 and six fixtures passed 176/176 at
 
 ### Reviewed next packet: `WP-4-8-m3-build-load-files`
 
-Status: Gate A accepted in `791e26b2`; B1 query-core activation landed in
-`ba457999`, but Gate B remains incomplete. B1.5 still owes exhaustive
-text-oracle and retained-daemon evidence, and seven factored-graph rows await the
-separately reviewed B2 packet. The full 64-row fixture is not yet accepted.
+Status: Gate A, B1 query core, and B1.5 are accepted in `791e26b2`,
+`ba457999`, and `d25bc8c0`; the diagnostic and cycle prerequisites landed in
+`4428df22` and `237e7cac`. Gate B remains incomplete solely because the seven
+graph rows await the separately reviewed B2 packet. The full 64-row fixture is
+not yet accepted.
 
 The parent packet has two acceptance gates and one oracle-first artifact:
 
@@ -1745,7 +1746,7 @@ The parent packet has two acceptance gates and one oracle-first artifact:
    registry remains deferred.
 2. Gate B activates exactly `buildfiles(EXPR)` and `loadfiles(EXPR)` after A
    receives Sol acceptance. B1 has now made that core activation without
-   admitting any other function; B1.5 and B2 remain acceptance requirements.
+   admitting any other function; B1.5 is accepted and B2 remains.
 3. Before either gate, create one combined generated Bazel 9.2 fixture. It is
    the proof for both the substrate and eventual command activation.
 
@@ -1835,10 +1836,9 @@ fake-left survivor was unmatched transitive `two.bzl`, not asymmetric
 real/fake semantics. Fake nodes are zero-edge; direct FULL
 `buildfiles` omits the selected real package BUILD unless another graph
 observer materializes it, while `deps(buildfiles(...))` includes result nodes.
-This oracle evidence is partially realized by Gate A plus B1 core. Exactly
-`buildfiles` and `loadfiles` are active and seven ordinary functions remain
-deferred, but the exhaustive text/retained-daemon and graph-output evidence
-still blocks Gate B acceptance.
+Gate A, B1, and B1.5 now realize every non-graph row. Exactly `buildfiles` and
+`loadfiles` are active and seven ordinary functions remain deferred. The seven
+graph-output rows alone still block Gate B acceptance.
 
 #### Gate A Stage 4 half evidence (2026-07-23)
 
@@ -1902,10 +1902,42 @@ The Terra-high worker and root independently passed
 post-final-review rework was required. Root also removed one transient
 candidate-package `String` allocation before the final tests.
 
-Gate B remains incomplete. B1.5 must still run and record the exhaustive
-text-oracle and retained-daemon matrix. B2 remains pending for the seven
-`--output=graph --graph:factored` rows; its approved boundary requires both
+#### B1.5 diagnostics and recursive-load prerequisite landed (2026-07-23)
+
+Commit `4428df22` matches Bazel's missing-load
+`cannot load '<label>': no such file` form and malformed-module compilation
+summary while preserving the underlying parse diagnostic. Commit `237e7cac`
+then adapts Buck2's lazy cycle-detector design as a request-scoped DICE
+`UserCycleDetector` installed only on loading-capable transactions. It records
+only `BzlModuleEvalKey` edges and returns a typed acyclic path plus cycle;
+loading renders the Bazel BUILD-origin, multi-node, and `[self-edge]` diagrams.
+An always-invalid poison dependency prevents a detected cycle from becoming a
+reusable success/failure value, so repairing the edge recovers in the same
+DICE instance.
+
+Focused loading evidence covers missing and malformed loads, two-node and
+self cycles, an acyclic BUILD-to-cycle prefix, a shared-leaf diamond that must
+not be classified as a cycle, timeout-bounded release of recursive waits, and
+same-DICE repair. Sol-low blocked the first cycle shape because it discarded
+the path leading to the cycle; the typed path-plus-cycle correction landed
+before final `ACCEPT`.
+
+#### B1.5 exhaustive text and retained-daemon evidence landed (2026-07-23)
+
+Commit `d25bc8c0` adds one exact CLI matrix for all 57 non-graph rows in
+`query-build-load-files-provenance`, checking raw stdout, empty success stderr,
+failure exit codes, diagnostics, and empty failure stdout. The full CLI suite
+passed 14 integration plus 1 unit test.
+
+Two retained-daemon regressions cover load-leaf edits; direct and transitive
+load-edge switch/delete/recreate; BUILD-to-BUILD.bazel companion priority; and
+the fact that companion changes invalidate `buildfiles` without changing
+`loadfiles`. Exact invalidated-file counts are asserted. The server suite
+passed 14 tests, and Sol-low's exact-set final review returned `ACCEPT`.
+
+Gate B remains incomplete solely on B2's seven
+`--output=graph --graph:factored` rows. Its approved boundary requires both
 true and false factoring, Bazel's minimal always-quoted label serialization
 without a general DOT escaper, and a structural selected graph carried to the
-renderer without reevaluation. Do not mark the 64-row fixture accepted until
-both residuals pass.
+renderer without reevaluation. Do not mark the full 64-row fixture accepted
+until B2 passes.

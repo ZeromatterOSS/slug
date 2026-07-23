@@ -1015,10 +1015,11 @@ accepted Slug semantics in this packet.
 
 ### Stage 4/8 load-provenance and fake-target packet — reviewed extraction plan
 
-Status: Gate A and B1 query-core activation are accepted in `791e26b2` and
-`ba457999`, respectively. Gate B remains incomplete: B1.5 still owes exhaustive
-text-oracle and retained-daemon evidence, and the separately reviewed B2 graph
-packet still owes seven factored rows. The 64-row fixture is not yet accepted.
+Status: Gate A, B1 query-core activation, and B1.5 are accepted in `791e26b2`,
+`ba457999`, and `d25bc8c0`; diagnostics and cycle recovery landed in
+`4428df22` and `237e7cac`. Gate B remains incomplete solely on the separately
+reviewed B2 graph packet and its seven rows. The 64-row fixture is not yet
+accepted.
 
 Parent: `WP-4-8-m3-build-load-files`. Gate A is a V2-owned
 `load-provenance-fake-target-substrate`; Gate B activates only `buildfiles`
@@ -1086,8 +1087,8 @@ an asymmetric real/fake operation. Factored FULL
 (`--output=graph --graph:factored`) confirms zero fake edges and forbids
 synthetic projection edges. Gate A and the B1 query core now implement this
 boundary. Exactly `buildfiles` and `loadfiles` are active, seven ordinary
-functions remain deferred, and Gate B acceptance still awaits B1.5 downstream
-evidence plus B2 graph output.
+functions remain deferred, and Gate B acceptance now awaits only B2 graph
+output.
 
 #### Stage 4 Gate A half landed (2026-07-23)
 
@@ -1154,9 +1155,39 @@ printed-package/owner/separate-set/absolute-companion corrections were made
 live before final review, with no post-final-review rework. Root also removed
 one transient candidate-package `String` allocation before the final tests.
 
-This is B1 core evidence, not Gate B completion. B1.5 must still supply
-exhaustive text-oracle and retained-daemon evidence. The pending, separately
-approved B2 must carry a structural selected graph without reevaluation,
-implement both factored and unfactored modes, and match Bazel's minimal
-always-quoted labels without a general DOT escaper for the seven graph rows.
-Until both land, the shared 64-row fixture remains unaccepted.
+#### B1.5 diagnostic and cycle extraction landed (2026-07-23)
+
+Commit `4428df22` ports Bazel-observed diagnostic shape, not Java loading
+machinery: missing loads name the canonical load label and malformed `.bzl`
+files retain the parse error plus Bazel's module-compilation summary.
+
+Commit `237e7cac` selectively adapts Buck2's
+`buck2_util::cycle_detector::LazyCycleDetector` pattern. The result is a
+request-scoped DICE user detector, installed per loading transaction, that
+tracks only `BzlModuleEvalKey` start/finish/edge events in compact
+`SmallMap`/`SmallSet` state. Its typed `BzlLoadCycle` separates the acyclic
+path from the cycle so the Bazel BUILD-origin, multi-node, and self-edge
+diagrams can be rendered exactly. A deliberately invalid poison dependency
+keeps the detected cycle from surviving an input repair.
+
+This is a utility-pattern extraction, not Buck identity, cell, label, or file
+semantics. Focused tests prove bounded release of recursive DICE waits,
+two-node/self-edge diagrams, preservation of the path into a cycle, a
+non-cycle diamond, and recovery after repair in the same DICE instance.
+Sol-low caught the blocking loss of the path-to-cycle segment; Terra-high
+corrected the typed result and final review returned `ACCEPT`.
+
+#### B1.5 downstream evidence landed (2026-07-23)
+
+Commit `d25bc8c0` accepts the exact 57-row non-graph CLI set, including raw
+success output and failure exit/stdout/stderr behavior. The full CLI suite
+passed 14 integration plus 1 unit test. Retained-daemon regressions cover leaf
+edits, direct/transitive edge switch-delete-recreate, companion BUILD priority,
+and `buildfiles` versus unaffected `loadfiles` invalidation with exact counts;
+the server suite passed 14 tests. Sol-low returned final `ACCEPT`.
+
+Gate B remains incomplete solely on B2. The pending packet must carry a
+structural selected graph without reevaluation, implement both factored and
+unfactored modes, and match Bazel's minimal always-quoted labels without a
+general DOT escaper for the seven graph rows. The shared 64-row fixture remains
+unaccepted until B2 passes.
