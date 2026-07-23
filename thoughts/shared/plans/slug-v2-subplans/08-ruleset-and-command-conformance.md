@@ -2767,3 +2767,25 @@ gate is 12 non-`visible()` rows; Stage 8 owns the remaining 22 future-Slug
 `visible()` rows and command activation. No new DICE key, V1 visibility
 registry, repository mapping, formatter, or alternate flag support enters the
 representation packet.
+
+## Stage 4 typed visibility graph accepted (2026-07-23)
+
+Commit `f9ae7337` lands the loading/query prerequisite. It retains typed
+effective and raw visibility, package-group direct contents and unresolved
+includes, exact producer provenance, a distinct query node kind, and one
+ordered tagged edge slice. Missing visibility/include destinations never
+synthesize source nodes; ordinary destinations still do. The implementation
+adds no recursive group evaluation, DICE key, registry, formatter, or command
+activation.
+
+The exact 12 non-`visible()` rows pass through a counted CLI table. Root also
+passed all 48 loading, 56 query, and 26 CLI/graph tests, rebuilt the CLI, and
+passed formatting, diff, and archive checks. Sol required one focused
+correction for `native.config_setting` in loaded macros, then returned final
+`ACCEPT`.
+
+The next packet is design-only for the remaining 22 future-Slug rows. It must
+place universal caller filtering and iterative group resolution in the generic
+function/request-local loading accessor, retain exact missing versus wrong-kind
+behavior and per-walk cycle suppression, and reuse the existing DICE package
+graphs. The final two flag-structure rows stay Bazel-only.

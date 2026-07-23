@@ -759,3 +759,31 @@ graph/loading-environment projection, and their focused loading, invalidation,
 query, and CLI-table tests. No new DICE key, global registry/interner, V1
 semantics, repository mapping, formatter, generic evaluator, or command
 activation is authorized.
+
+### Stage 4 visibility representation accepted
+
+Commit `f9ae7337` implements the accepted representation without activating
+`visible()`. Loading now retains immutable `Allocative` public/private/
+restricted visibility, direct exact/subtree positive and negative package
+contents, ordered unresolved group/include labels, first-class package groups,
+and declared/package-default/generating-rule/always-public provenance.
+Ordinary and Starlark rules, native and macro `config_setting`, exports,
+source/BUILD nodes, generated outputs, and package groups follow the pinned
+producer defaults. Compact persisted state uses `SmallSet` and shared slices;
+no registry, interner, lock, or new DICE key was added.
+
+The unconfigured query graph projects effective visibility, raw rule
+visibility attributes, distinct package-group nodes and direct contents, plus
+one ordered tagged edge slice. Rule visibility precedes ordinary edges,
+generators precede inherited visibility, package-group includes retain order,
+and only ordinary edges synthesize implicit source nodes. Group labels and
+includes remain unresolved; recursive lookup, wrong-kind handling,
+missing-target diagnostics, and cycle state remain Stage 8 work.
+
+Root passed all 48 loading tests, all 56 query tests, the exact counted
+12-command Stage 4 CLI gate, all 26 CLI/graph tests, a fresh
+`slug_cli_v2` build, formatting, diff, and archive checks. Same-DICE tests cover
+semantic equality, visibility and package-group edits, definition deletion,
+and recreation. Sol's one correction added the missing
+`native.config_setting` macro producer and its omitted-public versus
+explicit-restricted regression; final review returned `ACCEPT`.

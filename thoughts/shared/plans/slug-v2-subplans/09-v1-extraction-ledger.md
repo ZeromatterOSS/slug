@@ -1528,3 +1528,14 @@ include cycles remain graph data; Stage 8's future request-local accessor owns
 iterative cross-package resolution, diagnostics, and per-walk cycle state. No
 V1 registry, string-pattern semantics, fallback, group evaluator, DICE owner,
 or query-command implementation is imported.
+
+Commit `f9ae7337` accepts the V2-owned representation with compact immutable
+sets/slices and the existing package/query DICE owners. No V1 visibility
+registry, target-pattern parser, permissive fallback, recursive evaluator,
+global lock, or command implementation was imported. The only extracted shape
+remains the already approved Buck-derived compact collection pattern.
+
+Stage 8 may now design request-local iterative resolution and generic
+`visible()` filtering against the 22 accepted rows. That future work must
+consume the typed V2 graph and retain per-walk state locally; it must not
+revive V1 ownership or semantics.
