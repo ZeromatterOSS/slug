@@ -1015,17 +1015,16 @@ accepted Slug semantics in this packet.
 
 ### Stage 4/8 load-provenance and fake-target packet — reviewed extraction plan
 
-Status: Gate A, B1 query-core activation, and B1.5 are accepted in `791e26b2`,
-`ba457999`, and `d25bc8c0`; diagnostics and cycle recovery landed in
-`4428df22` and `237e7cac`. Gate B remains incomplete solely on the separately
-reviewed B2 graph packet and its seven rows. The 64-row fixture is not yet
-accepted.
+Status: Gate A and Gate B are accepted. Gate A, B1 query-core activation, and
+B1.5 landed in `791e26b2`, `ba457999`, and `d25bc8c0`; diagnostics and cycle
+recovery landed in `4428df22` and `237e7cac`. B2 landed in `cb514747`,
+accepting its seven graph rows and the complete 64-row fixture.
 
 Parent: `WP-4-8-m3-build-load-files`. Gate A is a V2-owned
 `load-provenance-fake-target-substrate`; Gate B activates only `buildfiles`
 and `loadfiles` after A acceptance. One combined Bazel 9.2 oracle fixture is
-required before either gate. This leaves nine deferred ordinary functions until
-B lands, then seven; exact Java regex and missing target metadata keep the
+required before either gate. B now leaves seven deferred ordinary functions;
+exact Java regex and missing target metadata keep the
 others deferred.
 
 | Candidate | Source / mode | Decision |
@@ -1186,8 +1185,27 @@ edits, direct/transitive edge switch-delete-recreate, companion BUILD priority,
 and `buildfiles` versus unaffected `loadfiles` invalidation with exact counts;
 the server suite passed 14 tests. Sol-low returned final `ACCEPT`.
 
-Gate B remains incomplete solely on B2. The pending packet must carry a
-structural selected graph without reevaluation, implement both factored and
-unfactored modes, and match Bazel's minimal always-quoted labels without a
-general DOT escaper for the seven graph rows. The shared 64-row fixture remains
-unaccepted until B2 passes.
+#### Stage 8 Gate B B2 graph presentation landed (2026-07-23)
+
+Commit `cb514747` completes Gate B without importing V1 query evaluation,
+graph identity, or serialization code. The V2 evaluator retains a compact
+request-local structural selected graph in `QueryOutput`; the CLI and daemon
+format it without reevaluation or DICE access. The implementation selectively
+uses Buck2-derived checked-`u32`, compact-map/set, deterministic-graph, and
+presentation-separation lessons while keeping Bazel 9's semantics
+authoritative.
+
+Both factored and unfactored modes are implemented. Factoring requires equal
+predecessor and successor sets and deduplicates quotient edges. Ordering
+matches Bazel's lexicographical member-label sequence comparator and reverse
+DFS postorder; a regression proves that a factored `//a:a\\n//z:z` class is
+not ordered by its joined DOT spelling against `//a:a0`. Serialization remains
+Bazel's narrow always-quoted spelling, not a general DOT escaper.
+
+All seven graph rows now pass exactly, so the shared 64-row fixture is
+accepted. Root also passed four focused formatter tests, explicit unfactored
+coverage, and the serialized four-crate suite: 12 command, 14 query unit, 18
+loading-query, 6 parser/registry, 15 server, 14 existing CLI integration, 2
+graph integration, and 1 CLI unit tests. Sol-low returned final `ACCEPT`.
+Seven ordinary query functions remain deferred; B2 adds no new function,
+DICE key, filesystem boundary, or global state.

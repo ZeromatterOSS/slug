@@ -1727,16 +1727,16 @@ The worker Slug gate passed 91/91 and six fixtures passed 176/176 at
 `040407-626548`, `040411-626572`, `040414-626601`, `040418-626692`,
 `040423-626782`, and `040427-626870`; root independently repeated them at
 `040534-628098`, `040540-628123`, `040546-628189`, `040549-628247`,
-`040554-628339`, and `040558-628428`. M3 now has nine deferred functions.
+`040554-628339`, and `040558-628428`. At that checkpoint M3 had nine deferred
+functions; Gate B now leaves seven.
 `filter` remains deferred pending exact Java `Pattern` parity.
 
 ### Reviewed next packet: `WP-4-8-m3-build-load-files`
 
-Status: Gate A, B1 query core, and B1.5 are accepted in `791e26b2`,
-`ba457999`, and `d25bc8c0`; the diagnostic and cycle prerequisites landed in
-`4428df22` and `237e7cac`. Gate B remains incomplete solely because the seven
-graph rows await the separately reviewed B2 packet. The full 64-row fixture is
-not yet accepted.
+Status: Gate A and Gate B are accepted. Gate A, B1 query core, and B1.5 landed
+in `791e26b2`, `ba457999`, and `d25bc8c0`; the diagnostic and cycle
+prerequisites landed in `4428df22` and `237e7cac`. B2 landed in `cb514747`,
+accepting the seven graph rows and the complete 64-row fixture.
 
 The parent packet has two acceptance gates and one oracle-first artifact:
 
@@ -1745,8 +1745,9 @@ The parent packet has two acceptance gates and one oracle-first artifact:
    request-local fake-target identity and consumer ownership. The function
    registry remains deferred.
 2. Gate B activates exactly `buildfiles(EXPR)` and `loadfiles(EXPR)` after A
-   receives Sol acceptance. B1 has now made that core activation without
-   admitting any other function; B1.5 is accepted and B2 remains.
+   receives Sol acceptance. B1 made that core activation without admitting any
+   other function; B1.5 and B2 complete the downstream evidence and graph
+   presentation boundary.
 3. Before either gate, create one combined generated Bazel 9.2 fixture. It is
    the proof for both the substrate and eventual command activation.
 
@@ -1935,9 +1936,29 @@ the fact that companion changes invalidate `buildfiles` without changing
 `loadfiles`. Exact invalidated-file counts are asserted. The server suite
 passed 14 tests, and Sol-low's exact-set final review returned `ACCEPT`.
 
-Gate B remains incomplete solely on B2's seven
-`--output=graph --graph:factored` rows. Its approved boundary requires both
-true and false factoring, Bazel's minimal always-quoted label serialization
-without a general DOT escaper, and a structural selected graph carried to the
-renderer without reevaluation. Do not mark the full 64-row fixture accepted
-until B2 passes.
+#### Gate B B2 graph output landed (2026-07-23)
+
+Commit `cb514747` completes Gate B and accepts all 64
+`query-build-load-files-provenance` rows. The evaluator retains one compact
+request-local selected graph in `QueryOutput`; both one-shot CLI and
+retained-daemon paths format that same value without reevaluation, DICE reads,
+or global state. Old daemon clients deserialize to text output with factoring
+enabled.
+
+The command surface accepts Bazel's omitted, bare, explicit boolean, and
+negated `--graph:factored` forms, rejects unsupported graph limits, and keeps
+the default 512-node label limit. The formatter implements factored and
+unfactored output, exact predecessor/successor equivalence, quotient-edge
+deduplication, minimal always-quoted DOT labels, and Bazel's sorted DFS
+postorder reversal. With sorting enabled, factored class IDs are ranks of the
+lexicographical member-label sequence comparator; joined rendered labels are
+never used as the comparator. A focused `//a:a\\n//z:z` versus `//a:a0`
+regression protects that distinction.
+
+Root passed formatting, four focused formatter tests, the seven exact graph
+oracle rows, explicit unfactored coverage, and the serialized four-crate
+suite: 12 command, 14 query unit, 18 loading-query, 6 parser/registry, 15
+server, 14 existing CLI integration, 2 graph integration, and 1 CLI unit
+tests. Sol-low's focused correction review returned `ACCEPT`. Exactly
+`buildfiles` and `loadfiles` are active; seven ordinary loading-query
+functions remain deferred.

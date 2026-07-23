@@ -451,12 +451,11 @@ in this plan, Stage 0, Stage 9, and `V1_ARCHIVE.md`, not in the prompt.
 
 ## Reviewed Next M3 Direction: Build and Load Files (2026-07-23)
 
-Status: Gate A, B1 core, and B1.5 are accepted. B1.5 landed exact load
-diagnostics in `4428df22`, recoverable DICE load-cycle handling in `237e7cac`,
-and the exhaustive non-graph CLI/retained-daemon evidence in `d25bc8c0`.
-Gate B remains incomplete solely on the separately reviewed B2
-formatter/protocol packet and its seven graph rows. The full 64-row fixture is
-not yet accepted under Slug.
+Status: Gate A and Gate B are accepted. B1.5 landed exact load diagnostics in
+`4428df22`, recoverable DICE load-cycle handling in `237e7cac`, and exhaustive
+non-graph CLI/retained-daemon evidence in `d25bc8c0`. B2 landed the reviewed
+formatter/protocol boundary in `cb514747`; all 64 rows of the shared Bazel 9.2
+fixture are now accepted under Slug.
 
 M3 began with nine deferred ordinary loading-query functions. The reviewed
 parent
@@ -518,8 +517,8 @@ package loading only `//shared:two.bzl`. Update `051423-694832`, Terra clean
 `051521-700085`, and root clean `051644-705470` passed; Sol-low returned final
 `ACCEPT`. At that oracle checkpoint, nine functions remained deferred and
 neither implementation gate had landed. Gate A subsequently landed in
-`791e26b2`, and B1 core activation landed in `ba457999`; Gate B is not yet
-accepted. The oracle proves selected active
+`791e26b2`, B1 core activation landed in `ba457999`, and B2 completed Gate B
+in `cb514747`. The oracle proves selected active
 BUILD/transitive-load/active-companion `buildfiles`, loads-only `loadfiles`,
 fallback/dual/diamond/multi-package/empty/idempotent/deps/failure cases, and
 broken companion discovery without package loading.
@@ -557,8 +556,8 @@ synthetic projection edge is allowed.
 
 Stage 4 half evidence landed in `b0670e33` (`feat: retain load provenance
 manifests`), and Stage 8 completes Gate A in `791e26b2` (`feat: add fake target
-provenance algebra`). B1 core landed in `ba457999`; seven ordinary functions
-remain deferred, and Gate B is still incomplete. Public
+provenance algebra`). B1 core landed in `ba457999`; B2 completed Gate B in
+`cb514747`, and seven ordinary functions remain deferred. Public
 `BzlLoadManifest`/`BzlModuleIdentity` retain canonical
 label/normalized path, source-order label-first direct IDs, first-seen closure,
 and `[u8; 32]` SHA-256 fingerprint. `LoadedPackage` equality now includes
@@ -601,6 +600,25 @@ rows exactly, including exit/stdout/stderr behavior, and retained-daemon tests
 cover leaf edits, direct/transitive edge switch-delete-recreate, and companion
 BUILD priority without over-invalidating `loadfiles`. The full CLI suite passed
 14 integration plus 1 unit test; the server suite passed 14 tests; Sol-low
-returned `ACCEPT`. B2 must still implement both factored and unfactored
-structural graph rendering without reevaluation. Its seven rows are the sole
-Gate B residual, so the 64-row fixture remains unaccepted.
+returned `ACCEPT`.
+
+`cb514747` accepts B2 and the complete 64-row fixture. `QueryOutput` retains a
+request-local structural selected graph from the evaluation that produced the
+labels; one-shot and retained-daemon presentation format that value without
+reevaluation or a DICE read. The command/protocol surface supports Bazel's
+default factored graph mode, explicit true/false and negated factoring, and
+the fixed 512-node label limit. Factoring uses exact predecessor and successor
+sets, quotient-edge deduplication, Bazel's lexicographical member-sequence
+class comparator, reverse-postorder graph visitation, and minimal
+always-quoted DOT labels. A dedicated regression distinguishes member-sequence
+ordering from the incorrect joined-label ordering at a literal `\\n`
+boundary.
+
+Root passed `cargo fmt --all -- --check`, the four focused graph formatter
+tests, the exact seven-row CLI graph matrix plus unfactored coverage, and the
+serialized `slug_commands_v2`/`slug_query_v2`/`slug_server_v2`/`slug_cli_v2`
+suite: 12 command, 14 query unit, 18 loading-query, 6 parser/registry, 15
+server, 14 existing CLI integration, 2 graph integration, and 1 CLI unit
+tests. Sol-low accepted the final comparator correction. Gate B is complete;
+the next M3 packet must address one of the seven still-deferred ordinary query
+functions rather than extending this formatter.
