@@ -18,7 +18,6 @@ use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackageIdentifier;
 use starlark::any::ProvidesStaticType;
-use starlark::environment::FrozenModule;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -44,6 +43,8 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
 
+use crate::bzl_module::BzlModuleIdentity;
+use crate::bzl_module::FrozenBzlLifetimeEntry;
 use crate::glob::GlobSpec;
 use crate::glob::PackageListing;
 use crate::glob::expand_glob;
@@ -67,9 +68,14 @@ pub struct LoadedPackage {
     pub default_visibility: Vec<String>,
     pub targets: Vec<PackageTarget>,
     pub used_globs: Vec<GlobSpec>,
+    /// Ordered label-first direct `.bzl` roots for this BUILD evaluation.
+    pub direct_load_roots: Arc<[BzlModuleIdentity]>,
+    /// Flat label-first first-seen closure of all direct roots.
+    pub reachable_loads: Arc<[BzlModuleIdentity]>,
+    /// SHA-256 over ordered direct semantic roots and their fingerprints.
+    pub load_fingerprint: [u8; 32],
     #[allow(dead_code)] // Ownership only; frozen rule values borrow these heaps.
-    #[allocative(skip)]
-    retained_bzl_modules: Vec<FrozenModule>,
+    retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
 }
 
 impl PartialEq for LoadedPackage {
@@ -79,6 +85,9 @@ impl PartialEq for LoadedPackage {
             && self.default_visibility == other.default_visibility
             && self.targets == other.targets
             && self.used_globs == other.used_globs
+            && self.direct_load_roots == other.direct_load_roots
+            && self.reachable_loads == other.reachable_loads
+            && self.load_fingerprint == other.load_fingerprint
     }
 }
 
@@ -233,7 +242,10 @@ impl PackageRecorder {
         self,
         package_dir: PathBuf,
         build_file: PathBuf,
-        retained_bzl_modules: Vec<FrozenModule>,
+        direct_load_roots: Arc<[BzlModuleIdentity]>,
+        reachable_loads: Arc<[BzlModuleIdentity]>,
+        load_fingerprint: [u8; 32],
+        retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
     ) -> LoadedPackage {
         let state = self.state.into_inner();
         LoadedPackage {
@@ -246,6 +258,9 @@ impl PackageRecorder {
                 .map(|(name, kind)| PackageTarget { name, kind })
                 .collect(),
             used_globs: state.used_globs,
+            direct_load_roots,
+            reachable_loads,
+            load_fingerprint,
             retained_bzl_modules,
         }
     }

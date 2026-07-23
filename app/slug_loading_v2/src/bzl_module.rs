@@ -23,11 +23,13 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_identity_v2::CanonicalLabel;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
+use starlark_map::small_set::SmallSet;
 
 use crate::glob::PackageListing;
 use crate::keys::BzlModuleEvalKey;
@@ -62,6 +64,39 @@ pub struct BzlModuleEvaluator {
 pub struct EvaluatedBzlModule {
     pub path: PathBuf,
     pub loads: Vec<String>,
+    pub manifest: BzlLoadManifest,
+}
+
+/// Stable identity for one local `.bzl` module in a workspace.
+///
+/// `label` is the canonical root-repository label and `workspace_path` is the
+/// normalized absolute path DICE evaluated.  The value intentionally carries
+/// no evaluator handle, so it can be used at semantic equality boundaries.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct BzlModuleIdentity {
+    pub label: CanonicalLabel,
+    pub workspace_path: PathBuf,
+}
+
+/// Flat, immutable loading provenance for one evaluated `.bzl` root.
+///
+/// Direct children retain source order with label-first deduplication.
+/// `reachable` is a label-first, first-seen closure and is
+/// deliberately flat: consumers do not need to walk an `Arc` DAG to compare
+/// the loading semantics.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct BzlLoadManifest {
+    pub root: BzlModuleIdentity,
+    pub direct_children: Arc<[BzlModuleIdentity]>,
+    pub reachable: Arc<[BzlModuleIdentity]>,
+    pub fingerprint: [u8; 32],
+}
+
+/// Parse-independent discovery result for a package's active BUILD basename.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct BuildFileCompanion {
+    pub label: CanonicalLabel,
+    pub path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -316,26 +351,89 @@ async fn observed_file(
 pub struct ParsedBzl {
     source: String,
     loads: Vec<String>,
-    source_digest: String,
+    source_digest: [u8; 32],
 }
 
-#[derive(Allocative, Clone)]
+#[derive(Debug, Allocative, Clone)]
 #[doc(hidden)]
 pub struct FrozenBzlModule {
     #[allocative(skip)]
     module: FrozenModule,
     path: PathBuf,
     loads: Vec<String>,
-    fingerprint: String,
+    manifest: BzlLoadManifest,
+    /// Kept separately from `manifest`: frozen module pointers are lifetime
+    /// ownership, never semantic equality.
+    retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
+}
+
+/// Lifetime-only pairing kept structurally aligned with its identity.
+#[derive(Debug, Allocative, Clone)]
+pub(crate) struct FrozenBzlLifetimeEntry {
+    identity: BzlModuleIdentity,
+    #[allocative(skip)]
+    module: FrozenModule,
 }
 
 impl PartialEq for FrozenBzlModule {
     fn eq(&self, other: &Self) -> bool {
-        self.fingerprint == other.fingerprint
+        self.manifest == other.manifest
     }
 }
 
 impl Eq for FrozenBzlModule {}
+
+impl FrozenBzlModule {
+    fn lifetime_modules(&self) -> impl Iterator<Item = (&BzlModuleIdentity, FrozenModule)> {
+        std::iter::once((&self.manifest.root, self.module.dupe())).chain(
+            self.retained_bzl_modules
+                .iter()
+                .map(|entry| (&entry.identity, entry.module.dupe())),
+        )
+    }
+}
+
+impl BzlLoadManifest {
+    fn new(
+        root: BzlModuleIdentity,
+        source_digest: [u8; 32],
+        direct_modules: impl IntoIterator<Item = impl std::borrow::Borrow<FrozenBzlModule>>,
+    ) -> Self {
+        let direct_modules = direct_modules.into_iter().collect::<Vec<_>>();
+        let mut direct_indices = Vec::with_capacity(direct_modules.len());
+        let mut direct_children = Vec::with_capacity(direct_modules.len());
+        let mut direct_seen_labels = SmallSet::with_capacity(direct_modules.len());
+        for (index, module) in direct_modules.iter().enumerate() {
+            let identity = &module.borrow().manifest.root;
+            if direct_seen_labels.insert(identity.label.clone()) {
+                direct_children.push(identity.clone());
+                direct_indices.push(index);
+            }
+        }
+        let mut reachable = vec![root.clone()];
+        let mut seen_labels = SmallSet::with_capacity(direct_children.len() + 1);
+        seen_labels.insert(root.label.clone());
+        for module in &direct_modules {
+            for identity in module.borrow().manifest.reachable.iter() {
+                if seen_labels.insert(identity.label.clone()) {
+                    reachable.push(identity.clone());
+                }
+            }
+        }
+        let fingerprint = manifest_fingerprint(
+            source_digest,
+            direct_indices
+                .iter()
+                .map(|index| direct_modules[*index].borrow()),
+        );
+        Self {
+            root,
+            direct_children: direct_children.into(),
+            reachable: reachable.into(),
+            fingerprint,
+        }
+    }
+}
 
 type LoadResult<T> = Arc<Result<T, LoadingError>>;
 
@@ -390,6 +488,7 @@ impl BzlModuleEvaluator {
         Ok(EvaluatedBzlModule {
             path: module.path.clone(),
             loads: module.loads.clone(),
+            manifest: module.manifest.clone(),
         })
     }
 
@@ -414,16 +513,87 @@ impl BzlModuleEvaluator {
             .map_err(|error| anyhow::anyhow!(error.to_string()))
     }
 
-    fn ensure_package(&self, package: &Path) -> anyhow::Result<()> {
-        if !package.is_absolute() || !package.starts_with(&self.workspace) {
-            anyhow::bail!(
-                "package must be absolute and inside workspace {}: {}",
-                self.workspace.display(),
-                package.display()
-            );
-        }
-        Ok(())
+    /// Return the active BUILD companion for `package` using only its injected
+    /// direct-directory observation. This is deliberately parse-independent:
+    /// a broken companion BUILD file is still discoverable and no package load
+    /// is computed as a side effect.
+    pub async fn discover_build_file_companion(
+        &self,
+        transaction: &mut DiceTransaction,
+        package: impl AsRef<Path>,
+    ) -> anyhow::Result<Option<BuildFileCompanion>> {
+        let package = package.as_ref().to_path_buf();
+        self.ensure_package(&package)?;
+        let value = transaction
+            .compute(&WorkspaceDirectoryKey {
+                workspace: self.workspace.clone(),
+                directory: package.clone(),
+            })
+            .await
+            .map_err(|error| anyhow::anyhow!("reading package directory through DICE: {error}"))?;
+        companion_from_directory_value(&self.workspace, &package, &value)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
     }
+
+    fn ensure_package(&self, package: &Path) -> anyhow::Result<()> {
+        validate_normalized_workspace_package(&self.workspace, package)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
+    }
+}
+
+/// Discover a package's active BUILD companion using the existing
+/// `WorkspaceDirectoryKey` only. Missing directories and missing BUILD files
+/// are not errors for a load-label package, while observation read failures
+/// remain errors.
+pub async fn discover_build_file_companion(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+    package: &Path,
+) -> Result<Option<BuildFileCompanion>, LoadingError> {
+    validate_normalized_workspace_package(workspace, package)?;
+    let value = ctx
+        .compute(&WorkspaceDirectoryKey {
+            workspace: workspace.to_path_buf(),
+            directory: package.to_path_buf(),
+        })
+        .await
+        .map_err(|error| {
+            LoadingError::new(format!("reading package directory through DICE: {error}"))
+        })?;
+    companion_from_directory_value(workspace, package, &value)
+}
+
+fn companion_from_directory_value(
+    workspace: &Path,
+    package: &Path,
+    value: &WorkspaceDirectoryValue,
+) -> Result<Option<BuildFileCompanion>, LoadingError> {
+    let entries = match value {
+        WorkspaceDirectoryValue::Present(entries) => entries,
+        WorkspaceDirectoryValue::Absent => return Ok(None),
+        WorkspaceDirectoryValue::ReadError(error) => {
+            return Err(LoadingError::new(format!(
+                "reading package directory {}: {error}",
+                package.display()
+            )));
+        }
+    };
+    let Some(basename) = ["BUILD.bazel", "BUILD"].into_iter().find(|name| {
+        entries.iter().any(|entry| {
+            entry.name.as_str() == *name
+                && matches!(
+                    entry.kind,
+                    WorkspaceDirectoryEntryKind::RegularFile | WorkspaceDirectoryEntryKind::Symlink
+                )
+        })
+    }) else {
+        return Ok(None);
+    };
+    let path = package.join(basename);
+    Ok(Some(BuildFileCompanion {
+        label: canonical_root_label(&build_source_label(workspace, &path)?)?,
+        path,
+    }))
 }
 
 #[async_trait]
@@ -544,7 +714,7 @@ impl Key for BzlModuleEvalKey {
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
-            loaded_modules.push((load.as_str(), module));
+            loaded_modules.push((load.clone(), module));
         }
 
         Arc::new((|| {
@@ -555,14 +725,15 @@ impl Key for BzlModuleEvalKey {
             )
             .map_err(|error| LoadingError::new(error.to_string()))?;
             let module = Module::new();
-            let fingerprint = transitive_fingerprint(
-                &parsed.source_digest,
-                loaded_modules.iter().map(|(load, module)| (*load, module)),
+            let manifest = BzlLoadManifest::new(
+                bzl_module_identity(&self.workspace, &self.path)?,
+                parsed.source_digest,
+                loaded_modules.iter().map(|(_, module)| module),
             );
             let loader = LocalBzlLoader {
                 modules: loaded_modules
                     .iter()
-                    .map(|(load, module)| (*load, module.module.dupe()))
+                    .map(|(load, module)| (load.as_str(), module.module.dupe()))
                     .collect(),
             };
             let evaluation_context = BzlEvaluationContext::new(
@@ -584,7 +755,8 @@ impl Key for BzlModuleEvalKey {
                 module,
                 path: self.path.clone(),
                 loads: parsed.loads.clone(),
-                fingerprint,
+                retained_bzl_modules: retained_module_closure(&loaded_modules),
+                manifest,
             })
         })())
     }
@@ -677,7 +849,7 @@ impl Key for PackageLoadKey {
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
-            loaded_modules.push((load, module.module.dupe()));
+            loaded_modules.push((load, module));
         }
 
         Arc::new((|| {
@@ -703,7 +875,7 @@ impl Key for PackageLoadKey {
             let loader = LocalBzlLoader {
                 modules: loaded_modules
                     .iter()
-                    .map(|(load, module)| (load.as_str(), module.dupe()))
+                    .map(|(load, module)| (load.as_str(), module.module.dupe()))
                     .collect(),
             };
             {
@@ -714,13 +886,20 @@ impl Key for PackageLoadKey {
                     .eval_module(ast, &loading_globals())
                     .map_err(|error| LoadingError::new(error.to_string()))?;
             }
+            let direct_load_roots = first_seen_direct_roots(&loaded_modules);
+            let retained_bzl_modules = flattened_lifetime_closure(&loaded_modules);
+            let reachable_loads = retained_bzl_modules
+                .iter()
+                .map(|entry| entry.identity.clone())
+                .collect::<Vec<_>>();
+            let load_fingerprint = package_load_fingerprint(&loaded_modules);
             Ok(recorder.finish(
                 self.package.clone(),
                 build_file,
-                loaded_modules
-                    .iter()
-                    .map(|(_, module)| module.dupe())
-                    .collect(),
+                direct_load_roots.into(),
+                reachable_loads.into(),
+                load_fingerprint,
+                retained_bzl_modules.into(),
             ))
         })())
     }
@@ -799,6 +978,59 @@ fn bzl_source_label(workspace: &Path, path: &Path) -> Result<String, LoadingErro
     Ok(format!("//{package}:{target}"))
 }
 
+fn build_source_label(workspace: &Path, path: &Path) -> Result<String, LoadingError> {
+    bzl_source_label(workspace, path)
+}
+
+fn bzl_module_identity(workspace: &Path, path: &Path) -> Result<BzlModuleIdentity, LoadingError> {
+    Ok(BzlModuleIdentity {
+        label: canonical_root_label(&bzl_source_label(workspace, path)?)?,
+        workspace_path: path.to_path_buf(),
+    })
+}
+
+fn validate_normalized_workspace_package(
+    workspace: &Path,
+    package: &Path,
+) -> Result<(), LoadingError> {
+    if !workspace.is_absolute()
+        || !package.is_absolute()
+        || !package.starts_with(workspace)
+        || workspace.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::CurDir | std::path::Component::ParentDir
+            )
+        })
+        || has_cur_or_parent_component(workspace)
+        || package.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::CurDir | std::path::Component::ParentDir
+            )
+        })
+        || has_cur_or_parent_component(package)
+    {
+        return Err(LoadingError::new(format!(
+            "package must be a normalized absolute path inside workspace {}: {}",
+            workspace.display(),
+            package.display()
+        )));
+    }
+    Ok(())
+}
+
+fn has_cur_or_parent_component(path: &Path) -> bool {
+    path.as_os_str()
+        .as_encoded_bytes()
+        .split(|byte| *byte == b'/')
+        .any(|component| matches!(component, b"." | b".."))
+}
+
+fn canonical_root_label(label: &str) -> Result<CanonicalLabel, LoadingError> {
+    CanonicalLabel::parse(&format!("@@{label}")).map_err(LoadingError::new)
+}
+
 fn ensure_within_workspace(
     workspace: &Path,
     path: PathBuf,
@@ -812,21 +1044,82 @@ fn ensure_within_workspace(
     Ok(path)
 }
 
-fn digest(source: &str) -> String {
+fn digest(source: &str) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(source.as_bytes());
-    format!("{:x}", hasher.finalize())
+    hasher.finalize().into()
 }
 
-fn transitive_fingerprint<'a>(
-    source_digest: &str,
-    loaded_modules: impl IntoIterator<Item = (&'a str, &'a FrozenBzlModule)>,
-) -> String {
+fn manifest_fingerprint(
+    source_digest: [u8; 32],
+    direct_modules: impl IntoIterator<Item = impl std::borrow::Borrow<FrozenBzlModule>>,
+) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.update(source_digest.as_bytes());
-    for (load, module) in loaded_modules {
-        hasher.update(load.as_bytes());
-        hasher.update(module.fingerprint.as_bytes());
+    hasher.update(b"slug-v2-bzl-load-manifest\0");
+    hasher.update(source_digest);
+    for module in direct_modules {
+        let module = module.borrow();
+        fingerprint_identity(&mut hasher, &module.manifest.root);
+        hasher.update(module.manifest.fingerprint);
     }
-    format!("{:x}", hasher.finalize())
+    hasher.finalize().into()
+}
+
+fn package_load_fingerprint<'a>(direct_loads: &'a [(String, FrozenBzlModule)]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"slug-v2-package-load-manifest\0");
+    let mut seen_labels = SmallSet::with_capacity(direct_loads.len());
+    for (_, module) in direct_loads {
+        if seen_labels.insert(module.manifest.root.label.clone()) {
+            fingerprint_identity(&mut hasher, &module.manifest.root);
+            hasher.update(module.manifest.fingerprint);
+        }
+    }
+    hasher.finalize().into()
+}
+
+fn fingerprint_identity(hasher: &mut Sha256, identity: &BzlModuleIdentity) {
+    let label = identity.label.to_string();
+    let label = label.as_bytes();
+    let path = identity.workspace_path.as_os_str().as_encoded_bytes();
+    hasher.update((label.len() as u64).to_be_bytes());
+    hasher.update(label);
+    hasher.update((path.len() as u64).to_be_bytes());
+    hasher.update(path);
+}
+
+fn first_seen_direct_roots(loaded_modules: &[(String, FrozenBzlModule)]) -> Vec<BzlModuleIdentity> {
+    let mut seen_labels = SmallSet::with_capacity(loaded_modules.len());
+    loaded_modules
+        .iter()
+        .filter_map(|(_, module)| {
+            seen_labels
+                .insert(module.manifest.root.label.clone())
+                .then(|| module.manifest.root.clone())
+        })
+        .collect()
+}
+
+fn retained_module_closure(
+    loaded_modules: &[(String, FrozenBzlModule)],
+) -> Arc<[FrozenBzlLifetimeEntry]> {
+    flattened_lifetime_closure(loaded_modules).into()
+}
+
+fn flattened_lifetime_closure(
+    loaded_modules: &[(String, FrozenBzlModule)],
+) -> Vec<FrozenBzlLifetimeEntry> {
+    let mut seen_labels = SmallSet::new();
+    let mut entries = Vec::new();
+    for (_, loaded_module) in loaded_modules {
+        for (identity, module) in loaded_module.lifetime_modules() {
+            if seen_labels.insert(identity.label.clone()) {
+                entries.push(FrozenBzlLifetimeEntry {
+                    identity: identity.clone(),
+                    module,
+                });
+            }
+        }
+    }
+    entries
 }

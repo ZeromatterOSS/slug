@@ -18,8 +18,12 @@ pub mod package;
 #[doc(hidden)]
 pub mod provider;
 
+pub use bzl_module::BuildFileCompanion;
+pub use bzl_module::BzlLoadManifest;
 pub use bzl_module::BzlModuleEvaluator;
+pub use bzl_module::BzlModuleIdentity;
 pub use bzl_module::EvaluatedBzlModule;
+pub use bzl_module::discover_build_file_companion;
 pub use glob::GlobSpec;
 pub use glob::PackageListing;
 pub use package::LoadedPackage;
