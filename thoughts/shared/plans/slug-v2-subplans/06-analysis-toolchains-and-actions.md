@@ -387,3 +387,167 @@ slug-v2-oracle run --fixture aspect-provider-propagation --compare providers,act
   `declared_action_count=1`. This advances gate clause 2 but does not execute,
   upload, materialize, or claim oracle parity for the output; those remain
   Stage 7/integration work.
+
+### Reviewed next packet — `WP-6-m2-recursive-custom-analysis` (2026-07-22)
+
+Work packet ID: `WP-6-m2-recursive-custom-analysis`
+
+Owner stage and plan: Stage 6,
+`thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`;
+consumes the retained workspace transaction and the Stage 4 package-loading
+graph through `de835cdc`.
+
+Goal and gate link: replace the direct one-rule analysis shortcut with one real
+recursive configured-target DICE key for root-repository custom rules. This is
+the first bounded M2 vertical. It must make returned providers and target-local
+declared actions authoritative before Stage 8 reads the graph.
+
+Prerequisites and current state:
+
+- `WorkspaceRuntime` owns the retained DICE instance and committed
+  file/directory observations;
+- `PackageLoadKey` owns BUILD and `.bzl` loading but Starlark rule definitions
+  currently discard attribute schemas and invocations discard attribute
+  values;
+- `analyze_loaded_rule` is called synchronously after package loading,
+  synthesizes `DefaultInfo.files` from action outputs, and is not a DICE key;
+- `AnalysisDiceInputs` and `ConfiguredTargetDiceKey` are digest-only
+  scaffolds, not computations; and
+- query/cquery/aquery remain consumers, not permission to create a second
+  command-owned graph.
+
+Oracle-first artifact:
+`tests/v2_oracle/fixtures/recursive-custom-rule-providers-actions`, generated
+and independently rerun with Bazel 9.2.0 at
+`8220c6198837d5c13d53fea211cf3282aa12408a`. A shared
+`//rules:defs.bzl` defines a string-field provider, a leaf rule, and a parent
+rule whose sole schema is `attrs = {"deps": attr.label_list()}`. Separate
+`//leaf` and `//parent` packages declare two leaves and a parent with dependency
+order `[second, first]`.
+
+The fixture uses Bazel `cquery --output=starlark --starlark:file=...` to report
+the configured label, `DefaultInfo.files`, and the qualified custom-provider
+field for parent and leaves. It uses `aquery deps(//parent:parent)` to prove
+distinct deterministic leaf and parent write actions. Build output or
+materialization is not provider evidence. Invoke Bazel normally so the user's
+external `~/.bazelrc` may accelerate it; never read, copy, log, or commit that
+file or its credentials.
+
+Reuse audit:
+
+- selectively translate Buck2 commit
+  `088c75c7e36805df99c3de29062baa95db700b8b`
+  `app/buck2_analysis/src/analysis/calculation.rs`: real recursive `Key`
+  computation plus ordered `try_compute_join`;
+- selectively translate
+  `app/buck2_analysis/src/analysis/env.rs`: prepare an immutable dependency
+  provider environment before Starlark evaluation, with no graph discovery in
+  Starlark getters;
+- adopt the ownership boundary, not Buck types, from
+  `app/buck2_build_api/src/analysis/registry.rs`: one target-local action
+  registry finalized after the rule returns;
+- reuse retained `SmallMap`/`SmallSet` or other compact ordered
+  `starlark_map` values, immutable shared slices, `Dupe`, `Allocative`, and
+  precomputed hashes when their semantics match; do not introduce default
+  `HashMap`/owned-string churn in graph values; and
+- keep V1
+  `slug-v1-archive:app/slug_analysis/src/analysis/calculation.rs` at
+  `e218054d4c796655939b968d90208b185decb352` reference-only. Reject Buck cells,
+  labels, configurations, output paths, global registries, and command-owned
+  analysis graphs.
+
+Reviewed architecture:
+
+1. Delete `AnalysisDiceInputs` and `ConfiguredTargetDiceKey`. Define the one
+   production identity
+   `ConfiguredTargetAnalysisKey { workspace, configured_target }`. Its compute
+   requests `PackageLoadKey`, resolves the target, recursively computes direct
+   dependency analysis keys in the same explicitly named root target
+   configuration, and evaluates the rule. Loaded revisions flow through DICE
+   dependencies, never digest strings.
+2. Loading supports exactly
+   `rule(implementation=..., attrs={"deps": attr.label_list()})`. Omitted
+   `deps` becomes `[]`. Invocation values accept only lists of root
+   `//pkg:name` or package-relative `:name` strings and normalize them to
+   canonical root labels. Unknown attributes, non-lists, non-string labels,
+   missing targets, and external repositories fail deterministically.
+   Immutable rule schemas live with frozen rule definitions; immutable
+   invocation values live with each package target.
+3. Implement one real `DefaultInfo(files=depset(...))` constructor and one
+   user-provider constructor with declared string fields. Provider identity is
+   structural—`.bzl` label plus exported name—and survives freezing. Prepared
+   `ctx.attr.deps` target/provider views support lookup by that constructor.
+   Decode the returned rule list into an owned `ProviderCollection` before
+   returning from analysis; no DICE result borrows evaluator heaps. Enforce
+   duplicate-provider and missing-`DefaultInfo` failures.
+4. The rule's returned provider list is authoritative. Declared files come
+   from returned `DefaultInfo`; action outputs remain registry facts. Do not
+   synthesize one from the other.
+5. `AnalysisResult` records ordered direct configured-dependency keys and owns
+   only the actions declared by its rule. It never aggregates dependency
+   actions; future Stage 8 traversal follows the named dependency keys.
+6. `WorkspaceRuntime` computes `ConfiguredTargetAnalysisKey` inside its
+   existing transaction. Remove the production direct-helper path. No lock may
+   cross DICE computation or Starlark evaluation; the action-state lock is
+   limited to synchronous registry mutation.
+
+Exact scope:
+
+- `app/slug_loading_v2` rule/attr/provider loading and focused tests;
+- `app/slug_analysis_v2` real key, prepared evaluator, owned result, and tests;
+- `app/slug_build_api_v2` only the minimal Starlark depset/provider values
+  required by this fixture;
+- `app/slug_core_v2/src/runtime/dice.rs` transaction wiring and retained-runtime
+  tests;
+- the oracle fixture, this owner plan, Stage 1 evidence, Stage 9 ledger, and
+  orchestration routing log.
+
+Exclude query implementation, command formatting, execution, external
+repositories and mapping, transitions, toolchains, selects, aspects, native
+rules, files/executables, general attribute/provider breadth, and new action
+kinds.
+
+Implementation and test order:
+
+1. Generate and independently rerun the Bazel 9.2.0 fixture; verify exact
+   cquery provider keys/fields and aquery ownership before Rust edits.
+2. Add loading schema/invocation regressions and the structural frozen-provider
+   identity test.
+3. Add the real analysis key and recursive ordered join, prepared dependency
+   views, authoritative provider decoding, and target-local registry
+   finalization.
+4. Replace the core direct call and add an `ActivationTracker` regression by
+   concrete analysis-key identity: initial leaf/parent evaluation; no
+   activation on identical observations; leaf provider edit reevaluating leaf
+   and parent; unrelated-package mutation validating/reusing without rule
+   evaluation; declaration-order dependencies; per-key providers and actions.
+5. Run the affected crates serially through one Cargo target, then obtain
+   Sol-low post-review before commit.
+
+Focused validation:
+
+- Bazel 9.2.0 generation plus no-update rerun of
+  `recursive-custom-rule-providers-actions`;
+- `CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 -p slug_build_api_v2
+  -p slug_analysis_v2 -p slug_core_v2 -p slug_server_v2 -p slug_cli_v2`;
+- `cargo fmt --all -- --check`;
+- ownership greps for filesystem reads, direct production analysis helpers,
+  duplicate configured-target identities, default std hash collections,
+  runtime creation, blocking bridges, and locks across DICE/evaluator work;
+- `scripts/v2_archive_status.sh` and `git diff --check`.
+
+Evidence and completion boundary: Sol-low accepted this revised architecture
+after requiring removal of the parallel digest identity, an exact loading
+schema, structural provider identity and owned decoding, target-local action
+ownership, ordered dependency keys, and key-specific activation evidence.
+Record the generated oracle commit first; after implementation acceptance,
+record the exact implementation commit, activation events, utility reuse,
+validation, and residuals here and in Stage 9.
+
+Stop on a non-generated/non-9.2 oracle, unsafe provider identity or frozen
+ownership, display-string provider keys, a need for general attr coercion or
+transitions, graph/filesystem discovery from Starlark, a lock across
+`ctx.compute`/ordered join/evaluation, provider/action synthesis, external
+repository identity, or any query/command-owned graph. Stage 5 does not block
+this root-only packet; non-root labels remain explicit errors until repository
+mapping is DICE-owned.
