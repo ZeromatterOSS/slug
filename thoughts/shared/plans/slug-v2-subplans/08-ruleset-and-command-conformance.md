@@ -516,6 +516,13 @@ Reviewed architecture and exact scope:
 5. Evaluate the graph inside the same committed `WorkspaceRuntime`
    transaction that injected file/directory observations. The CLI must not
    create a second DICE instance, cache, fixture graph, or filesystem view.
+   Extend `slug_server_v2` only as required for this ownership: replace the
+   build-only wire shape with tagged `DaemonRequest::{Build, Query}` and one
+   common response envelope. Preserve all Build fields/behavior. Query sends
+   the raw expression and accepted order mode; authoritative parsing,
+   registry validation, evaluation, and diagnostics occur in the retained
+   daemon/runtime, not the CLI. `Daemon::query` reuses the existing observation
+   adapter and `WorkspaceRuntime`.
 6. Wire text `query` only. Accept default/`--order_output=auto` and `full` only
    when the oracle establishes their exact behavior. Reject `deps`, `no`,
    structured formats, unsupported flag combinations, and deferred functions
@@ -548,8 +555,12 @@ Implementation steps:
 3. Add the demand-driven DICE package-graph key, recursive-only package-set
    key, structural nodes, normalized edges, and focused ownership/pattern
    tests.
-4. Add the retained-transaction query entry point, command evaluation, and
-   text renderer; remove the query placeholder only for the accepted matrix.
+4. Add the retained-transaction query entry point, tagged daemon request,
+   command evaluation, and text renderer; remove the query placeholder only
+   for the accepted matrix. Add protocol regressions proving existing build
+   requests are unchanged and `--output_base` queries reuse daemon state. A
+   fresh-runtime convenience path may call the identical runtime entry point,
+   but it is not same-daemon evidence.
 5. Add exact `ActivationTracker` multiset regressions: initial evaluation;
    zero activation on an identical revision; no package-graph activation for
    an unrelated package BUILD edit during a literal `deps()` query; deliberate
@@ -564,7 +575,7 @@ Focused validation:
 ```bash
 CARGO_TARGET_DIR=/tmp/slug-m3-query-target CARGO_BUILD_JOBS=1 cargo test \
   -p slug_query_v2 -p slug_loading_v2 -p slug_core_v2 \
-  -p slug_commands_v2 -p slug_cli_v2
+  -p slug_commands_v2 -p slug_server_v2 -p slug_cli_v2
 python3 -B -m tools.v2_oracle run --fixture query-parser-and-sets \
   --tool bazel --bazel /usr/bin/bazel
 python3 -B -m tools.v2_oracle run --fixture query-loading-thin-vertical \
@@ -577,6 +588,10 @@ Also grep for direct filesystem access in query keys/evaluation, extra DICE or
 runtime creation, command-local graphs, configured/action query imports,
 default hash collections/string-heavy graph state, blocking bridges, and
 locks across DICE work.
+
+The daemon protocol extension is deliberately not a general command bus:
+exclude cquery/aquery variants, protocol negotiation, streaming, execution,
+and unrelated request metadata.
 
 Evidence and plan update: land oracle evidence first. After implementation
 acceptance, record exact commits, Bazel provenance, externally observed

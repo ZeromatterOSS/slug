@@ -706,7 +706,9 @@ V2 wrapper/boundary: V2 owns Bazel labels/patterns, the complete Bazel 9.2
 loading-query registry, diagnostics, demand-driven
 `UnconfiguredPackageGraphKey`, recursive-only `RootPackageSetKey`, structural
 rule/source nodes, normalized alias/filegroup/custom-rule edges, ordering, and
-text rendering
+text rendering. The existing daemon wire boundary may gain only tagged
+Build/Query requests and a common response so query uses the retained
+`WorkspaceRuntime`; it must not become a general command bus.
 Bazel oracle: generated with Bazel 9.2.0 at
 `8220c6198837d5c13d53fea211cf3282aa12408a`
 V2 fixture: `query-parser-and-sets` and `query-loading-thin-vertical`; stale
