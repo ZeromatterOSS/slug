@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 Java `Pattern` qualification is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 Java `Pattern` qualification is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility audit completed | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | run the oracle/read-only `java_regex` substrate qualification packet; activate no function or dependency |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 residual-function ranking is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 residual-function ranking is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | rank the non-regex `tests` then `visible` functions with a read-only oracle/reuse audit |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,31 +33,19 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run one oracle/read-only Java-Pattern-substrate qualification packet.
-Bazel 9.2.0 compiles Java `Pattern` once for `filter`, regex-based `kind`, and
-`attr`, applies `Matcher.find`, and embeds OpenJDK 25.0.2. The accepted
-feasibility audit rejected Rust `regex`, `fancy-regex`, PCRE, and Onig as
-dialect substitutions. `java_regex` 0.1.0 at upstream commit
-`ed518dc23dacbe1a88d7cb3f26f0cfe31cc91393` is a qualification candidate only:
-its published crate identity/checksum, license, and MSRV are not independently
-pinned; its current find path copies every subject to `Vec<char>` and allocates
-match/group/map state; diagnostics use scalar rather than Java UTF-16 offsets;
-and unpaired surrogate escapes may collapse to NUL. No query function
-activates from this audit.
+Run a read-only oracle/source/reuse ranking of the two non-regex residual
+functions: `tests` first and `visible` second. For `tests`, map Bazel 9.2.0
+test-rule and `test_suite` expansion, tags/size filtering, current retained rule
+capability reuse, and the minimum missing loading representation. For
+`visible`, map exact target visibility, package-group inclusion/exclusion,
+same-package and `javatests` rules, and the minimum missing representation.
+Compare Bazel, Buck2, and V1 sources, identify the smallest oracle-first
+vertical, and obtain Sol-low adjudication before selecting implementation.
 
-Independently pin the published crate source/checksum, upstream commit,
-`MIT OR Apache-2.0` license files, and MSRV; generate an exact OpenJDK
-25.0.2/Bazel 9.2.0 differential corpus for compile success/failure and
-diagnostics, `Matcher.find`, Unicode/UTF-16, supplementary characters,
-unpaired surrogates, NUL, Java-only constructs, and bounded resource behavior;
-then measure the subject-copy/allocation path and design an allocation-free
-boolean-find API. Stop and reject the candidate on any semantic mismatch,
-immutable-source failure, uncontrolled resource behavior, or unacceptable
-hot-path allocation boundary.
-
-This packet adds no production dependency or lockfile entry,
-registry/evaluator/query-graph activation, DICE state, or representation
-substrate. `attr` and `kind` retain their independent representation gates.
+Do not react to the rejected regex candidate by starting a UTF-16 engine fork.
+`filter`, `attr`, and regex-based `kind` remain deferred; a V2-owned engine is
+an unapproved future architecture packet with its own UTF-16, diagnostic,
+resource, allocation, and differential-corpus gate.
 
 ## Operating Decision
 

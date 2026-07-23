@@ -38,19 +38,16 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
-### Live packet: `WP-8-m3-java-pattern-substrate-qualification`
+### Live packet: `WP-8-m3-tests-visible-feasibility-ranking`
 
-Perform an oracle/read-only qualification of `java_regex` 0.1.0 only.
-Independently pin its immutable published-crate source/checksum, upstream
-commit, license files, and MSRV; compare it against exact OpenJDK 25.0.2/Bazel
-9.2.0 compile diagnostics, `Matcher.find`, Java-only constructs,
-Unicode/UTF-16, supplementary characters, unpaired surrogates, NUL, and
-bounded resource behavior; and measure/design an allocation-free boolean-find
-boundary. Reject on any semantic mismatch, unverifiable source, uncontrolled
-resource behavior, or unacceptable hot-path allocation boundary. Add no
-production dependency, lockfile entry, query activation, DICE state, or
-representation substrate. `attr` and `kind` retain independent representation
-gates. Live Status in the canonical plan owns scheduling.
+Perform a read-only Bazel/Buck2/V1/oracle audit of the two non-regex residual
+functions, ranking `tests` first and `visible` second. Map exact Bazel 9.2.0
+test-rule and `test_suite` expansion, tags/size behavior, visibility and
+package-group semantics, the accepted V2 metadata that can be reused, and the
+minimum missing loading representation. Select one smallest oracle-first
+vertical for Sol-low adjudication. Do not edit code, add a UTF-16 regex engine,
+or activate any query function. Live Status in the canonical plan owns
+scheduling.
 
 ### Query engine reuse policy
 
@@ -2117,8 +2114,8 @@ remained. Sol-low approved the boundary before implementation and returned
 final `ACCEPT` after full-diff review.
 
 Five ordinary query functions remain deferred. The completed Java `Pattern`
-feasibility audit is recorded below; the next packet is the oracle/read-only
-`java_regex` substrate qualification.
+feasibility and rejected `java_regex` qualification are recorded below; the
+next packet ranks the non-regex `tests` then `visible` functions.
 
 ## Java `Pattern` feasibility audit accepted (2026-07-23)
 
@@ -2155,3 +2152,37 @@ regex qualification would unblock only their shared matching substrate;
 `kind` still requires exact target-kind representation. Terra-medium produced
 the source audit; Sol-low required this bounded qualification direction before
 any implementation authorization.
+
+## `java_regex` 0.1.0 qualification rejected (2026-07-23)
+
+The published crate tarball and crates.io index both pin SHA-256
+`1f3b3ff81a66205722b636dae12fc5cb2e77147569e8968f38a1d73b2b05fbe6`.
+Its packaged VCS metadata names
+`ed518dc23dacbe1a88d7cb3f26f0cfe31cc91393`; selected source, documentation,
+and both license files match that commit. The package declares
+`MIT OR Apache-2.0`, Rust 1.78, and four normal Unicode dependencies. This
+resolves supply-chain identity but does not authorize a dependency.
+
+Commit `5e78abc1` checks in the `java-pattern-utf16` Bazel oracle, which
+constructs all values from UTF-16 units. ASCII pattern `\uD800` does not find
+NUL but does find an
+unpaired-high-surrogate Java `String`. The portable fixture command uses
+`remotejdk_25` and generated the same two rows on 25.0.1; root ran the
+Bazel-compiled oracle jar with Bazel 9.2.0's embedded OpenJDK 25.0.2 and
+independently observed the identical rows. In contrast, the published Rust
+parser lowers an unpaired surrogate escape through
+`char::from_u32(...).unwrap_or('\0')`; its `find("\0")` returned true, while
+Rust `&str` cannot represent the Java surrogate subject. This boolean mismatch
+triggers the packet's stop-on-any-mismatch gate.
+
+The existing API also measured seven allocations for that discriminator and
+fourteen for a basic successful find. Source inspection confirms per-subject
+`Vec<char>` copying plus match/group/map construction, while fixed
+5,000,000-step and 500-depth limits return ordinary non-match. Sol-low accepted
+immediate rejection: continuing a broad corpus cannot rehabilitate 0.1.0.
+No crate, Cargo/lockfile change, query activation, DICE state, or candidate
+comparison probe entered the repository.
+
+`filter`, `attr`, and regex-based `kind` remain deferred. A V2-owned UTF-16
+engine is an unapproved future architecture proposal, not the next packet. The
+next read-only audit ranks `tests` then `visible`.
