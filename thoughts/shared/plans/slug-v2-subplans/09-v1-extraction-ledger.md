@@ -463,17 +463,46 @@ git diff --check -- thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledg
 
 ### Stage 2 DICE and starlark-rust root-evaluation packet
 
-Status: Pending reviewer decision; not landed
-Source ref/commit(s): retained active-tree `dice/dice/src/{api/dice.rs,api/key.rs,api/computations.rs}` and `starlark-rust/starlark/src/{eval.rs,eval/runtime/evaluator.rs}`; inspected `slug-v1-archive^{commit}:app/slug_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs` at `e218054d4c796655939b968d90208b185decb352`
-V2 commit(s): none; current worktree only, so this entry is deliberately not an accepted extraction record
-Source class: retained Buck2-derived runtime plus V1 reference-only interpreter delegate
-Reusable primitive or lesson: use a real `Dice` transaction and `Key`, then `AstModule` plus `Evaluator::eval_module`; keep the runtime wrapper V2-owned
-V2 wrapper/boundary: `slug_core_v2::runtime::evaluate_workspace` and `WorkspaceEvaluationKey`; CLI dispatch reaches this boundary before analysis
-Bazel oracle: Bazel 9.1.1 generated `simple-rule-action` expected result, including declared output digest `dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49`
-V2 fixture: `simple-rule-action`; it is oracle-ready but cannot yet run under Slug because Stage 4/6/7 semantics are not connected
-Validation: `CARGO_TARGET_DIR=/tmp/slug-v2-core-runtime-target CARGO_BUILD_JOBS=1 cargo test -p slug_core_v2 -p slug_cli_v2`; `scripts/v2_archive_status.sh`; `git diff --check`
-Decision pending: adopt retained DICE/starlark-rust primitives; V1 delegate is reference-only/rejected for Buck cells, package labels, file-ops, and global interpreter state; await Sol acceptance before moving this entry to Partially landed
-Residual risk: no DICE-tracked root-file dependencies or same-daemon invalidation, no Bazel-shaped globals/load graph, no configured target/action path, and no REAPI execution
+Status: Partially landed
+Source ref/commit(s): retained active-tree
+`dice/dice/src/{api/dice.rs,api/key.rs,api/computations.rs}` and
+`starlark-rust/starlark/src/{eval.rs,eval/runtime/evaluator.rs}`; Buck2
+`088c75c7e36805df99c3de29062baa95db700b8b`
+`app/buck2_common/src/file_ops/{dice.rs,metadata.rs}`; inspected V1
+`e218054d4c796655939b968d90208b185decb352` interpreter delegate, globspec,
+and watcher only as rejection/reference material
+V2 commit(s): `3659b0f9`, `35612655`
+Source class: retained Buck2-derived DICE/Starlark runtime and compact utility
+shapes behind V2-owned inputs; V1 reference-only behavior
+Reusable primitive or lesson: retain one DICE owner and transaction, injected
+immutable snapshots, per-value equality, compact names, and sorted shared
+directory entries; reject V1 Buck cells, labels, file-ops, global interpreter
+state, globspec, and watcher policy
+V2 wrapper/boundary: `slug_core_v2::runtime::WorkspaceRuntime` owns one
+workspace DICE instance; file and directory snapshots enter one updater/commit;
+root and package loading share its transaction; `WorkspaceDirectoryKey` is
+demand-driven and reads no filesystem state
+Bazel oracle: Bazel 9.2.0 generated
+`glob-directory-invalidation` create/rename/delete expectations at Bazel commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`; earlier `simple-rule-action`
+remains the first root/action reference
+V2 fixture: `glob-directory-invalidation` is generated and independently
+verified; this first half establishes inputs only and does not claim Slug query
+parity
+Validation:
+`CARGO_TARGET_DIR=/tmp/slug-m1-directory-target CARGO_BUILD_JOBS=1 cargo test
+-p slug_core_v2 -p slug_loading_v2 -p slug_server_v2 -p slug_analysis_v2
+-p slug_cli_v2`; `cargo fmt --all -- --check`; `git diff --check`; Sol-low
+post-review `ACCEPT`
+Decision: adopt the retained DICE/Starlark primitives and Buck2's compact,
+sorted directory-value lesson behind V2 identities. The first eager
+all-directory evidence API was rejected in review; production now computes no
+directory key until a semantic consumer requests it.
+Residual risk: the migration observer still scans the full workspace, existing
+Starlark glob expansion still reads the filesystem directly, and glob/package
+consumers plus unchanged-computation evidence remain for the next reviewed
+packet. Bazel-shaped globals, configured-target/action coverage, and REAPI
+execution remain incomplete beyond their owning partial packets.
 
 ### Stage 6 depset/provider/rule context tests
 
