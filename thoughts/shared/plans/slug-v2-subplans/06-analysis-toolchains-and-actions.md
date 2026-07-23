@@ -419,7 +419,8 @@ Prerequisites and current state:
 Oracle-first artifact:
 `tests/v2_oracle/fixtures/recursive-custom-rule-providers-actions`, generated
 and independently rerun with Bazel 9.2.0 at
-`8220c6198837d5c13d53fea211cf3282aa12408a`. A shared
+`8220c6198837d5c13d53fea211cf3282aa12408a`; landed as oracle commit
+`9e6a4450`. A shared
 `//rules:defs.bzl` defines a string-field provider, a leaf rule, and a parent
 rule whose sole schema is `attrs = {"deps": attr.label_list()}`. Separate
 `//leaf` and `//parent` packages declare two leaves and a parent with dependency

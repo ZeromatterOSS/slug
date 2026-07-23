@@ -545,3 +545,25 @@ with `generated: false` is not acceptance evidence.
   `simple-rule-action`, `shell-action-reapi`, `bare-remote-executor-reapi`,
   `platform-exec-properties-reapi`. The `load-invalidation` fixture (clause 5)
   remains, pending the daemon.
+
+## Recursive Configured-Analysis Oracle Checkpoint
+
+- 2026-07-22 commit `9e6a4450` added the generated Bazel 9.2.0
+  `recursive-custom-rule-providers-actions` fixture at immutable Bazel commit
+  `8220c6198837d5c13d53fea211cf3282aa12408a`. Separate `cquery
+  --output=starlark` commands prove the qualified structural provider keys
+  `//rules:defs.bzl%LeafInfo` and `//rules:defs.bzl%ParentInfo`, their exact
+  string fields, canonical configured labels, and returned
+  `DefaultInfo.files`.
+- The parent declares dependencies in `[second, first]` order and its provider
+  value is exactly `second,first`. `aquery deps(//parent:parent)
+  --output=text --include_file_write_contents` proves three distinct
+  target-owned `FileWrite` actions and exact output/content ownership without
+  invoking build execution or materialization. Its assertions are independent
+  of action ordering, configuration spelling, and action-key hashes.
+- Generation and an independent no-update rerun both passed with
+  `/usr/bin/bazel` 9.2.0. Fixture discovery, immutable provenance,
+  `generated: true`, whitespace checks, and candidate credential scans passed.
+  Bazel used ordinary RC discovery; no external RC or BuildBuddy credential
+  content was read, copied, logged into project files, or committed. Sol-low
+  reviewed the fixture and returned `ACCEPT`.
