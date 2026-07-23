@@ -2,11 +2,14 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use std::time::SystemTime;
 
 use dice::DetectCycles;
 use dice::Dice;
+use dice::UserComputationData;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
@@ -71,6 +74,15 @@ fn load_package(
     package: &Path,
     bzl_paths: &[PathBuf],
 ) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+    runtime.block_on(load_package_request(dice, workspace, package, bzl_paths))
+}
+
+async fn load_package_request(
+    dice: &Arc<Dice>,
+    workspace: &Path,
+    package: &Path,
+    bzl_paths: &[PathBuf],
+) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
     let paths = [
         vec![
             workspace.join("MODULE.bazel"),
@@ -95,25 +107,26 @@ fn load_package(
         })
         .collect();
     let evaluator = BzlModuleEvaluator::new(workspace)?;
-    runtime.block_on(async {
-        let mut updater = dice.updater();
-        updater.changed_to(vec![(
-            (WorkspaceSnapshotKey {
-                workspace: workspace.to_path_buf(),
-            }),
-            Arc::new(WorkspaceSnapshot {
-                files: Arc::new(files),
-            }),
-        )])?;
-        updater.changed_to(vec![(
-            (WorkspaceDirectorySnapshotKey {
-                workspace: workspace.to_path_buf(),
-            }),
-            Arc::new(directory_snapshot(workspace)),
-        )])?;
-        let mut transaction = updater.commit().await;
-        evaluator.evaluate_package(&mut transaction, package).await
-    })
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(bzl_load_cycle_detector()),
+        ..Default::default()
+    });
+    updater.changed_to(vec![(
+        (WorkspaceSnapshotKey {
+            workspace: workspace.to_path_buf(),
+        }),
+        Arc::new(WorkspaceSnapshot {
+            files: Arc::new(files),
+        }),
+    )])?;
+    updater.changed_to(vec![(
+        (WorkspaceDirectorySnapshotKey {
+            workspace: workspace.to_path_buf(),
+        }),
+        Arc::new(directory_snapshot(workspace)),
+    )])?;
+    let mut transaction = updater.commit().await;
+    evaluator.evaluate_package(&mut transaction, package).await
 }
 
 fn evaluate_load(
@@ -149,7 +162,10 @@ fn evaluate_load(
         .collect();
     let evaluator = BzlModuleEvaluator::new(workspace)?;
     runtime.block_on(async {
-        let mut updater = dice.updater();
+        let mut updater = dice.updater_with_data(UserComputationData {
+            cycle_detector: Some(bzl_load_cycle_detector()),
+            ..Default::default()
+        });
         updater.changed_to(vec![(
             (WorkspaceSnapshotKey {
                 workspace: workspace.to_path_buf(),
@@ -208,6 +224,159 @@ fn malformed_bzl_reports_bazel_module_compilation_summary() {
         error.contains("compilation of module 'pkg/bad.bzl' failed"),
         "{error}"
     );
+}
+
+#[test]
+fn bzl_load_cycles_report_bazel_shape_without_hanging_and_recover_in_same_dice() {
+    let workspace = scratch("cycle-recovery");
+    let package = workspace.join("pkg");
+    let one = package.join("one.bzl");
+    let two = package.join("two.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":one.bzl\", \"one\")\nfilegroup(name = \"probe\")\n",
+    );
+    write(&one, "load(\":two.bzl\", \"two\")\none = two\n");
+    write(&two, "load(\":one.bzl\", \"one\")\ntwo = one\n");
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let error = runtime
+        .block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(1),
+                load_package_request(&dice, &workspace, &package, &[one.clone(), two.clone()]),
+            )
+            .await
+        })
+        .expect("load-cycle detector must release the recursive DICE wait")
+        .unwrap_err()
+        .to_string();
+    assert_eq!(
+        error,
+        "cycle detected in extension files: \n    pkg/BUILD\n.-> //pkg:one.bzl\n|   //pkg:two.bzl\n`-- //pkg:one.bzl"
+    );
+
+    write(&two, "two = 1\n");
+    let loaded = load_package(&dice, &runtime, &workspace, &package, &[one, two]).unwrap();
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["probe"]
+    );
+}
+
+#[test]
+fn bzl_load_cycle_preserves_the_acyclic_path_from_the_build_file() {
+    let workspace = scratch("cycle-prefix");
+    let package = workspace.join("pkg");
+    let entry = package.join("entry.bzl");
+    let one = package.join("one.bzl");
+    let two = package.join("two.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":entry.bzl\", \"entry\")\nfilegroup(name = \"probe\")\n",
+    );
+    write(&entry, "load(\":one.bzl\", \"one\")\nentry = one\n");
+    write(&one, "load(\":two.bzl\", \"two\")\none = two\n");
+    write(&two, "load(\":one.bzl\", \"one\")\ntwo = one\n");
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let error = runtime
+        .block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(1),
+                load_package_request(&dice, &workspace, &package, &[entry, one, two]),
+            )
+            .await
+        })
+        .expect("load-cycle detector must retain and release the acyclic prefix")
+        .unwrap_err()
+        .to_string();
+    assert_eq!(
+        error,
+        "cycle detected in extension files: \n    pkg/BUILD\n    //pkg:entry.bzl\n.-> //pkg:one.bzl\n|   //pkg:two.bzl\n`-- //pkg:one.bzl"
+    );
+}
+
+#[test]
+fn bzl_self_cycle_uses_bazel_self_edge_shape() {
+    let workspace = scratch("self-cycle");
+    let package = workspace.join("pkg");
+    let one = package.join("one.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":one.bzl\", \"one\")\nfilegroup(name = \"probe\")\n",
+    );
+    write(&one, "load(\":one.bzl\", \"one\")\none = 1\n");
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let error = runtime
+        .block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(1),
+                load_package_request(&dice, &workspace, &package, &[one]),
+            )
+            .await
+        })
+        .expect("load-cycle detector must release a self-recursive DICE wait")
+        .unwrap_err()
+        .to_string();
+    assert_eq!(
+        error,
+        "cycle detected in extension files: \n    pkg/BUILD\n.-> //pkg:one.bzl [self-edge]\n`--"
+    );
+}
+
+#[test]
+fn bzl_load_diamond_is_not_reported_as_a_cycle() {
+    let workspace = scratch("diamond-no-cycle");
+    let package = workspace.join("pkg");
+    let left = package.join("left.bzl");
+    let right = package.join("right.bzl");
+    let leaf = package.join("leaf.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":left.bzl\", \"left\")\nload(\":right.bzl\", \"right\")\nfilegroup(name = \"probe\")\n",
+    );
+    write(&left, "load(\":leaf.bzl\", \"leaf\")\nleft = leaf\n");
+    write(&right, "load(\":leaf.bzl\", \"leaf\")\nright = leaf\n");
+    write(&leaf, "leaf = 1\n");
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let loaded = runtime
+        .block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(1),
+                load_package_request(&dice, &workspace, &package, &[left, right, leaf]),
+            )
+            .await
+        })
+        .expect("diamond loading should complete")
+        .unwrap();
+    assert_eq!(loaded.targets.len(), 1);
 }
 
 #[test]

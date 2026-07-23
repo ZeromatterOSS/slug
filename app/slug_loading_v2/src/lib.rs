@@ -9,6 +9,7 @@
  */
 
 pub mod bzl_module;
+mod cycle_detector;
 pub mod file_discovery;
 pub mod glob;
 pub mod globals;
@@ -24,6 +25,7 @@ pub use bzl_module::BzlModuleEvaluator;
 pub use bzl_module::BzlModuleIdentity;
 pub use bzl_module::EvaluatedBzlModule;
 pub use bzl_module::discover_build_file_companion;
+pub use cycle_detector::bzl_load_cycle_detector;
 pub use glob::GlobSpec;
 pub use glob::PackageListing;
 pub use package::LoadedPackage;

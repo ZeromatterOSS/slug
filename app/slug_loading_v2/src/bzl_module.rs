@@ -31,6 +31,8 @@ use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 use starlark_map::small_set::SmallSet;
 
+use crate::cycle_detector::BzlLoadCycle;
+use crate::cycle_detector::BzlLoadCycleGuard;
 use crate::glob::PackageListing;
 use crate::keys::BzlModuleEvalKey;
 use crate::keys::BzlParseKey;
@@ -54,7 +56,10 @@ use crate::provider::BzlEvaluationContext;
 ///
 /// This intentionally owns no DICE instance or asynchronous runtime. The
 /// workspace runtime supplies one committed transaction containing all file
-/// observations for root and package loading.
+/// observations for root and package loading. Loading-capable transactions
+/// must install [`crate::bzl_load_cycle_detector`] in their
+/// `UserComputationData`; the modern DICE engine does not detect key cycles
+/// itself.
 #[derive(Clone)]
 pub struct BzlModuleEvaluator {
     workspace: PathBuf,
@@ -104,6 +109,8 @@ pub struct BuildFileCompanion {
 pub struct LoadingError {
     message: String,
     absent: bool,
+    #[allocative(skip)]
+    cycle: Option<BzlLoadCycle>,
 }
 
 impl LoadingError {
@@ -111,6 +118,7 @@ impl LoadingError {
         Self {
             message: message.into(),
             absent: false,
+            cycle: None,
         }
     }
 
@@ -118,11 +126,53 @@ impl LoadingError {
         Self {
             message: format!("workspace file is absent: {}", path.display()),
             absent: true,
+            cycle: None,
         }
     }
 
     fn is_absent(&self) -> bool {
         self.absent
+    }
+
+    fn load_cycle(cycle: BzlLoadCycle) -> Self {
+        Self {
+            message: "cycle detected in extension files".to_owned(),
+            absent: false,
+            cycle: Some(cycle),
+        }
+    }
+
+    fn with_package_cycle_origin(&self, workspace: &Path, package: &Path) -> Self {
+        let Some(cycle) = &self.cycle else {
+            return self.clone();
+        };
+        let package = package
+            .strip_prefix(workspace)
+            .unwrap_or(package)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let origin = if package.is_empty() {
+            "BUILD".to_owned()
+        } else {
+            format!("{package}/BUILD")
+        };
+        let path = cycle
+            .path
+            .iter()
+            .map(|key| {
+                bzl_source_label(workspace, &key.path)
+                    .unwrap_or_else(|_| key.path.display().to_string())
+            })
+            .collect::<Vec<_>>();
+        let keys = cycle
+            .keys
+            .iter()
+            .map(|key| {
+                bzl_source_label(workspace, &key.path)
+                    .unwrap_or_else(|_| key.path.display().to_string())
+            })
+            .collect::<Vec<_>>();
+        Self::new(render_bzl_cycle(&origin, &path, &keys))
     }
 }
 
@@ -139,6 +189,61 @@ fn load_error(load_label: &str, error: &LoadingError) -> LoadingError {
         LoadingError::new(format!("cannot load '{load_label}': no such file"))
     } else {
         error.clone()
+    }
+}
+
+fn render_bzl_cycle(origin: &str, path: &[String], cycle: &[String]) -> String {
+    // Bazel 9 source of truth:
+    // BzlLoadCycleReporter + AbstractLabelCycleReporter::printCycle.
+    let mut message = format!("cycle detected in extension files: \n    {origin}");
+    for label in path {
+        message.push_str("\n    ");
+        message.push_str(label);
+    }
+    let Some((first, rest)) = cycle.split_first() else {
+        return message;
+    };
+    message.push_str("\n.-> ");
+    message.push_str(first);
+    if rest.is_empty() {
+        message.push_str(" [self-edge]\n`--");
+        return message;
+    }
+    for label in rest {
+        message.push_str("\n|   ");
+        message.push_str(label);
+    }
+    message.push_str("\n`-- ");
+    message.push_str(first);
+    message
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct BzlLoadCyclePoisonKey;
+
+impl fmt::Display for BzlLoadCyclePoisonKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("bzl-load-cycle-poison")
+    }
+}
+
+#[async_trait]
+impl Key for BzlLoadCyclePoisonKey {
+    type Value = ();
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+    }
+
+    fn equality(_x: &Self::Value, _y: &Self::Value) -> bool {
+        true
+    }
+
+    fn validity(_value: &Self::Value) -> bool {
+        false
     }
 }
 
@@ -723,13 +828,25 @@ impl Key for BzlModuleEvalKey {
                 Ok(label) => label,
                 Err(error) => return Arc::new(Err(error)),
             };
-            let module = match ctx
-                .compute(&BzlModuleEvalKey {
-                    workspace: self.workspace.clone(),
-                    path: resolved,
-                })
-                .await
-            {
+            let child = BzlModuleEvalKey {
+                workspace: self.workspace.clone(),
+                path: resolved,
+            };
+            let cycle_guard = match ctx.cycle_guard::<BzlLoadCycleGuard>() {
+                Ok(guard) => guard,
+                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+            };
+            let result = match cycle_guard {
+                Some(guard) => match guard.guard_this(ctx.compute(&child)).await {
+                    Ok(result) => result,
+                    Err(cycle) => {
+                        let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+                        return Arc::new(Err(LoadingError::load_cycle(cycle)));
+                    }
+                },
+                None => ctx.compute(&child).await,
+            };
+            let module = match result {
                 Ok(value) => match value.as_ref() {
                     Ok(module) => module.clone(),
                     Err(error) => return Arc::new(Err(load_error(&load_label, error))),
@@ -871,7 +988,10 @@ impl Key for PackageLoadKey {
             {
                 Ok(value) => match value.as_ref() {
                     Ok(module) => module.clone(),
-                    Err(error) => return Arc::new(Err(load_error(&load_label, error))),
+                    Err(error) => {
+                        return Arc::new(Err(load_error(&load_label, error)
+                            .with_package_cycle_origin(&self.workspace, &self.package)));
+                    }
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };

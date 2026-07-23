@@ -23,6 +23,7 @@ use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceComputations;
 use dice::Key;
+use dice::UserComputationData;
 use dice_futures::cancellation::CancellationContext;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
@@ -32,6 +33,7 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::LoadedPackage;
+use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectoryKey;
@@ -448,7 +450,10 @@ impl WorkspaceRuntime {
             directories: Arc::new(directories.into_iter().collect()),
         });
         self.runtime.block_on(async {
-            let mut updater = self.dice.updater();
+            let mut updater = self.dice.updater_with_data(UserComputationData {
+                cycle_detector: Some(bzl_load_cycle_detector()),
+                ..Default::default()
+            });
             updater
                 .changed_to(vec![(
                     WorkspaceSnapshotKey {
@@ -534,7 +539,10 @@ impl WorkspaceRuntime {
         });
         let revision = WorkspaceRevision(self.next_revision.fetch_add(1, Ordering::Relaxed));
         self.runtime.block_on(async {
-            let mut updater = self.dice.updater();
+            let mut updater = self.dice.updater_with_data(UserComputationData {
+                cycle_detector: Some(bzl_load_cycle_detector()),
+                ..Default::default()
+            });
             updater
                 .changed_to(vec![(
                     (WorkspaceSnapshotKey {
