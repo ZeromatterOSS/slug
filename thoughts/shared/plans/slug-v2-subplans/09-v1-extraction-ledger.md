@@ -1296,7 +1296,7 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: Oracle accepted in `8212afd6`; immutable representation review next
+Status: Oracle accepted in `8212afd6`; first representation review `REPLAN`
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1322,4 +1322,9 @@ semantic equality with same-daemon invalidation. Plumb strict mode separately
 as request/query-environment policy. `visible` follows only after a separate
 design covers explicit/default visibility, package-group
 packages/includes/excludes, same-package access, and the `javatests`/`java`
-asymmetry. Terra-medium audited; Sol-low returned `ACCEPT`.
+asymmetry. The first broader design correctly retained the existing DICE path
+but exhausted its correction budget: Sol required order-independent natural
+sorting with duplicate preservation, common `tags` on all Starlark rules, and
+one invariant-safe explicit-or-implicit membership source with derived
+`manual`. It closed `REPLAN` without implementation. The replacement review is
+loading-metadata-only; strict plumbing and activation remain later packets.

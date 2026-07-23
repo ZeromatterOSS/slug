@@ -38,15 +38,16 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
-### Live packet: `WP-8-m3-tests-query-representation-review`
+### Live packet: `WP-8-m3-tests-loading-metadata-replan`
 
-Review the immutable loading/query representation required by the accepted
-`tests-query-expansion` oracle. Pin native suite identity, explicit and
-package-derived implicit membership, scalar tags/size/manual state, semantic
-equality and lifecycle invalidation, and request-local strict policy. This is a
-design/review packet: do not activate `tests`, add DICE state or locks, begin
-`visible`, or add a regex engine. Live Status in the canonical plan owns
-scheduling.
+Replan the loading-owned test/suite metadata and graph projection after the
+broader representation review exhausted its correction budget. Pin Bazel's
+order-independent canonicalization with duplicate preservation, inherited
+common/test attrs, invariant-safe explicit-versus-implicit suite membership,
+derived `manual`, semantic equality, and lifecycle invalidation. This remains
+design/review only: strict request plumbing and `tests` activation are later
+packets. Do not add DICE state or locks, begin `visible`, or add a regex engine.
+Live Status in the canonical plan owns scheduling.
 
 ### Query engine reuse policy
 
@@ -2246,3 +2247,21 @@ independently passed all 16 Bazel commands. No Slug loading/query
 representation, DICE state, native rule, function activation, or V1/Buck2
 implementation entered the packet. The next packet is the reviewed immutable
 representation boundary, not `tests` activation.
+
+## `tests` representation review replanned (2026-07-23)
+
+The first representation proposal correctly kept rule capability separate,
+used existing package/query DICE ownership, derived implicit membership after
+full package loading, made suite members ordinary graph edges, and kept strict
+mode request-local. Root required one source correction for suite dependencies
+and inherited `tags`/`size`.
+
+Sol-low then found three remaining material invariants. Bazel
+`BuildType#convertFromBuildLangType` naturally sorts order-independent lists
+while preserving duplicates; common `tags=[]` belongs to every Starlark rule,
+not only tests; and independent `manual`, explicit-member, and implicit-member
+fields could encode contradictory state. Because this was the packet's second
+material correction, orchestration closed it as `REPLAN`. No implementation
+or worktree change entered. The replacement packet is limited to an
+invariant-safe loading metadata design; strict plumbing and activation remain
+separate.
