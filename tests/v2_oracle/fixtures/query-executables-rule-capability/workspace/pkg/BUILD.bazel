@@ -1,0 +1,17 @@
+load(":defs.bzl", "exec_arbitrary", "explicit_test_test", "implicit_test_test", "output_rule", "plain_rule")
+
+exports_files(["BUILD.bazel", "data.txt"])
+
+exec_arbitrary(name = "arbitrary_target")
+exec_arbitrary(name = "target_test")
+exec_arbitrary(name = "edge_exec", deps = [":edge_dep"])
+plain_rule(name = "plain")
+plain_rule(name = "edge_dep")
+implicit_test_test(name = "ordinary_target")
+explicit_test_test(name = "explicit_test_target")
+
+filegroup(name = "files", srcs = [":data.txt"])
+alias(name = "alias_exec", actual = ":arbitrary_target")
+config_setting(name = "setting", values = {"cpu": "k8"})
+
+output_rule(name = "generated_owner", outs = ["generated.txt"])

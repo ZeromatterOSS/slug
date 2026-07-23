@@ -1,0 +1,271 @@
+[fixture]
+name = "query-executables-rule-capability"
+description = "Bazel 9.2 ordinary-query oracle for the exact executables() rule-capability predicate."
+comparison = "message_shape"
+oracle_notes = "Root-repository current-loadable-graph gate only. It distinguishes per-target executable capability from exported Starlark rule-class identity, not BUILD target spelling or implementation identity. In Bazel rule() creation, test=True forces executable capability even when executable=False is supplied; that probe establishes accepted syntax plus exported *_test exclusion only, never a false capability. The executables() predicate remains Rule.isExecutable() plus non-test-class exclusion, not test || executable. The representation-only --output=label_kind rows pin upstream class names and are excluded from Stage 8 Slug formatter acceptance. Native genrule and test_suite are deliberately absent and remain separate substrate gates."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/ExecutablesFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeTargetAccessor.java#isExecutableNonTestRule",
+  "src/main/java/com/google/devtools/build/lib/packages/TargetUtils.java#isExecutableNonTestRule",
+  "src/main/java/com/google/devtools/build/lib/packages/TargetUtils.java#isTestRuleName",
+  "src/main/java/com/google/devtools/build/lib/packages/Rule.java#isExecutable",
+  "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkRuleFunctionsApi.java#rule",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java#rule",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java#getTestBaseRule",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java#createRule",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java#StarlarkRuleFunction.export",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testExecutablesQuery",
+]
+translation_notes = "The success workspace uses only Starlark rule(), filegroup, alias, config_setting, source, output, and active BUILD nodes supported by the current loading graph. Separate packages isolate invalid exported rule definitions and the test=True/executable=False acceptance probe. At the pinned StarlarkRuleClassFunctions#createRule source, test=True selects getTestBaseRule and independently calls setExecutableStarlark() through executable || test, so explicit executable=False is accepted but does not make a test non-executable. Its empty executables() result observes only the exported *_test exclusion. Query classification is Rule.isExecutable() plus non-test-class exclusion, never a test || executable predicate. Exact stdout patterns pin the ordinary-query surface; graph rows pin a no-edge filter over an edge-bearing operand. The --output=label_kind representation-only rows pin Bazel class names, but are deliberately excluded from Stage 8 Slug formatter acceptance."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-executables-rule-capability --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-executables-rule-capability --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "declared_executable_non_test_rules"
+argv = ["query", "executables(//pkg:all)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:arbitrary_target\\n//pkg:edge_exec\\n//pkg:target_test\\n?\\Z"]
+
+[[commands]]
+name = "representation_only_exec_arbitrary_label_kind"
+argv = ["query", "--output=label_kind", "//pkg:arbitrary_target"]
+expected_exit = 0
+stdout_patterns = ["\\Aexec_arbitrary rule //pkg:arbitrary_target\\n?\\Z"]
+
+[[commands]]
+name = "representation_only_implicit_test_label_kind"
+argv = ["query", "--output=label_kind", "//pkg:ordinary_target"]
+expected_exit = 0
+stdout_patterns = ["\\Aimplicit_test_test rule //pkg:ordinary_target\\n?\\Z"]
+
+[[commands]]
+name = "representation_only_explicit_test_label_kind"
+argv = ["query", "--output=label_kind", "//pkg:explicit_test_target"]
+expected_exit = 0
+stdout_patterns = ["\\Aexplicit_test_test rule //pkg:explicit_test_target\\n?\\Z"]
+
+[[commands]]
+name = "representation_only_plain_rule_label_kind"
+argv = ["query", "--output=label_kind", "//pkg:plain"]
+expected_exit = 0
+stdout_patterns = ["\\Aplain_rule rule //pkg:plain\\n?\\Z"]
+
+[[commands]]
+name = "representation_only_output_rule_label_kind"
+argv = ["query", "--output=label_kind", "//pkg:generated_owner"]
+expected_exit = 0
+stdout_patterns = ["\\Aoutput_rule rule //pkg:generated_owner\\n?\\Z"]
+
+[[commands]]
+name = "representation_only_filegroup_label_kind"
+argv = ["query", "--output=label_kind", "//pkg:files"]
+expected_exit = 0
+stdout_patterns = ["\\Afilegroup rule //pkg:files\\n?\\Z"]
+
+[[commands]]
+name = "representation_only_alias_label_kind"
+argv = ["query", "--output=label_kind", "//pkg:alias_exec"]
+expected_exit = 0
+stdout_patterns = ["\\Aalias rule //pkg:alias_exec\\n?\\Z"]
+
+[[commands]]
+name = "representation_only_config_setting_label_kind"
+argv = ["query", "--output=label_kind", "//pkg:setting"]
+expected_exit = 0
+stdout_patterns = ["\\Aconfig_setting rule //pkg:setting\\n?\\Z"]
+
+[[commands]]
+name = "executable_false_excluded"
+argv = ["query", "executables(//pkg:plain)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "test_class_ordinary_target_excluded"
+argv = ["query", "executables(//pkg:ordinary_target)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "explicit_test_and_executable_excluded"
+argv = ["query", "executables(//pkg:explicit_test_target)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "build_target_suffix_does_not_classify"
+argv = ["query", "executables(//pkg:target_test)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:target_test\\n?\\Z"]
+
+[[commands]]
+name = "source_file_negative"
+argv = ["query", "executables(//pkg:data.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "current_loadable_non_rule_and_native_negatives"
+argv = ["query", "executables(set(//pkg:data.txt //pkg:generated.txt //pkg:BUILD.bazel //pkg:files //pkg:alias_exec //pkg:setting))"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "alias_does_not_inherit_executable"
+argv = ["query", "executables(//pkg:alias_exec)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "build_file_negative"
+argv = ["query", "executables(//pkg:BUILD.bazel)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "generated_output_negative"
+argv = ["query", "executables(//pkg:generated.txt)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "filegroup_negative"
+argv = ["query", "executables(//pkg:files)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "config_setting_negative"
+argv = ["query", "executables(//pkg:setting)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "empty_operand"
+argv = ["query", "executables(set())"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "duplicate_operands_deduplicate"
+argv = ["query", "executables(set(//pkg:arbitrary_target //pkg:arbitrary_target //pkg:target_test))"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:arbitrary_target\\n//pkg:target_test\\n?\\Z"]
+
+[[commands]]
+name = "union_composition"
+argv = ["query", "executables(//pkg:arbitrary_target) union //pkg:plain"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:arbitrary_target\\n//pkg:plain\\n?\\Z"]
+
+[[commands]]
+name = "intersection_composition"
+argv = ["query", "executables(//pkg:all) intersect set(//pkg:target_test //pkg:plain)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:target_test\\n?\\Z"]
+
+[[commands]]
+name = "except_composition"
+argv = ["query", "executables(//pkg:all) except //pkg:target_test"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:arbitrary_target\\n//pkg:edge_exec\\n?\\Z"]
+
+[[commands]]
+name = "let_composition"
+argv = ["query", "let x = //pkg:all in executables($x)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:arbitrary_target\\n//pkg:edge_exec\\n//pkg:target_test\\n?\\Z"]
+
+[[commands]]
+name = "nested_executables"
+argv = ["query", "executables(executables(//pkg:all))"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:arbitrary_target\\n//pkg:edge_exec\\n//pkg:target_test\\n?\\Z"]
+
+[[commands]]
+name = "default_order"
+argv = ["query", "executables(//pkg:all)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:arbitrary_target\\n//pkg:edge_exec\\n//pkg:target_test\\n?\\Z"]
+
+[[commands]]
+name = "auto_order"
+argv = ["query", "--order_output=auto", "executables(//pkg:all)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:arbitrary_target\\n//pkg:edge_exec\\n//pkg:target_test\\n?\\Z"]
+
+[[commands]]
+name = "full_order"
+argv = ["query", "--order_output=full", "executables(//pkg:all)"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:target_test\\n//pkg:edge_exec\\n//pkg:arbitrary_target\\n?\\Z"]
+
+[[commands]]
+name = "filter_adds_no_edges_text"
+argv = ["query", "deps(executables(//pkg:edge_exec))"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:edge_dep\\n//pkg:edge_exec\\n?\\Z"]
+
+[[commands]]
+name = "filter_adds_no_edges_direct_graph"
+argv = ["query", "--output=graph", "--graph:factored", "executables(//pkg:edge_exec)"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \\\"//pkg:edge_exec\\\"\\n\\}\\n?\\Z"]
+
+[[commands]]
+name = "filter_adds_no_edges_graph"
+argv = ["query", "--output=graph", "--graph:factored", "deps(executables(//pkg:edge_exec))"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \\\"//pkg:edge_exec\\\"\\n  \\\"//pkg:edge_exec\\\" -> \\\"//pkg:edge_dep\\\"\\n  \\\"//pkg:edge_dep\\\"\\n\\}\\n?\\Z"]
+
+[[commands]]
+name = "operand_failure"
+argv = ["query", "executables(//missing:nope)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such package 'missing'"]
+
+[[commands]]
+name = "arity_failure"
+argv = ["query", "executables()"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too few arguments to function 'executables'"]
+
+[[commands]]
+name = "too_many_arguments_failure"
+argv = ["query", "executables(//pkg:plain, //pkg:arbitrary_target)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too many arguments to function 'executables'"]
+
+[[commands]]
+name = "operand_failure_has_no_partial_output"
+argv = ["query", "executables(//pkg:arbitrary_target union //missing:nope)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such package 'missing'"]
+
+[[commands]]
+name = "test_true_executable_false_probe"
+argv = ["query", "executables(//test_false:probe)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "invalid_test_true_class_without_suffix"
+argv = ["query", "//invalid_not_test:probe"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["Invalid rule class name 'not_test_suffix', test rule class names must end with '_test' and other rule classes must not"]
+
+[[commands]]
+name = "invalid_non_test_class_with_suffix"
+argv = ["query", "//invalid_suffix_test:probe"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["Invalid rule class name 'suffix_test', test rule class names must end with '_test' and other rule classes must not"]

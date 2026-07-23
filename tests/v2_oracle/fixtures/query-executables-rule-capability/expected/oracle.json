@@ -1,0 +1,960 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:all)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:all)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "declared_executable_non_test_rules",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085121-875066-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 9ad687d5-e6b6-40ef-b38c-39ce59778003\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "//pkg:arbitrary_target"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "//pkg:arbitrary_target"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "representation_only_exec_arbitrary_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "exec_arbitrary rule //pkg:arbitrary_target",
+      "stderr": "INFO: Invocation ID: 890fe983-51a3-4a6b-a169-90c23be3263b\nLoading: 0 packages loaded\n",
+      "stdout": "exec_arbitrary rule //pkg:arbitrary_target\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "//pkg:ordinary_target"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "//pkg:ordinary_target"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "representation_only_implicit_test_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "implicit_test_test rule //pkg:ordinary_target",
+      "stderr": "INFO: Invocation ID: cb2c4b27-f72e-43bc-b07e-7eb711900802\nLoading: 0 packages loaded\n",
+      "stdout": "implicit_test_test rule //pkg:ordinary_target\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "//pkg:explicit_test_target"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "//pkg:explicit_test_target"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "representation_only_explicit_test_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "explicit_test_test rule //pkg:explicit_test_target",
+      "stderr": "INFO: Invocation ID: 5cda06c7-93c4-4eca-a6ba-bc025a0d204c\nLoading: 0 packages loaded\n",
+      "stdout": "explicit_test_test rule //pkg:explicit_test_target\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "//pkg:plain"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "//pkg:plain"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "representation_only_plain_rule_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "plain_rule rule //pkg:plain",
+      "stderr": "INFO: Invocation ID: 83d37efc-ee68-4d31-807a-2e63643a1799\nLoading: 0 packages loaded\n",
+      "stdout": "plain_rule rule //pkg:plain\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "//pkg:generated_owner"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "//pkg:generated_owner"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "representation_only_output_rule_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "output_rule rule //pkg:generated_owner",
+      "stderr": "INFO: Invocation ID: a7bf466d-82a2-4636-bad2-4aada200c93e\nLoading: 0 packages loaded\n",
+      "stdout": "output_rule rule //pkg:generated_owner\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "//pkg:files"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "//pkg:files"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "representation_only_filegroup_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "filegroup rule //pkg:files",
+      "stderr": "INFO: Invocation ID: 42b245ee-50f1-4955-898f-80cfeba03055\nLoading: 0 packages loaded\n",
+      "stdout": "filegroup rule //pkg:files\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "//pkg:alias_exec"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "//pkg:alias_exec"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "representation_only_alias_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "alias rule //pkg:alias_exec",
+      "stderr": "INFO: Invocation ID: 2ee8a45f-1e3a-44f9-abac-ab9a772bb083\nLoading: 0 packages loaded\n",
+      "stdout": "alias rule //pkg:alias_exec\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label_kind",
+        "//pkg:setting"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label_kind",
+        "//pkg:setting"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "representation_only_config_setting_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "config_setting rule //pkg:setting",
+      "stderr": "INFO: Invocation ID: b8c6420b-4672-4f4f-bec3-b10985abb35c\nLoading: 0 packages loaded\n",
+      "stdout": "config_setting rule //pkg:setting\n"
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:plain)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:plain)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "executable_false_excluded",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1727bd31-061a-4bea-85c0-fbf0b7a5edd9\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:ordinary_target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:ordinary_target)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "test_class_ordinary_target_excluded",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: deb78716-7741-49b7-b8bb-53b6ada42eb8\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:explicit_test_target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:explicit_test_target)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "explicit_test_and_executable_excluded",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e4ed6d4f-b473-40b1-a0c2-f1751233945e\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:target_test)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:target_test)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_target_suffix_does_not_classify",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:target_test",
+      "stderr": "INFO: Invocation ID: 3f07fddc-879f-4ca8-aaf0-eb24cfe85785\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:data.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:data.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "source_file_negative",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: d5f15f68-bc0d-40e1-92cb-c1852d40bdad\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(set(//pkg:data.txt //pkg:generated.txt //pkg:BUILD.bazel //pkg:files //pkg:alias_exec //pkg:setting))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(set(//pkg:data.txt //pkg:generated.txt //pkg:BUILD.bazel //pkg:files //pkg:alias_exec //pkg:setting))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "current_loadable_non_rule_and_native_negatives",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: cd0c1bdd-4f45-4da8-bd18-1bcd70e7cd1e\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:alias_exec)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:alias_exec)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "alias_does_not_inherit_executable",
+      "normalized_stderr": "Another command holds the output base lock: \npid=881225\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=881225\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 8f090e7d-cf37-4366-a53a-7170fd752691\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:BUILD.bazel)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:BUILD.bazel)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "build_file_negative",
+      "normalized_stderr": "Another command holds the output base lock: \npid=881586\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=881586\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: b2db11c2-70a1-46f4-9e48-5c6a5c2a24cd\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:generated.txt)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:generated.txt)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "generated_output_negative",
+      "normalized_stderr": "Another command holds the output base lock: \npid=881974\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=881974\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 3ea081ae-8a61-461f-9989-72ad546e4173\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:files)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:files)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "filegroup_negative",
+      "normalized_stderr": "Another command holds the output base lock: \npid=882381\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=882381\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: dd00d8bf-6fa4-495c-94b6-50009258b510\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:setting)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:setting)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "config_setting_negative",
+      "normalized_stderr": "Another command holds the output base lock: \npid=882820\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=882820\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a123a1fb-43d0-45f9-9f22-c71f486d4129\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(set())"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(set())"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "empty_operand",
+      "normalized_stderr": "Another command holds the output base lock: \npid=883219\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=883219\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: d0a54838-a8a9-4f3d-8885-dae5d0883fea\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(set(//pkg:arbitrary_target //pkg:arbitrary_target //pkg:target_test))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(set(//pkg:arbitrary_target //pkg:arbitrary_target //pkg:target_test))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "duplicate_operands_deduplicate",
+      "normalized_stderr": "Another command holds the output base lock: \npid=883688\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:arbitrary_target\n//pkg:target_test",
+      "stderr": "Another command holds the output base lock: \npid=883688\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 249af047-11f4-4394-8f70-19ba62c00d09\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:arbitrary_target\n//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:arbitrary_target) union //pkg:plain"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:arbitrary_target) union //pkg:plain"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "union_composition",
+      "normalized_stderr": "Another command holds the output base lock: \npid=884058\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:arbitrary_target\n//pkg:plain",
+      "stderr": "Another command holds the output base lock: \npid=884058\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 0b107b82-f043-4a91-b793-d9bf10bcb5f2\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:arbitrary_target\n//pkg:plain\n"
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:all) intersect set(//pkg:target_test //pkg:plain)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:all) intersect set(//pkg:target_test //pkg:plain)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "intersection_composition",
+      "normalized_stderr": "Another command holds the output base lock: \npid=884473\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:target_test",
+      "stderr": "Another command holds the output base lock: \npid=884473\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 8b35d3e6-6823-4b52-9797-a58fd858a7a2\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:all) except //pkg:target_test"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:all) except //pkg:target_test"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "except_composition",
+      "normalized_stderr": "Another command holds the output base lock: \npid=884894\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:arbitrary_target\n//pkg:edge_exec",
+      "stderr": "Another command holds the output base lock: \npid=884894\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 6e6e9e25-f053-4ebd-8d24-14119e245f13\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n"
+    },
+    {
+      "argv": [
+        "query",
+        "let x = //pkg:all in executables($x)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "let x = //pkg:all in executables($x)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "let_composition",
+      "normalized_stderr": "Another command holds the output base lock: \npid=885320\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test",
+      "stderr": "Another command holds the output base lock: \npid=885320\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 4a2a6b3e-9d2e-49b1-acfd-d37b23f8b482\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "executables(executables(//pkg:all))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(executables(//pkg:all))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "nested_executables",
+      "normalized_stderr": "Another command holds the output base lock: \npid=885770\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test",
+      "stderr": "Another command holds the output base lock: \npid=885770\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 0b277719-ff91-44ef-b6a9-063b5df9c2d1\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:all)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:all)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "default_order",
+      "normalized_stderr": "Another command holds the output base lock: \npid=886237\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test",
+      "stderr": "Another command holds the output base lock: \npid=886237\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a08ad578-60ab-473d-acc4-e113aa0e7cad\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "executables(//pkg:all)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "executables(//pkg:all)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "auto_order",
+      "normalized_stderr": "Another command holds the output base lock: \npid=886653\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test",
+      "stderr": "Another command holds the output base lock: \npid=886653\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 6efc6da7-5be5-47a5-b0f0-a82381e6a0d6\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "executables(//pkg:all)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "executables(//pkg:all)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_order",
+      "normalized_stderr": "Another command holds the output base lock: \npid=887047\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:target_test\n//pkg:edge_exec\n//pkg:arbitrary_target",
+      "stderr": "Another command holds the output base lock: \npid=887047\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 4bd19705-2edf-47c6-a725-ceb272c04830\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:target_test\n//pkg:edge_exec\n//pkg:arbitrary_target\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(executables(//pkg:edge_exec))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(executables(//pkg:edge_exec))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "filter_adds_no_edges_text",
+      "normalized_stderr": "Another command holds the output base lock: \npid=887451\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:edge_dep\n//pkg:edge_exec",
+      "stderr": "Another command holds the output base lock: \npid=887451\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 93d04772-2980-4836-9f30-902ce7c02ceb\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:edge_dep\n//pkg:edge_exec\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "executables(//pkg:edge_exec)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "executables(//pkg:edge_exec)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "filter_adds_no_edges_direct_graph",
+      "normalized_stderr": "Another command holds the output base lock: \npid=887860\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:edge_exec\"\n}",
+      "stderr": "Another command holds the output base lock: \npid=887860\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 9c36035d-48b6-42af-990f-30073bb75dfd\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:edge_exec\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "deps(executables(//pkg:edge_exec))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "deps(executables(//pkg:edge_exec))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "filter_adds_no_edges_graph",
+      "normalized_stderr": "Another command holds the output base lock: \npid=888277\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:edge_exec\"\n  \"//pkg:edge_exec\" -> \"//pkg:edge_dep\"\n  \"//pkg:edge_dep\"\n}",
+      "stderr": "Another command holds the output base lock: \npid=888277\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 9008bcf1-b5c6-4b47-8fe7-9b518382447b\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//pkg:edge_exec\"\n  \"//pkg:edge_exec\" -> \"//pkg:edge_dep\"\n  \"//pkg:edge_dep\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//missing:nope)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//missing:nope)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "operand_failure",
+      "normalized_stderr": "Another command holds the output base lock: \npid=888759\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=888759\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 5b5665ab-9580-4dbe-b544-461a04d88115\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables()"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables()"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "arity_failure",
+      "normalized_stderr": "Another command holds the output base lock: \npid=889195\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'executables()': too few arguments to function 'executables' at ')'",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=889195\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a34fab35-48b0-4aac-85ec-5b7612ebe5b9\nLoading: 0 packages loaded\nERROR: Error while parsing 'executables()': too few arguments to function 'executables' at ')'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:plain, //pkg:arbitrary_target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:plain, //pkg:arbitrary_target)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "too_many_arguments_failure",
+      "normalized_stderr": "Another command holds the output base lock: \npid=889572\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'executables(//pkg:plain, //pkg:arbitrary_target)': too many arguments to function 'executables' at ', //pkg:arbitrary_target )'",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=889572\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 653df538-57f1-48d8-be28-ca6d368bff29\nLoading: 0 packages loaded\nERROR: Error while parsing 'executables(//pkg:plain, //pkg:arbitrary_target)': too many arguments to function 'executables' at ', //pkg:arbitrary_target )'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//pkg:arbitrary_target union //missing:nope)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//pkg:arbitrary_target union //missing:nope)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "operand_failure_has_no_partial_output",
+      "normalized_stderr": "Another command holds the output base lock: \npid=889922\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=889922\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: af8632aa-c96b-475d-a9fc-1232de24e976\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "executables(//test_false:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "executables(//test_false:probe)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "test_true_executable_false_probe",
+      "normalized_stderr": "Another command holds the output base lock: \npid=890285\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=890285\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 3bc08203-aa1f-4a70-a83f-4dc17618ae0d\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//invalid_not_test:probe"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//invalid_not_test:probe"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "invalid_test_true_class_without_suffix",
+      "normalized_stderr": "Another command holds the output base lock: \npid=890653\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=889147\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=891113\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=891372\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=891601\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=891818\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892030\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892218\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892426\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892643\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892863\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893097\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893291\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893486\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893681\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893896\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894096\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894302\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894526\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894729\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894928\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=895133\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=895313\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=895564\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/invalid_not_test/defs.bzl:4:23: Invalid rule class name 'not_test_suffix', test rule class names must end with '_test' and other rule classes must not\nERROR: error loading package 'invalid_not_test': initialization of module 'invalid_not_test/defs.bzl' failed",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=890653\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=889147\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=891113\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=891372\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=891601\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=891818\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892030\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892218\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892426\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892643\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=892863\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893097\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893291\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893486\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893681\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=893896\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894096\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894302\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894526\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894729\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=894928\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=895133\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=895313\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nAnother command holds the output base lock: \npid=895564\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085303-889108-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a1ab0139-76b8-4a03-9d35-35b5e50f27ed\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace/invalid_not_test/defs.bzl:4:23: Invalid rule class name 'not_test_suffix', test rule class names must end with '_test' and other rule classes must not\nERROR: error loading package 'invalid_not_test': initialization of module 'invalid_not_test/defs.bzl' failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//invalid_suffix_test:probe"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//invalid_suffix_test:probe"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "invalid_non_test_class_with_suffix",
+      "normalized_stderr": "Another command holds the output base lock: \npid=895739\nowner=client\ncwd=<workspace>\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/invalid_suffix_test/defs.bzl:4:19: Invalid rule class name 'suffix_test', test rule class names must end with '_test' and other rule classes must not\nERROR: error loading package 'invalid_suffix_test': initialization of module 'invalid_suffix_test/defs.bzl' failed",
+      "normalized_stdout": "",
+      "stderr": "Another command holds the output base lock: \npid=895739\nowner=client\ncwd=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n\nWaiting for it to complete...\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085213-881221-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 3fda2c8e-0052-4850-8de8-a5cbdbff8611\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-executables-rule-capability/20260723-085202-880190-bazel/workspace/invalid_suffix_test/defs.bzl:4:19: Invalid rule class name 'suffix_test', test rule class names must end with '_test' and other rule classes must not\nERROR: error loading package 'invalid_suffix_test': initialization of module 'invalid_suffix_test/defs.bzl' failed\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "query-executables-rule-capability",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
