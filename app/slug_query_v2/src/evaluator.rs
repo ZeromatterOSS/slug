@@ -32,7 +32,7 @@ use crate::QueryExpressionKind;
 use crate::graph::QueryError;
 use crate::graph::QueryLabel;
 use crate::graph::QueryNode;
-use crate::graph::RootPackageSetKey;
+use crate::graph::SubtreePackageSetKey;
 use crate::graph::UnconfiguredPackageGraph;
 use crate::graph::UnconfiguredPackageGraphKey;
 use crate::loading_query_function;
@@ -112,6 +112,10 @@ where
         self.0.iter()
     }
 
+    pub fn contains(&self, value: &T) -> bool {
+        self.0.contains(value)
+    }
+
     fn union(mut self, other: Self) -> Self {
         for value in other.0 {
             self.0.insert(value);
@@ -152,6 +156,11 @@ pub trait QueryEnvironment {
         &mut self,
         target: &Self::Target,
     ) -> Result<Arc<[Self::Target]>, QueryError>;
+
+    async fn same_pkg_direct_rdeps(
+        &mut self,
+        targets: &TargetSet<Self::Target>,
+    ) -> Result<TargetSet<Self::Target>, QueryError>;
 }
 
 pub struct QueryEvaluator<E> {
@@ -193,9 +202,11 @@ where
                     }
                     self.environment.resolve_literal(literal).await
                 }
-                QueryExpressionKind::Integer(_) => Err(QueryError::syntax(
-                    "an integer is only valid as a query function argument",
-                )),
+                QueryExpressionKind::Integer(value) => {
+                    self.environment
+                        .resolve_literal(&format!("//:{value}"))
+                        .await
+                }
                 QueryExpressionKind::Set(literals) => {
                     let mut result = TargetSet::default();
                     for literal in literals.iter() {
@@ -265,6 +276,8 @@ pub trait QueryFunction<E: QueryEnvironment>: Send + Sync {
 pub struct LoadingQueryFunctions;
 
 static DEPS_FUNCTION: DepsFunction = DepsFunction;
+static RDEPS_FUNCTION: RdepsFunction = RdepsFunction;
+static SAME_PKG_DIRECT_RDEPS_FUNCTION: SamePkgDirectRdepsFunction = SamePkgDirectRdepsFunction;
 
 impl<E> QueryFunctions<E> for LoadingQueryFunctions
 where
@@ -275,16 +288,13 @@ where
         if spec.status != crate::QueryFunctionStatus::Implemented {
             return None;
         }
-        // The implemented registry contains one entry in this vertical. New
-        // entries are added here, not in evaluator dispatch.
-        if std::ptr::eq(
-            spec,
-            <DepsFunction as QueryFunction<E>>::spec(&DEPS_FUNCTION),
-        ) {
-            Some(&DEPS_FUNCTION)
-        } else {
-            None
-        }
+        [
+            &DEPS_FUNCTION as &dyn QueryFunction<E>,
+            &RDEPS_FUNCTION as &dyn QueryFunction<E>,
+            &SAME_PKG_DIRECT_RDEPS_FUNCTION as &dyn QueryFunction<E>,
+        ]
+        .into_iter()
+        .find(|function| std::ptr::eq(spec, function.spec()))
     }
 }
 
@@ -380,6 +390,57 @@ where
     }
 }
 
+struct RdepsFunction;
+
+impl<E> QueryFunction<E> for RdepsFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("rdeps").expect("rdeps is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        async move {
+            let universe: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            let from: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 1).await?;
+            let depth: QueryDepth = eval_arg(evaluator, args, variables, 2).await?;
+            reverse_dependencies(&mut evaluator.environment, universe, from, depth.0).await
+        }
+        .boxed()
+    }
+}
+
+struct SamePkgDirectRdepsFunction;
+
+impl<E> QueryFunction<E> for SamePkgDirectRdepsFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("same_pkg_direct_rdeps")
+            .expect("same_pkg_direct_rdeps is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        async move {
+            let targets: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            evaluator.environment.same_pkg_direct_rdeps(&targets).await
+        }
+        .boxed()
+    }
+}
+
 async fn transitive_closure<E>(
     environment: &mut E,
     roots: TargetSet<E::Target>,
@@ -394,6 +455,238 @@ where
     })
     .await?;
     Ok(result)
+}
+
+#[derive(Clone)]
+struct ResolvedGraphNode<T> {
+    target: T,
+    children: Vec<u32>,
+}
+
+/// A request-local, integer-indexed graph adapted from Buck2
+/// `query/graph/graph.rs::Graph`. DICE continues to own immutable package
+/// nodes; this type owns only traversal state for one query evaluation.
+struct ResolvedGraph<T> {
+    nodes: Vec<ResolvedGraphNode<T>>,
+    target_to_index: SmallMap<T, u32>,
+}
+
+impl<T> ResolvedGraph<T>
+where
+    T: Clone + Eq + Hash,
+{
+    async fn build_stable_forward<E>(
+        environment: &mut E,
+        roots: impl IntoIterator<Item = T>,
+    ) -> Result<Self, QueryError>
+    where
+        E: QueryEnvironment<Target = T> + Send,
+    {
+        let roots = roots.into_iter().collect::<Vec<_>>();
+        let mut graph = Self {
+            nodes: Vec::new(),
+            target_to_index: SmallMap::new(),
+        };
+        let mut pending = VecDeque::new();
+        for root in roots.iter().cloned() {
+            let (index, created) = graph.get_or_create(root);
+            if created {
+                pending.push_back(index);
+            }
+        }
+
+        while let Some(index) = pending.pop_front() {
+            let target = graph.nodes[index as usize].target.clone();
+            let dependencies = environment.dependencies(&target).await?;
+            let mut children = Vec::with_capacity(dependencies.len());
+            for dependency in dependencies.iter().cloned() {
+                let (child, created) = graph.get_or_create(dependency);
+                children.push(child);
+                if created {
+                    pending.push_back(child);
+                }
+            }
+            children.shrink_to_fit();
+            graph.nodes[index as usize].children = children;
+        }
+
+        Ok(graph.stable_dfs_order(roots))
+    }
+
+    fn get_or_create(&mut self, target: T) -> (u32, bool) {
+        if let Some(index) = self.target_to_index.get(&target) {
+            return (*index, false);
+        }
+        let index: u32 = self
+            .nodes
+            .len()
+            .try_into()
+            .expect("query graph exceeds u32 node capacity");
+        self.target_to_index.insert(target.clone(), index);
+        self.nodes.push(ResolvedGraphNode {
+            target,
+            children: Vec::new(),
+        });
+        (index, true)
+    }
+
+    fn stable_dfs_order(self, roots: Vec<T>) -> Self {
+        let mut visited = SmallSet::new();
+        let mut order = Vec::with_capacity(self.nodes.len());
+        let mut stack = roots
+            .iter()
+            .rev()
+            .filter_map(|root| self.target_to_index.get(root).copied())
+            .collect::<Vec<_>>();
+        while let Some(index) = stack.pop() {
+            if !visited.insert(index) {
+                continue;
+            }
+            order.push(index);
+            for child in self.nodes[index as usize].children.iter().rev() {
+                stack.push(*child);
+            }
+        }
+        debug_assert_eq!(order.len(), self.nodes.len());
+        self.remap(order)
+    }
+
+    fn remap(self, old_indices: Vec<u32>) -> Self {
+        let mut old_to_new = vec![None; self.nodes.len()];
+        for (new, old) in old_indices.iter().copied().enumerate() {
+            old_to_new[old as usize] = Some(
+                new.try_into()
+                    .expect("query graph exceeds u32 node capacity"),
+            );
+        }
+
+        let mut nodes = Vec::with_capacity(old_indices.len());
+        let mut target_to_index = SmallMap::with_capacity(old_indices.len());
+        for old in old_indices {
+            let old_node = &self.nodes[old as usize];
+            let new_index: u32 = nodes
+                .len()
+                .try_into()
+                .expect("query graph exceeds u32 node capacity");
+            let target = old_node.target.clone();
+            let children = old_node
+                .children
+                .iter()
+                .filter_map(|child| old_to_new[*child as usize])
+                .collect();
+            target_to_index.insert(target.clone(), new_index);
+            nodes.push(ResolvedGraphNode { target, children });
+        }
+        Self {
+            nodes,
+            target_to_index,
+        }
+    }
+
+    fn reverse(mut self) -> Self {
+        let mut reversed = (0..self.nodes.len())
+            .map(|_| Vec::new())
+            .collect::<Vec<_>>();
+        for (parent, node) in self.nodes.iter().enumerate() {
+            for child in node.children.iter() {
+                reversed[*child as usize].push(
+                    parent
+                        .try_into()
+                        .expect("query graph exceeds u32 node capacity"),
+                );
+            }
+        }
+        for (node, children) in self.nodes.iter_mut().zip(reversed) {
+            node.children = children;
+        }
+        self
+    }
+
+    fn take_max_depth(self, roots: &[T], max_depth: u64) -> Self {
+        let mut visited = SmallSet::new();
+        let mut retained = Vec::new();
+        let mut edge = VecDeque::new();
+        for root in roots {
+            let Some(index) = self.target_to_index.get(root).copied() else {
+                continue;
+            };
+            if visited.insert(index) {
+                retained.push(index);
+                edge.push_back((index, 0_u64));
+            }
+        }
+
+        while let Some((index, depth)) = edge.pop_front() {
+            if depth >= max_depth {
+                continue;
+            }
+            for child in self.nodes[index as usize].children.iter().copied() {
+                if visited.insert(child) {
+                    retained.push(child);
+                    edge.push_back((child, depth + 1));
+                }
+            }
+        }
+        if retained.len() == self.nodes.len() {
+            self
+        } else {
+            self.remap(retained)
+        }
+    }
+
+    fn contains(&self, target: &T) -> bool {
+        self.target_to_index.get(target).is_some()
+    }
+
+    fn depth_first_postorder(&self, roots: &[T]) -> TargetSet<T> {
+        let mut result = TargetSet::default();
+        let mut visited = SmallSet::new();
+        for root in roots {
+            let Some(root) = self.target_to_index.get(root).copied() else {
+                continue;
+            };
+            if !visited.insert(root) {
+                continue;
+            }
+            let mut stack = vec![(root, 0_usize)];
+            while let Some((index, next_child)) = stack.last_mut() {
+                let node = &self.nodes[*index as usize];
+                if let Some(child) = node.children.get(*next_child).copied() {
+                    *next_child += 1;
+                    if visited.insert(child) {
+                        stack.push((child, 0));
+                    }
+                } else {
+                    let (index, _) = stack.pop().expect("query DFS stack is non-empty");
+                    result.insert(self.nodes[index as usize].target.clone());
+                }
+            }
+        }
+        result
+    }
+}
+
+async fn reverse_dependencies<E>(
+    environment: &mut E,
+    universe: TargetSet<E::Target>,
+    from: TargetSet<E::Target>,
+    max_depth: Option<u64>,
+) -> Result<TargetSet<E::Target>, QueryError>
+where
+    E: QueryEnvironment + Send,
+{
+    let graph = ResolvedGraph::build_stable_forward(environment, universe.iter().cloned()).await?;
+    let graph = graph.reverse();
+    let roots = from
+        .iter()
+        .filter(|target| graph.contains(*target))
+        .cloned()
+        .collect::<Vec<_>>();
+    let graph = match max_depth {
+        Some(depth) => graph.take_max_depth(&roots, depth),
+        None => graph,
+    };
+    Ok(graph.depth_first_postorder(&roots))
 }
 
 /// Generic depth-limited traversal adapted from Buck2
@@ -484,6 +777,36 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             ))
         })
     }
+
+    async fn resolve_recursive(
+        &mut self,
+        prefix: &str,
+    ) -> Result<TargetSet<QueryLabel>, QueryError> {
+        let packages = self
+            .ctx
+            .compute(&SubtreePackageSetKey {
+                workspace: self.workspace.clone(),
+                prefix: PathBuf::from(prefix),
+            })
+            .await
+            .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        let packages = packages.as_ref().as_ref().map_err(|error| error.clone())?;
+        let mut result = TargetSet::default();
+        for package in packages.packages.iter() {
+            let graph = self.package_graph(package).await?;
+            for (label, node) in graph.nodes.iter() {
+                if node.kind.is_rule() {
+                    result.insert(label.clone());
+                }
+            }
+        }
+        if result.iter().next().is_none() {
+            return Err(QueryError::evaluation(format!(
+                "no targets found beneath '{prefix}'"
+            )));
+        }
+        Ok(result)
+    }
 }
 
 #[async_trait]
@@ -495,26 +818,8 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         literal: &str,
     ) -> Result<TargetSet<Self::Target>, QueryError> {
         if literal == "//..." {
-            let packages = self
-                .ctx
-                .compute(&RootPackageSetKey {
-                    workspace: self.workspace.clone(),
-                })
-                .await
-                .map_err(|error| QueryError::evaluation(error.to_string()))?;
-            let packages = packages.as_ref().as_ref().map_err(|error| error.clone())?;
-            let mut result = TargetSet::default();
-            for package in packages.packages.iter() {
-                let graph = self.package_graph(package).await?;
-                for (label, node) in graph.nodes.iter() {
-                    if node.kind.is_rule() {
-                        result.insert(label.clone());
-                    }
-                }
-            }
-            return Ok(result);
+            return self.resolve_recursive("").await;
         }
-
         let pattern = TargetPattern::parse(literal).map_err(QueryError::evaluation)?;
         match pattern {
             TargetPattern::Single(label) => {
@@ -538,9 +843,14 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                 }
                 Ok(result)
             }
-            TargetPattern::Recursive { .. } => Err(QueryError::evaluation(
-                "only root recursive pattern //... is implemented",
-            )),
+            TargetPattern::Recursive { repo, package } => {
+                if !repo.is_root() {
+                    return Err(QueryError::evaluation(format!(
+                        "external repository query patterns are deferred: {literal}"
+                    )));
+                }
+                self.resolve_recursive(package.as_str()).await
+            }
         }
     }
 
@@ -551,6 +861,34 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         self.resolve_single(target.clone())
             .await
             .map(|node| node.dependencies)
+    }
+
+    async fn same_pkg_direct_rdeps(
+        &mut self,
+        targets: &TargetSet<Self::Target>,
+    ) -> Result<TargetSet<Self::Target>, QueryError> {
+        let mut by_package = SmallMap::<CompactString, SmallSet<QueryLabel>>::new();
+        for target in targets.iter() {
+            by_package
+                .entry(CompactString::new(target.package()))
+                .or_default()
+                .insert(target.clone());
+        }
+
+        let mut result = TargetSet::default();
+        for (package, package_targets) in by_package {
+            let graph = self.package_graph(&package).await?;
+            for node in graph.nodes.values() {
+                if node
+                    .dependencies
+                    .iter()
+                    .any(|dependency| package_targets.contains(dependency))
+                {
+                    result.insert(node.label.clone());
+                }
+            }
+        }
+        Ok(result)
     }
 }
 

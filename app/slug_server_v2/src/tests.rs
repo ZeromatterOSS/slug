@@ -273,3 +273,46 @@ fn retained_daemon_query_observes_build_dependency_edits() {
     assert_eq!(third.exit_code, 0, "{third:?}");
     assert_eq!(third.invalidated_files, 0);
 }
+
+#[test]
+fn retained_daemon_reverse_query_observes_edge_and_subtree_transitions() {
+    let workspace = scratch("reverse-query-transitions");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("app/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//leaf:item\"])\n",
+    );
+    write(
+        &workspace.join("leaf/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [])\n",
+    );
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let first = daemon.query("rdeps(//app:top, //leaf:item)", QueryOrder::Auto);
+    assert_eq!(first.exit_code, 0, "{first:?}");
+    assert_eq!(first.stdout, "//app:top\n//leaf:item\n");
+
+    write(
+        &workspace.join("app/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [])\n",
+    );
+    let lost = daemon.query("rdeps(//app:top, //leaf:item)", QueryOrder::Auto);
+    assert_eq!(lost.exit_code, 0, "{lost:?}");
+    assert!(lost.stdout.is_empty(), "{lost:?}");
+
+    write(
+        &workspace.join("tree/base/BUILD.bazel"),
+        "filegroup(name = \"base\", srcs = [])\n",
+    );
+    let subtree = daemon.query("//tree/...", QueryOrder::Auto);
+    assert_eq!(subtree.exit_code, 0, "{subtree:?}");
+    assert_eq!(subtree.stdout, "//tree/base:base\n");
+
+    write(
+        &workspace.join("tree/dynamic/BUILD.bazel"),
+        "filegroup(name = \"dynamic\", srcs = [])\n",
+    );
+    let created = daemon.query("//tree/...", QueryOrder::Auto);
+    assert_eq!(created.exit_code, 0, "{created:?}");
+    assert_eq!(created.stdout, "//tree/base:base\n//tree/dynamic:dynamic\n");
+}

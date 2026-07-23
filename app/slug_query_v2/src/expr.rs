@@ -122,8 +122,18 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
     deferred("kind", 2, &[WORD, EXPR]),
     deferred("labels", 2, &[WORD, EXPR]),
     deferred("loadfiles", 1, &[EXPR]),
-    deferred("rdeps", 2, &[EXPR, EXPR, INT]),
-    deferred("same_pkg_direct_rdeps", 1, &[EXPR]),
+    QueryFunctionSpec {
+        name: "rdeps",
+        mandatory_arguments: 2,
+        argument_kinds: &[EXPR, EXPR, INT],
+        status: QueryFunctionStatus::Implemented,
+    },
+    QueryFunctionSpec {
+        name: "same_pkg_direct_rdeps",
+        mandatory_arguments: 1,
+        argument_kinds: &[EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     deferred("siblings", 1, &[EXPR]),
     deferred("some", 1, &[EXPR, INT]),
     deferred("somepath", 2, &[EXPR, EXPR]),
@@ -211,9 +221,9 @@ fn validate_expression(expression: &QueryExpression) -> Result<(), QueryParseErr
             }
             for (index, (argument, expected)) in args.iter().zip(spec.argument_kinds).enumerate() {
                 let valid = match expected {
-                    QueryArgumentKind::Expression => {
-                        !matches!(argument.kind, QueryExpressionKind::Integer(_))
-                    }
+                    // Bazel treats an integer token in an expression position
+                    // as a target literal (for example `1` becomes `//:1`).
+                    QueryArgumentKind::Expression => true,
                     QueryArgumentKind::Word => {
                         matches!(argument.kind, QueryExpressionKind::TargetLiteral(_))
                     }

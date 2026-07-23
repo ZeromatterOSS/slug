@@ -225,6 +225,166 @@ fn loading_query_fixture_matches_full_bazel_semantic_slice() {
 }
 
 #[test]
+fn reverse_query_fixture_matches_all_twenty_six_bazel_rows_through_cli() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-rdeps-and-subtree-patterns/workspace");
+    let successes: &[(&[&str], &str)] = &[
+        (
+            &["query", "//tree/left/..."],
+            "//tree/left:cross_only\n//tree/left:custom_parent\n//tree/left:cycle_a\n//tree/left:cycle_b\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:via_alias\n//tree/left/nested:nested\n",
+        ),
+        (&["query", "//nonpackage/..."], "//nonpackage/desc:desc\n"),
+        (
+            &["query", "rdeps(//..., //tree/left:source.txt)"],
+            "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only\n",
+        ),
+        (
+            &["query", "rdeps(//..., //tree/left:source.txt, 0)"],
+            "//tree/left:source.txt\n",
+        ),
+        (
+            &["query", "rdeps(//..., //tree/left:source.txt, 1)"],
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/right:right_both\n//tree/right:right_cross_only\n",
+        ),
+        (
+            &["query", "rdeps(//..., //tree/left:source.txt, 2)"],
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only\n",
+        ),
+        (
+            &[
+                "query",
+                "rdeps(//tree/right:right_parent, //tree/left:source.txt)",
+            ],
+            "",
+        ),
+        (
+            &[
+                "query",
+                "rdeps(set(//tree/left:parent_one //tree/right:right_parent), //tree/left:source.txt)",
+            ],
+            "//tree/left:parent_one\n//tree/left:source.txt\n",
+        ),
+        (
+            &[
+                "query",
+                "rdeps(//..., set(//tree/left:source.txt //tree/left:source.txt))",
+            ],
+            "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only\n",
+        ),
+        (
+            &["query", "rdeps(//tree/left:cycle_a, //tree/left:cycle_b)"],
+            "//tree/left:cycle_a\n//tree/left:cycle_b\n",
+        ),
+        (
+            &["query", "rdeps(//..., //tree/left:leaf)"],
+            "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias\n",
+        ),
+        (
+            &[
+                "query",
+                "rdeps(//tree/right:right_parent, //tree/left:leaf)",
+            ],
+            "",
+        ),
+        (
+            &["query", "rdeps(//tree/..., //tree/left:leaf)"],
+            "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias\n",
+        ),
+        (
+            &[
+                "query",
+                "--order_output=auto",
+                "rdeps(//tree/..., //tree/left:leaf)",
+            ],
+            "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:via_alias\n",
+        ),
+        (
+            &[
+                "query",
+                "--order_output=full",
+                "rdeps(//tree/..., //tree/left:leaf)",
+            ],
+            "//tree/left:custom_parent\n//tree/left:via_alias\n//tree/left:leaf\n",
+        ),
+        (
+            &["query", "same_pkg_direct_rdeps(//tree/left:source.txt)"],
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n",
+        ),
+        (
+            &[
+                "query",
+                "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/left:source.txt))",
+            ],
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n",
+        ),
+        (
+            &["query", "same_pkg_direct_rdeps(//tree/left:leaf)"],
+            "//tree/left:via_alias\n",
+        ),
+        (
+            &["query", "same_pkg_direct_rdeps(//tree/left:via_alias)"],
+            "//tree/left:custom_parent\n",
+        ),
+        (
+            &[
+                "query",
+                "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/right:right_source.txt))",
+            ],
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/right:right_both\n//tree/right:right_parent\n",
+        ),
+    ];
+    for (args, expected) in successes {
+        let output = slug().current_dir(&workspace).args(*args).output().unwrap();
+        assert!(output.status.success(), "{args:?}: {output:?}");
+        assert_eq!(
+            std::str::from_utf8(&output.stdout).unwrap(),
+            *expected,
+            "{args:?}"
+        );
+    }
+
+    let failures: &[(&[&str], i32, &str)] = &[
+        (
+            &["query", "//empty/..."],
+            7,
+            "no targets found beneath 'empty'",
+        ),
+        (
+            &["query", "//missing/..."],
+            7,
+            "no targets found beneath 'missing'",
+        ),
+        (
+            &["query", "rdeps(//..., //tree/left:leaf, 1, 2)"],
+            2,
+            "too many arguments to function 'rdeps'",
+        ),
+        (
+            &["query", "rdeps(//..., 1)"],
+            7,
+            "no such target '//:1': target '1' not declared in package ''",
+        ),
+        (
+            &["query", "same_pkg_direct_rdeps()"],
+            2,
+            "too few arguments to function 'same_pkg_direct_rdeps'",
+        ),
+        (
+            &["query", "same_pkg_direct_rdeps(1)"],
+            7,
+            "no such target '//:1': target '1' not declared in package ''",
+        ),
+    ];
+    for (args, exit, message) in failures {
+        let output = slug().current_dir(&workspace).args(*args).output().unwrap();
+        assert_eq!(output.status.code(), Some(*exit), "{args:?}: {output:?}");
+        assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(message), "{args:?}: {stderr}");
+    }
+}
+
+#[test]
 fn output_base_query_reuses_one_daemon_across_build_edits() {
     let workspace = scratch("query-workspace");
     let output_base = scratch("query-output-base");

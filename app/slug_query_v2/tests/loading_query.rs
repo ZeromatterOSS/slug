@@ -20,7 +20,7 @@ use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_query_v2::QueryOrder;
-use slug_query_v2::RootPackageSetKey;
+use slug_query_v2::SubtreePackageSetKey;
 use slug_query_v2::UnconfiguredPackageGraphKey;
 use slug_query_v2::evaluate_loading_query;
 
@@ -110,7 +110,7 @@ async fn transaction(dice: &Arc<Dice>, workspace: &Path) -> dice::DiceTransactio
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 enum QueryKeyIdentity {
     Package(PathBuf),
-    RootPackageSet,
+    SubtreePackageSet(PathBuf),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
@@ -141,8 +141,8 @@ impl ActivationTracker for QueryTracker {
             .downcast_ref::<UnconfiguredPackageGraphKey>()
             .map(|key| QueryKeyIdentity::Package(key.package.clone()))
             .or_else(|| {
-                key.downcast_ref::<RootPackageSetKey>()
-                    .map(|_| QueryKeyIdentity::RootPackageSet)
+                key.downcast_ref::<SubtreePackageSetKey>()
+                    .map(|key| QueryKeyIdentity::SubtreePackageSet(key.prefix.clone()))
             });
         if let Some(identity) = identity {
             let kind = match activation {
@@ -199,6 +199,13 @@ async fn query_revision(
 
 fn package(package: &str, kind: ActivationKind) -> (QueryKeyIdentity, ActivationKind) {
     (QueryKeyIdentity::Package(PathBuf::from(package)), kind)
+}
+
+fn subtree(prefix: &str, kind: ActivationKind) -> (QueryKeyIdentity, ActivationKind) {
+    (
+        QueryKeyIdentity::SubtreePackageSet(PathBuf::from(prefix)),
+        kind,
+    )
 }
 
 // Source nodes belong to the package that owns their referring attribute.
@@ -314,7 +321,10 @@ async fn exact_query_key_activation_multisets_cover_retained_transitions() {
         events,
         [
             package("unrelated", ActivationKind::Evaluated),
-            (QueryKeyIdentity::RootPackageSet, ActivationKind::Evaluated),
+            (
+                QueryKeyIdentity::SubtreePackageSet(PathBuf::new()),
+                ActivationKind::Evaluated,
+            ),
         ]
     );
 
@@ -339,7 +349,10 @@ async fn exact_query_key_activation_multisets_cover_retained_transitions() {
             package("dynamic", ActivationKind::Evaluated),
             package("lib", ActivationKind::Reused),
             package("unrelated", ActivationKind::Reused),
-            (QueryKeyIdentity::RootPackageSet, ActivationKind::Evaluated),
+            (
+                QueryKeyIdentity::SubtreePackageSet(PathBuf::new()),
+                ActivationKind::Evaluated,
+            ),
         ]
     );
 
@@ -355,7 +368,10 @@ async fn exact_query_key_activation_multisets_cover_retained_transitions() {
             package("app", ActivationKind::Reused),
             package("lib", ActivationKind::Reused),
             package("unrelated", ActivationKind::Reused),
-            (QueryKeyIdentity::RootPackageSet, ActivationKind::Evaluated),
+            (
+                QueryKeyIdentity::SubtreePackageSet(PathBuf::new()),
+                ActivationKind::Evaluated,
+            ),
         ]
     );
 
@@ -380,7 +396,10 @@ async fn exact_query_key_activation_multisets_cover_retained_transitions() {
             package("dynamic", ActivationKind::Evaluated),
             package("lib", ActivationKind::Reused),
             package("unrelated", ActivationKind::Reused),
-            (QueryKeyIdentity::RootPackageSet, ActivationKind::Evaluated),
+            (
+                QueryKeyIdentity::SubtreePackageSet(PathBuf::new()),
+                ActivationKind::Evaluated,
+            ),
         ]
     );
 
@@ -426,4 +445,317 @@ async fn exact_query_key_activation_multisets_cover_retained_transitions() {
         ["//created:item", "//created:other.txt"]
     );
     assert_eq!(events, [package("created", ActivationKind::Evaluated)]);
+}
+
+#[tokio::test]
+async fn subtree_rdeps_and_same_package_reverse_queries_match_bazel_oracle() {
+    let workspace = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/v2_oracle/fixtures/query-rdeps-and-subtree-patterns/workspace"),
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    let cases = [
+        (
+            "//tree/left/...",
+            QueryOrder::Auto,
+            "//tree/left:cross_only\n//tree/left:custom_parent\n//tree/left:cycle_a\n//tree/left:cycle_b\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:via_alias\n//tree/left/nested:nested\n",
+        ),
+        (
+            "//nonpackage/...",
+            QueryOrder::Auto,
+            "//nonpackage/desc:desc\n",
+        ),
+        (
+            "rdeps(//..., //tree/left:source.txt)",
+            QueryOrder::Auto,
+            "//tree/left:custom_parent\n//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only\n",
+        ),
+        (
+            "rdeps(//..., //tree/left:source.txt, 0)",
+            QueryOrder::Auto,
+            "//tree/left:source.txt\n",
+        ),
+        (
+            "rdeps(//..., //tree/left:source.txt, 1)",
+            QueryOrder::Auto,
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/right:right_both\n//tree/right:right_cross_only\n",
+        ),
+        (
+            "rdeps(//..., //tree/left:source.txt, 2)",
+            QueryOrder::Auto,
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/left:source.txt\n//tree/left:via_alias\n//tree/right:right_both\n//tree/right:right_cross_only\n",
+        ),
+        (
+            "rdeps(//tree/right:right_parent, //tree/left:source.txt)",
+            QueryOrder::Auto,
+            "",
+        ),
+        (
+            "rdeps(set(//tree/left:parent_one //tree/right:right_parent), //tree/left:source.txt)",
+            QueryOrder::Auto,
+            "//tree/left:parent_one\n//tree/left:source.txt\n",
+        ),
+        (
+            "rdeps(//tree/left:cycle_a, //tree/left:cycle_b)",
+            QueryOrder::Auto,
+            "//tree/left:cycle_a\n//tree/left:cycle_b\n",
+        ),
+        (
+            "rdeps(//tree/..., //tree/left:leaf)",
+            QueryOrder::Full,
+            "//tree/left:custom_parent\n//tree/left:via_alias\n//tree/left:leaf\n",
+        ),
+        (
+            "same_pkg_direct_rdeps(//tree/left:source.txt)",
+            QueryOrder::Auto,
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n",
+        ),
+        (
+            "same_pkg_direct_rdeps(set(//tree/left:source.txt //tree/right:right_source.txt))",
+            QueryOrder::Auto,
+            "//tree/left:leaf\n//tree/left:parent_one\n//tree/left:parent_two\n//tree/right:right_both\n//tree/right:right_parent\n",
+        ),
+    ];
+    for (expression, order, expected) in cases {
+        let output = evaluate_loading_query(&mut transaction, workspace.clone(), expression, order)
+            .await
+            .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+
+    for (expression, expected) in [
+        ("//empty/...", "no targets found beneath 'empty'"),
+        ("//missing/...", "no targets found beneath 'missing'"),
+        (
+            "rdeps(//..., 1)",
+            "no such target '//:1': target '1' not declared in package ''",
+        ),
+        (
+            "same_pkg_direct_rdeps(1)",
+            "no such target '//:1': target '1' not declared in package ''",
+        ),
+    ] {
+        let error = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.exit_code, 7, "{expression}: {error}");
+        assert!(
+            error.to_string().contains(expected),
+            "{expression}: {error}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn reverse_query_keys_have_prefix_and_operand_local_activation_multisets() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("tree/base/BUILD.bazel"),
+        "filegroup(name = \"base\", srcs = [])\n",
+    );
+    write(
+        workspace.join("outside/BUILD.bazel"),
+        "filegroup(name = \"outside\", srcs = [])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(QueryTracker::default());
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(initial.unwrap().labels.as_ref(), ["//tree/base:base"]);
+    assert_eq!(
+        events,
+        [
+            package("tree/base", ActivationKind::Evaluated),
+            subtree("tree", ActivationKind::Evaluated),
+        ]
+    );
+
+    let (_, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(events, []);
+
+    write(
+        workspace.join("outside/BUILD.bazel"),
+        "filegroup(name = \"changed\", srcs = [])\n",
+    );
+    let (_, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(events, [package("tree/base", ActivationKind::Reused)]);
+
+    write(
+        workspace.join("outside/new/BUILD.bazel"),
+        "filegroup(name = \"new\", srcs = [])\n",
+    );
+    let (_, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(
+        events,
+        [
+            package("tree/base", ActivationKind::Reused),
+            subtree("tree", ActivationKind::Reused),
+        ]
+    );
+
+    fs::remove_file(workspace.join("outside/new/BUILD.bazel")).unwrap();
+    let (_, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(
+        events,
+        [
+            package("tree/base", ActivationKind::Reused),
+            subtree("tree", ActivationKind::Reused),
+        ]
+    );
+
+    write(
+        workspace.join("outside/new/BUILD.bazel"),
+        "filegroup(name = \"reborn\", srcs = [])\n",
+    );
+    let (_, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(
+        events,
+        [
+            package("tree/base", ActivationKind::Reused),
+            subtree("tree", ActivationKind::Reused),
+        ]
+    );
+
+    write(
+        workspace.join("tree/dynamic/BUILD.bazel"),
+        "filegroup(name = \"fresh\", srcs = [])\n",
+    );
+    let (created, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(
+        created.unwrap().labels.as_ref(),
+        ["//tree/base:base", "//tree/dynamic:fresh"]
+    );
+    assert_eq!(
+        events,
+        [
+            package("tree/base", ActivationKind::Reused),
+            package("tree/dynamic", ActivationKind::Evaluated),
+            subtree("tree", ActivationKind::Evaluated),
+        ]
+    );
+
+    fs::remove_file(workspace.join("tree/dynamic/BUILD.bazel")).unwrap();
+    let (_, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(
+        events,
+        [
+            package("tree/base", ActivationKind::Reused),
+            subtree("tree", ActivationKind::Evaluated),
+        ]
+    );
+
+    write(
+        workspace.join("tree/dynamic/BUILD.bazel"),
+        "filegroup(name = \"reborn\", srcs = [])\n",
+    );
+    let (_, events) = query_revision(&dice, &tracker, &workspace, "//tree/...").await;
+    assert_eq!(
+        events,
+        [
+            package("tree/base", ActivationKind::Reused),
+            package("tree/dynamic", ActivationKind::Evaluated),
+            subtree("tree", ActivationKind::Evaluated),
+        ]
+    );
+
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("app/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//leaf:item\"])\n",
+    );
+    write(
+        workspace.join("leaf/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"item.txt\"])\n",
+    );
+    write(workspace.join("leaf/item.txt"), "leaf\n");
+    write(
+        workspace.join("other/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"item.txt\"])\n",
+    );
+    write(workspace.join("other/item.txt"), "other\n");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "rdeps(//app:top, //leaf:item)";
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        initial.unwrap().labels.as_ref(),
+        ["//app:top", "//leaf:item"]
+    );
+    assert_eq!(
+        events,
+        [
+            package("app", ActivationKind::Evaluated),
+            package("leaf", ActivationKind::Evaluated),
+        ]
+    );
+
+    write(
+        workspace.join("app/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//other:item\"])\n",
+    );
+    let (lost, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert!(lost.unwrap().labels.is_empty());
+    assert_eq!(
+        events,
+        [
+            package("app", ActivationKind::Evaluated),
+            package("leaf", ActivationKind::Reused),
+            package("other", ActivationKind::Evaluated),
+        ]
+    );
+
+    write(
+        workspace.join("app/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//leaf:item\"])\n",
+    );
+    let (regained, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        regained.unwrap().labels.as_ref(),
+        ["//app:top", "//leaf:item"]
+    );
+    assert_eq!(
+        events,
+        [
+            package("app", ActivationKind::Evaluated),
+            package("leaf", ActivationKind::Reused),
+        ]
+    );
+
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("left/BUILD.bazel"),
+        "exports_files([\"source.txt\"])\nfilegroup(name = \"local\", srcs = [\":source.txt\"])\n",
+    );
+    write(workspace.join("left/source.txt"), "left\n");
+    write(
+        workspace.join("right/BUILD.bazel"),
+        "filegroup(name = \"cross\", srcs = [\"//left:source.txt\"])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "same_pkg_direct_rdeps(//left:source.txt)";
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(initial.unwrap().labels.as_ref(), ["//left:local"]);
+    assert_eq!(events, [package("left", ActivationKind::Evaluated)]);
+
+    write(
+        workspace.join("right/BUILD.bazel"),
+        "filegroup(name = \"changed_cross\", srcs = [\"//left:source.txt\"])\n",
+    );
+    let (unchanged, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(unchanged.unwrap().labels.as_ref(), ["//left:local"]);
+    assert_eq!(events, [package("left", ActivationKind::Reused)]);
 }

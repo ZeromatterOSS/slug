@@ -113,18 +113,24 @@ impl fmt::Display for UnconfiguredPackageGraphKey {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct RootPackageSet {
+pub struct SubtreePackageSet {
     pub packages: Arc<[CompactString]>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
-pub struct RootPackageSetKey {
+pub struct SubtreePackageSetKey {
     pub workspace: PathBuf,
+    pub prefix: PathBuf,
 }
 
-impl fmt::Display for RootPackageSetKey {
+impl fmt::Display for SubtreePackageSetKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "root-package-set:{}", self.workspace.display())
+        write!(
+            f,
+            "subtree-package-set:{}:{}",
+            self.workspace.display(),
+            self.prefix.display()
+        )
     }
 }
 
@@ -159,7 +165,7 @@ impl fmt::Display for QueryError {
 impl std::error::Error for QueryError {}
 
 type GraphValue = Arc<Result<Arc<UnconfiguredPackageGraph>, QueryError>>;
-type PackageSetValue = Arc<Result<RootPackageSet, QueryError>>;
+type PackageSetValue = Arc<Result<SubtreePackageSet, QueryError>>;
 
 #[async_trait]
 impl Key for UnconfiguredPackageGraphKey {
@@ -283,7 +289,7 @@ async fn compute_package_graph(
 }
 
 #[async_trait]
-impl Key for RootPackageSetKey {
+impl Key for SubtreePackageSetKey {
     type Value = PackageSetValue;
 
     async fn compute(
@@ -291,7 +297,7 @@ impl Key for RootPackageSetKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Arc::new(compute_root_packages(ctx, &self.workspace).await)
+        Arc::new(compute_subtree_packages(ctx, &self.workspace, &self.prefix).await)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -303,11 +309,12 @@ impl Key for RootPackageSetKey {
     }
 }
 
-async fn compute_root_packages(
+async fn compute_subtree_packages(
     ctx: &mut DiceComputations<'_>,
     workspace: &Path,
-) -> Result<RootPackageSet, QueryError> {
-    let mut pending = vec![workspace.to_path_buf()];
+    prefix: &Path,
+) -> Result<SubtreePackageSet, QueryError> {
+    let mut pending = vec![workspace.join(prefix)];
     let mut packages = Vec::new();
     while let Some(directory) = pending.pop() {
         let value = ctx
@@ -345,7 +352,7 @@ async fn compute_root_packages(
     }
     packages.sort_unstable();
     packages.dedup();
-    Ok(RootPackageSet {
+    Ok(SubtreePackageSet {
         packages: packages.into(),
     })
 }

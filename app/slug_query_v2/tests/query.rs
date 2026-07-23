@@ -50,9 +50,10 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 }
 
 // QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query
-// registry source of truth. Only deps is implemented in this packet.
+// registry source of truth. This packet adds only the reviewed reverse-query
+// pair to the existing deps vertical.
 #[test]
-fn registry_distinguishes_unknown_deferred_and_validates_deps_signature() {
+fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures() {
     assert_eq!(loading_query_functions().len(), 16);
     assert_eq!(
         loading_query_functions()
@@ -60,7 +61,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_deps_signature() {
             .filter(|function| function.status == QueryFunctionStatus::Implemented)
             .map(|function| function.name)
             .collect::<Vec<_>>(),
-        ["deps"]
+        ["deps", "rdeps", "same_pkg_direct_rdeps"]
     );
 
     let unknown = QueryExpression::parse("not_a_bazel_query_function(//pkg:bin)").unwrap();
@@ -85,6 +86,14 @@ fn registry_distinguishes_unknown_deferred_and_validates_deps_signature() {
             .contains("too many arguments to function 'deps'")
     );
     validate_loading_query(&QueryExpression::parse("deps(//pkg:bin, 2)").unwrap()).unwrap();
+    validate_loading_query(
+        &QueryExpression::parse("rdeps(//tree/..., //tree/left:leaf, 2)").unwrap(),
+    )
+    .unwrap();
+    validate_loading_query(
+        &QueryExpression::parse("same_pkg_direct_rdeps(//tree/left:leaf)").unwrap(),
+    )
+    .unwrap();
 }
 
 #[test]
