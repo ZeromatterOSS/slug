@@ -742,3 +742,56 @@ Root reran the suite and Slug oracles after final fixes; Sol-low final review
 Residual risk: this is the first integrated M3 vertical, not full query.
 External repositories, the remaining function registry, Sky Query,
 configuration/action environments, and non-text formatters remain open.
+
+### Stage 8 reverse-deps/subtree-pattern packet — approved extraction plan
+
+Status: Reviewed packet; oracle and implementation pending
+
+Source ref/commit(s): Buck2
+`088c75c7e36805df99c3de29062baa95db700b8b`
+`app/buck2_query/src/query/graph/graph.rs`,
+`query/environment.rs`, and
+`query/syntax/simple/functions/deps.rs`; V1
+`e218054d4c796655939b968d90208b185decb352`
+`tests/core/query/test_bazel_compat_query.py`
+
+Source class: directly port Buck2's stable graph construction, reversal,
+depth-bound traversal, and generic `rdeps` invocation; use V1 only as scenario
+inventory
+
+Reusable primitive or lesson: derive reverse traversal request-locally from
+the forward universe closure; keep semantic graph ownership in demand-driven
+DICE package keys; specialize package-local direct reverse lookup without
+enumerating the workspace
+
+V2 wrapper/boundary: V2 owns Bazel root-repository subtree patterns,
+`SubtreePackageSetKey { workspace, prefix }`, universe-closure semantics,
+same-package edge qualification, Bazel diagnostics, depth/order rendering, and
+the retained mutable-DICE serial lookup adaptation. Root `//...` is the
+empty-prefix specialization. No persistent reverse graph, Buck labels/cells,
+external repositories, configured/action nodes, printers, or `siblings`
+surface is imported.
+
+Bazel oracle: must be generated and independently verified with `/usr/bin/bazel`
+9.2.0 and cite Bazel commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+
+V2 fixture: `query-rdeps-and-subtree-patterns`
+
+Expected evidence artifact: exact root-subtree expansion/failure, `rdeps`
+universe/depth/cycle/seed/order behavior, package-local/criss-cross direct
+reverse-dependency behavior, and arity/type diagnostics
+
+Decision: port the named Buck2 graph/reverse traversal machinery; adapt its
+lookup to the existing retained DICE transaction and compact V2 labels; reject
+V1 implementation/output and all Buck/Bazel semantics outside the reviewed
+Stage 8 packet
+
+Validation: pending oracle-first implementation; the Stage 8 packet requires
+the serial six-crate suite, rebuilt V2 CLI, Bazel and Slug fixture runs, exact
+activation multisets, ownership/reuse inspection, formatting/diff checks, and
+Sol-low post-review
+
+Residual risk: oracle output ordering and missing-subtree diagnostics are not
+yet observed; external repositories, Sky Query, the other loading functions,
+non-text formatters, `cquery`, and `aquery` remain open

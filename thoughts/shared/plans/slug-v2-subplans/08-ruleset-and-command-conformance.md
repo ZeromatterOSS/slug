@@ -726,3 +726,163 @@ Residual scope remains explicit: external repositories and repository mapping,
 the other 15 loading functions, broader target patterns and Sky Query,
 non-text formats and remaining ordering modes, configured/action environments,
 and `cquery`/`aquery` are not implemented by this packet.
+
+### Reviewed next packet — `WP-8-m3-reverse-deps-subtree-patterns` (2026-07-23)
+
+Work packet ID: `WP-8-m3-reverse-deps-subtree-patterns`
+
+Owner stage and plan: Stage 8,
+`thoughts/shared/plans/slug-v2-subplans/08-ruleset-and-command-conformance.md`.
+
+Goal and gate link: extend the landed loading-query graph with one coherent
+reverse-dependency vertical: root-repository subtree patterns `//pkg/...`,
+`rdeps(universe, from[, depth])`, and
+`same_pkg_direct_rdeps(expression)`. This packet remains text-only with
+`--order_output=auto|full`; it does not complete `query`.
+
+Prerequisites and current state:
+
+- oracle `7e8993b2` and implementation `61ca25db` provide the generated Bazel
+  9.2 loading-query baseline, generic callable registry, compact structural
+  nodes, demand-driven package graph, retained DICE transaction, and root
+  `//...`;
+- `TargetPattern::Recursive` already represents `//pkg/...`, but loading query
+  currently rejects every recursive pattern except root `//...`;
+- the Bazel 9.2 registry already describes `rdeps` and
+  `same_pkg_direct_rdeps` with the correct argument shapes, but both are
+  explicitly deferred; and
+- the implementation has only forward dependency lookup. The new reverse
+  graph is request-local derived traversal state over immutable DICE-owned
+  package nodes, not a new semantic cache or DICE key.
+
+Oracle-first artifact:
+
+1. Add `tests/v2_oracle/fixtures/query-rdeps-and-subtree-patterns/` with root
+   packages under an existing package prefix, a non-package prefix, nested
+   packages, a missing/empty subtree, packages outside the subtree, aliases,
+   custom label-list rules, source labels, multiple parents, multiple universe
+   roots, duplicate seeds, and a cycle.
+2. Generate and independently rerun the fixture with `/usr/bin/bazel` 9.2.0
+   and cite immutable Bazel source commit
+   `8220c6198837d5c13d53fea211cf3282aa12408a`. Bazel may use ordinary RC
+   discovery and the user's external BuildBuddy configuration; no agent or
+   inspection tool may read, copy, print, log, or commit `~/.bazelrc` or any
+   credential.
+3. Pin exact exit/stdout/stderr behavior for:
+   - `//pkg/...` under an existing package subtree, a non-package prefix with
+     descendant packages, nested-package inclusion, rule-only expansion, and
+     an empty or missing subtree;
+   - unbounded `rdeps`, depth zero, one, and greater depth, a seed outside the
+     universe closure, multiple universe roots, duplicate seeds, cycles,
+     rule/source seeds, aliases, custom-rule edges, and an empty result;
+   - `same_pkg_direct_rdeps` with a source input, duplicate input, several
+     direct parents, cross-package parent exclusion, alias/custom-rule parents,
+     and the Bazel criss-cross case where inputs from two packages must not
+     admit a parent through the other package's input; and
+   - default, `auto`, and `full` ordering plus wrong arity/type diagnostics for
+     both functions.
+4. Do not prescribe traversal output from memory. Treat Bazel's generated
+   default/auto/full output as the authority, especially for cycles, multiple
+   roots, and reverse traversal.
+
+Reuse audit and approved decisions:
+
+- directly adapt Buck2 commit
+  `088c75c7e36805df99c3de29062baa95db700b8b`
+  `app/buck2_query/src/query/graph/graph.rs`,
+  `query/environment.rs`, and
+  `query/syntax/simple/functions/deps.rs` for stable forward-graph
+  construction, reversal, bounded traversal, and generic function invocation;
+- preserve the existing serial DICE lookup adaptation where mutable
+  `DiceComputations` prevents Buck2's concurrent lookup. Do not invent a
+  string-keyed reverse adjacency or add a monolithic reverse-graph DICE cache;
+- use V1
+  `e218054d4c796655939b968d90208b185decb352`
+  `tests/core/query/test_bazel_compat_query.py` only as scenario inventory.
+  V1 cells, labels, graph/server context, printers, and expected output remain
+  rejected; and
+- Bazel 9.2 source anchors are
+  `query2/engine/{RdepsFunction,SamePkgDirectRdepsFunction}.java`,
+  `cmdline/TargetPattern.java`, `skyframe/TargetPatternFunction.java`, and
+  focused `AbstractQueryTest` themes.
+
+Required implementation:
+
+1. Replace the root-only enumeration identity with
+   `SubtreePackageSetKey { workspace, prefix }`. It starts at
+   `workspace/prefix` and consumes only descendant `WorkspaceDirectoryKey`
+   values. Root `//...` is the empty-prefix specialization. Computing the
+   root package set and filtering it for `//pkg/...` is forbidden because it
+   creates a false whole-workspace dependency.
+2. Resolve root-repository `TargetPattern::Recursive` through that key and
+   preserve Bazel's rule-only pattern expansion and exact missing-subtree
+   behavior. External repository patterns remain explicit deferred errors.
+3. Implement `rdeps` through the existing generic callable registry. Evaluate
+   the universe expression, build the forward transitive closure of those
+   roots, reverse that graph request-locally, exclude seeds outside that
+   closure, and traverse from the remaining seeds with Bazel's oracle-pinned
+   depth/cycle/order behavior.
+4. Implement `same_pkg_direct_rdeps` without workspace enumeration. Evaluate
+   and group exact input labels by package, compute only those packages'
+   `UnconfiguredPackageGraphKey`s, and scan direct edges in each package. A
+   candidate qualifies only when it shares the package of the specific input
+   edge it matches. Do not expose or implement `siblings` as a workaround.
+5. Transition only these two registry entries to implemented. Add narrow
+   parser/registry, evaluator, loading-query, command, daemon, and CLI tests
+   without changing the existing build protocol or the `cquery`/`aquery`
+   placeholders.
+
+DICE acceptance evidence must assert complete relevant activation multisets:
+
+- identical and unrelated package edits validate/reuse but do not evaluate
+  package graphs for an unchanged subtree query;
+- edits outside the subtree do not evaluate `SubtreePackageSetKey`;
+- package create/delete/recreate inside the subtree evaluates the subtree key,
+  while the same transitions outside remain irrelevant;
+- `rdeps` invalidates when a universe member's edge changes and when its
+  forward closure gains or loses a package; and
+- `same_pkg_direct_rdeps` evaluates only operand packages and ignores edits in
+  cross-package reverse dependents.
+
+Focused validation:
+
+```bash
+CARGO_TARGET_DIR=/tmp/slug-m3-rdeps-target CARGO_BUILD_JOBS=1 cargo test \
+  -p slug_query_v2 -p slug_loading_v2 -p slug_core_v2 \
+  -p slug_commands_v2 -p slug_server_v2 -p slug_cli_v2
+cargo build -p slug_cli_v2
+python3 -B -m tools.v2_oracle run \
+  --fixture query-rdeps-and-subtree-patterns --tool bazel \
+  --bazel /usr/bin/bazel
+python3 -B -m tools.v2_oracle run \
+  --fixture query-rdeps-and-subtree-patterns --tool slug
+cargo fmt --all -- --check
+git diff --check
+```
+
+Also inspect the accepted diff for direct filesystem access in query
+keys/evaluation, extra DICE/runtime/cache creation, root-package-set filtering,
+string-keyed graph state, default hash collections or avoidable string churn,
+configured/action imports, locks across DICE work, and silent command-option
+acceptance.
+
+Evidence and completion boundary: land and review generated oracle evidence
+before Rust changes. Require Sol-low approval of the Buck2 port shape before
+implementation and a complete post-validation review before recording
+implementation evidence. Record exact commits, Bazel provenance, output/depth
+semantics, activation multisets, residuals, and routing observations here, in
+Stage 1, Stage 9, and the orchestration log.
+
+Sol-low accepted this revised architecture after requiring the prefix-local
+enumeration key, forward-universe closure, direct Buck2 graph/reversal port,
+edge-specific criss-cross filtering, and complete invalidation matrix.
+
+Stop conditions: dirty overlap; non-generated or non-9.2 oracle data; any need
+for configured/generated/toolchain edges, external repository mapping, Sky
+Query universe flags, arbitrary retained Starlark attributes, a persistent
+reverse-graph cache, or whole-workspace enumeration for a subtree/package-local
+operation; inability to execute through the retained DICE transaction; or an
+oracle ordering/diagnostic mismatch that cannot be represented without
+expanding this packet. Defer `siblings`, `kind`, `filter`, `attr`, `labels`,
+`buildfiles`, `loadfiles`, `some`, path functions, tests/visibility functions,
+non-text formats, remaining order modes, `cquery`, and `aquery`.
