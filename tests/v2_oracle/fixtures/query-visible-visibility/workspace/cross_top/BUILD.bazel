@@ -1,0 +1,4 @@
+package_group(
+    name = "top",
+    includes = ["//cross_leaf:friends"],
+)

@@ -1,0 +1,3 @@
+load("//loads:defs.bzl", "make_consumer")
+
+make_consumer(name = "consumer")

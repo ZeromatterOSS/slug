@@ -2,7 +2,7 @@
 name = "query-visible-visibility"
 description = "Bazel 9.2.0 ordinary-query oracle for target visibility representation, package groups, visible(), and visibility query edges."
 comparison = "message_shape"
-oracle_notes = "Root-repository, bzlmod-only fixture. The first 34 rows are future Slug representation/visible gates. The final two bazel_only_structure_* rows are Bazel-only evidence for flag-sensitive graph structure and do not authorize Slug command support or enter a future Slug acceptance count."
+oracle_notes = "Root-repository, bzlmod-only fixture. The first 37 rows are future Slug representation/visible gates: 25 visible() rows and 12 Stage 4 representation rows. The final two bazel_only_structure_* rows are Bazel-only evidence for flag-sensitive graph structure and do not authorize Slug command support or enter a future Slug acceptance count."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -10,6 +10,7 @@ bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
   "src/main/java/com/google/devtools/build/lib/query2/engine/VisibleFunction.java",
   "src/main/java/com/google/devtools/build/lib/query2/engine/QueryVisibility.java",
+  "src/main/java/com/google/devtools/build/lib/query2/common/AbstractBlazeQueryEnvironment.java#TargetKeyExtractor",
   "src/main/java/com/google/devtools/build/lib/query2/query/BlazeTargetAccessor.java",
   "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryVisibility.java",
   "src/main/java/com/google/devtools/build/lib/query2/compat/FakeLoadTarget.java",
@@ -35,7 +36,7 @@ source_anchors = [
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testDefaultVisibilityReturnedInDeps",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testIncludesReturnedInDeps",
 ]
-translation_notes = "VisibleFunction materializes callers once and retains an input only when every caller can see it; an empty caller set is vacuously true. BlazeTargetAccessor always adds same-package access and the one-way matching javatests/X caller to private java/X target. Direct package specifications and recursively expanded package-group contents are OR alternatives. Negatives override positives only inside one PackageGroupContents, so a separate direct or included positive can re-allow a package. Real generated/source/BUILD targets retain real visibility; package_group and fake load targets are public. Bazel 9.2 PackageOptions defaults incompatible_enforce_config_setting_visibility to true and incompatible_config_setting_private_default_visibility to false, so SkyframeExecutor selects ConfigSettingVisibilityPolicy.DEFAULT_PUBLIC. Rule.getDefaultVisibility then makes an omitted config_setting visibility public while preserving and enforcing an explicit package-group restriction. LabelsFunction calls TargetAccessor.getPrerequisites; BlazeTargetAccessor.getPrerequisites then calls AggregatingAttributeMapper.getReachableLabels over the stored/raw rule attribute. visitRawNonConfigurableAttributeValue is the mapper's related declared-visibility special case, not this LabelsFunction call path. Explicit loadable group labels project as targets, omitted visibility stays empty even when the package default names a group, explicit direct __pkg__/__subpackages__ values are retained but fail target lookup because they are non-loadable pseudo-labels, and omitted visibility with direct package defaults stays empty. In contrast, deps and LabelVisitationUtils use effective visibility dependency labels, including inherited groups; direct package specifications remain visibility values but never dependency targets. The bazel_only_structure rows document flag-sensitive graph distinctions without authorizing those flags for Slug."
+translation_notes = "VisibleFunction materializes callers once through QueryUtil.evalAll and retains an input only when every materialized caller can see it; an empty caller set is vacuously true, and each retained input is emitted as a singleton callback delivery. Ordinary BlazeQueryEnvironment target sets use TargetKeyExtractor, which keys real and fake targets by Label rather than Java object equality. Same-label fake callers therefore collapse at predicate materialization; the retained representative still exposes its consuming BUILD package through FakeLoadTarget package metadata. BlazeTargetAccessor always adds same-package access and the one-way matching javatests/X caller to private java/X target. Direct package specifications and recursively expanded package-group contents are OR alternatives. Negatives override positives only inside one PackageGroupContents, so a separate direct or included positive can re-allow a package. Top-level groups and includes may cross package boundaries through ordinary query target lookup. Real generated/source/BUILD targets retain real visibility; package_group and fake load targets are public. A streamed real-first real/fake same-label input still permits the later public fake candidate before final label output materialization. Bazel 9.2 PackageOptions defaults incompatible_enforce_config_setting_visibility to true and incompatible_config_setting_private_default_visibility to false, so SkyframeExecutor selects ConfigSettingVisibilityPolicy.DEFAULT_PUBLIC. Rule.getDefaultVisibility then makes an omitted config_setting visibility public while preserving and enforcing an explicit package-group restriction. LabelsFunction calls TargetAccessor.getPrerequisites; BlazeTargetAccessor.getPrerequisites then calls AggregatingAttributeMapper.getReachableLabels over the stored/raw rule attribute. visitRawNonConfigurableAttributeValue is the mapper's related declared-visibility special case, not this LabelsFunction call path. Explicit loadable group labels project as targets, omitted visibility stays empty even when the package default names a group, explicit direct __pkg__/__subpackages__ values are retained but fail target lookup because they are non-loadable pseudo-labels, and omitted visibility with direct package defaults stays empty. In contrast, deps and LabelVisitationUtils use effective visibility dependency labels, including inherited groups; direct package specifications remain visibility values but never dependency targets. The bazel_only_structure rows document flag-sensitive graph distinctions without authorizing those flags for Slug."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture query-visible-visibility --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture query-visible-visibility --tool bazel --bazel /usr/bin/bazel"
 
@@ -248,6 +249,24 @@ name = "visible_config_setting_explicit_group_restriction_rejects_other"
 argv = ["query", "visible(//other:caller, set(//owner:config_omitted //owner:config_exact))"]
 expected_exit = 0
 stdout_patterns = ["\\A//owner:config_omitted\\n?\\Z"]
+
+[[commands]]
+name = "visible_cross_package_top_and_included_groups"
+argv = ["query", "visible(//viewer:caller, //cross_target:visible)"]
+expected_exit = 0
+stdout_patterns = ["\\A//cross_target:visible\\n?\\Z"]
+
+[[commands]]
+name = "visible_real_first_same_label_fake_input_survives"
+argv = ["query", "visible(//viewer:caller, //loads:defs.bzl union loadfiles(//loads:consumer))"]
+expected_exit = 0
+stdout_patterns = ["\\A//loads:defs\\.bzl\\n?\\Z"]
+
+[[commands]]
+name = "visible_same_label_fake_callers_materialize_by_label"
+argv = ["query", "visible(loadfiles(//consumer_a:consumer) union loadfiles(//consumer_b:consumer), //consumer_a:restricted)"]
+expected_exit = 0
+stdout_patterns = ["\\A//consumer_a:restricted\\n?\\Z"]
 
 [[commands]]
 name = "bazel_only_structure_noimplicit_keeps_explicit_drops_inherited_visibility"
