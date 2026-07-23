@@ -1296,7 +1296,7 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: Reviewed; `tests` ranked first, oracle-only packet authorized
+Status: Oracle accepted in `8212afd6`; immutable representation review next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1312,9 +1312,9 @@ Decision: Reuse V2 `RuleCapability.rule_class`, typed Starlark values, DICE
 package graph, and Buck2 compact request-local evaluator patterns. Reference
 only V1's accessor/storage shapes. Reject Buck2/V1 test semantics as incomplete
 for Bazel suite expansion, and reject V1 visibility semantics and global
-package-group registry. The next packet checks in only the
-`tests-query-expansion` Bazel oracle. No query activation or representation
-change is authorized.
+package-group registry. Commit `8212afd6` checks in the oracle-only
+`tests-query-expansion` fixture with 16 passing Bazel commands and no query
+activation or representation change.
 
 Required later boundary: immutable loading/query metadata for native
 `test_suite`, explicit and implicit members, scalar tags/size/manual state, and

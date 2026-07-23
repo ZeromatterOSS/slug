@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 `tests` oracle packet is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 `tests` oracle packet is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; read-only residual ranking selected `tests` before `visible` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | add the oracle-only `tests-query-expansion` fixture; do not activate `tests` |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 `tests` representation review is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 `tests` representation review is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 16-command Bazel oracle accepted in `8212afd6` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | review the immutable loading/query representation for `tests`; do not activate it |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,21 +33,21 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Add only the `tests-query-expansion` Bazel 9.2.0 oracle fixture selected by
-`WP-8-m3-tests-visible-feasibility-ranking`. Cover direct test/non-test
-partitioning; empty-suite implicit same-package tests and `manual` exclusion;
-explicit, nested, and cross-package suites; cycles and deduplication; required,
-excluded, `manual`, and size tags; default versus `--strict_test_suite`
-non-test handling; missing members; and ordinary/full output. Record exact
-stdout or stable diagnostics without inferring order from Bazel's asynchronous
-suite callbacks.
+Review and pin the immutable loading/query representation required by the
+accepted `tests-query-expansion` oracle. The design must retain native
+`test_suite` identity, explicit and package-derived implicit members, test and
+suite tags, test size, and `manual` state in semantic package values; define
+equality and same-daemon create/edit/delete/recreate invalidation; and keep
+`--strict_test_suite` as request/query-environment policy rather than package
+identity. Test classification remains exported rule class identity, not
+executability or BUILD target spelling.
 
-This packet is oracle-only. Do not activate `tests`, add native `test_suite`,
-change loading/query representations, or begin `visible`. The subsequent
-representation packet must retain suite members, scalar tags/size, implicit
-membership in immutable loading/query semantics with same-daemon invalidation,
-and plumb strict mode separately as request/query-environment policy; rule
-executability is not test classification.
+This packet is design/review only. Read the DICE ownership guide and the
+hot-path utility skill before proposing retained fields or keys. Record exact
+Bazel 9.2.0 package-loading/query source anchors, the Buck2/V1 reuse decision,
+the owner/downstream test matrix, and a Sol verdict before implementation.
+Do not activate `tests`, add a DICE key or lock, begin `visible`, or add a regex
+engine.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.

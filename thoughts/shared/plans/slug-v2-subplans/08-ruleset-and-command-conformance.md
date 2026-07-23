@@ -38,15 +38,15 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
-### Live packet: `WP-8-m3-tests-query-expansion-oracle`
+### Live packet: `WP-8-m3-tests-query-representation-review`
 
-Add one Bazel 9.2.0 oracle fixture for `tests(EXPR)`. It must cover direct
-test/non-test partitioning; implicit and explicit suite membership; nested,
-cross-package, cyclic, and duplicate suites; tags and size; `manual`;
-default/strict invalid members; missing members; and ordinary/full output.
-This is fixture-only: do not activate `tests`, add loading/query
-representations, begin `visible`, or add a regex engine. Live Status in the
-canonical plan owns scheduling.
+Review the immutable loading/query representation required by the accepted
+`tests-query-expansion` oracle. Pin native suite identity, explicit and
+package-derived implicit membership, scalar tags/size/manual state, semantic
+equality and lifecycle invalidation, and request-local strict policy. This is a
+design/review packet: do not activate `tests`, add DICE state or locks, begin
+`visible`, or add a regex engine. Live Status in the canonical plan owns
+scheduling.
 
 ### Query engine reuse policy
 
@@ -2227,3 +2227,22 @@ behavior. Reject V1 visibility semantics and its process-global package-group
 registry. Terra-medium produced the read-only source/reuse audit, root checked
 the pinned Bazel sources and current V2 representation, and Sol-low returned
 `ACCEPT` for the oracle-only next packet.
+
+## `tests(EXPR)` expansion oracle accepted (2026-07-23)
+
+Commit `8212afd6` checks in the 16-command Bazel 9.2.0
+`tests-query-expansion` fixture. Exact-set rows distinguish direct tests from
+non-tests; implicit same-package membership from explicit, nested, and
+cross-package suites; `manual` exclusion; cycles and deduplication; bare/`+`
+required, `-` excluded, ignored suite `manual`, and size filters; default and
+strict invalid-member policy; an absent target in an existing package; and
+ordinary versus full output. Multi-result assertions require each exact label
+once while permitting only callback-order permutations.
+
+Root inspected the pinned `TestsFunction`,
+`TestSuiteImplicitTestsAccumulator`, `TargetUtils`, `QueryOptions`, and
+`AbstractQueryTest` anchors, corrected the missing-target discriminator, and
+independently passed all 16 Bazel commands. No Slug loading/query
+representation, DICE state, native rule, function activation, or V1/Buck2
+implementation entered the packet. The next packet is the reviewed immutable
+representation boundary, not `tests` activation.
