@@ -1297,9 +1297,9 @@ representation-only; five ordinary query functions and M3 remain open.
 ### Stage 8 `tests` / `visible` feasibility ranking
 
 Status: 25-command tests oracle, total explicitness design, and 37-command
-labels/package-context oracle accepted; second Gate A attempt closed `REPLAN`
-with no code retained; loading foundation stopped cleanly on permissive core
-target-name parsing; Stage 3 identity validation review next
+labels/package-context oracle accepted; exact identity and package-context
+loading foundation accepted through `40ac1cd2`; tests loading/query metadata
+Gate A retry next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1406,3 +1406,9 @@ outside this packet; loading resumes after the identity boundary is accepted.
 Commit `22313daa` accepts that central identity boundary after source-derived
 diagnostic and normalization tests. No V1/Buck decision changes. The next
 packet resumes the V2-owned package-context loading converter.
+
+Commit `40ac1cd2` accepts that converter and canonical loading storage after
+full loading/query validation, including retained-DICE transitions and exact
+triple-dot package rejection. No V1/Buck semantics were imported. Gate A may
+now retry the accepted suite/test metadata and total explicitness design;
+strict policy and function activation remain separate.

@@ -2475,3 +2475,22 @@ Bazel's package-context rejection of non-absolute `pkg:target`.
 Commit `22313daa` is accepted with all 10 identity tests green and loading/query
 test targets compiled. The package-context loading converter is current again;
 native suite metadata, strict policy, and `tests()` activation remain deferred.
+
+## Package-context loading label foundation accepted (2026-07-23)
+
+Commit `40ac1cd2` adds one V2-owned package-context converter, canonical native
+filegroup/alias storage, defining-`.bzl` default ownership, same-package output
+ownership, and query projection that preserves attribute multiplicity while
+deduplicating ordinary edges separately. Same-DICE spelling equality,
+definition edits, deletion/recreation, and implicit source-node behavior are
+covered without a new key or lock.
+
+Root's source pass used the one correction for `LabelParser`'s reserved
+triple-dot package forms. Sol accepted the corrected packet. Root passed all 43
+loading and 48 query tests, rebuilt `slug_cli_v2`, and confirmed formatting and
+diff checks. Native suite metadata is now unblocked; strict policy and
+`tests()` activation remain later packets.
+
+The current packet retries loading/query metadata Gate A with the already
+accepted invariant-safe suite membership and total query-attribute explicitness
+designs. It must not activate the function or formatter surfaces.
