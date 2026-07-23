@@ -2543,3 +2543,25 @@ errors, and the tests fixture with suite duplicate rejection plus successful
 string and structural-label ordering. Configurable selector duplicate
 semantics, malformed input bytes, loading fixes, Gate A metadata, strict
 policy, function activation, and formatters remain separate.
+
+## Ordering and duplicate-label oracle accepted (2026-07-23)
+
+Commit `57192df9` extends `query-labels-attribute-metadata` from 37 to 39
+Bazel commands and `tests-query-expansion` from 25 to 29. Exact rows now pin
+native filegroup, direct unconditional Starlark label-list, and native suite
+duplicate errors after equivalent spellings canonicalize to one label.
+Successful build-output rows pin duplicate-preserving UTF-8 byte order for
+Starlark and native tags, structural explicit-suite label order, and implicit
+suite member order.
+
+Generation and clean verification passed both fixtures; root's final runs
+were labels `20260723-135203-1126830-bazel` and tests
+`20260723-135233-1129462-bazel`. Root corrected an initial illegal explicit
+`configurable=False` Starlark declaration to a default schema with a direct
+unconditional value, and retained only append-only expected records rather
+than regenerated UUID/path/graph noise. Sol returned `ACCEPT`.
+
+The next prerequisite adds the allocation-free structural canonical-label
+comparison and corrects direct native/Starlark label-list duplicate behavior.
+Selectors, malformed bytes, suite implementation, strict policy, function
+activation, and formatters remain deferred.

@@ -1296,11 +1296,10 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: 25-command tests oracle, total explicitness design, and 37-command
-labels/package-context oracle accepted; exact identity and package-context
-loading foundation accepted through `40ac1cd2`; third Gate A attempt closed
-`REPLAN` with no code retained; corrected ordering and three-surface
-duplicate-label oracle next
+Status: 29-command tests oracle and 39-command labels metadata oracle accepted
+through `57192df9`; exact identity and package-context loading foundation
+accepted through `40ac1cd2`; third Gate A attempt closed `REPLAN` with no code
+retained; direct label-list duplicate prerequisite next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1429,3 +1428,10 @@ required oracle coverage for filegroup, direct Starlark label-list, and suite
 errors before implementation. No V1/Buck duplicate or ordering behavior is
 authorized; configurable selector duplicates and malformed bytes remain
 separate.
+
+Commit `57192df9` accepts the corrected append-only oracle at 39 labels and 29
+tests commands. Native filegroup, direct Starlark, and native suite duplicate
+diagnostics plus string/structural-label ordering are pinned without importing
+V1/Buck behavior. The next V2-owned prerequisite corrects direct-list
+validation and adds the borrowed identity comparator; selector permutations
+and malformed byte strings remain outside it.
