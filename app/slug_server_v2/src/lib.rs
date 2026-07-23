@@ -18,9 +18,9 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::WorkspaceFileObservation;
+use slug_core_v2::runtime::WorkspaceObservation;
 use slug_core_v2::runtime::WorkspaceRuntime;
-use slug_core_v2::runtime::observe_workspace_files;
+use slug_core_v2::runtime::observe_workspace;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_reapi_v2::RemoteConfig;
@@ -66,7 +66,7 @@ impl Daemon {
                 return BuildResult::error("build_runtime_error", &error.to_string());
             }
         };
-        let evaluation = match self.runtime.evaluate(observations, targets) {
+        let evaluation = match self.runtime.evaluate_observations(observations, targets) {
             Ok(eval) => eval,
             Err(error) => {
                 return BuildResult::error("build_runtime_error", &error.to_string());
@@ -158,12 +158,10 @@ struct FilesystemObservationAdapter {
 }
 
 impl FilesystemObservationAdapter {
-    fn observe(
-        &mut self,
-        workspace: &Path,
-    ) -> anyhow::Result<(Vec<WorkspaceFileObservation>, usize)> {
-        let observations = observe_workspace_files(workspace)?;
+    fn observe(&mut self, workspace: &Path) -> anyhow::Result<(WorkspaceObservation, usize)> {
+        let observations = observe_workspace(workspace)?;
         let current = observations
+            .files
             .iter()
             .map(|observation| (observation.path.clone(), observation.value.clone()))
             .collect::<BTreeMap<_, _>>();

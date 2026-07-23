@@ -183,6 +183,142 @@ Current worktree evidence (2026-07-22):
   downstream reuse is not yet instrumented and fine-grained watcher/directory
   inputs remain an explicit performance follow-up.
 
+#### Reviewed next packet — `WP-2-m1-directory-observations` (2026-07-22)
+
+Work packet ID: `WP-2-m1-directory-observations`
+
+Owner stage and plan: Stage 2,
+`thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`;
+prepares Stage 4 section 4.2 without yet wiring Starlark `glob()`.
+
+Goal and gate link: add explicit, immutable direct-directory observations and
+a per-directory DICE propagation boundary to the M1 workspace runtime. This is
+the first half of the reviewed directory/glob packet; it does not claim the
+M1 glob or unchanged-reuse clauses complete.
+
+Prerequisites and current state: `3659b0f9` supplies the retained workspace
+DICE/file-input spine. `5ebf8db1` supplies the generated and independently
+verified Bazel 9.2.0 create/rename/delete oracle. Production observation still
+collects only regular files, and `GlobExpansionKey` remains data-only.
+
+Oracle-first artifact:
+`tests/v2_oracle/fixtures/glob-directory-invalidation/expected/oracle.json`,
+generated at Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. This packet uses its directory
+transition semantics but does not run Slug query parity.
+
+Reuse audit:
+
+- adopt retained DICE `InjectedKey`, `Key`, `changed_to`, and equality
+  propagation behind V2-owned keys;
+- selectively port Buck2 commit
+  `088c75c7e36805df99c3de29062baa95db700b8b`'s compact
+  `FileType`/sorted `Arc<[SimpleDirEntry]>` shape from
+  `app/buck2_common/src/file_ops/metadata.rs`;
+- keep Buck2 `app/buck2_common/src/file_ops/dice.rs` and
+  `app/buck2_file_watcher/src/fs_hash_crawler.rs` reference-only for
+  per-directory dirtying and observer separation;
+- reject V1 commit `e218054d4c796655939b968d90208b185decb352`
+  `app/slug_interpreter_for_build/src/interpreter/globspec.rs` and
+  `app/slug_file_watcher/` because their Buck package listings, cells, ignores,
+  and watcher freshness policy violate the V2 boundary; and
+- treat Bazel 9.2.0
+  `DirectoryListingValue.java`/`DirectoryListingStateFunction.java` as semantic
+  authority, not source to port.
+
+Sol-low approved this reuse decision and a compact name-sorted entry containing
+`RegularFile | Directory | Symlink | Other`, plus a directory value of
+`Present(entries) | Absent | ReadError`. Symlink identity is observed but not
+resolved. Canonical workspace plus normalized contained absolute key paths is
+approved for this root-repository-only packet; it must not become the Stage 5
+repository-aware public identity.
+
+Exact scope:
+
+- `app/slug_loading_v2/Cargo.toml`;
+- `app/slug_loading_v2/src/{keys.rs,bzl_module.rs}`;
+- `app/slug_core_v2/src/runtime/{dice.rs,mod.rs}` and
+  `app/slug_core_v2/tests/runtime.rs`;
+- `app/slug_server_v2/src/{lib.rs,tests.rs}`; and
+- focused downstream compile fixes caused directly by the observation API.
+
+Exclude glob matching/traversal, Starlark globals, package construction,
+external repositories, repo mapping, query, analysis semantics, execution,
+symlink traversal, and a production file-watcher replacement.
+
+Decisions reserved for design reviewer: the subsequent Starlark `glob()` bridge
+remains unapproved. No blocking bridge, nested runtime, direct filesystem
+compute, injected input during compute, or lock across a DICE/Starlark await is
+permitted.
+
+Implementation steps:
+
+1. Add allocative directory entry/value/snapshot/key types using
+   `CompactString`, a sorted `Arc` slice, and a compact deterministic snapshot.
+2. Extend the migration observation adapter to record each directory's direct
+   listing or explicit absence/read error without matching globs, following
+   symlinks, swallowing failures, or deciding freshness.
+3. Batch file and directory injected snapshots into the same updater/commit;
+   make `WorkspaceDirectoryKey` compute only from its injected snapshot and use
+   per-value equality as the propagation boundary.
+4. Add focused sorted-kind, absent/read-error, containment, create/rename/delete
+   transition, and same-revision tests. Leave computation counters and
+   glob/package reuse evidence for the second half, where consumers exist.
+
+Focused validation:
+
+- `CARGO_TARGET_DIR=/tmp/slug-m1-directory-target CARGO_BUILD_JOBS=1 cargo test
+  -p slug_core_v2 -p slug_loading_v2 -p slug_server_v2 -p slug_analysis_v2
+  -p slug_cli_v2`;
+- `cargo fmt --all -- --check`;
+- ownership greps proving filesystem directory reads remain only in the
+  pre-transaction observation adapter and the DICE runtime is built only by
+  `WorkspaceRuntime`; and
+- `scripts/v2_archive_status.sh` plus `git diff --check`.
+
+Evidence and plan update: after Sol post-review acceptance, record the exact
+test results, observed transitions, utility reuse, residual migration scanner,
+and accepted commit here and in the Stage 9 ledger.
+
+Stop conditions: stop on an ungenerated/stale oracle, external-repository
+identity, silent symlink traversal, swallowed read failures, an injected input
+requested before initialization, injection during compute, a lock crossing a
+compute/evaluator await, or any need for the unreviewed Starlark bridge.
+
+Accepted implementation evidence (2026-07-22):
+
+- `WorkspaceDirectoryValue` now preserves sorted compact direct entries,
+  absence, and read failures. Entry names use `CompactString`; present values
+  retain a sorted `Arc` slice; symlinks and special files stay distinct; and an
+  invalid UTF-8 name becomes an explicit read error rather than a lossy key.
+- The migration observer records direct listings without following symlinks.
+  Normalized contained paths are required, including rejection of symlink
+  aliases. Filesystem reads remain outside DICE computations.
+- File and directory snapshots are scheduled through two typed `changed_to`
+  calls on one updater and become visible through its sole commit.
+  `WorkspaceDirectoryKey` reads only the injected snapshot and compares its
+  per-directory value.
+- Production root/package evaluation deliberately requests zero directory
+  keys. A private same-module probe exists only for focused tests until the
+  reviewed Starlark/glob consumer is implemented; no migration evidence leaks
+  into `WorkspaceBuildEvaluation`.
+- Focused tests prove sorted kinds, absence versus read error, normalized and
+  symlink-alias rejection, selected-key revision coherence, and retained-runtime
+  create/rename/delete transitions with an unchanged unrelated directory.
+  Sol-low post-review rejected the first eager all-directory result shape; the
+  corrected demand-driven boundary was accepted.
+- Root validation passed
+  `CARGO_TARGET_DIR=/tmp/slug-m1-directory-target CARGO_BUILD_JOBS=1 cargo test
+  -p slug_core_v2 -p slug_loading_v2 -p slug_server_v2 -p slug_analysis_v2
+  -p slug_cli_v2`, `cargo fmt --all -- --check`, and `git diff --check`.
+  `scripts/v2_archive_status.sh` retains known hygiene failures for the absent
+  local `v1-archive` branch and its broad non-V2 path matcher; neither is caused
+  by this runtime packet.
+- Residual: the recursive observer is still a full-workspace migration adapter,
+  existing `slug_loading_v2::glob` still reads the filesystem directly, and no
+  semantic consumer or unchanged-computation counter exists. Those are owned by
+  the separately reviewed second half, not evidence of M1 glob completion.
+
 ### 2.6 First-Real-Build Promotion
 
 Before Stage 5-8 work can advance beyond scaffold status:

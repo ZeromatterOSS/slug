@@ -1,11 +1,15 @@
 use std::fs;
 use std::sync::Arc;
 
+use slug_core_v2::runtime::WorkspaceDirectoryObservation;
 use slug_core_v2::runtime::WorkspaceFileObservation;
+use slug_core_v2::runtime::WorkspaceObservation;
 use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_core_v2::runtime::evaluate_workspace;
 use slug_core_v2::runtime::evaluate_workspace_targets;
+use slug_core_v2::runtime::observe_workspace;
 use slug_identity_v2::TargetPattern;
+use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 
 #[test]
@@ -178,4 +182,121 @@ fn read_error_observation_is_not_treated_as_file_absence() {
         .unwrap_err()
         .to_string();
     assert!(error.contains("permission denied"), "{error}");
+}
+
+#[test]
+fn directory_observer_records_sorted_direct_entries_without_following_symlinks() {
+    let workspace = tempfile::tempdir().unwrap();
+    let root = workspace.path();
+    fs::write(root.join("z-file"), "").unwrap();
+    fs::create_dir(root.join("a-dir")).unwrap();
+    fs::write(root.join("a-dir").join("nested"), "").unwrap();
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("a-dir", root.join("m-link")).unwrap();
+    #[cfg(unix)]
+    let _other = std::os::unix::net::UnixListener::bind(root.join("b-socket")).unwrap();
+
+    let observation = observe_workspace(root).unwrap();
+    let root_listing = observation
+        .directories
+        .iter()
+        .find(|directory| directory.path == root)
+        .unwrap();
+    let WorkspaceDirectoryValue::Present(entries) = &root_listing.value else {
+        panic!("root listing was not present: {root_listing:?}");
+    };
+    let names = entries
+        .iter()
+        .map(|entry| entry.name.as_str())
+        .collect::<Vec<_>>();
+    let mut sorted = names.clone();
+    sorted.sort_unstable();
+    assert_eq!(names, sorted);
+    assert!(entries.iter().any(|entry| {
+        entry.name == "z-file"
+            && entry.kind == slug_loading_v2::keys::WorkspaceDirectoryEntryKind::RegularFile
+    }));
+    assert!(entries.iter().any(|entry| {
+        entry.name == "a-dir"
+            && entry.kind == slug_loading_v2::keys::WorkspaceDirectoryEntryKind::Directory
+    }));
+    #[cfg(unix)]
+    assert!(entries.iter().any(|entry| {
+        entry.name == "m-link"
+            && entry.kind == slug_loading_v2::keys::WorkspaceDirectoryEntryKind::Symlink
+    }));
+    #[cfg(unix)]
+    assert!(entries.iter().any(|entry| {
+        entry.name == "b-socket"
+            && entry.kind == slug_loading_v2::keys::WorkspaceDirectoryEntryKind::Other
+    }));
+    #[cfg(unix)]
+    assert!(
+        !observation
+            .directories
+            .iter()
+            .any(|directory| directory.path == root.join("m-link"))
+    );
+}
+
+#[test]
+fn directory_observation_paths_must_be_normalized_and_contained() {
+    let workspace = tempfile::tempdir().unwrap();
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"root\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let error = runtime
+        .evaluate_observations(
+            WorkspaceObservation {
+                files: vec![
+                    WorkspaceFileObservation::read(workspace.path().join("MODULE.bazel")),
+                    WorkspaceFileObservation::read(workspace.path().join("BUILD.bazel")),
+                ],
+                directories: vec![WorkspaceDirectoryObservation {
+                    path: workspace.path().join("nested/../outside"),
+                    value: WorkspaceDirectoryValue::Absent,
+                }],
+            },
+            &[],
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("not normalized"), "{error}");
+}
+
+#[cfg(unix)]
+#[test]
+fn directory_observation_paths_must_not_alias_through_symlinks() {
+    let workspace = tempfile::tempdir().unwrap();
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"root\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
+    fs::create_dir(workspace.path().join("actual")).unwrap();
+    std::os::unix::fs::symlink("actual", workspace.path().join("alias")).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let error = runtime
+        .evaluate_observations(
+            WorkspaceObservation {
+                files: vec![
+                    WorkspaceFileObservation::read(workspace.path().join("MODULE.bazel")),
+                    WorkspaceFileObservation::read(workspace.path().join("BUILD.bazel")),
+                ],
+                directories: vec![WorkspaceDirectoryObservation {
+                    path: workspace.path().join("alias"),
+                    value: WorkspaceDirectoryValue::Absent,
+                }],
+            },
+            &[],
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("aliases through"), "{error}");
 }

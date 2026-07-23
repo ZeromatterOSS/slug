@@ -32,6 +32,9 @@ use crate::keys::BzlModuleEvalKey;
 use crate::keys::BzlParseKey;
 use crate::keys::LoadLabelResolutionKey;
 use crate::keys::PackageLoadKey;
+use crate::keys::WorkspaceDirectoryKey;
+use crate::keys::WorkspaceDirectorySnapshotKey;
+use crate::keys::WorkspaceDirectoryValue;
 use crate::keys::WorkspaceFileKey;
 use crate::keys::WorkspaceFileValue;
 use crate::keys::WorkspaceSnapshotKey;
@@ -114,6 +117,38 @@ impl Key for WorkspaceFileKey {
             Err(error) => WorkspaceFileValue::ReadError(Arc::new(format!(
                 "reading workspace snapshot for {}: {error}",
                 self.path.display()
+            ))),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[async_trait]
+impl Key for WorkspaceDirectoryKey {
+    type Value = WorkspaceDirectoryValue;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match ctx
+            .compute(&WorkspaceDirectorySnapshotKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(snapshot) => snapshot
+                .directories
+                .get(&self.directory)
+                .cloned()
+                .unwrap_or(WorkspaceDirectoryValue::Absent),
+            Err(error) => WorkspaceDirectoryValue::ReadError(Arc::new(format!(
+                "reading workspace directory snapshot for {}: {error}",
+                self.directory.display()
             ))),
         }
     }

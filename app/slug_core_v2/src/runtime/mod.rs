@@ -14,12 +14,15 @@ pub mod reapi;
 pub mod starlark;
 
 pub use dice::WorkspaceBuildEvaluation;
+pub use dice::WorkspaceDirectoryObservation;
 pub use dice::WorkspaceEvaluation;
 pub use dice::WorkspaceFileObservation;
+pub use dice::WorkspaceObservation;
 pub use dice::WorkspaceRevision;
 pub use dice::WorkspaceRuntime;
 pub use dice::evaluate_workspace;
 pub use dice::evaluate_workspace_targets;
+pub use dice::observe_workspace;
 pub use dice::observe_workspace_files;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

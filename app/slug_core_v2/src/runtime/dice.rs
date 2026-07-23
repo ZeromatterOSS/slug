@@ -9,6 +9,7 @@
  */
 
 use std::fmt;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -31,6 +32,12 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::LoadedPackage;
+use slug_loading_v2::keys::WorkspaceDirectoryEntry;
+use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
+use slug_loading_v2::keys::WorkspaceDirectoryKey;
+use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
+use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
+use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileKey;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
@@ -89,44 +96,135 @@ impl WorkspaceFileObservation {
     }
 }
 
+/// A complete external observation of one direct workspace directory.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct WorkspaceDirectoryObservation {
+    pub path: PathBuf,
+    pub value: WorkspaceDirectoryValue,
+}
+
+/// Externally observed workspace state supplied to one runtime request.
+///
+/// Files-only callers remain convenient through 'Self::from_files', but the
+/// resulting request still injects an explicit empty directory snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct WorkspaceObservation {
+    pub files: Vec<WorkspaceFileObservation>,
+    pub directories: Vec<WorkspaceDirectoryObservation>,
+}
+
+impl WorkspaceObservation {
+    pub fn from_files(files: impl IntoIterator<Item = WorkspaceFileObservation>) -> Self {
+        Self {
+            files: files.into_iter().collect(),
+            directories: Vec::new(),
+        }
+    }
+}
+
 /// Read a complete workspace snapshot outside DICE.
 ///
 /// This initial M1 adapter observes every regular file, including hidden
 /// paths, so a missing requested `.bzl` is represented by `Absent` rather than
 /// an uninitialized DICE input. It deliberately makes no freshness decision;
 /// `WorkspaceRuntime` owns that through `changed_to` equality.
-pub fn observe_workspace_files(workspace: &Path) -> anyhow::Result<Vec<WorkspaceFileObservation>> {
-    let mut paths = Vec::new();
-    collect_workspace_paths(workspace, &mut paths)?;
-    Ok(paths
-        .into_iter()
-        .map(WorkspaceFileObservation::read)
-        .collect())
+pub fn observe_workspace(workspace: &Path) -> anyhow::Result<WorkspaceObservation> {
+    let workspace = workspace
+        .canonicalize()
+        .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
+    let mut observation = WorkspaceObservation::from_files([]);
+    collect_workspace_observations(&workspace, &mut observation);
+    Ok(observation)
 }
 
-fn collect_workspace_paths(workspace: &Path, paths: &mut Vec<PathBuf>) -> anyhow::Result<()> {
-    let entries = std::fs::read_dir(workspace).map_err(|error| {
-        anyhow::anyhow!(
-            "reading workspace directory {}: {error}",
-            workspace.display()
-        )
-    })?;
+/// The legacy focused-test adapter. Production callers should use
+/// 'observe_workspace' so direct directory observations travel with files.
+pub fn observe_workspace_files(workspace: &Path) -> anyhow::Result<Vec<WorkspaceFileObservation>> {
+    Ok(observe_workspace(workspace)?.files)
+}
+
+fn collect_workspace_observations(directory: &Path, observation: &mut WorkspaceObservation) {
+    let entries = match std::fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            observation.directories.push(WorkspaceDirectoryObservation {
+                path: directory.to_path_buf(),
+                value: WorkspaceDirectoryValue::Absent,
+            });
+            return;
+        }
+        Err(error) => {
+            observation.directories.push(WorkspaceDirectoryObservation {
+                path: directory.to_path_buf(),
+                value: WorkspaceDirectoryValue::ReadError(Arc::new(error.to_string())),
+            });
+            return;
+        }
+    };
+    let mut direct_entries = Vec::new();
+    let mut children = Vec::new();
     for entry in entries {
-        let entry = entry.map_err(|error| {
-            anyhow::anyhow!(
-                "reading directory entry in {}: {error}",
-                workspace.display()
-            )
-        })?;
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                observation.directories.push(WorkspaceDirectoryObservation {
+                    path: directory.to_path_buf(),
+                    value: WorkspaceDirectoryValue::ReadError(Arc::new(error.to_string())),
+                });
+                return;
+            }
+        };
         let path = entry.path();
-        let file_type = entry.file_type()?;
-        if file_type.is_dir() {
-            collect_workspace_paths(&path, paths)?;
-        } else if file_type.is_file() {
-            paths.push(path);
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                observation.directories.push(WorkspaceDirectoryObservation {
+                    path: directory.to_path_buf(),
+                    value: WorkspaceDirectoryValue::ReadError(Arc::new(error.to_string())),
+                });
+                return;
+            }
+        };
+        let kind = if file_type.is_file() {
+            WorkspaceDirectoryEntryKind::RegularFile
+        } else if file_type.is_dir() {
+            WorkspaceDirectoryEntryKind::Directory
+        } else if file_type.is_symlink() {
+            WorkspaceDirectoryEntryKind::Symlink
+        } else {
+            WorkspaceDirectoryEntryKind::Other
+        };
+        let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+            observation.directories.push(WorkspaceDirectoryObservation {
+                path: directory.to_path_buf(),
+                value: WorkspaceDirectoryValue::ReadError(Arc::new(format!(
+                    "directory entry name is not valid UTF-8: {}",
+                    path.display()
+                ))),
+            });
+            return;
+        };
+        direct_entries.push(WorkspaceDirectoryEntry {
+            name: name.into(),
+            kind,
+        });
+        match kind {
+            WorkspaceDirectoryEntryKind::RegularFile => {
+                observation.files.push(WorkspaceFileObservation::read(path));
+            }
+            WorkspaceDirectoryEntryKind::Directory => children.push(path),
+            WorkspaceDirectoryEntryKind::Symlink | WorkspaceDirectoryEntryKind::Other => {}
         }
     }
-    Ok(())
+    observation.directories.push(WorkspaceDirectoryObservation {
+        path: directory.to_path_buf(),
+        value: WorkspaceDirectoryValue::present(direct_entries),
+    });
+    for child in children {
+        // 'file_type()' identified a directory. Symlinks were already recorded
+        // above and deliberately never arrive here.
+        collect_workspace_observations(&child, observation);
+    }
 }
 
 /// The sole DICE owner for one canonical workspace identity.
@@ -317,16 +415,59 @@ impl WorkspaceRuntime {
         observations: impl IntoIterator<Item = WorkspaceFileObservation>,
         targets: &[TargetPattern],
     ) -> anyhow::Result<WorkspaceBuildEvaluation> {
-        let observations = observations
-            .into_iter()
-            .map(|observation| self.validate_observation(observation))
-            .collect::<anyhow::Result<Vec<_>>>()?;
+        self.evaluate_observations(WorkspaceObservation::from_files(observations), targets)
+    }
+
+    /// Commit file and direct-directory observations together, then evaluate
+    /// root files and packages from that one request revision.
+    pub fn evaluate_observations(
+        &self,
+        observations: WorkspaceObservation,
+        targets: &[TargetPattern],
+    ) -> anyhow::Result<WorkspaceBuildEvaluation> {
+        self.evaluate_observations_with_directory_probes(observations, targets, &[])
+            .map(|(evaluation, _)| evaluation)
+    }
+
+    /// Internal evidence hook for selected directory keys.
+    ///
+    /// Production requests pass no probes. Keeping this private prevents the
+    /// migration observer from turning every directory into an eager semantic
+    /// dependency before a real glob consumer exists.
+    fn evaluate_observations_with_directory_probes(
+        &self,
+        observations: WorkspaceObservation,
+        targets: &[TargetPattern],
+        directory_probes: &[PathBuf],
+    ) -> anyhow::Result<(
+        WorkspaceBuildEvaluation,
+        Vec<(PathBuf, WorkspaceDirectoryValue, WorkspaceRevision)>,
+    )> {
         let files = observations
+            .files
             .into_iter()
-            .map(|observation| (observation.path, observation.value))
-            .collect();
+            .map(|observation| {
+                self.validate_file_observation(observation)
+                    .map(|observation| (observation.path, observation.value))
+            })
+            .collect::<anyhow::Result<_>>()?;
+        let directories = observations
+            .directories
+            .into_iter()
+            .map(|observation| {
+                self.validate_directory_observation(observation)
+                    .map(|observation| (observation.path, observation.value))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let directory_probes = directory_probes
+            .iter()
+            .map(|path| self.validate_observation_path(path))
+            .collect::<anyhow::Result<Vec<_>>>()?;
         let snapshot = Arc::new(WorkspaceSnapshot {
             files: Arc::new(files),
+        });
+        let directory_snapshot = Arc::new(WorkspaceDirectorySnapshot {
+            directories: Arc::new(directories.into_iter().collect()),
         });
         let revision = WorkspaceRevision(self.next_revision.fetch_add(1, Ordering::Relaxed));
         self.runtime.block_on(async {
@@ -339,6 +480,17 @@ impl WorkspaceRuntime {
                     snapshot,
                 )])
                 .context("injecting workspace-file observations")?;
+            // DICE's typed 'changed_to' batches one key type per call. Both
+            // snapshots are scheduled on this single updater before its sole
+            // commit, so no transaction can see one without the other.
+            updater
+                .changed_to(vec![(
+                    (WorkspaceDirectorySnapshotKey {
+                        workspace: self.workspace.clone(),
+                    }),
+                    directory_snapshot,
+                )])
+                .context("injecting workspace-directory observations")?;
             let mut transaction = updater.commit().await;
             let mut workspace = transaction
                 .compute(&WorkspaceEvaluationKey {
@@ -350,6 +502,17 @@ impl WorkspaceRuntime {
                 .clone()
                 .into_result()?;
             workspace.revision = revision;
+            let mut probed_directories = Vec::with_capacity(directory_probes.len());
+            for path in directory_probes {
+                let value = transaction
+                    .compute(&WorkspaceDirectoryKey {
+                        workspace: self.workspace.clone(),
+                        directory: path.clone(),
+                    })
+                    .await
+                    .context("computing observed workspace directory through DICE")?;
+                probed_directories.push((path, value, revision));
+            }
             let mut packages = Vec::with_capacity(targets.len());
             for target in targets {
                 let package_path = package_path_for_target(&self.workspace, target)?;
@@ -365,29 +528,79 @@ impl WorkspaceRuntime {
                     revision,
                 });
             }
-            Ok(WorkspaceBuildEvaluation {
-                workspace,
-                packages,
-                revision,
-            })
+            Ok((
+                WorkspaceBuildEvaluation {
+                    workspace,
+                    packages,
+                    revision,
+                },
+                probed_directories,
+            ))
         })
     }
 
-    fn validate_observation(
+    fn validate_file_observation(
         &self,
-        mut observation: WorkspaceFileObservation,
+        observation: WorkspaceFileObservation,
     ) -> anyhow::Result<WorkspaceFileObservation> {
-        if !observation.path.is_absolute() {
-            observation.path = self.workspace.join(observation.path);
+        Ok(WorkspaceFileObservation {
+            path: self.validate_observation_path(&observation.path)?,
+            value: observation.value,
+        })
+    }
+
+    fn validate_directory_observation(
+        &self,
+        observation: WorkspaceDirectoryObservation,
+    ) -> anyhow::Result<WorkspaceDirectoryObservation> {
+        Ok(WorkspaceDirectoryObservation {
+            path: self.validate_observation_path(&observation.path)?,
+            value: observation.value,
+        })
+    }
+
+    fn validate_observation_path(&self, path: &Path) -> anyhow::Result<PathBuf> {
+        if !path.is_absolute() {
+            anyhow::bail!(
+                "workspace observation path must be absolute: {}",
+                path.display()
+            );
         }
-        if !observation.path.starts_with(&self.workspace) {
+        if path
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+        {
+            anyhow::bail!(
+                "workspace observation path is not normalized: {}",
+                path.display()
+            );
+        }
+        let path = path.to_path_buf();
+        if !path.starts_with(&self.workspace) {
             anyhow::bail!(
                 "workspace observation is outside {}: {}",
                 self.workspace.display(),
-                observation.path.display()
+                path.display()
             );
         }
-        Ok(observation)
+        let existing_ancestor = path
+            .ancestors()
+            .find(|candidate| std::fs::symlink_metadata(candidate).is_ok())
+            .expect("the canonical workspace is an existing observation ancestor");
+        let canonical_ancestor = existing_ancestor.canonicalize().with_context(|| {
+            format!(
+                "canonicalizing observation ancestor {}",
+                existing_ancestor.display()
+            )
+        })?;
+        if canonical_ancestor != existing_ancestor {
+            anyhow::bail!(
+                "workspace observation path aliases through {}: {}",
+                existing_ancestor.display(),
+                path.display()
+            );
+        }
+        Ok(path)
     }
 }
 
@@ -398,7 +611,7 @@ pub fn evaluate_workspace(workspace: impl Into<PathBuf>) -> anyhow::Result<Works
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
     let runtime = WorkspaceRuntime::new(&workspace)?;
-    let evaluation = runtime.evaluate(observe_workspace_files(&workspace)?, &[])?;
+    let evaluation = runtime.evaluate_observations(observe_workspace(&workspace)?, &[])?;
     Ok(evaluation.workspace)
 }
 
@@ -415,7 +628,7 @@ pub fn evaluate_workspace_targets(
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
     let runtime = WorkspaceRuntime::new(&workspace)?;
-    runtime.evaluate(observe_workspace_files(&workspace)?, targets)
+    runtime.evaluate_observations(observe_workspace(&workspace)?, targets)
 }
 
 /// Analyze a single target within a loaded package.
@@ -478,4 +691,180 @@ pub fn package_path_for_target(
         );
     }
     Ok(workspace.join(package.as_str()))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+
+    #[test]
+    fn selected_directory_keys_preserve_absent_read_error_and_request_revision() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        let unknown = root.join("unknown");
+        let unreadable = root.join("unreadable");
+        fs::write(root.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+        fs::write(root.join("BUILD.bazel"), "").unwrap();
+        assert_eq!(
+            WorkspaceDirectorySnapshot::empty().value(&unknown),
+            WorkspaceDirectoryValue::Absent
+        );
+
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let (evaluation, directories) = runtime
+            .evaluate_observations_with_directory_probes(
+                WorkspaceObservation {
+                    files: vec![
+                        WorkspaceFileObservation::read(root.join("MODULE.bazel")),
+                        WorkspaceFileObservation::read(root.join("BUILD.bazel")),
+                    ],
+                    directories: vec![
+                        WorkspaceDirectoryObservation {
+                            path: unknown.clone(),
+                            value: WorkspaceDirectoryValue::Absent,
+                        },
+                        WorkspaceDirectoryObservation {
+                            path: unreadable.clone(),
+                            value: WorkspaceDirectoryValue::ReadError(Arc::new(
+                                "permission denied".to_owned(),
+                            )),
+                        },
+                    ],
+                },
+                &[],
+                &[unknown.clone(), unreadable.clone()],
+            )
+            .unwrap();
+
+        assert_eq!(
+            probed_directory_value(&directories, &unknown),
+            WorkspaceDirectoryValue::Absent
+        );
+        assert_eq!(
+            probed_directory_value(&directories, &unreadable),
+            WorkspaceDirectoryValue::ReadError(Arc::new("permission denied".to_owned()))
+        );
+        assert!(
+            directories
+                .iter()
+                .all(|(_, _, revision)| *revision == evaluation.revision)
+        );
+    }
+
+    #[test]
+    fn selected_directory_key_observes_create_rename_delete() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        let package = root.join("pkg");
+        let unrelated = root.join("unrelated");
+        fs::write(root.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+        fs::write(root.join("BUILD.bazel"), "").unwrap();
+        fs::create_dir(&package).unwrap();
+        fs::create_dir(&unrelated).unwrap();
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let probes = [package.clone(), unrelated.clone()];
+
+        let (empty_evaluation, empty_directories) = runtime
+            .evaluate_observations_with_directory_probes(
+                observe_workspace(&root).unwrap(),
+                &[],
+                &probes,
+            )
+            .unwrap();
+        let unchanged = probed_directory_value(&empty_directories, &unrelated);
+        assert_directory_names(&probed_directory_value(&empty_directories, &package), &[]);
+
+        fs::write(package.join("before"), "").unwrap();
+        let (created_evaluation, created_directories) = runtime
+            .evaluate_observations_with_directory_probes(
+                observe_workspace(&root).unwrap(),
+                &[],
+                &probes,
+            )
+            .unwrap();
+        assert_eq!(
+            created_evaluation.revision,
+            created_evaluation.workspace.revision
+        );
+        assert!(
+            created_directories
+                .iter()
+                .all(|(_, _, revision)| *revision == created_evaluation.revision)
+        );
+        assert_directory_names(
+            &probed_directory_value(&created_directories, &package),
+            &["before"],
+        );
+        assert_eq!(
+            unchanged,
+            probed_directory_value(&created_directories, &unrelated)
+        );
+
+        fs::rename(package.join("before"), package.join("after")).unwrap();
+        let (renamed_evaluation, renamed_directories) = runtime
+            .evaluate_observations_with_directory_probes(
+                observe_workspace(&root).unwrap(),
+                &[],
+                &probes,
+            )
+            .unwrap();
+        assert_eq!(
+            renamed_evaluation.revision,
+            renamed_evaluation.workspace.revision
+        );
+        assert_directory_names(
+            &probed_directory_value(&renamed_directories, &package),
+            &["after"],
+        );
+        assert_eq!(
+            unchanged,
+            probed_directory_value(&renamed_directories, &unrelated)
+        );
+
+        fs::remove_file(package.join("after")).unwrap();
+        let (deleted_evaluation, deleted_directories) = runtime
+            .evaluate_observations_with_directory_probes(
+                observe_workspace(&root).unwrap(),
+                &[],
+                &probes,
+            )
+            .unwrap();
+        assert_ne!(deleted_evaluation.revision, empty_evaluation.revision);
+        assert_eq!(
+            deleted_evaluation.revision,
+            deleted_evaluation.workspace.revision
+        );
+        assert_directory_names(&probed_directory_value(&deleted_directories, &package), &[]);
+        assert_eq!(
+            unchanged,
+            probed_directory_value(&deleted_directories, &unrelated)
+        );
+    }
+
+    fn probed_directory_value(
+        directories: &[(PathBuf, WorkspaceDirectoryValue, WorkspaceRevision)],
+        path: &Path,
+    ) -> WorkspaceDirectoryValue {
+        directories
+            .iter()
+            .find(|(directory, _, _)| directory == path)
+            .unwrap_or_else(|| panic!("missing evaluated directory for {}", path.display()))
+            .1
+            .clone()
+    }
+
+    fn assert_directory_names(value: &WorkspaceDirectoryValue, expected: &[&str]) {
+        let WorkspaceDirectoryValue::Present(entries) = value else {
+            panic!("expected present directory value: {value:?}");
+        };
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
 }
