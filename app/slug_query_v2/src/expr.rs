@@ -130,7 +130,12 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
     deferred("executables", 1, &[EXPR]),
     deferred("filter", 2, &[WORD, EXPR]),
     deferred("kind", 2, &[WORD, EXPR]),
-    deferred("labels", 2, &[WORD, EXPR]),
+    QueryFunctionSpec {
+        name: "labels",
+        mandatory_arguments: 2,
+        argument_kinds: &[WORD, EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     QueryFunctionSpec {
         name: "loadfiles",
         mandatory_arguments: 1,

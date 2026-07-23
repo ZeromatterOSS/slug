@@ -38,7 +38,13 @@ pub fn run(argv: Vec<String>) -> i32 {
             print!("{stdout}");
             0
         }
-        Err(error) => emit_error(error.exit_code, &error.to_string(), "one-shot"),
+        Err(error) => {
+            let mut message = error.to_string();
+            if error.needs_evaluation_context() {
+                message.push_str("\nEvaluation of query");
+            }
+            emit_error(error.exit_code, &message, "one-shot")
+        }
     }
 }
 

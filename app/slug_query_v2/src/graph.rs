@@ -28,6 +28,7 @@ use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectoryKey;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
+use slug_loading_v2::package::StarlarkRuleImplementation;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -78,6 +79,7 @@ impl fmt::Display for QueryLabel {
 pub enum QueryNodeKind {
     BuildFile,
     SourceFile,
+    GeneratedFile,
     Rule(CompactString),
 }
 
@@ -93,6 +95,13 @@ pub struct QueryNode {
     pub kind: QueryNodeKind,
     pub build_file: CompactString,
     pub dependencies: Arc<[QueryLabel]>,
+    pub attributes: Arc<[QueryAttribute]>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct QueryAttribute {
+    pub name: CompactString,
+    pub labels: Arc<[QueryLabel]>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -139,6 +148,14 @@ impl fmt::Display for SubtreePackageSetKey {
 pub struct QueryError {
     pub message: Arc<str>,
     pub exit_code: i32,
+    kind: QueryErrorKind,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative, Dupe)]
+enum QueryErrorKind {
+    Syntax,
+    Evaluation,
+    PackageLoading,
 }
 
 impl QueryError {
@@ -146,6 +163,7 @@ impl QueryError {
         Self {
             message: Arc::from(message.into()),
             exit_code: 2,
+            kind: QueryErrorKind::Syntax,
         }
     }
 
@@ -153,7 +171,25 @@ impl QueryError {
         Self {
             message: Arc::from(message.into()),
             exit_code: 7,
+            kind: QueryErrorKind::Evaluation,
         }
+    }
+
+    pub fn package_loading(message: impl Into<String>) -> Self {
+        Self {
+            message: Arc::from(message.into()),
+            exit_code: 7,
+            kind: QueryErrorKind::PackageLoading,
+        }
+    }
+
+    pub fn needs_evaluation_context(&self) -> bool {
+        matches!(self.kind, QueryErrorKind::PackageLoading)
+    }
+
+    pub fn with_message(mut self, message: impl Into<String>) -> Self {
+        self.message = Arc::from(message.into());
+        self
     }
 }
 
@@ -205,11 +241,11 @@ async fn compute_package_graph(
             package: package_dir,
         })
         .await
-        .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        .map_err(|error| QueryError::package_loading(error.to_string()))?;
     let loaded = loaded
         .as_ref()
         .as_ref()
-        .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        .map_err(|error| QueryError::package_loading(error.to_string()))?;
     let package_name = path_to_package(package)?;
     let build_basename = loaded
         .build_file
@@ -225,48 +261,71 @@ async fn compute_package_graph(
     let mut nodes = SmallMap::with_capacity(loaded.targets.len() + 1);
 
     for target in &loaded.targets {
-        // Stage 4 records generated files in the loading package so their
-        // identity/owner is available to the later labels() projection.
-        // Do not activate them in the existing ordinary-query graph yet.
-        if matches!(target.kind, PackageTargetKind::GeneratedFile { .. }) {
-            continue;
-        }
-        let label = label_in_package(&package_name, &target.name)?;
-        let (kind, dependencies) = match &target.kind {
-            PackageTargetKind::ExportedFile if target.name == build_basename => {
-                (QueryNodeKind::BuildFile, Arc::from([]))
+        let label = match &target.kind {
+            PackageTargetKind::GeneratedFile { label, .. } => {
+                QueryLabel::from_canonical(label.clone())
             }
-            PackageTargetKind::ExportedFile => (QueryNodeKind::SourceFile, Arc::from([])),
+            _ => label_in_package(&package_name, &target.name)?,
+        };
+        let (kind, dependencies, attributes) = match &target.kind {
+            PackageTargetKind::ExportedFile if target.name == build_basename => {
+                (QueryNodeKind::BuildFile, Arc::from([]), Arc::from([]))
+            }
+            PackageTargetKind::ExportedFile => {
+                (QueryNodeKind::SourceFile, Arc::from([]), Arc::from([]))
+            }
             PackageTargetKind::Filegroup { srcs } => {
                 let dependencies = srcs
                     .iter()
                     .map(|value| normalize_dependency(&package_name, value))
                     .collect::<Result<Vec<_>, _>>()?;
+                let attributes = Arc::from([QueryAttribute {
+                    name: CompactString::new("srcs"),
+                    labels: dependencies.clone().into(),
+                }]);
                 (
                     QueryNodeKind::Rule(CompactString::new("filegroup rule")),
                     dependencies.into(),
+                    attributes,
                 )
             }
-            PackageTargetKind::Alias { actual } => (
-                QueryNodeKind::Rule(CompactString::new("alias rule")),
-                Arc::from([normalize_dependency(&package_name, actual)?]),
-            ),
+            PackageTargetKind::Alias { actual } => {
+                let actual = normalize_dependency(&package_name, actual)?;
+                (
+                    QueryNodeKind::Rule(CompactString::new("alias rule")),
+                    Arc::from([actual.dupe()]),
+                    Arc::from([QueryAttribute {
+                        name: CompactString::new("actual"),
+                        labels: Arc::from([actual]),
+                    }]),
+                )
+            }
             PackageTargetKind::ConfigSetting { .. } => (
                 QueryNodeKind::Rule(CompactString::new("config_setting rule")),
                 Arc::from([]),
+                Arc::from([]),
             ),
-            PackageTargetKind::StarlarkRule(implementation) => (
-                QueryNodeKind::Rule(CompactString::new("rule")),
-                implementation
+            PackageTargetKind::StarlarkRule(implementation) => {
+                let dependencies = implementation
                     .dependencies()
                     .iter()
                     .cloned()
                     .map(QueryLabel::from_canonical)
                     .collect::<Vec<_>>()
-                    .into(),
+                    .into();
+                (
+                    QueryNodeKind::Rule(CompactString::new("rule")),
+                    dependencies,
+                    project_attributes(implementation),
+                )
+            }
+            PackageTargetKind::GeneratedFile {
+                generating_rule, ..
+            } => (
+                QueryNodeKind::GeneratedFile,
+                Arc::from([label_in_package(&package_name, generating_rule)?]),
+                Arc::from([]),
             ),
-            // Filtered above: Stage 8 will give this a real query-node kind.
-            PackageTargetKind::GeneratedFile { .. } => unreachable!("filtered generated target"),
         };
         if target.name == build_basename && !matches!(kind, QueryNodeKind::BuildFile) {
             return Err(QueryError::evaluation(format!(
@@ -281,6 +340,7 @@ async fn compute_package_graph(
                 kind,
                 build_file: build_file.clone(),
                 dependencies,
+                attributes,
             },
         );
     }
@@ -294,6 +354,7 @@ async fn compute_package_graph(
                 kind: QueryNodeKind::BuildFile,
                 build_file: build_file.clone(),
                 dependencies: Arc::from([]),
+                attributes: Arc::from([]),
             },
         );
     }
@@ -317,6 +378,7 @@ async fn compute_package_graph(
                     kind: QueryNodeKind::SourceFile,
                     build_file: build_file.clone(),
                     dependencies: Arc::from([]),
+                    attributes: Arc::from([]),
                 },
             );
         }
@@ -326,6 +388,31 @@ async fn compute_package_graph(
         package: package_name,
         nodes,
     })
+}
+
+fn project_attributes(implementation: &StarlarkRuleImplementation) -> Arc<[QueryAttribute]> {
+    implementation
+        .schema()
+        .iter()
+        .zip(implementation.values())
+        .filter_map(|(schema, value)| {
+            debug_assert_eq!(value.declaration_name, schema.declaration_name());
+            if !schema.dependency_reachable() {
+                return None;
+            }
+            let mut labels = Vec::new();
+            value.value.labels(&mut labels);
+            Some(QueryAttribute {
+                name: CompactString::new(schema.query_name()),
+                labels: labels
+                    .into_iter()
+                    .map(QueryLabel::from_canonical)
+                    .collect::<Vec<_>>()
+                    .into(),
+            })
+        })
+        .collect::<Vec<_>>()
+        .into()
 }
 
 #[async_trait]

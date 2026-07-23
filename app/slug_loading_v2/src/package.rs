@@ -1126,7 +1126,7 @@ where
                             )?,
                         ),
                         None if declaration.mandatory => anyhow::bail!(
-                            "missing value for mandatory attribute `{}`",
+                            "missing value for mandatory attribute '{}'",
                             declaration.name
                         ),
                         None if declaration.name.starts_with('_') => (

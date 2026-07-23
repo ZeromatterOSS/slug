@@ -718,7 +718,7 @@ fn siblings_build_file_node_fixture_matches_all_oracle_rows() {
         assert!(output.status.success(), "{argv:?}: {output:?}");
         assert!(output.stderr.is_empty(), "{argv:?}: {output:?}");
         assert_eq!(
-            String::from_utf8(output.stdout).unwrap(),
+            std::str::from_utf8(&output.stdout).unwrap(),
             expected_stdout,
             "{argv:?}"
         );
@@ -794,6 +794,208 @@ fn loading_query_fixture_matches_full_bazel_semantic_slice() {
         assert!(output.stdout.is_empty(), "{expression}: {output:?}");
         let stderr = String::from_utf8(output.stderr).unwrap();
         assert!(stderr.contains(expected), "{expression}: {stderr}");
+    }
+}
+
+#[test]
+fn labels_metadata_fixture_matches_twenty_nine_non_label_kind_bazel_rows_through_cli() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-labels-attribute-metadata/workspace");
+    let successes: &[(&[&str], &str)] = &[
+        (
+            &["query", "labels(one, //pkg:explicit)"],
+            "//pkg:source.txt\n",
+        ),
+        (
+            &["query", "labels(many, //pkg:explicit)"],
+            "//other:cross.txt\n//pkg:source.txt\n",
+        ),
+        (
+            &["query", "labels(with_default, //pkg:omitted)"],
+            "//pkg:default.txt\n",
+        ),
+        (&["query", "labels(many, //pkg:empty)"], ""),
+        (&["query", "labels(note, //pkg:explicit)"], ""),
+        (&["query", "labels(no_such_attr, //pkg:explicit)"], ""),
+        (
+            &["query", "labels($implicit, //pkg:implicit)"],
+            "//pkg:implicit.txt\n",
+        ),
+        (&["query", "labels(_implicit, //pkg:implicit)"], ""),
+        (
+            &["query", "labels(chosen, //pkg:selecting)"],
+            "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt\n",
+        ),
+        (
+            &["query", "labels(combined, //pkg:selecting)"],
+            "//pkg:branch_arm.txt\n//pkg:branch_default.txt\n//pkg:branch_linux.txt\n//pkg:shared.txt\n",
+        ),
+        (&["query", "labels(out, //pkg:outputs)"], "//pkg:one.out\n"),
+        (
+            &["query", "labels(outs, //pkg:outputs)"],
+            "//pkg:three.out\n//pkg:two.out\n",
+        ),
+        (
+            &["query", "labels(outs, //pkg:outputs_two)"],
+            "//pkg:five.out\n//pkg:six.out\n",
+        ),
+        (
+            &["query", "deps(labels(outs, //pkg:outputs))"],
+            "//pkg:outputs\n//pkg:three.out\n//pkg:two.out\n",
+        ),
+        (
+            &[
+                "query",
+                "deps(labels(outs, //pkg:outputs) union //pkg:outputs)",
+            ],
+            "//pkg:outputs\n//pkg:three.out\n//pkg:two.out\n",
+        ),
+        (
+            &[
+                "query",
+                "deps(labels(outs, //pkg:outputs) union labels(outs, //pkg:outputs_two) union //pkg:outputs union //pkg:outputs_two)",
+            ],
+            "//pkg:five.out\n//pkg:outputs\n//pkg:outputs_two\n//pkg:six.out\n//pkg:three.out\n//pkg:two.out\n",
+        ),
+        (
+            &["query", "labels(string_labels, //pkg:dicts)"],
+            "//other:cross.txt\n//pkg:source.txt\n",
+        ),
+        (
+            &["query", "labels(label_strings, //pkg:dicts)"],
+            "//other:cross.txt\n//pkg:default.txt\n",
+        ),
+        (
+            &["query", "labels(label_lists, //pkg:dicts)"],
+            "//other:cross.txt\n//pkg:implicit.txt\n//pkg:source.txt\n",
+        ),
+        (
+            &[
+                "query",
+                "labels(many, set(//pkg:source.txt //pkg:alias //pkg:BUILD.bazel))",
+            ],
+            "",
+        ),
+        (
+            &[
+                "query",
+                "labels(many, set(//pkg:explicit //pkg:explicit //other:consumer))",
+            ],
+            "//other:cross.txt\n//pkg:source.txt\n",
+        ),
+        (
+            &[
+                "query",
+                "labels(one, //pkg:explicit) union labels(with_default, //pkg:omitted)",
+            ],
+            "//pkg:default.txt\n//pkg:source.txt\n",
+        ),
+        (
+            &[
+                "query",
+                "--order_output=auto",
+                "labels(many, //pkg:explicit)",
+            ],
+            "//other:cross.txt\n//pkg:source.txt\n",
+        ),
+        (
+            &[
+                "query",
+                "--order_output=full",
+                "labels(many, //pkg:explicit)",
+            ],
+            "//pkg:source.txt\n//other:cross.txt\n",
+        ),
+        // The plain default-order invocation is intentionally a distinct
+        // oracle row from explicit --order_output=auto.
+        (
+            &["query", "labels(many, //pkg:explicit)"],
+            "//other:cross.txt\n//pkg:source.txt\n",
+        ),
+    ];
+    let graph_rows: &[(&[&str], &str)] = &[
+        (
+            &[
+                "query",
+                "--output=graph",
+                "--graph:factored",
+                "deps(labels(outs, //pkg:outputs) union //pkg:outputs)",
+            ],
+            concat!(
+                "digraph mygraph {\n",
+                "  node [shape=box];\n",
+                "  \"//pkg:three.out\\n//pkg:two.out\"\n",
+                "  \"//pkg:three.out\\n//pkg:two.out\" -> \"//pkg:outputs\"\n",
+                "  \"//pkg:outputs\"\n",
+                "}\n",
+            ),
+        ),
+        (
+            &[
+                "query",
+                "--output=graph",
+                "--graph:factored",
+                "deps(labels(outs, //pkg:outputs) union labels(outs, //pkg:outputs_two) union //pkg:outputs union //pkg:outputs_two)",
+            ],
+            concat!(
+                "digraph mygraph {\n",
+                "  node [shape=box];\n",
+                "  \"//pkg:six.out\\n//pkg:five.out\"\n",
+                "  \"//pkg:six.out\\n//pkg:five.out\" -> \"//pkg:outputs_two\"\n",
+                "  \"//pkg:outputs_two\"\n",
+                "  \"//pkg:three.out\\n//pkg:two.out\"\n",
+                "  \"//pkg:three.out\\n//pkg:two.out\" -> \"//pkg:outputs\"\n",
+                "  \"//pkg:outputs\"\n",
+                "}\n",
+            ),
+        ),
+    ];
+    let failures: &[(&[&str], &[&str])] = &[
+        (
+            &["query", "labels(many, //pkg:missing_ref)"],
+            &[
+                "in 'many' of rule //pkg:missing_ref: no such package 'does_not_exist'",
+                "Evaluation of query",
+            ],
+        ),
+        (
+            &["query", "//broken:must"],
+            &[
+                "missing value for mandatory attribute 'required'",
+                "Evaluation of query",
+            ],
+        ),
+    ];
+    assert_eq!(successes.len() + graph_rows.len() + failures.len(), 29);
+
+    for (argv, expected_stdout) in successes {
+        let output = slug().current_dir(&workspace).args(*argv).output().unwrap();
+        assert!(output.status.success(), "{argv:?}: {output:?}");
+        assert!(output.stderr.is_empty(), "{argv:?}: {output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            *expected_stdout,
+            "{argv:?}"
+        );
+    }
+    for (argv, expected_stdout) in graph_rows {
+        let output = slug().current_dir(&workspace).args(*argv).output().unwrap();
+        assert!(output.status.success(), "{argv:?}: {output:?}");
+        assert!(output.stderr.is_empty(), "{argv:?}: {output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            *expected_stdout,
+            "{argv:?}"
+        );
+    }
+    for (argv, expected_fragments) in failures {
+        let output = slug().current_dir(&workspace).args(*argv).output().unwrap();
+        assert_eq!(output.status.code(), Some(7), "{argv:?}: {output:?}");
+        assert!(output.stdout.is_empty(), "{argv:?}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        for fragment in *expected_fragments {
+            assert!(stderr.contains(fragment), "{argv:?}: {stderr}");
+        }
     }
 }
 
@@ -1463,6 +1665,134 @@ fn output_base_query_reuses_one_daemon_across_build_edits() {
         String::from_utf8(second.stdout).unwrap(),
         "//pkg:bin\n//pkg:two.txt\n"
     );
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        pid
+    );
+}
+
+#[test]
+fn only_package_loading_query_errors_receive_evaluation_context() {
+    let workspace = scratch("query-error-context");
+    let output_base = scratch("query-error-context-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(workspace.join("BUILD.bazel"), "filegroup(name = \"one\")\n");
+    let output_base_arg = format!("--output_base={}", output_base.display());
+
+    for (expression, exit_code, diagnostic) in [
+        ("some(//:one, -1)", 2, "syntax error at '- 1 )'"),
+        ("some(set())", 7, "argument set is empty"),
+    ] {
+        let output = slug()
+            .current_dir(&workspace)
+            .args(["query", expression])
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(exit_code),
+            "{expression}: {output:?}"
+        );
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains(diagnostic),
+            "one-shot {expression}: {stderr}"
+        );
+        assert!(
+            !stderr.contains("Evaluation of query"),
+            "one-shot {expression}: {stderr}"
+        );
+    }
+
+    for (expression, exit_code, diagnostic) in [
+        ("some(//:one, -1)", 2, "syntax error at '- 1 )'"),
+        ("some(set())", 7, "argument set is empty"),
+    ] {
+        let output = slug()
+            .current_dir(&workspace)
+            .args([output_base_arg.as_str(), "query", expression])
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(exit_code),
+            "{expression}: {output:?}"
+        );
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(diagnostic), "daemon {expression}: {stderr}");
+        assert!(
+            !stderr.contains("Evaluation of query"),
+            "daemon {expression}: {stderr}"
+        );
+    }
+}
+
+#[test]
+fn output_base_labels_reuses_one_daemon_across_metadata_semantic_transitions() {
+    let workspace = scratch("labels-metadata-workspace");
+    let output_base = scratch("labels-metadata-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let defs = workspace.join("pkg/defs.bzl");
+    let build = workspace.join("pkg/BUILD.bazel");
+    let schema = |default| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {{\"dep\": attr.label(default = \":{default}\"), \"out\": attr.output(mandatory = True)}})\n"
+        )
+    };
+    write(&defs, &schema("one.txt"));
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\nexports_files([\"one.txt\", \"two.txt\", \"three.txt\"])\nload(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", out = \"one.out\")\n",
+    );
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let query = |expression: &str| {
+        slug()
+            .current_dir(&workspace)
+            .args([output_base_arg.as_str(), "query", expression])
+            .output()
+            .unwrap()
+    };
+    let assert_query = |expression: &str, expected: &str| {
+        let output = query(expression);
+        assert!(output.status.success(), "{expression}: {output:?}");
+        assert_eq!(
+            std::str::from_utf8(&output.stdout).unwrap(),
+            expected,
+            "{expression}"
+        );
+        assert!(output.stderr.is_empty(), "{expression}: {output:?}");
+    };
+
+    assert_query("labels(dep, //pkg:rule)", "//pkg:one.txt\n");
+    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    write(
+        &build,
+        "# semantic no-op\nconfig_setting( name = \"linux\", values = {\"cpu\": \"k8\"} )\nexports_files([\"one.txt\", \"two.txt\", \"three.txt\"])\nload(\":defs.bzl\", \"probe\")\nprobe( name = \"rule\", out = \"one.out\" )\n",
+    );
+    assert_query("labels(dep, //pkg:rule)", "//pkg:one.txt\n");
+
+    write(&defs, &schema("two.txt"));
+    assert_query("labels(dep, //pkg:rule)", "//pkg:two.txt\n");
+
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\nexports_files([\"one.txt\", \"two.txt\", \"three.txt\"])\nload(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", dep = \":three.txt\", out = \"one.out\")\n",
+    );
+    assert_query("labels(dep, //pkg:rule)", "//pkg:three.txt\n");
+
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\nexports_files([\"one.txt\", \"two.txt\", \"three.txt\"])\nload(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", dep = select({\":linux\": \":one.txt\", \"//conditions:default\": \":two.txt\"}), out = \"one.out\")\n",
+    );
+    assert_query("labels(dep, //pkg:rule)", "//pkg:one.txt\n//pkg:two.txt\n");
+
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\nexports_files([\"one.txt\", \"two.txt\", \"three.txt\"])\nload(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", dep = select({\":linux\": \":one.txt\", \"//conditions:default\": \":two.txt\"}), out = \"two.out\")\n",
+    );
+    assert_query("labels(out, //pkg:rule)", "//pkg:two.out\n");
     assert_eq!(
         std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
         pid

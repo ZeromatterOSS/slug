@@ -180,13 +180,21 @@ impl Daemon {
                 stdout: String::new(),
                 stderr: format!(
                     "{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{}}}",
-                    json_escape(&error.to_string()),
+                    json_escape(&query_error_message(&error)),
                     invalidated,
                 ),
                 invalidated_files: invalidated,
             },
         }
     }
+}
+
+fn query_error_message(error: &slug_query_v2::QueryError) -> String {
+    let mut message = error.to_string();
+    if error.needs_evaluation_context() {
+        message.push_str("\nEvaluation of query");
+    }
+    message
 }
 
 /// Result of a daemon build request.

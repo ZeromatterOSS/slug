@@ -622,7 +622,7 @@ probe(
         try_load_package(&workspace, &package)
             .unwrap_err()
             .to_string()
-            .contains("missing value for mandatory attribute `out`")
+            .contains("missing value for mandatory attribute 'out'")
     );
     fs::write(
         package.join(BUILD_FILE_PRIMARY),

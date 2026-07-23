@@ -592,7 +592,7 @@ async fn active_build_basename_non_export_target_collision_is_a_query_error() {
 }
 
 #[tokio::test]
-async fn output_targets_remain_unmaterialized_in_the_preactivation_query_graph() {
+async fn output_targets_are_generated_files_with_only_generator_edges() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
     write(
@@ -613,18 +613,150 @@ async fn output_targets_remain_unmaterialized_in_the_preactivation_query_graph()
         .await
         .unwrap();
     let graph = graph.as_ref().as_ref().unwrap();
-    let labels = graph
+    let mut labels = graph
         .nodes
         .keys()
         .map(ToString::to_string)
         .collect::<Vec<_>>();
-    assert_eq!(labels, vec!["//pkg:rule", "//pkg:BUILD.bazel"]);
+    labels.sort();
+    assert_eq!(
+        labels,
+        vec![
+            "//pkg:BUILD.bazel",
+            "//pkg:one.out",
+            "//pkg:rule",
+            "//pkg:two.out",
+        ]
+    );
     let rule = graph
         .nodes
         .values()
         .find(|node| node.label.to_string() == "//pkg:rule")
         .unwrap();
     assert!(rule.dependencies.is_empty());
+    for output in ["//pkg:one.out", "//pkg:two.out"] {
+        let output = graph
+            .nodes
+            .values()
+            .find(|node| node.label.to_string() == output)
+            .unwrap();
+        assert_eq!(output.kind, QueryNodeKind::GeneratedFile);
+        assert_eq!(
+            output
+                .dependencies
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            ["//pkg:rule"]
+        );
+    }
+}
+
+#[tokio::test]
+async fn labels_projects_supported_native_filegroup_and_alias_attributes() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"group\", srcs = [\":local.txt\", \"//other:cross.txt\"])\nalias(name = \"redirect\", actual = \":group\")\n",
+    );
+    write(
+        workspace.join("other/BUILD.bazel"),
+        "exports_files([\"cross.txt\"])\n",
+    );
+    write(workspace.join("pkg/local.txt"), "local\n");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, expected) in [
+        (
+            "labels(srcs, //pkg:group)",
+            "//other:cross.txt\n//pkg:local.txt\n",
+        ),
+        ("labels(actual, //pkg:redirect)", "//pkg:group\n"),
+        ("labels(srcs, //pkg:local.txt)", ""),
+    ] {
+        let output = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+}
+
+#[tokio::test]
+async fn labels_metadata_changes_invalidate_and_semantic_formatting_reuses_the_package_graph() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    let defs = workspace.join("pkg/defs.bzl");
+    let build = workspace.join("pkg/BUILD.bazel");
+    let schema = |default| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {{\"dep\": attr.label(default = \":{default}\"), \"out\": attr.output(mandatory = True)}})\n"
+        )
+    };
+    write(&defs, &schema("one.txt"));
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\nload(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", out = \"one.out\")\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(QueryTracker::default());
+    let labels = "labels(dep, //pkg:rule)";
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, labels).await;
+    assert_eq!(initial.unwrap().stdout(), "//pkg:one.txt\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        "# semantic no-op\nconfig_setting( name = \"linux\", values = {\"cpu\": \"k8\"} )\nload(\":defs.bzl\", \"probe\")\nprobe( name = \"rule\", out = \"one.out\" )\n",
+    );
+    let (formatted, events) = query_revision(&dice, &tracker, &workspace, labels).await;
+    assert_eq!(formatted.unwrap().stdout(), "//pkg:one.txt\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+
+    write(&defs, &schema("two.txt"));
+    let (default_changed, events) = query_revision(&dice, &tracker, &workspace, labels).await;
+    assert_eq!(default_changed.unwrap().stdout(), "//pkg:two.txt\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\nload(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", dep = \":three.txt\", out = \"one.out\")\n",
+    );
+    let (value_changed, events) = query_revision(&dice, &tracker, &workspace, labels).await;
+    assert_eq!(value_changed.unwrap().stdout(), "//pkg:three.txt\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\nload(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", dep = select({\":linux\": \":one.txt\", \"//conditions:default\": \":two.txt\"}), out = \"one.out\")\n",
+    );
+    let (selector_changed, events) = query_revision(&dice, &tracker, &workspace, labels).await;
+    assert_eq!(
+        selector_changed.unwrap().stdout(),
+        "//pkg:one.txt\n//pkg:two.txt\n"
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    let (output_initial, events) =
+        query_revision(&dice, &tracker, &workspace, "labels(out, //pkg:rule)").await;
+    assert_eq!(output_initial.unwrap().stdout(), "//pkg:one.out\n");
+    assert!(events.is_empty());
+
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\nload(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", dep = select({\":linux\": \":one.txt\", \"//conditions:default\": \":two.txt\"}), out = \"two.out\")\n",
+    );
+    let (output_changed, events) =
+        query_revision(&dice, &tracker, &workspace, "labels(out, //pkg:rule)").await;
+    assert_eq!(output_changed.unwrap().stdout(), "//pkg:two.out\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
 }
 
 #[tokio::test]

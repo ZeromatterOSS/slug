@@ -19,6 +19,11 @@ fn workspace() -> std::path::PathBuf {
         .join("../../tests/v2_oracle/fixtures/query-build-load-files-provenance/workspace")
 }
 
+fn ordinary_graph_workspace() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-loading-thin-vertical/workspace")
+}
+
 #[test]
 fn graph_output_matches_each_bazel_provenance_oracle_row() {
     let cases = [
@@ -106,4 +111,62 @@ fn graph_output_honors_unfactored_mode() {
             "}\n",
         )
     );
+}
+
+#[test]
+fn ordinary_graphs_keep_the_existing_lexical_selection_order() {
+    let factored = concat!(
+        "digraph mygraph {\n",
+        "  node [shape=box];\n",
+        "  \"//app:app\"\n",
+        "  \"//app:app\" -> \"//app:via_alias\"\n",
+        "  \"//app:app\" -> \"//nested:branch\"\n",
+        "  \"//nested:branch\"\n",
+        "  \"//nested:branch\" -> \"//nested/child:child.txt\"\n",
+        "  \"//nested/child:child.txt\"\n",
+        "  \"//app:via_alias\"\n",
+        "  \"//app:via_alias\" -> \"//lib:leaf\"\n",
+        "  \"//lib:leaf\"\n",
+        "  \"//lib:leaf\" -> \"//lib:explicit.txt\\n//lib:implicit.txt\\n//lib:missing_input.txt\"\n",
+        "  \"//lib:explicit.txt\\n//lib:implicit.txt\\n//lib:missing_input.txt\"\n",
+        "}\n",
+    );
+    let unfactored = concat!(
+        "digraph mygraph {\n",
+        "  node [shape=box];\n",
+        "  \"//app:app\"\n",
+        "  \"//app:app\" -> \"//app:via_alias\"\n",
+        "  \"//app:app\" -> \"//nested:branch\"\n",
+        "  \"//nested:branch\"\n",
+        "  \"//nested:branch\" -> \"//nested/child:child.txt\"\n",
+        "  \"//nested/child:child.txt\"\n",
+        "  \"//app:via_alias\"\n",
+        "  \"//app:via_alias\" -> \"//lib:leaf\"\n",
+        "  \"//lib:leaf\"\n",
+        "  \"//lib:leaf\" -> \"//lib:explicit.txt\"\n",
+        "  \"//lib:leaf\" -> \"//lib:implicit.txt\"\n",
+        "  \"//lib:leaf\" -> \"//lib:missing_input.txt\"\n",
+        "  \"//lib:missing_input.txt\"\n",
+        "  \"//lib:implicit.txt\"\n",
+        "  \"//lib:explicit.txt\"\n",
+        "}\n",
+    );
+
+    for (factored_flag, expected) in [
+        ("--graph:factored", factored),
+        ("--nograph:factored", unfactored),
+    ] {
+        let output = slug()
+            .current_dir(ordinary_graph_workspace())
+            .args(["query", "--output=graph", factored_flag, "deps(//app:app)"])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{factored_flag}: {output:?}");
+        assert!(output.stderr.is_empty(), "{factored_flag}: {output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            expected,
+            "{factored_flag}"
+        );
+    }
 }

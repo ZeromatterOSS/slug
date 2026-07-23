@@ -20,6 +20,7 @@ use allocative::Allocative;
 use async_trait::async_trait;
 use compact_str::CompactString;
 use dice::DiceComputations;
+use dupe::Dupe;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use slug_identity_v2::TargetPattern;
@@ -107,6 +108,7 @@ impl QueryOutput {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 struct SelectedQueryGraph {
     nodes: Vec<SelectedQueryGraphNode>,
+    generated_file_labels: SmallSet<CompactString>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -238,6 +240,15 @@ impl SelectedQueryGraph {
                         .label
                         .cmp(&self.nodes[*right as usize].label)
                 });
+            } else if class.iter().all(|node| {
+                self.generated_file_labels
+                    .contains(&self.nodes[*node as usize].label)
+            }) {
+                // Bazel's unsorted factored visitor renders output-list
+                // members in its reverse traversal order. Preserve that
+                // order only for the generated-file equivalence class;
+                // ordinary factored classes retain their existing order.
+                class.reverse();
             }
             classes.push(class);
         }
@@ -368,6 +379,12 @@ pub(crate) trait QueryEnvironment {
         targets: &Self::Set,
         include_buildfiles: bool,
     ) -> Result<Self::Set, QueryError>;
+
+    async fn labels(
+        &mut self,
+        attribute: &str,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError>;
 }
 
 pub(crate) struct QueryEvaluator<E> {
@@ -493,6 +510,7 @@ static BUILDFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
 static LOADFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
     include_buildfiles: false,
 };
+static LABELS_FUNCTION: LabelsFunction = LabelsFunction;
 
 impl<E> QueryFunctions<E> for LoadingQueryFunctions
 where
@@ -507,6 +525,7 @@ where
             &ALLPATHS_FUNCTION as &dyn QueryFunction<E>,
             &BUILDFILES_FUNCTION as &dyn QueryFunction<E>,
             &DEPS_FUNCTION as &dyn QueryFunction<E>,
+            &LABELS_FUNCTION as &dyn QueryFunction<E>,
             &LOADFILES_FUNCTION as &dyn QueryFunction<E>,
             &RDEPS_FUNCTION as &dyn QueryFunction<E>,
             &SAME_PKG_DIRECT_RDEPS_FUNCTION as &dyn QueryFunction<E>,
@@ -816,6 +835,34 @@ where
 
 struct LoadingFilesFunction {
     include_buildfiles: bool,
+}
+
+struct LabelsFunction;
+
+impl<E> QueryFunction<E> for LabelsFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("labels").expect("labels is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
+        async move {
+            let attribute = match &args[0].kind {
+                QueryExpressionKind::TargetLiteral(value) => value.as_str(),
+                _ => return Err(QueryError::syntax("labels attribute must be a word")),
+            };
+            let targets = eval_set_arg(evaluator, args, variables, 1).await?;
+            evaluator.environment.labels(attribute, &targets).await
+        }
+        .boxed()
+    }
 }
 
 impl<E> QueryFunction<E> for LoadingFilesFunction
@@ -1254,6 +1301,7 @@ struct LoadingQueryEnvironment<'a, 'd> {
     ctx: &'a mut DiceComputations<'d>,
     workspace: PathBuf,
     evaluation_graph: ResolvedGraph<QueryLabel>,
+    generated_file_labels: SmallSet<QueryLabel>,
     candidates: QueryCandidateArena,
 }
 
@@ -1263,6 +1311,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             ctx,
             workspace,
             evaluation_graph: ResolvedGraph::new(),
+            generated_file_labels: SmallSet::new(),
             candidates: QueryCandidateArena::new(),
         }
     }
@@ -1292,7 +1341,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             if error.message.contains("no BUILD.bazel or BUILD file")
                 || error.message.contains("package directory is absent")
             {
-                QueryError::evaluation(format!(
+                error.with_message(format!(
                     "no such package '{}': BUILD file not found",
                     label.package()
                 ))
@@ -1308,6 +1357,9 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                 label.package()
             ))
         })?;
+        if matches!(node.kind, crate::QueryNodeKind::GeneratedFile) {
+            self.generated_file_labels.insert(label.dupe());
+        }
         self.evaluation_graph.record_node(label);
         Ok(node)
     }
@@ -1389,16 +1441,28 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             }
         }
 
+        let has_selected_generated_files = included
+            .keys()
+            .any(|label| self.generated_file_labels.contains(label));
         let mut selected = included.keys().cloned().collect::<Vec<_>>();
-        selected.sort_unstable();
+        if !has_selected_generated_files {
+            // Preserve the established ordinary-query graph order. Generated
+            // outputs retain callback/materialization order because sorting
+            // here would erase producer order before Bazel's reverse visitor.
+            selected.sort_unstable();
+        }
         let mut target_to_index = SmallMap::with_capacity(selected.len());
         let mut nodes = Vec::with_capacity(selected.len());
+        let mut generated_file_labels = SmallSet::new();
         for label in selected {
             let index: u32 = nodes
                 .len()
                 .try_into()
                 .expect("query graph exceeds u32 node capacity");
             target_to_index.insert(label.clone(), index);
+            if self.generated_file_labels.contains(&label) {
+                generated_file_labels.insert(CompactString::new(label.to_string()));
+            }
             nodes.push(SelectedQueryGraphNode {
                 label: CompactString::new(label.to_string()),
                 successors: Vec::new(),
@@ -1431,7 +1495,10 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         for node in &mut nodes {
             node.successors.sort_unstable();
         }
-        SelectedQueryGraph { nodes }
+        SelectedQueryGraph {
+            nodes,
+            generated_file_labels,
+        }
     }
 
     // Text FULL is an existing public ordering contract. Keep its reverse
@@ -1719,6 +1786,40 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         }
         Ok(result)
     }
+
+    async fn labels(
+        &mut self,
+        attribute: &str,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        let mut labels = SmallSet::new();
+        for (_, id) in targets.materialized_by_label(&self.candidates) {
+            let candidate = self.candidates.get(id).clone();
+            let Some(label) = candidate.evaluation_graph_label().cloned() else {
+                continue;
+            };
+            let node = self.resolve_single(label.clone()).await?;
+            if !node.kind.is_rule() {
+                continue;
+            }
+            let Some(attribute) = node
+                .attributes
+                .iter()
+                .find(|projection| projection.name == attribute)
+            else {
+                continue;
+            };
+            for label in attribute.labels.iter().cloned() {
+                self.resolve_single(label.clone()).await.map_err(|error| {
+                    let message =
+                        format!("in '{}' of rule {}: {error}", attribute.name, node.label);
+                    error.with_message(message)
+                })?;
+                labels.insert(label);
+            }
+        }
+        Ok(self.real_delivery(labels))
+    }
 }
 
 pub async fn evaluate_loading_query(
@@ -1776,6 +1877,7 @@ mod graph_output_tests {
                     successors: successors.to_vec(),
                 })
                 .collect(),
+            generated_file_labels: Default::default(),
         }
     }
 
