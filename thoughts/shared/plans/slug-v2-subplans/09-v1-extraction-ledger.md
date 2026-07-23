@@ -951,3 +951,50 @@ Query, Java regex, BUILD pseudo-nodes, generated nodes,
 metadata, attrs, loads, visibility, tests, executables, external repositories,
 the other ten loading functions, non-text formatters, `cquery`, and `aquery`
 remain open.
+
+### Stage 8 siblings BUILD-file-node packet — approved extraction plan
+
+Status: Reviewed, oracle and implementation pending
+
+Source ref/commit(s): Bazel `8220c6198837d5c13d53fea211cf3282aa12408a`,
+`src/main/java/com/google/devtools/build/lib/query2/engine/SiblingsFunction.java`,
+`src/main/java/com/google/devtools/build/lib/query2/engine/QueryEnvironment.java`,
+`src/main/java/com/google/devtools/build/lib/pkgcache/PackageProvider.java`
+lines 147-153, `src/main/java/com/google/devtools/build/lib/packages/Package.java`
+lines 858-862, 1036, and 1462-1474,
+`src/test/java/com/google/devtools/build/lib/packages/PackageFactoryTest.java`
+line 943, and the named `AbstractQueryTest` sibling and exported-BUILD themes;
+Buck2
+`088c75c7e36805df99c3de29062baa95db700b8b` compact ordered collections; V1
+`e218054d4c796655939b968d90208b185decb352` rejected for no siblings support.
+
+V2 fixture: `query-siblings-build-file-node`
+
+V2 commit(s): pending oracle; pending implementation
+
+Decision: port no Buck2/V1 function semantics. Add the minimum V2-owned
+`BuildFile` package-graph node with its actual loaded basename and zero edges,
+then add generic `siblings` package projection with compact package
+deduplication. Do not normalize `BUILD` to `BUILD.bazel`; an absent basename
+is the normal target-missing path. Coalesce a matching `ExportedFile` for the
+active BUILD basename into the one `BuildFile` node; any rule/alias/custom
+collision remains an invariant error. Keep it non-rule and zero-edge so it
+does not alter `:all`, recursive, or traversal behavior. Defer transitive
+loads/fake `.bzl` nodes, regex/kind, attributes/labels, visibility, tests,
+executables, generated/external/configured/action state.
+
+Expected evidence: exact actual/wrong BUILD labels including root and matching
+`exports_files` coalescing; complete same/multiple-package sibling sets;
+rule/source/alias/custom/BUILD operands; implemented compositions and FULL
+ordering; empty/error behavior; and exact retained-DICE lifecycle,
+BUILD-content, basename-priority/rename, and package delete/recreate
+transitions.
+
+Validation boundary: generation and two independent Bazel no-update runs,
+then focused V2 graph/evaluator/CLI/daemon tests and the preceding five Slug
+fixtures. Require compact utility/reuse, collision, scope, diff/format, and
+daemon-clean checks plus Sol-low review before recording a landed commit.
+
+Residual risk: `buildfiles`/`loadfiles` require a separate transitive loading
+representation; do not treat their source tests or `kind` interactions as
+accepted Slug semantics in this packet.

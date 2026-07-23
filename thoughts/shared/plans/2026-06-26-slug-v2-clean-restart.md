@@ -255,6 +255,14 @@ fixtures (133/133 rows). M3 remains open for the other ten loading functions,
 repository/pattern/order/formatter breadth; `filter` stays deferred until an
 exact Java `Pattern` substrate exists.
 
+Next reviewed packet: `WP-8-m3-siblings-build-file-node` is oracle-first
+`siblings(EXPR)` plus the smallest missing package representation: one actual
+BUILD-file pseudo-node per existing package. It is not yet landed, so M3 still
+has ten deferred functions; landing it would leave nine. `buildfiles` and
+`loadfiles` remain separate because they require transitive `.bzl`/fake-target
+semantics, while regex, attribute, generated, external, configured, and action
+surfaces remain out of scope.
+
 ## Two-Tier Work-Packet Contract
 
 Use role boundaries rather than relying on a particular model to infer project

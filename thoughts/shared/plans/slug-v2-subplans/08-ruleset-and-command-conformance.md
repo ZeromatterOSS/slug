@@ -1582,3 +1582,91 @@ graph/DICE/cache/runtime state, direct filesystem access, locks, or
 build/cquery/aquery changes. Defer `filter` pending a Java-regex compatibility
 substrate. If this packet stops, audit `siblings` plus BUILD pseudo-node
 representation as the next foundation.
+
+### Reviewed next packet — `WP-8-m3-siblings-build-file-node` (2026-07-23)
+
+Work packet ID: `WP-8-m3-siblings-build-file-node`
+
+Goal and gate link: implement only ordinary root-repository `siblings(EXPR)`
+and the package BUILD-file node it necessarily exposes. This is not
+`buildfiles`/`loadfiles`, `kind`, regex filtering, generated/output-file,
+external-repository, configured, or action-query work. It moves only
+`siblings` from deferred after an oracle and implementation land; M3 currently
+still has ten deferred functions and would then have nine.
+
+Representation decision: extend the existing `UnconfiguredPackageGraph` with
+exactly one zero-edge, non-rule `QueryNodeKind::BuildFile` node. Its label is
+derived from `loaded.build_file.file_name()`, not normalized: a package loaded
+from `BUILD.bazel` gets `//pkg:BUILD.bazel`, a package loaded from `BUILD` gets
+`//pkg:BUILD`, and root follows the same rule. The wrong basename is an
+ordinary missing-target error. If `exports_files` already recorded the actual
+loaded BUILD basename as an `ExportedFile`, coalesce that entry into the one
+zero-edge `BuildFile` node; visibility remains deferred. Any rule, alias, or
+custom-target collision is an invariant error, never a silent overwrite. The
+node must not leak into current `:all`/recursive rule filters or dependency
+traversal; direct `deps(actual_BUILD_label)` returns only that node.
+
+Implementation boundary:
+
+1. Add only `QueryEnvironment::siblings` and its generic registry function.
+   It evaluates its operand once, deduplicates package identities with compact
+   `SmallSet`/`SmallMap`, computes the existing package graph once per package,
+   and unions every graph node.
+2. Retain the existing `UnconfiguredPackageGraphKey`, `PackageLoadKey`,
+   `TargetSet`, `SmallMap`, `SmallSet`, and mutable-DICE serial ownership. Add
+   no DICE key, graph/cache/runtime/protocol/filesystem seam, or lock.
+3. Buck2 commit `088c75c7e36805df99c3de29062baa95db700b8b` contributes only
+   compact deterministic collection lessons; it has no Bazel `siblings`
+   semantic port. V1 commit `e218054d4c796655939b968d90208b185decb352` is
+   rejected: its query surface did not implement siblings. Do not import V1
+   process/server, Buck labels/cells, or pseudo-file conventions.
+
+Bazel 9.2 source anchors:
+`src/main/java/com/google/devtools/build/lib/query2/engine/SiblingsFunction.java`;
+`src/main/java/com/google/devtools/build/lib/query2/engine/QueryEnvironment.java`
+for the target accessor and `getSiblingTargetsInPackage` boundary;
+`src/main/java/com/google/devtools/build/lib/pkgcache/PackageProvider.java`
+lines 147-153 for package target-map membership;
+`src/main/java/com/google/devtools/build/lib/packages/Package.java` lines
+858-862, 1036, and 1462-1474 for BUILD target membership and actual discovered
+basename;
+`src/test/java/com/google/devtools/build/lib/packages/PackageFactoryTest.java`
+line 943 and `AbstractQueryTest.java` line 1123 for an exported active BUILD
+file; and
+`src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java`
+`testSiblings_simple`, `testSiblings_duplicatePackages`,
+`testSiblings_samePackageRdeps`, `testSiblings_matchesTargetNamedAll`, and
+`testSiblings_withBuildfiles`. The latter two `kind`/`buildfiles` themes are
+source evidence for pseudo-node interaction only, not Slug acceptance rows.
+
+Oracle-first fixture: `query-siblings-build-file-node`, generated and
+independently no-update verified with Bazel 9.2 at immutable commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Bazel may use external RC/
+BuildBuddy configuration by invocation only; no agent/tool reads, prints,
+copies, or records `~/.bazelrc` or credentials.
+
+Required oracle matrix:
+
+- actual and wrong BUILD labels for `BUILD.bazel`, `BUILD`, and root, including
+  matching `exports_files(["BUILD.bazel"])` and `exports_files(["BUILD"])`
+  packages that still expose exactly one directly resolvable BUILD node;
+- rule, attribute-created source, alias, custom-rule, and actual BUILD-file
+  operands; duplicate operands and multiple packages;
+- only implemented compositions: union/set/intersection/difference, `deps`
+  on an actual BUILD node, and existing `rdeps`/`same_pkg_direct_rdeps` where
+  the oracle proves the zero-edge/non-rule boundary;
+- exact default/AUTO/FULL output for acyclic package membership plus a local
+  chain/cycle, with FULL using the shared selected-induced-graph renderer;
+- empty input, arity/syntax, wrong-basename, missing target/package, and
+  no partial stdout on errors; and
+- exact DICE activation multisets for initial/identical/unrelated requests,
+  target create/rename/delete/recreate, BUILD content edit,
+  `BUILD.bazel`/`BUILD` rename in both directions, dual-file priority/fallback,
+  and package deletion/recreation.
+
+Stop rather than broaden if Bazel requires a fake `.bzl` target/transitive-load
+projection, generated/output node, whole-workspace package scan, external
+repository, a new cache/key/protocol/filesystem/lock boundary, changed current
+rule-only pattern semantics, metadata/attribute/visibility/test/executable
+semantics, regex matching, or configured/action state. `buildfiles` and
+`loadfiles` remain the subsequent load-provenance packet.
