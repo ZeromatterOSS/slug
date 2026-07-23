@@ -12,6 +12,49 @@ fork migrated toward Bazel compatibility. V2 keeps the proven lessons and
 selected code from V1, but the active trunk is a Bazel-shaped Rust
 implementation from the first architectural boundary.
 
+## Live Status
+
+This table is the scheduling authority for a clean root agent. Historical
+checkpoint sections below are evidence only. A request such as
+`/goal follow the implementation plan` starts with the root-orchestrator prompt
+and advances the **Current packet**, not an older `next` paragraph.
+
+| Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
+|-----------|--------|-------------------|--------------|------------------------|
+| M0: archive and baseline health | **blocked** | `slug-v1-archive` tag and clean-root shape | local `v1-archive` branch is absent; archive checker allowlists reject `slug_server_v2`, the orchestration skill, and the current root prompt | finish the active M3 packet, then `WP-0-baseline-repair` before another feature packet |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | reassess after M0; do not infer completion from the narrow verticals |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while M3's active packet is open |
+| M3: `query` | **active** | parser/evaluator/loading graph; 10 of 16 Bazel default functions; exact accepted text/graph fixtures; executable capability substrate accepted in `c86fc656` | six functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | finish `WP-4-8-m3-executables-rule-capability` by activating Stage 8 Gate B against the accepted 40-command oracle |
+| M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
+| M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
+| M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
+| M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
+| M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | a separate disjoint developer-graph packet may be proposed after M0 |
+
+### Operating-remediation queue
+
+Complete these as separate accepted packets; do not combine them into one broad
+cleanup:
+
+1. Finish `WP-4-8-m3-executables-rule-capability`, whose immutable oracle is
+   already accepted.
+2. Run `WP-0-baseline-repair`: create the recorded local archive branch after
+   read-only verification, update only truthful checker allowlists, and make
+   `scripts/v2_archive_status.sh` green.
+3. Add a root-owned serialized packet-validation wrapper around the existing
+   `tools/v2_oracle` Slug comparison path. It must not weaken daemon tests when
+   the current sandbox lacks Unix-socket binding.
+4. Run an oracle-neutral `slug_query_v2` module-extraction packet that separates
+   output formatting, traversal, function dispatch, and the loading
+   environment from `evaluator.rs`; preserve every accepted fixture and obtain
+   Sol pre/final review for the internal interface boundary.
+5. Run a read-only Java `Pattern` feasibility/reuse audit and Sol adjudication
+   before implementing `filter`, `attr`, or regex-based `kind`. Finite fixture
+   agreement or substituting Rust/fancy regex is not Bazel parity.
+
+The root owns Live Status updates. Implementation workers return source/test
+patches and evidence; they do not append checkpoint prose or create commits.
+
 ## Operating Decision
 
 Use the existing repository for continuity, but restart the implementation
@@ -111,8 +154,8 @@ restart. Before implementation proceeds as V2 trunk, do this sequence:
 5. Run `scripts/v2_archive_status.sh`, `git diff --check`, and the touched
    stage validation before calling the root clean.
 
-Use the saved implementer prompt at
-[thoughts/shared/prompts/2026-06-29-slug-v2-generic-implementer.md](../prompts/2026-06-29-slug-v2-generic-implementer.md)
+Use the current root-orchestrator prompt at
+[thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md](../prompts/2026-07-23-slug-v2-root-orchestrator.md)
 for sessions that continue this remediation.
 
 2026-06-29 execution update: the missing local archive refs have been repaired;
@@ -296,73 +339,38 @@ loading-query, 6 parser/registry); Sol-low final review returned `ACCEPT`.
 
 ## Two-Tier Work-Packet Contract
 
-Use role boundaries rather than relying on a particular model to infer project
-architecture. The default assignment is a Terra or Luna xhigh agent as the
-**implementation worker** and a Sol agent as the **design reviewer**; another
-model may fill either role only if it follows the same contract.
+The current operating contract lives in
+`.codex/skills/slug-agent-orchestration/SKILL.md`. A clean plan-following root
+must also read
+`thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md`.
 
-- The implementation worker executes one bounded packet, makes only local
-  implementation choices already implied by its owner plan, edits only the
-  named scope, and produces the fixture, patch, validation, and evidence bundle.
-- The design reviewer owns choices that change architecture, public or
-  cross-crate interfaces, DICE keys/ownership/invalidation/locking, stage
-  boundaries, or V1/Buck2 reuse and adaptation boundaries. Read-only discovery
-  may precede review, but implementation of such a choice may not.
-- Every Stage 2-8 and Stage 10 packet begins with reuse discovery, even when
-  its request does not mention an import. Before new implementation, the worker
-  must inspect the
-  owner plan, the matching Stage 9 candidates, relevant retained Buck2-derived
-  crates, and the V1 and mixed-root refs documented by `V1_ARCHIVE.md`, then
-  obtain Sol approval for the recorded reuse decisions.
-- Sol review is mandatory before any reserved choice and after every validated
-  packet. The post-validation result is `accept`, `revise`, or `replan`; only an
-  accepted packet may be recorded as completed evidence in its owner plan.
+The default roles are:
 
-Copy and fill this template before editing. Every field is required; use
-`none` with a reason rather than omitting a field. Paths, commands, pass
-criteria, and exclusions must be concrete enough that another worker can run
-the packet without reconstructing its design.
+- one persistent high-capability Sol root for critical-path selection,
+  architecture, integration, validation, status/evidence, and commits;
+- Terra medium for bounded audits, fixtures, focused tests, and
+  one-abstraction implementation;
+- Terra high for difficult but already-approved multi-file implementation; and
+- Sol low for concise pre-implementation adjudication and final risky-patch
+  review. Sol high review is an escalation after concrete unresolved evidence,
+  not a standing second orchestrator.
 
-```text
-Work packet ID: WP-<stage>-<short-name>
-Owner stage and plan: <stage number and exact V2 subplan path>
-Goal and gate link: <one result; current milestone exit gate or narrow independent oracle reason>
-Prerequisites and current state: <required prior packets; branch/HEAD; relevant dirty paths; observed baseline>
-Oracle-first artifact: <fixture and expected artifact path, or exact local Bazel source citation, created/verified before implementation>
-Reuse audit (required for Stages 2-8 and 10):
-- Candidates checked: <owner-plan sections and exact Stage 9 rows>
-- Sources inspected: <exact retained paths; archive or mixed-root ref@commit:path>
-- Prior evidence inspected: <tests, oracle/evidence paths, and relevant results>
-- Decision and Sol approval: <adopt/port/rewrite/reference-only/reject for each candidate with reason; approval reference>
-Exact scope: <allowed files/symbols plus explicit exclusions>
-Decisions reserved for design reviewer: <questions and affected boundary, or none with reason>
-Implementation steps:
-1. <ordered bounded step>
-2. <ordered bounded step>
-Focused validation: <exact commands and pass criteria>
-Evidence and plan update: <owner-plan section; oracle/result/diff facts to record after acceptance>
-Stop conditions: <state mismatch, missing oracle, dirty overlap, scope growth, reserved decision, changed failure class, or other packet-specific stop>
-```
+Every Stage 2-8 and Stage 10 packet still begins with required reuse discovery.
+Any architecture, public/cross-crate interface, DICE key/ownership/locking,
+stage-boundary, formatter-identity, regex-engine, or V1/Buck2 reuse decision
+requires recorded Sol review before implementation.
 
-For every Stage 2-8 and Stage 10 packet, reuse discovery is required before new
-implementation, including apparently greenfield work. The worker records the
-Stage 9 rows and owner-plan candidates checked; the exact retained active-tree
-paths and archive or mixed-root refs, commits, and paths inspected; prior tests
-or evidence read; and an `adopt`, `port`, `rewrite`, `reference-only`, or
-`reject` decision with a reason for each candidate. A request that names no
-import is not a reason to skip the audit. If discovery finds no reusable
-candidate, record the concrete sources checked and why they were rejected or
-kept reference-only. Sol must approve the audit before implementation begins.
+Use the stored templates:
 
-After reuse approval where required, the worker checks the stated current state
-and creates or refreshes the oracle artifact. If another reserved question
-appears, the worker sends Sol the packet plus the smallest relevant source/plan
-evidence and waits for a recorded decision before related edits. After
-implementation and focused validation, the worker sends Sol the packet ID,
-scoped diff, oracle or Bazel citation, command results, and residual risks.
-`revise` returns to the same packet and requires revalidation; `replan` ends it
-and requires a replacement packet. Record the accepted result and reviewer
-outcome compactly in the owner plan before starting another packet.
+- `.codex/skills/slug-agent-orchestration/references/implementation-worker.md`
+- `.codex/skills/slug-agent-orchestration/references/design-reviewer.md`
+
+Workers normally edit only exact source/test/fixture scope and run focused
+tests. The root inspects the actual diff, adds a source-derived adversarial
+regression, owns downstream and broad serialized validation, obtains the
+terminal `ACCEPT`/`REVISE`/`REPLAN` verdict, and updates Live Status plus compact
+owner evidence once. One focused correction is allowed; a second material miss
+requires `REPLAN`.
 
 ## Retained First Real Bazel Build Integration Gate
 
@@ -445,8 +453,8 @@ slice's subplan and record compact evidence in the owning V2 plan.
 ## Next Agent Prompt
 
 Use
-[thoughts/shared/prompts/2026-06-29-slug-v2-generic-implementer.md](../prompts/2026-06-29-slug-v2-generic-implementer.md)
-for implementation sessions. The split-specific remediation instructions live
+[thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md](../prompts/2026-07-23-slug-v2-root-orchestrator.md)
+for plan-following sessions. The split-specific remediation instructions live
 in this plan, Stage 0, Stage 9, and `V1_ARCHIVE.md`, not in the prompt.
 
 ## Reviewed Next M3 Direction: Build and Load Files (2026-07-23)

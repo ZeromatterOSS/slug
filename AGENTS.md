@@ -37,6 +37,27 @@ Cite Bazel source of truth for parity decisions:
 
 Start from the live checkout, not from memory.
 
+- A request to "follow the implementation plan", continue the roadmap, pursue
+  the current goal, or otherwise choose the next V2 work is an orchestration
+  task. Before selecting or delegating work, read
+  `.codex/skills/slug-agent-orchestration/SKILL.md` and
+  `thoughts/shared/prompts/2026-07-23-slug-v2-root-orchestrator.md`.
+  This applies even when the initial request is only `/goal follow the
+  implementation plan`.
+- For plan-following goals, use the canonical plan's **Live Status** table as
+  the scheduling authority. Historical checkpoint prose is evidence, not the
+  current queue. Finish an already-active owned packet to a safe boundary, then
+  clear any baseline blocker named by Live Status before starting another
+  feature packet.
+- The root orchestrator owns architecture, worktree safety, plan/status and
+  routing-log edits, broad validation, commits, and final communication.
+  Implementation workers normally edit only their explicitly allowed source,
+  test, and fixture files. They return evidence to the root rather than editing
+  plans or committing.
+- Default to one write worker. A concurrent second worker must be read-only or
+  own completely disjoint files. Allow one focused correction after a concrete
+  miss; a second material correction requires replanning rather than an
+  open-ended repair loop.
 - Read this file, then the current roadmap entry under
   `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`, then the
   relevant V2 subplan under `thoughts/shared/plans/slug-v2-subplans/`.
@@ -50,10 +71,11 @@ Start from the live checkout, not from memory.
   Buck2-derived data structures, interning, hashing, compact collections, or
   memory-accounting work, read
   `.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing.
-- When splitting work across agents or choosing a lower-cost model, read
+- When splitting work across agents or choosing a lower-cost model, follow
   `.codex/skills/slug-agent-orchestration/SKILL.md`. Route each bounded packet
   to the least-cost capable agent, keep context forks small, verify delegated
-  diffs in the root, and update its routing log after meaningful results.
+  diffs in the root, and add one routing-log rollup only when the packet reaches
+  `ACCEPT`, `REPLAN`, or a genuine stop.
 - Check `git status --short` and inspect dirty diffs before making changes.
   Treat dirty files as active user/agent state unless the user says otherwise.
 - Prefer focused owning-abstraction tests before broad SDK or repo-wide smokes.
