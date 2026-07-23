@@ -2,7 +2,7 @@
 name = "query-build-load-files-provenance"
 description = "Bazel 9.2 ordinary-query oracle for buildfiles/loadfiles transitive provenance and fake .bzl targets."
 comparison = "message_shape"
-oracle_notes = "Root-repository ordinary-query slice. Discovery established that the same printed fake-load label may project to each consuming package in siblings(), independent of union order; the fixture therefore never claims a request-global owner. No .scl, external repository, generated/output, configured, or action semantics are accepted."
+oracle_notes = "Root-repository ordinary-query slice. A single fake/real label probe proves intersection keeps the left representative, equal-label except is empty in both directions, and union reaches both provenances; the fixture never claims a request-global owner. No .scl, external repository, generated/output, configured, or action semantics are accepted."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -16,7 +16,7 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/query2/common/AbstractBlazeQueryEnvironment.java#TargetKeyExtractor",
   "src/main/java/com/google/devtools/build/lib/query2/compat/FakeLoadTarget.java",
 ]
-translation_notes = "Each separately evaluated load-function invocation can project the same printed label with its consuming package; within one invocation seenBzlLabels label-dedups. Real exported .bzl and fake .bzl operands are intentionally contrasted. Broken companion BUILD syntax/load rows prove output provenance without asserting that PackageLoad succeeded; .bzl load cycles are failure rows."
+translation_notes = "Each separately evaluated load-function invocation can project the same printed label with its consuming package; within one invocation seenBzlLabels label-dedups. TargetKeyExtractor labels determine membership: intersection retains the left representative, equal-label except removes both directions, and union streams both provenances to siblings. Broken companion BUILD syntax/load rows prove output provenance without asserting that PackageLoad succeeded; .bzl load cycles are failure rows."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture query-build-load-files-provenance --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture query-build-load-files-provenance --tool bazel --bazel /usr/bin/bazel"
 
@@ -375,3 +375,39 @@ name = "full_graph_buildfiles_union_real"
 argv = ["query", "--order_output=full", "--output=graph", "--graph:factored", "buildfiles(//a:one) union //a:one"]
 expected_exit = 0
 stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \"//a:one/n//shared:BUILD\\.bazel/n//shared:one\\.bzl/n//shared:two\\.bzl\"\\n\\}\\Z"]
+
+[[commands]]
+name = "siblings_single_fake_real_intersect"
+argv = ["query", "siblings(loadfiles(//single:only) intersect //shared:two.bzl)"]
+expected_exit = 0
+stdout_patterns = ["\\A//single:BUILD\\.bazel\\n//single:only\\Z"]
+
+[[commands]]
+name = "siblings_single_real_fake_intersect"
+argv = ["query", "siblings(//shared:two.bzl intersect loadfiles(//single:only))"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:shared_rule\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "siblings_single_fake_real_except"
+argv = ["query", "siblings(loadfiles(//single:only) except //shared:two.bzl)"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "siblings_single_real_fake_except"
+argv = ["query", "siblings(//shared:two.bzl except loadfiles(//single:only))"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "siblings_single_fake_real_union"
+argv = ["query", "siblings(loadfiles(//single:only) union //shared:two.bzl)"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:shared_rule\\n//shared:two\\.bzl\\n//single:BUILD\\.bazel\\n//single:only\\Z"]
+
+[[commands]]
+name = "siblings_single_real_fake_union"
+argv = ["query", "siblings(//shared:two.bzl union loadfiles(//single:only))"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:shared_rule\\n//shared:two\\.bzl\\n//single:BUILD\\.bazel\\n//single:only\\Z"]

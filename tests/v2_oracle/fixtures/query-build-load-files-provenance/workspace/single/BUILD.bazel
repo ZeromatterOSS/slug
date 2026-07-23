@@ -1,0 +1,4 @@
+load("//shared:two.bzl", "transitive_marker")
+
+exports_files(["BUILD.bazel"])
+filegroup(name = "only")

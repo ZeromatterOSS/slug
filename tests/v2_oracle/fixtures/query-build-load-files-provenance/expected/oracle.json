@@ -20,7 +20,7 @@
       "name": "buildfiles_direct_primary",
       "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043543-650513-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a52e50fb-89b9-4a8e-9919-2fb7da286223\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-044122-670177-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-051423-694832-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: f2069089-81d0-40c0-b3a6-8383723e9ecf\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -43,7 +43,7 @@
       "name": "loadfiles_direct_primary",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: deb4906f-cbf1-4b4b-b657-c5022457575c\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: c1c196c0-a46e-441f-bef6-fefd09621a05\nLoading: 0 packages loaded\n",
       "stdout": "//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -66,7 +66,7 @@
       "name": "siblings_fake_a",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one",
-      "stderr": "INFO: Invocation ID: 3d515c5e-5515-487b-a464-8a01b873190a\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 41eba3b6-f3a4-4e2d-b831-b2263405919f\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n"
     },
     {
@@ -89,7 +89,7 @@
       "name": "siblings_fake_b",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//b:BUILD.bazel\n//b:two",
-      "stderr": "INFO: Invocation ID: 85562600-9b76-4f79-ae7d-6ff9fdb14a80\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: ddb765ec-a2f6-4422-9867-94ef191afe38\nLoading: 0 packages loaded\n",
       "stdout": "//b:BUILD.bazel\n//b:two\n"
     },
     {
@@ -112,7 +112,7 @@
       "name": "siblings_two_consumers_ab",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two",
-      "stderr": "INFO: Invocation ID: 867edd6a-d909-4c49-80eb-c7bd1fb9b9e2\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: a982fd28-c174-4cc7-8ab6-d68d63fb95a9\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n"
     },
     {
@@ -135,7 +135,7 @@
       "name": "siblings_two_consumers_ba",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two",
-      "stderr": "INFO: Invocation ID: 91e92c0b-e9cf-43bf-a864-acba24b20b3a\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: bc02052b-cc99-4dd6-af39-deb532c5d18d\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n"
     },
     {
@@ -158,7 +158,7 @@
       "name": "siblings_real_fake_order",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two",
-      "stderr": "INFO: Invocation ID: 676212be-cee0-4e25-b720-44cddfe97f4a\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: d9a1bf3f-5fcb-4b29-a604-d7596af64a85\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n"
     },
     {
@@ -181,7 +181,7 @@
       "name": "siblings_fake_real_order",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two",
-      "stderr": "INFO: Invocation ID: 2a6e82d7-1366-4fb6-9dbf-61e428ec06a1\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 281bdd24-722d-431a-9fc6-b6b0c9a01839\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n"
     },
     {
@@ -204,7 +204,7 @@
       "name": "real_exported_bzl_siblings",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: b733a1a5-1faa-4dad-b01b-f4bc367b53ad\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: fb332cd0-aefb-4e3f-b96c-fd5279399f71\nLoading: 0 packages loaded\n",
       "stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
     },
     {
@@ -227,7 +227,7 @@
       "name": "siblings_real_fake_same_label",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: 03648d7b-d65c-438d-8358-776067c5d6e8\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: b374749b-af98-4d85-80da-81d2d00286ac\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
     },
     {
@@ -250,7 +250,7 @@
       "name": "siblings_fake_real_same_label",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: dd0c3a45-0f69-4f38-8898-edca8e6fbb38\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 47abcd3c-98b3-45a4-8a33-0f999b302d6d\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
     },
     {
@@ -273,7 +273,7 @@
       "name": "siblings_buildfiles_companions",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one",
-      "stderr": "INFO: Invocation ID: 5b478d33-5252-44e0-a2b0-03f29bb19234\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 93910a67-e194-4b56-957f-42719b0bbd16\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n"
     },
     {
@@ -296,7 +296,7 @@
       "name": "buildfiles_diamond",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//diamond:BUILD.bazel\n//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl",
-      "stderr": "INFO: Invocation ID: b88610c1-f31f-4b83-958c-233eaa1dba43\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 0989db43-5979-4aa8-b752-b05ebb2da974\nLoading: 0 packages loaded\n",
       "stdout": "//diamond:BUILD.bazel\n//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl\n"
     },
     {
@@ -319,7 +319,7 @@
       "name": "loadfiles_diamond",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl",
-      "stderr": "INFO: Invocation ID: 950baf6c-566b-4afb-8447-079fd53c84bf\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 3214a02f-3a7b-44b8-b577-4d215721c1a1\nLoading: 0 packages loaded\n",
       "stdout": "//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl\n"
     },
     {
@@ -342,7 +342,7 @@
       "name": "buildfiles_fallback",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: a2e97baf-b27b-41f8-8419-e1637aaee20d\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: a404a064-b729-41c5-85a2-4faea6f00ccb\nLoading: 0 packages loaded\n",
       "stdout": "//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -365,7 +365,7 @@
       "name": "loadfiles_fallback",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: b500e9f4-f3a5-40f5-8da4-4c4bcd62f529\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 30a5a5b3-3be6-401f-a1db-1279616b93a0\nLoading: 0 packages loaded\n",
       "stdout": "//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -388,7 +388,7 @@
       "name": "buildfiles_dual_primary",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//dual:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: 18988bb6-cf60-4384-8bca-c06975c385dc\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: ea24201c-bb68-44d8-8d92-eafbb7f246c5\nLoading: 0 packages loaded\n",
       "stdout": "//dual:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -411,7 +411,7 @@
       "name": "buildfiles_root",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: 14c91c8a-7640-4b5b-94b0-66844096d8fd\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: a6323eb0-e5db-4570-b05a-430ca9c065be\nLoading: 0 packages loaded\n",
       "stdout": "//:BUILD.bazel\n"
     },
     {
@@ -434,7 +434,7 @@
       "name": "buildfiles_multiple_packages",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: dc0364ed-47ee-446e-8c35-142caf5b94af\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 9d20000c-79dc-4178-9bf2-802a4c22320d\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -457,7 +457,7 @@
       "name": "loadfiles_multiple_packages",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: f180330b-8e49-4341-92df-ce358ea0c1d7\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 9efa900f-3b35-416f-960a-c1c38ce8e53a\nLoading: 0 packages loaded\n",
       "stdout": "//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -480,7 +480,7 @@
       "name": "buildfiles_duplicate_operand",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: a8249d85-f505-46ea-9d38-ae6b2d7c462b\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 3ba07cae-e9f8-43bd-8a0a-b7ccc890bfef\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -503,7 +503,7 @@
       "name": "loadfiles_empty",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 05a68ffe-18c1-46d9-b88d-cc95c0a1040a\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 771b659c-0628-4ee7-b080-640e54ea1384\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -526,7 +526,7 @@
       "name": "buildfiles_empty",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 4b9acdd5-fd48-4e47-81c9-ea9cba8b8d5f\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 61757f11-3125-465d-99fa-4831cd525d55\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -549,7 +549,7 @@
       "name": "buildfiles_idempotent",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: 9eb08c9a-d306-4ea9-97f0-1b58705e0e29\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 76565500-6a77-43af-9e0a-c3b41e81485f\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -572,7 +572,7 @@
       "name": "buildfiles_union",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//fallback:only\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: 95547152-dbb7-4bd3-9ba6-273291f9dab0\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 0b5551a1-2649-4e32-9266-9796749ef54d\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//fallback:only\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -595,7 +595,7 @@
       "name": "buildfiles_intersect",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//shared:one.bzl",
-      "stderr": "INFO: Invocation ID: 3e79396c-e67c-4a86-9835-cdd441ed60ea\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: bdad68c6-0a38-4830-82a8-bf49d7652d8c\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//shared:one.bzl\n"
     },
     {
@@ -618,7 +618,7 @@
       "name": "loadfiles_except",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:one.bzl",
-      "stderr": "INFO: Invocation ID: 93c26995-0e5e-4630-a67f-1f4ed57a7692\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 472b492f-5e6a-423b-880a-ce656315edca\nLoading: 0 packages loaded\n",
       "stdout": "//shared:one.bzl\n"
     },
     {
@@ -641,7 +641,7 @@
       "name": "deps_function_fake_nodes",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: 03651595-506b-4809-ae89-904ab936d335\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: e3131eb5-3d67-4ad8-87b8-e4913f5dbeee\nLoading: 0 packages loaded\n",
       "stdout": "//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -664,7 +664,7 @@
       "name": "deps_buildfiles_fake_nodes",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: cd76b70a-e186-4296-b534-f72dcdbb5029\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: b05b50c4-aa58-4c0c-8035-ad3ba1ab6383\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -687,7 +687,7 @@
       "name": "default_direct",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: 2b6568d1-6652-4ddf-a374-d460ae1cb096\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: a6acc7d1-56cd-4e39-b454-7ae32be8c727\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -712,7 +712,7 @@
       "name": "auto_direct",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: 16587727-7126-4158-8f7e-16721625e74f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 847106dc-703f-4dac-9b50-e616a558c41d\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
     },
     {
@@ -737,7 +737,7 @@
       "name": "full_direct",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: 78dc59f2-4f5b-439c-a633-a17ba1612d09\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 34877d87-38a7-4126-bb81-dc82c224f608\nLoading: 0 packages loaded\n",
       "stdout": "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel\n"
     },
     {
@@ -762,7 +762,7 @@
       "name": "full_wrapped_union",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: d258d492-1ba1-4f3e-b605-00b48c724cb1\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 50177a5f-5b56-4f05-8cb1-2096c50e7b3c\nLoading: 0 packages loaded\n",
       "stdout": "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel\n"
     },
     {
@@ -785,7 +785,7 @@
       "name": "buildfiles_broken_companions",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//broken_load:BUILD.bazel\n//broken_load:good.bzl\n//broken_syntax:BUILD.bazel\n//broken_syntax:good.bzl\n//consumer_bad:BUILD.bazel",
-      "stderr": "INFO: Invocation ID: 35ed3a02-2eb3-4d30-939f-bfe5e729e0fa\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: a3204ff3-81c3-4c63-be6c-020ea6888969\nLoading: 0 packages loaded\n",
       "stdout": "//broken_load:BUILD.bazel\n//broken_load:good.bzl\n//broken_syntax:BUILD.bazel\n//broken_syntax:good.bzl\n//consumer_bad:BUILD.bazel\n"
     },
     {
@@ -808,7 +808,7 @@
       "name": "loadfiles_broken_companions",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//broken_load:good.bzl\n//broken_syntax:good.bzl",
-      "stderr": "INFO: Invocation ID: 3cd725f3-f1fe-4913-b3bc-6c9eeb63f57a\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 2c205b6f-9703-4f68-99d6-9311e6bfa676\nLoading: 0 packages loaded\n",
       "stdout": "//broken_load:good.bzl\n//broken_syntax:good.bzl\n"
     },
     {
@@ -831,7 +831,7 @@
       "name": "missing_load_failure",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: error loading package 'missing_load': cannot load '//missing_load:missing.bzl': no such file",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 2d8237ff-0b0c-440d-ac4e-f7c60d9f6c43\nLoading: 0 packages loaded\nERROR: error loading package 'missing_load': cannot load '//missing_load:missing.bzl': no such file\n",
+      "stderr": "INFO: Invocation ID: 8cbf5436-6898-431d-83d5-9c5b44946d85\nLoading: 0 packages loaded\nERROR: error loading package 'missing_load': cannot load '//missing_load:missing.bzl': no such file\n",
       "stdout": ""
     },
     {
@@ -854,7 +854,7 @@
       "name": "broken_bzl_failure",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/broken_bzl/bad.bzl:1:6: 'is' not supported, use '==' instead\nERROR: <workspace>/broken_bzl/bad.bzl:1:6: syntax error at 'is': expected newline\nERROR: <workspace>/broken_bzl/bad.bzl:1:1: name 'this' is not defined\nERROR: error loading package 'broken_bzl': compilation of module 'broken_bzl/bad.bzl' failed",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 0b2545b4-b2e1-4873-b775-f78733f9442d\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace/broken_bzl/bad.bzl:1:6: 'is' not supported, use '==' instead\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace/broken_bzl/bad.bzl:1:6: syntax error at 'is': expected newline\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace/broken_bzl/bad.bzl:1:1: name 'this' is not defined\nERROR: error loading package 'broken_bzl': compilation of module 'broken_bzl/bad.bzl' failed\n",
+      "stderr": "INFO: Invocation ID: 94d5fb65-8b36-4377-8478-4cc8d18424ab\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-051423-694832-bazel/workspace/broken_bzl/bad.bzl:1:6: 'is' not supported, use '==' instead\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-051423-694832-bazel/workspace/broken_bzl/bad.bzl:1:6: syntax error at 'is': expected newline\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-051423-694832-bazel/workspace/broken_bzl/bad.bzl:1:1: name 'this' is not defined\nERROR: error loading package 'broken_bzl': compilation of module 'broken_bzl/bad.bzl' failed\n",
       "stdout": ""
     },
     {
@@ -877,7 +877,7 @@
       "name": "bzl_cycle_failure",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: cycle detected in extension files: \n    bzl_cycle/BUILD\n.-> //bzl_cycle:one.bzl\n|   //bzl_cycle:two.bzl\n`-- //bzl_cycle:one.bzl\nERROR: cycles detected during target parsing",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 7f0098c4-22ed-4de3-baa5-8ccb35d4ac8d\nLoading: 0 packages loaded\nERROR: cycle detected in extension files: \n    bzl_cycle/BUILD\n.-> //bzl_cycle:one.bzl\n|   //bzl_cycle:two.bzl\n`-- //bzl_cycle:one.bzl\nERROR: cycles detected during target parsing\n",
+      "stderr": "INFO: Invocation ID: 75c4fe6e-44ac-4a39-965e-d42b69ed9230\nLoading: 0 packages loaded\nERROR: cycle detected in extension files: \n    bzl_cycle/BUILD\n.-> //bzl_cycle:one.bzl\n|   //bzl_cycle:two.bzl\n`-- //bzl_cycle:one.bzl\nERROR: cycles detected during target parsing\n",
       "stdout": ""
     },
     {
@@ -900,7 +900,7 @@
       "name": "buildfiles_too_few_arguments",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles()': too few arguments to function 'buildfiles' at ')'",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: bc42b0e3-dccc-4481-a4e1-301e03d6abff\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles()': too few arguments to function 'buildfiles' at ')'\n",
+      "stderr": "INFO: Invocation ID: 83bc141f-3347-4a5c-8ee2-2dc1372e9dd5\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles()': too few arguments to function 'buildfiles' at ')'\n",
       "stdout": ""
     },
     {
@@ -923,7 +923,7 @@
       "name": "loadfiles_too_many_arguments",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'loadfiles(//a:one, //b:two)': too many arguments to function 'loadfiles' at ', //b:two )'",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: f2656edb-6bdd-48b8-b958-ad918d70d86b\nLoading: 0 packages loaded\nERROR: Error while parsing 'loadfiles(//a:one, //b:two)': too many arguments to function 'loadfiles' at ', //b:two )'\n",
+      "stderr": "INFO: Invocation ID: 8cb9a31c-fdff-4ac5-b1c9-680b5d0a0009\nLoading: 0 packages loaded\nERROR: Error while parsing 'loadfiles(//a:one, //b:two)': too many arguments to function 'loadfiles' at ', //b:two )'\n",
       "stdout": ""
     },
     {
@@ -946,7 +946,7 @@
       "name": "buildfiles_syntax_failure",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles(': premature end of input",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 43317a67-cc1c-4ec8-86a9-4dffd54bd9ca\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles(': premature end of input\n",
+      "stderr": "INFO: Invocation ID: afb01f95-ad3c-4fff-9f61-35500e441b84\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles(': premature end of input\n",
       "stdout": ""
     },
     {
@@ -969,7 +969,7 @@
       "name": "buildfiles_missing_target",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//a:missing': target 'missing' not declared in package 'a' defined by <workspace>/a/BUILD.bazel",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: a8605803-f14b-4708-a553-5842903f68ce\nLoading: 0 packages loaded\nERROR: no such target '//a:missing': target 'missing' not declared in package 'a' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace/a/BUILD.bazel\n",
+      "stderr": "INFO: Invocation ID: 68a840c9-de40-4387-8475-a333b3568122\nLoading: 0 packages loaded\nERROR: no such target '//a:missing': target 'missing' not declared in package 'a' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-051423-694832-bazel/workspace/a/BUILD.bazel\n",
       "stdout": ""
     },
     {
@@ -992,7 +992,7 @@
       "name": "buildfiles_later_error",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: a2f16f5b-47d7-40cc-8738-2e62c2474fc0\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stderr": "INFO: Invocation ID: 8711e7c1-e2d9-441a-be19-1f075386413b\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
       "stdout": ""
     },
     {
@@ -1015,7 +1015,7 @@
       "name": "siblings_loadfiles_intersect_ab",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one",
-      "stderr": "INFO: Invocation ID: 7f51f529-727f-49b4-b8bd-119f75884491\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: d267388e-c17d-40ad-8daa-eb4c330563af\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n"
     },
     {
@@ -1038,7 +1038,7 @@
       "name": "siblings_loadfiles_intersect_ba",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//b:BUILD.bazel\n//b:two",
-      "stderr": "INFO: Invocation ID: 7a52546d-21e5-4e4c-874b-19ca0ac8f6a9\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: d0f4a012-8b90-428c-962b-8ea63a71539d\nLoading: 0 packages loaded\n",
       "stdout": "//b:BUILD.bazel\n//b:two\n"
     },
     {
@@ -1061,7 +1061,7 @@
       "name": "siblings_loadfiles_except_ab",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: f0268861-49df-461c-877b-248ea9d0554d\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 27446ee2-d8f1-4594-af67-ac1005d0cba0\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -1084,7 +1084,7 @@
       "name": "siblings_loadfiles_except_ba",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 795a2b02-befa-4d6b-b355-1a80cb63844a\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 2e968b32-360d-405f-89e1-c149060db072\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -1107,7 +1107,7 @@
       "name": "siblings_real_fake_intersect",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
-      "stderr": "INFO: Invocation ID: cdf07c6b-6f94-4880-b634-a683049aaacf\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: cb968782-3699-4407-b3d5-738434703606\nLoading: 0 packages loaded\n",
       "stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
     },
     {
@@ -1130,7 +1130,7 @@
       "name": "siblings_fake_real_intersect",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one",
-      "stderr": "INFO: Invocation ID: 69bc2382-8486-4905-ad9c-ade2ace56310\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: d4357188-7d17-4096-a85b-1bf30382ed91\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n"
     },
     {
@@ -1153,7 +1153,7 @@
       "name": "siblings_real_fake_except",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 2a411c91-c6ae-410d-a7fc-cda9d37cb4cd\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 18708f22-b886-4611-a563-7f779daabed2\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -1176,7 +1176,7 @@
       "name": "siblings_fake_real_except",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//a:BUILD.bazel\n//a:one",
-      "stderr": "INFO: Invocation ID: 8e75a62f-555a-4244-aabb-714321b2657c\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: df05d14b-7342-4cc2-a096-0072413883cf\nLoading: 0 packages loaded\n",
       "stdout": "//a:BUILD.bazel\n//a:one\n"
     },
     {
@@ -1205,7 +1205,7 @@
       "name": "full_graph_loadfiles_direct",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:one.bzl/n//shared:two.bzl\"\n}",
-      "stderr": "INFO: Invocation ID: fcef9fc6-de48-4398-bb42-ac57b33b99c5\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: b915c97a-0fba-4328-84be-c4d1c74857df\nLoading: 0 packages loaded\n",
       "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
     },
     {
@@ -1234,7 +1234,7 @@
       "name": "full_graph_buildfiles_root",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n}",
-      "stderr": "INFO: Invocation ID: a553f6dc-f2aa-4c1a-867f-65fad193b2d3\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 8761c5b5-11ff-4ad4-91d5-64340972b873\nLoading: 0 packages loaded\n",
       "stdout": "digraph mygraph {\n  node [shape=box];\n}\n"
     },
     {
@@ -1263,7 +1263,7 @@
       "name": "full_graph_buildfiles_fallback",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:BUILD.bazel/n//shared:one.bzl/n//shared:two.bzl\"\n}",
-      "stderr": "INFO: Invocation ID: c724a913-c34b-42dd-86ef-33b03bf9eaf3\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 04b5ab0b-41ca-423b-a52e-098902e467d2\nLoading: 0 packages loaded\n",
       "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:BUILD.bazel\\n//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
     },
     {
@@ -1292,7 +1292,7 @@
       "name": "full_graph_buildfiles_diamond",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//diamond:leaf.bzl/n//diamond:left.bzl/n//diamond:right.bzl\"\n}",
-      "stderr": "INFO: Invocation ID: 50f5908c-31f3-42f9-a5d3-dba45b51a33d\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 2d2dfd61-1d69-4a26-afe2-d6910206ba83\nLoading: 0 packages loaded\n",
       "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//diamond:leaf.bzl\\n//diamond:left.bzl\\n//diamond:right.bzl\"\n}\n"
     },
     {
@@ -1321,7 +1321,7 @@
       "name": "full_graph_buildfiles_multi_package",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:BUILD.bazel/n//shared:one.bzl/n//shared:two.bzl\"\n}",
-      "stderr": "INFO: Invocation ID: edbf39c4-7adc-4ec5-a648-5005966bcf4f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 2b6f0244-ec4b-49ff-a31b-363d21d2436a\nLoading: 0 packages loaded\n",
       "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:BUILD.bazel\\n//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
     },
     {
@@ -1350,7 +1350,7 @@
       "name": "full_graph_deps_buildfiles_direct",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//a:BUILD.bazel/n//shared:BUILD.bazel/n//shared:one.bzl/n//shared:two.bzl\"\n}",
-      "stderr": "INFO: Invocation ID: e1283639-b1b3-4bcd-b8d0-2f79aaf78190\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 90ec4991-6e25-493a-92d9-623a4dc95d08\nLoading: 0 packages loaded\n",
       "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//a:BUILD.bazel\\n//shared:BUILD.bazel\\n//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
     },
     {
@@ -1379,8 +1379,146 @@
       "name": "full_graph_buildfiles_union_real",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//a:one/n//shared:BUILD.bazel/n//shared:one.bzl/n//shared:two.bzl\"\n}",
-      "stderr": "INFO: Invocation ID: 20fedf77-4610-4b51-899a-2faf022dd8d3\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: f002ff14-1f36-44b8-b062-95f714698beb\nLoading: 0 packages loaded\n",
       "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//a:one\\n//shared:BUILD.bazel\\n//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//single:only) intersect //shared:two.bzl)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//single:only) intersect //shared:two.bzl)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_single_fake_real_intersect",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//single:BUILD.bazel\n//single:only",
+      "stderr": "INFO: Invocation ID: 7e8523f8-2ed0-4aa3-b026-33d2eaea99c8\nLoading: 0 packages loaded\n",
+      "stdout": "//single:BUILD.bazel\n//single:only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//shared:two.bzl intersect loadfiles(//single:only))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//shared:two.bzl intersect loadfiles(//single:only))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_single_real_fake_intersect",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: e213348b-1a44-46f3-b1b7-827ef94b616f\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//single:only) except //shared:two.bzl)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//single:only) except //shared:two.bzl)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_single_fake_real_except",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 68edcf7f-54e6-42c2-81cb-69701a0a7a66\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//shared:two.bzl except loadfiles(//single:only))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//shared:two.bzl except loadfiles(//single:only))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_single_real_fake_except",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 83e44957-41c3-4db9-ae5f-45ffc0a1b454\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//single:only) union //shared:two.bzl)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//single:only) union //shared:two.bzl)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_single_fake_real_union",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n//single:BUILD.bazel\n//single:only",
+      "stderr": "INFO: Invocation ID: 719eae16-dbc1-479c-8625-d7644a68dc98\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n//single:BUILD.bazel\n//single:only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//shared:two.bzl union loadfiles(//single:only))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//shared:two.bzl union loadfiles(//single:only))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_single_real_fake_union",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n//single:BUILD.bazel\n//single:only",
+      "stderr": "INFO: Invocation ID: e9bc353c-6669-4a1d-b0fc-99ae9a2f8b90\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n//single:BUILD.bazel\n//single:only\n"
     }
   ],
   "fixture": "query-build-load-files-provenance",
