@@ -2316,3 +2316,27 @@ global state, or fresh graph is needed. V1/Buck test semantics remain rejected;
 only compact collection and Arc-slice patterns are reused. Terra-medium
 audited, root resolved provenance against `fd4c5da0`, and Sol-low returned
 `ACCEPT`. Gate A may now implement loading/graph metadata only.
+
+## `tests` loading metadata Gate A implementation replanned (2026-07-23)
+
+A bounded seven-file implementation added the accepted suite/test loading
+shape and passed the focused loading, same-DICE invalidation, and query graph
+suites. Root review found that generated `$implicit_tests` had initially been
+projected as non-explicit even though Bazel `AttributeProvider` deliberately
+sets it explicit for query output; the one permitted correction fixed that
+case and added all three suite-membership assertions.
+
+The independent full-diff review then found a second material representation
+gap. `QueryAttribute.explicit` was introduced as general semantic state, but
+native `filegroup.srcs` was hard-coded explicit. Bazel distinguishes omitted
+`srcs` from explicit `srcs=[]`, while the current loading target collapses
+them. Extending a total explicitness field without resolving every existing
+producer would therefore encode false formatter/equality semantics.
+
+The orchestration correction budget was exhausted, so the packet closed
+`REPLAN`. All seven implementation files were restored and no Rust change was
+committed. The replacement packet is design-only: audit all current query
+attribute producers and choose a provenance representation that is exact for
+filegroup, alias, Starlark attrs, suite `tests`, and generated
+`$implicit_tests`. Strict request plumbing and `tests()` activation remain
+separate.

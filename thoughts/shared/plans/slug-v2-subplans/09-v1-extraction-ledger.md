@@ -1296,7 +1296,9 @@ representation-only; five ordinary query functions and M3 remain open.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 
-Status: 23-command oracle and loading-metadata design accepted; Gate A next
+Status: 23-command oracle and loading-metadata design accepted; first Gate A
+implementation closed `REPLAN` with no code retained; total query-attribute
+provenance review next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1343,3 +1345,12 @@ capability, scalar metadata, attributes, provenance, and edges derive from
 finished target state. Existing DICE keys and compact utilities are sufficient.
 Sol-low returned `ACCEPT`; implementation Gate A imports no V1/Buck test
 semantics and leaves strict policy/function activation later.
+
+The first implementation attempt exposed an adjacent V2-owned representation
+gap and retained no code. After root corrected generated `$implicit_tests`
+explicitness, Sol-low found that a general query-attribute explicitness boolean
+would falsely mark omitted native `filegroup.srcs` explicit because loading
+currently stores only the normalized list. This was the packet's second
+material correction, so it closed `REPLAN`. No V1/Buck extraction decision
+changes. A design-only replacement must close provenance for every current
+native and Starlark query-attribute producer before suite metadata is retried.
