@@ -1402,3 +1402,7 @@ The Stage 3 design is now accepted: implement the pinned Bazel target-name
 matrix and trailing `/.` normalization centrally, without importing V1/Buck
 identity code. `PackagePath` and package-context raw-label classification stay
 outside this packet; loading resumes after the identity boundary is accepted.
+
+Commit `22313daa` accepts that central identity boundary after source-derived
+diagnostic and normalization tests. No V1/Buck decision changes. The next
+packet resumes the V2-owned package-context loading converter.

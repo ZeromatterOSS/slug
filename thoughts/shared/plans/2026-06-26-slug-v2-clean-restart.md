@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the Stage 3 target-name implementation is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the Stage 3 target-name implementation is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 25-command Bazel oracle including suite provenance/source members and 37-command labels oracle accepted through `3621b3e7`; total query-attribute explicitness and package-context label-normalization designs Sol-accepted; two Gate A attempts closed `REPLAN`; exact central target-name design Sol-accepted | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, exact target-name validation, package-context label foundation, Gate A metadata implementation, and remaining command breadth | implement exact central `TargetName` validation, then resume loading |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 package-context loading foundation is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 package-context loading foundation is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 25-command Bazel oracle including suite provenance/source members and 37-command labels oracle accepted through `3621b3e7`; total query-attribute explicitness and package-context label-normalization designs Sol-accepted; exact central target-name parity accepted in `22313daa`; two Gate A attempts closed `REPLAN` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, package-context label foundation, Gate A metadata implementation, and remaining command breadth | implement the package-context loading label foundation only |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,26 +33,30 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Implement the accepted Stage 3 `TargetName::parse` packet against pinned Bazel
-9.2 `LabelValidator.validateTargetName` and
-`LabelParser.validateAndProcessTargetName`. Reject empty names, colon,
-backslash, ASCII controls/DEL, leading/trailing slash, doubled slash, exact
-up-level segments, and exact interior/leading current-directory segments.
-Accept printable punctuation and Unicode, Bazel's temporary target `.`, and
-trailing `/.`; normalize the last form before storage so equality, ordering,
-hashing, display, and stable label serialization match its stripped spelling.
+Implement only the accepted package-context loading label-normalization
+foundation. Add one crate-private converter for dependency labels: bare
+`name`/`dir/name` and `:name` resolve in an explicit base package; root-absolute
+forms retain their package; repository spellings preserve the current
+unsupported stop; relative `pkg:target` is classified before canonical
+construction and matches the accepted absolute-label diagnostic class.
 
-Add source-derived table tests at the value boundary plus apparent/canonical
-label regressions for invalid characters and normalization. Validate
-`cargo test -p slug_identity_v2` and direct downstream identity/pattern
-consumers. No new oracle is needed: this packet is fully discriminated by
-pinned source and the accepted 37-row fixture remains the subsequent loading
-converter's gate.
+Explicit Starlark values use the instantiated BUILD package. Label-bearing
+defaults canonicalize against the defining `.bzl` package using retained
+evaluation context before becoming loaded schema state. Canonicalize native
+filegroup and alias storage so equivalent spellings compare equal before query
+projection. Keep output conversion a same-target-package wrapper that creates
+generated nodes, never source/dependency edges. Preserve attribute ordering and
+duplicates; ordinary graph edge dedup remains separate.
 
-Do not change `PackagePath`, label splitting, loading/query code, repository
-mapping, interning, DICE ownership, or persisted formats. Raw relative
-`pkg:target` classification belongs to the next package-context loading parser,
-not `TargetName`.
+Prove all 37 labels-oracle semantics at focused loading/query boundaries,
+including bare/slash implicit source nodes, defining-package defaults, invalid
+relative syntax, native spelling equality, create/edit/delete/recreate, and
+output ownership. The two native-suite rows remain future Gate A evidence; do
+not add `test_suite` in this foundation.
+
+Use existing package-load and graph DICE keys only. Do not change public
+identity APIs, add repository mapping or filesystem existence checks, restore
+test metadata, activate `tests`, plumb strict mode, or edit formatters.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.
@@ -74,6 +78,13 @@ shape:
    starlark-rust, and REAPI-first execution.
 4. Import V1 code only after a small oracle fixture or focused regression proves
    the behavior matches the V2 boundary.
+
+### Future branding TODO
+
+Consider renaming the project to **Rubin**, after Red Rubin basil. The name is
+concise, retains the basil theme, and its “red” and initial “R” associations
+subtly signal the Rust implementation. Treat this as a future branding decision,
+not an implementation milestone or current-packet dependency.
 
 ## 2026-07-22 Direction Reset
 

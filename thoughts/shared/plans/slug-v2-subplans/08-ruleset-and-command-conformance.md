@@ -2471,3 +2471,7 @@ inside `TargetName::parse` only. Package-path grammar and raw label-part
 classification do not move into this identity packet. After its focused tests
 and downstream consumers pass, the shared loading converter resumes and owns
 Bazel's package-context rejection of non-absolute `pkg:target`.
+
+Commit `22313daa` is accepted with all 10 identity tests green and loading/query
+test targets compiled. The package-context loading converter is current again;
+native suite metadata, strict policy, and `tests()` activation remain deferred.

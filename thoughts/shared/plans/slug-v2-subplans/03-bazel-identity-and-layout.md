@@ -170,3 +170,12 @@ relative `pkg:target` classification remains the next loading parser's job.
 The implementation packet changes only `package.rs` and focused identity tests,
 with no new oracle, interner, repository mapping, DICE owner, or persisted
 format.
+
+## Exact target-name validation accepted (2026-07-23)
+
+Commit `22313daa` implements the pinned matrix and trailing `/.` normalization.
+Source-derived tests pin exact diagnostic precedence plus value/label equality,
+ordering, hashing, display, and stable serialization. Root passed all 10
+`slug_identity_v2` tests; loading and query test targets compiled. Sol accepted
+the diff after one focused test-strength correction. Package-context loading
+may now resume without constructing illegal target identities.
