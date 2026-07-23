@@ -214,3 +214,21 @@ argv = ["query", "//duplicate_labels:duplicate"]
 expected_exit = 7
 stdout_patterns = ["\\A\\Z"]
 stderr_patterns = ["Label '//duplicate_labels:member' is duplicated in the 'tests' attribute of rule 'duplicate'", "Evaluation of query"]
+
+[[commands]]
+name = "nested_suite_uses_own_filters_not_parent_filters"
+argv = ["query", "tests(//source_critical:parent_requires_parent_tag)"]
+expected_exit = 0
+stdout_patterns = ["\\A//source_critical:nested_unfiltered_test\\n?\\Z"]
+
+[[commands]]
+name = "excluded_direct_route_does_not_consume_test_uniqueness"
+argv = ["query", "tests(//source_critical:filtered_direct_then_nested)"]
+expected_exit = 0
+stdout_patterns = ["\\A//source_critical:shared_blocked_test\\n?\\Z"]
+
+[[commands]]
+name = "minus_plus_tag_excludes_literal_plus_tag_only"
+argv = ["query", "tests(//source_critical:exclude_literal_plus_tag)"]
+expected_exit = 0
+stdout_patterns = ["\\A//source_critical:plain_tag_test\\n?\\Z"]

@@ -680,6 +680,75 @@
       "normalized_stdout": "",
       "stderr": "INFO: Invocation ID: 952b102e-d0c1-45cc-936c-b0dc6f13af9f\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/duplicate_labels/BUILD.bazel:3:11: Label '//duplicate_labels:member' is duplicated in the 'tests' attribute of rule 'duplicate'\nERROR: Evaluation of query \"//duplicate_labels:duplicate\" failed\n",
       "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "tests(//source_critical:parent_requires_parent_tag)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "tests(//source_critical:parent_requires_parent_tag)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "nested_suite_uses_own_filters_not_parent_filters",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//source_critical:nested_unfiltered_test",
+      "stderr": "INFO: Invocation ID: 1449a426-cc20-4c3d-8092-3155a11d87fc\nLoading: 0 packages loaded\n",
+      "stdout": "//source_critical:nested_unfiltered_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "tests(//source_critical:filtered_direct_then_nested)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "tests(//source_critical:filtered_direct_then_nested)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "excluded_direct_route_does_not_consume_test_uniqueness",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//source_critical:shared_blocked_test",
+      "stderr": "INFO: Invocation ID: 9628b3b1-63b5-48c7-abb9-e52e3ace4605\nLoading: 0 packages loaded\n",
+      "stdout": "//source_critical:shared_blocked_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "tests(//source_critical:exclude_literal_plus_tag)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "tests(//source_critical:exclude_literal_plus_tag)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "minus_plus_tag_excludes_literal_plus_tag_only",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//source_critical:plain_tag_test",
+      "stderr": "INFO: Invocation ID: 64da5efd-f4e7-4523-abbc-e45e31fe5b45\nLoading: 0 packages loaded\n",
+      "stdout": "//source_critical:plain_tag_test\n"
     }
   ],
   "fixture": "tests-query-expansion",
