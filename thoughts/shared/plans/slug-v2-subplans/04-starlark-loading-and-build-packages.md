@@ -631,7 +631,8 @@ Bazel-only rule-class representation rows passed Terra update/clean and root
 clean runs `085202-880190`, `085213-881221`, and `085303-889108`. The explicit
 `test=True, executable=False` row observes accepted syntax plus `_test`
 exclusion only; Bazel's pinned `createRule`/test-base source establishes that
-test still implies executable capability. Stage 4 is now the next gate.
+test still implies executable capability. Gate A implementation `c86fc656` is
+now landed and Sol-accepted.
 
 Retain V2-owned immutable `Allocative`
 `RuleCapability { rule_class: CompactString, executable: bool }` for every
@@ -656,4 +657,17 @@ Gate A tests prove false→true executable, false→true test, exported-rule ren
 and target rename crossing `_test` with unchanged classification, plus
 delete/recreate and semantically equal formatting reuse through
 `BzlModuleEvalKey → PackageLoadKey → focused semantic consumer/observer`.
-Stage 8 may not start until Sol accepts this equality/invalidation boundary.
+The implementation freezes evaluator-local `OnceCell` export identity into one
+shared immutable `Arc<RuleCapability>`, while the sole public target accessor
+borrows it. Native capabilities are allocation-free static `CompactString`
+values derived from existing variants; alias does not inherit. Exact focused
+DICE evidence isolates capability equality from `load_fingerprint`: target
+rename and `.bzl` formatting evaluate the capability consumer but reuse its
+observer, while field changes propagate through all four keys. Delete and
+byte-identical recreate also pass.
+
+Root passed the full 40-test loading suite, analysis/query downstream
+compilation, fmt, and diff; Sol final review returned `ACCEPT`. No production
+DICE key or Stage 8/query path changed. Archive-status still reports the
+documented unrelated missing `v1-archive` branch and stale orchestration/server
+allowlists. Stage 8 Gate B may now start.

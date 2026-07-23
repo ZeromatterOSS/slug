@@ -1262,9 +1262,10 @@ output→own-generator edges, exact 29 rows, two formatter-deferred label-kind
 rows. Sol `ACCEPT` after graph/order corrections. Six functions/M3 remain open;
 no V1/Buck import or 31/31 claim.
 
-### WP-4-8-m3-executables-rule-capability — prospective extraction decision
+### WP-4-8-m3-executables-rule-capability — landed Gate A extraction decision
 
-Oracle `c8e469f5` is landed and Sol-accepted; implementation remains pending.
+Oracle `c8e469f5` and Stage 4 implementation `c86fc656` are landed and
+Sol-accepted; Stage 8 activation remains pending.
 Its 32 semantic rows and eight representation-only `label_kind` rows establish
 the current-loadable rule-capability boundary without importing V1 behavior.
 Stage 4 owns a V2 `RuleCapability {
@@ -1280,4 +1281,7 @@ reference-only, not a Bazel source of truth. Bazel 9.2
 not ending `_test`. Pinned `StarlarkRuleClassFunctions#createRule`,
 `getTestBaseRule`, and `StarlarkRuleFunction.export` establish exported class
 identity and test-implies-executable even when `executable=False` is explicit.
+Gate A used the bounded Buck2/provider export-and-freeze shape, V2-owned
+`CompactString`/`Arc`/`Allocative`, static native capability values, and a
+borrowed public projection; no V1 code or Buck query semantics were imported.
 Native genrule behavior remains a separate oracle gate.

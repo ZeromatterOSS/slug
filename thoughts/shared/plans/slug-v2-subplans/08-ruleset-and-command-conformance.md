@@ -2024,8 +2024,11 @@ final `ACCEPT`; M3 remains open and this is never a 31/31 claim.
 
 Oracle gate `c8e469f5` is landed and Sol-accepted. It has 32 semantic rows plus
 eight Bazel-only `label_kind` rows pinning rule-class identity; those eight are
-not Slug formatter acceptance. Stage 4 Gate A remains the prerequisite before
-the `executables(EXPR)`-only activation. Authority is
+not Slug formatter acceptance. Stage 4 Gate A `c86fc656` is also landed and
+Sol-accepted: immutable exported-name/executable capability, borrowed
+allocation-free projection, and focused DICE equality/invalidation passed
+without query activation. Gate B `executables(EXPR)` is now the active
+activation. Authority is
 `ExecutablesFunction.java`, `BlazeTargetAccessor`, and `TargetUtils` at
 `8220c619…`: filter the once-evaluated operand by retained per-target
 `Rule.isExecutable()` / `$is_executable` and a rule-class name not ending
