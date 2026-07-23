@@ -18,6 +18,8 @@ pub mod package;
 
 pub use bzl_module::BzlModuleEvaluator;
 pub use bzl_module::EvaluatedBzlModule;
+pub use glob::GlobSpec;
+pub use glob::PackageListing;
 pub use package::LoadedPackage;
 pub use package::PackageTarget;
 pub use package::PackageTargetKind;

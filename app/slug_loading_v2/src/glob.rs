@@ -8,38 +8,103 @@
  * above-listed licenses.
  */
 
-use std::collections::BTreeSet;
 use std::fmt;
-use std::fs;
-use std::path::Component;
-use std::path::Path;
-use std::path::PathBuf;
+use std::sync::Arc;
 
-use globset::Glob;
-use globset::GlobSet;
-use globset::GlobSetBuilder;
+use allocative::Allocative;
+use compact_str::CompactString;
+use dupe::Dupe;
 
-use crate::file_discovery::find_build_file;
+/// Immutable package-relative input for synchronous BUILD-file glob calls.
+#[derive(Debug, Clone, Dupe, PartialEq, Eq, Allocative)]
+pub struct PackageListing {
+    regular_files: Arc<[CompactString]>,
+    directories: Arc<[CompactString]>,
+    watched_directories: Arc<[CompactString]>,
+    subpackages: Arc<[CompactString]>,
+}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl PackageListing {
+    pub fn new(
+        regular_files: Vec<CompactString>,
+        directories: Vec<CompactString>,
+        watched_directories: Vec<CompactString>,
+        subpackages: Vec<CompactString>,
+    ) -> Self {
+        Self {
+            regular_files: sorted_shared(regular_files),
+            directories: sorted_shared(directories),
+            watched_directories: sorted_shared(watched_directories),
+            subpackages: sorted_shared(subpackages),
+        }
+    }
+
+    pub fn regular_files(&self) -> &[CompactString] {
+        &self.regular_files
+    }
+
+    pub fn directories(&self) -> &[CompactString] {
+        &self.directories
+    }
+
+    pub fn watched_directories(&self) -> &[CompactString] {
+        &self.watched_directories
+    }
+
+    pub fn subpackages(&self) -> &[CompactString] {
+        &self.subpackages
+    }
+}
+
+fn sorted_shared(mut paths: Vec<CompactString>) -> Arc<[CompactString]> {
+    paths.sort_unstable();
+    paths.dedup();
+    paths.into()
+}
+
+/// One observed BUILD-file glob call.
+#[derive(Debug, Clone, Dupe, PartialEq, Eq, Allocative)]
 pub struct GlobSpec {
-    pub includes: Vec<String>,
-    pub excludes: Vec<String>,
+    pub includes: Arc<[CompactString]>,
+    pub excludes: Arc<[CompactString]>,
+    pub exclude_directories: bool,
     pub allow_empty: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GlobExpansion {
-    pub matches: Vec<String>,
-    pub watched_dirs: Vec<String>,
-    pub skipped_subpackages: Vec<String>,
+impl GlobSpec {
+    pub fn new(
+        includes: impl IntoIterator<Item = impl AsRef<str>>,
+        excludes: impl IntoIterator<Item = impl AsRef<str>>,
+        exclude_directories: bool,
+        allow_empty: bool,
+    ) -> Result<Self, GlobError> {
+        let includes = includes
+            .into_iter()
+            .map(|pattern| validate_pattern(pattern.as_ref()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let excludes = excludes
+            .into_iter()
+            .map(|pattern| validate_pattern(pattern.as_ref()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
+            includes: includes.into(),
+            excludes: excludes.into(),
+            exclude_directories,
+            allow_empty,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GlobError {
-    InvalidPattern { pattern: String, message: String },
-    Io { path: PathBuf, message: String },
-    EmptyPattern { pattern: String },
+    InvalidPattern {
+        pattern: String,
+        message: &'static str,
+    },
+    EmptyPattern {
+        pattern: String,
+    },
+    AllExcluded,
 }
 
 impl fmt::Display for GlobError {
@@ -48,10 +113,12 @@ impl fmt::Display for GlobError {
             Self::InvalidPattern { pattern, message } => {
                 write!(f, "invalid glob pattern {pattern:?}: {message}")
             }
-            Self::Io { path, message } => write!(f, "failed to read {}: {message}", path.display()),
             Self::EmptyPattern { pattern } => write!(
                 f,
                 "glob pattern '{pattern}' didn't match anything, but allow_empty is set to False"
+            ),
+            Self::AllExcluded => f.write_str(
+                "all files in the glob have been excluded, but allow_empty is set to False",
             ),
         }
     }
@@ -59,147 +126,145 @@ impl fmt::Display for GlobError {
 
 impl std::error::Error for GlobError {}
 
-pub fn expand_glob(package_dir: &Path, spec: &GlobSpec) -> Result<GlobExpansion, GlobError> {
-    let include_set = compile_patterns(&spec.includes)?;
-    let exclude_set = compile_patterns(&spec.excludes)?;
-    let mut include_matched = vec![false; spec.includes.len()];
-    let mut state = ExpansionState::default();
+/// Resolve a reviewed M1 glob pattern subset over a prepared package listing.
+pub fn expand_glob(listing: &PackageListing, spec: &GlobSpec) -> Result<Vec<String>, GlobError> {
+    if spec.includes.is_empty() {
+        return if spec.allow_empty {
+            Ok(Vec::new())
+        } else {
+            Err(GlobError::AllExcluded)
+        };
+    }
 
-    walk_package_dir(
-        package_dir,
-        Path::new(""),
-        &include_set,
-        &exclude_set,
-        &mut include_matched,
-        &mut state,
-    )?;
+    let mut include_matched = vec![false; spec.includes.len()];
+    let mut matches = Vec::new();
+    let candidates = listing.regular_files.iter().chain(
+        (!spec.exclude_directories)
+            .then_some(listing.directories.iter())
+            .into_iter()
+            .flatten(),
+    );
+
+    for candidate in candidates {
+        let mut included = false;
+        for (index, pattern) in spec.includes.iter().enumerate() {
+            if pattern_matches(pattern, candidate) {
+                include_matched[index] = true;
+                included = true;
+            }
+        }
+        if included
+            && !spec
+                .excludes
+                .iter()
+                .any(|pattern| pattern_matches(pattern, candidate))
+        {
+            matches.push(candidate.to_string());
+        }
+    }
 
     if !spec.allow_empty {
-        for (index, matched) in include_matched.iter().enumerate() {
-            if !matched {
-                return Err(GlobError::EmptyPattern {
-                    pattern: spec.includes[index].clone(),
-                });
-            }
+        if let Some((index, _)) = include_matched
+            .iter()
+            .enumerate()
+            .find(|(_, matched)| !**matched)
+        {
+            return Err(GlobError::EmptyPattern {
+                pattern: spec.includes[index].to_string(),
+            });
+        }
+        if matches.is_empty() {
+            return Err(GlobError::AllExcluded);
         }
     }
 
-    Ok(state.finish())
+    matches.sort_unstable();
+    matches.dedup();
+    Ok(matches)
 }
 
-#[derive(Default)]
-struct ExpansionState {
-    matches: BTreeSet<String>,
-    watched_dirs: BTreeSet<String>,
-    skipped_subpackages: BTreeSet<String>,
-}
-
-impl ExpansionState {
-    fn finish(self) -> GlobExpansion {
-        GlobExpansion {
-            matches: self.matches.into_iter().collect(),
-            watched_dirs: self.watched_dirs.into_iter().collect(),
-            skipped_subpackages: self.skipped_subpackages.into_iter().collect(),
-        }
-    }
-}
-
-fn compile_patterns(patterns: &[String]) -> Result<GlobSet, GlobError> {
-    let mut builder = GlobSetBuilder::new();
-    for pattern in patterns {
-        let glob = Glob::new(pattern).map_err(|error| GlobError::InvalidPattern {
-            pattern: pattern.clone(),
-            message: error.to_string(),
-        })?;
-        builder.add(glob);
-    }
-    builder.build().map_err(|error| GlobError::InvalidPattern {
-        pattern: patterns.join(","),
-        message: error.to_string(),
-    })
-}
-
-fn walk_package_dir(
-    package_dir: &Path,
-    relative_dir: &Path,
-    include_set: &GlobSet,
-    exclude_set: &GlobSet,
-    include_matched: &mut [bool],
-    state: &mut ExpansionState,
-) -> Result<(), GlobError> {
-    let dir = if relative_dir.as_os_str().is_empty() {
-        package_dir.to_path_buf()
-    } else {
-        package_dir.join(relative_dir)
+fn validate_pattern(pattern: &str) -> Result<CompactString, GlobError> {
+    let reject = |message| {
+        Err(GlobError::InvalidPattern {
+            pattern: pattern.to_owned(),
+            message,
+        })
     };
-    state
-        .watched_dirs
-        .insert(relative_path_to_slash(relative_dir));
-
-    let mut entries = fs::read_dir(&dir)
-        .map_err(|error| io_error(&dir, error))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| io_error(&dir, error))?;
-    entries.sort_by_key(|entry| entry.file_name());
-
-    for entry in entries {
-        let file_type = entry
-            .file_type()
-            .map_err(|error| io_error(entry.path(), error))?;
-        let child_relative = relative_dir.join(entry.file_name());
-        if file_type.is_dir() {
-            let child = entry.path();
-            let child_relative_slash = relative_path_to_slash(&child_relative);
-            state.watched_dirs.insert(child_relative_slash.clone());
-            if find_build_file(&child).is_some() {
-                state.skipped_subpackages.insert(child_relative_slash);
-            } else {
-                walk_package_dir(
-                    package_dir,
-                    &child_relative,
-                    include_set,
-                    exclude_set,
-                    include_matched,
-                    state,
-                )?;
-            }
-        } else if file_type.is_file() {
-            let child_relative_slash = relative_path_to_slash(&child_relative);
-            let include_matches = include_set.matches(&child_relative_slash);
-            if include_matches.is_empty() {
-                continue;
-            }
-            for index in include_matches {
-                include_matched[index] = true;
-            }
-            if !exclude_set.is_match(&child_relative_slash) {
-                state.matches.insert(child_relative_slash);
-            }
-        }
+    if pattern.is_empty() {
+        return reject("empty patterns are not supported");
     }
-
-    Ok(())
+    if pattern.starts_with('/') {
+        return reject("absolute patterns are not supported");
+    }
+    if pattern.ends_with('/') {
+        return reject("trailing separators are not supported");
+    }
+    if pattern.contains("//") {
+        return reject("doubled separators are not supported");
+    }
+    if pattern.contains('\\') {
+        return reject("backslashes and escapes are not supported");
+    }
+    if pattern.contains("**") {
+        return reject("recursive ** patterns are not supported");
+    }
+    if pattern.contains('?') {
+        return reject("? wildcards are not supported");
+    }
+    if pattern.contains('[') || pattern.contains(']') {
+        return reject("character classes are not supported");
+    }
+    if pattern.contains('{') || pattern.contains('}') {
+        return reject("brace patterns are not supported");
+    }
+    if pattern
+        .split('/')
+        .any(|segment| segment == "." || segment == "..")
+    {
+        return reject("dot and uplevel segments are not supported");
+    }
+    Ok(pattern.into())
 }
 
-fn relative_path_to_slash(path: &Path) -> String {
-    let mut parts = Vec::new();
-    for component in path.components() {
-        match component {
-            Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
-            Component::CurDir => {}
-            _ => parts.push(component.as_os_str().to_string_lossy().into_owned()),
+fn pattern_matches(pattern: &str, candidate: &str) -> bool {
+    let mut pattern_segments = pattern.split('/');
+    let mut candidate_segments = candidate.split('/');
+    loop {
+        match (pattern_segments.next(), candidate_segments.next()) {
+            (Some(pattern), Some(candidate)) if segment_matches(pattern, candidate) => {}
+            (None, None) => return true,
+            _ => return false,
         }
-    }
-    if parts.is_empty() {
-        ".".to_owned()
-    } else {
-        parts.join("/")
     }
 }
 
-fn io_error(path: impl Into<PathBuf>, error: std::io::Error) -> GlobError {
-    GlobError::Io {
-        path: path.into(),
-        message: error.to_string(),
+fn segment_matches(pattern: &str, candidate: &str) -> bool {
+    let pattern = pattern.as_bytes();
+    let candidate = candidate.as_bytes();
+    let (mut pattern_index, mut candidate_index) = (0, 0);
+    let (mut last_star, mut star_candidate) = (None, 0);
+
+    while candidate_index < candidate.len() {
+        if pattern_index < pattern.len()
+            && pattern[pattern_index] != b'*'
+            && pattern[pattern_index] == candidate[candidate_index]
+        {
+            pattern_index += 1;
+            candidate_index += 1;
+        } else if pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
+            last_star = Some(pattern_index);
+            pattern_index += 1;
+            star_candidate = candidate_index;
+        } else if let Some(star) = last_star {
+            star_candidate += 1;
+            candidate_index = star_candidate;
+            pattern_index = star + 1;
+        } else {
+            return false;
+        }
     }
+    while pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
+        pattern_index += 1;
+    }
+    pattern_index == pattern.len()
 }

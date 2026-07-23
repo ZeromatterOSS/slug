@@ -16,6 +16,11 @@ use slug_loading_v2::file_discovery::find_build_file;
 use slug_loading_v2::file_discovery::find_workspace_root;
 use slug_loading_v2::file_discovery::is_bazel_build_file;
 use slug_loading_v2::file_discovery::is_bzl_file;
+use slug_loading_v2::keys::WorkspaceDirectoryEntry;
+use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
+use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
+use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
+use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
@@ -30,7 +35,44 @@ fn scratch(name: &str) -> PathBuf {
     root
 }
 
+fn directory_snapshot(root: &Path) -> WorkspaceDirectorySnapshot {
+    let mut pending = vec![root.to_path_buf()];
+    let mut directories = Vec::new();
+    while let Some(directory) = pending.pop() {
+        let mut entries = Vec::new();
+        for entry in fs::read_dir(&directory).unwrap() {
+            let entry = entry.unwrap();
+            let file_type = entry.file_type().unwrap();
+            let kind = if file_type.is_file() {
+                WorkspaceDirectoryEntryKind::RegularFile
+            } else if file_type.is_dir() {
+                pending.push(entry.path());
+                WorkspaceDirectoryEntryKind::Directory
+            } else if file_type.is_symlink() {
+                WorkspaceDirectoryEntryKind::Symlink
+            } else {
+                WorkspaceDirectoryEntryKind::Other
+            };
+            entries.push(WorkspaceDirectoryEntry {
+                name: entry.file_name().to_str().unwrap().into(),
+                kind,
+            });
+        }
+        directories.push((directory, WorkspaceDirectoryValue::present(entries)));
+    }
+    WorkspaceDirectorySnapshot {
+        directories: Arc::new(directories.into_iter().collect()),
+    }
+}
+
 fn load_package(workspace: &Path, package: &Path) -> slug_loading_v2::LoadedPackage {
+    try_load_package(workspace, package).unwrap()
+}
+
+fn try_load_package(
+    workspace: &Path,
+    package: &Path,
+) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut paths = vec![
         workspace.join(MODULE_FILE),
@@ -73,11 +115,16 @@ fn load_package(workspace: &Path, package: &Path) -> slug_loading_v2::LoadedPack
                     }),
                 )])
                 .unwrap();
+            updater
+                .changed_to(vec![(
+                    (WorkspaceDirectorySnapshotKey {
+                        workspace: workspace.to_path_buf(),
+                    }),
+                    Arc::new(directory_snapshot(workspace)),
+                )])
+                .unwrap();
             let mut transaction = updater.commit().await;
-            evaluator
-                .evaluate_package(&mut transaction, package)
-                .await
-                .unwrap()
+            evaluator.evaluate_package(&mut transaction, package).await
         })
 }
 
@@ -198,4 +245,100 @@ fn package_load_registers_a_generic_starlark_rule_without_executing_it() {
         loaded.targets[0].kind,
         PackageTargetKind::StarlarkRule(_)
     ));
+}
+
+#[test]
+fn build_and_macro_native_glob_share_the_prepared_package_listing() {
+    let workspace = scratch("glob-callable");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(package.join("sub")).unwrap();
+    fs::create_dir_all(package.join("subpackage")).unwrap();
+    fs::write(package.join("keep.txt"), "keep\n").unwrap();
+    fs::write(package.join("skip.txt"), "skip\n").unwrap();
+    fs::write(package.join("sub/child.txt"), "child\n").unwrap();
+    fs::write(package.join("subpackage/BUILD.bazel"), "# boundary\n").unwrap();
+    fs::write(package.join("subpackage/hidden.txt"), "hidden\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def make_group():\n    native.filegroup(name = \"macro\", srcs = native.glob((\"sub/*.txt\",)))\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"make_group\")\nfilegroup(name = \"direct\", srcs = glob([\"*.txt\"], exclude = [\"skip.txt\"]))\nfilegroup(name = \"dirs\", srcs = glob([\"*\"], exclude_directories = 0))\nfilegroup(name = \"omitted\", srcs = glob(allow_empty = True))\nmake_group()\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| (target.name.clone(), target.kind.clone()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                "direct".to_owned(),
+                PackageTargetKind::Filegroup {
+                    srcs: vec!["keep.txt".to_owned()]
+                }
+            ),
+            (
+                "dirs".to_owned(),
+                PackageTargetKind::Filegroup {
+                    srcs: vec![
+                        "BUILD.bazel".to_owned(),
+                        "defs.bzl".to_owned(),
+                        "keep.txt".to_owned(),
+                        "skip.txt".to_owned(),
+                        "sub".to_owned()
+                    ]
+                }
+            ),
+            (
+                "omitted".to_owned(),
+                PackageTargetKind::Filegroup { srcs: Vec::new() },
+            ),
+            (
+                "macro".to_owned(),
+                PackageTargetKind::Filegroup {
+                    srcs: vec!["sub/child.txt".to_owned()]
+                }
+            ),
+        ]
+    );
+    assert_eq!(loaded.used_globs.len(), 4);
+}
+
+#[test]
+fn glob_reports_context_and_allow_empty_type_errors() {
+    let workspace = scratch("glob-errors");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "filegroup(name = \"bad\", srcs = glob([\"*.txt\"], allow_empty = 5))\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("expected boolean for argument `allow_empty`, got `5`"));
+
+    fs::write(
+        package.join("defs.bzl"),
+        "BAD = glob([\"*.txt\"], allow_empty = True)\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"BAD\")\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("glob() may only be called while evaluating a BUILD package"));
 }

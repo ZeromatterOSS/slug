@@ -316,9 +316,10 @@ Implementation and test order:
    package's listing.
 4. Add a retained-DICE regression using `ActivationTracker`, not process-global
    atomics. Assert events by concrete key identity and activation kind:
-   identical observations reuse the tested `PackageListingKey` and
-   `PackageLoadKey`; an unrelated sibling-package mutation reuses both; a
-   mutation below an established subpackage reuses both; matching
+   identical observations do not activate the tested `PackageListingKey` or
+   `PackageLoadKey`; an unrelated sibling-package mutation activates and
+   reuses both; a file-content mutation below an established subpackage does
+   not activate the listing and reuses the package load; matching
    create/rename/delete evaluates the affected directory key, listing key, and
    package key; and adding/removing a child BUILD boundary evaluates the parent
    listing/package exactly once in that committed revision. Assert filegroup
@@ -350,6 +351,46 @@ during compute, a lock across DICE/Starlark work, swallowed directory errors,
 silent omission of a participating symlink, unsupported pattern behavior
 without a Bazel 9 oracle, or inability to distinguish sibling/subpackage reuse
 through key-specific activation data.
+
+Accepted implementation evidence (2026-07-22):
+
+- `PackageListingKey` now recursively consumes only
+  `WorkspaceDirectoryKey`, stops before traversing nested packages, and returns
+  sorted immutable package-relative `CompactString` slices for files,
+  directories, watched directories, and subpackages. Required absence/read
+  errors fail explicitly; participating symlinks and special entries produce
+  deterministic unsupported-entry errors.
+- `PackageLoadKey` is the sole asynchronous bridge. It prepares the listing
+  before synchronous Starlark evaluation; production glob expansion performs
+  no filesystem reads, starts no runtime, blocks on no channel, and mutates no
+  injected input.
+- Global `glob()` and `native.glob()` share the prepared listing, including
+  calls made by a loaded macro in BUILD package context. The Bazel 9.2.0
+  include/exclude defaults, `exclude_directories`, unbound `allow_empty`
+  behavior, list/tuple inputs, per-include empty checks, and reviewed M1 pattern
+  subset are covered by focused tests. Loaded packages retain the used compact
+  glob specs.
+- The retained-DICE regression distinguishes an untouched cached key from
+  dependency-validation reuse. Identical observations activate neither listing
+  nor package load; an unrelated sibling mutation reuses both; a content edit
+  below an established subpackage leaves the listing untouched and reuses the
+  load. Matching create/rename/delete and adding/removing a child BUILD
+  boundary evaluate the affected listing/load identities and produce the
+  expected filegroup sources.
+- Root validation passed
+  `CARGO_TARGET_DIR=/tmp/slug-m1-glob-target CARGO_BUILD_JOBS=1 cargo test
+  -p slug_loading_v2 -p slug_core_v2 -p slug_server_v2 -p slug_analysis_v2
+  -p slug_cli_v2`, `cargo fmt --all -- --check`, ownership/forbidden-surface
+  greps, and `git diff --check`. `scripts/v2_archive_status.sh` retains the
+  known absent local `v1-archive` branch and broad path-matcher failures; this
+  packet introduced neither.
+- Sol-low post-review accepted the implementation with no blockers after the
+  root corrected the initial test assumption that every untouched cache hit
+  emits `ActivationData::Reused`.
+- Residual: the migration observation adapter still scans the workspace,
+  symlink resolution and full Bazel glob syntax remain unsupported, and
+  repository-aware listing identity waits for Stage 5. The Bazel oracle fixture
+  remains authoritative until Slug query can execute it.
 
 ## Exact Test Criteria
 

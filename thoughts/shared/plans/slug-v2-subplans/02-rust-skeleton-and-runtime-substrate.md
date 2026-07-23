@@ -314,10 +314,12 @@ Accepted implementation evidence (2026-07-22):
   `scripts/v2_archive_status.sh` retains known hygiene failures for the absent
   local `v1-archive` branch and its broad non-V2 path matcher; neither is caused
   by this runtime packet.
-- Residual: the recursive observer is still a full-workspace migration adapter,
-  existing `slug_loading_v2::glob` still reads the filesystem directly, and no
-  semantic consumer or unchanged-computation counter exists. Those are owned by
-  the separately reviewed second half, not evidence of M1 glob completion.
+- Residual after the accepted Stage 4 consumer: the recursive observer remains
+  a full-workspace migration adapter. `PackageListingKey` now provides the
+  semantic directory consumer and retained-DICE activation evidence, while
+  production glob filtering is pure over its listing. Fine-grained watcher
+  input, symlink resolution, full Bazel glob syntax, and repository-aware
+  listing identity remain later work.
 
 ### 2.6 First-Real-Build Promotion
 

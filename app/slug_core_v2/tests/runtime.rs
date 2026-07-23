@@ -99,19 +99,11 @@ fn root_and_package_share_one_committed_revision_across_module_edit_and_delete()
     .unwrap();
     let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
     let target = TargetPattern::parse("//pkg:probe").unwrap();
-    let observe = || {
-        [
-            "MODULE.bazel",
-            "BUILD.bazel",
-            "pkg/BUILD.bazel",
-            "pkg/BUILD",
-        ]
-        .into_iter()
-        .map(|path| WorkspaceFileObservation::read(workspace.path().join(path)))
-        .collect::<Vec<_>>()
-    };
+    let observe = || observe_workspace(workspace.path()).unwrap();
 
-    let first = runtime.evaluate(observe(), &[target.clone()]).unwrap();
+    let first = runtime
+        .evaluate_observations(observe(), &[target.clone()])
+        .unwrap();
     assert_eq!(first.revision, first.workspace.revision);
     assert_eq!(first.revision, first.packages[0].revision);
 
@@ -120,16 +112,18 @@ fn root_and_package_share_one_committed_revision_across_module_edit_and_delete()
         "module(name = \"after\")\n",
     )
     .unwrap();
-    let edited = runtime.evaluate(observe(), &[target.clone()]).unwrap();
+    let edited = runtime
+        .evaluate_observations(observe(), &[target.clone()])
+        .unwrap();
     assert_eq!(edited.revision, edited.workspace.revision);
     assert_eq!(edited.revision, edited.packages[0].revision);
 
     fs::write(workspace.path().join("MODULE.bazel"), "module(name = )\n").unwrap();
-    let invalid = runtime.evaluate(observe(), &[target.clone()]);
+    let invalid = runtime.evaluate_observations(observe(), &[target.clone()]);
     assert!(invalid.unwrap_err().to_string().contains("MODULE.bazel"));
 
     fs::remove_file(workspace.path().join("MODULE.bazel")).unwrap();
-    let deleted = runtime.evaluate(observe(), &[target]);
+    let deleted = runtime.evaluate_observations(observe(), &[target]);
     assert!(deleted.unwrap_err().to_string().contains("MODULE.bazel"));
 }
 

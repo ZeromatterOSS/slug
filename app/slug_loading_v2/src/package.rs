@@ -40,6 +40,10 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
 
+use crate::glob::GlobSpec;
+use crate::glob::PackageListing;
+use crate::glob::expand_glob;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackageFile {
     pub package: PackageIdentifier,
@@ -56,6 +60,7 @@ pub struct LoadedPackage {
     pub build_file: PathBuf,
     pub default_visibility: Vec<String>,
     pub targets: Vec<PackageTarget>,
+    pub used_globs: Vec<GlobSpec>,
     #[allow(dead_code)] // Ownership only; frozen rule values borrow these heaps.
     #[allocative(skip)]
     retained_bzl_modules: Vec<FrozenModule>,
@@ -67,6 +72,7 @@ impl PartialEq for LoadedPackage {
             && self.build_file == other.build_file
             && self.default_visibility == other.default_visibility
             && self.targets == other.targets
+            && self.used_globs == other.used_globs
     }
 }
 
@@ -112,20 +118,39 @@ impl StarlarkRuleImplementation {
 struct PackageState {
     default_visibility: Vec<String>,
     targets: SmallMap<String, PackageTargetKind>,
+    used_globs: Vec<GlobSpec>,
 }
 
-#[derive(Debug, Default, ProvidesStaticType)]
-pub(crate) struct PackageRecorder(RefCell<PackageState>);
+#[derive(Debug, ProvidesStaticType)]
+pub(crate) struct PackageRecorder {
+    listing: PackageListing,
+    state: RefCell<PackageState>,
+}
 
 impl PackageRecorder {
+    pub(crate) fn new(listing: PackageListing) -> Self {
+        Self {
+            listing,
+            state: RefCell::new(PackageState::default()),
+        }
+    }
+
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> {
         eval.extra
             .and_then(|extra| extra.downcast_ref::<Self>())
             .ok_or_else(|| anyhow::anyhow!("Bazel package global invoked without package state"))
     }
 
+    fn for_glob<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> {
+        eval.extra
+            .and_then(|extra| extra.downcast_ref::<Self>())
+            .ok_or_else(|| {
+                anyhow::anyhow!("glob() may only be called while evaluating a BUILD package")
+            })
+    }
+
     fn set_default_visibility(&self, visibility: Vec<String>) {
-        self.0.borrow_mut().default_visibility = visibility;
+        self.state.borrow_mut().default_visibility = visibility;
     }
 
     fn exports_files(&self, srcs: Vec<String>) -> anyhow::Result<()> {
@@ -151,12 +176,18 @@ impl PackageRecorder {
     }
 
     fn record_target(&self, name: String, kind: PackageTargetKind) -> anyhow::Result<()> {
-        let mut state = self.0.borrow_mut();
+        let mut state = self.state.borrow_mut();
         if state.targets.get(&name).is_some() {
             anyhow::bail!("target '{name}' declared more than once");
         }
         state.targets.insert(name, kind);
         Ok(())
+    }
+
+    fn glob(&self, spec: GlobSpec) -> anyhow::Result<Vec<String>> {
+        let matches = expand_glob(&self.listing, &spec)?;
+        self.state.borrow_mut().used_globs.push(spec);
+        Ok(matches)
     }
 
     pub(crate) fn finish(
@@ -165,7 +196,7 @@ impl PackageRecorder {
         build_file: PathBuf,
         retained_bzl_modules: Vec<FrozenModule>,
     ) -> LoadedPackage {
-        let state = self.0.into_inner();
+        let state = self.state.into_inner();
         LoadedPackage {
             package_dir,
             build_file,
@@ -175,6 +206,7 @@ impl PackageRecorder {
                 .into_iter()
                 .map(|(name, kind)| PackageTarget { name, kind })
                 .collect(),
+            used_globs: state.used_globs,
             retained_bzl_modules,
         }
     }
@@ -215,6 +247,31 @@ fn filegroup_global(
 fn alias_global(name: &str, actual: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
     PackageRecorder::from_evaluator(eval)?.alias(name.to_owned(), actual.to_owned())?;
     Ok(NoneType)
+}
+
+fn glob_global<'v>(
+    include: UnpackListOrTuple<&str>,
+    exclude: UnpackListOrTuple<&str>,
+    exclude_directories: i32,
+    allow_empty: Option<Value<'v>>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> anyhow::Result<Vec<String>> {
+    let allow_empty = match allow_empty {
+        None => false,
+        Some(value) => value.unpack_bool().ok_or_else(|| {
+            anyhow::anyhow!(
+                "expected boolean for argument `allow_empty`, got `{}`",
+                value
+            )
+        })?,
+    };
+    let spec = GlobSpec::new(
+        include.items,
+        exclude.items,
+        exclude_directories != 0,
+        allow_empty,
+    )?;
+    PackageRecorder::for_glob(eval)?.glob(spec)
 }
 
 /// The callable returned by Bazel's `rule()` global during package loading.
@@ -355,6 +412,16 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         alias_global(name, actual, eval)
     }
 
+    fn glob<'v>(
+        #[starlark(default=UnpackListOrTuple::default())] include: UnpackListOrTuple<&str>,
+        #[starlark(default=UnpackListOrTuple::default())] exclude: UnpackListOrTuple<&str>,
+        #[starlark(default = 1)] exclude_directories: i32,
+        allow_empty: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Vec<String>> {
+        glob_global(include, exclude, exclude_directories, allow_empty, eval)
+    }
+
     fn rule<'v>(implementation: Value<'v>) -> anyhow::Result<RuleDefinition<'v>> {
         Ok(RuleDefinition { implementation })
     }
@@ -395,6 +462,17 @@ fn native_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         alias_global(name, actual, eval)
+    }
+
+    fn glob<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        #[starlark(default=UnpackListOrTuple::default())] include: UnpackListOrTuple<&str>,
+        #[starlark(default=UnpackListOrTuple::default())] exclude: UnpackListOrTuple<&str>,
+        #[starlark(default = 1)] exclude_directories: i32,
+        allow_empty: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Vec<String>> {
+        glob_global(include, exclude, exclude_directories, allow_empty, eval)
     }
 }
 

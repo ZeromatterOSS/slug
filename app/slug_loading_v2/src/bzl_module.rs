@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use compact_str::CompactString;
 use dice::DiceComputations;
 use dice::DiceTransaction;
 use dice::Key;
@@ -28,10 +29,13 @@ use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 
+use crate::glob::PackageListing;
 use crate::keys::BzlModuleEvalKey;
 use crate::keys::BzlParseKey;
 use crate::keys::LoadLabelResolutionKey;
+use crate::keys::PackageListingKey;
 use crate::keys::PackageLoadKey;
+use crate::keys::WorkspaceDirectoryEntryKind;
 use crate::keys::WorkspaceDirectoryKey;
 use crate::keys::WorkspaceDirectorySnapshotKey;
 use crate::keys::WorkspaceDirectoryValue;
@@ -155,6 +159,130 @@ impl Key for WorkspaceDirectoryKey {
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
+    }
+}
+
+#[async_trait]
+impl Key for PackageListingKey {
+    type Value = LoadResult<PackageListing>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        if !self.workspace.is_absolute()
+            || !self.package.is_absolute()
+            || !self.package.starts_with(&self.workspace)
+            || self.package.components().any(|component| {
+                matches!(
+                    component,
+                    std::path::Component::CurDir | std::path::Component::ParentDir
+                )
+            })
+        {
+            return Arc::new(Err(LoadingError::new(format!(
+                "package listing key requires a normalized absolute package inside workspace {}: {}",
+                self.workspace.display(),
+                self.package.display()
+            ))));
+        }
+
+        let mut regular_files = Vec::new();
+        let mut directories = Vec::new();
+        let mut watched_directories = Vec::new();
+        let mut subpackages = Vec::new();
+        let mut pending = vec![(self.package.clone(), String::new())];
+
+        while let Some((directory, relative_directory)) = pending.pop() {
+            let value = match ctx
+                .compute(&WorkspaceDirectoryKey {
+                    workspace: self.workspace.clone(),
+                    directory: directory.clone(),
+                })
+                .await
+            {
+                Ok(value) => value,
+                Err(error) => {
+                    return Arc::new(Err(LoadingError::new(format!(
+                        "reading package directory {} through DICE: {error}",
+                        directory.display()
+                    ))));
+                }
+            };
+            let entries = match value {
+                WorkspaceDirectoryValue::Present(entries) => entries,
+                WorkspaceDirectoryValue::Absent => {
+                    return Arc::new(Err(LoadingError::new(format!(
+                        "package directory is absent: {}",
+                        directory.display()
+                    ))));
+                }
+                WorkspaceDirectoryValue::ReadError(error) => {
+                    return Arc::new(Err(LoadingError::new(format!(
+                        "reading package directory {}: {error}",
+                        directory.display()
+                    ))));
+                }
+            };
+
+            watched_directories.push(CompactString::new(&relative_directory));
+            let is_subpackage = !relative_directory.is_empty()
+                && entries.iter().any(|entry| {
+                    matches!(entry.name.as_str(), "BUILD.bazel" | "BUILD")
+                        && entry.kind == WorkspaceDirectoryEntryKind::RegularFile
+                });
+            if is_subpackage {
+                subpackages.push(CompactString::new(&relative_directory));
+                continue;
+            }
+
+            if !relative_directory.is_empty() {
+                directories.push(CompactString::new(&relative_directory));
+            }
+            for entry in entries.iter().rev() {
+                let relative = if relative_directory.is_empty() {
+                    entry.name.to_string()
+                } else {
+                    format!("{relative_directory}/{}", entry.name)
+                };
+                match entry.kind {
+                    WorkspaceDirectoryEntryKind::RegularFile => {
+                        regular_files.push(CompactString::new(&relative));
+                    }
+                    WorkspaceDirectoryEntryKind::Directory => {
+                        pending.push((directory.join(entry.name.as_str()), relative));
+                    }
+                    WorkspaceDirectoryEntryKind::Symlink => {
+                        return Arc::new(Err(LoadingError::new(format!(
+                            "symlink entries are unsupported while listing package {}: {relative}",
+                            self.package.display()
+                        ))));
+                    }
+                    WorkspaceDirectoryEntryKind::Other => {
+                        return Arc::new(Err(LoadingError::new(format!(
+                            "special filesystem entries are unsupported while listing package {}: {relative}",
+                            self.package.display()
+                        ))));
+                    }
+                }
+            }
+        }
+
+        Arc::new(Ok(PackageListing::new(
+            regular_files,
+            directories,
+            watched_directories,
+            subpackages,
+        )))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        matches!((x.as_ref(), y.as_ref()), (Ok(x), Ok(y)) if x == y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_ok()
     }
 }
 
@@ -473,6 +601,19 @@ impl Key for PackageLoadKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        let listing = match ctx
+            .compute(&PackageListingKey {
+                workspace: self.workspace.clone(),
+                package: self.package.clone(),
+            })
+            .await
+        {
+            Ok(value) => match value.as_ref() {
+                Ok(listing) => listing.dupe(),
+                Err(error) => return Arc::new(Err(error.clone())),
+            },
+            Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+        };
         let primary_build = self.package.join("BUILD.bazel");
         let fallback_build = self.package.join("BUILD");
         let (build_file, source) = match observed_file(ctx, &self.workspace, &primary_build).await {
@@ -540,7 +681,7 @@ impl Key for PackageLoadKey {
                 &Dialect::Standard,
             )
             .map_err(|error| LoadingError::new(error.to_string()))?;
-            let recorder = PackageRecorder::default();
+            let recorder = PackageRecorder::new(listing);
             let module = Module::new();
             let loader = LocalBzlLoader {
                 modules: loaded_modules

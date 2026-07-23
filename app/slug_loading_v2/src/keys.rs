@@ -17,7 +17,6 @@ use compact_str::CompactString;
 use dice::InjectedKey;
 use dupe::Dupe;
 use slug_identity_v2::ApparentLabel;
-use slug_identity_v2::PackageIdentifier;
 use starlark_map::sorted_map::SortedMap;
 
 /// An observation supplied to the workspace DICE graph before loading begins.
@@ -231,11 +230,17 @@ impl fmt::Display for PackageLoadKey {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct GlobExpansionKey {
-    pub package: PackageIdentifier,
-    pub includes: Vec<String>,
-    pub excludes: Vec<String>,
+/// DICE identity for the direct-directory-derived contents of one root package.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct PackageListingKey {
+    pub workspace: PathBuf,
+    pub package: PathBuf,
+}
+
+impl fmt::Display for PackageListingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "package-listing:{}", self.package.display())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -20,6 +20,11 @@ use slug_analysis_v2::analyze_loaded_rule;
 use slug_build_api_v2::ActionKind;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::keys::WorkspaceDirectoryEntry;
+use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
+use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
+use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
+use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
@@ -32,6 +37,36 @@ fn scratch() -> PathBuf {
     let root = std::env::temp_dir().join(format!("slug-analysis-rule-{nanos}"));
     fs::create_dir_all(&root).unwrap();
     root
+}
+
+fn directory_snapshot(root: &std::path::Path) -> WorkspaceDirectorySnapshot {
+    let mut pending = vec![root.to_path_buf()];
+    let mut directories = Vec::new();
+    while let Some(directory) = pending.pop() {
+        let mut entries = Vec::new();
+        for entry in fs::read_dir(&directory).unwrap() {
+            let entry = entry.unwrap();
+            let file_type = entry.file_type().unwrap();
+            let kind = if file_type.is_file() {
+                WorkspaceDirectoryEntryKind::RegularFile
+            } else if file_type.is_dir() {
+                pending.push(entry.path());
+                WorkspaceDirectoryEntryKind::Directory
+            } else if file_type.is_symlink() {
+                WorkspaceDirectoryEntryKind::Symlink
+            } else {
+                WorkspaceDirectoryEntryKind::Other
+            };
+            entries.push(WorkspaceDirectoryEntry {
+                name: entry.file_name().to_str().unwrap().into(),
+                kind,
+            });
+        }
+        directories.push((directory, WorkspaceDirectoryValue::present(entries)));
+    }
+    WorkspaceDirectorySnapshot {
+        directories: Arc::new(directories.into_iter().collect()),
+    }
 }
 
 #[test]
@@ -83,6 +118,14 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
                     Arc::new(WorkspaceSnapshot {
                         files: Arc::new(files),
                     }),
+                )])
+                .unwrap();
+            updater
+                .changed_to(vec![(
+                    (WorkspaceDirectorySnapshotKey {
+                        workspace: workspace.clone(),
+                    }),
+                    Arc::new(directory_snapshot(&workspace)),
                 )])
                 .unwrap();
             let mut transaction = updater.commit().await;
