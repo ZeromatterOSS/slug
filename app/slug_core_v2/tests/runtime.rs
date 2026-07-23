@@ -6,11 +6,73 @@ use slug_core_v2::runtime::WorkspaceFileObservation;
 use slug_core_v2::runtime::WorkspaceObservation;
 use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_core_v2::runtime::evaluate_workspace;
+use slug_core_v2::runtime::evaluate_workspace_query;
+use slug_core_v2::runtime::evaluate_workspace_query_with_policy;
 use slug_core_v2::runtime::evaluate_workspace_targets;
 use slug_core_v2::runtime::observe_workspace;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
+use slug_query_v2::QueryOrder;
+use slug_query_v2::QueryPolicy;
+
+#[test]
+fn query_policy_defaults_and_primary_runtime_path_toggle_without_semantic_state() {
+    let workspace = tempfile::tempdir().unwrap();
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"runtime_test\")\n",
+    )
+    .unwrap();
+    fs::create_dir_all(workspace.path().join("pkg")).unwrap();
+    fs::write(
+        workspace.path().join("pkg/BUILD.bazel"),
+        "filegroup(name = \"plain\")\ntest_suite(name = \"suite\", tests = [\":plain\"])\n",
+    )
+    .unwrap();
+    let expression = "tests(//pkg:suite)";
+
+    let default = evaluate_workspace_query(workspace.path(), expression, QueryOrder::Auto).unwrap();
+    assert!(default.stdout().is_empty());
+    let strict = evaluate_workspace_query_with_policy(
+        workspace.path(),
+        expression,
+        QueryOrder::Auto,
+        QueryPolicy {
+            strict_test_suite: true,
+        },
+    )
+    .unwrap_err();
+    assert!(strict.to_string().contains(
+        "The label '//pkg:plain' in the test_suite '//pkg:suite' does not refer to a test or test_suite rule!"
+    ));
+
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let observe = || observe_workspace(workspace.path()).unwrap();
+    let default = runtime
+        .query_observations(observe(), expression, QueryOrder::Auto)
+        .unwrap();
+    assert!(default.stdout().is_empty());
+    let strict = runtime
+        .query_observations_with_policy(
+            observe(),
+            expression,
+            QueryOrder::Auto,
+            QueryPolicy {
+                strict_test_suite: true,
+            },
+        )
+        .unwrap_err();
+    assert!(
+        strict
+            .to_string()
+            .contains("does not refer to a test or test_suite rule")
+    );
+    let default_again = runtime
+        .query_observations(observe(), expression, QueryOrder::Auto)
+        .unwrap();
+    assert!(default_again.stdout().is_empty());
+}
 
 #[test]
 fn root_module_and_build_are_evaluated_through_dice_and_starlark() {

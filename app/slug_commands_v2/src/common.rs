@@ -348,6 +348,8 @@ fn classify_flag(name: &str) -> FlagDisposition {
         | "graph:factored"
         | "nograph:factored"
         | "graph:node_limit"
+        | "strict_test_suite"
+        | "nostrict_test_suite"
         | "config"
         | "allow_yanked_versions"
         | "ignore_dev_dependency"

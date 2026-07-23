@@ -21,9 +21,11 @@ use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_query_v2::QueryNodeKind;
 use slug_query_v2::QueryOrder;
+use slug_query_v2::QueryPolicy;
 use slug_query_v2::SubtreePackageSetKey;
 use slug_query_v2::UnconfiguredPackageGraphKey;
 use slug_query_v2::evaluate_loading_query;
+use slug_query_v2::evaluate_loading_query_with_policy;
 
 fn scratch() -> PathBuf {
     let nanos = SystemTime::now()
@@ -177,6 +179,28 @@ async fn query_revision_order(
     Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError>,
     Vec<(QueryKeyIdentity, ActivationKind)>,
 ) {
+    query_revision_order_with_policy(
+        dice,
+        tracker,
+        workspace,
+        expression,
+        order,
+        QueryPolicy::default(),
+    )
+    .await
+}
+
+async fn query_revision_order_with_policy(
+    dice: &Arc<Dice>,
+    tracker: &Arc<QueryTracker>,
+    workspace: &Path,
+    expression: &str,
+    order: QueryOrder,
+    policy: QueryPolicy,
+) -> (
+    Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError>,
+    Vec<(QueryKeyIdentity, ActivationKind)>,
+) {
     let (files, directories) = observations(workspace);
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker.clone()),
@@ -199,8 +223,14 @@ async fn query_revision_order(
         )])
         .unwrap();
     let mut transaction = updater.commit().await;
-    let result =
-        evaluate_loading_query(&mut transaction, workspace.to_path_buf(), expression, order).await;
+    let result = evaluate_loading_query_with_policy(
+        &mut transaction,
+        workspace.to_path_buf(),
+        expression,
+        order,
+        policy,
+    )
+    .await;
     let mut events = tracker.take();
     events.sort();
     (result, events)
@@ -215,6 +245,343 @@ fn subtree(prefix: &str, kind: ActivationKind) -> (QueryKeyIdentity, ActivationK
         QueryKeyIdentity::SubtreePackageSet(PathBuf::from(prefix)),
         kind,
     )
+}
+
+#[tokio::test]
+async fn tests_function_source_critical_discriminators_and_strict_policy_are_request_local() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace")
+        .canonicalize()
+        .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, expected) in [
+        (
+            "tests(//source_critical:parent_requires_parent_tag)",
+            "//source_critical:nested_unfiltered_test\n",
+        ),
+        (
+            "tests(//source_critical:filtered_direct_then_nested)",
+            "//source_critical:shared_blocked_test\n",
+        ),
+        (
+            "tests(//source_critical:exclude_literal_plus_tag)",
+            "//source_critical:plain_tag_test\n",
+        ),
+    ] {
+        let output = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+
+    let default = evaluate_loading_query(
+        &mut transaction,
+        workspace.clone(),
+        "tests(//strict:non_test_member)",
+        QueryOrder::Auto,
+    )
+    .await
+    .unwrap();
+    assert!(default.stdout().is_empty());
+
+    let strict = evaluate_loading_query_with_policy(
+        &mut transaction,
+        workspace,
+        "tests(//strict:non_test_member)",
+        QueryOrder::Auto,
+        QueryPolicy {
+            strict_test_suite: true,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        strict.to_string(),
+        "The label '//strict:plain' in the test_suite '//strict:non_test_member' does not refer to a test or test_suite rule!"
+    );
+}
+
+#[tokio::test]
+async fn tests_function_matches_all_twenty_one_non_build_oracle_rows() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace")
+        .canonicalize()
+        .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let successes: &[(&str, QueryOrder, &[&str])] = &[
+        (
+            "tests(set(//direct:direct_test //direct:plain))",
+            QueryOrder::Auto,
+            &["//direct:direct_test"],
+        ),
+        (
+            "tests(//implicit:empty)",
+            QueryOrder::Auto,
+            &["//implicit:alpha_test", "//implicit:large_test"],
+        ),
+        (
+            "tests(//explicit:root_suite)",
+            QueryOrder::Auto,
+            &[
+                "//cross:cross_test",
+                "//explicit:direct_test",
+                "//explicit:nested_test",
+            ],
+        ),
+        (
+            "tests(//explicit:only_direct)",
+            QueryOrder::Auto,
+            &["//explicit:direct_test"],
+        ),
+        ("tests(//cycle_a:a)", QueryOrder::Auto, &[]),
+        (
+            "tests(//dedup:root)",
+            QueryOrder::Auto,
+            &["//dedup:shared_test"],
+        ),
+        (
+            "tests(//filters:bare)",
+            QueryOrder::Auto,
+            &["//filters:fast_test"],
+        ),
+        (
+            "tests(//filters:plus)",
+            QueryOrder::Auto,
+            &["//filters:fast_test"],
+        ),
+        (
+            "tests(//filters:exclude_slow)",
+            QueryOrder::Auto,
+            &["//filters:fast_test"],
+        ),
+        (
+            "tests(//filters:manual_suite)",
+            QueryOrder::Auto,
+            &["//filters:plain_test"],
+        ),
+        (
+            "tests(//filters:large)",
+            QueryOrder::Auto,
+            &["//filters:large_test"],
+        ),
+        ("tests(//strict:non_test_member)", QueryOrder::Auto, &[]),
+        (
+            "tests(//explicit:root_suite)",
+            QueryOrder::Auto,
+            &[
+                "//cross:cross_test",
+                "//explicit:direct_test",
+                "//explicit:nested_test",
+            ],
+        ),
+        (
+            "tests(//explicit:root_suite)",
+            QueryOrder::Full,
+            &[
+                "//cross:cross_test",
+                "//explicit:direct_test",
+                "//explicit:nested_test",
+            ],
+        ),
+        (
+            "tests(//provenance:omitted)",
+            QueryOrder::Auto,
+            &["//provenance:member_test"],
+        ),
+        (
+            "tests(//provenance:explicit_empty)",
+            QueryOrder::Auto,
+            &["//provenance:member_test"],
+        ),
+        (
+            "tests(//source_critical:parent_requires_parent_tag)",
+            QueryOrder::Auto,
+            &["//source_critical:nested_unfiltered_test"],
+        ),
+        (
+            "tests(//source_critical:filtered_direct_then_nested)",
+            QueryOrder::Auto,
+            &["//source_critical:shared_blocked_test"],
+        ),
+        (
+            "tests(//source_critical:exclude_literal_plus_tag)",
+            QueryOrder::Auto,
+            &["//source_critical:plain_tag_test"],
+        ),
+    ];
+    assert_eq!(successes.len(), 19);
+    for (expression, order, expected) in successes {
+        let output =
+            evaluate_loading_query(&mut transaction, workspace.clone(), expression, *order)
+                .await
+                .unwrap();
+        let mut actual = output
+            .labels
+            .iter()
+            .map(AsRef::<str>::as_ref)
+            .collect::<Vec<_>>();
+        actual.sort_unstable();
+        let mut expected = expected.to_vec();
+        expected.sort_unstable();
+        assert_eq!(actual, expected, "{expression}");
+    }
+
+    let strict = evaluate_loading_query_with_policy(
+        &mut transaction,
+        workspace.clone(),
+        "tests(//strict:non_test_member)",
+        QueryOrder::Auto,
+        QueryPolicy {
+            strict_test_suite: true,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(strict.exit_code, 7);
+    assert_eq!(
+        strict.to_string(),
+        "The label '//strict:plain' in the test_suite '//strict:non_test_member' does not refer to a test or test_suite rule!"
+    );
+
+    let missing = evaluate_loading_query(
+        &mut transaction,
+        workspace,
+        "tests(//missing:broken)",
+        QueryOrder::Auto,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(missing.exit_code, 7);
+    assert_eq!(
+        missing.to_string(),
+        "couldn't expand 'tests' attribute of test_suite //missing:broken: no such target '//missing_target:missing_target': target 'missing_target' not declared in package 'missing_target'"
+    );
+}
+
+#[tokio::test]
+async fn tests_function_keeps_fake_and_top_level_other_targets_outside_strict_lookup() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(workspace.join("pkg/defs.bzl"), "VALUE = 1\n");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"VALUE\")\nfilegroup(name = \"plain\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    for expression in [
+        "tests(loadfiles(//pkg:plain))",
+        "tests(//pkg:plain)",
+        "tests(set(//pkg:plain //pkg:BUILD.bazel))",
+    ] {
+        let output = evaluate_loading_query_with_policy(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+            QueryPolicy {
+                strict_test_suite: true,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(output.stdout().is_empty(), "{expression}");
+    }
+}
+
+#[tokio::test]
+async fn tests_named_attribute_resolution_records_suite_evaluation_edges() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace")
+        .canonicalize()
+        .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let output = evaluate_loading_query(
+        &mut transaction,
+        workspace,
+        "tests(//explicit:root_suite) union set(//explicit:root_suite //explicit:nested_suite //cross:cross_suite)",
+        QueryOrder::Auto,
+    )
+    .await
+    .unwrap();
+    let graph = output.graph_stdout(false, true);
+    for edge in [
+        "\"//explicit:root_suite\" -> \"//explicit:direct_test\"",
+        "\"//explicit:root_suite\" -> \"//explicit:nested_suite\"",
+        "\"//explicit:root_suite\" -> \"//cross:cross_suite\"",
+        "\"//explicit:nested_suite\" -> \"//explicit:nested_test\"",
+        "\"//cross:cross_suite\" -> \"//cross:cross_test\"",
+    ] {
+        assert!(graph.contains(edge), "{edge} missing from:\n{graph}");
+    }
+    assert!(!graph.contains("unlisted_test"), "{graph}");
+}
+
+#[tokio::test]
+async fn strict_policy_toggle_reuses_the_same_unconfigured_package_graph() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"plain\")\ntest_suite(name = \"suite\", tests = [\":plain\"])\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "tests(//pkg:suite)";
+
+    let (default, events) = query_revision_order_with_policy(
+        &dice,
+        &tracker,
+        &workspace,
+        expression,
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+    )
+    .await;
+    assert!(default.unwrap().stdout().is_empty());
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    let (strict, events) = query_revision_order_with_policy(
+        &dice,
+        &tracker,
+        &workspace,
+        expression,
+        QueryOrder::Auto,
+        QueryPolicy {
+            strict_test_suite: true,
+        },
+    )
+    .await;
+    assert!(
+        strict
+            .unwrap_err()
+            .to_string()
+            .contains("does not refer to a test or test_suite rule")
+    );
+    // The identical observations do not create another DICE version, so the
+    // retained graph is returned without activating or recomputing the key.
+    assert!(events.is_empty(), "{events:?}");
+
+    let (default_again, events) = query_revision_order_with_policy(
+        &dice,
+        &tracker,
+        &workspace,
+        expression,
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+    )
+    .await;
+    assert!(default_again.unwrap().stdout().is_empty());
+    assert!(events.is_empty(), "{events:?}");
 }
 
 #[tokio::test]
@@ -989,16 +1356,15 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
     assert!(test.manual);
     assert!(node("attrs").test_metadata.is_none());
 
-    let error = evaluate_loading_query(
+    let output = evaluate_loading_query(
         &mut transaction,
         workspace.clone(),
         "tests(//pkg:implicit)",
         QueryOrder::Auto,
     )
     .await
-    .unwrap_err()
-    .to_string();
-    assert!(error.contains("tests"), "{error}");
+    .unwrap();
+    assert_eq!(output.stdout(), "//pkg:auto\n");
 }
 
 #[tokio::test]

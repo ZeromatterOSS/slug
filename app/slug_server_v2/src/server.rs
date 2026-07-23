@@ -43,6 +43,8 @@ pub struct QueryRequest {
     pub output: String,
     #[serde(default = "default_graph_factored")]
     pub graph_factored: bool,
+    #[serde(default)]
+    pub strict_test_suite: bool,
 }
 
 fn default_query_output() -> String {
@@ -154,11 +156,14 @@ fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
                     };
                 }
             };
-            let result = daemon.query_with_output(
+            let result = daemon.query_with_output_and_policy(
                 &request.expression,
                 order,
                 &request.output,
                 request.graph_factored,
+                slug_query_v2::QueryPolicy {
+                    strict_test_suite: request.strict_test_suite,
+                },
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -232,6 +237,7 @@ pub fn send_query_request(
         order_output: request.order_output.clone(),
         output: request.output.clone(),
         graph_factored: request.graph_factored,
+        strict_test_suite: request.strict_test_suite,
     }))
     .context("serializing query request for daemon")?;
     write!(stream, "{json}\n").context("sending query request to daemon")?;

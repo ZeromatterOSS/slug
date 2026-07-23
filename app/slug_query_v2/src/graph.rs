@@ -163,6 +163,7 @@ pub struct QueryError {
 enum QueryErrorKind {
     Syntax,
     Evaluation,
+    TargetMissing,
     PackageLoading,
 }
 
@@ -188,6 +189,14 @@ impl QueryError {
             message: Arc::from(message.into()),
             exit_code: 7,
             kind: QueryErrorKind::PackageLoading,
+        }
+    }
+
+    pub(crate) fn target_missing(message: impl Into<String>) -> Self {
+        Self {
+            message: Arc::from(message.into()),
+            exit_code: 7,
+            kind: QueryErrorKind::TargetMissing,
         }
     }
 

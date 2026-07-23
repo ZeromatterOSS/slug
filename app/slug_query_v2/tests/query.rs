@@ -52,8 +52,8 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 // QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query
 // registry source of truth. Loading-file provenance activates
 // buildfiles/loadfiles, retained attribute metadata activates labels, and the
-// retained rule capability activates executables while the other ordinary
-// functions remain deferred.
+// retained rule capability activates executables and tests while the other
+// ordinary functions remain deferred.
 #[test]
 fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures() {
     assert_eq!(loading_query_functions().len(), 16);
@@ -75,6 +75,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             "siblings",
             "some",
             "somepath",
+            "tests",
         ]
     );
 
@@ -120,6 +121,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
     )
     .unwrap();
     validate_loading_query(&QueryExpression::parse("some(//:single, '-1')").unwrap()).unwrap();
+    validate_loading_query(&QueryExpression::parse("tests(//pkg:suite)").unwrap()).unwrap();
     validate_loading_query(&QueryExpression::parse("buildfiles(//pkg:bin)").unwrap()).unwrap();
     validate_loading_query(&QueryExpression::parse("loadfiles(//pkg:bin)").unwrap()).unwrap();
     assert_eq!(
@@ -127,7 +129,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             .iter()
             .filter(|function| function.status == QueryFunctionStatus::Deferred)
             .count(),
-        5
+        4
     );
 }
 

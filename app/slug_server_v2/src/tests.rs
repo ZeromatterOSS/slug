@@ -15,6 +15,7 @@ use std::time::SystemTime;
 
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::QueryOrder;
+use slug_query_v2::QueryPolicy;
 use slug_reapi_v2::RemoteConfig;
 
 use crate::BuildRequest;
@@ -199,6 +200,7 @@ fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
         order_output: "full".to_owned(),
         output: "graph".to_owned(),
         graph_factored: false,
+        strict_test_suite: true,
     });
     let json = serde_json::to_value(request).unwrap();
     assert_eq!(json["kind"], "query");
@@ -206,7 +208,8 @@ fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
     assert_eq!(json["request"]["order_output"], "full");
     assert_eq!(json["request"]["output"], "graph");
     assert_eq!(json["request"]["graph_factored"], false);
-    assert_eq!(json["request"].as_object().unwrap().len(), 4);
+    assert_eq!(json["request"]["strict_test_suite"], true);
+    assert_eq!(json["request"].as_object().unwrap().len(), 5);
 
     let old: DaemonRequest = serde_json::from_str(
         r#"{"kind":"query","request":{"expression":"//pkg:bin","order_output":"auto"}}"#,
@@ -217,6 +220,46 @@ fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
     };
     assert_eq!(old.output, "text");
     assert!(old.graph_factored);
+    assert!(!old.strict_test_suite);
+}
+
+#[test]
+fn retained_daemon_strict_test_suite_toggle_is_request_local_and_invalidates_no_files() {
+    let workspace = scratch("strict-test-suite-policy");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"plain\")\ntest_suite(name = \"suite\", tests = [\":plain\"])\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let expression = "tests(//pkg:suite)";
+
+    let default = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(default.exit_code, 0, "{default:?}");
+    assert!(default.stdout.is_empty(), "{default:?}");
+    assert_eq!(default.invalidated_files, 0);
+
+    let strict = daemon.query_with_policy(
+        expression,
+        QueryOrder::Auto,
+        QueryPolicy {
+            strict_test_suite: true,
+        },
+    );
+    assert_eq!(strict.exit_code, 7, "{strict:?}");
+    assert!(strict.stdout.is_empty(), "{strict:?}");
+    assert_eq!(strict.invalidated_files, 0);
+    assert!(
+        strict.stderr.contains(
+            "The label '//pkg:plain' in the test_suite '//pkg:suite' does not refer to a test or test_suite rule!"
+        ),
+        "{strict:?}"
+    );
+
+    let default_again = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(default_again.exit_code, 0, "{default_again:?}");
+    assert!(default_again.stdout.is_empty(), "{default_again:?}");
+    assert_eq!(default_again.invalidated_files, 0);
 }
 
 #[test]

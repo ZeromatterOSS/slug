@@ -18,6 +18,7 @@ use slug_commands_v2::cquery::CqueryRequest;
 use slug_commands_v2::query::QueryRequest;
 use slug_commands_v2::run::RunRequest;
 use slug_commands_v2::test::TestRequest;
+use slug_query_v2::QueryPolicy;
 
 #[test]
 fn build_request_parses_target_patterns_and_classifies_flags() {
@@ -166,6 +167,58 @@ fn query_request_parses_graph_output_and_factoring_flags() {
 }
 
 #[test]
+fn query_request_parses_strict_test_suite_booleans_and_last_occurrence_wins() {
+    let default = QueryRequest::parse(&["//pkg:bin"]).unwrap();
+    assert_eq!(default.policy, QueryPolicy::default());
+
+    for (flag, expected) in [
+        ("--strict_test_suite", true),
+        ("--strict_test_suite=true", true),
+        ("--strict_test_suite=yes", true),
+        ("--strict_test_suite=1", true),
+        ("--strict_test_suite=false", false),
+        ("--strict_test_suite=no", false),
+        ("--strict_test_suite=0", false),
+        ("--nostrict_test_suite", false),
+        ("--nostrict_test_suite=true", false),
+        ("--nostrict_test_suite=false", true),
+    ] {
+        let request = QueryRequest::parse(&[flag, "//pkg:bin"]).unwrap();
+        assert_eq!(request.policy.strict_test_suite, expected, "{flag}");
+        assert_eq!(
+            request
+                .flags
+                .iter()
+                .find(|parsed| parsed.raw == flag)
+                .unwrap()
+                .disposition,
+            FlagDisposition::ParseOnly,
+            "{flag}"
+        );
+    }
+
+    let request = QueryRequest::parse(&[
+        "--strict_test_suite",
+        "--nostrict_test_suite",
+        "--strict_test_suite=false",
+        "--nostrict_test_suite=false",
+        "//pkg:bin",
+    ])
+    .unwrap();
+    assert!(request.policy.strict_test_suite);
+
+    for flag in ["--strict_test_suite=maybe", "--nostrict_test_suite=maybe"] {
+        let error = QueryRequest::parse(&[flag, "//pkg:bin"])
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("expected a boolean value"),
+            "{flag}: {error}"
+        );
+    }
+}
+
+#[test]
 fn query_request_rejects_deferred_output_and_order_modes_before_runtime() {
     let output = QueryRequest::parse(&["--output=label_kind", "//pkg:bin"])
         .unwrap_err()
@@ -231,6 +284,11 @@ fn cquery_and_aquery_retain_placeholder_flag_parsing_without_query_restrictions(
     .unwrap();
     assert_eq!(aquery.query.output, QueryOutputFormat::StreamedJsonProto);
     assert_eq!(aquery.query.order, slug_query_v2::QueryOrder::Auto);
+
+    let cquery = CqueryRequest::parse(&["--strict_test_suite", "//pkg:bin"]).unwrap();
+    let aquery = AqueryRequest::parse(&["--nostrict_test_suite=false", "//pkg:bin"]).unwrap();
+    assert_eq!(cquery.query.policy, QueryPolicy::default());
+    assert_eq!(aquery.query.policy, QueryPolicy::default());
 }
 
 #[test]

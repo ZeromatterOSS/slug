@@ -18,9 +18,15 @@ mod parser;
 pub(crate) mod provenance;
 mod traversal;
 
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+pub struct QueryPolicy {
+    pub strict_test_suite: bool,
+}
+
 pub use evaluator::QueryOrder;
 pub use evaluator::QueryOutput;
 pub use evaluator::evaluate_loading_query;
+pub use evaluator::evaluate_loading_query_with_policy;
 pub use expr::BinaryOperator;
 pub use expr::QueryExpression;
 pub use expr::QueryExpressionKind;

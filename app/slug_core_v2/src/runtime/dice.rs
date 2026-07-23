@@ -47,7 +47,8 @@ use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_query_v2::QueryError;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryOutput;
-use slug_query_v2::evaluate_loading_query;
+use slug_query_v2::QueryPolicy;
+use slug_query_v2::evaluate_loading_query_with_policy;
 
 use super::RuntimeMode;
 use super::starlark::evaluate_file;
@@ -425,6 +426,16 @@ impl WorkspaceRuntime {
         expression: &str,
         order: QueryOrder,
     ) -> Result<QueryOutput, QueryError> {
+        self.query_observations_with_policy(observations, expression, order, QueryPolicy::default())
+    }
+
+    pub fn query_observations_with_policy(
+        &self,
+        observations: WorkspaceObservation,
+        expression: &str,
+        order: QueryOrder,
+        policy: QueryPolicy,
+    ) -> Result<QueryOutput, QueryError> {
         let files = observations
             .files
             .into_iter()
@@ -471,8 +482,14 @@ impl WorkspaceRuntime {
                 )])
                 .map_err(|error| QueryError::evaluation(error.to_string()))?;
             let mut transaction = updater.commit().await;
-            evaluate_loading_query(&mut transaction, self.workspace.clone(), expression, order)
-                .await
+            evaluate_loading_query_with_policy(
+                &mut transaction,
+                self.workspace.clone(),
+                expression,
+                order,
+                policy,
+            )
+            .await
         })
     }
 

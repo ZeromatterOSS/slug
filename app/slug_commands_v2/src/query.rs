@@ -11,6 +11,7 @@
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_query_v2::QueryOrder;
+use slug_query_v2::QueryPolicy;
 
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
@@ -29,6 +30,7 @@ pub struct QueryRequest {
     pub output: QueryOutputFormat,
     pub order: QueryOrder,
     pub graph_factored: bool,
+    pub policy: QueryPolicy,
     pub flags: Vec<ParsedFlag>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
@@ -47,36 +49,43 @@ pub(crate) fn parse_query_like(
     let parsed = split_args(args);
     let expression = parse_query_expression_for(command, &parsed.positionals)?;
     let output = output_format(&parsed.flags);
-    let (order, graph_factored, bzlmod_policy, lockfile_mode) = if command == CommandKind::Query {
-        let (order, graph_factored) = validate_query_flags(&parsed.flags)?;
-        (
-            order,
-            graph_factored,
-            bzlmod_command_policy(&[])?,
-            bzlmod_lockfile_mode(&[])?,
-        )
-    } else {
-        (
-            QueryOrder::Auto,
-            true,
-            bzlmod_command_policy(&parsed.flags)?,
-            bzlmod_lockfile_mode(&parsed.flags)?,
-        )
-    };
+    let (order, graph_factored, policy, bzlmod_policy, lockfile_mode) =
+        if command == CommandKind::Query {
+            let (order, graph_factored, policy) = validate_query_flags(&parsed.flags)?;
+            (
+                order,
+                graph_factored,
+                policy,
+                bzlmod_command_policy(&[])?,
+                bzlmod_lockfile_mode(&[])?,
+            )
+        } else {
+            (
+                QueryOrder::Auto,
+                true,
+                QueryPolicy::default(),
+                bzlmod_command_policy(&parsed.flags)?,
+                bzlmod_lockfile_mode(&parsed.flags)?,
+            )
+        };
     Ok(QueryRequest {
         expression,
         output,
         order,
         graph_factored,
+        policy,
         flags: parsed.flags,
         bzlmod_policy,
         lockfile_mode,
     })
 }
 
-fn validate_query_flags(flags: &[ParsedFlag]) -> Result<(QueryOrder, bool), CommandParseError> {
+fn validate_query_flags(
+    flags: &[ParsedFlag],
+) -> Result<(QueryOrder, bool, QueryPolicy), CommandParseError> {
     let mut order = QueryOrder::Auto;
     let mut graph_factored = true;
+    let mut policy = QueryPolicy::default();
     for flag in flags {
         match flag.name.as_str() {
             "output" => {
@@ -124,6 +133,12 @@ fn validate_query_flags(flags: &[ParsedFlag]) -> Result<(QueryOrder, bool), Comm
                     });
                 }
             }
+            "strict_test_suite" => {
+                policy.strict_test_suite = parse_bool_flag(flag, false)?;
+            }
+            "nostrict_test_suite" => {
+                policy.strict_test_suite = parse_bool_flag(flag, true)?;
+            }
             _ => {
                 return Err(CommandParseError::InvalidFlagValue {
                     flag: flag.raw.clone(),
@@ -132,7 +147,7 @@ fn validate_query_flags(flags: &[ParsedFlag]) -> Result<(QueryOrder, bool), Comm
             }
         }
     }
-    Ok((order, graph_factored))
+    Ok((order, graph_factored, policy))
 }
 
 fn required_query_flag_value<'a>(

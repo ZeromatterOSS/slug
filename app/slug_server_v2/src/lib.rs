@@ -24,6 +24,7 @@ use slug_core_v2::runtime::observe_workspace;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_query_v2::QueryOrder;
+use slug_query_v2::QueryPolicy;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
@@ -135,7 +136,16 @@ impl Daemon {
     /// Run one loading query against the same retained runtime and observation
     /// adapter used by builds.
     pub fn query(&mut self, expression: &str, order: QueryOrder) -> QueryResult {
-        self.query_with_output(expression, order, "text", true)
+        self.query_with_policy(expression, order, QueryPolicy::default())
+    }
+
+    pub fn query_with_policy(
+        &mut self,
+        expression: &str,
+        order: QueryOrder,
+        policy: QueryPolicy,
+    ) -> QueryResult {
+        self.query_with_output_and_policy(expression, order, "text", true, policy)
     }
 
     /// Output selection formats the retained query result only. It does not
@@ -147,6 +157,23 @@ impl Daemon {
         output_format: &str,
         graph_factored: bool,
     ) -> QueryResult {
+        self.query_with_output_and_policy(
+            expression,
+            order,
+            output_format,
+            graph_factored,
+            QueryPolicy::default(),
+        )
+    }
+
+    pub fn query_with_output_and_policy(
+        &mut self,
+        expression: &str,
+        order: QueryOrder,
+        output_format: &str,
+        graph_factored: bool,
+        policy: QueryPolicy,
+    ) -> QueryResult {
         let (observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
@@ -155,7 +182,7 @@ impl Daemon {
         };
         match self
             .runtime
-            .query_observations(observations, expression, order)
+            .query_observations_with_policy(observations, expression, order, policy)
         {
             Ok(output) => {
                 let stdout = match output_format {

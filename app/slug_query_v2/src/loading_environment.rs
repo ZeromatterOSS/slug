@@ -18,13 +18,18 @@ use compact_str::CompactString;
 use dice::DiceComputations;
 use dupe::Dupe;
 use slug_identity_v2::TargetPattern;
+use slug_loading_v2::TestRuleKind;
 use slug_loading_v2::discover_build_file_companion;
 use slug_loading_v2::keys::PackageLoadKey;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::QueryPolicy;
 use crate::generic::QueryEnvironment;
 use crate::generic::TargetSet;
+use crate::generic::TestSuiteAttribute;
+use crate::generic::TestTargetInfo;
+use crate::generic::TestTargetKind;
 use crate::graph::QueryError;
 use crate::graph::QueryLabel;
 use crate::graph::QueryNode;
@@ -42,16 +47,22 @@ use crate::traversal::ResolvedGraph;
 pub(crate) struct LoadingQueryEnvironment<'a, 'd> {
     ctx: &'a mut DiceComputations<'d>,
     workspace: PathBuf,
+    policy: QueryPolicy,
     evaluation_graph: ResolvedGraph<QueryLabel>,
     generated_file_labels: SmallSet<QueryLabel>,
     pub(crate) candidates: QueryCandidateArena,
 }
 
 impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
-    pub(crate) fn new(ctx: &'a mut DiceComputations<'d>, workspace: PathBuf) -> Self {
+    pub(crate) fn new(
+        ctx: &'a mut DiceComputations<'d>,
+        workspace: PathBuf,
+        policy: QueryPolicy,
+    ) -> Self {
         Self {
             ctx,
             workspace,
+            policy,
             evaluation_graph: ResolvedGraph::new(),
             generated_file_labels: SmallSet::new(),
             candidates: QueryCandidateArena::new(),
@@ -92,7 +103,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             }
         })?;
         let node = graph.nodes.get(&label).cloned().ok_or_else(|| {
-            QueryError::evaluation(format!(
+            QueryError::target_missing(format!(
                 "no such target '{}': target '{}' not declared in package '{}'",
                 label,
                 label.target(),
@@ -583,5 +594,71 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             result = result.union(QueryCandidateBatches::from_delivery_ids(delivered));
         }
         Ok(result)
+    }
+
+    fn query_policy(&self) -> QueryPolicy {
+        self.policy
+    }
+
+    async fn test_target_info(
+        &mut self,
+        target: &Self::Target,
+    ) -> Result<TestTargetInfo, QueryError> {
+        let candidate = self.candidates.get(*target).clone();
+        let label = CompactString::new(candidate.printed_label().to_string());
+        let Some(graph_label) = candidate.evaluation_graph_label().cloned() else {
+            return Ok(TestTargetInfo {
+                label,
+                kind: TestTargetKind::Other,
+                tags: Arc::from([]),
+                size: None,
+            });
+        };
+        let node = self.resolve_single(graph_label).await?;
+        let kind = match node
+            .rule_capability
+            .as_ref()
+            .and_then(|capability| capability.test_kind)
+        {
+            Some(TestRuleKind::Test) => TestTargetKind::Test,
+            Some(TestRuleKind::Suite) => TestTargetKind::Suite,
+            None => TestTargetKind::Other,
+        };
+        let metadata = node.test_metadata;
+        Ok(TestTargetInfo {
+            label,
+            kind,
+            tags: metadata
+                .as_ref()
+                .map_or_else(|| Arc::from([]), |metadata| metadata.tags.clone()),
+            size: metadata.and_then(|metadata| metadata.size),
+        })
+    }
+
+    async fn test_suite_members(
+        &mut self,
+        suite: &Self::Target,
+        attribute: TestSuiteAttribute,
+    ) -> Result<Arc<[Self::Target]>, QueryError> {
+        let candidate = self.candidates.get(*suite).clone();
+        let Some(suite_label) = candidate.evaluation_graph_label().cloned() else {
+            return Ok(Arc::from([]));
+        };
+        let node = self.resolve_single(suite_label.clone()).await?;
+        let Some(attribute) = node
+            .attributes
+            .iter()
+            .find(|projection| projection.name == attribute.name())
+        else {
+            return Ok(Arc::from([]));
+        };
+        let mut members = Vec::with_capacity(attribute.labels.len());
+        for label in attribute.labels.iter().cloned() {
+            self.evaluation_graph
+                .record_edge(suite_label.clone(), label.clone());
+            self.resolve_single(label.clone()).await?;
+            members.push(self.candidates.intern(QueryCandidate::real(label)));
+        }
+        Ok(members.into())
     }
 }

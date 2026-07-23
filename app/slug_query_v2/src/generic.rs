@@ -24,6 +24,7 @@ use starlark_map::small_set::SmallSet;
 use crate::BinaryOperator;
 use crate::QueryExpression;
 use crate::QueryExpressionKind;
+use crate::QueryPolicy;
 use crate::graph::QueryError;
 use crate::loading_query_function;
 use crate::traversal::reverse_dependencies;
@@ -59,6 +60,36 @@ where
 
     pub(crate) fn contains(&self, value: &T) -> bool {
         self.0.contains(value)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum TestTargetKind {
+    Test,
+    Suite,
+    Other,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct TestTargetInfo {
+    pub(crate) label: CompactString,
+    pub(crate) kind: TestTargetKind,
+    pub(crate) tags: Arc<[CompactString]>,
+    pub(crate) size: Option<CompactString>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum TestSuiteAttribute {
+    Tests,
+    ImplicitTests,
+}
+
+impl TestSuiteAttribute {
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::Tests => "tests",
+            Self::ImplicitTests => "$implicit_tests",
+        }
     }
 }
 
@@ -101,6 +132,19 @@ pub(crate) trait QueryEnvironment {
     ) -> Result<Self::Set, QueryError>;
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
+
+    fn query_policy(&self) -> QueryPolicy;
+
+    async fn test_target_info(
+        &mut self,
+        target: &Self::Target,
+    ) -> Result<TestTargetInfo, QueryError>;
+
+    async fn test_suite_members(
+        &mut self,
+        suite: &Self::Target,
+        attribute: TestSuiteAttribute,
+    ) -> Result<Arc<[Self::Target]>, QueryError>;
 }
 
 pub(crate) struct QueryEvaluator<E> {
@@ -231,6 +275,7 @@ static LOADFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
 };
 static LABELS_FUNCTION: LabelsFunction = LabelsFunction;
 static EXECUTABLES_FUNCTION: ExecutablesFunction = ExecutablesFunction;
+static TESTS_FUNCTION: TestsFunction = TestsFunction;
 
 impl<E> QueryFunctions<E> for LoadingQueryFunctions
 where
@@ -253,6 +298,7 @@ where
             &SIBLINGS_FUNCTION as &dyn QueryFunction<E>,
             &SOME_FUNCTION as &dyn QueryFunction<E>,
             &SOMEPATH_FUNCTION as &dyn QueryFunction<E>,
+            &TESTS_FUNCTION as &dyn QueryFunction<E>,
         ]
         .into_iter()
         .find(|function| std::ptr::eq(spec, function.spec()))
@@ -561,6 +607,150 @@ struct LoadingFilesFunction {
 struct LabelsFunction;
 
 struct ExecutablesFunction;
+
+struct TestsFunction;
+
+impl<E> QueryFunction<E> for TestsFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("tests").expect("tests is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
+        async move {
+            let targets = eval_set_arg(evaluator, args, variables, 0).await?;
+            let targets = evaluator.environment.eval_all(&targets);
+            let strict = evaluator.environment.query_policy().strict_test_suite;
+            let mut unique_tests = SmallSet::new();
+            let mut unique_suites = SmallSet::new();
+            let mut pending_suites = Vec::new();
+
+            for target in targets.iter() {
+                let info = evaluator.environment.test_target_info(target).await?;
+                match info.kind {
+                    TestTargetKind::Test => {
+                        unique_tests.insert(target.clone());
+                    }
+                    TestTargetKind::Suite => {
+                        if unique_suites.insert(target.clone()) {
+                            pending_suites.push((target.clone(), info));
+                        }
+                    }
+                    TestTargetKind::Other => {}
+                }
+            }
+
+            while let Some((suite, suite_info)) = pending_suites.pop() {
+                let (required_tags, excluded_tags) = split_test_tags(&suite_info.tags);
+                let explicit = suite_members_with_prefix(
+                    &mut evaluator.environment,
+                    &suite,
+                    &suite_info.label,
+                    TestSuiteAttribute::Tests,
+                )
+                .await?;
+                for member in explicit.iter() {
+                    let info = evaluator.environment.test_target_info(member).await?;
+                    match info.kind {
+                        TestTargetKind::Test => {
+                            if include_test(&info, &required_tags, &excluded_tags) {
+                                unique_tests.insert(member.clone());
+                            }
+                        }
+                        TestTargetKind::Suite => {
+                            if unique_suites.insert(member.clone()) {
+                                pending_suites.push((member.clone(), info));
+                            }
+                        }
+                        TestTargetKind::Other if strict => {
+                            return Err(QueryError::evaluation(format!(
+                                "The label '{}' in the test_suite '{}' does not refer to a test or test_suite rule!",
+                                info.label, suite_info.label
+                            )));
+                        }
+                        TestTargetKind::Other => {}
+                    }
+                }
+
+                let implicit = suite_members_with_prefix(
+                    &mut evaluator.environment,
+                    &suite,
+                    &suite_info.label,
+                    TestSuiteAttribute::ImplicitTests,
+                )
+                .await?;
+                for member in implicit.iter() {
+                    let info = evaluator.environment.test_target_info(member).await?;
+                    if info.kind == TestTargetKind::Test
+                        && include_test(&info, &required_tags, &excluded_tags)
+                    {
+                        unique_tests.insert(member.clone());
+                    }
+                }
+            }
+
+            Ok(evaluator
+                .environment
+                .lift_one_delivery(TargetSet(unique_tests)))
+        }
+        .boxed()
+    }
+}
+
+async fn suite_members_with_prefix<E>(
+    environment: &mut E,
+    suite: &E::Target,
+    suite_label: &str,
+    attribute: TestSuiteAttribute,
+) -> Result<Arc<[E::Target]>, QueryError>
+where
+    E: QueryEnvironment + Send,
+{
+    environment
+        .test_suite_members(suite, attribute)
+        .await
+        .map_err(|error| {
+            let message = format!(
+                "couldn't expand '{}' attribute of test_suite {}: {error}",
+                attribute.name(),
+                suite_label
+            );
+            error.with_message(message)
+        })
+}
+
+fn split_test_tags(tags: &[CompactString]) -> (SmallSet<CompactString>, SmallSet<CompactString>) {
+    let mut required = SmallSet::new();
+    let mut excluded = SmallSet::new();
+    for tag in tags {
+        if let Some(tag) = tag.strip_prefix('-') {
+            excluded.insert(CompactString::new(tag));
+        } else if let Some(tag) = tag.strip_prefix('+') {
+            required.insert(CompactString::new(tag));
+        } else if tag != "manual" {
+            required.insert(tag.clone());
+        }
+    }
+    (required, excluded)
+}
+
+fn include_test(
+    test: &TestTargetInfo,
+    required: &SmallSet<CompactString>,
+    excluded: &SmallSet<CompactString>,
+) -> bool {
+    let has_tag = |tag: &CompactString| {
+        test.tags.iter().any(|candidate| candidate == tag) || test.size.as_ref() == Some(tag)
+    };
+    excluded.iter().all(|tag| !has_tag(tag)) && required.iter().all(has_tag)
+}
 
 impl<E> QueryFunction<E> for ExecutablesFunction
 where

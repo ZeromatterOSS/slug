@@ -12,7 +12,7 @@ use slug_commands_v2::CommandKind;
 use slug_commands_v2::QueryOutputFormat;
 use slug_commands_v2::query::QueryRequest;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::evaluate_workspace_query;
+use slug_core_v2::runtime::evaluate_workspace_query_with_policy;
 
 pub fn run(argv: Vec<String>) -> i32 {
     if let Some(output_base) = super::build::extract_output_base(&argv) {
@@ -26,7 +26,12 @@ pub fn run(argv: Vec<String>) -> i32 {
         Ok(workspace) => workspace,
         Err(error) => return emit_error(7, &error.to_string(), "one-shot"),
     };
-    match evaluate_workspace_query(&workspace, &request.expression, request.order) {
+    match evaluate_workspace_query_with_policy(
+        &workspace,
+        &request.expression,
+        request.order,
+        request.policy,
+    ) {
         Ok(output) => {
             let stdout = match request.output {
                 QueryOutputFormat::Text => output.stdout(),
@@ -70,6 +75,7 @@ fn run_daemon_query(argv: &[String], output_base: &str) -> i32 {
         order_output: request.order.to_string(),
         output: request.output.to_string(),
         graph_factored: request.graph_factored,
+        strict_test_suite: request.policy.strict_test_suite,
     };
     match slug_server_v2::send_query_request(&socket, &request) {
         Ok(response) => {

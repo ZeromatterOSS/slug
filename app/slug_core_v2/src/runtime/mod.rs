@@ -32,11 +32,25 @@ pub fn evaluate_workspace_query(
     expression: &str,
     order: slug_query_v2::QueryOrder,
 ) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
+    evaluate_workspace_query_with_policy(
+        workspace,
+        expression,
+        order,
+        slug_query_v2::QueryPolicy::default(),
+    )
+}
+
+pub fn evaluate_workspace_query_with_policy(
+    workspace: &std::path::Path,
+    expression: &str,
+    order: slug_query_v2::QueryOrder,
+    policy: slug_query_v2::QueryPolicy,
+) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
     let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
     let observations = observe_workspace(workspace)
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
-    runtime.query_observations(observations, expression, order)
+    runtime.query_observations_with_policy(observations, expression, order, policy)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

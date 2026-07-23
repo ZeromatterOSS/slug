@@ -33,6 +33,212 @@ fn write(path: impl AsRef<std::path::Path>, content: &str) {
     std::fs::write(path, content).unwrap();
 }
 
+#[derive(Clone, Copy)]
+struct QueryOracleCase {
+    args: &'static [&'static str],
+    expected_labels: &'static [&'static str],
+    error_fragments: &'static [&'static str],
+}
+
+fn tests_function_oracle_cases() -> [QueryOracleCase; 21] {
+    [
+        QueryOracleCase {
+            args: &["tests(set(//direct:direct_test //direct:plain))"],
+            expected_labels: &["//direct:direct_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//implicit:empty)"],
+            expected_labels: &["//implicit:alpha_test", "//implicit:large_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//explicit:root_suite)"],
+            expected_labels: &[
+                "//cross:cross_test",
+                "//explicit:direct_test",
+                "//explicit:nested_test",
+            ],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//explicit:only_direct)"],
+            expected_labels: &["//explicit:direct_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//cycle_a:a)"],
+            expected_labels: &[],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//dedup:root)"],
+            expected_labels: &["//dedup:shared_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//filters:bare)"],
+            expected_labels: &["//filters:fast_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//filters:plus)"],
+            expected_labels: &["//filters:fast_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//filters:exclude_slow)"],
+            expected_labels: &["//filters:fast_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//filters:manual_suite)"],
+            expected_labels: &["//filters:plain_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//filters:large)"],
+            expected_labels: &["//filters:large_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//strict:non_test_member)"],
+            expected_labels: &[],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["--strict_test_suite", "tests(//strict:non_test_member)"],
+            expected_labels: &[],
+            error_fragments: &[
+                "The label '//strict:plain' in the test_suite '//strict:non_test_member' does not refer to a test or test_suite rule!",
+            ],
+        },
+        QueryOracleCase {
+            args: &["tests(//missing:broken)"],
+            expected_labels: &[],
+            error_fragments: &[
+                "couldn't expand 'tests' attribute of test_suite //missing:broken:",
+                "no such target '//missing_target:missing_target'",
+            ],
+        },
+        QueryOracleCase {
+            args: &["tests(//explicit:root_suite)"],
+            expected_labels: &[
+                "//cross:cross_test",
+                "//explicit:direct_test",
+                "//explicit:nested_test",
+            ],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["--order_output=full", "tests(//explicit:root_suite)"],
+            expected_labels: &[
+                "//cross:cross_test",
+                "//explicit:direct_test",
+                "//explicit:nested_test",
+            ],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//provenance:omitted)"],
+            expected_labels: &["//provenance:member_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//provenance:explicit_empty)"],
+            expected_labels: &["//provenance:member_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//source_critical:parent_requires_parent_tag)"],
+            expected_labels: &["//source_critical:nested_unfiltered_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//source_critical:filtered_direct_then_nested)"],
+            expected_labels: &["//source_critical:shared_blocked_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["tests(//source_critical:exclude_literal_plus_tag)"],
+            expected_labels: &["//source_critical:plain_tag_test"],
+            error_fragments: &[],
+        },
+    ]
+}
+
+fn non_function_tests_oracle_cases() -> [QueryOracleCase; 6] {
+    [
+        QueryOracleCase {
+            args: &["labels(tests, //bare_members:suite)"],
+            expected_labels: &["//bare_members:a.txt", "//bare_members:dir/b.txt"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["deps(//bare_members:suite)"],
+            expected_labels: &[
+                "//bare_members:a.txt",
+                "//bare_members:dir/b.txt",
+                "//bare_members:suite",
+            ],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["labels($implicit_tests, //provenance:omitted)"],
+            expected_labels: &["//provenance:member_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["labels($implicit_tests, //provenance:explicit_empty)"],
+            expected_labels: &["//provenance:member_test"],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["labels(tests, set(//provenance:omitted //provenance:explicit_empty))"],
+            expected_labels: &[],
+            error_fragments: &[],
+        },
+        QueryOracleCase {
+            args: &["//duplicate_labels:duplicate"],
+            expected_labels: &[],
+            error_fragments: &[
+                "Label '//duplicate_labels:member' is duplicated in the 'tests' attribute of rule 'duplicate'",
+                "Evaluation of query",
+            ],
+        },
+    ]
+}
+
+fn assert_query_oracle_case(
+    workspace: &std::path::Path,
+    output_base_arg: Option<&str>,
+    case: QueryOracleCase,
+) {
+    let mut command = slug();
+    command.current_dir(workspace);
+    if let Some(output_base_arg) = output_base_arg {
+        command.arg(output_base_arg);
+    }
+    let output = command.arg("query").args(case.args).output().unwrap();
+    if case.error_fragments.is_empty() {
+        assert!(output.status.success(), "{:?}: {output:?}", case.args);
+        assert!(output.stderr.is_empty(), "{:?}: {output:?}", case.args);
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let mut actual = stdout.lines().collect::<Vec<_>>();
+        actual.sort_unstable();
+        let mut expected = case.expected_labels.to_vec();
+        expected.sort_unstable();
+        assert_eq!(actual, expected, "{:?}", case.args);
+    } else {
+        assert_eq!(output.status.code(), Some(7), "{:?}: {output:?}", case.args);
+        assert!(output.stdout.is_empty(), "{:?}: {output:?}", case.args);
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        for fragment in case.error_fragments {
+            assert!(stderr.contains(fragment), "{:?}: {stderr}", case.args);
+        }
+    }
+}
+
 struct DaemonCleanup(std::path::PathBuf);
 
 impl Drop for DaemonCleanup {
@@ -157,6 +363,33 @@ fn query_prints_text_labels_in_auto_and_full_order() {
         String::from_utf8(full.stdout).unwrap(),
         "//pkg:bin\n//pkg:lib\n//pkg:data.txt\n"
     );
+}
+
+#[test]
+fn tests_query_expansion_fixture_matches_exact_twenty_seven_non_build_rows_one_shot() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace");
+    let function_cases = tests_function_oracle_cases();
+    let non_function_cases = non_function_tests_oracle_cases();
+    assert_eq!(function_cases.len() + non_function_cases.len(), 27);
+    for case in function_cases.into_iter().chain(non_function_cases) {
+        assert_query_oracle_case(&workspace, None, case);
+    }
+}
+
+#[test]
+fn tests_query_expansion_fixture_matches_all_twenty_one_function_rows_through_daemon() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace");
+    let output_base = scratch("tests-query-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let cases = tests_function_oracle_cases();
+    assert_eq!(cases.len(), 21);
+    for case in cases {
+        assert_query_oracle_case(&workspace, Some(&output_base_arg), case);
+    }
+    assert!(slug_server_v2::pid_path(&output_base).is_file());
 }
 
 #[test]
