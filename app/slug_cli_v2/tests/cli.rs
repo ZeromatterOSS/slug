@@ -1000,6 +1000,269 @@ fn labels_metadata_fixture_matches_twenty_nine_non_label_kind_bazel_rows_through
 }
 
 #[test]
+fn executables_rule_capability_fixture_matches_all_thirty_two_non_label_kind_bazel_rows() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-executables-rule-capability/workspace");
+    let successes: &[(&[&str], &str)] = &[
+        (
+            &["query", "executables(//pkg:all)"],
+            "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n",
+        ),
+        (&["query", "executables(//pkg:plain)"], ""),
+        (&["query", "executables(//pkg:ordinary_target)"], ""),
+        (&["query", "executables(//pkg:explicit_test_target)"], ""),
+        (
+            &["query", "executables(//pkg:target_test)"],
+            "//pkg:target_test\n",
+        ),
+        (&["query", "executables(//pkg:data.txt)"], ""),
+        (
+            &[
+                "query",
+                "executables(set(//pkg:data.txt //pkg:generated.txt //pkg:BUILD.bazel //pkg:files //pkg:alias_exec //pkg:setting))",
+            ],
+            "",
+        ),
+        (&["query", "executables(//pkg:alias_exec)"], ""),
+        (&["query", "executables(//pkg:BUILD.bazel)"], ""),
+        (&["query", "executables(//pkg:generated.txt)"], ""),
+        (&["query", "executables(//pkg:files)"], ""),
+        (&["query", "executables(//pkg:setting)"], ""),
+        (&["query", "executables(set())"], ""),
+        (
+            &[
+                "query",
+                "executables(set(//pkg:arbitrary_target //pkg:arbitrary_target //pkg:target_test))",
+            ],
+            "//pkg:arbitrary_target\n//pkg:target_test\n",
+        ),
+        (
+            &[
+                "query",
+                "executables(//pkg:arbitrary_target) union //pkg:plain",
+            ],
+            "//pkg:arbitrary_target\n//pkg:plain\n",
+        ),
+        (
+            &[
+                "query",
+                "executables(//pkg:all) intersect set(//pkg:target_test //pkg:plain)",
+            ],
+            "//pkg:target_test\n",
+        ),
+        (
+            &["query", "executables(//pkg:all) except //pkg:target_test"],
+            "//pkg:arbitrary_target\n//pkg:edge_exec\n",
+        ),
+        (
+            &["query", "let x = //pkg:all in executables($x)"],
+            "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n",
+        ),
+        (
+            &["query", "executables(executables(//pkg:all))"],
+            "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n",
+        ),
+        (
+            &["query", "executables(//pkg:all)"],
+            "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n",
+        ),
+        (
+            &["query", "--order_output=auto", "executables(//pkg:all)"],
+            "//pkg:arbitrary_target\n//pkg:edge_exec\n//pkg:target_test\n",
+        ),
+        (
+            &["query", "--order_output=full", "executables(//pkg:all)"],
+            "//pkg:target_test\n//pkg:edge_exec\n//pkg:arbitrary_target\n",
+        ),
+        (
+            &["query", "deps(executables(//pkg:edge_exec))"],
+            "//pkg:edge_dep\n//pkg:edge_exec\n",
+        ),
+        (&["query", "executables(//test_false:probe)"], ""),
+    ];
+    let graph_rows: &[(&[&str], &str)] = &[
+        (
+            &[
+                "query",
+                "--output=graph",
+                "--graph:factored",
+                "executables(//pkg:edge_exec)",
+            ],
+            concat!(
+                "digraph mygraph {\n",
+                "  node [shape=box];\n",
+                "  \"//pkg:edge_exec\"\n",
+                "}\n",
+            ),
+        ),
+        (
+            &[
+                "query",
+                "--output=graph",
+                "--graph:factored",
+                "deps(executables(//pkg:edge_exec))",
+            ],
+            concat!(
+                "digraph mygraph {\n",
+                "  node [shape=box];\n",
+                "  \"//pkg:edge_exec\"\n",
+                "  \"//pkg:edge_exec\" -> \"//pkg:edge_dep\"\n",
+                "  \"//pkg:edge_dep\"\n",
+                "}\n",
+            ),
+        ),
+    ];
+    let failures: &[(&[&str], i32, &str)] = &[
+        (
+            &["query", "executables(//missing:nope)"],
+            7,
+            "no such package 'missing'",
+        ),
+        (
+            &["query", "executables()"],
+            2,
+            "too few arguments to function 'executables'",
+        ),
+        (
+            &["query", "executables(//pkg:plain, //pkg:arbitrary_target)"],
+            2,
+            "too many arguments to function 'executables'",
+        ),
+        (
+            &[
+                "query",
+                "executables(//pkg:arbitrary_target union //missing:nope)",
+            ],
+            7,
+            "no such package 'missing'",
+        ),
+        (
+            &["query", "//invalid_not_test:probe"],
+            7,
+            "Invalid rule class name 'not_test_suffix', test rule class names must end with '_test' and other rule classes must not",
+        ),
+        (
+            &["query", "//invalid_suffix_test:probe"],
+            7,
+            "Invalid rule class name 'suffix_test', test rule class names must end with '_test' and other rule classes must not",
+        ),
+    ];
+    assert_eq!(successes.len() + graph_rows.len() + failures.len(), 32);
+
+    for (argv, expected_stdout) in successes.iter().chain(graph_rows) {
+        let output = slug().current_dir(&workspace).args(*argv).output().unwrap();
+        assert!(output.status.success(), "{argv:?}: {output:?}");
+        assert!(output.stderr.is_empty(), "{argv:?}: {output:?}");
+        assert_eq!(
+            std::str::from_utf8(&output.stdout).unwrap(),
+            *expected_stdout,
+            "{argv:?}"
+        );
+    }
+    for (argv, expected_exit, diagnostic) in failures {
+        let output = slug().current_dir(&workspace).args(*argv).output().unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(*expected_exit),
+            "{argv:?}: {output:?}"
+        );
+        assert!(output.stdout.is_empty(), "{argv:?}: {output:?}");
+        assert!(
+            std::str::from_utf8(&output.stderr)
+                .unwrap()
+                .contains(diagnostic),
+            "{argv:?}: {output:?}"
+        );
+    }
+}
+
+#[test]
+fn output_base_executables_reuses_one_daemon_across_capability_transitions() {
+    let workspace = scratch("executables-capability-workspace");
+    let output_base = scratch("executables-capability-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let defs = workspace.join("pkg/defs.bzl");
+    let build = workspace.join("pkg/BUILD.bazel");
+    let definition = |name: &str, arguments: &str| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\n\n{name} = rule(implementation = _impl{arguments})\n"
+        )
+    };
+    let build_file = |rule: &str, target: &str| {
+        format!("load(\":defs.bzl\", \"{rule}\")\n{rule}(name = \"{target}\")\n")
+    };
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let query = |expression: &str| {
+        slug()
+            .current_dir(&workspace)
+            .args([output_base_arg.as_str(), "query", expression])
+            .output()
+            .unwrap()
+    };
+    let assert_query = |expression: &str, expected: &str| {
+        let output = query(expression);
+        assert!(output.status.success(), "{expression}: {output:?}");
+        assert!(output.stderr.is_empty(), "{expression}: {output:?}");
+        assert_eq!(
+            std::str::from_utf8(&output.stdout).unwrap(),
+            expected,
+            "{expression}"
+        );
+    };
+
+    write(&defs, &definition("probe", ", executable = False"));
+    write(&build, &build_file("probe", "item"));
+    assert_query("executables(//pkg:item)", "");
+    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+
+    write(&defs, &definition("probe", ", executable = True"));
+    assert_query("executables(//pkg:item)", "//pkg:item\n");
+
+    write(&defs, &definition("renamed_exec", ", executable = True"));
+    write(&build, &build_file("renamed_exec", "item"));
+    assert_query("executables(//pkg:item)", "//pkg:item\n");
+
+    write(&defs, &definition("renamed_exec", ", executable = False"));
+    assert_query("executables(//pkg:item)", "");
+
+    write(&defs, &definition("probe_test", ", test = True"));
+    write(&build, &build_file("probe_test", "item"));
+    assert_query("executables(//pkg:item)", "");
+
+    write(&defs, &definition("renamed_exec", ", executable = True"));
+    write(&build, &build_file("renamed_exec", "item"));
+    assert_query("executables(//pkg:item)", "//pkg:item\n");
+
+    write(&build, &build_file("renamed_exec", "item_test"));
+    assert_query("executables(//pkg:item_test)", "//pkg:item_test\n");
+
+    write(
+        &build,
+        "# formatting only\nload( \":defs.bzl\", \"renamed_exec\" )\nrenamed_exec( name = \"item_test\" )\n",
+    );
+    assert_query("executables(//pkg:item_test)", "//pkg:item_test\n");
+
+    std::fs::remove_file(&build).unwrap();
+    let deleted = query("executables(//pkg:item_test)");
+    assert_eq!(deleted.status.code(), Some(7), "{deleted:?}");
+    assert!(deleted.stdout.is_empty(), "{deleted:?}");
+    assert!(
+        std::str::from_utf8(&deleted.stderr)
+            .unwrap()
+            .contains("no such package 'pkg'"),
+        "{deleted:?}"
+    );
+
+    write(&build, &build_file("renamed_exec", "item_test"));
+    assert_query("executables(//pkg:item_test)", "//pkg:item_test\n");
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        pid
+    );
+}
+
+#[test]
 fn reverse_query_fixture_matches_all_twenty_six_bazel_rows_through_cli() {
     let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/v2_oracle/fixtures/query-rdeps-and-subtree-patterns/workspace");

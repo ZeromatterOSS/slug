@@ -385,6 +385,8 @@ pub(crate) trait QueryEnvironment {
         attribute: &str,
         targets: &Self::Set,
     ) -> Result<Self::Set, QueryError>;
+
+    async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
 }
 
 pub(crate) struct QueryEvaluator<E> {
@@ -511,6 +513,7 @@ static LOADFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
     include_buildfiles: false,
 };
 static LABELS_FUNCTION: LabelsFunction = LabelsFunction;
+static EXECUTABLES_FUNCTION: ExecutablesFunction = ExecutablesFunction;
 
 impl<E> QueryFunctions<E> for LoadingQueryFunctions
 where
@@ -525,6 +528,7 @@ where
             &ALLPATHS_FUNCTION as &dyn QueryFunction<E>,
             &BUILDFILES_FUNCTION as &dyn QueryFunction<E>,
             &DEPS_FUNCTION as &dyn QueryFunction<E>,
+            &EXECUTABLES_FUNCTION as &dyn QueryFunction<E>,
             &LABELS_FUNCTION as &dyn QueryFunction<E>,
             &LOADFILES_FUNCTION as &dyn QueryFunction<E>,
             &RDEPS_FUNCTION as &dyn QueryFunction<E>,
@@ -838,6 +842,32 @@ struct LoadingFilesFunction {
 }
 
 struct LabelsFunction;
+
+struct ExecutablesFunction;
+
+impl<E> QueryFunction<E> for ExecutablesFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("executables").expect("executables is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
+        async move {
+            // Match Bazel's ExecutablesFunction: evaluate the sole operand
+            // once, then filter every callback delivery in place.
+            let targets = eval_set_arg(evaluator, args, variables, 0).await?;
+            evaluator.environment.executables(&targets).await
+        }
+        .boxed()
+    }
+}
 
 impl<E> QueryFunction<E> for LabelsFunction
 where
@@ -1819,6 +1849,28 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             }
         }
         Ok(self.real_delivery(labels))
+    }
+
+    async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        let mut result = QueryCandidateBatches::empty();
+        for batch in targets.batches() {
+            let mut delivered = Vec::with_capacity(batch.ids().len());
+            for id in batch.ids().iter().copied() {
+                let Some(label) = self.candidates.get(id).evaluation_graph_label().cloned() else {
+                    // Fake candidates have no loaded target and must neither
+                    // be classified nor create a graph node/edge.
+                    continue;
+                };
+                let node = self.resolve_single(label).await?;
+                if node.rule_capability.as_ref().is_some_and(|capability| {
+                    capability.executable && !capability.rule_class.ends_with("_test")
+                }) {
+                    delivered.push(id);
+                }
+            }
+            result = result.union(QueryCandidateBatches::from_delivery_ids(delivered));
+        }
+        Ok(result)
     }
 }
 

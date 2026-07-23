@@ -24,6 +24,7 @@ use dice::Key;
 use dupe::Dupe;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::RuleCapability;
 use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectoryKey;
@@ -93,6 +94,9 @@ impl QueryNodeKind {
 pub struct QueryNode {
     pub label: QueryLabel,
     pub kind: QueryNodeKind,
+    /// Loading-time rule capability retained for ordinary-query filters. This
+    /// is `None` for source, BUILD, and generated-file nodes.
+    pub rule_capability: Option<RuleCapability>,
     pub build_file: CompactString,
     pub dependencies: Arc<[QueryLabel]>,
     pub attributes: Arc<[QueryAttribute]>,
@@ -261,6 +265,10 @@ async fn compute_package_graph(
     let mut nodes = SmallMap::with_capacity(loaded.targets.len() + 1);
 
     for target in &loaded.targets {
+        // Borrow once from the loading target and retain an owned compact
+        // projection in the immutable package graph. Query-time filters must
+        // not classify targets or clone rule-class names repeatedly.
+        let rule_capability = target.rule_capability().cloned();
         let label = match &target.kind {
             PackageTargetKind::GeneratedFile { label, .. } => {
                 QueryLabel::from_canonical(label.clone())
@@ -338,6 +346,7 @@ async fn compute_package_graph(
             QueryNode {
                 label,
                 kind,
+                rule_capability,
                 build_file: build_file.clone(),
                 dependencies,
                 attributes,
@@ -352,6 +361,7 @@ async fn compute_package_graph(
             QueryNode {
                 label: build_label,
                 kind: QueryNodeKind::BuildFile,
+                rule_capability: None,
                 build_file: build_file.clone(),
                 dependencies: Arc::from([]),
                 attributes: Arc::from([]),
@@ -376,6 +386,7 @@ async fn compute_package_graph(
                 QueryNode {
                     label,
                     kind: QueryNodeKind::SourceFile,
+                    rule_capability: None,
                     build_file: build_file.clone(),
                     dependencies: Arc::from([]),
                     attributes: Arc::from([]),

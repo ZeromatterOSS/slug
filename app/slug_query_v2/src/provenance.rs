@@ -178,6 +178,16 @@ impl QueryCandidateBatches {
         Self { batches }
     }
 
+    /// Retain one callback delivery after an in-place candidate filter. The
+    /// IDs were already label-materialized when the delivery was created, so
+    /// this deliberately performs neither candidate interning nor cross-batch
+    /// collapse.
+    pub(crate) fn from_delivery_ids(ids: Vec<QueryCandidateId>) -> Self {
+        Self {
+            batches: QueryCandidateBatch::from_ids(ids).into_iter().collect(),
+        }
+    }
+
     pub(crate) fn batches(&self) -> &[QueryCandidateBatch] {
         &self.batches
     }
@@ -451,6 +461,21 @@ mod tests {
             arena.get(materialized.ids()[0]),
             &fake("//shared:one.bzl", "a")
         );
+    }
+
+    #[test]
+    fn delivery_id_filter_keeps_distinct_nonempty_callback_boundaries() {
+        let mut arena = QueryCandidateArena::new();
+        let first = arena.intern(real("//pkg:first"));
+        let dropped = arena.intern(real("//pkg:dropped"));
+        let second = arena.intern(real("//pkg:second"));
+        let filtered = QueryCandidateBatches::from_delivery_ids(vec![first])
+            .union(QueryCandidateBatches::from_delivery_ids(vec![second]));
+
+        assert_eq!(filtered.batches().len(), 2);
+        assert_eq!(filtered.batches()[0].ids(), &[first]);
+        assert_eq!(filtered.batches()[1].ids(), &[second]);
+        assert_ne!(first, dropped);
     }
 
     #[test]

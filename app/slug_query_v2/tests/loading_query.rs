@@ -568,6 +568,158 @@ async fn config_setting_is_a_loading_rule_without_configuration_evaluation() {
 }
 
 #[tokio::test]
+async fn executable_capability_projection_keeps_exported_class_and_non_rule_boundaries() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\n\nexec_arbitrary = rule(implementation = _impl, executable = True)\nplain_rule = rule(implementation = _impl)\nimplicit_test_test = rule(implementation = _impl, test = True)\noutput_rule = rule(implementation = _impl, attrs = {\"outs\": attr.output_list()})\n",
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"exec_arbitrary\", \"implicit_test_test\", \"output_rule\", \"plain_rule\")\nexports_files([\"data.txt\"])\nexec_arbitrary(name = \"target_test\")\nplain_rule(name = \"plain\")\nimplicit_test_test(name = \"ordinary_target\")\nfilegroup(name = \"files\", srcs = [\":data.txt\"])\nalias(name = \"alias_exec\", actual = \":target_test\")\nconfig_setting(name = \"setting\", values = {\"cpu\": \"k8\"})\noutput_rule(name = \"generated_owner\", outs = [\"generated.txt\"])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace: workspace.clone(),
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    let capability = |label: &str| {
+        graph
+            .nodes
+            .values()
+            .find(|node| node.label.to_string() == label)
+            .unwrap()
+            .rule_capability
+            .as_ref()
+            .map(|value| (value.rule_class.as_str(), value.executable))
+    };
+    assert_eq!(
+        capability("//pkg:target_test"),
+        Some(("exec_arbitrary", true))
+    );
+    assert_eq!(capability("//pkg:plain"), Some(("plain_rule", false)));
+    assert_eq!(
+        capability("//pkg:ordinary_target"),
+        Some(("implicit_test_test", true))
+    );
+    assert_eq!(capability("//pkg:files"), Some(("filegroup", false)));
+    assert_eq!(capability("//pkg:alias_exec"), Some(("alias", false)));
+    assert_eq!(capability("//pkg:setting"), Some(("config_setting", false)));
+    for label in ["//pkg:data.txt", "//pkg:BUILD.bazel", "//pkg:generated.txt"] {
+        assert_eq!(capability(label), None, "{label}");
+    }
+
+    // The target name alone never determines executable/test classification.
+    let executable = evaluate_loading_query(
+        &mut transaction,
+        workspace,
+        "executables(//pkg:target_test)",
+        QueryOrder::Auto,
+    )
+    .await
+    .unwrap();
+    assert_eq!(executable.stdout(), "//pkg:target_test\n");
+}
+
+#[tokio::test]
+async fn executables_capability_transitions_invalidate_or_reuse_the_retained_package_graph() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    let defs = workspace.join("pkg/defs.bzl");
+    let build = workspace.join("pkg/BUILD.bazel");
+    let definition = |name: &str, arguments: &str| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\n\n{name} = rule(implementation = _impl{arguments})\n"
+        )
+    };
+    let build_file = |rule: &str, target: &str| {
+        format!("load(\":defs.bzl\", \"{rule}\")\n{rule}(name = \"{target}\")\n")
+    };
+    write(&defs, &definition("probe", ", executable = False"));
+    write(&build, &build_file("probe", "item"));
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(QueryTracker::default());
+
+    let (initial, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item)").await;
+    assert_eq!(initial.unwrap().stdout(), "");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&defs, &definition("probe", ", executable = True"));
+    let (executable, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item)").await;
+    assert_eq!(executable.unwrap().stdout(), "//pkg:item\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&defs, &definition("renamed_exec", ", executable = True"));
+    write(&build, &build_file("renamed_exec", "item"));
+    let (renamed_export, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item)").await;
+    assert_eq!(renamed_export.unwrap().stdout(), "//pkg:item\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&defs, &definition("renamed_exec", ", executable = False"));
+    let (non_executable_again, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item)").await;
+    assert_eq!(non_executable_again.unwrap().stdout(), "");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&defs, &definition("probe_test", ", test = True"));
+    write(&build, &build_file("probe_test", "item"));
+    let (test_rule, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item)").await;
+    assert_eq!(test_rule.unwrap().stdout(), "");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&defs, &definition("renamed_exec", ", executable = True"));
+    write(&build, &build_file("renamed_exec", "item"));
+    let (non_test_again, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item)").await;
+    assert_eq!(non_test_again.unwrap().stdout(), "//pkg:item\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&build, &build_file("renamed_exec", "item_test"));
+    let (renamed_target, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item_test)").await;
+    assert_eq!(renamed_target.unwrap().stdout(), "//pkg:item_test\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        "# whitespace-only\nload( \":defs.bzl\", \"renamed_exec\" )\nrenamed_exec( name = \"item_test\" )\n",
+    );
+    let (formatted, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item_test)").await;
+    assert_eq!(formatted.unwrap().stdout(), "//pkg:item_test\n");
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+
+    fs::remove_file(&build).unwrap();
+    let (deleted, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item_test)").await;
+    assert!(
+        deleted
+            .unwrap_err()
+            .to_string()
+            .contains("no such package 'pkg'")
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(&build, &build_file("renamed_exec", "item_test"));
+    let (recreated, events) =
+        query_revision(&dice, &tracker, &workspace, "executables(//pkg:item_test)").await;
+    assert_eq!(recreated.unwrap().stdout(), "//pkg:item_test\n");
+    // The graph recomputes after deletion, but its recreated semantic value
+    // equals the retained one, so DICE reports reuse at this projection key.
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+}
+
+#[tokio::test]
 async fn active_build_basename_non_export_target_collision_is_a_query_error() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
