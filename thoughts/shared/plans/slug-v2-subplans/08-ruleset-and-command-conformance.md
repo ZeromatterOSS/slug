@@ -2027,8 +2027,8 @@ eight Bazel-only `label_kind` rows pinning rule-class identity; those eight are
 not Slug formatter acceptance. Stage 4 Gate A `c86fc656` is also landed and
 Sol-accepted: immutable exported-name/executable capability, borrowed
 allocation-free projection, and focused DICE equality/invalidation passed
-without query activation. Gate B `executables(EXPR)` is now the active
-activation. Authority is
+without query activation. Gate B `executables(EXPR)` is accepted in
+`69565a29`. Authority is
 `ExecutablesFunction.java`, `BlazeTargetAccessor`, and `TargetUtils` at
 `8220c619…`: filter the once-evaluated operand by retained per-target
 `Rule.isExecutable()` / `$is_executable` and a rule-class name not ending
@@ -2056,5 +2056,18 @@ false→true executable, false→true test, export rename, target rename crossin
 `_test` without class change, formatting-only reuse, and delete/recreate.
 Hard-stop on any need for a DICE key, direct filesystem/query-time Starlark,
 global classifier, configured analysis/providers, Java regex, visibility, or
-tests expansion. On activation only five ordinary functions remain deferred;
-M3 itself remains open.
+tests expansion.
+
+#### Gate B accepted (2026-07-23)
+
+Commit `69565a29` evaluates the operand once and filters each existing delivery
+with the retained `executable && !rule_class.ends_with("_test")` capability.
+It preserves candidate IDs, order, and nonempty delivery boundaries, skips
+fake/non-rule candidates, and creates no query edges or new DICE ownership
+surface. Exact acceptance is all 32 semantic oracle rows; the eight
+`label_kind` rows remain formatter-deferred. DICE and retained-daemon evidence
+covers capability, exported-class, target-name, formatting, and
+delete/recreate transitions. Root validation passed 45 query tests, 50
+downstream CLI/commands/server tests, formatting/diff checks, and a clean CLI
+build; Sol-low returned final `ACCEPT`. Five ordinary functions remain
+deferred and M3 itself remains open.

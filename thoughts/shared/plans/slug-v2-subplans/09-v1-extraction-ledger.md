@@ -1262,10 +1262,10 @@ output→own-generator edges, exact 29 rows, two formatter-deferred label-kind
 rows. Sol `ACCEPT` after graph/order corrections. Six functions/M3 remain open;
 no V1/Buck import or 31/31 claim.
 
-### WP-4-8-m3-executables-rule-capability — landed Gate A extraction decision
+### WP-4-8-m3-executables-rule-capability — landed Gate A/B extraction decision
 
 Oracle `c8e469f5` and Stage 4 implementation `c86fc656` are landed and
-Sol-accepted; Stage 8 activation remains pending.
+Sol-accepted. Stage 8 activation `69565a29` is also landed and Sol-accepted.
 Its 32 semantic rows and eight representation-only `label_kind` rows establish
 the current-loadable rule-capability boundary without importing V1 behavior.
 Stage 4 owns a V2 `RuleCapability {
@@ -1285,3 +1285,10 @@ Gate A used the bounded Buck2/provider export-and-freeze shape, V2-owned
 `CompactString`/`Arc`/`Allocative`, static native capability values, and a
 borrowed public projection; no V1 code or Buck query semantics were imported.
 Native genrule behavior remains a separate oracle gate.
+
+Gate B reused the current V2 generic evaluator/candidate algebra and compact
+capability projection rather than importing V1 evaluation or Buck2 rule
+classification. It filters retained delivery IDs in place, adds no edges or
+DICE key, and passes all 32 semantic oracle rows plus same-DICE and
+same-daemon lifecycle evidence. The eight `label_kind` rows remain
+representation-only; five ordinary query functions and M3 remain open.

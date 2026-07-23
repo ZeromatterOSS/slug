@@ -849,3 +849,10 @@ root clean `085303-889108` passed; Sol-low final review returned `ACCEPT`.
 Native `genrule` and `test_suite` remain separate substrate gates. Bazel used
 ordinary external RC discovery only; no agent inspected or persisted
 `~/.bazelrc` or BuildBuddy credentials.
+
+Stage 8 activation `69565a29` accepts all 32 semantic fixture rows through the
+Slug CLI while deliberately excluding the eight `label_kind` formatter rows.
+The retained-daemon transition matrix and focused DICE equality/reuse checks
+also pass. Root validation covered 45 query tests and 50 downstream
+CLI/commands/server tests; Sol-low returned final `ACCEPT`. Five ordinary
+functions remain deferred, so this is not full M3 acceptance.

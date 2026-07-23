@@ -21,10 +21,10 @@ and advances the **Current packet**, not an older `next` paragraph.
 
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
-| M0: archive and baseline health | **blocked** | `slug-v1-archive` tag and clean-root shape | local `v1-archive` branch is absent; archive checker allowlists reject `slug_server_v2`, the orchestration skill, and the current root prompt | finish the active M3 packet, then `WP-0-baseline-repair` before another feature packet |
+| M0: archive and baseline health | **blocked** | `slug-v1-archive` tag and clean-root shape | local `v1-archive` branch is absent; archive checker allowlists reject `slug_server_v2`, the orchestration skill, and the current root prompt | run `WP-0-baseline-repair` before another feature packet |
 | M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | reassess after M0; do not infer completion from the narrow verticals |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while M3's active packet is open |
-| M3: `query` | **active** | parser/evaluator/loading graph; 10 of 16 Bazel default functions; exact accepted text/graph fixtures; executable capability substrate accepted in `c86fc656` | six functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | finish `WP-4-8-m3-executables-rule-capability` by activating Stage 8 Gate B against the accepted 40-command oracle |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet before M0 baseline repair |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, and remaining command breadth | pause feature work for `WP-0-baseline-repair` |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -36,11 +36,12 @@ and advances the **Current packet**, not an older `next` paragraph.
 Complete these as separate accepted packets; do not combine them into one broad
 cleanup:
 
-1. Finish `WP-4-8-m3-executables-rule-capability`, whose immutable oracle is
-   already accepted.
-2. Run `WP-0-baseline-repair`: create the recorded local archive branch after
-   read-only verification, update only truthful checker allowlists, and make
-   `scripts/v2_archive_status.sh` green.
+1. Accepted: `WP-4-8-m3-executables-rule-capability` landed in `69565a29`
+   against all 32 semantic oracle rows; the eight `label_kind` rows remain
+   formatter-only constraints.
+2. Current: run `WP-0-baseline-repair`: create the recorded local archive
+   branch after read-only verification, update only truthful checker
+   allowlists, and make `scripts/v2_archive_status.sh` green.
 3. Add a root-owned serialized packet-validation wrapper around the existing
    `tools/v2_oracle` Slug comparison path. It must not weaken daemon tests when
    the current sandbox lacks Unix-socket binding.
@@ -723,12 +724,11 @@ needed no Bazel invocation; no agent or tool accessed `~/.bazelrc`. Future
 Bazel commands may consume it through ordinary RC discovery without inspection.
 Archive-status baseline failures (v1-archive/stale allowlists) are unrelated.
 
-## Authoritative Next M3 Packet: Executable Rule Capability (2026-07-23)
+## Accepted M3 Packet: Executable Rule Capability (2026-07-23)
 
-`WP-4-8-m3-executables-rule-capability` supersedes the labels packet. Oracle
-commit `c8e469f5` has completed the first gate; the remaining vertical is Stage
-4 load-only capability retention and, only after Sol acceptance, Stage 8
-activation of `executables(EXPR)`. Bazel authority is
+`WP-4-8-m3-executables-rule-capability` superseded the labels packet and is now
+accepted. Oracle commit `c8e469f5`, Stage 4 substrate `c86fc656`, and Stage 8
+activation `69565a29` complete the vertical. Bazel authority is
 `ExecutablesFunction`, `BlazeTargetAccessor#isExecutableNonTestRule`, and
 `TargetUtils#isExecutableNonTestRule` at `8220c619…`: the predicate is the
 per-target `Rule.isExecutable()` / `$is_executable` capability *and* a retained
@@ -770,5 +770,8 @@ tests activation. Oracle and retained-daemon rows cover non-rules, executable
 and non-executable rules, executable `_test` exclusion, native negatives,
 composition/order/graph/diagnostics, false→true executable, false→true test,
 export rename, target rename crossing `_test` without classification change,
-formatting reuse, and delete/recreate. M3 remains open; only after this gate
-would five ordinary functions remain deferred.
+formatting reuse, and delete/recreate. Root validation passed 45 query tests,
+50 downstream CLI/commands/server tests, formatting, diff checks, and a clean
+`slug_cli_v2` build; Sol-low returned final `ACCEPT`. M3 remains open with five
+ordinary functions deferred. The scheduling authority now returns to
+`WP-0-baseline-repair` before another feature packet.
