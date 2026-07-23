@@ -12,6 +12,11 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/packages/TestSuiteImplicitTestsAccumulator.java",
   "src/main/java/com/google/devtools/build/lib/packages/TargetUtils.java#isTestRule",
   "src/main/java/com/google/devtools/build/lib/query2/query/output/QueryOptions.java#strict_test_suite",
+  "src/main/java/com/google/devtools/build/lib/packages/AttributeProvider.java#$implicit_tests",
+  "src/main/java/com/google/devtools/build/lib/packages/Rule.java#isAttributeValueExplicitlySpecified",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/BuildOutputFormatter.java#outputRule",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/ProtoOutputFormatter.java#shouldIncludeAttribute",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/StreamedJSONProtoOutputFormatter.java",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorExpandsTestsAndExcludesNonTests",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorFiltersByTagSizeAndEnv",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorCrossesPackages",
@@ -19,7 +24,7 @@ source_anchors = [
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testTestsOperatorReportsMissingTargets",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testStrictTestSuiteWithFile",
 ]
-translation_notes = "TestsFunction partitions direct tests, suites, and other targets; uniquely visits suites/tests; filters explicit and implicit tests using tags plus size; and treats suite tag manual as a property, not a filter. TestSuiteImplicitTestsAccumulator supplies only same-package non-manual tests for an empty suite. V1 test-suite/accessor storage and Buck2 evaluator/sets are reference-only: this oracle imports no V1/Buck2 implementation."
+translation_notes = "TestsFunction partitions direct tests, suites, and other targets; uniquely visits suites/tests; filters explicit and implicit tests using tags plus size; and treats suite tag manual as a property, not a filter. TestSuiteImplicitTestsAccumulator supplies only same-package non-manual tests for an empty suite. The provenance rows pin Bazel's orthogonal explicitness: omitted and explicit-empty tests both receive identical $implicit_tests membership, while --output=build prints tests = [] only for the explicitly supplied value. These build-format rows are representation-only and do not authorize Slug formatter acceptance. V1 test-suite/accessor storage and Buck2 evaluator/sets are reference-only: this oracle imports no V1/Buck2 implementation."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture tests-query-expansion --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture tests-query-expansion --tool bazel --bazel /usr/bin/bazel"
 
@@ -120,3 +125,45 @@ name = "full_output_exact_set_without_async_order_assumption"
 argv = ["query", "--order_output=full", "tests(//explicit:root_suite)"]
 expected_exit = 0
 stdout_patterns = ["\\A(?=[\\s\\S]*(?m:^//cross:cross_test$))(?=[\\s\\S]*(?m:^//explicit:direct_test$))(?=[\\s\\S]*(?m:^//explicit:nested_test$))(?:(?://cross:cross_test|//explicit:direct_test|//explicit:nested_test)\\n?){3}\\Z"]
+
+[[commands]]
+name = "provenance_omitted_tests_expands_implicit_member"
+argv = ["query", "tests(//provenance:omitted)"]
+expected_exit = 0
+stdout_patterns = ["\\A//provenance:member_test\\n?\\Z"]
+
+[[commands]]
+name = "provenance_explicit_empty_tests_expands_same_implicit_member"
+argv = ["query", "tests(//provenance:explicit_empty)"]
+expected_exit = 0
+stdout_patterns = ["\\A//provenance:member_test\\n?\\Z"]
+
+[[commands]]
+name = "provenance_omitted_implicit_attribute_labels"
+argv = ["query", "labels($implicit_tests, //provenance:omitted)"]
+expected_exit = 0
+stdout_patterns = ["\\A//provenance:member_test\\n?\\Z"]
+
+[[commands]]
+name = "provenance_explicit_empty_implicit_attribute_labels"
+argv = ["query", "labels($implicit_tests, //provenance:explicit_empty)"]
+expected_exit = 0
+stdout_patterns = ["\\A//provenance:member_test\\n?\\Z"]
+
+[[commands]]
+name = "provenance_tests_attribute_empty_for_both_forms"
+argv = ["query", "labels(tests, set(//provenance:omitted //provenance:explicit_empty))"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "provenance_omitted_build_lacks_explicit_tests_but_has_implicit_tests"
+argv = ["query", "--output=build", "//provenance:omitted"]
+expected_exit = 0
+stdout_patterns = ["\\A#[^\\n]*/provenance/BUILD\\.bazel:3:11\\ntest_suite\\(\\n  name = \"omitted\",\\n(?![\\s\\S]*\\n  tests = )  _implicit_tests = \\[\"//provenance:member_test\"\\],\\n\\)\\n# Rule omitted instantiated at \\(most recent call last\\):\\n#   [^\\n]*/provenance/BUILD\\.bazel:3:11 in <toplevel>\\Z"]
+
+[[commands]]
+name = "provenance_explicit_empty_build_has_explicit_tests_and_same_implicit_tests"
+argv = ["query", "--output=build", "//provenance:explicit_empty"]
+expected_exit = 0
+stdout_patterns = ["\\A#[^\\n]*/provenance/BUILD\\.bazel:4:11\\ntest_suite\\(\\n  name = \"explicit_empty\",\\n  tests = \\[\\],\\n  _implicit_tests = \\[\"//provenance:member_test\"\\],\\n\\)\\n# Rule explicit_empty instantiated at \\(most recent call last\\):\\n#   [^\\n]*/provenance/BUILD\\.bazel:4:11 in <toplevel>\\Z"]

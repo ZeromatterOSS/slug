@@ -20,7 +20,7 @@
       "name": "direct_test_partition_excludes_direct_non_test",
       "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
       "normalized_stdout": "//direct:direct_test",
-      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-110923-982276-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-111054-984045-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a9ffc3b0-00d8-46b9-9d42-d506e1b6c82a\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-113035-997214-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-113146-999601-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: b8bcdc93-f87f-484a-bbed-43201a4cb444\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
       "stdout": "//direct:direct_test\n"
     },
     {
@@ -43,7 +43,7 @@
       "name": "empty_suite_uses_same_package_implicit_tests_and_excludes_manual",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//implicit:alpha_test\n//implicit:large_test",
-      "stderr": "INFO: Invocation ID: d58d70f0-c236-4f5f-b569-10ec61355804\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 4f6968e2-deba-4960-99be-54f45017d8c1\nLoading: 0 packages loaded\n",
       "stdout": "//implicit:alpha_test\n//implicit:large_test\n"
     },
     {
@@ -66,7 +66,7 @@
       "name": "explicit_nested_and_cross_package_members_are_exact_set",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//cross:cross_test\n//explicit:direct_test\n//explicit:nested_test",
-      "stderr": "INFO: Invocation ID: 6e2ea1cd-a93e-4435-b9d2-b43401c4a8ff\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 3be7ee59-33a3-488f-95c4-f40927b3c9e0\nLoading: 0 packages loaded\n",
       "stdout": "//cross:cross_test\n//explicit:direct_test\n//explicit:nested_test\n"
     },
     {
@@ -89,7 +89,7 @@
       "name": "explicit_suite_does_not_pull_unlisted_same_package_tests",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//explicit:direct_test",
-      "stderr": "INFO: Invocation ID: 942927c8-cbb8-44d3-a1c2-39271628a8cf\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: dcd031e1-47b3-49e6-9de5-c9cd164de5de\nLoading: 0 packages loaded\n",
       "stdout": "//explicit:direct_test\n"
     },
     {
@@ -112,7 +112,7 @@
       "name": "cycle_terminates",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: e6e20dd6-ae12-406a-94f8-595e16ec6bd1\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: cf4586b7-c388-43a7-8000-80d1cb057580\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -135,7 +135,7 @@
       "name": "shared_and_duplicate_members_deduplicate",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//dedup:shared_test",
-      "stderr": "INFO: Invocation ID: 0080c9a3-a30a-4856-88fd-f17bcbe25476\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 38d206a5-366b-4f0a-b660-77e3476978c4\nLoading: 0 packages loaded\n",
       "stdout": "//dedup:shared_test\n"
     },
     {
@@ -158,7 +158,7 @@
       "name": "required_bare_tag",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//filters:fast_test",
-      "stderr": "INFO: Invocation ID: 3f692b98-4b84-4a9f-8548-6bee85e3e91f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: f3c42866-5da5-4861-8b23-91c64a754ee7\nLoading: 0 packages loaded\n",
       "stdout": "//filters:fast_test\n"
     },
     {
@@ -181,7 +181,7 @@
       "name": "required_plus_tag",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//filters:fast_test",
-      "stderr": "INFO: Invocation ID: 9c2731fd-90e9-4ed3-986e-9a40ffb76997\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: cd030a46-7fdd-4bd5-857f-a2731a4ea566\nLoading: 0 packages loaded\n",
       "stdout": "//filters:fast_test\n"
     },
     {
@@ -204,7 +204,7 @@
       "name": "excluded_minus_tag",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//filters:fast_test",
-      "stderr": "INFO: Invocation ID: 2092e480-96d7-44a1-bc3f-1c51208176ee\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 733fa8d5-d6bb-4da3-9ce6-8c1ca116bafb\nLoading: 0 packages loaded\n",
       "stdout": "//filters:fast_test\n"
     },
     {
@@ -227,7 +227,7 @@
       "name": "suite_manual_tag_is_not_a_filter",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//filters:plain_test",
-      "stderr": "INFO: Invocation ID: 77488270-83e6-496b-9aba-46d476832019\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: c3201e44-3a45-491c-8ad5-4d7b9c251470\nLoading: 0 packages loaded\n",
       "stdout": "//filters:plain_test\n"
     },
     {
@@ -250,7 +250,7 @@
       "name": "test_size_matches_suite_tag",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//filters:large_test",
-      "stderr": "INFO: Invocation ID: c45382b1-4154-48ef-bd46-c4132e302973\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 8c487140-648f-424b-85dc-9539e5fab2c9\nLoading: 0 packages loaded\n",
       "stdout": "//filters:large_test\n"
     },
     {
@@ -273,7 +273,7 @@
       "name": "non_test_member_is_dropped_by_default",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 9319f200-6c93-4279-8426-1ebca5f93bb2\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stderr": "INFO: Invocation ID: 675d2b72-54b3-498d-89c3-425c5581890c\nLoading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -298,7 +298,7 @@
       "name": "strict_non_test_member_reports_invalid_label",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"tests(//strict:non_test_member)\" failed: The label '//strict:plain' in the test_suite '//strict:non_test_member' does not refer to a test or test_suite rule!",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 7affbdc2-df9d-41b6-8c44-732743210b9a\nLoading: 0 packages loaded\nERROR: Evaluation of query \"tests(//strict:non_test_member)\" failed: The label '//strict:plain' in the test_suite '//strict:non_test_member' does not refer to a test or test_suite rule!\n",
+      "stderr": "INFO: Invocation ID: cda99fab-fc5c-4f0e-a5ea-ab71f7aa37a5\nLoading: 0 packages loaded\nERROR: Evaluation of query \"tests(//strict:non_test_member)\" failed: The label '//strict:plain' in the test_suite '//strict:non_test_member' does not refer to a test or test_suite rule!\n",
       "stdout": ""
     },
     {
@@ -321,7 +321,7 @@
       "name": "missing_member_has_tests_attribute_expansion_prefix",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Evaluation of query \"tests(//missing:broken)\" failed: couldn't expand 'tests' attribute of test_suite //missing:broken: no such target '//missing_target:missing_target': target 'missing_target' not declared in package 'missing_target' defined by <workspace>/missing_target/BUILD.bazel",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 812a2232-1f35-4b1e-aa64-878bfd557eaa\nLoading: 0 packages loaded\nERROR: Evaluation of query \"tests(//missing:broken)\" failed: couldn't expand 'tests' attribute of test_suite //missing:broken: no such target '//missing_target:missing_target': target 'missing_target' not declared in package 'missing_target' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-111054-984045-bazel/workspace/missing_target/BUILD.bazel\n",
+      "stderr": "INFO: Invocation ID: fa65e8c1-88f0-4500-8e87-81cfa4816dc9\nLoading: 0 packages loaded\nERROR: Evaluation of query \"tests(//missing:broken)\" failed: couldn't expand 'tests' attribute of test_suite //missing:broken: no such target '//missing_target:missing_target': target 'missing_target' not declared in package 'missing_target' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-113146-999601-bazel/workspace/missing_target/BUILD.bazel\n",
       "stdout": ""
     },
     {
@@ -344,7 +344,7 @@
       "name": "default_output_exact_set_without_async_order_assumption",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//cross:cross_test\n//explicit:direct_test\n//explicit:nested_test",
-      "stderr": "INFO: Invocation ID: e1474ff1-73d0-4672-98fe-7afbcb4822df\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: d83ef5be-3d7a-41cb-b2ab-9609e00fd75d\nLoading: 0 packages loaded\n",
       "stdout": "//cross:cross_test\n//explicit:direct_test\n//explicit:nested_test\n"
     },
     {
@@ -369,8 +369,173 @@
       "name": "full_output_exact_set_without_async_order_assumption",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//explicit:nested_test\n//explicit:direct_test\n//cross:cross_test",
-      "stderr": "INFO: Invocation ID: f41daf38-1866-4562-a4ac-5e09eec0b47f\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: f993a1e5-f38d-4d55-a42e-6f48a96daf5d\nLoading: 0 packages loaded\n",
       "stdout": "//explicit:nested_test\n//explicit:direct_test\n//cross:cross_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "tests(//provenance:omitted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "tests(//provenance:omitted)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "provenance_omitted_tests_expands_implicit_member",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//provenance:member_test",
+      "stderr": "INFO: Invocation ID: 3c43b100-3160-45e1-bf4b-ede39e05ff63\nLoading: 0 packages loaded\n",
+      "stdout": "//provenance:member_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "tests(//provenance:explicit_empty)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "tests(//provenance:explicit_empty)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "provenance_explicit_empty_tests_expands_same_implicit_member",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//provenance:member_test",
+      "stderr": "INFO: Invocation ID: 0fbd73f3-6642-4400-a9c0-5b5ea59909ce\nLoading: 0 packages loaded\n",
+      "stdout": "//provenance:member_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels($implicit_tests, //provenance:omitted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels($implicit_tests, //provenance:omitted)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "provenance_omitted_implicit_attribute_labels",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//provenance:member_test",
+      "stderr": "INFO: Invocation ID: 5d1f34e3-9fe6-40a7-868b-b8fdde7ca124\nLoading: 0 packages loaded\n",
+      "stdout": "//provenance:member_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels($implicit_tests, //provenance:explicit_empty)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels($implicit_tests, //provenance:explicit_empty)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "provenance_explicit_empty_implicit_attribute_labels",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//provenance:member_test",
+      "stderr": "INFO: Invocation ID: 5e213897-b7d0-4ac6-afb2-93875b19eedd\nLoading: 0 packages loaded\n",
+      "stdout": "//provenance:member_test\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(tests, set(//provenance:omitted //provenance:explicit_empty))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(tests, set(//provenance:omitted //provenance:explicit_empty))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "provenance_tests_attribute_empty_for_both_forms",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 14b4e0c1-2524-40a3-9ff5-fe80d419c7f2\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "--output=build",
+        "//provenance:omitted"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=build",
+        "//provenance:omitted"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "provenance_omitted_build_lacks_explicit_tests_but_has_implicit_tests",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "# <workspace>/provenance/BUILD.bazel:3:11\ntest_suite(\n  name = \"omitted\",\n  _implicit_tests = [\"//provenance:member_test\"],\n)\n# Rule omitted instantiated at (most recent call last):\n#   <workspace>/provenance/BUILD.bazel:3:11 in <toplevel>",
+      "stderr": "INFO: Invocation ID: 0ea6503c-4ce2-4eab-81cc-dc728efd801b\nLoading: 0 packages loaded\n",
+      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-113146-999601-bazel/workspace/provenance/BUILD.bazel:3:11\ntest_suite(\n  name = \"omitted\",\n  _implicit_tests = [\"//provenance:member_test\"],\n)\n# Rule omitted instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-113146-999601-bazel/workspace/provenance/BUILD.bazel:3:11 in <toplevel>\n\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=build",
+        "//provenance:explicit_empty"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=build",
+        "//provenance:explicit_empty"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "provenance_explicit_empty_build_has_explicit_tests_and_same_implicit_tests",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "# <workspace>/provenance/BUILD.bazel:4:11\ntest_suite(\n  name = \"explicit_empty\",\n  tests = [],\n  _implicit_tests = [\"//provenance:member_test\"],\n)\n# Rule explicit_empty instantiated at (most recent call last):\n#   <workspace>/provenance/BUILD.bazel:4:11 in <toplevel>",
+      "stderr": "INFO: Invocation ID: 5b3cafa3-9ebe-4c42-a114-5951ae5fb572\nLoading: 0 packages loaded\n",
+      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-113146-999601-bazel/workspace/provenance/BUILD.bazel:4:11\ntest_suite(\n  name = \"explicit_empty\",\n  tests = [],\n  _implicit_tests = [\"//provenance:member_test\"],\n)\n# Rule explicit_empty instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-113146-999601-bazel/workspace/provenance/BUILD.bazel:4:11 in <toplevel>\n\n"
     }
   ],
   "fixture": "tests-query-expansion",

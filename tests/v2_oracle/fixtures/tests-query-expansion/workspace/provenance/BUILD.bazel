@@ -1,0 +1,6 @@
+load("//:defs.bzl", "oracle_test")
+
+test_suite(name = "omitted")
+test_suite(name = "explicit_empty", tests = [])
+
+oracle_test(name = "member_test")
