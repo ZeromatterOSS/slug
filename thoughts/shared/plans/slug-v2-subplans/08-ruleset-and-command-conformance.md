@@ -1729,3 +1729,83 @@ The worker Slug gate passed 91/91 and six fixtures passed 176/176 at
 `040534-628098`, `040540-628123`, `040546-628189`, `040549-628247`,
 `040554-628339`, and `040558-628428`. M3 now has nine deferred functions.
 `filter` remains deferred pending exact Java `Pattern` parity.
+
+### Reviewed next packet: `WP-4-8-m3-build-load-files`
+
+Status: approved direction only; it records no implementation evidence.
+
+The parent packet has two acceptance gates and one oracle-first artifact:
+
+1. Gate A, owned with Stage 4, is `load-provenance-fake-target-substrate`.
+   Stage 4 establishes compact DICE-owned load provenance; Stage 8 establishes
+   request-local fake-target identity and consumer ownership. The function
+   registry remains deferred.
+2. Gate B activates exactly `buildfiles(EXPR)` and `loadfiles(EXPR)` after A
+   receives Sol acceptance. No other of the nine remaining ordinary functions
+   may ride this change.
+3. Before either gate, create one combined generated Bazel 9.2 fixture. It is
+   the proof for both the substrate and eventual command activation.
+
+Bazel source anchors are
+`src/main/java/com/google/devtools/build/lib/query2/engine/{BuildFilesFunction,LoadFilesFunction}.java`,
+`query2/common/AbstractBlazeQueryEnvironment.java#transitiveLoadFiles`, and
+`query2/compat/FakeLoadTarget.java`. Concrete ownership/identity anchors are
+`query2/query/BlazeQueryEnvironment.java#getTransitiveLoadFilesHelper`,
+`query2/query/BlazeTargetAccessor.java#getPackage`, and
+`query2/common/AbstractBlazeQueryEnvironment.java#TargetKeyExtractor`;
+upstream query regression themes are in
+`src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java`.
+The V1 reference is limited to
+`slug-v1-archive:app/slug_query_impls/src/uquery/environment.rs`
+(`allbuildfiles`/`get_transitive_loads`); Buck identity, cells, and path
+semantics are rejected. Buck2 references are only the generic compact graph,
+environment separation, and deterministic collection patterns under
+`../buck2/app/buck2_query/`.
+
+Required combined oracle matrix:
+
+- active primary/fallback/root basename, dual-file priority, direct/shared/
+  transitive `.bzl` loads, label-first deduplication, and failing `.bzl`
+  cycles;
+- `buildfiles` adds the selected package's active BUILD, every transitive load
+  label, and every load-label package's active BUILD companion; `loadfiles`
+  emits only the transitive load labels;
+- fake `.bzl` and companion BUILD labels print normally while preserving
+  consuming-package provenance for `siblings`; real/fake and two-consumer
+  operand order determine which provenance wins;
+- broken syntax or a broken `load()` in a loaded label's containing-package
+  BUILD retains Bazel's companion basename without assuming that package's
+  `PackageLoad` succeeded; missing selected loads and `.bzl` cycles are
+  failure rows;
+- empty, duplicates, multiple packages, set operators, `siblings`, zero-edge
+  `deps` on function-produced fake nodes, AUTO and FULL provenance, plus
+  missing/malformed/unsupported errors with empty stdout; and
+- same-daemon load-leaf edit, load-edge create/delete/recreate, BUILD↔BUILD.bazel
+  replacement, and exact DICE evaluation/reuse events.
+
+Implementation contract: use existing `BzlParseKey`, `BzlModuleEvalKey`, load
+label resolution, `PackageLoadKey`, package listing, and injected workspace
+observations. The immutable manifest holds canonical root label/path, direct
+children, and a transitive fingerprint in compact `Arc` slices; `LoadedPackage`
+exposes its BUILD roots/reachable closure and retains matching `FrozenModule`
+lifetimes separately. Companion basename lookup is parse-independent and
+must not load the companion package. A new key/cache/lock requires Sol
+pre-review. `LoadedPackage` equality includes the direct roots and transitive
+manifest identity/fingerprint so load-edge and leaf-content changes invalidate
+package/query state even when target declarations are unchanged; retained
+`FrozenModule` pointer/lifetime identity remains excluded.
+
+Use request-local fake-node/provenance state only; do not rewrite global
+`QueryLabel` identity. It must preserve enough `(printed label, consuming
+package, real/fake)` information to implement the post-oracle winner through
+each function and set composition. Do not assume request-global first-owner
+semantics before the real/fake operand-order and two-consumer rows are
+generated and reviewed. Fake nodes never enter package graphs, `:all`,
+recursive patterns, or dependency edges; they are zero-edge, so `deps(fake)`
+returns itself. The projection is otherwise graphless apart from real
+operand-evaluation edges, and FULL must never synthesize edges.
+
+Hard stops: external mapping, silent `.scl` omission, direct filesystem
+discovery, whole-workspace scan, global identity rewrite, unreviewed DICE key,
+or treating a `.bzl` cycle as success. After B, seven ordinary functions
+remain deferred; regex and rule-metadata dependent functions remain blocked.

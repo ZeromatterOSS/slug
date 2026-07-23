@@ -352,6 +352,83 @@ silent omission of a participating symlink, unsupported pattern behavior
 without a Bazel 9 oracle, or inability to distinguish sibling/subpackage reuse
 through key-specific activation data.
 
+## WP-4-8-M3-A: Load-Provenance Fake-Target Substrate
+
+Status: reviewed next direction; no implementation evidence.
+
+Goal: supply the loading-owned provenance required by Stage 8 `buildfiles()`
+and `loadfiles()` without activating either query function. This is gate A of
+parent packet `WP-4-8-m3-build-load-files`; gate B may start only after Sol
+accepts A and the single combined Bazel 9.2 fixture is already committed.
+
+Use Bazel `8220c6198837d5c13d53fea211cf3282aa12408a` as authority:
+`src/main/java/com/google/devtools/build/lib/query2/common/AbstractBlazeQueryEnvironment.java`
+(`transitiveLoadFiles`), `query2/compat/FakeLoadTarget.java`, and the
+`BuildFilesFunction`/`LoadFilesFunction` engine classes. The compatibility
+tests in `src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java`
+cover transitive loads, broken companions, fake-target composition, and active
+BUILD basename behavior.
+
+The Stage 4 portion of A must preserve, without command-owned scans:
+
+- canonical root label and physical path;
+- direct loaded children and a deterministic transitive fingerprint in compact
+  immutable `Arc` slices;
+- `LoadedPackage` access to its BUILD's direct roots and reachable closure; and
+- enough separate ownership to keep every relevant `FrozenModule` alive.
+
+Stage 8, not `LoadedPackage`, owns the request-local fake-node table and the
+candidate consuming package for each printed label. It must distinguish
+zero-edge fake nodes from real package-graph nodes and preserve enough
+`(printed label, consuming package, real/fake)` provenance for the combined
+oracle to establish the winner through each function and set composition.
+Do not preselect a request-global first-owner rule.
+
+`LoadedPackage::PartialEq` must include the BUILD direct-root set and the
+transitive manifest identity/fingerprint, so a direct load-edge change or
+transitive `.bzl` content change recomputes package/query state even when
+declared targets are unchanged. Frozen-module pointers and lifetime-only
+storage remain excluded from semantic equality.
+
+It reuses `BzlParseKey`, `BzlModuleEvalKey`, existing load-label resolution,
+`PackageLoadKey`, `PackageListing`, and injected workspace observations.
+Actual companion BUILD basename discovery must be parse-independent and must
+not compute `PackageLoadKey` for the load-label package. A new key, cache,
+lock, or filesystem seam is a reserved Sol decision. Do not put fake `.bzl`
+or companion BUILD nodes in `UnconfiguredPackageGraph`, global `QueryLabel`
+identity, `:all`, recursive patterns, or dependency edges. Function-produced
+fake targets remain directly queryable inside their expression and have zero
+edges, so `deps(fake)` contains only that target. The future query projection
+is otherwise graphless except for real operand-evaluation edges, so FULL
+formatting cannot invent fake-to-load or fake-to-BUILD edges.
+
+Oracle-first matrix shared with gate B:
+
+- direct and shared-transitive `.bzl` loads; `.bzl` cycles are failures, never
+  a success claim;
+- primary/fallback/root BUILD basenames, dual-file priority, and a broken
+  syntax or broken `load()` in a loaded label's containing-package BUILD,
+  whose basename still appears without a successful `PackageLoad`;
+- `buildfiles` membership for the selected package BUILD, every transitive
+  load label, and every load-label package's active BUILD companion;
+  `loadfiles` excludes every BUILD companion;
+- real/fake `siblings` operands in both orders, label-first uniqueness, and
+  consuming-package provenance;
+- duplicate/empty/multi-package arguments, set operations, zero-edge
+  `deps(fake)`, AUTO/FULL order, missing/malformed/unsupported inputs, and
+  empty stdout on failures; and
+- exact DICE and same-daemon create/edit/delete/recreate transitions for a
+  leaf `.bzl`, a direct load edge, and BUILD/BUILD.bazel replacement.
+
+The equality gate must prove that a leaf content edit and direct/transitive
+load-edge changes invalidate the owning `PackageLoad`/query through manifest
+equality, without comparing retained `FrozenModule` pointer identity.
+
+Hard stops: external mapping, `.scl` silent omission, direct filesystem reads,
+global identity rewrites, whole-workspace traversal, a lifetime shortcut that
+drops `FrozenModule`, synthetic rendering edges, or any attempt to treat a
+`.bzl` cycle as successful.
+
 Accepted implementation evidence (2026-07-22):
 
 - Accepted implementation commit: `de835cdc` (`feat: add DICE-backed Starlark

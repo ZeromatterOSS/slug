@@ -1012,3 +1012,48 @@ and no credentials were accessed.
 Residual risk: `buildfiles`/`loadfiles` require a separate transitive loading
 representation; do not treat their source tests or `kind` interactions as
 accepted Slug semantics in this packet.
+
+### Stage 4/8 load-provenance and fake-target packet — reviewed extraction plan
+
+Status: approved next direction; no source has been imported and no behavior
+is accepted yet.
+
+Parent: `WP-4-8-m3-build-load-files`. Gate A is a V2-owned
+`load-provenance-fake-target-substrate`; Gate B activates only `buildfiles`
+and `loadfiles` after A acceptance. One combined Bazel 9.2 oracle fixture is
+required before either gate. This leaves nine deferred ordinary functions until
+B lands, then seven; exact Java regex and missing target metadata keep the
+others deferred.
+
+| Candidate | Source / mode | Decision |
+| --- | --- | --- |
+| Bazel transitive loading | Bazel `8220c6198837d5c13d53fea211cf3282aa12408a:src/main/java/com/google/devtools/build/lib/query2/{engine/BuildFilesFunction.java,engine/LoadFilesFunction.java,common/AbstractBlazeQueryEnvironment.java,compat/FakeLoadTarget.java,query/BlazeQueryEnvironment.java,query/BlazeTargetAccessor.java}`; specifically `transitiveLoadFiles`, `getTransitiveLoadFilesHelper`, `getPackage`, and `TargetKeyExtractor` | Semantic authority. Port no Java implementation; fixture must prove full transitive load behavior, fake printed-label versus consuming-package behavior, label-keyed uniqueness across compositions, broken companion basename, and failure cycles. |
+| V1 traversal | `slug-v1-archive:app/slug_query_impls/src/uquery/environment.rs` (`allbuildfiles`, `get_transitive_loads`) | Reference-only extraction candidate. Its DICE traversal/lifetime lesson may inform a V2 adapter, but reject Buck paths, cells, identities, query filesets, and direct import. |
+| Buck2 query utilities | `../buck2/app/buck2_query/src/query/{environment.rs,graph.rs,traversal.rs}` and `syntax/simple/` | Selectively reuse compact request-local graph/collection and environment-separation patterns only. Reject Buck function names, labels, cells, and file semantics. |
+| Existing V2 loading | `app/slug_loading_v2/src/{keys.rs,bzl_module.rs,load_label.rs,package.rs}` | Adopt. Build on `BzlParseKey`, `BzlModuleEvalKey`, load-label resolution, `PackageLoadKey`, package listings, and injected workspace observations. |
+
+Required V2 boundary: immutable compact provenance manifests contain canonical
+root label/path, direct children, and transitive fingerprint in `Arc` slices;
+`LoadedPackage` exposes its BUILD roots/reachable closure and retains
+`FrozenModule` lifetimes separately. `LoadedPackage` semantic equality includes
+the direct roots and transitive manifest identity/fingerprint, not frozen
+pointer identity. Request-local fake-node state preserves `(printed label,
+consuming package, real/fake)` provenance until the oracle establishes the
+winner through function/set compositions; do not assume request-global
+first-owner behavior. This is not a global identity change: fake `.bzl` and
+companion BUILD targets never belong in package graphs, `:all`, recursive
+patterns, or dependency edges, while `deps(fake)` returns only the
+function-produced target. Companion BUILD basename discovery is DICE-tracked
+but parse-independent and does not require the companion package to load. FULL
+preserves only real operand-evaluation edges and adds no synthetic fake-load
+edges.
+
+Stop/replan instead of importing or widening on external repository mapping,
+silent `.scl` loss, direct filesystem scans, whole-workspace discovery,
+unreviewed DICE keys, global query-label rewrites, dropped frozen-module
+lifetimes, or a `.bzl` cycle represented as success. Any new DICE key needs
+Sol approval before implementation.
+
+Validation must prove manifest equality invalidates the owning package/query
+for direct-root, transitive-edge, and leaf-content changes while excluding
+retained `FrozenModule` pointer identity from equality.

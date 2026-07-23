@@ -434,3 +434,56 @@ Use
 [thoughts/shared/prompts/2026-06-29-slug-v2-generic-implementer.md](../prompts/2026-06-29-slug-v2-generic-implementer.md)
 for implementation sessions. The split-specific remediation instructions live
 in this plan, Stage 0, Stage 9, and `V1_ARCHIVE.md`, not in the prompt.
+
+## Reviewed Next M3 Direction: Build and Load Files (2026-07-23)
+
+M3 has nine deferred ordinary loading-query functions. The reviewed parent
+packet is `WP-4-8-m3-build-load-files`, but it is deliberately split into two
+commit gates: (A) `load-provenance-fake-target-substrate`, then (B) activation
+of `buildfiles()` and `loadfiles()` only after A is accepted. One combined,
+immutable Bazel 9.2 oracle fixture must be generated before either code gate.
+After both gates land, seven ordinary functions remain deferred; `filter` stays
+blocked on exact Java `Pattern` compatibility, and attribute/kind/label,
+test, visibility, and executable functions remain blocked on their missing
+metadata surfaces.
+
+This is a loading-only, root-repository packet. It must model Bazel's full
+transitive load graph and its `FakeLoadTarget` behavior, not a source-file
+approximation: a fake target prints its `.bzl` label but belongs, for query
+operations such as `siblings`, to the package that first consumed it. Uniquing
+is label-based within each load-function invocation, while real targets, fake
+targets, query-graph nodes, and set operations can meet through separate
+paths. Request-local state must preserve enough `(printed label, consuming
+package, real/fake)` provenance for the oracle-observed winner; it must not
+collapse this to a request-global first-owner rule before both operand orders
+and two-consumer cases are generated and reviewed.
+
+Stage 4 owns a compact immutable manifest: each node has a canonical root
+label/path, direct children, and transitive fingerprint in shared `Arc`
+slices; `LoadedPackage` exposes its BUILD's direct roots/reachable closure
+while retaining the corresponding `FrozenModule` lifetime separately. Stage
+8 owns request-local fake-node/provenance state; it does not change global
+`QueryLabel` identity. `LoadedPackage` semantic equality must include its
+direct roots and transitive manifest identity/fingerprint, while frozen-module
+pointer/lifetime storage remains excluded. The packet may use the existing DICE
+`BzlParseKey`, `BzlModuleEvalKey`, load-label resolution, `PackageLoadKey`,
+`PackageListing`, and workspace observations. Any new DICE key requires Sol
+pre-review.
+
+`buildfiles` must emit the selected package's active BUILD plus every
+transitive load label and the active BUILD companion of every load-label
+package; `loadfiles` emits only the transitive load labels. Companion basename
+discovery is tracked but parse-independent and must not require a successful
+`PackageLoad` for that package. The request-local projection retains only
+operand-evaluation edges for FULL output: fake nodes never enter package
+graphs, `:all`, or recursive patterns, and neither fake nor synthetic edges
+may be added merely to render the result. A function-produced fake target is
+zero-edge, so `deps(fake)` returns only itself.
+
+Stop and replan on external-repository mapping, a requirement to silently omit
+`.scl`, direct filesystem discovery, a global `QueryLabel` identity rewrite,
+whole-workspace scanning, a new DICE key without review, or a claim that a
+`.bzl` load cycle succeeds. A loaded label's containing-package BUILD may have
+broken syntax or a broken `load()` and must still contribute its discovered
+companion basename without a successful `PackageLoad` value; missing selected
+loads and `.bzl` cycles are explicit failure-oracle cases.
