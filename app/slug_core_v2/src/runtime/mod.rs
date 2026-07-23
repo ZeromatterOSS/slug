@@ -25,6 +25,20 @@ pub use dice::evaluate_workspace_targets;
 pub use dice::observe_workspace;
 pub use dice::observe_workspace_files;
 
+/// One-shot convenience that enters the identical retained-runtime query
+/// method used by the daemon.
+pub fn evaluate_workspace_query(
+    workspace: &std::path::Path,
+    expression: &str,
+    order: slug_query_v2::QueryOrder,
+) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
+        .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
+    let observations = observe_workspace(workspace)
+        .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
+    runtime.query_observations(observations, expression, order)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeMode {
     OneShot,

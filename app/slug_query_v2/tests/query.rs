@@ -8,46 +8,88 @@
  * above-listed licenses.
  */
 
-use slug_query_v2::QueryArg;
+use slug_query_v2::BinaryOperator;
 use slug_query_v2::QueryExpression;
-use slug_query_v2::QueryFunctionName;
-use slug_query_v2::QueryParseError;
+use slug_query_v2::QueryExpressionKind;
+use slug_query_v2::QueryFunctionStatus;
+use slug_query_v2::SourceSpan;
+use slug_query_v2::loading_query_functions;
+use slug_query_v2::validate_loading_query;
 
+// Bazel 9.2 QueryParser.java: all binary operators have equal precedence and
+// are left-associative. QueryParserTest.testMultipleBinaryOperatorParsing
+// covers the corresponding nested shape.
 #[test]
-fn parses_nested_query_functions() {
-    let expression = QueryExpression::parse("kind(\"cc_.* rule\", deps(//pkg:bin))").unwrap();
-
-    let QueryExpression::Function(function) = expression else {
-        panic!("expected function expression");
+fn parser_retains_bazel_left_associative_shape_and_source_spans() {
+    let expression = QueryExpression::parse("a union b except c").unwrap();
+    assert_eq!(expression.span, SourceSpan { start: 0, end: 18 });
+    let QueryExpressionKind::BinaryOpSequence { left, operations } = expression.kind else {
+        panic!("expected binary sequence");
     };
-    assert_eq!(function.name, QueryFunctionName::Kind);
+    assert!(matches!(left.kind, QueryExpressionKind::TargetLiteral(_)));
+    assert_eq!(operations.len(), 2);
+    assert_eq!(operations[0].0, BinaryOperator::Union);
+    assert_eq!(operations[1].0, BinaryOperator::Except);
+    assert_eq!(operations[1].1.span, SourceSpan { start: 17, end: 18 });
+}
+
+// Bazel 9.2 QueryParser.java grammar plus QueryParserTest target/set cases.
+#[test]
+fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
+    let expression =
+        QueryExpression::parse("let x = set(//pkg:bin //pkg:lib) in (unknown($x, 1))").unwrap();
+    let QueryExpressionKind::Let { name, body, .. } = expression.kind else {
+        panic!("expected let");
+    };
+    assert_eq!(name.value, "x");
+    let QueryExpressionKind::Function { name, args } = body.kind else {
+        panic!("expected generic function");
+    };
+    assert_eq!(name.value, "unknown");
+    assert_eq!(args.len(), 2);
+}
+
+// QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query
+// registry source of truth. Only deps is implemented in this packet.
+#[test]
+fn registry_distinguishes_unknown_deferred_and_validates_deps_signature() {
+    assert_eq!(loading_query_functions().len(), 16);
     assert_eq!(
-        function.args[0],
-        QueryArg::StringLiteral("cc_.* rule".to_owned())
+        loading_query_functions()
+            .iter()
+            .filter(|function| function.status == QueryFunctionStatus::Implemented)
+            .map(|function| function.name)
+            .collect::<Vec<_>>(),
+        ["deps"]
     );
-    let QueryArg::Expr(nested) = &function.args[1] else {
-        panic!("expected nested expression");
-    };
-    assert_eq!(nested.to_string(), "deps(//pkg:bin)");
+
+    let unknown = QueryExpression::parse("not_a_bazel_query_function(//pkg:bin)").unwrap();
+    assert!(
+        validate_loading_query(&unknown)
+            .unwrap_err()
+            .to_string()
+            .contains("unknown function 'not_a_bazel_query_function'")
+    );
+    let deferred = QueryExpression::parse("kind(rule, //pkg:all)").unwrap();
+    assert!(
+        validate_loading_query(&deferred)
+            .unwrap_err()
+            .to_string()
+            .contains("recognized by Bazel 9.2")
+    );
+    let wrong = QueryExpression::parse("deps(//pkg:bin, 1, 2)").unwrap();
+    assert!(
+        validate_loading_query(&wrong)
+            .unwrap_err()
+            .to_string()
+            .contains("too many arguments to function 'deps'")
+    );
+    validate_loading_query(&QueryExpression::parse("deps(//pkg:bin, 2)").unwrap()).unwrap();
 }
 
 #[test]
-fn parses_query_words_without_treating_them_as_targets() {
-    let expression = QueryExpression::parse("rdeps(//..., //pkg:lib, 1)").unwrap();
-
-    let QueryExpression::Function(function) = expression else {
-        panic!("expected function expression");
-    };
-    assert_eq!(function.name, QueryFunctionName::Rdeps);
-    assert_eq!(function.args[2], QueryArg::Word("1".to_owned()));
-}
-
-#[test]
-fn rejects_unsupported_functions() {
-    let err = QueryExpression::parse("somepath(//a:b, //c:d)").unwrap_err();
-
-    assert!(matches!(
-        err,
-        QueryParseError::UnsupportedFunction { name, .. } if name == "somepath"
-    ));
+fn parser_reports_bazel_premature_end_diagnostic_with_a_span() {
+    let error = QueryExpression::parse("deps(//pkg:bin").unwrap_err();
+    assert!(error.message.contains("premature end of input"));
+    assert_eq!(error.span, SourceSpan { start: 14, end: 14 });
 }

@@ -23,6 +23,7 @@ use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_core_v2::runtime::observe_workspace;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::keys::WorkspaceFileValue;
+use slug_query_v2::QueryOrder;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
@@ -97,6 +98,7 @@ impl Daemon {
             );
             return BuildResult {
                 exit_code: outcome.exit_code,
+                stdout: String::new(),
                 stderr: outcome.stderr,
                 invalidated_files: invalidated,
             };
@@ -115,6 +117,7 @@ impl Daemon {
         };
         BuildResult {
             exit_code: 2,
+            stdout: String::new(),
             stderr: format!(
                 "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"argv\":[{}],\"target_count\":{},\"loaded_package_count\":{},\"analyzed_target_count\":{},\"declared_action_count\":{},\"runtime_mode\":\"daemon\",\"invalidated_files\":{},\"completed_boundary\":\"{}\"}}",
                 argv_json,
@@ -128,12 +131,45 @@ impl Daemon {
             invalidated_files: invalidated,
         }
     }
+
+    /// Run one loading query against the same retained runtime and observation
+    /// adapter used by builds.
+    pub fn query(&mut self, expression: &str, order: QueryOrder) -> QueryResult {
+        let (observations, invalidated) = match self.observations.observe(&self.workspace) {
+            Ok(observations) => observations,
+            Err(error) => {
+                return QueryResult::error(7, &error.to_string());
+            }
+        };
+        match self
+            .runtime
+            .query_observations(observations, expression, order)
+        {
+            Ok(output) => QueryResult {
+                exit_code: 0,
+                stdout: output.stdout(),
+                stderr: String::new(),
+                invalidated_files: invalidated,
+            },
+            Err(error) => QueryResult {
+                exit_code: error.exit_code,
+                stdout: String::new(),
+                stderr: format!(
+                    "{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{}}}",
+                    json_escape(&error.to_string()),
+                    invalidated,
+                ),
+                invalidated_files: invalidated,
+            },
+        }
+    }
 }
 
 /// Result of a daemon build request.
 #[derive(Debug, Clone)]
 pub struct BuildResult {
     pub exit_code: i32,
+    pub stdout: String,
     pub stderr: String,
     pub invalidated_files: usize,
 }
@@ -142,9 +178,33 @@ impl BuildResult {
     fn error(kind: &str, message: &str) -> Self {
         Self {
             exit_code: 2,
+            stdout: String::new(),
             stderr: format!(
                 "{{\"error\":\"{}\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}",
                 kind,
+                json_escape(message),
+            ),
+            invalidated_files: 0,
+        }
+    }
+}
+
+/// Result of a daemon query request.
+#[derive(Debug, Clone)]
+pub struct QueryResult {
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+    pub invalidated_files: usize,
+}
+
+impl QueryResult {
+    fn error(exit_code: i32, message: &str) -> Self {
+        Self {
+            exit_code,
+            stdout: String::new(),
+            stderr: format!(
+                "{{\"error\":\"query_runtime_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}",
                 json_escape(message),
             ),
             invalidated_files: 0,
@@ -185,8 +245,12 @@ mod server;
 
 pub use server::BuildRequest;
 pub use server::BuildResponse;
+pub use server::DaemonRequest;
+pub use server::DaemonResponse;
+pub use server::QueryRequest;
 pub use server::pid_path;
 pub use server::send_build_request;
+pub use server::send_query_request;
 pub use server::send_shutdown;
 pub use server::serve;
 pub use server::socket_path;

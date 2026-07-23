@@ -87,26 +87,26 @@ fn build_request_parses_target_patterns_and_classifies_flags() {
 
 #[test]
 fn command_requests_extract_bzlmod_policy_flags() {
-    let query = QueryRequest::parse(&[
+    let query = QueryRequest::parse(&["--output=text", "deps(//pkg:bin)"]).unwrap();
+    let cquery = CqueryRequest::parse(&[
         "--ignore_dev_dependency=false",
         "--lockfile_mode=error",
-        "--output=streamed_jsonproto",
-        "deps(//pkg:bin)",
+        "--allow_yanked_versions=all",
+        "//pkg:bin",
     ])
     .unwrap();
-    let cquery = CqueryRequest::parse(&["--allow_yanked_versions=all", "//pkg:bin"]).unwrap();
     let aquery = AqueryRequest::parse(&["--ignore_dev_dependency", "deps(//pkg:bin)"]).unwrap();
     let run = RunRequest::parse(&["--ignore_dev_dependency", "//pkg:bin"]).unwrap();
     let test = TestRequest::parse(&["--noignore_dev_dependency", "//pkg:probe_test"]).unwrap();
 
-    assert_eq!(query.output, QueryOutputFormat::StreamedJsonProto);
+    assert_eq!(query.output, QueryOutputFormat::Text);
     assert!(!query.bzlmod_policy.ignore_dev_dependency());
-    assert_eq!(query.lockfile_mode, LockfileMode::Error);
+    assert_eq!(query.lockfile_mode, LockfileMode::Update);
     assert_eq!(
         cquery.query.bzlmod_policy.stable_serialize(),
         "allow_yanked=all;ignore_dev_dependency=false"
     );
-    assert_eq!(cquery.query.lockfile_mode, LockfileMode::Update);
+    assert_eq!(cquery.query.lockfile_mode, LockfileMode::Error);
     assert!(aquery.query.bzlmod_policy.ignore_dev_dependency());
     assert!(run.bzlmod_policy.ignore_dev_dependency());
     assert!(!test.bzlmod_policy.ignore_dev_dependency());
@@ -118,7 +118,7 @@ fn bzlmod_policy_flags_report_structured_parse_errors() {
     let allow_error = BuildRequest::parse(&["--allow_yanked_versions=not-a-module", "//pkg:bin"])
         .unwrap_err()
         .to_string();
-    let bool_error = QueryRequest::parse(&["--ignore_dev_dependency=maybe", "//pkg:bin"])
+    let bool_error = CqueryRequest::parse(&["--ignore_dev_dependency=maybe", "//pkg:bin"])
         .unwrap_err()
         .to_string();
     let lockfile_error = BuildRequest::parse(&["--lockfile_mode=bad", "//pkg:bin"])
@@ -132,10 +132,86 @@ fn bzlmod_policy_flags_report_structured_parse_errors() {
 
 #[test]
 fn query_request_parses_expression_and_output_format() {
-    let request = QueryRequest::parse(&["--output=streamed_jsonproto", "deps(//pkg:bin)"]).unwrap();
+    let request =
+        QueryRequest::parse(&["--output=text", "--order_output=full", "deps(//pkg:bin)"]).unwrap();
 
     assert_eq!(request.expression.to_string(), "deps(//pkg:bin)");
-    assert_eq!(request.output, QueryOutputFormat::StreamedJsonProto);
+    assert_eq!(request.output, QueryOutputFormat::Text);
+    assert_eq!(request.order, slug_query_v2::QueryOrder::Full);
+}
+
+#[test]
+fn query_request_rejects_deferred_output_and_order_modes_before_runtime() {
+    let output = QueryRequest::parse(&["--output=label_kind", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
+    assert!(output.contains("only text is implemented"));
+
+    for order in ["deps", "no"] {
+        let error =
+            QueryRequest::parse(&[format!("--order_output={order}"), "//pkg:bin".to_owned()])
+                .unwrap_err()
+                .to_string();
+        assert!(error.contains("not supported"), "{error}");
+    }
+}
+
+#[test]
+fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
+    for (flag, expected) in [
+        ("--output", "expected text"),
+        ("--output=", "expected text"),
+        ("--order_output", "expected auto or full"),
+        ("--order_output=", "expected auto or full"),
+        ("--output_base", "expected a non-empty path"),
+        ("--output_base=", "expected a non-empty path"),
+        (
+            "--allow_yanked_versions=all",
+            "not supported by loading query",
+        ),
+        ("--ignore_dev_dependency", "not supported by loading query"),
+        ("--lockfile_mode=off", "not supported by loading query"),
+        ("--config=dbg", "not supported by loading query"),
+        ("--color=no", "not supported by loading query"),
+        ("--show_progress", "not supported by loading query"),
+        (
+            "--build_event_json_file=events.json",
+            "not supported by loading query",
+        ),
+        (
+            "--remote_cache=grpc://cache",
+            "not supported by loading query",
+        ),
+        ("--unknown_flag=value", "not supported by loading query"),
+    ] {
+        let error = QueryRequest::parse(&[flag, "//pkg:bin"])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{flag}: {error}");
+    }
+}
+
+#[test]
+fn cquery_and_aquery_retain_placeholder_flag_parsing_without_query_restrictions() {
+    let cquery =
+        CqueryRequest::parse(&["--output=label_kind", "--order_output=deps", "//pkg:bin"]).unwrap();
+    assert_eq!(cquery.query.output, QueryOutputFormat::LabelKind);
+    assert_eq!(cquery.query.order, slug_query_v2::QueryOrder::Auto);
+
+    let aquery = AqueryRequest::parse(&[
+        "--output=streamed_jsonproto",
+        "--order_output=no",
+        "//pkg:bin",
+    ])
+    .unwrap();
+    assert_eq!(aquery.query.output, QueryOutputFormat::StreamedJsonProto);
+    assert_eq!(aquery.query.order, slug_query_v2::QueryOrder::Auto);
+}
+
+#[test]
+fn query_request_preserves_invalid_syntax_for_authoritative_runtime_parse() {
+    let request = QueryRequest::parse(&["deps(//pkg:bin"]).unwrap();
+    assert_eq!(request.expression, "deps(//pkg:bin");
 }
 
 #[test]

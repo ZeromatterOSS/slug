@@ -13,8 +13,6 @@ use std::fmt;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
-use slug_query_v2::QueryExpression;
-use slug_query_v2::QueryParseError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandKind {
@@ -223,12 +221,11 @@ pub(crate) fn parse_single_target(
 pub(crate) fn parse_query_expression_for(
     command: CommandKind,
     positionals: &[String],
-) -> Result<QueryExpression, CommandParseError> {
+) -> Result<String, CommandParseError> {
     if positionals.is_empty() {
         return Err(CommandParseError::MissingQueryExpression { command });
     }
-    let expression = positionals.join(" ");
-    QueryExpression::parse(&expression).map_err(query_error)
+    Ok(positionals.join(" "))
 }
 
 pub(crate) fn bzlmod_command_policy(
@@ -343,6 +340,8 @@ fn parse_flag(raw: &str) -> ParsedFlag {
 fn classify_flag(name: &str) -> FlagDisposition {
     match name {
         "output"
+        | "order_output"
+        | "output_base"
         | "config"
         | "allow_yanked_versions"
         | "ignore_dev_dependency"
@@ -363,12 +362,6 @@ fn classify_flag(name: &str) -> FlagDisposition {
         | "test_env"
         | "runs_per_test" => FlagDisposition::Planned,
         _ => FlagDisposition::Planned,
-    }
-}
-
-fn query_error(error: QueryParseError) -> CommandParseError {
-    CommandParseError::InvalidQueryExpression {
-        message: error.to_string(),
     }
 }
 

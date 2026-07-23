@@ -8,51 +8,156 @@
  * above-listed licenses.
  */
 
+//! Bazel-shaped query syntax values and loading-query function registry.
+//!
+//! Parsing is the owned lowering of the borrowed-span/nom parser in
+//! `parser.rs`, adapted from Buck2's `buck2_query_parser`.
+
 use std::fmt;
+use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QueryExpression {
-    TargetPattern(String),
-    Function(QueryFunction),
+use allocative::Allocative;
+use compact_str::CompactString;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
+pub struct SourceSpan {
+    pub start: usize,
+    pub end: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QueryFunction {
-    pub name: QueryFunctionName,
-    pub args: Vec<QueryArg>,
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct Spanned<T> {
+    pub span: SourceSpan,
+    pub value: T,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QueryFunctionName {
-    Deps,
-    Rdeps,
-    Kind,
-    Attr,
-    Filter,
-    Buildfiles,
-    Tests,
+impl<T> Spanned<T> {
+    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> Spanned<U> {
+        Spanned {
+            span: self.span,
+            value: map(self.value),
+        }
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QueryArg {
-    Expr(Box<QueryExpression>),
-    StringLiteral(String),
-    Word(String),
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct QueryExpression {
+    pub span: SourceSpan,
+    pub kind: QueryExpressionKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QueryParseError {
-    EmptyExpression,
-    ExpectedExpression { offset: usize },
-    ExpectedCommaOrCloseParen { offset: usize },
-    ExpectedCloseParen { function: String, offset: usize },
-    UnsupportedFunction { name: String, offset: usize },
-    UnterminatedString { offset: usize },
-    TrailingInput { offset: usize },
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub enum QueryExpressionKind {
+    TargetLiteral(CompactString),
+    Integer(u64),
+    Function {
+        name: Spanned<CompactString>,
+        args: Arc<[QueryExpression]>,
+    },
+    Let {
+        name: Spanned<CompactString>,
+        value: Box<QueryExpression>,
+        body: Box<QueryExpression>,
+    },
+    Set(Arc<[Spanned<CompactString>]>),
+    /// Buck2's non-recursive `BinaryOpSequence`; evaluation folds it from the
+    /// left, preserving Bazel's equal-precedence semantics.
+    BinaryOpSequence {
+        left: Box<QueryExpression>,
+        operations: Arc<[(BinaryOperator, QueryExpression)]>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
+pub enum BinaryOperator {
+    Union,
+    Except,
+    Intersect,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct QueryParseError {
+    pub message: CompactString,
+    pub span: SourceSpan,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum QueryArgumentKind {
+    Expression,
+    Word,
+    Integer,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum QueryFunctionStatus {
+    Implemented,
+    Deferred,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct QueryFunctionSpec {
+    pub name: &'static str,
+    pub mandatory_arguments: usize,
+    pub argument_kinds: &'static [QueryArgumentKind],
+    pub status: QueryFunctionStatus,
+}
+
+const EXPR: QueryArgumentKind = QueryArgumentKind::Expression;
+const WORD: QueryArgumentKind = QueryArgumentKind::Word;
+const INT: QueryArgumentKind = QueryArgumentKind::Integer;
+
+// Bazel 9.2 QueryEnvironment.DEFAULT_QUERY_FUNCTIONS, in source order.
+const FUNCTIONS: &[QueryFunctionSpec] = &[
+    deferred("allpaths", 2, &[EXPR, EXPR]),
+    deferred("attr", 3, &[WORD, WORD, EXPR]),
+    deferred("buildfiles", 1, &[EXPR]),
+    QueryFunctionSpec {
+        name: "deps",
+        mandatory_arguments: 1,
+        argument_kinds: &[EXPR, INT],
+        status: QueryFunctionStatus::Implemented,
+    },
+    deferred("executables", 1, &[EXPR]),
+    deferred("filter", 2, &[WORD, EXPR]),
+    deferred("kind", 2, &[WORD, EXPR]),
+    deferred("labels", 2, &[WORD, EXPR]),
+    deferred("loadfiles", 1, &[EXPR]),
+    deferred("rdeps", 2, &[EXPR, EXPR, INT]),
+    deferred("same_pkg_direct_rdeps", 1, &[EXPR]),
+    deferred("siblings", 1, &[EXPR]),
+    deferred("some", 1, &[EXPR, INT]),
+    deferred("somepath", 2, &[EXPR, EXPR]),
+    deferred("tests", 1, &[EXPR]),
+    deferred("visible", 2, &[EXPR, EXPR]),
+];
+
+const fn deferred(
+    name: &'static str,
+    mandatory_arguments: usize,
+    argument_kinds: &'static [QueryArgumentKind],
+) -> QueryFunctionSpec {
+    QueryFunctionSpec {
+        name,
+        mandatory_arguments,
+        argument_kinds,
+        status: QueryFunctionStatus::Deferred,
+    }
+}
+
+pub fn loading_query_functions() -> &'static [QueryFunctionSpec] {
+    FUNCTIONS
+}
+
+pub fn loading_query_function(name: &str) -> Option<&'static QueryFunctionSpec> {
+    FUNCTIONS.iter().find(|function| function.name == name)
 }
 
 pub fn parse_query_expression(source: &str) -> Result<QueryExpression, QueryParseError> {
-    Parser::new(source).parse()
+    crate::parser::parse(source)
+}
+
+pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
+    validate_expression(expression)
 }
 
 impl QueryExpression {
@@ -61,283 +166,164 @@ impl QueryExpression {
     }
 }
 
-impl QueryFunctionName {
-    pub fn parse(name: &str) -> Option<Self> {
-        match name {
-            "deps" => Some(Self::Deps),
-            "rdeps" => Some(Self::Rdeps),
-            "kind" => Some(Self::Kind),
-            "attr" => Some(Self::Attr),
-            "filter" => Some(Self::Filter),
-            "buildfiles" => Some(Self::Buildfiles),
-            "tests" => Some(Self::Tests),
-            _ => None,
+fn validate_expression(expression: &QueryExpression) -> Result<(), QueryParseError> {
+    match &expression.kind {
+        QueryExpressionKind::TargetLiteral(_)
+        | QueryExpressionKind::Integer(_)
+        | QueryExpressionKind::Set(_) => Ok(()),
+        QueryExpressionKind::Let { value, body, .. } => {
+            validate_expression(value)?;
+            validate_expression(body)
         }
-    }
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Deps => "deps",
-            Self::Rdeps => "rdeps",
-            Self::Kind => "kind",
-            Self::Attr => "attr",
-            Self::Filter => "filter",
-            Self::Buildfiles => "buildfiles",
-            Self::Tests => "tests",
-        }
-    }
-}
-
-impl fmt::Display for QueryFunctionName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-impl fmt::Display for QueryExpression {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TargetPattern(pattern) => f.write_str(pattern),
-            Self::Function(function) => write!(f, "{function}"),
-        }
-    }
-}
-
-impl fmt::Display for QueryFunction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}(", self.name)?;
-        for (index, arg) in self.args.iter().enumerate() {
-            if index > 0 {
-                f.write_str(", ")?;
+        QueryExpressionKind::BinaryOpSequence { left, operations } => {
+            validate_expression(left)?;
+            for (_, right) in operations.iter() {
+                validate_expression(right)?;
             }
-            write!(f, "{arg}")?;
+            Ok(())
         }
-        f.write_str(")")
+        QueryExpressionKind::Function { name, args } => {
+            let Some(spec) = loading_query_function(&name.value) else {
+                let expected = FUNCTIONS
+                    .iter()
+                    .map(|spec| spec.name)
+                    .collect::<Vec<_>>()
+                    .join("', '");
+                return Err(QueryParseError::new(
+                    format!(
+                        "unknown function '{}'; expected one of ['{}']",
+                        name.value, expected
+                    ),
+                    name.span,
+                ));
+            };
+            if args.len() < spec.mandatory_arguments {
+                return Err(QueryParseError::new(
+                    format!("too few arguments to function '{}'", spec.name),
+                    expression.span,
+                ));
+            }
+            if args.len() > spec.argument_kinds.len() {
+                return Err(QueryParseError::new(
+                    format!("too many arguments to function '{}'", spec.name),
+                    expression.span,
+                ));
+            }
+            for (index, (argument, expected)) in args.iter().zip(spec.argument_kinds).enumerate() {
+                let valid = match expected {
+                    QueryArgumentKind::Expression => {
+                        !matches!(argument.kind, QueryExpressionKind::Integer(_))
+                    }
+                    QueryArgumentKind::Word => {
+                        matches!(argument.kind, QueryExpressionKind::TargetLiteral(_))
+                    }
+                    QueryArgumentKind::Integer => {
+                        matches!(argument.kind, QueryExpressionKind::Integer(_))
+                    }
+                };
+                if !valid {
+                    return Err(QueryParseError::new(
+                        format!(
+                            "argument {} to function '{}' must be {}",
+                            index + 1,
+                            spec.name,
+                            expected
+                        ),
+                        argument.span,
+                    ));
+                }
+                validate_expression(argument)?;
+            }
+            if spec.status == QueryFunctionStatus::Deferred {
+                return Err(QueryParseError::new(
+                    format!(
+                        "query function '{}' is recognized by Bazel 9.2 but not implemented in this loading-query slice",
+                        spec.name
+                    ),
+                    name.span,
+                ));
+            }
+            Ok(())
+        }
     }
 }
 
-impl fmt::Display for QueryArg {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Expr(expr) => write!(f, "{expr}"),
-            Self::StringLiteral(value) => write!(f, "\"{}\"", escape_string(value)),
-            Self::Word(value) => f.write_str(value),
+impl QueryParseError {
+    pub(crate) fn new(message: impl Into<CompactString>, span: SourceSpan) -> Self {
+        Self {
+            message: message.into(),
+            span,
         }
     }
 }
 
 impl fmt::Display for QueryParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::EmptyExpression => f.write_str("query expression is empty"),
-            Self::ExpectedExpression { offset } => {
-                write!(f, "expected query expression at byte {offset}")
-            }
-            Self::ExpectedCommaOrCloseParen { offset } => {
-                write!(f, "expected ',' or ')' at byte {offset}")
-            }
-            Self::ExpectedCloseParen { function, offset } => {
-                write!(f, "expected ')' for {function} at byte {offset}")
-            }
-            Self::UnsupportedFunction { name, offset } => {
-                write!(f, "unsupported query function {name:?} at byte {offset}")
-            }
-            Self::UnterminatedString { offset } => {
-                write!(f, "unterminated query string starting at byte {offset}")
-            }
-            Self::TrailingInput { offset } => write!(f, "trailing input at byte {offset}"),
-        }
+        write!(
+            f,
+            "{} at bytes {}..{}",
+            self.message, self.span.start, self.span.end
+        )
     }
 }
 
 impl std::error::Error for QueryParseError {}
 
-struct Parser<'a> {
-    source: &'a str,
-    offset: usize,
-}
-
-impl<'a> Parser<'a> {
-    fn new(source: &'a str) -> Self {
-        Self { source, offset: 0 }
-    }
-
-    fn parse(mut self) -> Result<QueryExpression, QueryParseError> {
-        self.skip_ws();
-        if self.is_eof() {
-            return Err(QueryParseError::EmptyExpression);
-        }
-        let arg = self.parse_arg(true)?;
-        self.skip_ws();
-        if !self.is_eof() {
-            return Err(QueryParseError::TrailingInput {
-                offset: self.offset,
-            });
-        }
-        match arg {
-            QueryArg::Expr(expr) => Ok(*expr),
-            QueryArg::StringLiteral(_) | QueryArg::Word(_) => {
-                Err(QueryParseError::ExpectedExpression { offset: 0 })
-            }
-        }
-    }
-
-    fn parse_arg(&mut self, top_level: bool) -> Result<QueryArg, QueryParseError> {
-        self.skip_ws();
-        if self.is_eof() || self.peek() == Some(')') || self.peek() == Some(',') {
-            return Err(QueryParseError::ExpectedExpression {
-                offset: self.offset,
-            });
-        }
-        if let Some(quote @ ('"' | '\'')) = self.peek() {
-            return self.parse_string(quote).map(QueryArg::StringLiteral);
-        }
-
-        let atom_start = self.offset;
-        let atom = self.parse_atom()?;
-        self.skip_ws();
-        if self.peek() == Some('(') {
-            self.offset += 1;
-            let Some(function_name) = QueryFunctionName::parse(&atom) else {
-                return Err(QueryParseError::UnsupportedFunction {
-                    name: atom,
-                    offset: atom_start,
-                });
-            };
-            return Ok(QueryArg::Expr(Box::new(QueryExpression::Function(
-                self.parse_function(atom_start, atom, function_name)?,
-            ))));
-        }
-
-        if top_level || looks_like_target_pattern(&atom) {
-            Ok(QueryArg::Expr(Box::new(QueryExpression::TargetPattern(
-                atom,
-            ))))
-        } else {
-            Ok(QueryArg::Word(atom))
-        }
-    }
-
-    fn parse_function(
-        &mut self,
-        function_offset: usize,
-        raw_name: String,
-        name: QueryFunctionName,
-    ) -> Result<QueryFunction, QueryParseError> {
-        let mut args = Vec::new();
-        self.skip_ws();
-        if self.peek() == Some(')') {
-            self.offset += 1;
-            return Ok(QueryFunction { name, args });
-        }
-
-        loop {
-            args.push(self.parse_arg(false)?);
-            self.skip_ws();
-            match self.peek() {
-                Some(',') => {
-                    self.offset += 1;
-                    self.skip_ws();
-                }
-                Some(')') => {
-                    self.offset += 1;
-                    return Ok(QueryFunction { name, args });
-                }
-                None => {
-                    return Err(QueryParseError::ExpectedCloseParen {
-                        function: raw_name,
-                        offset: function_offset,
-                    });
-                }
-                _ => {
-                    return Err(QueryParseError::ExpectedCommaOrCloseParen {
-                        offset: self.offset,
-                    });
-                }
-            }
-        }
-    }
-
-    fn parse_string(&mut self, quote: char) -> Result<String, QueryParseError> {
-        let start = self.offset;
-        self.offset += quote.len_utf8();
-        let mut value = String::new();
-        while let Some(ch) = self.peek() {
-            self.offset += ch.len_utf8();
-            if ch == quote {
-                return Ok(value);
-            }
-            if ch == '\\' {
-                let Some(escaped) = self.peek() else {
-                    return Err(QueryParseError::UnterminatedString { offset: start });
-                };
-                self.offset += escaped.len_utf8();
-                value.push(match escaped {
-                    'n' => '\n',
-                    'r' => '\r',
-                    't' => '\t',
-                    other => other,
-                });
-            } else {
-                value.push(ch);
-            }
-        }
-        Err(QueryParseError::UnterminatedString { offset: start })
-    }
-
-    fn parse_atom(&mut self) -> Result<String, QueryParseError> {
-        let start = self.offset;
-        while let Some(ch) = self.peek() {
-            if ch.is_whitespace() || ch == ',' || ch == ')' || ch == '(' {
-                break;
-            }
-            self.offset += ch.len_utf8();
-        }
-        if self.offset == start {
-            Err(QueryParseError::ExpectedExpression { offset: start })
-        } else {
-            Ok(self.source[start..self.offset].to_owned())
-        }
-    }
-
-    fn skip_ws(&mut self) {
-        while let Some(ch) = self.peek() {
-            if !ch.is_whitespace() {
-                break;
-            }
-            self.offset += ch.len_utf8();
-        }
-    }
-
-    fn peek(&self) -> Option<char> {
-        self.source[self.offset..].chars().next()
-    }
-
-    fn is_eof(&self) -> bool {
-        self.offset >= self.source.len()
+impl fmt::Display for QueryArgumentKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Expression => "an expression",
+            Self::Word => "a word",
+            Self::Integer => "an integer",
+        })
     }
 }
 
-fn looks_like_target_pattern(atom: &str) -> bool {
-    atom.starts_with("//")
-        || atom.starts_with('@')
-        || atom.starts_with(':')
-        || atom.contains(':')
-        || atom.ends_with("/...")
-        || atom.ends_with(":all")
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Union => "union",
+            Self::Except => "except",
+            Self::Intersect => "intersect",
+        })
+    }
 }
 
-fn escape_string(value: &str) -> String {
-    let mut escaped = String::new();
-    for ch in value.chars() {
-        match ch {
-            '\\' => escaped.push_str("\\\\"),
-            '"' => escaped.push_str("\\\""),
-            '\n' => escaped.push_str("\\n"),
-            '\r' => escaped.push_str("\\r"),
-            '\t' => escaped.push_str("\\t"),
-            ch => escaped.push(ch),
+impl fmt::Display for QueryExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            QueryExpressionKind::TargetLiteral(value) => f.write_str(value),
+            QueryExpressionKind::Integer(value) => write!(f, "{value}"),
+            QueryExpressionKind::Function { name, args } => {
+                write!(f, "{}(", name.value)?;
+                for (index, argument) in args.iter().enumerate() {
+                    if index != 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{argument}")?;
+                }
+                f.write_str(")")
+            }
+            QueryExpressionKind::Let { name, value, body } => {
+                write!(f, "let {} = {value} in {body}", name.value)
+            }
+            QueryExpressionKind::Set(values) => {
+                f.write_str("set(")?;
+                for (index, value) in values.iter().enumerate() {
+                    if index != 0 {
+                        f.write_str(" ")?;
+                    }
+                    f.write_str(&value.value)?;
+                }
+                f.write_str(")")
+            }
+            QueryExpressionKind::BinaryOpSequence { left, operations } => {
+                write!(f, "{left}")?;
+                for (operator, right) in operations.iter() {
+                    write!(f, " {operator} {right}")?;
+                }
+                Ok(())
+            }
         }
     }
-    escaped
 }

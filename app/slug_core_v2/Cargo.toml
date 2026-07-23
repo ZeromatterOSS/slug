@@ -15,6 +15,7 @@ dice_futures = { workspace = true }
 slug_identity_v2 = { workspace = true }
 slug_analysis_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }
+slug_query_v2 = { workspace = true }
 starlark = { workspace = true }
 tokio = { workspace = true }
 

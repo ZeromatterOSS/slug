@@ -8,11 +8,36 @@
  * above-listed licenses.
  */
 
+pub mod evaluator;
 pub mod expr;
+pub mod graph;
+mod parser;
 
-pub use expr::QueryArg;
+pub use evaluator::LoadingQueryEnvironment;
+pub use evaluator::QueryEnvironment;
+pub use evaluator::QueryEvaluator;
+pub use evaluator::QueryOrder;
+pub use evaluator::QueryOutput;
+pub use evaluator::TargetSet;
+pub use evaluator::async_depth_limited_traversal;
+pub use evaluator::evaluate_loading_query;
+pub use expr::BinaryOperator;
 pub use expr::QueryExpression;
-pub use expr::QueryFunction;
-pub use expr::QueryFunctionName;
+pub use expr::QueryExpressionKind;
+pub use expr::QueryFunctionSpec;
+pub use expr::QueryFunctionStatus;
 pub use expr::QueryParseError;
+pub use expr::SourceSpan;
+pub use expr::Spanned;
+pub use expr::loading_query_function;
+pub use expr::loading_query_functions;
 pub use expr::parse_query_expression;
+pub use expr::validate_loading_query;
+pub use graph::QueryError;
+pub use graph::QueryLabel;
+pub use graph::QueryNode;
+pub use graph::QueryNodeKind;
+pub use graph::RootPackageSet;
+pub use graph::RootPackageSetKey;
+pub use graph::UnconfiguredPackageGraph;
+pub use graph::UnconfiguredPackageGraphKey;

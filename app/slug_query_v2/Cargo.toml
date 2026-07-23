@@ -7,3 +7,16 @@ repository = { workspace = true }
 version = "0.1.0"
 
 [dependencies]
+allocative = { workspace = true }
+async-trait = { workspace = true }
+compact_str = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+futures = { workspace = true }
+nom = { workspace = true }
+slug_identity_v2 = { workspace = true }
+slug_loading_v2 = { workspace = true }
+starlark_map = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

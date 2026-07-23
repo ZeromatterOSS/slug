@@ -34,13 +34,32 @@ pub struct BuildRequest {
     pub default_exec_properties: Vec<(String, String)>,
 }
 
-/// A build response returned to the CLI client.
+/// A loading query request sent over the same daemon protocol.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct BuildResponse {
+pub struct QueryRequest {
+    pub expression: String,
+    pub order_output: String,
+}
+
+/// Tagged command request. The envelope is deliberately small; query syntax
+/// remains raw until the retained runtime parses it.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "request", rename_all = "snake_case")]
+pub enum DaemonRequest {
+    Build(BuildRequest),
+    Query(QueryRequest),
+}
+
+/// Common response envelope for all daemon commands.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DaemonResponse {
     pub exit_code: i32,
+    pub stdout: String,
     pub stderr: String,
     pub invalidated_files: usize,
 }
+
+pub type BuildResponse = DaemonResponse;
 
 /// Run the daemon server on the given Unix socket path. Blocks until a
 /// `shutdown` request is received or the process is killed.
@@ -71,7 +90,7 @@ pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyh
         }
         let response = handle_request(&mut daemon, &line);
         let json = serde_json::to_string(&response).unwrap_or_else(|_| {
-            r#"{"exit_code":2,"stderr":"{\"error\":\"daemon_serialize_error\"}","invalidated_files":0}"#.to_string()
+            r#"{"exit_code":2,"stdout":"","stderr":"{\"error\":\"daemon_serialize_error\"}","invalidated_files":0}"#.to_string()
         });
         if write!(stream, "{json}\n").is_err() {
             // Client disconnected; ignore.
@@ -80,12 +99,13 @@ pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyh
     Ok(())
 }
 
-fn handle_request(daemon: &mut Daemon, request_json: &str) -> BuildResponse {
-    let request: BuildRequest = match serde_json::from_str(request_json) {
+fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
+    let request: DaemonRequest = match serde_json::from_str(request_json) {
         Ok(req) => req,
         Err(error) => {
-            return BuildResponse {
+            return DaemonResponse {
                 exit_code: 2,
+                stdout: String::new(),
                 stderr: format!(
                     "{{\"error\":\"daemon_parse_error\",\"message\":\"{}\"}}",
                     error
@@ -94,17 +114,42 @@ fn handle_request(daemon: &mut Daemon, request_json: &str) -> BuildResponse {
             };
         }
     };
-    let targets: Vec<TargetPattern> = request
-        .targets
-        .iter()
-        .filter_map(|t| TargetPattern::parse(t).ok())
-        .collect();
-    let remote = build_remote_config(&request);
-    let result = daemon.build(&targets, &remote, &[]);
-    BuildResponse {
-        exit_code: result.exit_code,
-        stderr: result.stderr,
-        invalidated_files: result.invalidated_files,
+    match request {
+        DaemonRequest::Build(request) => {
+            let targets: Vec<TargetPattern> = request
+                .targets
+                .iter()
+                .filter_map(|t| TargetPattern::parse(t).ok())
+                .collect();
+            let remote = build_remote_config(&request);
+            let result = daemon.build(&targets, &remote, &[]);
+            DaemonResponse {
+                exit_code: result.exit_code,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                invalidated_files: result.invalidated_files,
+            }
+        }
+        DaemonRequest::Query(request) => {
+            let order = match slug_query_v2::QueryOrder::parse(&request.order_output) {
+                Ok(order) => order,
+                Err(error) => {
+                    return DaemonResponse {
+                        exit_code: error.exit_code,
+                        stdout: String::new(),
+                        stderr: format!("{{\"error\":\"query_error\",\"message\":\"{}\"}}", error),
+                        invalidated_files: 0,
+                    };
+                }
+            };
+            let result = daemon.query(&request.expression, order);
+            DaemonResponse {
+                exit_code: result.exit_code,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                invalidated_files: result.invalidated_files,
+            }
+        }
     }
 }
 
@@ -145,12 +190,34 @@ pub fn send_build_request(
 ) -> anyhow::Result<BuildResponse> {
     let mut stream = UnixStream::connect(socket_path)
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
-    let json = serde_json::to_string(request).context("serializing build request for daemon")?;
+    let json = serde_json::to_string(&DaemonRequest::Build(BuildRequest {
+        targets: request.targets.clone(),
+        executor: request.executor.clone(),
+        default_exec_properties: request.default_exec_properties.clone(),
+    }))
+    .context("serializing build request for daemon")?;
     write!(stream, "{json}\n").context("sending build request to daemon")?;
     let line = read_line(&mut stream)?;
     let response: BuildResponse =
         serde_json::from_str(&line).context("deserializing daemon build response")?;
     Ok(response)
+}
+
+/// Send a raw query request to a running daemon.
+pub fn send_query_request(
+    socket_path: &Path,
+    request: &QueryRequest,
+) -> anyhow::Result<DaemonResponse> {
+    let mut stream = UnixStream::connect(socket_path)
+        .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
+    let json = serde_json::to_string(&DaemonRequest::Query(QueryRequest {
+        expression: request.expression.clone(),
+        order_output: request.order_output.clone(),
+    }))
+    .context("serializing query request for daemon")?;
+    write!(stream, "{json}\n").context("sending query request to daemon")?;
+    let line = read_line(&mut stream)?;
+    serde_json::from_str(&line).context("deserializing daemon query response")
 }
 
 /// Send a shutdown command to a running daemon.

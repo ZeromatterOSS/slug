@@ -14,9 +14,14 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use slug_identity_v2::TargetPattern;
+use slug_query_v2::QueryOrder;
 use slug_reapi_v2::RemoteConfig;
 
+use crate::BuildRequest;
 use crate::Daemon;
+use crate::DaemonRequest;
+use crate::DaemonResponse;
+use crate::QueryRequest;
 
 fn scratch(name: &str) -> PathBuf {
     let nanos = SystemTime::now()
@@ -183,4 +188,88 @@ fn retained_runtime_switches_from_build_bazel_to_build_fallback() {
         "{fallback:?}"
     );
     assert!(fallback.stderr.contains("dice_starlark_package_loading"));
+}
+
+#[test]
+fn tagged_query_protocol_carries_only_raw_expression_and_order() {
+    let request = DaemonRequest::Query(QueryRequest {
+        expression: "deps(//pkg:bin)".to_owned(),
+        order_output: "full".to_owned(),
+    });
+    let json = serde_json::to_value(request).unwrap();
+    assert_eq!(json["kind"], "query");
+    assert_eq!(json["request"]["expression"], "deps(//pkg:bin)");
+    assert_eq!(json["request"]["order_output"], "full");
+    assert_eq!(json["request"].as_object().unwrap().len(), 2);
+}
+
+#[test]
+fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
+    let request = DaemonRequest::Build(BuildRequest {
+        targets: vec!["//pkg:one".to_owned(), "//pkg:two".to_owned()],
+        executor: Some("grpc://executor".to_owned()),
+        default_exec_properties: vec![
+            ("cpu".to_owned(), "x86_64".to_owned()),
+            ("os".to_owned(), "linux".to_owned()),
+        ],
+    });
+    let json = serde_json::to_string(&request).unwrap();
+    let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
+    let DaemonRequest::Build(build) = round_trip else {
+        panic!("expected tagged build request");
+    };
+    assert_eq!(build.targets, ["//pkg:one", "//pkg:two"]);
+    assert_eq!(build.executor.as_deref(), Some("grpc://executor"));
+    assert_eq!(
+        build.default_exec_properties,
+        [
+            ("cpu".to_owned(), "x86_64".to_owned()),
+            ("os".to_owned(), "linux".to_owned())
+        ]
+    );
+
+    let response = DaemonResponse {
+        exit_code: 2,
+        stdout: String::new(),
+        stderr: "{\"error\":\"analysis_not_implemented\"}".to_owned(),
+        invalidated_files: 3,
+    };
+    let response: DaemonResponse =
+        serde_json::from_str(&serde_json::to_string(&response).unwrap()).unwrap();
+    assert_eq!(response.exit_code, 2);
+    assert!(response.stdout.is_empty());
+    assert_eq!(response.stderr, "{\"error\":\"analysis_not_implemented\"}");
+    assert_eq!(response.invalidated_files, 3);
+}
+
+#[test]
+fn retained_daemon_query_observes_build_dependency_edits() {
+    let workspace = scratch("query-build-edit");
+    let package = workspace.join("pkg");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &package.join("BUILD.bazel"),
+        "filegroup(name = \"bin\", srcs = [\"one.txt\"])\n",
+    );
+    write(&package.join("one.txt"), "one\n");
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let first = daemon.query("deps(//pkg:bin)", QueryOrder::Auto);
+    assert_eq!(first.exit_code, 0, "{first:?}");
+    assert_eq!(first.stdout, "//pkg:bin\n//pkg:one.txt\n");
+    assert_eq!(first.invalidated_files, 0);
+
+    write(
+        &package.join("BUILD.bazel"),
+        "filegroup(name = \"bin\", srcs = [\"two.txt\"])\n",
+    );
+    write(&package.join("two.txt"), "two\n");
+    let second = daemon.query("deps(//pkg:bin)", QueryOrder::Auto);
+    assert_eq!(second.exit_code, 0, "{second:?}");
+    assert_eq!(second.stdout, "//pkg:bin\n//pkg:two.txt\n");
+    assert_eq!(second.invalidated_files, 2);
+
+    let third = daemon.query("deps(//pkg:bin)", QueryOrder::Auto);
+    assert_eq!(third.exit_code, 0, "{third:?}");
+    assert_eq!(third.invalidated_files, 0);
 }

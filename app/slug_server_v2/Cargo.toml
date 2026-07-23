@@ -10,6 +10,7 @@ slug_loading_v2 = { path = "../slug_loading_v2" }
 slug_analysis_v2 = { path = "../slug_analysis_v2" }
 slug_identity_v2 = { path = "../slug_identity_v2" }
 slug_reapi_v2 = { path = "../slug_reapi_v2" }
+slug_query_v2 = { path = "../slug_query_v2" }
 slug_build_api_v2 = { path = "../slug_build_api_v2" }
 anyhow = { workspace = true }
 serde = { workspace = true }

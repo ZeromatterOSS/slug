@@ -241,7 +241,7 @@ fn run_reapi_build(
 }
 
 /// Extract `--output_base=PATH` or `--output_base PATH` from the argv.
-fn extract_output_base(argv: &[String]) -> Option<String> {
+pub(super) fn extract_output_base(argv: &[String]) -> Option<String> {
     let mut iter = argv.iter();
     while let Some(arg) = iter.next() {
         if let Some(value) = arg.strip_prefix("--output_base=") {
@@ -304,7 +304,12 @@ fn run_daemon_build(argv: &[String], output_base: &str) -> i32 {
 
     match slug_server_v2::send_build_request(&socket, &daemon_request) {
         Ok(response) => {
-            eprintln!("{}", response.stderr);
+            if !response.stdout.is_empty() {
+                print!("{}", response.stdout);
+            }
+            if !response.stderr.is_empty() {
+                eprintln!("{}", response.stderr);
+            }
             response.exit_code
         }
         Err(error) => {
@@ -319,7 +324,7 @@ fn run_daemon_build(argv: &[String], output_base: &str) -> i32 {
 
 /// Start the daemon as a background process. The current binary re-execs
 /// itself with `--serve` to enter server mode.
-fn start_daemon(output_base: &std::path::Path) -> anyhow::Result<()> {
+pub(super) fn start_daemon(output_base: &std::path::Path) -> anyhow::Result<()> {
     let socket = slug_server_v2::socket_path(output_base);
     let pid_file = slug_server_v2::pid_path(output_base);
     let workspace = std::env::current_dir()

@@ -42,6 +42,10 @@ use slug_loading_v2::keys::WorkspaceFileKey;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_query_v2::QueryError;
+use slug_query_v2::QueryOrder;
+use slug_query_v2::QueryOutput;
+use slug_query_v2::evaluate_loading_query;
 
 use super::RuntimeMode;
 use super::starlark::evaluate_file;
@@ -406,6 +410,65 @@ impl WorkspaceRuntime {
 
     pub fn workspace(&self) -> &Path {
         &self.workspace
+    }
+
+    /// Evaluate one loading query in this runtime's retained DICE graph.
+    ///
+    /// Parsing, registry validation, literal resolution, and traversal all
+    /// happen after the observation batch is committed, in the same
+    /// transaction used by loading keys.
+    pub fn query_observations(
+        &self,
+        observations: WorkspaceObservation,
+        expression: &str,
+        order: QueryOrder,
+    ) -> Result<QueryOutput, QueryError> {
+        let files = observations
+            .files
+            .into_iter()
+            .map(|observation| {
+                self.validate_file_observation(observation)
+                    .map(|observation| (observation.path, observation.value))
+            })
+            .collect::<anyhow::Result<_>>()
+            .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        let directories = observations
+            .directories
+            .into_iter()
+            .map(|observation| {
+                self.validate_directory_observation(observation)
+                    .map(|observation| (observation.path, observation.value))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        let snapshot = Arc::new(WorkspaceSnapshot {
+            files: Arc::new(files),
+        });
+        let directory_snapshot = Arc::new(WorkspaceDirectorySnapshot {
+            directories: Arc::new(directories.into_iter().collect()),
+        });
+        self.runtime.block_on(async {
+            let mut updater = self.dice.updater();
+            updater
+                .changed_to(vec![(
+                    WorkspaceSnapshotKey {
+                        workspace: self.workspace.clone(),
+                    },
+                    snapshot,
+                )])
+                .map_err(|error| QueryError::evaluation(error.to_string()))?;
+            updater
+                .changed_to(vec![(
+                    WorkspaceDirectorySnapshotKey {
+                        workspace: self.workspace.clone(),
+                    },
+                    directory_snapshot,
+                )])
+                .map_err(|error| QueryError::evaluation(error.to_string()))?;
+            let mut transaction = updater.commit().await;
+            evaluate_loading_query(&mut transaction, self.workspace.clone(), expression, order)
+                .await
+        })
     }
 
     /// Commit all external file observations as one DICE version, then evaluate
