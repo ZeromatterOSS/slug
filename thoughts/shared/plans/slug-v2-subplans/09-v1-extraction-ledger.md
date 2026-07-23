@@ -1297,7 +1297,8 @@ representation-only; five ordinary query functions and M3 remain open.
 ### Stage 8 `tests` / `visible` feasibility ranking
 
 Status: 23-command tests oracle, total explicitness design, and 33-command
-labels/filegroup provenance oracle accepted; retry loading/query Gate A next
+labels/filegroup provenance oracle accepted; second Gate A attempt closed
+`REPLAN` with no code retained; bare-label coercion review next
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -1367,3 +1368,11 @@ Commit `e1d3f910` now supplies that missing native discriminator by extending
 filegroup `srcs` is absent from build output while explicit empty is printed.
 The result changes no reuse decision: Gate A remains V2-owned loading/query
 metadata with compact values and existing DICE ownership.
+
+The second Gate A implementation attempt also retained no code. After one
+downstream enum-pattern correction, Sol-low found that routing native suite
+members through V2's existing dependency-label helper rejects Bazel's accepted
+bare source spelling (`tests = ["a.txt"]`). The same restriction exists for
+Starlark label-bearing attrs. This second material correction closed the packet
+`REPLAN`. No V1/Buck decision changes; the next design must choose the exact
+shared loading label-coercion boundary and oracle before metadata work resumes.

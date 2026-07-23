@@ -2379,3 +2379,26 @@ passed all 33 commands in run
 `20260723-120148-1028764-bazel`; Sol-low returned `ACCEPT`. Gate A may now be
 retried with total exact explicitness across native, Starlark, suite, and
 generated query attributes.
+
+## Second loading metadata Gate A implementation replanned (2026-07-23)
+
+The fresh eight-file attempt incorporated the total explicitness design and
+the filegroup oracle, strengthened loading/query lifecycle and downstream
+coverage, and passed root's focused loading 13, invalidation 22, and query 27
+tests. Its one integration correction updated an older exhaustive filegroup
+test pattern for the new provenance field; both full loading and query test
+targets then compiled.
+
+The independent final review found a second material Bazel boundary. Native
+`test_suite.tests` used V2's existing `dependency_label`, which rejects bare
+package-relative labels. Bazel accepts `tests = ["a.txt"]`;
+`AbstractQueryTest#testTestSuiteWithFile` proves ordinary `deps` retains the
+source edge while `tests()` excludes it by default and strict mode diagnoses
+it. The same V2 helper currently makes Starlark label attrs reject a common
+Bazel spelling.
+
+The packet exhausted its correction budget and closed `REPLAN`. All eight Rust
+and test files were restored; no implementation was committed. The replacement
+packet is design-only and must settle shared versus native-only bare-label
+coercion, source-node projection, errors, and oracle scope before Gate A is
+retried. Strict plumbing and function activation remain separate.

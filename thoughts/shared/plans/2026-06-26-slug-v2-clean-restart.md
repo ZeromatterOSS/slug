@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while M3 test-suite loading Gate A is current |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while M3 test-suite loading Gate A is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0`; total query-attribute explicitness design Sol-accepted; filegroup provenance oracle accepted in `e1d3f910` | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, Gate A metadata implementation, and remaining command breadth | retry loading/query metadata Gate A with total exact explicitness; do not plumb strict mode or activate `tests` |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 bare-label coercion review is current |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 bare-label coercion review is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 11 of 16 Bazel default functions; exact accepted text/graph fixtures; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 23-command Bazel oracle including suite provenance accepted through `fd4c5da0`; total query-attribute explicitness design Sol-accepted; filegroup provenance oracle accepted in `e1d3f910`; two Gate A attempts closed `REPLAN` with no code retained | five functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, bare package-relative label coercion, Gate A metadata implementation, and remaining command breadth | review bare source-label coercion across native suite and Starlark label attrs before another Gate A retry |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,32 +33,24 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Retry loading/query metadata Gate A with the accepted total explicitness
-boundary. Add internal duplicate-preserving order-independent string lists;
-inherited common `tags=[]` and test `size="medium"`; derived test metadata;
-native `test_suite`; exclusive explicit-or-implicit membership with the
-explicit-empty bit; suite capability/scalars/attributes; and deduplicated
-ordinary suite edges.
+Review the bare package-relative label coercion boundary before another Gate A
+retry. Bazel accepts native suite members such as `tests = ["a.txt"]`; ordinary
+query retains that source edge even though `tests()` later drops it by default
+or diagnoses it in strict mode. Current V2 `dependency_label` rejects that
+spelling and an existing Starlark label-list test encodes the same non-Bazel
+restriction.
 
-Add a total `QueryAttribute.explicit` whose only meaning is Bazel
-`isAttributeValueExplicitlySpecified`. Loading must retain native
-`filegroup.srcs` input explicitness instead of inferring it from the normalized
-list. Mandatory alias is true; retained Starlark Explicit is true and
-Default/Implicit false; suite `tests` uses its input bit; materialized
-`$implicit_tests` is true.
+Audit pinned Bazel label conversion and `AbstractQueryTest#testTestSuiteWithFile`
+to decide whether the correct boundary is one shared loading label coercer for
+native suite and Starlark label-bearing attrs or a narrower native-only path.
+Cover bare filenames and slash-containing target names, `:name`, absolute root
+labels, the existing external-repository stop, output-label ownership, error
+shape, package/graph equality, and source-node projection. Decide what oracle
+extension is required before implementation.
 
-Use only existing package-load and unconfigured-package-graph DICE ownership.
-Focused tests must cover filegroup omitted/explicit-empty package and graph
-inequality with identical edges; natural reorder versus duplicate inequality;
-inherited defaults/overrides/redeclaration; suite omitted/explicit-empty
-membership and provenance; explicit/implicit lifecycle; tags/size/manual;
-non-test, missing, generated, and external boundaries; downstream
-`deps`/`rdeps`/`labels`/graph projection; and the inactive `tests()` guard.
-
-Allowed source remains loading attrs/package exports, the unconfigured query
-graph, and their focused loading/query/lifecycle tests. Do not add a DICE key
-or lock, plumb `--strict_test_suite`, edit the generic evaluator/registry,
-activate `tests`, implement a formatter, begin `visible`, or add regex work.
+This is a design/review packet only. Do not restore either rejected Gate A
+patch, change Rust, activate `tests`, plumb strict mode, add DICE state, or
+broaden into repository mapping.
 `visible` remains second because a truthful first slice already requires
 explicit/default target visibility, package groups and includes/excludes,
 same-package handling, and the asymmetric `javatests` to `java` rule.
