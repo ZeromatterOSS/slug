@@ -23,8 +23,10 @@ use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
 use slug_identity_v2::CanonicalLabel;
+use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::RuleCapability;
+use slug_loading_v2::TestMetadata;
 use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectoryKey;
@@ -97,6 +99,7 @@ pub struct QueryNode {
     /// Loading-time rule capability retained for ordinary-query filters. This
     /// is `None` for source, BUILD, and generated-file nodes.
     pub rule_capability: Option<RuleCapability>,
+    pub test_metadata: Option<TestMetadata>,
     pub build_file: CompactString,
     pub dependencies: Arc<[QueryLabel]>,
     pub attributes: Arc<[QueryAttribute]>,
@@ -106,6 +109,7 @@ pub struct QueryNode {
 pub struct QueryAttribute {
     pub name: CompactString,
     pub labels: Arc<[QueryLabel]>,
+    pub explicit: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -269,6 +273,7 @@ async fn compute_package_graph(
         // projection in the immutable package graph. Query-time filters must
         // not classify targets or clone rule-class names repeatedly.
         let rule_capability = target.rule_capability().cloned();
+        let test_metadata = target.test_metadata();
         let label = match &target.kind {
             PackageTargetKind::GeneratedFile { label, .. } => {
                 QueryLabel::from_canonical(label.clone())
@@ -282,7 +287,10 @@ async fn compute_package_graph(
             PackageTargetKind::ExportedFile => {
                 (QueryNodeKind::SourceFile, Arc::from([]), Arc::from([]))
             }
-            PackageTargetKind::Filegroup { srcs } => {
+            PackageTargetKind::Filegroup {
+                srcs,
+                srcs_explicit,
+            } => {
                 let labels = srcs
                     .iter()
                     .cloned()
@@ -297,6 +305,7 @@ async fn compute_package_graph(
                 let attributes = Arc::from([QueryAttribute {
                     name: CompactString::new("srcs"),
                     labels: labels.into(),
+                    explicit: *srcs_explicit,
                 }]);
                 (
                     QueryNodeKind::Rule(CompactString::new("filegroup rule")),
@@ -312,6 +321,7 @@ async fn compute_package_graph(
                     Arc::from([QueryAttribute {
                         name: CompactString::new("actual"),
                         labels: Arc::from([actual]),
+                        explicit: true,
                     }]),
                 )
             }
@@ -320,6 +330,43 @@ async fn compute_package_graph(
                 Arc::from([]),
                 Arc::from([]),
             ),
+            PackageTargetKind::TestSuite { membership, .. } => {
+                let tests = membership
+                    .tests()
+                    .iter()
+                    .cloned()
+                    .map(QueryLabel::from_canonical)
+                    .collect::<Vec<_>>();
+                let implicit_tests = membership
+                    .implicit_tests()
+                    .iter()
+                    .cloned()
+                    .map(QueryLabel::from_canonical)
+                    .collect::<Vec<_>>();
+                let mut seen = SmallSet::new();
+                let dependencies = tests
+                    .iter()
+                    .chain(implicit_tests.iter())
+                    .filter(|label| seen.insert((*label).dupe()))
+                    .map(QueryLabel::dupe)
+                    .collect::<Vec<_>>();
+                (
+                    QueryNodeKind::Rule(CompactString::new("test_suite rule")),
+                    dependencies.into(),
+                    Arc::from([
+                        QueryAttribute {
+                            name: CompactString::new("tests"),
+                            labels: tests.into(),
+                            explicit: membership.tests_explicit(),
+                        },
+                        QueryAttribute {
+                            name: CompactString::new("$implicit_tests"),
+                            labels: implicit_tests.into(),
+                            explicit: true,
+                        },
+                    ]),
+                )
+            }
             PackageTargetKind::StarlarkRule(implementation) => {
                 let dependencies = implementation
                     .dependencies()
@@ -354,6 +401,7 @@ async fn compute_package_graph(
                 label,
                 kind,
                 rule_capability,
+                test_metadata,
                 build_file: build_file.clone(),
                 dependencies,
                 attributes,
@@ -369,6 +417,7 @@ async fn compute_package_graph(
                 label: build_label,
                 kind: QueryNodeKind::BuildFile,
                 rule_capability: None,
+                test_metadata: None,
                 build_file: build_file.clone(),
                 dependencies: Arc::from([]),
                 attributes: Arc::from([]),
@@ -394,6 +443,7 @@ async fn compute_package_graph(
                     label,
                     kind: QueryNodeKind::SourceFile,
                     rule_capability: None,
+                    test_metadata: None,
                     build_file: build_file.clone(),
                     dependencies: Arc::from([]),
                     attributes: Arc::from([]),
@@ -427,6 +477,7 @@ fn project_attributes(implementation: &StarlarkRuleImplementation) -> Arc<[Query
                     .map(QueryLabel::from_canonical)
                     .collect::<Vec<_>>()
                     .into(),
+                explicit: value.provenance == AttributeProvenance::Explicit,
             })
         })
         .collect::<Vec<_>>()

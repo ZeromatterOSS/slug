@@ -30,11 +30,12 @@ pub enum AttributeKind {
     Output,
     OutputList,
     String,
+    StringList,
 }
 
 impl AttributeKind {
     pub(crate) fn reaches_labels(self) -> bool {
-        !matches!(self, Self::String)
+        !matches!(self, Self::String | Self::StringList)
     }
 
     pub(crate) fn contributes_ordinary_dependencies(self) -> bool {
@@ -128,6 +129,7 @@ pub enum CoercedAttributeValue {
     Label(CanonicalLabel),
     LabelList(Arc<[CanonicalLabel]>),
     String(CompactString),
+    StringList(Arc<[CompactString]>),
     StringKeyedLabelDict(Arc<[(CompactString, CanonicalLabel)]>),
     LabelKeyedStringDict(Arc<[(CanonicalLabel, CompactString)]>),
     LabelListDict(Arc<[(CompactString, Arc<[CanonicalLabel]>)]>),
@@ -170,7 +172,7 @@ impl CoercedAttributeValue {
                 left.labels(labels);
                 right.labels(labels);
             }
-            Self::String(_) | Self::None => {}
+            Self::String(_) | Self::StringList(_) | Self::None => {}
         }
     }
 }

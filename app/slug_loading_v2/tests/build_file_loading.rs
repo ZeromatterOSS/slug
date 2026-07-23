@@ -14,6 +14,7 @@ use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::PackageTarget;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::RuleCapability;
+use slug_loading_v2::TestSuiteMembership;
 use slug_loading_v2::file_discovery::BUILD_FILE_FALLBACK;
 use slug_loading_v2::file_discovery::BUILD_FILE_PRIMARY;
 use slug_loading_v2::file_discovery::MODULE_FILE;
@@ -233,6 +234,9 @@ config_setting(name = "setting", values = {"cpu": "k8"})
         Some(RuleCapability {
             rule_class: rule_class.into(),
             executable,
+            test_kind: rule_class
+                .ends_with("_test")
+                .then_some(slug_loading_v2::TestRuleKind::Test),
         })
     };
 
@@ -362,6 +366,7 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
                 name: "fg".to_owned(),
                 kind: PackageTargetKind::Filegroup {
                     srcs: vec![CanonicalLabel::parse("@@//pkg:data.txt").unwrap()].into(),
+                    srcs_explicit: true,
                 },
             },
             PackageTarget {
@@ -378,6 +383,7 @@ fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
                 name: "macro_file".to_owned(),
                 kind: PackageTargetKind::Filegroup {
                     srcs: vec![CanonicalLabel::parse("@@//pkg:macro.txt").unwrap()].into(),
+                    srcs_explicit: true,
                 },
             },
         ]
@@ -412,7 +418,7 @@ fn native_labels_canonicalize_spelling_preserve_order_and_reject_duplicates() {
     );
     assert_eq!(initial, equivalent);
 
-    let PackageTargetKind::Filegroup { srcs } = &equivalent.targets[0].kind else {
+    let PackageTargetKind::Filegroup { srcs, .. } = &equivalent.targets[0].kind else {
         panic!("expected filegroup")
     };
     assert_eq!(
@@ -523,6 +529,206 @@ fn direct_starlark_label_lists_reject_explicit_and_materialized_default_duplicat
             CanonicalLabel::parse("@@//pkg:default.txt").unwrap(),
             CanonicalLabel::parse("@@//pkg:other.txt").unwrap(),
         ]
+    );
+}
+
+#[test]
+fn test_metadata_retains_inherited_values_suite_provenance_and_bazel_ordering() {
+    let workspace = scratch("test-metadata");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nplain = rule(implementation = _impl)\nsample_test = rule(implementation = _impl, test = True)\n",
+    )
+    .unwrap();
+    let build = package.join(BUILD_FILE_PRIMARY);
+    fs::write(
+        &build,
+        "load(\":defs.bzl\", \"plain\", \"sample_test\")\n\
+         test_suite(name = \"implicit\")\n\
+         test_suite(name = \"empty\", tests = [])\n\
+         test_suite(name = \"filtered\", tags = [\"fast\", \"-slow\"])\n\
+         test_suite(name = \"literal_plus_excluded\", tags = [\"-+tag\"])\n\
+         test_suite(name = \"suite_manual_is_ignored\", tags = [\"manual\"])\n\
+         test_suite(name = \"large_only\", tags = [\"large\"])\n\
+         test_suite(name = \"explicit\", tests = [\"//ordering/a/b:a\", \"//ordering/a:b/c\", \"//ordering:𐀀\", \"//ordering:\"], tags = [\"z\", \"a\", \"z\"])\n\
+         plain(name = \"ordinary\", tags = [\"z\", \"a\", \"z\"])\n\
+         sample_test(name = \"auto\")\n\
+         sample_test(name = \"fast_test\", tags = [\"fast\"])\n\
+         sample_test(name = \"slow_test\", tags = [\"slow\", \"fast\"])\n\
+         sample_test(name = \"plus_test\", tags = [\"+tag\"])\n\
+         sample_test(name = \"large_test\", size = \"large\")\n\
+         sample_test(name = \"manual_test\", tags = [\"𐀀\", \"\", \"𐀀\", \"ascii\", \"manual\", \"-+tag\"], size = \"small\")\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let target = |name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .unwrap()
+    };
+    let implicit_members = [
+        CanonicalLabel::parse("@@//pkg:auto").unwrap(),
+        CanonicalLabel::parse("@@//pkg:fast_test").unwrap(),
+        CanonicalLabel::parse("@@//pkg:large_test").unwrap(),
+        CanonicalLabel::parse("@@//pkg:plus_test").unwrap(),
+        CanonicalLabel::parse("@@//pkg:slow_test").unwrap(),
+    ];
+    for (name, explicit) in [("implicit", false), ("empty", true)] {
+        let PackageTargetKind::TestSuite { membership, .. } = &target(name).kind else {
+            panic!("expected test_suite")
+        };
+        let TestSuiteMembership::Implicit {
+            members,
+            tests_explicit,
+        } = membership
+        else {
+            panic!("expected implicit membership")
+        };
+        assert_eq!(members.as_ref(), implicit_members);
+        assert_eq!(*tests_explicit, explicit);
+    }
+    let implicit = |name: &str| {
+        let PackageTargetKind::TestSuite { membership, .. } = &target(name).kind else {
+            panic!("expected test_suite")
+        };
+        membership
+            .implicit_tests()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(implicit("filtered"), ["@@//pkg:fast_test"]);
+    assert_eq!(
+        implicit("literal_plus_excluded"),
+        [
+            "@@//pkg:auto",
+            "@@//pkg:fast_test",
+            "@@//pkg:large_test",
+            "@@//pkg:slow_test",
+        ]
+    );
+    assert_eq!(
+        implicit("suite_manual_is_ignored"),
+        [
+            "@@//pkg:auto",
+            "@@//pkg:fast_test",
+            "@@//pkg:large_test",
+            "@@//pkg:plus_test",
+            "@@//pkg:slow_test",
+        ]
+    );
+    assert_eq!(implicit("large_only"), ["@@//pkg:large_test"]);
+
+    let PackageTargetKind::TestSuite { membership, tags } = &target("explicit").kind else {
+        panic!("expected test_suite")
+    };
+    let TestSuiteMembership::Explicit { tests } = membership else {
+        panic!("expected explicit membership")
+    };
+    assert_eq!(
+        tests.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        [
+            "@@//ordering:",
+            "@@//ordering:𐀀",
+            "@@//ordering/a:b/c",
+            "@@//ordering/a/b:a",
+        ]
+    );
+    assert_eq!(tags.as_ref(), ["a", "z", "z"]);
+
+    let PackageTargetKind::StarlarkRule(ordinary) = &target("ordinary").kind else {
+        panic!("expected Starlark rule")
+    };
+    assert!(matches!(
+        ordinary
+            .values()
+            .iter()
+            .find(|value| value.declaration_name == "tags")
+            .unwrap()
+            .value
+            .as_ref(),
+        CoercedAttributeValue::StringList(values) if values.as_ref() == ["a", "z", "z"]
+    ));
+    assert!(
+        ordinary
+            .values()
+            .iter()
+            .all(|value| value.declaration_name != "size")
+    );
+
+    let manual = target("manual_test").test_metadata().unwrap();
+    assert_eq!(
+        manual.tags.as_ref(),
+        ["-+tag", "ascii", "manual", "", "𐀀", "𐀀"]
+    );
+    assert_eq!(manual.size.as_deref(), Some("small"));
+    assert!(manual.manual);
+    let auto = target("auto").test_metadata().unwrap();
+    assert!(auto.tags.is_empty());
+    assert_eq!(auto.size.as_deref(), Some("medium"));
+    assert!(!auto.manual);
+    assert_eq!(
+        target("auto").rule_capability().unwrap().test_kind,
+        Some(slug_loading_v2::TestRuleKind::Test)
+    );
+    assert_eq!(
+        target("explicit").rule_capability().unwrap().test_kind,
+        Some(slug_loading_v2::TestRuleKind::Suite)
+    );
+
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nbad = rule(implementation = _impl, attrs = {\"tags\": attr.string()})\n",
+    )
+    .unwrap();
+    fs::write(
+        &build,
+        "load(\":defs.bzl\", \"bad\")\nbad(name = \"bad\")\n",
+    )
+    .unwrap();
+    let tags_redeclaration = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        tags_redeclaration.contains("rule attribute `tags` is built in and cannot be redeclared"),
+        "{tags_redeclaration}"
+    );
+
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nbad_test = rule(implementation = _impl, test = True, attrs = {\"size\": attr.string()})\n",
+    )
+    .unwrap();
+    fs::write(
+        &build,
+        "load(\":defs.bzl\", \"bad_test\")\nbad_test(name = \"bad\")\n",
+    )
+    .unwrap();
+    let size_redeclaration = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        size_redeclaration.contains("rule attribute `size` is built in and cannot be redeclared"),
+        "{size_redeclaration}"
+    );
+
+    fs::write(
+        &build,
+        "test_suite(name = \"bad\", tests = [\"one\", \":one\"])\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("Label '//pkg:one' is duplicated in the 'tests' attribute of rule 'bad'"),
+        "{error}"
     );
 }
 
@@ -848,6 +1054,7 @@ probe(
             AttributeKind::Label,
             AttributeKind::LabelList,
             AttributeKind::LabelList,
+            AttributeKind::StringList,
         ]
     );
     assert_eq!(rule.schema()[3].declaration_name(), "_implicit");
@@ -1091,7 +1298,8 @@ fn build_and_macro_native_glob_share_the_prepared_package_listing() {
             (
                 "direct".to_owned(),
                 PackageTargetKind::Filegroup {
-                    srcs: vec![CanonicalLabel::parse("@@//pkg:keep.txt").unwrap()].into()
+                    srcs: vec![CanonicalLabel::parse("@@//pkg:keep.txt").unwrap()].into(),
+                    srcs_explicit: true,
                 }
             ),
             (
@@ -1104,19 +1312,22 @@ fn build_and_macro_native_glob_share_the_prepared_package_listing() {
                         CanonicalLabel::parse("@@//pkg:skip.txt").unwrap(),
                         CanonicalLabel::parse("@@//pkg:sub").unwrap()
                     ]
-                    .into()
+                    .into(),
+                    srcs_explicit: true,
                 }
             ),
             (
                 "omitted".to_owned(),
                 PackageTargetKind::Filegroup {
                     srcs: Arc::from([]),
+                    srcs_explicit: true,
                 },
             ),
             (
                 "macro".to_owned(),
                 PackageTargetKind::Filegroup {
-                    srcs: vec![CanonicalLabel::parse("@@//pkg:sub/child.txt").unwrap()].into()
+                    srcs: vec![CanonicalLabel::parse("@@//pkg:sub/child.txt").unwrap()].into(),
+                    srcs_explicit: true,
                 }
             ),
         ]

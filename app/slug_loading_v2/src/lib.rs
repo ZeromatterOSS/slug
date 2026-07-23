@@ -38,3 +38,6 @@ pub use package::LoadedPackage;
 pub use package::PackageTarget;
 pub use package::PackageTargetKind;
 pub use package::RuleCapability;
+pub use package::TestMetadata;
+pub use package::TestRuleKind;
+pub use package::TestSuiteMembership;

@@ -842,6 +842,266 @@ async fn labels_projects_supported_native_filegroup_and_alias_attributes() {
 }
 
 #[tokio::test]
+async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitness() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"explicit\": attr.label(), \"defaulted\": attr.label(default = \":default.txt\"), \"_implicit\": attr.label(default = \":implicit.txt\"), \"many\": attr.label_list()})\nprobe_test = rule(implementation = _impl, test = True)\n",
+    );
+    let build = workspace.join("pkg/BUILD.bazel");
+    write(
+        &build,
+        "load(\":defs.bzl\", \"probe\", \"probe_test\")\n\
+         filegroup(name = \"omitted\")\n\
+         filegroup(name = \"empty\", srcs = [])\n\
+         alias(name = \"redirect\", actual = \":auto\")\n\
+         test_suite(name = \"implicit\")\n\
+         test_suite(name = \"empty_suite\", tests = [])\n\
+         test_suite(name = \"explicit_suite\", tests = [\":auto\", \":manual_test\"], tags = [\"suite\", \"manual\"])\n\
+         probe(name = \"attrs\", explicit = \":explicit.txt\", many = select({\":condition\": [\":dupe.txt\"]}) + [\":dupe.txt\"])\n\
+         probe_test(name = \"auto\", tags = [\"z\", \"a\", \"z\"])\n\
+         probe_test(name = \"manual_test\", tags = [\"manual\", \"-+tag\"], size = \"large\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace: workspace.clone(),
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    let node = |name: &str| {
+        graph
+            .nodes
+            .values()
+            .find(|node| node.label.to_string() == format!("//pkg:{name}"))
+            .unwrap()
+    };
+    let attribute = |name: &str, attribute: &str| {
+        node(name)
+            .attributes
+            .iter()
+            .find(|value| value.name == attribute)
+            .unwrap()
+    };
+
+    assert!(!attribute("omitted", "srcs").explicit);
+    assert!(attribute("empty", "srcs").explicit);
+    assert!(attribute("redirect", "actual").explicit);
+    assert!(attribute("attrs", "explicit").explicit);
+    assert!(!attribute("attrs", "defaulted").explicit);
+    assert!(!attribute("attrs", "$implicit").explicit);
+    assert_eq!(
+        attribute("attrs", "many")
+            .labels
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:dupe.txt", "//pkg:dupe.txt"]
+    );
+    assert_eq!(
+        node("attrs")
+            .dependencies
+            .iter()
+            .filter(|label| label.to_string() == "//pkg:dupe.txt")
+            .count(),
+        1
+    );
+
+    for (suite, tests_explicit) in [
+        ("implicit", false),
+        ("empty_suite", true),
+        ("explicit_suite", true),
+    ] {
+        assert_eq!(attribute(suite, "tests").explicit, tests_explicit);
+        assert!(attribute(suite, "$implicit_tests").explicit);
+    }
+    assert_eq!(
+        attribute("implicit", "$implicit_tests")
+            .labels
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:auto"]
+    );
+    assert!(attribute("implicit", "tests").labels.is_empty());
+    assert_eq!(
+        attribute("explicit_suite", "tests")
+            .labels
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:auto", "//pkg:manual_test"]
+    );
+    assert!(
+        attribute("explicit_suite", "$implicit_tests")
+            .labels
+            .is_empty()
+    );
+    assert_eq!(
+        node("explicit_suite")
+            .dependencies
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:auto", "//pkg:manual_test"]
+    );
+    assert_eq!(
+        node("implicit")
+            .dependencies
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:auto"]
+    );
+    assert_eq!(
+        node("explicit_suite")
+            .rule_capability
+            .as_ref()
+            .map(|capability| (
+                capability.rule_class.as_str(),
+                capability.executable,
+                capability.test_kind,
+            )),
+        Some((
+            "test_suite",
+            false,
+            Some(slug_loading_v2::TestRuleKind::Suite),
+        ))
+    );
+    assert_eq!(
+        node("auto")
+            .rule_capability
+            .as_ref()
+            .and_then(|capability| capability.test_kind),
+        Some(slug_loading_v2::TestRuleKind::Test)
+    );
+    let suite = node("explicit_suite").test_metadata.as_ref().unwrap();
+    assert_eq!(suite.tags.as_ref(), ["manual", "suite"]);
+    assert_eq!(suite.size, None);
+    assert!(suite.manual);
+    let test = node("manual_test").test_metadata.as_ref().unwrap();
+    assert_eq!(test.tags.as_ref(), ["-+tag", "manual"]);
+    assert_eq!(test.size.as_deref(), Some("large"));
+    assert!(test.manual);
+    assert!(node("attrs").test_metadata.is_none());
+
+    let error = evaluate_loading_query(
+        &mut transaction,
+        workspace.clone(),
+        "tests(//pkg:implicit)",
+        QueryOrder::Auto,
+    )
+    .await
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("tests"), "{error}");
+}
+
+#[tokio::test]
+async fn test_suite_metadata_reuses_reorders_and_recovers_across_same_dice_lifecycle() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe_test = rule(implementation = _impl, test = True)\n",
+    );
+    let build = workspace.join("pkg/BUILD.bazel");
+    let explicit = |tests: &str, tags: &str| {
+        format!(
+            "load(\":defs.bzl\", \"probe_test\")\nprobe_test(name = \"one\")\nprobe_test(name = \"two\")\ntest_suite(name = \"suite\", tests = {tests}, tags = {tags})\n"
+        )
+    };
+    write(
+        &build,
+        &explicit("[\":two\", \":one\"]", "[\"z\", \"a\", \"z\"]"),
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "deps(//pkg:suite, 1)";
+    let expected = "//pkg:one\n//pkg:suite\n//pkg:two\n";
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(initial.unwrap().stdout(), expected);
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        &explicit("[\":one\", \":two\"]", "[\"z\", \"z\", \"a\"]"),
+    );
+    let (reordered, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(reordered.unwrap().stdout(), expected);
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+
+    write(&build, &explicit("[\":one\", \":two\"]", "[\"a\", \"z\"]"));
+    let (duplicate_removed, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(duplicate_removed.unwrap().stdout(), expected);
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        &explicit("[\":two\", \":one\"]", "[\"z\", \"a\", \"z\"]"),
+    );
+    let (duplicate_restored, events) =
+        query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(duplicate_restored.unwrap().stdout(), expected);
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        &explicit("[\":one\", \"one\"]", "[\"z\", \"a\", \"z\"]"),
+    );
+    let (duplicate, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert!(
+        duplicate
+            .unwrap_err()
+            .to_string()
+            .contains("Label '//pkg:one' is duplicated in the 'tests' attribute of rule 'suite'")
+    );
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        &explicit("[\":two\", \":one\"]", "[\"z\", \"a\", \"z\"]"),
+    );
+    let (recovered, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(recovered.unwrap().stdout(), expected);
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+
+    write(
+        &build,
+        "load(\":defs.bzl\", \"probe_test\")\nprobe_test(name = \"one\")\nprobe_test(name = \"two\")\ntest_suite(name = \"suite\")\n",
+    );
+    let (implicit, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(implicit.unwrap().stdout(), expected);
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        "load(\":defs.bzl\", \"probe_test\")\nprobe_test(name = \"one\")\nprobe_test(name = \"two\")\ntest_suite(name = \"suite\", tests = [])\n",
+    );
+    let (explicit_empty, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(explicit_empty.unwrap().stdout(), expected);
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    fs::remove_file(&build).unwrap();
+    let (deleted, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert!(deleted.is_err());
+    assert_eq!(events, [package("pkg", ActivationKind::Evaluated)]);
+
+    write(
+        &build,
+        "load(\":defs.bzl\", \"probe_test\")\nprobe_test(name = \"one\")\nprobe_test(name = \"two\")\ntest_suite(name = \"suite\", tests = [])\n",
+    );
+    let (recreated, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(recreated.unwrap().stdout(), expected);
+    assert_eq!(events, [package("pkg", ActivationKind::Reused)]);
+}
+
+#[tokio::test]
 async fn native_label_canonicalization_reuses_rejects_duplicates_and_recovers() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");

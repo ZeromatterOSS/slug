@@ -116,6 +116,10 @@ impl PackageTarget {
     pub fn rule_capability(&self) -> Option<&RuleCapability> {
         self.kind.rule_capability()
     }
+
+    pub fn test_metadata(&self) -> Option<TestMetadata> {
+        self.kind.test_metadata()
+    }
 }
 
 /// Immutable loading-time classification used by the deferred Stage 8
@@ -125,26 +129,83 @@ impl PackageTarget {
 pub struct RuleCapability {
     pub rule_class: CompactString,
     pub executable: bool,
+    pub test_kind: Option<TestRuleKind>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+pub enum TestRuleKind {
+    Test,
+    Suite,
 }
 
 static FILEGROUP_RULE_CAPABILITY: RuleCapability = RuleCapability {
     rule_class: CompactString::const_new("filegroup"),
     executable: false,
+    test_kind: None,
 };
 static ALIAS_RULE_CAPABILITY: RuleCapability = RuleCapability {
     rule_class: CompactString::const_new("alias"),
     executable: false,
+    test_kind: None,
 };
 static CONFIG_SETTING_RULE_CAPABILITY: RuleCapability = RuleCapability {
     rule_class: CompactString::const_new("config_setting"),
     executable: false,
+    test_kind: None,
 };
+static TEST_SUITE_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("test_suite"),
+    executable: false,
+    test_kind: Some(TestRuleKind::Suite),
+};
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct TestMetadata {
+    pub tags: Arc<[CompactString]>,
+    pub size: Option<CompactString>,
+    pub manual: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum TestSuiteMembership {
+    Explicit {
+        tests: Arc<[CanonicalLabel]>,
+    },
+    Implicit {
+        members: Arc<[CanonicalLabel]>,
+        tests_explicit: bool,
+    },
+}
+
+impl TestSuiteMembership {
+    pub fn tests(&self) -> &[CanonicalLabel] {
+        match self {
+            Self::Explicit { tests } => tests,
+            Self::Implicit { .. } => &[],
+        }
+    }
+
+    pub fn implicit_tests(&self) -> &[CanonicalLabel] {
+        match self {
+            Self::Explicit { .. } => &[],
+            Self::Implicit { members, .. } => members,
+        }
+    }
+
+    pub fn tests_explicit(&self) -> bool {
+        match self {
+            Self::Explicit { .. } => true,
+            Self::Implicit { tests_explicit, .. } => *tests_explicit,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum PackageTargetKind {
     ExportedFile,
     Filegroup {
         srcs: Arc<[CanonicalLabel]>,
+        srcs_explicit: bool,
     },
     Alias {
         actual: CanonicalLabel,
@@ -154,6 +215,10 @@ pub enum PackageTargetKind {
     /// intentionally owned by a later configured-analysis stage.
     ConfigSetting {
         values: Arc<[(CompactString, CompactString)]>,
+    },
+    TestSuite {
+        membership: TestSuiteMembership,
+        tags: Arc<[CompactString]>,
     },
     /// A file declared by an `attr.output` or `attr.output_list` value.
     /// Its generator is retained explicitly; names alone cannot determine it.
@@ -176,8 +241,40 @@ impl PackageTargetKind {
             Self::Filegroup { .. } => Some(&FILEGROUP_RULE_CAPABILITY),
             Self::Alias { .. } => Some(&ALIAS_RULE_CAPABILITY),
             Self::ConfigSetting { .. } => Some(&CONFIG_SETTING_RULE_CAPABILITY),
+            Self::TestSuite { .. } => Some(&TEST_SUITE_RULE_CAPABILITY),
             Self::StarlarkRule(rule) => Some(&rule.capability),
             Self::ExportedFile | Self::GeneratedFile { .. } => None,
+        }
+    }
+
+    fn test_metadata(&self) -> Option<TestMetadata> {
+        match self {
+            Self::TestSuite { tags, .. } => Some(TestMetadata {
+                tags: tags.clone(),
+                size: None,
+                manual: tags.iter().any(|tag| tag == "manual"),
+            }),
+            Self::StarlarkRule(rule) if rule.is_test() => {
+                let tags = rule
+                    .value("tags")
+                    .and_then(|value| match value.value.as_ref() {
+                        CoercedAttributeValue::StringList(tags) => Some(tags.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| Arc::from([]));
+                let size = rule
+                    .value("size")
+                    .and_then(|value| match value.value.as_ref() {
+                        CoercedAttributeValue::String(size) => Some(size.clone()),
+                        _ => None,
+                    });
+                Some(TestMetadata {
+                    manual: tags.iter().any(|tag| tag == "manual"),
+                    tags,
+                    size,
+                })
+            }
+            _ => None,
         }
     }
 }
@@ -222,6 +319,16 @@ impl StarlarkRuleImplementation {
 
     pub fn values(&self) -> &[AttributeValue] {
         &self.values
+    }
+
+    fn value(&self, name: &str) -> Option<&AttributeValue> {
+        self.values
+            .iter()
+            .find(|value| value.declaration_name == name)
+    }
+
+    fn is_test(&self) -> bool {
+        self.capability.test_kind == Some(TestRuleKind::Test)
     }
 }
 
@@ -273,14 +380,60 @@ impl PackageRecorder {
         Ok(())
     }
 
-    fn filegroup(&self, name: String, srcs: Vec<String>) -> anyhow::Result<()> {
+    fn filegroup(&self, name: String, srcs: Option<Vec<String>>) -> anyhow::Result<()> {
+        let srcs_explicit = srcs.is_some();
         let srcs = srcs
+            .unwrap_or_default()
             .iter()
             .map(|src| self.dependency_label(src))
             .collect::<anyhow::Result<Vec<_>>>()?;
         reject_duplicate_canonical_labels(&srcs, "srcs", &name)?;
         let srcs = srcs.into();
-        self.record_target(name, PackageTargetKind::Filegroup { srcs })
+        self.record_target(
+            name,
+            PackageTargetKind::Filegroup {
+                srcs,
+                srcs_explicit,
+            },
+        )
+    }
+
+    fn test_suite(
+        &self,
+        name: String,
+        tests: Option<Vec<String>>,
+        mut tags: Vec<String>,
+    ) -> anyhow::Result<()> {
+        let tests_explicit = tests.is_some();
+        let mut tests = tests
+            .unwrap_or_default()
+            .iter()
+            .map(|test| self.dependency_label(test))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        reject_duplicate_canonical_labels(&tests, "tests", &name)?;
+        tests.sort_by(CanonicalLabel::bazel_natural_cmp);
+        tags.sort_unstable();
+        let membership = if tests.is_empty() {
+            TestSuiteMembership::Implicit {
+                members: Arc::from([]),
+                tests_explicit,
+            }
+        } else {
+            TestSuiteMembership::Explicit {
+                tests: tests.into(),
+            }
+        };
+        self.record_target(
+            name,
+            PackageTargetKind::TestSuite {
+                membership,
+                tags: tags
+                    .into_iter()
+                    .map(CompactString::from)
+                    .collect::<Vec<_>>()
+                    .into(),
+            },
+        )
     }
 
     fn alias(&self, name: String, actual: String) -> anyhow::Result<()> {
@@ -379,7 +532,38 @@ impl PackageRecorder {
         load_fingerprint: [u8; 32],
         retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
     ) -> LoadedPackage {
-        let state = self.state.into_inner();
+        let mut state = self.state.into_inner();
+        let mut implicit_candidates = state
+            .targets
+            .iter()
+            .filter_map(|(name, kind)| match kind {
+                PackageTargetKind::StarlarkRule(rule) if rule.is_test() => {
+                    kind.test_metadata().map(|metadata| {
+                        (
+                            package_context_label(&self.package, name)
+                                .expect("recorded target names are valid package-context labels"),
+                            metadata,
+                        )
+                    })
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        implicit_candidates.sort_by(|(left, _), (right, _)| left.bazel_natural_cmp(right));
+        for (_, kind) in state.targets.iter_mut() {
+            if let PackageTargetKind::TestSuite {
+                membership: TestSuiteMembership::Implicit { members, .. },
+                tags,
+            } = kind
+            {
+                *members = implicit_candidates
+                    .iter()
+                    .filter(|(_, metadata)| implicit_test_matches_suite(metadata, tags))
+                    .map(|(label, _)| label.clone())
+                    .collect::<Vec<_>>()
+                    .into();
+            }
+        }
         LoadedPackage {
             package_dir,
             build_file,
@@ -396,6 +580,24 @@ impl PackageRecorder {
             retained_bzl_modules,
         }
     }
+}
+
+fn implicit_test_matches_suite(metadata: &TestMetadata, suite_tags: &[CompactString]) -> bool {
+    if metadata.manual {
+        return false;
+    }
+    suite_tags.iter().all(|filter| {
+        if filter == "manual" {
+            return true;
+        }
+        let (excluded, required) = match filter.strip_prefix('-') {
+            Some(required) => (true, required),
+            None => (false, filter.strip_prefix('+').unwrap_or(filter)),
+        };
+        let present = metadata.tags.iter().any(|tag| tag == required)
+            || metadata.size.as_deref() == Some(required);
+        if excluded { !present } else { present }
+    })
 }
 
 fn reject_duplicate_canonical_labels(
@@ -492,8 +694,21 @@ fn filegroup_global(
     srcs: Option<UnpackListOrTuple<&str>>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?
-        .filegroup(name.to_owned(), srcs.map(list).unwrap_or_default())?;
+    PackageRecorder::from_evaluator(eval)?.filegroup(name.to_owned(), srcs.map(list))?;
+    Ok(NoneType)
+}
+
+fn test_suite_global(
+    name: &str,
+    tests: Option<UnpackListOrTuple<&str>>,
+    tags: UnpackListOrTuple<&str>,
+    eval: &mut Evaluator,
+) -> anyhow::Result<NoneType> {
+    PackageRecorder::from_evaluator(eval)?.test_suite(
+        name.to_owned(),
+        tests.map(list),
+        list(tags),
+    )?;
     Ok(NoneType)
 }
 
@@ -580,6 +795,7 @@ fn intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
         AttributeKind::Label | AttributeKind::Output => CoercedAttributeValue::None,
         AttributeKind::LabelList => CoercedAttributeValue::LabelList(Arc::from([])),
         AttributeKind::String => CoercedAttributeValue::String(CompactString::default()),
+        AttributeKind::StringList => CoercedAttributeValue::StringList(Arc::from([])),
         AttributeKind::StringKeyedLabelDict => {
             CoercedAttributeValue::StringKeyedLabelDict(Arc::from([]))
         }
@@ -614,6 +830,17 @@ fn coerce_raw_value(
             "output",
         )?)),
         AttributeKind::String => Ok(CoercedAttributeValue::String(raw_string(raw, "string")?)),
+        AttributeKind::StringList => {
+            let RawAttributeValue::List(values) = raw else {
+                anyhow::bail!("attribute must be a list of strings");
+            };
+            let mut values = values
+                .iter()
+                .map(|value| raw_string(value, "string list"))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            values.sort_unstable();
+            Ok(CoercedAttributeValue::StringList(values.into()))
+        }
         AttributeKind::LabelList | AttributeKind::OutputList => {
             let RawAttributeValue::List(values) = raw else {
                 anyhow::bail!("attribute must be a list of labels");
@@ -780,9 +1007,14 @@ fn coerce_starlark_value(
         }
         return result.ok_or_else(|| anyhow::anyhow!("select() requires at least one branch"));
     }
-    if matches!(kind, AttributeKind::LabelList | AttributeKind::OutputList)
-        && ListRef::from_value(value).is_none()
+    if matches!(
+        kind,
+        AttributeKind::LabelList | AttributeKind::OutputList | AttributeKind::StringList
+    ) && ListRef::from_value(value).is_none()
     {
+        if kind == AttributeKind::StringList {
+            anyhow::bail!("attribute `{attribute_name}` must be a list of strings");
+        }
         anyhow::bail!("attribute `{attribute_name}` must be a list of labels");
     }
     let raw = raw_attribute_value(value).map_err(|_| {
@@ -844,6 +1076,7 @@ impl<'v> Freeze for RuleDefinition<'v> {
             capability: Arc::new(RuleCapability {
                 rule_class,
                 executable: self.executable || self.test,
+                test_kind: self.test.then_some(TestRuleKind::Test),
             }),
         })
     }
@@ -1375,6 +1608,15 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         filegroup_global(name, srcs, eval)
     }
 
+    fn test_suite(
+        name: &str,
+        tests: Option<UnpackListOrTuple<&str>>,
+        #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        test_suite_global(name, tests, tags, eval)
+    }
+
     fn alias(name: &str, actual: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
         alias_global(name, actual, eval)
     }
@@ -1411,6 +1653,9 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         let mut schema = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
+                if name == "tags" || (test && name == "size") {
+                    anyhow::bail!("rule attribute `{name}` is built in and cannot be redeclared");
+                }
                 let definition = AttributeDefinition::from_value(value)
                     .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
                 schema.push(RuleAttributeSchema {
@@ -1421,6 +1666,24 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     default: definition.default.clone(),
                 });
             }
+        }
+        schema.push(RuleAttributeSchema {
+            name: CompactString::const_new("tags"),
+            kind: AttributeKind::StringList,
+            mandatory: false,
+            configurable: false,
+            default: Some(CoercedAttributeValue::StringList(Arc::from([]))),
+        });
+        if test {
+            schema.push(RuleAttributeSchema {
+                name: CompactString::const_new("size"),
+                kind: AttributeKind::String,
+                mandatory: false,
+                configurable: false,
+                default: Some(CoercedAttributeValue::String(CompactString::const_new(
+                    "medium",
+                ))),
+            });
         }
         Ok(RuleDefinition {
             implementation,
@@ -1487,6 +1750,16 @@ fn native_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         filegroup_global(name, srcs, eval)
+    }
+
+    fn test_suite(
+        #[starlark(this)] _native: Value,
+        name: &str,
+        tests: Option<UnpackListOrTuple<&str>>,
+        #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        test_suite_global(name, tests, tags, eval)
     }
 
     fn alias(
