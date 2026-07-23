@@ -1215,9 +1215,79 @@ credential material in fixture files. Bazel could consume the user's external
 RC or BuildBuddy credential content entered the repository. Sol-low returned
 final `ACCEPT`.
 
-The oracle-first gate is closed. Implementation, exact activation evidence,
-retained-daemon transitions, and Slug fixture parity remain pending; do not
-mark this packet or M3 complete from the oracle alone.
+The oracle-first gate closed before Rust edits. The implementation evidence
+below is separate; the oracle alone did not complete the packet.
+
+#### Implementation evidence landed (2026-07-23)
+
+Implementation commit `7d851ce9` completes `WP-8-m3-path-topology`. It does
+not complete M3 or loading query.
+
+Reuse and ownership:
+
+- `AllPathsFunction` evaluates its typed operands and directly calls the
+  landed `reverse_dependencies(environment, from, to, None)` helper. No second
+  dependency walk, reverse adjacency, DICE key, or cache was added.
+- `SomePathFunction` builds the existing stable forward `ResolvedGraph` once.
+  Its `shortest_path` method directly adapts Buck2 commit
+  `088c75c7e36805df99c3de29062baa95db700b8b`
+  `query/graph/async_bfs.rs`: a multi-source `VecDeque`, `SmallSet<u32>`
+  visited state, and `Vec<Option<u32>>` parent map reconstruct one complete
+  shortest root-to-destination path. V2 omits Buck2's concurrent lookup queue
+  only because mutable `DiceComputations` has already resolved the compact
+  graph serially.
+- Structural `QueryLabel`, `SmallMap`, `SmallSet`, and request-local integer
+  graph storage remain authoritative. No string-keyed adjacency, default hash
+  collection, new runtime/cache/key, direct filesystem read, or lock across
+  DICE was introduced.
+- `QueryExpression::is_top_level_somepath` recognizes only the parsed root
+  function node. `evaluate_loading_query` suppresses AUTO sorting only for
+  that predicate; parentheses lower away, binary and `let` wrappers retain
+  ordinary lexical AUTO sorting, and `Full` remains insertion ordered.
+
+Integrated behavior:
+
+- only `allpaths` and `somepath` moved from deferred to implemented in the
+  generic 16-entry callable registry;
+- all 35 success and eight failure rows in `query-path-topology` pass through
+  the real CLI/daemon boundary, including exactly bounded complete diamond and
+  multi-pair paths, direct-versus-nested ordering, topology/endpoint cases,
+  arity failures, and integer operands resolved as `//:1`; and
+- build requests, the query protocol, prior three query fixtures,
+  `cquery`/`aquery` placeholders, target patterns, formatters, configured and
+  action state remain unchanged.
+
+Exact DICE evidence:
+
+- initial `allpaths(//origin:top, //dest:end)` evaluates `origin`, `mid`, and
+  `dest`; an identical request in the same revision emits no activation
+  callbacks, while an unrelated edit validates all three as `Reused`;
+- removing/restoring `mid -> dest` evaluates `mid` and reuses `origin` and
+  `dest`, with the path disappearing and returning;
+- adding a demanded branch evaluates `origin` and new `branch` while reusing
+  `mid`/`dest`; removing it evaluates only `origin` and omits `branch`;
+  restoring it evaluates `origin` and reuses `branch`, `mid`, and `dest`;
+- an outside-package edit only validates the four demanded packages as
+  `Reused`; a literal destination outside the forward closure evaluates its
+  operand package but never enters the graph/result; and
+- literal-only path queries activate no `SubtreePackageSetKey`. The retained
+  daemon independently observes edge loss/regain and reachable package
+  create/delete/recreate without restart.
+
+Validation:
+
+- both the Terra-high worker and root independently passed the serial
+  six-crate suite with 76 tests and rebuilt `slug_cli_v2` at
+  `/tmp/slug-m3-path-target/debug/slug`;
+- root's four sequential Slug runs passed at
+  `query-parser-and-sets/20260723-015838-505418-slug`,
+  `query-loading-thin-vertical/20260723-015842-505479-slug`,
+  `query-rdeps-and-subtree-patterns/20260723-015846-505509-slug`, and
+  `query-path-topology/20260723-015849-505567-slug`;
+- formatting, diff, ownership/reuse, forbidden-scope, and stale-daemon checks
+  passed; and
+- Sol-low accepted both the early stable-diff graph/ownership audit and the
+  complete post-validation evidence.
 
 Stop conditions: an unstable diamond oracle that cannot be bounded to complete
 valid alternatives; behavior contradicting generated Bazel 9.2; any need for

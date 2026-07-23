@@ -813,7 +813,7 @@ functions, non-text formatters, remaining ordering modes, `cquery`, and
 
 ### Stage 8 path-topology packet — approved extraction plan
 
-Status: Oracle landed; implementation pending
+Status: Packet landed; full loading query remains open
 
 Source ref/commit(s): Buck2
 `088c75c7e36805df99c3de29062baa95db700b8b`
@@ -850,7 +850,7 @@ Bazel oracle: must be generated and independently verified with
 
 V2 fixture: `query-path-topology`
 
-V2 commit(s): oracle `2b73c08d`; implementation pending
+V2 commit(s): oracle `2b73c08d`; implementation `7d851ce9`
 
 Expected evidence artifact: exact all-path sets; unique shortest paths; bounded
 complete diamond/multi-pair alternatives; zero/no-path, cycle, source
@@ -867,11 +867,12 @@ V1 implementation/output and all semantics outside the reviewed Stage 8
 packet.
 
 Validation: oracle generation plus two independent sequential no-update Bazel
-runs passed all 43 commands and anchored patterns; provenance, diff, and
-fixture-only credential checks passed; Sol-low returned `ACCEPT`.
-Implementation still requires the serial six-crate suite, rebuilt V2 CLI, all
-four query fixture runs, exact activation multisets, ownership/reuse scans,
-formatting/diff checks, daemon cleanup, and early/final Sol-low reviews.
+runs passed all 43 commands and anchored patterns. Worker and root independent
+implementation validation each passed the serial 76-test six-crate suite,
+rebuilt the V2 CLI, and passed all four query fixtures. Exact activation
+multisets, retained-daemon transitions, ownership/reuse, formatting/diff,
+scope, and daemon-cleanup checks passed. Sol-low returned `ACCEPT` at the
+architecture, oracle, early implementation, and final evidence gates.
 
 Residual risk: Bazel's arbitrary diamond/multi-pair choice must be expressible
 as bounded complete alternatives. Generated/output-file reverse edges, the

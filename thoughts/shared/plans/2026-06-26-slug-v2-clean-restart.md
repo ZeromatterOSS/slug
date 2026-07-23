@@ -238,8 +238,11 @@ Buck2-derived reverse traversal. M3 remains open for the other 13 loading
 functions, repository/pattern breadth, ordering modes, and formatters.
 Oracle commit `2b73c08d` now pins the next 43-command packet for `allpaths`
 and `somepath`, including bounded arbitrary shortest paths and Bazel's
-source-backed root-node `somepath` AUTO-order exception. Rust implementation
-and DICE evidence remain pending; this oracle does not close M3.
+source-backed root-node `somepath` AUTO-order exception. Implementation commit
+`7d851ce9` passes that oracle with direct unbounded reverse-traversal reuse,
+Buck2-derived compact BFS/parent reconstruction, exact DICE transitions, and
+retained-daemon execution. M3 remains open for the other 11 loading functions,
+repository/pattern breadth, ordering modes, and formatters.
 
 ## Two-Tier Work-Packet Contract
 

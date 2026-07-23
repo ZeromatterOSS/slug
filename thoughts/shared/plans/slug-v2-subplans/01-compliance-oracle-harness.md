@@ -667,6 +667,16 @@ with `generated: false` is not acceptance evidence.
   tool read its contents, and no external RC or BuildBuddy credential content
   was copied, logged into project files, or committed. Sol-low returned
   `ACCEPT`.
-- This checkpoint authorizes the reviewed Rust packet; it does not prove an
-  implementation. `allpaths`, `somepath`, exact DICE activation, retained
-  daemon transitions, and all Slug fixture results remain pending.
+- Implementation commit `7d851ce9` now passes all 43 rows through the rebuilt
+  Slug V2 CLI and retained daemon. It directly reuses the landed unbounded
+  reverse-dependency helper for `allpaths`, adds Buck2-derived compact
+  integer-index BFS/parent reconstruction for `somepath`, and applies the
+  root-node AUTO exception only where the parsed AST meets output ordering.
+- Focused tests pin complete activation multisets and same-daemon edge/package
+  transitions without a new DICE key, cache, protocol, or filesystem seam.
+  Worker and root serial validations each passed the 76-test six-crate suite,
+  rebuilt the V2 CLI, and passed all four query fixtures. Formatting,
+  ownership/scope, diff, and stale-daemon checks passed; Sol-low returned
+  `ACCEPT` before and after broad validation. M3 remains open for the other 11
+  loading functions, repository/pattern breadth, ordering modes, and
+  formatters.
