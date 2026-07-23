@@ -911,6 +911,45 @@ fn build_comment_and_whitespace_edits_do_not_change_loaded_package() {
 }
 
 #[test]
+fn same_dice_config_setting_values_are_package_semantics() {
+    let workspace = scratch("config-setting-values");
+    let package = workspace.join("pkg");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let build = package.join("BUILD.bazel");
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\", \"compilation_mode\": \"opt\"})\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let initial = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"compilation_mode\": \"opt\", \"cpu\": \"k8\"})\n",
+    );
+    let reordered = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+    assert_eq!(initial, reordered);
+
+    write(
+        &build,
+        "config_setting(name = \"linux\", values = {\"cpu\": \"arm\", \"compilation_mode\": \"opt\"})\n",
+    );
+    let changed = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+    assert_ne!(reordered, changed);
+
+    write(
+        &build,
+        "# formatting only\nconfig_setting( name = \"linux\", values = {\"cpu\": \"arm\", \"compilation_mode\": \"opt\"} )\n",
+    );
+    let formatted = load_package(&dice, &runtime, &workspace, &package, &[]).unwrap();
+    assert_eq!(changed, formatted);
+}
+
+#[test]
 fn same_dice_attribute_metadata_edits_are_semantic_and_recreate_cleanly() {
     let workspace = scratch("attribute-metadata-transitions");
     let package = workspace.join("pkg");

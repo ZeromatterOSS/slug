@@ -251,6 +251,10 @@ async fn compute_package_graph(
                 QueryNodeKind::Rule(CompactString::new("alias rule")),
                 Arc::from([normalize_dependency(&package_name, actual)?]),
             ),
+            PackageTargetKind::ConfigSetting { .. } => (
+                QueryNodeKind::Rule(CompactString::new("config_setting rule")),
+                Arc::from([]),
+            ),
             PackageTargetKind::StarlarkRule(implementation) => (
                 QueryNodeKind::Rule(CompactString::new("rule")),
                 implementation

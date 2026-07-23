@@ -535,6 +535,39 @@ async fn package_graph_has_one_zero_edge_build_file_node_synthesized_or_coalesce
 }
 
 #[tokio::test]
+async fn config_setting_is_a_loading_rule_without_configuration_evaluation() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\"})\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let graph = transaction
+        .compute(&UnconfiguredPackageGraphKey {
+            workspace: workspace.clone(),
+            package: PathBuf::from("pkg"),
+        })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    let node = graph
+        .nodes
+        .values()
+        .find(|node| node.label.to_string() == "//pkg:linux")
+        .unwrap();
+    assert_eq!(node.kind, QueryNodeKind::Rule("config_setting rule".into()));
+    assert!(node.dependencies.is_empty());
+
+    let output =
+        evaluate_loading_query(&mut transaction, workspace, "//pkg:linux", QueryOrder::Auto)
+            .await
+            .unwrap();
+    assert_eq!(output.stdout(), "//pkg:linux\n");
+}
+
+#[tokio::test]
 async fn active_build_basename_non_export_target_collision_is_a_query_error() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");

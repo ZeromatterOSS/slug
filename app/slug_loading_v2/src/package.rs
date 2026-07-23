@@ -115,6 +115,12 @@ pub enum PackageTargetKind {
     Alias {
         actual: String,
     },
+    /// Loading-only representation of Bazel's `config_setting`. Its values
+    /// are retained for package semantic equality; configuration matching is
+    /// intentionally owned by a later configured-analysis stage.
+    ConfigSetting {
+        values: Arc<[(CompactString, CompactString)]>,
+    },
     /// A file declared by an `attr.output` or `attr.output_list` value.
     /// Its generator is retained explicitly; names alone cannot determine it.
     GeneratedFile {
@@ -223,6 +229,20 @@ impl PackageRecorder {
 
     fn alias(&self, name: String, actual: String) -> anyhow::Result<()> {
         self.record_target(name, PackageTargetKind::Alias { actual })
+    }
+
+    fn config_setting(&self, name: String, values: SmallMap<String, String>) -> anyhow::Result<()> {
+        let mut values = values
+            .into_iter()
+            .map(|(key, value)| (CompactString::from(key), CompactString::from(value)))
+            .collect::<Vec<_>>();
+        values.sort_unstable();
+        self.record_target(
+            name,
+            PackageTargetKind::ConfigSetting {
+                values: values.into(),
+            },
+        )
     }
 
     fn starlark_rule(
@@ -1175,6 +1195,19 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
 
     fn alias(name: &str, actual: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
         alias_global(name, actual, eval)
+    }
+
+    // Bazel 9.2 `ConfigRuleClasses.ConfigSettingRule` declares `values` as
+    // the nonconfigurable string dictionary that records flag bindings. This
+    // loading slice retains only that immutable declaration and rejects every
+    // other config_setting argument rather than pretending to evaluate it.
+    fn config_setting(
+        name: &str,
+        #[starlark(require = named)] values: SmallMap<String, String>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        PackageRecorder::from_evaluator(eval)?.config_setting(name.to_owned(), values)?;
+        Ok(NoneType)
     }
 
     fn glob<'v>(

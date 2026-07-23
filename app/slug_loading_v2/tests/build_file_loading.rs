@@ -172,6 +172,44 @@ fn recognizes_bzl_extension_only() {
 }
 
 #[test]
+fn config_setting_retains_values_and_rejects_unmodeled_arguments() {
+    let workspace = scratch("config-setting");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "config_setting(name = \"linux\", values = {\"cpu\": \"k8\", \"compilation_mode\": \"opt\"})\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    assert_eq!(
+        loaded.targets,
+        vec![PackageTarget {
+            name: "linux".to_owned(),
+            kind: PackageTargetKind::ConfigSetting {
+                values: vec![
+                    ("compilation_mode".into(), "opt".into()),
+                    ("cpu".into(), "k8".into()),
+                ]
+                .into(),
+            },
+        }]
+    );
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "config_setting(name = \"unsupported\", values = {}, define_values = {\"mode\": \"fast\"})\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("define_values"), "{error}");
+}
+
+#[test]
 fn package_load_evaluates_loaded_macro_and_bazel_package_globals() {
     let workspace = scratch("package-load");
     let package = workspace.join("pkg");
