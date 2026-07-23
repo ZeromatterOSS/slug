@@ -741,5 +741,24 @@ with `generated: false` is not acceptance evidence.
 - The first 35-row draft was not landed: root caught the wrong
   `PackageProvider` source path and absent root/fallback/dual/syntax coverage;
   all were corrected before `8c28877b`. Sol-low final review returned
-  `ACCEPT`. This closes only the Bazel behavior gate; implementation, exact
-  DICE/daemon transitions, and Slug comparison remain pending.
+  `ACCEPT`. At that oracle checkpoint, implementation, exact DICE/daemon
+  transitions, and Slug comparison remained pending.
+
+### Siblings BUILD-file-node landed evidence (2026-07-23)
+
+- The fixture chain is base `8c28877b`, attribute correction `20f88c05`, and
+  43-row FULL-provenance oracle `1a3dec16`; implementation is `d19a9b29`. The
+  attribute-corrected update/no-update/root Bazel runs `034446-589899`,
+  `034516-592708`, and `034623-595736` passed. FULL-provenance discovery,
+  anchored update, clean no-update, and root runs `035638-609525`,
+  `035734-612675`, `035759-615627`, and `035853-619234` passed.
+- The provenance rows prove that direct literal `siblings` and its graphless
+  union wrapper have the same FULL order, while `siblings(deps(...))` retains
+  the recorded dependency-evaluation edge and differs. External RC could be
+  consumed only by Bazel invocation; no RC contents or credentials were
+  accessed.
+- Rebuilt Slug passed the 91/91 serial six-crate gate and six fixtures/176 rows:
+  worker `040407-626548`, `040411-626572`, `040414-626601`,
+  `040418-626692`, `040423-626782`, `040427-626870`; independent root
+  `040534-628098`, `040540-628123`, `040546-628189`, `040549-628247`,
+  `040554-628339`, `040558-628428`.

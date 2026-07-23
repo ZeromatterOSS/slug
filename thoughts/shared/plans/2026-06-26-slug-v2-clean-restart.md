@@ -247,22 +247,38 @@ Oracle commit `e8e1d9ef` now pins the next 42-command ordinary-query packet for
 `some` and the shared signed Java-`int` boundary used by `deps`/`rdeps`.
 Implementation commit `b25c8aff` now passes that packet through the retained
 daemon: `some` selects from the existing insertion-ordered `TargetSet`, while
-the shared FULL renderer deterministically topologically orders the selected
-induced graph. It also carries signed `i32` depth/count values through
+the shared FULL renderer deterministically topologically orders the final
+selected portion of the request-local evaluation graph. The siblings packet
+below replaced the initial semantic selected-induced approximation with
+recorded evaluation edges while preserving all `some` oracle rows. It also
+carries signed `i32` depth/count values through
 `deps`/`rdeps` and renders bare-negative syntax safely for UTF-8 input. Worker
 and root each passed the six-crate 82-test suite and all five accepted query
 fixtures (133/133 rows). M3 remains open for the other ten loading functions,
 repository/pattern/order/formatter breadth; `filter` stays deferred until an
 exact Java `Pattern` substrate exists.
 
-Oracle commit `8c28877b` now lands the 40-command
-`query-siblings-build-file-node` packet for `siblings(EXPR)` plus actual
-BUILD-file basename behavior. Implementation, DICE/daemon evidence, and Slug
-parity against the preceding six query fixtures remain pending, so M3 still
-has ten deferred functions; landing siblings would leave nine. `buildfiles`
-and `loadfiles` remain separate because they require transitive `.bzl` and
-fake-target semantics, while regex, attribute, generated, external,
-configured, and action surfaces remain out of scope.
+The siblings/BUILD-file vertical is now landed: fixture base `8c28877b`,
+attribute correction `20f88c05`, FULL-provenance oracle `1a3dec16`, and
+implementation `d19a9b29`. `QueryNodeKind::BuildFile` uses the exact active
+loaded basename, coalesces an exported active BUILD target, and remains a
+zero-edge non-rule node. `siblings` evaluates once and deduplicates packages;
+request-local `u32`/`Vec`/`SmallMap` evaluation edges follow Bazel
+`BlazeQueryEnvironment` and the Buck2 graph pattern, while FULL renders only
+those recorded edges with no render-time DICE read. Exact retained-DICE and
+daemon transition coverage passed without adding a key, cache, protocol,
+filesystem, lock, or global boundary.
+
+The corrected Bazel update/no-update/root runs were `034446-589899`,
+`034516-592708`, and `034623-595736`; FULL-provenance discovery/anchored
+update/no-update/root runs were `035638-609525`, `035734-612675`,
+`035759-615627`, and `035853-619234`. The Slug gate passed 91/91 and all six
+query fixtures passed 176/176: worker `040407-626548`, `040411-626572`,
+`040414-626601`, `040418-626692`, `040423-626782`, `040427-626870`; root
+`040534-628098`, `040540-628123`, `040546-628189`, `040549-628247`,
+`040554-628339`, `040558-628428`. M3 now has nine deferred functions;
+`filter` remains deferred pending exact Java `Pattern` parity. `buildfiles`
+and `loadfiles` remain separate transitive-load/fake-target work.
 
 ## Two-Tier Work-Packet Contract
 

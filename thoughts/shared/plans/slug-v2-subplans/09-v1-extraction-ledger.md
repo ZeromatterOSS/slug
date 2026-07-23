@@ -927,10 +927,11 @@ order; add the minimum typed signed-integer seam shared with `deps`/`rdeps`;
 keep generic expression integers and all graph/DICE/protocol ownership
 unchanged. Selection order is not FULL output order: the shared selected-graph
 deterministic topological renderer follows Bazel
-`AbstractUnorderedFormatter`/`Digraph`, as exposed by the failed
-`equal_count_full` gate. The UTF-8-safe three-token bare-negative diagnostic
-is part of that landed parser boundary. Defer `filter` until an exact Java
-`Pattern` substrate exists.
+`AbstractUnorderedFormatter`/`Digraph` and, as of `d19a9b29`, is backed by
+request-local recorded evaluation edges. The failed `equal_count_full` gate
+exposed the topological rather than insertion-order boundary. The UTF-8-safe
+three-token bare-negative diagnostic is part of that landed parser boundary.
+Defer `filter` until an exact Java `Pattern` substrate exists.
 
 Validation: final Bazel generation plus worker/root independent sequential
 no-update reruns passed all 42 commands and anchored patterns. Normal-query
@@ -952,9 +953,9 @@ metadata, attrs, loads, visibility, tests, executables, external repositories,
 the other ten loading functions, non-text formatters, `cquery`, and `aquery`
 remain open.
 
-### Stage 8 siblings BUILD-file-node packet — approved extraction plan
+### Stage 8 siblings BUILD-file-node packet — landed extraction
 
-Status: Oracle landed; implementation pending
+Status: Landed
 
 Source ref/commit(s): Bazel `8220c6198837d5c13d53fea211cf3282aa12408a`,
 `src/main/java/com/google/devtools/build/lib/query2/engine/SiblingsFunction.java`,
@@ -970,11 +971,12 @@ Buck2
 
 V2 fixture: `query-siblings-build-file-node`
 
-V2 commit(s): oracle `8c28877b`; implementation pending
+V2 commit(s): fixture base `8c28877b`; attribute correction `20f88c05`;
+FULL-provenance oracle `1a3dec16`; implementation `d19a9b29`
 
-Decision: port no Buck2/V1 function semantics. Add the minimum V2-owned
-`BuildFile` package-graph node with its actual loaded basename and zero edges,
-then add generic `siblings` package projection with compact package
+Decision implemented: port no Buck2/V1 function semantics. The V2-owned
+`BuildFile` package-graph node uses its actual loaded basename and zero edges;
+generic `siblings` projects packages with compact package
 deduplication. Do not normalize `BUILD` to `BUILD.bazel`; an absent basename
 is the normal target-missing path. Coalesce a matching `ExportedFile` for the
 active BUILD basename into the one `BuildFile` node; any rule/alias/custom
@@ -990,16 +992,22 @@ ordering; empty/error behavior; and exact retained-DICE lifecycle,
 BUILD-content, basename-priority/rename, and package delete/recreate
 transitions.
 
-Validation: final 40-row generation
-`query-siblings-build-file-node/20260723-033048-572448-bazel`, worker clean
-no-update `20260723-033115-575225-bazel`, and root independent no-update
-`20260723-033329-578427-bazel` passed. The unlanded 35-row draft had a wrong
-`PackageProvider` anchor and lacked root/fallback/dual/syntax rows; root
-corrected it before `8c28877b`, and Sol-low returned `ACCEPT`. Generated/tool/
-schema/provenance, anchored records, whitespace/diff, and fixture-only hygiene
-were clean. Implementation still requires focused V2 graph/evaluator/CLI/
-daemon tests, exact DICE transitions, and rebuilt-Slug comparison against this
-fixture plus the preceding five query fixtures.
+Validation: the attribute-corrected update/no-update/root Bazel runs
+`034446-589899`, `034516-592708`, and `034623-595736` passed. The
+43-row FULL-provenance discovery/anchored-update/no-update/root runs
+`035638-609525`, `035734-612675`, `035759-615627`, and `035853-619234` passed
+and prove direct and graphless-wrapped `siblings` retain the same FULL order,
+while `siblings(deps(...))` retains evaluation provenance. Rebuilt Slug passed
+91/91 and the six-fixture 176/176 gate at worker runs `040407-626548`,
+`040411-626572`, `040414-626601`, `040418-626692`, `040423-626782`,
+`040427-626870` and root runs `040534-628098`, `040540-628123`,
+`040546-628189`, `040549-628247`, `040554-628339`, `040558-628428`. The
+implementation uses the exact BuildFile basename/coalescing/zero-edge/nonrule
+representation, evaluates siblings once with package deduplication, and keeps
+the `u32`/`Vec`/`SmallMap` evaluation graph request-local; FULL has no
+render-time DICE read. No key/cache/protocol/filesystem/lock/global boundary
+entered the packet. External RC could be consumed only by Bazel invocation,
+and no credentials were accessed.
 
 Residual risk: `buildfiles`/`loadfiles` require a separate transitive loading
 representation; do not treat their source tests or `kind` interactions as

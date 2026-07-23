@@ -1428,8 +1428,10 @@ Required implementation:
 4. Preserve ordinary output policy. Root `some` has no top-level ordering
    exception: default/AUTO lexically sort whatever subset was selected. FULL
    is not `some` insertion order: it uses the shared deterministic
-   topological renderer over the selected induced graph, matching Bazel's
-   `AbstractUnorderedFormatter` and `Digraph` ordering path.
+   topological renderer, matching Bazel's `AbstractUnorderedFormatter` and
+   `Digraph` ordering path. The later siblings provenance packet established
+   that its graph must contain recorded evaluation edges, not synthesized
+   semantic edges.
 5. Add focused parser/registry/integer tests, evaluator selection/error/order
    tests, complete CLI oracle coverage, exact DICE activation multisets, and a
    retained-daemon candidate create/rename/delete/recreate regression.
@@ -1535,9 +1537,12 @@ registry. It evaluates the complete operand once, chooses up to the requested
 members in `TargetSet<SmallSet<_>>` insertion order, and retains the existing
 empty-selection diagnostic. That insertion choice is deliberately distinct
 from rendering: default/AUTO lexically order the selected result, while FULL
-builds the selected induced graph and deterministically topologically renders
-it. The first Slug gate failed `equal_count_full` because the old packet claim
-that FULL preserved insertion was wrong; Bazel 9.2's
+deterministically topologically renders it. At this checkpoint the renderer
+synthesized the semantic selected-induced graph; implementation `d19a9b29`
+later replaced that approximation with the final selected portion of the
+request-local recorded evaluation graph, preserving every `some` row. The
+first Slug gate failed `equal_count_full` because the old packet claim that
+FULL preserved insertion was wrong; Bazel 9.2's
 `query2/query/output/AbstractUnorderedFormatter.java` and
 `graph/Digraph.java` establish the shared renderer boundary. The
 corrected gate also required the UTF-8-safe three-token bare-negative message
@@ -1591,8 +1596,8 @@ Goal and gate link: implement only ordinary root-repository `siblings(EXPR)`
 and the package BUILD-file node it necessarily exposes. This is not
 `buildfiles`/`loadfiles`, `kind`, regex filtering, generated/output-file,
 external-repository, configured, or action-query work. It moves only
-`siblings` from deferred after an oracle and implementation land; M3 currently
-still has ten deferred functions and would then have nine.
+`siblings` from deferred after an oracle and implementation land; at packet
+review time M3 had ten deferred functions and landing it would leave nine.
 
 Representation decision: extend the existing `UnconfiguredPackageGraph` with
 exactly one zero-edge, non-rule `QueryNodeKind::BuildFile` node. Its label is
@@ -1656,7 +1661,8 @@ Required oracle matrix:
   on an actual BUILD node, and existing `rdeps`/`same_pkg_direct_rdeps` where
   the oracle proves the zero-edge/non-rule boundary;
 - exact default/AUTO/FULL output for acyclic package membership plus a local
-  chain/cycle, with FULL using the shared selected-induced-graph renderer;
+  chain/cycle, with FULL behavior pinned by Bazel rather than inferred from
+  semantic dependency edges;
 - empty input, arity/syntax, wrong-basename, missing target/package, and
   no partial stdout on errors; and
 - exact DICE activation multisets for initial/identical/unrelated requests,
@@ -1694,7 +1700,32 @@ anchoring, whitespace/diff, and fixture-only hygiene passed; external RC may
 be consumed only by Bazel invocation and was never inspected. Sol-low returned
 final `ACCEPT`.
 
-This closes only the oracle gate. `siblings`/`BuildFile` implementation, exact
-DICE activation and retained-daemon transitions, and rebuilt-Slug comparison
-against this fixture plus the preceding five query fixtures remain pending;
-M3 still has ten deferred functions.
+#### Implementation evidence landed (2026-07-23)
+
+Fixture base `8c28877b`, attribute correction `20f88c05`, FULL-provenance
+oracle `1a3dec16` (which expands the fixture to 43 rows), and implementation
+`d19a9b29` close this packet.
+`QueryNodeKind::BuildFile` represents only the actual active loaded basename,
+coalesces the matching exported BUILD target, and is zero-edge/non-rule.
+`siblings` evaluates its operand once and deduplicates packages. Its
+request-local evaluation-edge graph uses `u32`/`Vec`/`SmallMap` following
+Bazel `BlazeQueryEnvironment` and the Buck2 graph pattern; FULL renders only
+recorded evaluation edges and performs no render-time DICE read. Exact
+retained-DICE and daemon create/edit/delete/basename transitions passed. No
+key/cache/protocol/filesystem/lock/global boundary was added.
+
+The attribute-corrected Bazel update/no-update/root runs `034446-589899`,
+`034516-592708`, and `034623-595736` passed. FULL-provenance discovery,
+anchored update, clean no-update, and root runs `035638-609525`,
+`035734-612675`, `035759-615627`, and `035853-619234` passed. The provenance
+fixture proves direct literal and graphless union-wrapped `siblings` order are
+equal, while `siblings(deps(...))` preserves the dependency-evaluation edge
+and differs. External RC could be consumed only by Bazel invocation; no RC
+contents or credentials were accessed.
+
+The worker Slug gate passed 91/91 and six fixtures passed 176/176 at
+`040407-626548`, `040411-626572`, `040414-626601`, `040418-626692`,
+`040423-626782`, and `040427-626870`; root independently repeated them at
+`040534-628098`, `040540-628123`, `040546-628189`, `040549-628247`,
+`040554-628339`, and `040558-628428`. M3 now has nine deferred functions.
+`filter` remains deferred pending exact Java `Pattern` parity.
