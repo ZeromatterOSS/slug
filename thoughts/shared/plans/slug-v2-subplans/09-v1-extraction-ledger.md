@@ -1481,3 +1481,16 @@ The next `visible()` packet remains source/representation audit only. Inspect
 V1/Buck visibility code as reference only after the pinned Bazel 9 rule,
 package-group, and accessor semantics are fixed; no extraction decision or Rust
 reuse is authorized in advance.
+
+The visibility audit rejects V1's implementation semantics. In particular,
+`app/slug_node/src/visibility.rs` uses a process-global locked string registry,
+target-pattern matching, permissive parse/unknown-repository fallback, and
+recursive group lookup without Bazel's DICE ownership, target inheritance,
+Java asymmetry, dependency edges, or exact diagnostics. V1 coercion can
+silently skip or broaden invalid values. None of that may be ported.
+
+Compact immutable enum/list shapes and the already V2-owned generic filtering
+and set patterns remain reference material only. The accepted next packet is a
+new Bazel oracle fixture; only after it lands may a reviewed Stage 4 design
+choose V2-native compact storage. No V1/Buck visibility code or global
+registry is authorized.

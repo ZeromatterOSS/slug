@@ -24,7 +24,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007` | the full loading/bzlmod/analysis/command spine has not received one exit-gate review | no new M1 packet while the M3 visibility audit is current |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M3 visibility audit is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 12 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604` | four functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, visibility representation, and remaining command breadth | audit Bazel 9 visibility representation and design the smallest truthful `visible()` oracle; no Rust activation yet |
+| M3: `query` | **active** | parser/evaluator/loading graph; 12 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; visibility representation/oracle design Sol-accepted | four functions, external repositories/pattern breadth, Java `Pattern`-dependent semantics, visibility representation, and remaining command breadth | add only the accepted `query-visible-visibility` Bazel oracle fixture |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,27 +33,50 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Audit Bazel 9 visibility representation and design the smallest truthful
-`visible(PREDICATE, INPUT)` oracle before changing Rust. Start from the pinned
-Bazel 9.2 sources for `VisibleFunction`, the target accessor, rule visibility,
-package specifications/groups, and native rule defaults. Compare only the
-current V2 loading/query representation and the matching Stage 9 rows.
+Add only one self-contained root-repository Bazel 9.2 fixture at
+`tests/v2_oracle/fixtures/query-visible-visibility/`. The worker may create its
+`fixture.toml`, `expected/oracle.json`, and `workspace/**`; it must not edit an
+existing fixture, harness, plan, Rust source, manifest, or build file outside
+that new fixture. Generate and clean-verify with `/usr/bin/bazel`, then require
+an independent clean run and source/evidence review.
 
-The audit must account for explicit and default target visibility, package
-groups with includes/excludes, same-package behavior, the asymmetric
-`javatests`-to-`java` rule, generated/source/non-rule operands, missing or
-malformed visibility prerequisites, and evaluation-graph edges. Separate
-loading-owned representation from the later generic query predicate. Do not
-claim a graph-light subset that makes Bazel-visible targets fail or makes
-Bazel failures succeed.
+The fixture must discriminate:
 
-The first mutable packet after review is oracle-only. It may add one
-self-contained root-repository fixture that discriminates the smallest
-complete representation and query boundary accepted by source review. No
-production Rust, DICE key, repository mapping, external repository behavior,
-configured analysis, visibility migration shim, or `visible()` activation is
-authorized yet. Stop and replan if truthful parity requires a larger Stage 4
-schema than can be bounded in one reviewed foundation.
+- explicit/default public and private visibility; direct `__pkg__` and
+  `__subpackages__`; same-package access; matching and mismatching descendants;
+- universal all-callers filtering, vacuous empty callers, one-way matching
+  `javatests/X` caller to private `java/X` target, and the reverse/different
+  suffix failures;
+- package-group exact/subtree packages, local negative precedence, separate
+  direct/include alternatives that can re-allow a package, recursive includes,
+  and a cycle that terminates while retaining the include-cycle graph;
+- generated-file inheritance, explicit/default real source and BUILD
+  visibility, public package-group targets, public fake `.bzl` load targets,
+  and a real same-label source target that remains governed by real
+  visibility;
+- wrong-kind group labels/includes being ignored, missing top-level and
+  included groups with exact diagnostics, misspelled special labels, and
+  malformed package specifications;
+- effective `labels(visibility, ...)` for explicit and inherited group
+  visibility plus direct `__pkg__`/`__subpackages__` values; direct package
+  specifications remain retained values but are not dependency targets;
+- default ordinary `deps` visibility NODEP edges, transitive package-group
+  include edges, and inherited visibility edges for rules and sources.
+
+Bazel-only structural rows may use `--noimplicit_deps` to distinguish explicit
+from inherited visibility edges and `--nonodep_deps` to remove rule visibility
+edges without removing package-group include structure. They do not authorize
+Slug flag support or enter a future Slug acceptance count.
+
+The accepted post-oracle architecture remains split. Stage 4 owns typed package
+defaults, raw/effective target visibility and provenance, package-group
+contents/includes, source/generated/fake target behavior, semantic equality,
+and query edge projection. Stage 8 later owns the universal `visible()` filter,
+same-package/Java rules, recursive accessor, and exact query diagnostics. V1's
+global string-pattern registry and permissive fallback are rejected; no port
+is authorized. Stop if fixture evidence contradicts this split or exposes
+symbolic-macro, repository-mapping, configured-analysis, or new DICE-key
+requirements.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine

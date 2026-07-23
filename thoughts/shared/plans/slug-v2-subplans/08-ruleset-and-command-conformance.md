@@ -2704,3 +2704,38 @@ packet is read-only: audit pinned Bazel visibility representation and current
 V2 loading/query ownership, then design the smallest truthful oracle for
 `visible(PREDICATE, INPUT)`. No production visibility implementation or
 activation is authorized by this acceptance.
+
+## Visibility representation audit and corrected oracle design accepted (2026-07-23)
+
+Pinned Bazel 9.2 source shows that `visible(PREDICATE, INPUT)` is not an
+accessor-only packet. It evaluates the predicate once and retains an input only
+when it is visible to every predicate target; an empty predicate is vacuously
+true. Visibility always includes the same package plus the one-way matching
+`javatests/X` caller to private `java/X` target. Package-group contents are
+recursive OR alternatives with cycle suppression; negatives override
+positives only inside one group, so a separate direct or included positive can
+re-allow a package.
+
+The prerequisite is a Stage 4 typed visibility/package-group representation.
+Bazel distinguishes raw declared visibility from effective package defaults,
+but `labels(visibility, rule)` projects effective declared labels, including an
+inherited group or direct `__pkg__`/`__subpackages__` values. Only loadable
+group labels are rule visibility dependencies. Default ordinary query includes
+those NODEP edges, while package-group includes are separate structural edges.
+Generated files inherit their rule; real source and BUILD targets use real
+visibility; package groups and fake query `.bzl` load targets are public.
+
+The first draft incorrectly made inherited `labels(visibility, ...)` empty and
+treated `--noimplicit_deps` as removing explicit visibility edges. Root
+corrected both from `AggregatingAttributeMapper` and dependency-filter source.
+Sol-low then returned `REPLAN` for missing include-cycle termination and direct
+package-specification projection discriminators. The corrected design adds both
+and keeps `--noimplicit_deps`/`--nonodep_deps` as Bazel-only structural
+evidence; final re-review returned `ACCEPT`.
+
+The current packet creates only
+`tests/v2_oracle/fixtures/query-visible-visibility/`. After accepted oracle
+evidence, separately design and implement the Stage 4 representation before
+reviewing Stage 8 activation. External repositories/mapping, symbolic macros,
+special `bind`/`config_setting` defaults, alternate visibility flags,
+keep-going, configured query, formatters, and production Rust remain excluded.
