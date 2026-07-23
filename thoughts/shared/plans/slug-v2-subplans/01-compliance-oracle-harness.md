@@ -820,3 +820,9 @@ sorted compact `values` as a load-only zero-edge `config_setting rule`, with
 semantic reorder/change tests and fail-closed unsupported attrs. It does not
 evaluate configuration. Sol `ACCEPT`; define/flag/constraint/common attrs and
 matching remain deferred. The Stage 8 29+2 boundary is unchanged.
+
+`8fec2696` activates only `labels`. Exact acceptance is 29 non-label-kind CLI
+rows including two graph stdout rows; two label-kind rows stay Bazel-only
+formatter constraints. Same-DICE/daemon transitions pass (loading 37/query
+42/CLI 21 [1+17+3]/server 15/analysis 11, fmt/diff); Sol `ACCEPT`. Six ordinary
+functions/M3 remain open; no 31/31 claim or credential exposure.

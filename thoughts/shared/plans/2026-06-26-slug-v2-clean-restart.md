@@ -697,3 +697,20 @@ tests; it performs no configuration evaluation and unsupported attrs fail
 closed. Sol `ACCEPT`. Define/flag/constraint/common attrs and matching remain
 deferred. Stage 8 `labels` now resumes unchanged at 29 CLI plus two
 generated-kind assertions.
+
+Stage 8 `8fec2696` activates exactly `labels(attr, expr)`; six ordinary
+functions remain deferred. 29 non-label-kind CLI rows, including two complete
+graph stdout rows, are exact; two Bazel-only label-kind rows remain formatter
+constraints. QueryNode has compact immutable `Allocative` attrs separate from
+deps; selectors retain all branches/default, exclude keys, and generated files
+only output→own-generator edges. Package-load QueryError alone adds Bazel
+`Evaluation of query`, preserving syntax/unrelated diagnostics one-shot/daemon.
+Same-DICE/reuse and schema/value/select/default/output daemon transitions pass:
+loading 37, query 42, CLI 21 (1 unit/17 CLI/3 graph), server 15, analysis 11,
+fmt/diff. Sol corrected global suffix/fragment graph then selected-graph order;
+final `ACCEPT` requires structural classification, exact graph rows,
+generated-only ordering, ordinary factored/unfactored regression. M3 stays
+open: never claim 31/31. This implementation reused the checked-in oracle and
+needed no Bazel invocation; no agent or tool accessed `~/.bazelrc`. Future
+Bazel commands may consume it through ordinary RC discovery without inspection.
+Archive-status baseline failures (v1-archive/stale allowlists) are unrelated.

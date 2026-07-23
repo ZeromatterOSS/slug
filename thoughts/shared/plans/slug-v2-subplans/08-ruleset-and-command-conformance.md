@@ -2009,3 +2009,13 @@ now load as sorted compact zero-edge `config_setting rule` metadata, without
 configuration evaluation; unsupported attrs fail closed. Sol `ACCEPT`.
 Define/flag/constraint/common attrs and matching remain deferred. Resume
 Stage 8 labels at the unchanged 29 CLI plus two generated-kind boundary.
+
+`8fec2696` activates exactly `labels`; six ordinary functions remain deferred.
+29 rows (two complete graph stdout rows included) are exact; two label-kind rows
+remain formatter-deferred GeneratedFile constraints. Package-load QueryError
+alone gets Bazel framing; syntax/unrelated eval diagnostics remain unchanged.
+Same-DICE semantic/reuse and retained-daemon schema/value/select/default/output
+transitions pass. Root validation: loading 37, query 42, CLI 21
+(1 unit/17 CLI/3 graph), server 15, analysis 11, plus fmt/diff. Sol corrected
+error classification, exact graph evidence, and generated-only ordering before
+final `ACCEPT`; M3 remains open and this is never a 31/31 claim.

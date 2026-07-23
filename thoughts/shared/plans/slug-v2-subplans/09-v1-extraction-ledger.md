@@ -1255,3 +1255,9 @@ generated-kind assertions.
 load-only behavior, and fail-closed unsupported attrs. No configuration
 evaluation or V1/Buck semantics entered; Sol `ACCEPT`. Define/flag/constraint/
 common attrs and matching remain deferred; Stage 8 remains 29+2.
+
+`8fec2696` is accepted V2-owned labels-only activation: immutable Allocative
+query attrs separate from deps, selectors exclude keys, generated files only
+output→own-generator edges, exact 29 rows, two formatter-deferred label-kind
+rows. Sol `ACCEPT` after graph/order corrections. Six functions/M3 remain open;
+no V1/Buck import or 31/31 claim.

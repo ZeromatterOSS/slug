@@ -618,3 +618,8 @@ changes. It is
 load-only, does not evaluate configuration, and fails closed for unsupported
 attrs. Sol `ACCEPT`. Define/flag/constraint/common attrs and matching remain
 deferred; Stage 8 labels resumes without changing its 29+2 claim.
+
+Stage 8 `8fec2696` consumes this substrate through compact immutable
+`Allocative` QueryNode attrs separate from deps: all selector branches/default,
+not keys, and only output→own-generator generated edges. Same-DICE semantic/
+reuse and same-daemon metadata transitions passed; no loading scope expands.
