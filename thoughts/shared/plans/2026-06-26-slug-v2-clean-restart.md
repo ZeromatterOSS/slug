@@ -243,6 +243,10 @@ source-backed root-node `somepath` AUTO-order exception. Implementation commit
 Buck2-derived compact BFS/parent reconstruction, exact DICE transitions, and
 retained-daemon execution. M3 remains open for the other 11 loading functions,
 repository/pattern breadth, ordering modes, and formatters.
+Oracle commit `e8e1d9ef` now pins the next 42-command ordinary-query packet for
+`some` and the shared signed Java-`int` boundary used by `deps`/`rdeps`.
+Implementation and DICE evidence remain pending; `filter` stays deferred until
+an exact Java `Pattern` substrate exists.
 
 ## Two-Tier Work-Packet Contract
 

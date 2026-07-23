@@ -881,7 +881,7 @@ modes, non-text formatters, `cquery`, and `aquery` remain open.
 
 ### Stage 8 arbitrary-selection packet — approved extraction plan
 
-Status: Reviewed packet; oracle and implementation pending
+Status: Oracle landed; implementation pending
 
 Source ref/commit(s): Bazel
 `8220c6198837d5c13d53fea211cf3282aa12408a`
@@ -913,6 +913,8 @@ source anchors are the files named above
 
 V2 fixture: `query-some-selection`
 
+V2 commit(s): oracle `e8e1d9ef`; implementation pending
+
 Expected evidence artifact: singleton and arbitrary bounded selections;
 omitted/zero/negative/equal/excess counts; duplicate/nested/empty/cycle/
 recursive operands; normal-query later-error precedence; signed `i32`
@@ -925,11 +927,13 @@ order; add the minimum typed signed-integer seam shared with `deps`/`rdeps`;
 keep generic expression integers and all graph/DICE/protocol ownership
 unchanged. Defer `filter` until an exact Java `Pattern` substrate exists.
 
-Validation: pending oracle-first implementation; require Bazel generation plus
-independent rerun, normal-query cancellation/error probes, the serial
-six-crate suite, rebuilt V2 CLI, all five query fixture runs, exact activation
-multisets, ownership/scope scans, formatting/diff checks, daemon cleanup, and
-Sol-low reviews
+Validation: final Bazel generation plus worker/root independent sequential
+no-update reruns passed all 42 commands and anchored patterns. Normal-query
+later-error probes emitted empty stdout; provenance, generated metadata,
+diff/whitespace, and fixture-only credential checks passed; Sol-low returned
+`ACCEPT`. Implementation still requires the serial six-crate suite, rebuilt V2
+CLI, all five query fixture runs, exact activation multisets, ownership/scope
+scans, formatting/diff checks, daemon cleanup, and early/final Sol-low reviews.
 
 Residual risk: ordinary query may mask later failures or emit nonempty partial
 stdout on failure, neither of which is representable by the current eager

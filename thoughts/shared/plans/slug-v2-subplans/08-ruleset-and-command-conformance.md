@@ -1479,6 +1479,54 @@ selection seams before broad validation, then a complete post-validation
 review. Update Stage 1, Stage 8, Stage 9, and the routing log with exact
 commits, bounded alternatives, activation events, validation, and residuals.
 
+Sol-low accepted the architecture after rejecting `filter`'s non-parity regex
+substrate and requiring valid Java max/min boundaries, a hard stop on failing
+partial stdout, and complete candidate create/rename/delete/recreate evidence.
+
+#### Oracle evidence landed (2026-07-23)
+
+Oracle commit `e8e1d9ef` lands the generated 42-command Bazel 9.2.0
+`query-some-selection` fixture at immutable source commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+The matrix establishes:
+
+- singleton, arbitrary one-of-three, arbitrary two-of-three, equal/excess
+  count, duplicate, nested, empty, cycle, recursive, and cross-package
+  selection behavior with only complete finite alternatives;
+- default/AUTO lexical rendering and distinct FULL insertion rendering without
+  claiming a winning arbitrary member or callback order;
+- zero, quoted negative, and quoted minimum counts select nothing and fail
+  `argument set is empty`; bare negative is syntax; Java max is accepted;
+  positive/negative overflow, separators, and nonintegers fail before operand
+  lookup;
+- expression-position `2147483648` remains the target literal
+  `//:2147483648`; and
+- `deps`/`rdeps` accept signed maximum depth, return empty success for quoted
+  negative/minimum depth, and reject overflow before lookup.
+
+All four early-candidate/later-missing target/package union/set probes exit 7
+with empty stdout. Ordinary Blaze query therefore exposes neither masked
+errors nor failing partial output for this matrix. Cross-package success rows
+make complete operand demand observable.
+
+Final authoritative generation
+`target/v2o/runs/query-some-selection/20260723-022513-519324-bazel`, the
+worker's clean no-update rerun
+`target/v2o/runs/query-some-selection/20260723-022556-521952-bazel`, and root's
+independent clean no-update rerun
+`target/v2o/runs/query-some-selection/20260723-022658-524651-bazel` all passed
+sequentially. Root validated all 42 names/argv/exits and configured anchored
+stdout/stderr patterns, schema/generated/tool metadata, immutable provenance,
+whitespace, and fixture-only candidate credential terms. Bazel could consume
+the user's external `~/.bazelrc`; no agent or tool read its contents, and no
+external RC or BuildBuddy credential material entered the repository.
+Sol-low returned final `ACCEPT`.
+
+The oracle-first gate is closed. Implementation, signed-depth ownership,
+exact activation multisets, retained-daemon transitions, and five Slug fixture
+runs remain pending; do not mark this packet or M3 complete from the oracle.
+
 Stop conditions: normal Bazel 9.2 query masks a later operand failure after an
 early selection, or exits nonzero with nonempty partial stdout; signed integer
 parity requires a broad/context-sensitive parser rewrite rather than the

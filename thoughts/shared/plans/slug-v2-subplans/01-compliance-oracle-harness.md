@@ -680,3 +680,31 @@ with `generated: false` is not acceptance evidence.
   `ACCEPT` before and after broad validation. M3 remains open for the other 11
   loading functions, repository/pattern breadth, ordering modes, and
   formatters.
+
+## Arbitrary Selection Oracle Checkpoint
+
+- 2026-07-23 commit `e8e1d9ef` added the generated Bazel 9.2.0
+  `query-some-selection` fixture at immutable source commit
+  `8220c6198837d5c13d53fea211cf3282aa12408a`.
+- Its 42 commands cover ordinary-query `some`: singleton and finite bounded
+  arbitrary selections, equal/excess/zero/negative counts, duplicates, nested
+  selection, empty/cycle/recursive/cross-package inputs, AUTO/FULL ordering,
+  later operand errors, arity, and signed Java-`int` boundaries.
+- The same fixture pins the shared integer seam for `deps` and `rdeps`.
+  `2147483647` is accepted; `2147483648` is rejected before lookup; quoted
+  negative/minimum depths succeed with empty output; and expression-position
+  `2147483648` remains the target literal `//:2147483648`.
+- Four ordinary-query stop probes prove that an early valid member does not
+  mask a later missing target/package and that the failing command emits empty
+  stdout. This permits eager V2 operand materialization without importing Sky
+  Query cancellation or a streaming result protocol.
+- Final generation and two independent sequential no-update reruns passed
+  with `/usr/bin/bazel` 9.2.0. All 42 command records, exits, anchored output
+  patterns, generated metadata, provenance, whitespace, and fixture-only
+  candidate credential scans passed. Bazel could consume the user's external
+  `~/.bazelrc`; no agent or tool read its contents, and no external RC or
+  BuildBuddy credential content entered the repository. Sol-low returned
+  `ACCEPT`.
+- This oracle closes only the behavior gate. `some`, the bounded signed
+  integer correction, DICE/daemon evidence, and Slug fixture parity remain
+  pending.
