@@ -1771,8 +1771,10 @@ Required combined oracle matrix:
   label, and every load-label package's active BUILD companion; `loadfiles`
   emits only the transitive load labels;
 - fake `.bzl` and companion BUILD labels print normally while preserving
-  consuming-package provenance for `siblings`; real/fake and two-consumer
-  operand order determine which provenance wins;
+  consuming-package provenance for `siblings`; set membership is by printed
+  label, intersection retains its left representative, equal-label `except`
+  removes symmetrically, and union delivers distinct operand callback batches
+  to `siblings`;
 - broken syntax or a broken `load()` in a loaded label's containing-package
   BUILD retains Bazel's companion basename without assuming that package's
   `PackageLoad` succeeded; missing selected loads and `.bzl` cycles are
@@ -1797,10 +1799,10 @@ package/query state even when target declarations are unchanged; retained
 
 Use request-local fake-node/provenance state only; do not rewrite global
 `QueryLabel` identity. It must preserve enough `(printed label, consuming
-package, real/fake)` information to implement the post-oracle winner through
-each function and set composition. Do not assume request-global first-owner
-semantics before the real/fake operand-order and two-consumer rows are
-generated and reviewed. Fake nodes never enter package graphs, `:all`,
+package, real/fake)` information to retain the left intersection representative
+and explicit union callback batches while applying symmetric label removal for
+`except`; do not encode asymmetric `Eq` or operator semantics. Do not assume
+request-global first-owner semantics. Fake nodes never enter package graphs, `:all`,
 recursive patterns, or dependency edges; they are zero-edge, so `deps(fake)`
 returns itself. The projection is otherwise graphless apart from real
 operand-evaluation edges, and FULL must never synthesize edges.
@@ -1812,22 +1814,26 @@ remain deferred; regex and rule-metadata dependent functions remain blocked.
 
 #### Oracle evidence landed (2026-07-23)
 
-`8f6f02b3` lands the shared 58-command Bazel 9.2 fixture
-`query-build-load-files-provenance`. Update `043543-650513`, Terra clean
-`043649-655650`, root clean `043934-665303`, and post-note root clean
-`044122-670177` passed; Sol-low final review was `ACCEPT`. It covers selected
-active BUILD/transitive loads/active companions for `buildfiles`, loads-only
-`loadfiles`, fallback/dual/diamond/multi-package/empty/idempotent/deps/failure
-cases, broken companions without package loading, and factored FULL with
+`8f6f02b3` landed the base 58-command fixture; `e8014b25` corrects it to the
+shared 64-command Bazel 9.2 `query-build-load-files-provenance` fixture with a
+singleton fake-target topology. Update `051423-694832`, Terra clean
+`051521-700085`, and root clean `051644-705470` passed; Sol-low final review
+was `ACCEPT`. It covers selected active BUILD/transitive loads/active
+companions for `buildfiles`, loads-only `loadfiles`,
+fallback/dual/diamond/multi-package/empty/idempotent/deps/failure cases,
+broken companions without package loading, and factored FULL with
 `--output=graph --graph:factored`.
 
-Gate B must retain `(printed label, consuming package, real/fake)`: left
-intersections preserve provenance, equal fake/fake except is empty, and
-real/fake except is asymmetric. Fake nodes are zero-edge; direct FULL
+`BinaryOperatorExpression#evalPlus/#evalMinus/#evalIntersect`, `QueryUtil`'s
+`TargetKeyExtractor` label-key set, and `SiblingsFunction` require Gate B to
+retain `(printed label, consuming package, real/fake)` with left intersections,
+symmetric equal-label `except`, and explicit union callback batches. The older
+fake-left survivor was unmatched transitive `two.bzl`, not asymmetric
+real/fake semantics. Fake nodes are zero-edge; direct FULL
 `buildfiles` omits the selected real package BUILD unless another graph
 observer materializes it, while `deps(buildfiles(...))` includes result nodes.
-This is oracle evidence only: Gate A and activation remain pending and nine
-ordinary functions remain deferred.
+This is oracle evidence only: the remaining Stage 8 half of Gate A and all
+activation remain pending; nine ordinary functions remain deferred.
 
 #### Gate A Stage 4 half evidence (2026-07-23)
 

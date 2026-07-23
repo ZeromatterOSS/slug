@@ -1060,23 +1060,31 @@ retained `FrozenModule` pointer identity from equality.
 
 #### Oracle evidence landed (2026-07-23)
 
-`8f6f02b3` (`test: add build and load files oracles`) lands 58 Bazel 9.2
-records in `query-build-load-files-provenance`: update `043543-650513`, Terra
-clean `043649-655650`, root clean `043934-665303`, and post-note root clean
-`044122-670177`; Sol-low final review was `ACCEPT`. The source anchors are
-`BuildFilesFunction`, `LoadFilesFunction`,
+`8f6f02b3` (`test: add build and load files oracles`) established 58 Bazel 9.2
+records; `e8014b25` (`test: isolate fake target set algebra`) corrects
+`query-build-load-files-provenance` to 64 with a singleton fake-target
+topology. Update `051423-694832`, Terra clean `051521-700085`, and root clean
+`051644-705470` passed; Sol-low final review was `ACCEPT`. The source anchors
+are `BuildFilesFunction`, `LoadFilesFunction`,
 `AbstractBlazeQueryEnvironment#transitiveLoadFiles`, `FakeLoadTarget`,
 `BlazeQueryEnvironment#getTransitiveLoadFilesHelper`,
-`BlazeTargetAccessor#getPackage`, and `TargetKeyExtractor`.
+`BlazeTargetAccessor#getPackage`, `TargetKeyExtractor`,
+`BinaryOperatorExpression#evalPlus/#evalMinus/#evalIntersect`, `QueryUtil`'s
+label-key set, and `SiblingsFunction`.
 
 No V1/Buck semantics were imported. The observed V2 boundary is stricter:
 request-local state retains `(printed label, consuming package, real/fake)`
 through set composition. `seenBzlLabels` deduplicates per invocation, but
 separate invocations can project the same printed label to different consumers;
 do not replace that with global `QueryLabel` identity or a request-global
-winner. Factored FULL (`--output=graph --graph:factored`) confirms zero fake
-edges and forbids synthetic projection edges. Gate A/B remain unimplemented;
-nine ordinary functions remain deferred.
+winner. Intersection retains the left representative, equal-label `except`
+removes in both directions, and union sends distinct callback batches to
+`siblings`; the older fake-left survivor is unmatched transitive `two.bzl`, not
+an asymmetric real/fake operation. Factored FULL
+(`--output=graph --graph:factored`) confirms zero fake edges and forbids
+synthetic projection edges. The Stage 8 half of Gate A and Gate B remain
+unimplemented; no functions are activated and nine ordinary functions remain
+deferred.
 
 #### Stage 4 Gate A half landed (2026-07-23)
 

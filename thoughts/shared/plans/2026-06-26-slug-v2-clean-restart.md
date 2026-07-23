@@ -488,26 +488,36 @@ broken syntax or a broken `load()` and must still contribute its discovered
 companion basename without a successful `PackageLoad` value; missing selected
 loads and `.bzl` cycles are explicit failure-oracle cases.
 
-Oracle evidence landed in `8f6f02b3` (`test: add build and load files
-oracles`): `query-build-load-files-provenance` has 58 Bazel 9.2 commands.
-Update `043543-650513`, Terra clean `043649-655650`, root clean
-`043934-665303`, and post-note root clean `044122-670177` passed; Sol-low
-returned final `ACCEPT`. This accepts only the oracle: nine functions remain
-deferred and neither Gate A nor Gate B is implemented. It proves selected
-active BUILD/transitive-load/active-companion `buildfiles`, loads-only
-`loadfiles`, fallback/dual/diamond/multi-package/empty/idempotent/deps/failure
-cases, and broken companion discovery without package loading.
+Oracle evidence now ends at `e8014b25` (`test: isolate fake target set
+algebra`): `query-build-load-files-provenance` has 64 Bazel 9.2 commands.
+The base 58-row evidence is `8f6f02b3`; the correction adds a singleton
+package loading only `//shared:two.bzl`. Update `051423-694832`, Terra clean
+`051521-700085`, and root clean `051644-705470` passed; Sol-low returned final
+`ACCEPT`. This accepts only the oracle: nine functions remain deferred and
+neither full Gate A nor Gate B is implemented. It proves selected active
+BUILD/transitive-load/active-companion `buildfiles`, loads-only `loadfiles`,
+fallback/dual/diamond/multi-package/empty/idempotent/deps/failure cases, and
+broken companion discovery without package loading.
+
+The source basis is `BinaryOperatorExpression`'s `evalPlus`, `evalMinus`, and
+`evalIntersect`, `QueryUtil`'s `TargetKeyExtractor`-keyed set,
+`TargetKeyExtractor`, and `SiblingsFunction`: intersection retains the left
+representative; equal printed-label `except` removes in both directions; and
+union streams both provenance callback batches to `siblings`. The older
+fake-left `except` real-`one.bzl` row remains nonempty only for unmatched
+transitive `two.bzl`, not asymmetric equality. Stage 8 must use symmetric
+label removal and explicit callback batches, never an asymmetric `Eq` or
+operator rule.
 
 Within one invocation `seenBzlLabels` label-deduplicates; across separately
 evaluated functions one printed fake label can have different consuming
-packages. Intersections preserve left provenance, equal fake/fake except is
-empty, and real/fake except is asymmetric. Gate A must retain `(printed label,
-consuming package, real/fake)`; Gate B may not use a request-global winner or
-`QueryLabel`-only result identity. Factored FULL uses `--output=graph
---graph:factored`: fake nodes are zero-edge, direct `buildfiles` omits the
-selected real BUILD unless another graph observer materializes it,
-`deps(buildfiles(...))` includes result nodes, and no synthetic projection
-edge is allowed.
+packages. Gate A must retain `(printed label, consuming package, real/fake)`;
+Gate B may not use a request-global winner or `QueryLabel`-only result
+identity, and must apply the corrected label-keyed set/batch semantics above.
+Factored FULL uses `--output=graph --graph:factored`: fake nodes are zero-edge,
+direct `buildfiles` omits the selected real BUILD unless another graph observer
+materializes it, `deps(buildfiles(...))` includes result nodes, and no
+synthetic projection edge is allowed.
 
 Stage 4 half evidence landed in `b0670e33` (`feat: retain load provenance
 manifests`). Gate A is partial: Stage 4 is accepted, while Stage 8 fake-target

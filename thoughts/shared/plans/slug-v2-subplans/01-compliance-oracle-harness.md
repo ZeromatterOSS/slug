@@ -765,17 +765,21 @@ with `generated: false` is not acceptance evidence.
 
 ### Build/load provenance oracle checkpoint (2026-07-23)
 
-`8f6f02b3` adds the 58-command Bazel 9.2 fixture
-`query-build-load-files-provenance`. Update `043543-650513`, Terra clean
-`043649-655650`, root clean `043934-665303`, and post-note root clean
-`044122-670177` passed; Sol-low final review was `ACCEPT`. Its seven anchors
-are `BuildFilesFunction`, `LoadFilesFunction`,
+`8f6f02b3` established the base 58-command fixture; `e8014b25` corrects it to
+the 64-command Bazel 9.2 `query-build-load-files-provenance` fixture with a
+singleton fake-target topology. Update `051423-694832`, Terra clean
+`051521-700085`, and root clean `051644-705470` passed; Sol-low final review
+was `ACCEPT`. Its anchors are `BuildFilesFunction`, `LoadFilesFunction`,
 `AbstractBlazeQueryEnvironment#transitiveLoadFiles`, `FakeLoadTarget`,
 `BlazeQueryEnvironment#getTransitiveLoadFilesHelper`,
-`BlazeTargetAccessor#getPackage`, and `TargetKeyExtractor`, all at
+`BlazeTargetAccessor#getPackage`, `TargetKeyExtractor`,
+`BinaryOperatorExpression#evalPlus/#evalMinus/#evalIntersect`, `QueryUtil`'s
+label-key set, and `SiblingsFunction`, all at
 `8220c6198837d5c13d53fea211cf3282aa12408a`.
 
 This is an implementation prerequisite, not Slug parity evidence: nine
 ordinary functions remain deferred. It establishes transitive/companion,
 fake-provenance/set, failure, and factored FULL observations with
-`--output=graph --graph:factored`.
+`--output=graph --graph:factored`: intersection keeps the left representative,
+label-equal `except` is symmetric, and union preserves distinct callback
+batches to `siblings`.

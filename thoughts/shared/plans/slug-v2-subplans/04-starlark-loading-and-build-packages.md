@@ -505,17 +505,23 @@ rg -n "BUCK|TARGETS|buckconfig|CellResolver|CellName" app/slug_loading_v2
 
 ### Build/load provenance oracle evidence (2026-07-23)
 
-`8f6f02b3` lands the shared 58-row Bazel 9.2
-`query-build-load-files-provenance` fixture. Update `043543-650513`, Terra
-clean `043649-655650`, root clean `043934-665303`, and post-note root clean
-`044122-670177` passed; Sol-low returned `ACCEPT`. It proves companion BUILD
-basenames are discoverable through broken syntax/load packages without
+`8f6f02b3` landed the shared base 58-row fixture; `e8014b25` corrects it to
+64 Bazel 9.2 `query-build-load-files-provenance` rows by isolating a singleton
+fake target. Update `051423-694832`, Terra clean `051521-700085`, and root
+clean `051644-705470` passed; Sol-low returned `ACCEPT`. It proves companion
+BUILD basenames are discoverable through broken syntax/load packages without
 successfully loading them, and separately evaluated load functions can
 associate one printed fake `.bzl` label with different consumers.
 
-This implements no Stage 4 substrate. Gate A must preserve `(printed label,
-consuming package, real/fake)`, retain `seenBzlLabels` label dedup only within
-an invocation, and use no request-global winner. Factored FULL uses
+The `BinaryOperatorExpression` `evalPlus`/`evalMinus`/`evalIntersect`,
+`QueryUtil` label-key set, `TargetKeyExtractor`, and `SiblingsFunction` show
+that intersection retains the left representative, equal-label `except`
+removes in both directions, and union sends both callback batches to siblings.
+The earlier fake-left survivor is unmatched transitive `two.bzl`, not an
+asymmetric real/fake operation. This oracle evidence itself implements no
+additional Stage 4 substrate. Gate A must preserve `(printed label, consuming
+package, real/fake)`, retain `seenBzlLabels` label dedup only within an
+invocation, and use no request-global winner. Factored FULL uses
 `--output=graph --graph:factored` and confirms zero fake edges/no synthetic
 projection edges. Nine ordinary functions remain deferred.
 
