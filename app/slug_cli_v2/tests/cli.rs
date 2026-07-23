@@ -653,6 +653,204 @@ fn path_topology_fixture_covers_all_forty_three_bazel_rows_through_cli() {
 }
 
 #[test]
+fn some_selection_fixture_covers_all_forty_two_bazel_rows_through_cli() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-some-selection/workspace");
+    const ONE_OF_THREE: &[&str] = &["//:zeta\n", "//:alpha\n", "//:middle\n"];
+    const TWO_AUTO: &[&str] = &[
+        "//:alpha\n//:middle\n",
+        "//:alpha\n//:zeta\n",
+        "//:middle\n//:zeta\n",
+    ];
+    const TWO_FULL: &[&str] = &[
+        "//:alpha\n//:middle\n",
+        "//:alpha\n//:zeta\n",
+        "//:middle\n//:alpha\n",
+        "//:middle\n//:zeta\n",
+        "//:zeta\n//:alpha\n",
+        "//:zeta\n//:middle\n",
+    ];
+    let successes: &[(&str, Option<&str>, &[&str])] = &[
+        ("some(//:single)", None, &["//:single\n"]),
+        ("some(//:single)", Some("auto"), &["//:single\n"]),
+        ("some(//:single)", Some("full"), &["//:single\n"]),
+        ("some(set(//:zeta //:alpha //:middle))", None, ONE_OF_THREE),
+        (
+            "some(set(//:zeta //:alpha //:middle), 2)",
+            Some("auto"),
+            TWO_AUTO,
+        ),
+        (
+            "some(set(//:zeta //:alpha //:middle), 2)",
+            Some("full"),
+            TWO_FULL,
+        ),
+        (
+            "some(set(//:zeta //:alpha //:middle), 3)",
+            Some("auto"),
+            &["//:alpha\n//:middle\n//:zeta\n"],
+        ),
+        (
+            "some(set(//:zeta //:alpha //:middle), 3)",
+            Some("full"),
+            &["//:zeta\n//:middle\n//:alpha\n"],
+        ),
+        (
+            "some(set(//:zeta //:alpha //:middle), 5)",
+            None,
+            &["//:alpha\n//:middle\n//:zeta\n"],
+        ),
+        (
+            "some(set(//:zeta //:zeta //:alpha), 5)",
+            None,
+            &["//:alpha\n//:zeta\n"],
+        ),
+        (
+            "some(some(set(//:zeta //:alpha), 2) union some(set(//:alpha //:middle), 2), 5)",
+            None,
+            &["//:alpha\n//:middle\n//:zeta\n"],
+        ),
+        ("some(//:single, 2147483647)", None, &["//:single\n"]),
+        (
+            "some(deps(//:cycle_a), 5)",
+            None,
+            &["//:cycle_a\n//:cycle_b\n"],
+        ),
+        (
+            "some(set(//:early //other:later), 1)",
+            None,
+            &["//:early\n", "//other:later\n"],
+        ),
+        (
+            "some(set(//:early //other:later), 5)",
+            None,
+            &["//:early\n//other:later\n"],
+        ),
+        (
+            "some(//recursive/..., 5)",
+            None,
+            &["//recursive:rec_zeta\n//recursive/nested:rec_alpha\n"],
+        ),
+        (
+            "deps(//:depth_root, 2147483647)",
+            None,
+            &["//:depth_child\n//:depth_root\n"],
+        ),
+        ("deps(//:depth_root, '-1')", None, &[""]),
+        ("deps(//:depth_root, '-2147483648')", None, &[""]),
+        (
+            "rdeps(set(//:depth_root //:depth_child), //:depth_child, '-1')",
+            None,
+            &[""],
+        ),
+        (
+            "rdeps(set(//:depth_root //:depth_child), //:depth_child, '-2147483648')",
+            None,
+            &[""],
+        ),
+        (
+            "rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483647)",
+            None,
+            &["//:depth_child\n//:depth_root\n"],
+        ),
+    ];
+    let failures: &[(&str, i32, &str)] = &[
+        (
+            "some(//:early union //:missing_target, 1)",
+            7,
+            "no such target '//:missing_target'",
+        ),
+        (
+            "some(set(//:early //:missing_target), 1)",
+            7,
+            "no such target '//:missing_target'",
+        ),
+        (
+            "some(//:early union //missing:target, 1)",
+            7,
+            "no such package 'missing'",
+        ),
+        (
+            "some(set(//:early //missing:target), 1)",
+            7,
+            "no such package 'missing'",
+        ),
+        ("some(set())", 7, "argument set is empty"),
+        ("some(//:single, 0)", 7, "argument set is empty"),
+        ("some(set(), 0)", 7, "argument set is empty"),
+        ("some(//:single, '-1')", 7, "argument set is empty"),
+        ("some(set(), '-1')", 7, "argument set is empty"),
+        ("some(//:single, '-2147483648')", 7, "argument set is empty"),
+        ("some(//:single, -1)", 2, "syntax error at '- 1 )'"),
+        (
+            "some(//missing:target, 2147483648)",
+            2,
+            "expected an integer literal: '2147483648'",
+        ),
+        (
+            "some(//missing:target, '-2147483649')",
+            2,
+            "expected an integer literal: '-2147483649'",
+        ),
+        (
+            "some(//missing:target, 2_147_483_647)",
+            2,
+            "expected an integer literal: '2_147_483_647'",
+        ),
+        (
+            "some(//:single, nope)",
+            2,
+            "expected an integer literal: 'nope'",
+        ),
+        ("some()", 2, "too few arguments to function 'some'"),
+        (
+            "some(//:single, 1, 2)",
+            2,
+            "too many arguments to function 'some'",
+        ),
+        ("some(2147483648)", 7, "no such target '//:2147483648'"),
+        (
+            "deps(//:depth_root, 2147483648)",
+            2,
+            "expected an integer literal: '2147483648'",
+        ),
+        (
+            "rdeps(set(//:depth_root //:depth_child), //:depth_child, 2147483648)",
+            2,
+            "expected an integer literal: '2147483648'",
+        ),
+    ];
+    assert_eq!(successes.len() + failures.len(), 42);
+
+    for (expression, order, alternatives) in successes {
+        let mut command = slug();
+        command.current_dir(&workspace).arg("query");
+        if let Some(order) = order {
+            command.arg(format!("--order_output={order}"));
+        }
+        let output = command.arg(expression).output().unwrap();
+        assert!(output.status.success(), "{expression}: {output:?}");
+        let stdout = std::str::from_utf8(&output.stdout).unwrap();
+        assert!(alternatives.contains(&stdout), "{expression}: {stdout:?}");
+    }
+    for (expression, exit, message) in failures {
+        let output = slug()
+            .current_dir(&workspace)
+            .args(["query", expression])
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(*exit),
+            "{expression}: {output:?}"
+        );
+        assert!(output.stdout.is_empty(), "{expression}: {output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(stderr.contains(message), "{expression}: {stderr}");
+    }
+}
+
+#[test]
 fn output_base_query_reuses_one_daemon_across_build_edits() {
     let workspace = scratch("query-workspace");
     let output_base = scratch("query-output-base");

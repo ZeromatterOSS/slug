@@ -180,7 +180,7 @@ where
     }
 
     pub async fn evaluate(
-        mut self,
+        &mut self,
         expression: &QueryExpression,
     ) -> Result<TargetSet<E::Target>, QueryError> {
         let mut variables = SmallMap::new();
@@ -279,6 +279,7 @@ static DEPS_FUNCTION: DepsFunction = DepsFunction;
 static RDEPS_FUNCTION: RdepsFunction = RdepsFunction;
 static SAME_PKG_DIRECT_RDEPS_FUNCTION: SamePkgDirectRdepsFunction = SamePkgDirectRdepsFunction;
 static ALLPATHS_FUNCTION: AllPathsFunction = AllPathsFunction;
+static SOME_FUNCTION: SomeFunction = SomeFunction;
 static SOMEPATH_FUNCTION: SomePathFunction = SomePathFunction;
 
 impl<E> QueryFunctions<E> for LoadingQueryFunctions
@@ -295,6 +296,7 @@ where
             &DEPS_FUNCTION as &dyn QueryFunction<E>,
             &RDEPS_FUNCTION as &dyn QueryFunction<E>,
             &SAME_PKG_DIRECT_RDEPS_FUNCTION as &dyn QueryFunction<E>,
+            &SOME_FUNCTION as &dyn QueryFunction<E>,
             &SOMEPATH_FUNCTION as &dyn QueryFunction<E>,
         ]
         .into_iter()
@@ -328,7 +330,7 @@ where
 }
 
 #[derive(Debug, Clone, Copy)]
-struct QueryDepth(Option<u64>);
+struct QueryDepth(Option<i32>);
 
 impl<E: QueryEnvironment> QueryFunctionArg<E> for QueryDepth {
     fn accept_none() -> Option<Self> {
@@ -341,10 +343,33 @@ impl<E: QueryEnvironment> QueryFunctionArg<E> for QueryDepth {
         _variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
     ) -> BoxFuture<'a, Result<Self, QueryError>> {
         async move {
-            match expression.kind {
-                QueryExpressionKind::Integer(value) => Ok(Self(Some(value))),
-                _ => Err(QueryError::syntax("expected an integer query argument")),
-            }
+            expression
+                .java_integer_literal()
+                .map(|value| Self(Some(value)))
+                .map_err(|raw| QueryError::syntax(format!("expected an integer literal: '{raw}'")))
+        }
+        .boxed()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct QuerySelectionCount(i32);
+
+impl<E: QueryEnvironment> QueryFunctionArg<E> for QuerySelectionCount {
+    fn accept_none() -> Option<Self> {
+        Some(Self(1))
+    }
+
+    fn eval<'a>(
+        _evaluator: &'a mut QueryEvaluator<E>,
+        expression: &'a QueryExpression,
+        _variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+    ) -> BoxFuture<'a, Result<Self, QueryError>> {
+        async move {
+            expression
+                .java_integer_literal()
+                .map(Self)
+                .map_err(|raw| QueryError::syntax(format!("expected an integer literal: '{raw}'")))
         }
         .boxed()
     }
@@ -422,6 +447,41 @@ where
 
 struct AllPathsFunction;
 
+struct SomeFunction;
+
+impl<E> QueryFunction<E> for SomeFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("some").expect("some is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, TargetSet<E::Target>>,
+    ) -> BoxFuture<'a, Result<TargetSet<E::Target>, QueryError>> {
+        async move {
+            let candidates: TargetSet<E::Target> = eval_arg(evaluator, args, variables, 0).await?;
+            let count: QuerySelectionCount = eval_arg(evaluator, args, variables, 1).await?;
+            let mut selected = TargetSet::default();
+            if count.0 > 0 {
+                for candidate in candidates.iter().take(count.0 as usize) {
+                    selected.insert(candidate.clone());
+                }
+            }
+            if selected.iter().next().is_none() {
+                Err(QueryError::evaluation("argument set is empty"))
+            } else {
+                Ok(selected)
+            }
+        }
+        .boxed()
+    }
+}
+
 impl<E> QueryFunction<E> for AllPathsFunction
 where
     E: QueryEnvironment + Send,
@@ -498,7 +558,7 @@ where
 async fn transitive_closure<E>(
     environment: &mut E,
     roots: TargetSet<E::Target>,
-    max_depth: Option<u64>,
+    max_depth: Option<i32>,
 ) -> Result<TargetSet<E::Target>, QueryError>
 where
     E: QueryEnvironment + Send,
@@ -529,6 +589,72 @@ impl<T> ResolvedGraph<T>
 where
     T: Clone + Eq + Hash,
 {
+    async fn build_selected_induced<E>(
+        environment: &mut E,
+        selected: &TargetSet<T>,
+    ) -> Result<Self, QueryError>
+    where
+        E: QueryEnvironment<Target = T> + Send,
+        T: Ord,
+    {
+        let mut targets = selected.iter().cloned().collect::<Vec<_>>();
+        targets.sort_unstable();
+        let mut graph = Self {
+            nodes: Vec::with_capacity(targets.len()),
+            target_to_index: SmallMap::with_capacity(targets.len()),
+        };
+        for target in targets {
+            graph.get_or_create(target);
+        }
+        for index in 0..graph.nodes.len() {
+            let target = graph.nodes[index].target.clone();
+            let dependencies = environment.dependencies(&target).await?;
+            let mut children = dependencies
+                .iter()
+                .filter_map(|dependency| graph.target_to_index.get(dependency).copied())
+                .collect::<Vec<_>>();
+            children.sort_unstable_by(|left, right| {
+                graph.nodes[*left as usize]
+                    .target
+                    .cmp(&graph.nodes[*right as usize].target)
+            });
+            children.dedup();
+            graph.nodes[index].children = children;
+        }
+        Ok(graph)
+    }
+
+    fn deterministic_topological_order(&self) -> Vec<T> {
+        let mut visited = SmallSet::new();
+        let mut postorder = Vec::with_capacity(self.nodes.len());
+        for root in 0..self.nodes.len() {
+            let root: u32 = root
+                .try_into()
+                .expect("query graph exceeds u32 node capacity");
+            if !visited.insert(root) {
+                continue;
+            }
+            let mut stack = vec![(root, 0_usize)];
+            while let Some((index, next_child)) = stack.last_mut() {
+                if let Some(child) = self.nodes[*index as usize]
+                    .children
+                    .get(*next_child)
+                    .copied()
+                {
+                    *next_child += 1;
+                    if visited.insert(child) {
+                        stack.push((child, 0));
+                    }
+                } else {
+                    let (index, _) = stack.pop().expect("query DFS stack is non-empty");
+                    postorder.push(self.nodes[index as usize].target.clone());
+                }
+            }
+        }
+        postorder.reverse();
+        postorder
+    }
+
     async fn build_stable_forward<E>(
         environment: &mut E,
         roots: impl IntoIterator<Item = T>,
@@ -656,7 +782,7 @@ where
         self
     }
 
-    fn take_max_depth(self, roots: &[T], max_depth: u64) -> Self {
+    fn take_max_depth(self, roots: &[T], max_depth: i32) -> Self {
         let mut visited = SmallSet::new();
         let mut retained = Vec::new();
         let mut edge = VecDeque::new();
@@ -666,7 +792,7 @@ where
             };
             if visited.insert(index) {
                 retained.push(index);
-                edge.push_back((index, 0_u64));
+                edge.push_back((index, 0_i32));
             }
         }
 
@@ -677,7 +803,7 @@ where
             for child in self.nodes[index as usize].children.iter().copied() {
                 if visited.insert(child) {
                     retained.push(child);
-                    edge.push_back((child, depth + 1));
+                    edge.push_back((child, depth.saturating_add(1)));
                 }
             }
         }
@@ -772,12 +898,15 @@ async fn reverse_dependencies<E>(
     environment: &mut E,
     universe: TargetSet<E::Target>,
     from: TargetSet<E::Target>,
-    max_depth: Option<u64>,
+    max_depth: Option<i32>,
 ) -> Result<TargetSet<E::Target>, QueryError>
 where
     E: QueryEnvironment + Send,
 {
     let graph = ResolvedGraph::build_stable_forward(environment, universe.iter().cloned()).await?;
+    if max_depth.is_some_and(|depth| depth < 0) {
+        return Ok(TargetSet::default());
+    }
     let graph = graph.reverse();
     let roots = from
         .iter()
@@ -813,12 +942,15 @@ where
 pub async fn async_depth_limited_traversal<E>(
     environment: &mut E,
     roots: impl IntoIterator<Item = E::Target>,
-    max_depth: Option<u64>,
+    max_depth: Option<i32>,
     mut visit: impl FnMut(E::Target),
 ) -> Result<(), QueryError>
 where
     E: QueryEnvironment + Send,
 {
+    if max_depth.is_some_and(|depth| depth < 0) {
+        return Ok(());
+    }
     let mut visited = SmallSet::new();
     let mut pending = VecDeque::new();
     for root in roots {
@@ -833,7 +965,7 @@ where
         }
         for dependency in environment.dependencies(&target).await?.iter() {
             if visited.insert(dependency.clone()) {
-                pending.push_back((dependency.clone(), depth + 1));
+                pending.push_back((dependency.clone(), depth.saturating_add(1)));
             }
         }
     }
@@ -1016,10 +1148,15 @@ pub async fn evaluate_loading_query(
     let expression =
         parse_query_expression(source).map_err(|error| QueryError::syntax(error.to_string()))?;
     validate_loading_query(&expression).map_err(|error| QueryError::syntax(error.to_string()))?;
-    let targets = QueryEvaluator::new(LoadingQueryEnvironment::new(ctx, workspace))
-        .evaluate(&expression)
-        .await?;
-    let mut labels = targets.iter().cloned().collect::<Vec<_>>();
+    let mut evaluator = QueryEvaluator::new(LoadingQueryEnvironment::new(ctx, workspace));
+    let targets = evaluator.evaluate(&expression).await?;
+    let mut labels = if order == QueryOrder::Full {
+        ResolvedGraph::build_selected_induced(&mut evaluator.environment, &targets)
+            .await?
+            .deterministic_topological_order()
+    } else {
+        targets.iter().cloned().collect::<Vec<_>>()
+    };
     if order == QueryOrder::Auto && !expression.is_top_level_somepath() {
         labels.sort_unstable();
     }

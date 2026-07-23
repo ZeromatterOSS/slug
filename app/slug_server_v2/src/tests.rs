@@ -275,6 +275,49 @@ fn retained_daemon_query_observes_build_dependency_edits() {
 }
 
 #[test]
+fn retained_daemon_some_observes_candidate_create_rename_delete_recreate() {
+    let workspace = scratch("some-candidate-transitions");
+    let build = workspace.join("cand/BUILD.bazel");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(&build, "filegroup(name = \"one\")\n");
+    let expression = "some(//cand:all, 10)";
+    let mut daemon = Daemon::new(&workspace).unwrap();
+
+    let initial = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(initial.exit_code, 0, "{initial:?}");
+    assert_eq!(initial.stdout, "//cand:one\n");
+
+    write(
+        &build,
+        "filegroup(name = \"one\")\nfilegroup(name = \"two\")\n",
+    );
+    let created = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(created.exit_code, 0, "{created:?}");
+    assert_eq!(created.stdout, "//cand:one\n//cand:two\n");
+
+    write(
+        &build,
+        "filegroup(name = \"one\")\nfilegroup(name = \"middle\")\n",
+    );
+    let renamed = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(renamed.exit_code, 0, "{renamed:?}");
+    assert_eq!(renamed.stdout, "//cand:middle\n//cand:one\n");
+
+    write(&build, "filegroup(name = \"one\")\n");
+    let deleted = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(deleted.exit_code, 0, "{deleted:?}");
+    assert_eq!(deleted.stdout, "//cand:one\n");
+
+    write(
+        &build,
+        "filegroup(name = \"one\")\nfilegroup(name = \"zeta\")\n",
+    );
+    let recreated = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(recreated.exit_code, 0, "{recreated:?}");
+    assert_eq!(recreated.stdout, "//cand:one\n//cand:zeta\n");
+}
+
+#[test]
 fn retained_daemon_reverse_query_observes_edge_and_subtree_transitions() {
     let workspace = scratch("reverse-query-transitions");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

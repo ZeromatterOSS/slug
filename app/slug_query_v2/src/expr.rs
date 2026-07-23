@@ -140,7 +140,12 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
         status: QueryFunctionStatus::Implemented,
     },
     deferred("siblings", 1, &[EXPR]),
-    deferred("some", 1, &[EXPR, INT]),
+    QueryFunctionSpec {
+        name: "some",
+        mandatory_arguments: 1,
+        argument_kinds: &[EXPR, INT],
+        status: QueryFunctionStatus::Implemented,
+    },
     QueryFunctionSpec {
         name: "somepath",
         mandatory_arguments: 2,
@@ -193,6 +198,15 @@ impl QueryExpression {
             &self.kind,
             QueryExpressionKind::Function { name, .. } if name.value == "somepath"
         )
+    }
+
+    pub(crate) fn java_integer_literal(&self) -> Result<i32, CompactString> {
+        let raw = match &self.kind {
+            QueryExpressionKind::Integer(value) => CompactString::from(value.to_string()),
+            QueryExpressionKind::TargetLiteral(value) => value.clone(),
+            _ => CompactString::from(self.to_string()),
+        };
+        raw.parse::<i32>().map_err(|_| raw)
     }
 }
 
@@ -247,9 +261,15 @@ fn validate_expression(expression: &QueryExpression) -> Result<(), QueryParseErr
                     QueryArgumentKind::Word => {
                         matches!(argument.kind, QueryExpressionKind::TargetLiteral(_))
                     }
-                    QueryArgumentKind::Integer => {
-                        matches!(argument.kind, QueryExpressionKind::Integer(_))
-                    }
+                    QueryArgumentKind::Integer => match argument.java_integer_literal() {
+                        Ok(_) => true,
+                        Err(raw) => {
+                            return Err(QueryParseError::new(
+                                format!("expected an integer literal: '{raw}'"),
+                                argument.span,
+                            ));
+                        }
+                    },
                 };
                 if !valid {
                     return Err(QueryParseError::new(

@@ -66,6 +66,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             "deps",
             "rdeps",
             "same_pkg_direct_rdeps",
+            "some",
             "somepath",
         ]
     );
@@ -108,6 +109,65 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
         &QueryExpression::parse("somepath(//:linear_start, //:linear_end)").unwrap(),
     )
     .unwrap();
+    validate_loading_query(&QueryExpression::parse("some(//:single, '-1')").unwrap()).unwrap();
+}
+
+#[test]
+fn signed_java_integer_slots_validate_without_narrowing_expression_integers() {
+    for source in [
+        "some(//:single, 2147483647)",
+        "some(//:single, '-2147483648')",
+        "deps(//:depth_root, '-1')",
+        "rdeps(//..., //:depth_child, '-2147483648')",
+        "some(2147483648)",
+    ] {
+        validate_loading_query(&QueryExpression::parse(source).unwrap()).unwrap();
+    }
+
+    for (source, raw) in [
+        ("some(//:single, 2147483648)", "2147483648"),
+        ("some(//:single, '-2147483649')", "-2147483649"),
+        ("some(//:single, 2_147_483_647)", "2_147_483_647"),
+        ("some(//:single, nope)", "nope"),
+        ("deps(//:depth_root, 2147483648)", "2147483648"),
+    ] {
+        let error = validate_loading_query(&QueryExpression::parse(source).unwrap())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(&format!("expected an integer literal: '{raw}'")),
+            "{source}: {error}"
+        );
+    }
+
+    let error = QueryExpression::parse("some(//:single, -1)").unwrap_err();
+    assert_eq!(error.span, SourceSpan { start: 19, end: 19 });
+    assert_eq!(error.to_string(), "syntax error at '- 1 )' at bytes 19..19");
+    assert_eq!(
+        QueryExpression::parse("some(//:single, '-1')")
+            .unwrap()
+            .to_string(),
+        "some(//:single, -1)"
+    );
+    for (source, tokens) in [
+        ("some(//:single, -1foo)", "- 1foo )"),
+        ("some(//:single, -1, 2)", "- 1 ,"),
+        ("some(//:single, -1 union //:other)", "- 1 union"),
+        ("some(//:single, -1é)", "- 1é )"),
+        ("some(//:single, -1 é)", "- 1 é"),
+        ("some(//:single, -1~foo)", "- 1~foo )"),
+        ("some(//:single, -1[abc])", "- 1[abc] )"),
+        ("some(//:single, -1#foo)", "- 1 #foo"),
+        ("some(//:single, -1%foo)", "- 1 %foo"),
+    ] {
+        assert!(
+            QueryExpression::parse(source)
+                .unwrap_err()
+                .to_string()
+                .contains(&format!("syntax error at '{tokens}'")),
+            "{source}"
+        );
+    }
 }
 
 #[test]

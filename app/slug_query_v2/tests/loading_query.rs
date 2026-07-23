@@ -163,6 +163,19 @@ async fn query_revision(
     Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError>,
     Vec<(QueryKeyIdentity, ActivationKind)>,
 ) {
+    query_revision_order(dice, tracker, workspace, expression, QueryOrder::Auto).await
+}
+
+async fn query_revision_order(
+    dice: &Arc<Dice>,
+    tracker: &Arc<QueryTracker>,
+    workspace: &Path,
+    expression: &str,
+    order: QueryOrder,
+) -> (
+    Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError>,
+    Vec<(QueryKeyIdentity, ActivationKind)>,
+) {
     let (files, directories) = observations(workspace);
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker.clone()),
@@ -185,13 +198,8 @@ async fn query_revision(
         )])
         .unwrap();
     let mut transaction = updater.commit().await;
-    let result = evaluate_loading_query(
-        &mut transaction,
-        workspace.to_path_buf(),
-        expression,
-        QueryOrder::Auto,
-    )
-    .await;
+    let result =
+        evaluate_loading_query(&mut transaction, workspace.to_path_buf(), expression, order).await;
     let mut events = tracker.take();
     events.sort();
     (result, events)
@@ -206,6 +214,286 @@ fn subtree(prefix: &str, kind: ActivationKind) -> (QueryKeyIdentity, ActivationK
         QueryKeyIdentity::SubtreePackageSet(PathBuf::from(prefix)),
         kind,
     )
+}
+
+#[tokio::test]
+async fn some_selects_once_in_set_order_and_signed_depths_are_empty() {
+    let workspace = fs::canonicalize(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/v2_oracle/fixtures/query-some-selection/workspace"),
+    )
+    .unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, order, expected) in [
+        ("some(//:single)", QueryOrder::Auto, "//:single\n"),
+        (
+            "some(set(//:zeta //:alpha //:middle), 2)",
+            QueryOrder::Auto,
+            "//:alpha\n//:zeta\n",
+        ),
+        (
+            "some(set(//:zeta //:alpha //:middle), 2)",
+            QueryOrder::Full,
+            "//:zeta\n//:alpha\n",
+        ),
+        (
+            "set(//:zeta //:alpha //:middle)",
+            QueryOrder::Full,
+            "//:zeta\n//:middle\n//:alpha\n",
+        ),
+        (
+            "some(set(//:zeta //:alpha //:middle), 3)",
+            QueryOrder::Full,
+            "//:zeta\n//:middle\n//:alpha\n",
+        ),
+        (
+            "some(set(//:zeta //:zeta //:alpha), 2)",
+            QueryOrder::Full,
+            "//:zeta\n//:alpha\n",
+        ),
+        (
+            "some(//recursive/..., 2)",
+            QueryOrder::Full,
+            "//recursive/nested:rec_alpha\n//recursive:rec_zeta\n",
+        ),
+        (
+            "some(deps(//:cycle_a), 10)",
+            QueryOrder::Auto,
+            "//:cycle_a\n//:cycle_b\n",
+        ),
+        (
+            "deps(//:depth_root)",
+            QueryOrder::Full,
+            "//:depth_root\n//:depth_child\n",
+        ),
+        (
+            "deps(//:cycle_a)",
+            QueryOrder::Full,
+            "//:cycle_a\n//:cycle_b\n",
+        ),
+        ("deps(//:depth_root, '-1')", QueryOrder::Auto, ""),
+        (
+            "rdeps(//:depth_root, //:depth_child, '-2147483648')",
+            QueryOrder::Auto,
+            "",
+        ),
+        (
+            "deps(//:depth_root, 2147483647)",
+            QueryOrder::Auto,
+            "//:depth_child\n//:depth_root\n",
+        ),
+    ] {
+        let output = evaluate_loading_query(&mut transaction, workspace.clone(), expression, order)
+            .await
+            .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+
+    for expression in ["some(set())", "some(//:single, 0)", "some(//:single, '-1')"] {
+        let error = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.exit_code, 7, "{expression}: {error}");
+        assert!(error.to_string().contains("argument set is empty"));
+    }
+}
+
+#[tokio::test]
+async fn some_has_exact_operand_prevalidation_and_signed_depth_key_demand() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("first/BUILD.bazel"),
+        "filegroup(name = \"a\")\n",
+    );
+    write(
+        workspace.join("second/BUILD.bazel"),
+        "filegroup(name = \"b\")\n",
+    );
+    let tracker = Arc::new(QueryTracker::default());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+
+    let (selected, events) = query_revision(
+        &dice,
+        &tracker,
+        &workspace,
+        "some(set(//second:b //first:a), 1)",
+    )
+    .await;
+    assert_eq!(selected.unwrap().stdout(), "//second:b\n");
+    assert_eq!(
+        events,
+        [
+            package("first", ActivationKind::Evaluated),
+            package("second", ActivationKind::Evaluated),
+        ]
+    );
+
+    write(
+        workspace.join("first/BUILD.bazel"),
+        "filegroup(name = \"a\")\nfilegroup(name = \"changed\")\n",
+    );
+    let (empty, events) = query_revision(&dice, &tracker, &workspace, "some(//first:a, 0)").await;
+    assert!(
+        empty
+            .unwrap_err()
+            .to_string()
+            .contains("argument set is empty")
+    );
+    assert_eq!(events, [package("first", ActivationKind::Evaluated)]);
+
+    let (invalid, events) =
+        query_revision(&dice, &tracker, &workspace, "some(//second:b, 2147483648)").await;
+    assert_eq!(invalid.unwrap_err().exit_code, 2);
+    assert!(events.is_empty(), "{events:?}");
+
+    write(
+        workspace.join("BUILD.bazel"),
+        "filegroup(name = \"cycle_a\", srcs = [\":cycle_b\"])\n\
+         filegroup(name = \"cycle_b\", srcs = [\":cycle_a\"])\n",
+    );
+    write(
+        workspace.join("origin/BUILD.bazel"),
+        "filegroup(name = \"top\", srcs = [\"//mid:item\"])\n",
+    );
+    write(
+        workspace.join("mid/BUILD.bazel"),
+        "filegroup(name = \"item\", srcs = [\"//dest:end\"])\n",
+    );
+    write(
+        workspace.join("dest/BUILD.bazel"),
+        "filegroup(name = \"end\")\n",
+    );
+    write(
+        workspace.join("recursive/BUILD.bazel"),
+        "filegroup(name = \"outer\")\n",
+    );
+    write(
+        workspace.join("recursive/nested/BUILD.bazel"),
+        "filegroup(name = \"inner\")\n",
+    );
+
+    for (expression, expected_events) in [
+        (
+            "deps(//origin:top, '-1')",
+            vec![package("origin", ActivationKind::Evaluated)],
+        ),
+        (
+            "rdeps(//origin:top, //dest:end, '-1')",
+            vec![
+                package("dest", ActivationKind::Evaluated),
+                package("mid", ActivationKind::Evaluated),
+                package("origin", ActivationKind::Evaluated),
+            ],
+        ),
+        (
+            "some(deps(//:cycle_a), 5)",
+            vec![package("", ActivationKind::Evaluated)],
+        ),
+        (
+            "some(//recursive/..., 5)",
+            vec![
+                package("recursive", ActivationKind::Evaluated),
+                package("recursive/nested", ActivationKind::Evaluated),
+                subtree("recursive", ActivationKind::Evaluated),
+            ],
+        ),
+    ] {
+        let tracker = Arc::new(QueryTracker::default());
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let (result, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+        result.unwrap();
+        assert_eq!(events, expected_events, "{expression}");
+    }
+
+    let tracker = Arc::new(QueryTracker::default());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let (full, events) = query_revision_order(
+        &dice,
+        &tracker,
+        &workspace,
+        "some(//origin:top, 1)",
+        QueryOrder::Full,
+    )
+    .await;
+    assert_eq!(full.unwrap().stdout(), "//origin:top\n");
+    assert_eq!(events, [package("origin", ActivationKind::Evaluated)]);
+}
+
+#[tokio::test]
+async fn some_all_candidates_tracks_retained_create_rename_delete_recreate() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    let candidates = workspace.join("cand/BUILD.bazel");
+    write(&candidates, "filegroup(name = \"one\")\n");
+    write(
+        workspace.join("unrelated/BUILD.bazel"),
+        "filegroup(name = \"outside\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "some(//cand:all, 10)";
+
+    let (initial, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(initial.unwrap().labels.as_ref(), ["//cand:one"]);
+    assert_eq!(events, [package("cand", ActivationKind::Evaluated)]);
+
+    let (identical, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(identical.unwrap().labels.as_ref(), ["//cand:one"]);
+    assert_eq!(events, []);
+
+    write(
+        workspace.join("unrelated/BUILD.bazel"),
+        "filegroup(name = \"changed_outside\")\n",
+    );
+    let (unrelated, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(unrelated.unwrap().labels.as_ref(), ["//cand:one"]);
+    assert_eq!(events, [package("cand", ActivationKind::Reused)]);
+
+    write(
+        &candidates,
+        "filegroup(name = \"one\")\nfilegroup(name = \"two\")\n",
+    );
+    let (created, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        created.unwrap().labels.as_ref(),
+        ["//cand:one", "//cand:two"]
+    );
+    assert_eq!(events, [package("cand", ActivationKind::Evaluated)]);
+
+    write(
+        &candidates,
+        "filegroup(name = \"one\")\nfilegroup(name = \"middle\")\n",
+    );
+    let (renamed, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        renamed.unwrap().labels.as_ref(),
+        ["//cand:middle", "//cand:one"]
+    );
+    assert_eq!(events, [package("cand", ActivationKind::Evaluated)]);
+
+    write(&candidates, "filegroup(name = \"one\")\n");
+    let (deleted, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(deleted.unwrap().labels.as_ref(), ["//cand:one"]);
+    assert_eq!(events, [package("cand", ActivationKind::Evaluated)]);
+
+    write(
+        &candidates,
+        "filegroup(name = \"one\")\nfilegroup(name = \"zeta\")\n",
+    );
+    let (recreated, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(
+        recreated.unwrap().labels.as_ref(),
+        ["//cand:one", "//cand:zeta"]
+    );
+    assert_eq!(events, [package("cand", ActivationKind::Evaluated)]);
 }
 
 // Source nodes belong to the package that owns their referring attribute.

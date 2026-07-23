@@ -167,16 +167,112 @@ pub(crate) fn parse(source: &str) -> Result<QueryExpression, QueryParseError> {
                 || source.matches('(').count() > source.matches(')').count()
                 || source.trim_end().ends_with(',')
                 || source.trim_end().ends_with('=');
-            Err(QueryParseError::new(
-                if premature {
-                    "premature end of input"
-                } else {
-                    "syntax error in query expression"
-                },
-                end,
-            ))
+            let message = if premature {
+                CompactString::new("premature end of input")
+            } else if let Some(tokens) = unquoted_bare_negative_tokens(source) {
+                CompactString::from(format!("syntax error at '{tokens}'"))
+            } else {
+                CompactString::new("syntax error in query expression")
+            };
+            Err(QueryParseError::new(message, end))
         }
     }
+}
+
+fn unquoted_bare_negative_tokens(source: &str) -> Option<String> {
+    fn next_char(source: &str, index: usize) -> Option<(char, usize)> {
+        source[index..]
+            .chars()
+            .next()
+            .map(|ch| (ch, index + ch.len_utf8()))
+    }
+
+    fn scan_word(source: &str, start: usize) -> usize {
+        let (first, mut index) = next_char(source, start).expect("word starts before EOF");
+        let starts_with_double_at =
+            first == '@' && next_char(source, index).is_some_and(|(ch, _)| ch == '@');
+        while let Some((ch, next)) = next_char(source, index) {
+            let continues = ch.is_ascii_alphanumeric()
+                || "*/@.-_:$~[]".contains(ch)
+                || !ch.is_ascii()
+                || (ch == '+' && starts_with_double_at);
+            if !continues {
+                break;
+            }
+            index = next;
+        }
+        index
+    }
+
+    fn scan_token(source: &str, mut index: usize) -> Option<(String, usize)> {
+        while let Some((ch, next)) = next_char(source, index) {
+            if !ch.is_ascii_whitespace() {
+                break;
+            }
+            index = next;
+        }
+        let (first, next) = next_char(source, index)?;
+        if "(),+-=^".contains(first) {
+            return Some((first.to_string(), next));
+        }
+        if first == '\'' || first == '"' {
+            let value_start = next;
+            let mut end = next;
+            while let Some((ch, following)) = next_char(source, end) {
+                if ch == first {
+                    return Some((source[value_start..end].to_owned(), following));
+                }
+                end = following;
+            }
+            return Some((source[value_start..].to_owned(), source.len()));
+        }
+        let end = scan_word(source, index);
+        Some((source[index..end].to_owned(), end))
+    }
+
+    let mut quote = None;
+    let mut index = 0;
+    while let Some((ch, next)) = next_char(source, index) {
+        match ch {
+            '\'' | '"' => {
+                quote = if quote == Some(ch) {
+                    None
+                } else if quote.is_none() {
+                    Some(ch)
+                } else {
+                    quote
+                };
+                index = next;
+            }
+            '(' | ',' if quote.is_none() => {
+                index = next;
+                while let Some((ch, following)) = next_char(source, index) {
+                    if !ch.is_ascii_whitespace() {
+                        break;
+                    }
+                    index = following;
+                }
+                let Some(('-', after_minus)) = next_char(source, index) else {
+                    continue;
+                };
+                if !next_char(source, after_minus).is_some_and(|(ch, _)| ch.is_ascii_digit()) {
+                    continue;
+                }
+                let mut tokens = Vec::with_capacity(3);
+                let mut cursor = index;
+                while tokens.len() < 3 {
+                    let Some((token, next)) = scan_token(source, cursor) else {
+                        break;
+                    };
+                    tokens.push(token);
+                    cursor = next;
+                }
+                return Some(tokens.join(" "));
+            }
+            _ => index = next,
+        }
+    }
+    None
 }
 
 fn expression(input: Span<'_>) -> Parsed<'_, QueryExpression> {
@@ -263,6 +359,14 @@ fn word_expression(input: Span<'_>) -> Parsed<'_, QueryExpression> {
 fn integer_expression(input: Span<'_>) -> Parsed<'_, QueryExpression> {
     spanned(|input| {
         let (remaining, value) = digit1(input)?;
+        if remaining
+            .fragment()
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_alphanumeric() || "*/@.-_:$#%".contains(ch))
+        {
+            return Err(nom::Err::Error(()));
+        }
         let parsed = value
             .fragment()
             .parse::<u64>()
@@ -372,6 +476,14 @@ fn word(input: Span<'_>) -> Parsed<'_, Span<'_>> {
         }
     }
     fn unquoted(input: Span<'_>) -> Parsed<'_, Span<'_>> {
+        if input
+            .fragment()
+            .strip_prefix('-')
+            .and_then(|rest| rest.chars().next())
+            .is_some_and(|ch| ch.is_ascii_digit())
+        {
+            return Err(nom::Err::Error(()));
+        }
         recognize(many1(alt((alphanumeric1, is_a("*/@.-_:$#%"))))).parse(input)
     }
     alt((quoted('\''), quoted('"'), unquoted)).parse(input)
