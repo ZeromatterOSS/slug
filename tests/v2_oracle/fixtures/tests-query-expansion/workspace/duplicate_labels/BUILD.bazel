@@ -1,0 +1,6 @@
+filegroup(name = "member")
+
+test_suite(
+    name = "duplicate",
+    tests = ["member", ":member"],
+)

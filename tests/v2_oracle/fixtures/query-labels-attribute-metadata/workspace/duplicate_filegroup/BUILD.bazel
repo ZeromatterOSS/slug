@@ -1,0 +1,4 @@
+filegroup(
+    name = "duplicate",
+    srcs = ["member", ":member"],
+)

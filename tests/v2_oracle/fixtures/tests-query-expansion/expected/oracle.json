@@ -582,6 +582,104 @@
       "normalized_stdout": "# <workspace>/provenance/BUILD.bazel:4:11\ntest_suite(\n  name = \"explicit_empty\",\n  tests = [],\n  _implicit_tests = [\"//provenance:member_test\"],\n)\n# Rule explicit_empty instantiated at (most recent call last):\n#   <workspace>/provenance/BUILD.bazel:4:11 in <toplevel>",
       "stderr": "INFO: Invocation ID: f26d544a-3f51-40b3-a2c2-82820ff2f9df\nLoading: 0 packages loaded\n",
       "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-123340-1052987-bazel/workspace/provenance/BUILD.bazel:4:11\ntest_suite(\n  name = \"explicit_empty\",\n  tests = [],\n  _implicit_tests = [\"//provenance:member_test\"],\n)\n# Rule explicit_empty instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-123340-1052987-bazel/workspace/provenance/BUILD.bazel:4:11 in <toplevel>\n\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=build",
+        "//ordering:tagged_test"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=build",
+        "//ordering:tagged_test"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "starlark_test_tags_use_utf8_byte_order_and_preserve_duplicates",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "# <workspace>/ordering/BUILD.bazel:3:12\noracle_test(\n  name = \"tagged_test\",\n  tags = [\"ascii\", \"\ue000\", \"\ud800\udc00\", \"\ud800\udc00\"],\n)\n# Rule tagged_test instantiated at (most recent call last):\n#   <workspace>/ordering/BUILD.bazel:3:12 in <toplevel>\n# Rule oracle_test defined at (most recent call last):\n#   <workspace>/defs.bzl:4:19 in <toplevel>",
+      "stderr": "INFO: Invocation ID: 71d512bb-85b1-4aa2-a05e-1201bfb1c3f5\nLoading: 0 packages loaded\n",
+      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/ordering/BUILD.bazel:3:12\noracle_test(\n  name = \"tagged_test\",\n  tags = [\"ascii\", \"\ue000\", \"\ud800\udc00\", \"\ud800\udc00\"],\n)\n# Rule tagged_test instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/ordering/BUILD.bazel:3:12 in <toplevel>\n# Rule oracle_test defined at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/defs.bzl:4:19 in <toplevel>\n\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=build",
+        "//ordering:explicit_order"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=build",
+        "//ordering:explicit_order"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "native_suite_tags_and_explicit_labels_use_bazel_natural_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "# <workspace>/ordering/BUILD.bazel:10:11\ntest_suite(\n  name = \"explicit_order\",\n  tags = [\"ascii\", \"\ue000\", \"\ud800\udc00\", \"\ud800\udc00\"],\n  tests = [\"//ordering:\ue000\", \"//ordering:\ud800\udc00\", \"//ordering/a:b/c\", \"//ordering/a/b:a\"],\n)\n# Rule explicit_order instantiated at (most recent call last):\n#   <workspace>/ordering/BUILD.bazel:10:11 in <toplevel>",
+      "stderr": "INFO: Invocation ID: f5644e4b-cfb9-403a-b127-c521756ab2c2\nLoading: 0 packages loaded\n",
+      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/ordering/BUILD.bazel:10:11\ntest_suite(\n  name = \"explicit_order\",\n  tags = [\"ascii\", \"\ue000\", \"\ud800\udc00\", \"\ud800\udc00\"],\n  tests = [\"//ordering:\ue000\", \"//ordering:\ud800\udc00\", \"//ordering/a:b/c\", \"//ordering/a/b:a\"],\n)\n# Rule explicit_order instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/ordering/BUILD.bazel:10:11 in <toplevel>\n\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=build",
+        "//ordering:implicit_order"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=build",
+        "//ordering:implicit_order"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "implicit_suite_labels_use_bazel_natural_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "# <workspace>/ordering/BUILD.bazel:21:11\ntest_suite(\n  name = \"implicit_order\",\n  _implicit_tests = [\"//ordering:tagged_test\", \"//ordering:\ue000\", \"//ordering:\ud800\udc00\"],\n)\n# Rule implicit_order instantiated at (most recent call last):\n#   <workspace>/ordering/BUILD.bazel:21:11 in <toplevel>",
+      "stderr": "INFO: Invocation ID: 8f53125b-a3c9-42d3-a52d-127c6820f070\nLoading: 0 packages loaded\n",
+      "stdout": "# /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/ordering/BUILD.bazel:21:11\ntest_suite(\n  name = \"implicit_order\",\n  _implicit_tests = [\"//ordering:tagged_test\", \"//ordering:\ue000\", \"//ordering:\ud800\udc00\"],\n)\n# Rule implicit_order instantiated at (most recent call last):\n#   /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/ordering/BUILD.bazel:21:11 in <toplevel>\n\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//duplicate_labels:duplicate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//duplicate_labels:duplicate"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "native_suite_equivalent_label_spellings_are_duplicate",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/duplicate_labels/BUILD.bazel:3:11: Label '//duplicate_labels:member' is duplicated in the 'tests' attribute of rule 'duplicate'\nERROR: Evaluation of query \"//duplicate_labels:duplicate\" failed",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 952b102e-d0c1-45cc-936c-b0dc6f13af9f\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/tests-query-expansion/20260723-135018-1121805-bazel/workspace/duplicate_labels/BUILD.bazel:3:11: Label '//duplicate_labels:member' is duplicated in the 'tests' attribute of rule 'duplicate'\nERROR: Evaluation of query \"//duplicate_labels:duplicate\" failed\n",
+      "stdout": ""
     }
   ],
   "fixture": "tests-query-expansion",

@@ -20,6 +20,8 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/packages/BuildType.java#LABEL_KEYED_STRING_DICT",
   "src/main/java/com/google/devtools/build/lib/packages/BuildType.java#LABEL_LIST_DICT",
   "src/main/java/com/google/devtools/build/lib/packages/BuildType.java#convertFromBuildLangType",
+  "src/main/java/com/google/devtools/build/lib/packages/RuleClass.java#checkForDuplicateLabels",
+  "src/main/java/com/google/devtools/build/lib/packages/AggregatingAttributeMapper.java#checkForDuplicateLabels",
   "src/main/java/com/google/devtools/build/lib/cmdline/LabelParser.java#Parts.parse",
   "src/main/java/com/google/devtools/build/lib/cmdline/Label.java#parseWithPackageContext",
   "src/main/java/com/google/devtools/build/lib/packages/LabelConverter.java",
@@ -35,7 +37,7 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/query2/query/output/ProtoOutputFormatter.java#shouldIncludeAttribute",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testLabelsOperator",
 ]
-translation_notes = "LabelParser.Parts.parse and Label.parseWithPackageContext distinguish bare names, package-relative :names, and root-absolute labels; LabelConverter applies the active package context. BuildType conversion applies that context to explicit BUILD values, while StarlarkAttrModule defaultValue uses LabelConverter.forBzlEvaluatingThread so a .bzl-defined default remains rooted at its defining package. The public unconfigured label-bearing attr set audited from StarlarkAttrModuleApi/BuildType is label, label_list, string_keyed_label_dict, label_keyed_string_dict, label_list_dict, output, and output_list; dormant_label variants are experimental/documented false and excluded. AttributeProvider carries the resulting loading representation. BlazeTargetAccessor calls getReachableLabels(attribute, false): selector condition keys are excluded. Direct labels(outs, ...) returns generated targets; output graph/deps observers distinguish each producer. FilegroupRule supplies native srcs while RuleOrMacroInstance retains whether it was explicitly specified; BuildOutputFormatter/ProtoOutputFormatter consume that provenance. This oracle is loading-representation-only: its build-format rows require state distinctions but grant no Slug formatter acceptance. Mandatory-attribute, invalid-relative-label, and fail-fast missing-prerequisite rows retain observed Bazel behavior."
+translation_notes = "LabelParser.Parts.parse and Label.parseWithPackageContext distinguish bare names, package-relative :names, and root-absolute labels; LabelConverter applies the active package context. BuildType conversion applies that context to explicit BUILD values, while StarlarkAttrModule defaultValue uses LabelConverter.forBzlEvaluatingThread so a .bzl-defined default remains rooted at its defining package. RuleClass invokes AggregatingAttributeMapper after conversion and rejects duplicate canonical labels in every direct LABEL_LIST, so equivalent bare and colon spellings fail for both native filegroup srcs and a direct unconditional Starlark label_list. Configurable selector duplicate semantics are not claimed. The public unconfigured label-bearing attr set audited from StarlarkAttrModuleApi/BuildType is label, label_list, string_keyed_label_dict, label_keyed_string_dict, label_list_dict, output, and output_list; dormant_label variants are experimental/documented false and excluded. AttributeProvider carries the resulting loading representation. BlazeTargetAccessor calls getReachableLabels(attribute, false): selector condition keys are excluded. Direct labels(outs, ...) returns generated targets; output graph/deps observers distinguish each producer. FilegroupRule supplies native srcs while RuleOrMacroInstance retains whether it was explicitly specified; BuildOutputFormatter/ProtoOutputFormatter consume that provenance. This oracle is loading-representation-only: its build-format rows require state distinctions but grant no Slug formatter acceptance. Mandatory-attribute, invalid-relative-label, duplicate-label, and fail-fast missing-prerequisite rows retain observed Bazel behavior."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture query-labels-attribute-metadata --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture query-labels-attribute-metadata --tool bazel --bazel /usr/bin/bazel"
 
@@ -263,3 +265,17 @@ argv = ["query", "//broken:must"]
 expected_exit = 7
 stdout_patterns = ["\\A\\Z"]
 stderr_patterns = ["missing value for mandatory attribute 'required'", "Evaluation of query"]
+
+[[commands]]
+name = "native_filegroup_equivalent_label_spellings_are_duplicate"
+argv = ["query", "//duplicate_filegroup:duplicate"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["Label '//duplicate_filegroup:member' is duplicated in the 'srcs' attribute of rule 'duplicate'", "Evaluation of query"]
+
+[[commands]]
+name = "direct_unconditional_starlark_label_list_equivalent_spellings_are_duplicate"
+argv = ["query", "//duplicate_starlark:duplicate"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["Label '//duplicate_starlark:member' is duplicated in the 'many' attribute of rule 'duplicate'", "Evaluation of query"]

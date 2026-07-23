@@ -870,6 +870,52 @@
       "normalized_stdout": "",
       "stderr": "INFO: Invocation ID: 04c736b5-f077-4c0e-8688-933d57bd4c30\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-123533-1057487-bazel/workspace/broken/BUILD.bazel:3:10: //broken:must: missing value for mandatory attribute 'required' in 'must_rule' rule\nERROR: Evaluation of query \"//broken:must\" failed\n",
       "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//duplicate_filegroup:duplicate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//duplicate_filegroup:duplicate"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "native_filegroup_equivalent_label_spellings_are_duplicate",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/duplicate_filegroup/BUILD.bazel:1:10: Label '//duplicate_filegroup:member' is duplicated in the 'srcs' attribute of rule 'duplicate'\nERROR: Evaluation of query \"//duplicate_filegroup:duplicate\" failed",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: d82e819a-b351-41b0-a8fa-40e15da89817\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-134913-1116474-bazel/workspace/duplicate_filegroup/BUILD.bazel:1:10: Label '//duplicate_filegroup:member' is duplicated in the 'srcs' attribute of rule 'duplicate'\nERROR: Evaluation of query \"//duplicate_filegroup:duplicate\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//duplicate_starlark:duplicate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//duplicate_starlark:duplicate"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "direct_unconditional_starlark_label_list_equivalent_spellings_are_duplicate",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/duplicate_starlark/BUILD.bazel:3:15: Label '//duplicate_starlark:member' is duplicated in the 'many' attribute of rule 'duplicate'\nERROR: Evaluation of query \"//duplicate_starlark:duplicate\" failed",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: fde82049-d132-43c4-b568-2fc4d0803b9b\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-labels-attribute-metadata/20260723-134913-1116474-bazel/workspace/duplicate_starlark/BUILD.bazel:3:15: Label '//duplicate_starlark:member' is duplicated in the 'many' attribute of rule 'duplicate'\nERROR: Evaluation of query \"//duplicate_starlark:duplicate\" failed\n",
+      "stdout": ""
     }
   ],
   "fixture": "query-labels-attribute-metadata",

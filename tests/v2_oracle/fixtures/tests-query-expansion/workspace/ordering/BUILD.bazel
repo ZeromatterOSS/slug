@@ -1,0 +1,21 @@
+load("//:defs.bzl", "oracle_test")
+
+oracle_test(
+    name = "tagged_test",
+    tags = ["𐀀", "", "𐀀", "ascii"],
+)
+oracle_test(name = "")
+oracle_test(name = "𐀀")
+
+test_suite(
+    name = "explicit_order",
+    tags = ["𐀀", "", "𐀀", "ascii"],
+    tests = [
+        "//ordering/a/b:a",
+        "//ordering/a:b/c",
+        ":𐀀",
+        ":",
+    ],
+)
+
+test_suite(name = "implicit_order")
