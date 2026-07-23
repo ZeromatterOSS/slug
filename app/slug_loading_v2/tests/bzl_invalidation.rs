@@ -180,6 +180,37 @@ fn load_label_must_point_to_bzl_file() {
 }
 
 #[test]
+fn malformed_bzl_reports_bazel_module_compilation_summary() {
+    let workspace = scratch("malformed-module");
+    let package = workspace.join("pkg");
+    let malformed = package.join("bad.bzl");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    write(&malformed, "this is not valid Starlark\n");
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let error = evaluate_load(
+        &dice,
+        &runtime,
+        &workspace,
+        &package,
+        &[malformed],
+        ":bad.bzl",
+    )
+    .unwrap_err()
+    .to_string();
+
+    assert!(error.contains("Parse error"), "{error}");
+    assert!(
+        error.contains("compilation of module 'pkg/bad.bzl' failed"),
+        "{error}"
+    );
+}
+
+#[test]
 fn injected_bzl_create_edit_delete_replays_the_loaded_package() {
     let workspace = scratch("workspace-file-input");
     let package = workspace.join("pkg");
@@ -202,7 +233,12 @@ fn injected_bzl_create_edit_delete_replays_the_loaded_package() {
         &package,
         &[definitions.clone()],
     );
-    assert!(missing.unwrap_err().to_string().contains("absent"));
+    assert!(
+        missing
+            .unwrap_err()
+            .to_string()
+            .contains("cannot load '//pkg:defs.bzl': no such file")
+    );
 
     write(
         &definitions,
@@ -234,7 +270,12 @@ fn injected_bzl_create_edit_delete_replays_the_loaded_package() {
 
     fs::remove_file(&definitions).unwrap();
     let deleted = load_package(&dice, &runtime, &workspace, &package, &[definitions]);
-    assert!(deleted.unwrap_err().to_string().contains("absent"));
+    assert!(
+        deleted
+            .unwrap_err()
+            .to_string()
+            .contains("cannot load '//pkg:defs.bzl': no such file")
+    );
 
     write(
         &package.join("defs.bzl"),

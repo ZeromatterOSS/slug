@@ -134,6 +134,14 @@ impl fmt::Display for LoadingError {
 
 impl std::error::Error for LoadingError {}
 
+fn load_error(load_label: &str, error: &LoadingError) -> LoadingError {
+    if error.is_absent() {
+        LoadingError::new(format!("cannot load '{load_label}': no such file"))
+    } else {
+        error.clone()
+    }
+}
+
 #[async_trait]
 impl Key for WorkspaceFileKey {
     type Value = WorkspaceFileValue;
@@ -466,13 +474,15 @@ impl BzlModuleEvaluator {
             .compute(&LoadLabelResolutionKey {
                 workspace: workspace.clone(),
                 requesting_package,
-                load,
+                load: load.clone(),
             })
             .await
             .map_err(|error| anyhow::anyhow!("resolving local .bzl load through DICE: {error}"))?;
         let path = path
             .as_ref()
             .as_ref()
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        let load_label = bzl_source_label(&workspace, path)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         let module = transaction
             .compute(&BzlModuleEvalKey {
@@ -484,7 +494,7 @@ impl BzlModuleEvaluator {
         let module = module
             .as_ref()
             .as_ref()
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+            .map_err(|error| anyhow::anyhow!(load_error(&load_label, error).to_string()))?;
         Ok(EvaluatedBzlModule {
             path: module.path.clone(),
             loads: module.loads.clone(),
@@ -615,7 +625,15 @@ impl Key for BzlParseKey {
                 source.as_ref().clone(),
                 &Dialect::Standard,
             )
-            .map_err(|error| LoadingError::new(error.to_string()))?;
+            .map_err(|error| {
+                let module = self
+                    .path
+                    .strip_prefix(&self.workspace)
+                    .unwrap_or(&self.path)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                LoadingError::new(format!("{error}\ncompilation of module '{module}' failed"))
+            })?;
             Ok(ParsedBzl {
                 source_digest: digest(&source),
                 source: source.as_ref().clone(),
@@ -701,6 +719,10 @@ impl Key for BzlModuleEvalKey {
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
+            let load_label = match bzl_source_label(&self.workspace, &resolved) {
+                Ok(label) => label,
+                Err(error) => return Arc::new(Err(error)),
+            };
             let module = match ctx
                 .compute(&BzlModuleEvalKey {
                     workspace: self.workspace.clone(),
@@ -710,7 +732,7 @@ impl Key for BzlModuleEvalKey {
             {
                 Ok(value) => match value.as_ref() {
                     Ok(module) => module.clone(),
-                    Err(error) => return Arc::new(Err(error.clone())),
+                    Err(error) => return Arc::new(Err(load_error(&load_label, error))),
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
@@ -836,6 +858,10 @@ impl Key for PackageLoadKey {
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
+            let load_label = match bzl_source_label(&self.workspace, &resolved) {
+                Ok(label) => label,
+                Err(error) => return Arc::new(Err(error)),
+            };
             let module = match ctx
                 .compute(&BzlModuleEvalKey {
                     workspace: self.workspace.clone(),
@@ -845,7 +871,7 @@ impl Key for PackageLoadKey {
             {
                 Ok(value) => match value.as_ref() {
                     Ok(module) => module.clone(),
-                    Err(error) => return Arc::new(Err(error.clone())),
+                    Err(error) => return Arc::new(Err(load_error(&load_label, error))),
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
