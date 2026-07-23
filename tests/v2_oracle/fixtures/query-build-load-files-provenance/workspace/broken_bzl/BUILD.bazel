@@ -1,0 +1,2 @@
+load(":bad.bzl", "bad")
+filegroup(name = "probe")

@@ -1,0 +1,2 @@
+exports_files(["BUILD.bazel", "one.bzl", "two.bzl"])
+filegroup(name = "shared_rule")

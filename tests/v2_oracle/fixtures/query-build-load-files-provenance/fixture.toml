@@ -1,0 +1,377 @@
+[fixture]
+name = "query-build-load-files-provenance"
+description = "Bazel 9.2 ordinary-query oracle for buildfiles/loadfiles transitive provenance and fake .bzl targets."
+comparison = "message_shape"
+oracle_notes = "Root-repository ordinary-query slice. Discovery established that the same printed fake-load label may project to each consuming package in siblings(), independent of union order; the fixture therefore never claims a request-global owner. No .scl, external repository, generated/output, configured, or action semantics are accepted."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/BuildFilesFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/LoadFilesFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/common/AbstractBlazeQueryEnvironment.java#transitiveLoadFiles",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryEnvironment.java#getTransitiveLoadFilesHelper",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeTargetAccessor.java#getPackage",
+  "src/main/java/com/google/devtools/build/lib/query2/common/AbstractBlazeQueryEnvironment.java#TargetKeyExtractor",
+  "src/main/java/com/google/devtools/build/lib/query2/compat/FakeLoadTarget.java",
+]
+translation_notes = "Each separately evaluated load-function invocation can project the same printed label with its consuming package; within one invocation seenBzlLabels label-dedups. Real exported .bzl and fake .bzl operands are intentionally contrasted. Broken companion BUILD syntax/load rows prove output provenance without asserting that PackageLoad succeeded; .bzl load cycles are failure rows."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-build-load-files-provenance --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-build-load-files-provenance --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "buildfiles_direct_primary"
+argv = ["query", "buildfiles(//a:one)"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "loadfiles_direct_primary"
+argv = ["query", "loadfiles(//a:one)"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "siblings_fake_a"
+argv = ["query", "siblings(loadfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\Z"]
+
+[[commands]]
+name = "siblings_fake_b"
+argv = ["query", "siblings(loadfiles(//b:two))"]
+expected_exit = 0
+stdout_patterns = ["\\A//b:BUILD\\.bazel\\n//b:two\\Z"]
+
+[[commands]]
+name = "siblings_two_consumers_ab"
+argv = ["query", "siblings(loadfiles(//a:one) union loadfiles(//b:two))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\n//b:BUILD\\.bazel\\n//b:two\\Z"]
+
+[[commands]]
+name = "siblings_two_consumers_ba"
+argv = ["query", "siblings(loadfiles(//b:two) union loadfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\n//b:BUILD\\.bazel\\n//b:two\\Z"]
+
+[[commands]]
+name = "siblings_real_fake_order"
+argv = ["query", "siblings(//a:one union loadfiles(//b:two))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\n//b:BUILD\\.bazel\\n//b:two\\Z"]
+
+[[commands]]
+name = "siblings_fake_real_order"
+argv = ["query", "siblings(loadfiles(//b:two) union //a:one)"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\n//b:BUILD\\.bazel\\n//b:two\\Z"]
+
+[[commands]]
+name = "real_exported_bzl_siblings"
+argv = ["query", "siblings(//shared:one.bzl)"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:shared_rule\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "siblings_real_fake_same_label"
+argv = ["query", "siblings(//shared:one.bzl union loadfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:shared_rule\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "siblings_fake_real_same_label"
+argv = ["query", "siblings(loadfiles(//a:one) union //shared:one.bzl)"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:shared_rule\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "siblings_buildfiles_companions"
+argv = ["query", "siblings(buildfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\Z"]
+
+[[commands]]
+name = "buildfiles_diamond"
+argv = ["query", "buildfiles(//diamond:probe)"]
+expected_exit = 0
+stdout_patterns = ["\\A//diamond:BUILD\\.bazel\\n//diamond:leaf\\.bzl\\n//diamond:left\\.bzl\\n//diamond:right\\.bzl\\Z"]
+
+[[commands]]
+name = "loadfiles_diamond"
+argv = ["query", "loadfiles(//diamond:probe)"]
+expected_exit = 0
+stdout_patterns = ["\\A//diamond:leaf\\.bzl\\n//diamond:left\\.bzl\\n//diamond:right\\.bzl\\Z"]
+
+[[commands]]
+name = "buildfiles_fallback"
+argv = ["query", "buildfiles(//fallback:only)"]
+expected_exit = 0
+stdout_patterns = ["\\A//fallback:BUILD\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "loadfiles_fallback"
+argv = ["query", "loadfiles(//fallback:only)"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "buildfiles_dual_primary"
+argv = ["query", "buildfiles(//dual:preferred)"]
+expected_exit = 0
+stdout_patterns = ["\\A//dual:BUILD\\.bazel\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "buildfiles_root"
+argv = ["query", "buildfiles(//:root)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "buildfiles_multiple_packages"
+argv = ["query", "buildfiles(set(//a:one //fallback:only))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//fallback:BUILD\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "loadfiles_multiple_packages"
+argv = ["query", "loadfiles(set(//a:one //fallback:only))"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "buildfiles_duplicate_operand"
+argv = ["query", "buildfiles(set(//a:one //a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "loadfiles_empty"
+argv = ["query", "loadfiles(set())"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "buildfiles_empty"
+argv = ["query", "buildfiles(set())"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "buildfiles_idempotent"
+argv = ["query", "buildfiles(buildfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "buildfiles_union"
+argv = ["query", "buildfiles(//a:one) union //fallback:only"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//fallback:only\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "buildfiles_intersect"
+argv = ["query", "buildfiles(//a:one) intersect set(//a:BUILD.bazel //shared:one.bzl //fallback:only)"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//shared:one\\.bzl\\Z"]
+
+[[commands]]
+name = "loadfiles_except"
+argv = ["query", "loadfiles(//a:one) except //shared:two.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:one\\.bzl\\Z"]
+
+[[commands]]
+name = "deps_function_fake_nodes"
+argv = ["query", "deps(loadfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "deps_buildfiles_fake_nodes"
+argv = ["query", "deps(buildfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "default_direct"
+argv = ["query", "buildfiles(//a:one)"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "auto_direct"
+argv = ["query", "--order_output=auto", "buildfiles(//a:one)"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "full_direct"
+argv = ["query", "--order_output=full", "buildfiles(//a:one)"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:two\\.bzl\\n//shared:one\\.bzl\\n//shared:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "full_wrapped_union"
+argv = ["query", "--order_output=full", "buildfiles(//a:one) union set()"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:two\\.bzl\\n//shared:one\\.bzl\\n//shared:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "buildfiles_broken_companions"
+argv = ["query", "buildfiles(//consumer_bad:probe)"]
+expected_exit = 0
+stdout_patterns = ["\\A//broken_load:BUILD\\.bazel\\n//broken_load:good\\.bzl\\n//broken_syntax:BUILD\\.bazel\\n//broken_syntax:good\\.bzl\\n//consumer_bad:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "loadfiles_broken_companions"
+argv = ["query", "loadfiles(//consumer_bad:probe)"]
+expected_exit = 0
+stdout_patterns = ["\\A//broken_load:good\\.bzl\\n//broken_syntax:good\\.bzl\\Z"]
+
+[[commands]]
+name = "missing_load_failure"
+argv = ["query", "buildfiles(//missing_load:probe)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["cannot load '//missing_load:missing\\.bzl': no such file"]
+
+[[commands]]
+name = "broken_bzl_failure"
+argv = ["query", "loadfiles(//broken_bzl:probe)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["compilation of module 'broken_bzl/bad\\.bzl' failed"]
+
+[[commands]]
+name = "bzl_cycle_failure"
+argv = ["query", "loadfiles(//bzl_cycle:probe)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["cycle detected in extension files"]
+
+[[commands]]
+name = "buildfiles_too_few_arguments"
+argv = ["query", "buildfiles()"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too few arguments to function 'buildfiles'"]
+
+[[commands]]
+name = "loadfiles_too_many_arguments"
+argv = ["query", "loadfiles(//a:one, //b:two)"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["too many arguments to function 'loadfiles'"]
+
+[[commands]]
+name = "buildfiles_syntax_failure"
+argv = ["query", "buildfiles("]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["premature end of input"]
+
+[[commands]]
+name = "buildfiles_missing_target"
+argv = ["query", "buildfiles(//a:missing)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//a:missing'"]
+
+[[commands]]
+name = "buildfiles_later_error"
+argv = ["query", "buildfiles(//a:one union //missing:target)"]
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such package 'missing': BUILD file not found"]
+
+[[commands]]
+name = "siblings_loadfiles_intersect_ab"
+argv = ["query", "siblings(loadfiles(//a:one) intersect loadfiles(//b:two))"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\Z"]
+
+[[commands]]
+name = "siblings_loadfiles_intersect_ba"
+argv = ["query", "siblings(loadfiles(//b:two) intersect loadfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//b:BUILD\\.bazel\\n//b:two\\Z"]
+
+[[commands]]
+name = "siblings_loadfiles_except_ab"
+argv = ["query", "siblings(loadfiles(//a:one) except loadfiles(//b:two))"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "siblings_loadfiles_except_ba"
+argv = ["query", "siblings(loadfiles(//b:two) except loadfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "siblings_real_fake_intersect"
+argv = ["query", "siblings(//shared:one.bzl intersect loadfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A//shared:BUILD\\.bazel\\n//shared:one\\.bzl\\n//shared:shared_rule\\n//shared:two\\.bzl\\Z"]
+
+[[commands]]
+name = "siblings_fake_real_intersect"
+argv = ["query", "siblings(loadfiles(//a:one) intersect //shared:one.bzl)"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\Z"]
+
+[[commands]]
+name = "siblings_real_fake_except"
+argv = ["query", "siblings(//shared:one.bzl except loadfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+
+[[commands]]
+name = "siblings_fake_real_except"
+argv = ["query", "siblings(loadfiles(//a:one) except //shared:one.bzl)"]
+expected_exit = 0
+stdout_patterns = ["\\A//a:BUILD\\.bazel\\n//a:one\\Z"]
+
+[[commands]]
+name = "full_graph_loadfiles_direct"
+argv = ["query", "--order_output=full", "--output=graph", "--graph:factored", "loadfiles(//a:one)"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \"//shared:one\\.bzl/n//shared:two\\.bzl\"\\n\\}\\Z"]
+
+[[commands]]
+name = "full_graph_buildfiles_root"
+argv = ["query", "--order_output=full", "--output=graph", "--graph:factored", "buildfiles(//:root)"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n\\}\\Z"]
+
+[[commands]]
+name = "full_graph_buildfiles_fallback"
+argv = ["query", "--order_output=full", "--output=graph", "--graph:factored", "buildfiles(//fallback:only)"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \"//shared:BUILD\\.bazel/n//shared:one\\.bzl/n//shared:two\\.bzl\"\\n\\}\\Z"]
+
+[[commands]]
+name = "full_graph_buildfiles_diamond"
+argv = ["query", "--order_output=full", "--output=graph", "--graph:factored", "buildfiles(//diamond:probe)"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \"//diamond:leaf\\.bzl/n//diamond:left\\.bzl/n//diamond:right\\.bzl\"\\n\\}\\Z"]
+
+[[commands]]
+name = "full_graph_buildfiles_multi_package"
+argv = ["query", "--order_output=full", "--output=graph", "--graph:factored", "buildfiles(set(//a:one //fallback:only))"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \"//shared:BUILD\\.bazel/n//shared:one\\.bzl/n//shared:two\\.bzl\"\\n\\}\\Z"]
+
+[[commands]]
+name = "full_graph_deps_buildfiles_direct"
+argv = ["query", "--order_output=full", "--output=graph", "--graph:factored", "deps(buildfiles(//a:one))"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \"//a:BUILD\\.bazel/n//shared:BUILD\\.bazel/n//shared:one\\.bzl/n//shared:two\\.bzl\"\\n\\}\\Z"]
+
+[[commands]]
+name = "full_graph_buildfiles_union_real"
+argv = ["query", "--order_output=full", "--output=graph", "--graph:factored", "buildfiles(//a:one) union //a:one"]
+expected_exit = 0
+stdout_patterns = ["\\Adigraph mygraph \\{\\n  node \\[shape=box\\];\\n  \"//a:one/n//shared:BUILD\\.bazel/n//shared:one\\.bzl/n//shared:two\\.bzl\"\\n\\}\\Z"]

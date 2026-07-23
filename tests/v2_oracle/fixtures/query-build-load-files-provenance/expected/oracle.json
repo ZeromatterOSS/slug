@@ -1,0 +1,1394 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "buildfiles(//a:one)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//a:one)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_direct_primary",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043543-650513-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a52e50fb-89b9-4a8e-9919-2fb7da286223\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(//a:one)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(//a:one)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "loadfiles_direct_primary",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: deb4906f-cbf1-4b4b-b657-c5022457575c\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_fake_a",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one",
+      "stderr": "INFO: Invocation ID: 3d515c5e-5515-487b-a464-8a01b873190a\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//b:two))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//b:two))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_fake_b",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//b:BUILD.bazel\n//b:two",
+      "stderr": "INFO: Invocation ID: 85562600-9b76-4f79-ae7d-6ff9fdb14a80\nLoading: 0 packages loaded\n",
+      "stdout": "//b:BUILD.bazel\n//b:two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//a:one) union loadfiles(//b:two))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//a:one) union loadfiles(//b:two))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_two_consumers_ab",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two",
+      "stderr": "INFO: Invocation ID: 867edd6a-d909-4c49-80eb-c7bd1fb9b9e2\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//b:two) union loadfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//b:two) union loadfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_two_consumers_ba",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two",
+      "stderr": "INFO: Invocation ID: 91e92c0b-e9cf-43bf-a864-acba24b20b3a\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//a:one union loadfiles(//b:two))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//a:one union loadfiles(//b:two))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_real_fake_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two",
+      "stderr": "INFO: Invocation ID: 676212be-cee0-4e25-b720-44cddfe97f4a\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//b:two) union //a:one)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//b:two) union //a:one)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_fake_real_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two",
+      "stderr": "INFO: Invocation ID: 2a6e82d7-1366-4fb6-9dbf-61e428ec06a1\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n//b:BUILD.bazel\n//b:two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//shared:one.bzl)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//shared:one.bzl)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "real_exported_bzl_siblings",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: b733a1a5-1faa-4dad-b01b-f4bc367b53ad\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//shared:one.bzl union loadfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//shared:one.bzl union loadfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_real_fake_same_label",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: 03648d7b-d65c-438d-8358-776067c5d6e8\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//a:one) union //shared:one.bzl)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//a:one) union //shared:one.bzl)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_fake_real_same_label",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: dd0c3a45-0f69-4f38-8898-edca8e6fbb38\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(buildfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(buildfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_buildfiles_companions",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one",
+      "stderr": "INFO: Invocation ID: 5b478d33-5252-44e0-a2b0-03f29bb19234\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//diamond:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//diamond:probe)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_diamond",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//diamond:BUILD.bazel\n//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl",
+      "stderr": "INFO: Invocation ID: b88610c1-f31f-4b83-958c-233eaa1dba43\nLoading: 0 packages loaded\n",
+      "stdout": "//diamond:BUILD.bazel\n//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(//diamond:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(//diamond:probe)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "loadfiles_diamond",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl",
+      "stderr": "INFO: Invocation ID: 950baf6c-566b-4afb-8447-079fd53c84bf\nLoading: 0 packages loaded\n",
+      "stdout": "//diamond:leaf.bzl\n//diamond:left.bzl\n//diamond:right.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//fallback:only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//fallback:only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_fallback",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: a2e97baf-b27b-41f8-8419-e1637aaee20d\nLoading: 0 packages loaded\n",
+      "stdout": "//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(//fallback:only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(//fallback:only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "loadfiles_fallback",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: b500e9f4-f3a5-40f5-8da4-4c4bcd62f529\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//dual:preferred)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//dual:preferred)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_dual_primary",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//dual:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: 18988bb6-cf60-4384-8bca-c06975c385dc\nLoading: 0 packages loaded\n",
+      "stdout": "//dual:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//:root)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//:root)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_root",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 14c91c8a-7640-4b5b-94b0-66844096d8fd\nLoading: 0 packages loaded\n",
+      "stdout": "//:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(set(//a:one //fallback:only))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(set(//a:one //fallback:only))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_multiple_packages",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: dc0364ed-47ee-446e-8c35-142caf5b94af\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//fallback:BUILD\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(set(//a:one //fallback:only))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(set(//a:one //fallback:only))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "loadfiles_multiple_packages",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: f180330b-8e49-4341-92df-ce358ea0c1d7\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(set(//a:one //a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(set(//a:one //a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_duplicate_operand",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: a8249d85-f505-46ea-9d38-ae6b2d7c462b\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(set())"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(set())"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "loadfiles_empty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 05a68ffe-18c1-46d9-b88d-cc95c0a1040a\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(set())"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(set())"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_empty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 4b9acdd5-fd48-4e47-81c9-ea9cba8b8d5f\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(buildfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(buildfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_idempotent",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: 9eb08c9a-d306-4ea9-97f0-1b58705e0e29\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//a:one) union //fallback:only"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//a:one) union //fallback:only"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_union",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//fallback:only\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: 95547152-dbb7-4bd3-9ba6-273291f9dab0\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//fallback:only\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//a:one) intersect set(//a:BUILD.bazel //shared:one.bzl //fallback:only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//a:one) intersect set(//a:BUILD.bazel //shared:one.bzl //fallback:only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_intersect",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//shared:one.bzl",
+      "stderr": "INFO: Invocation ID: 3e79396c-e67c-4a86-9835-cdd441ed60ea\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//shared:one.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(//a:one) except //shared:two.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(//a:one) except //shared:two.bzl"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "loadfiles_except",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:one.bzl",
+      "stderr": "INFO: Invocation ID: 93c26995-0e5e-4630-a67f-1f4ed57a7692\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:one.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(loadfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(loadfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_function_fake_nodes",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: 03651595-506b-4809-ae89-904ab936d335\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(buildfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(buildfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_buildfiles_fake_nodes",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: cd76b70a-e186-4296-b534-f72dcdbb5029\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//a:one)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//a:one)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "default_direct",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: 2b6568d1-6652-4ddf-a374-d460ae1cb096\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=auto",
+        "buildfiles(//a:one)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=auto",
+        "buildfiles(//a:one)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "auto_direct",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: 16587727-7126-4158-8f7e-16721625e74f\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//shared:BUILD.bazel\n//shared:one.bzl\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "buildfiles(//a:one)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "buildfiles(//a:one)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_direct",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 78dc59f2-4f5b-439c-a633-a17ba1612d09\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "buildfiles(//a:one) union set()"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "buildfiles(//a:one) union set()"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_wrapped_union",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: d258d492-1ba1-4f3e-b605-00b48c724cb1\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:two.bzl\n//shared:one.bzl\n//shared:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//consumer_bad:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//consumer_bad:probe)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_broken_companions",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//broken_load:BUILD.bazel\n//broken_load:good.bzl\n//broken_syntax:BUILD.bazel\n//broken_syntax:good.bzl\n//consumer_bad:BUILD.bazel",
+      "stderr": "INFO: Invocation ID: 35ed3a02-2eb3-4d30-939f-bfe5e729e0fa\nLoading: 0 packages loaded\n",
+      "stdout": "//broken_load:BUILD.bazel\n//broken_load:good.bzl\n//broken_syntax:BUILD.bazel\n//broken_syntax:good.bzl\n//consumer_bad:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(//consumer_bad:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(//consumer_bad:probe)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "loadfiles_broken_companions",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//broken_load:good.bzl\n//broken_syntax:good.bzl",
+      "stderr": "INFO: Invocation ID: 3cd725f3-f1fe-4913-b3bc-6c9eeb63f57a\nLoading: 0 packages loaded\n",
+      "stdout": "//broken_load:good.bzl\n//broken_syntax:good.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//missing_load:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//missing_load:probe)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_load_failure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: error loading package 'missing_load': cannot load '//missing_load:missing.bzl': no such file",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 2d8237ff-0b0c-440d-ac4e-f7c60d9f6c43\nLoading: 0 packages loaded\nERROR: error loading package 'missing_load': cannot load '//missing_load:missing.bzl': no such file\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(//broken_bzl:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(//broken_bzl:probe)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "broken_bzl_failure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: <workspace>/broken_bzl/bad.bzl:1:6: 'is' not supported, use '==' instead\nERROR: <workspace>/broken_bzl/bad.bzl:1:6: syntax error at 'is': expected newline\nERROR: <workspace>/broken_bzl/bad.bzl:1:1: name 'this' is not defined\nERROR: error loading package 'broken_bzl': compilation of module 'broken_bzl/bad.bzl' failed",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 0b2545b4-b2e1-4873-b775-f78733f9442d\nLoading: 0 packages loaded\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace/broken_bzl/bad.bzl:1:6: 'is' not supported, use '==' instead\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace/broken_bzl/bad.bzl:1:6: syntax error at 'is': expected newline\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace/broken_bzl/bad.bzl:1:1: name 'this' is not defined\nERROR: error loading package 'broken_bzl': compilation of module 'broken_bzl/bad.bzl' failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(//bzl_cycle:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(//bzl_cycle:probe)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "bzl_cycle_failure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: cycle detected in extension files: \n    bzl_cycle/BUILD\n.-> //bzl_cycle:one.bzl\n|   //bzl_cycle:two.bzl\n`-- //bzl_cycle:one.bzl\nERROR: cycles detected during target parsing",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 7f0098c4-22ed-4de3-baa5-8ccb35d4ac8d\nLoading: 0 packages loaded\nERROR: cycle detected in extension files: \n    bzl_cycle/BUILD\n.-> //bzl_cycle:one.bzl\n|   //bzl_cycle:two.bzl\n`-- //bzl_cycle:one.bzl\nERROR: cycles detected during target parsing\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles()"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles()"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_too_few_arguments",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles()': too few arguments to function 'buildfiles' at ')'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: bc42b0e3-dccc-4481-a4e1-301e03d6abff\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles()': too few arguments to function 'buildfiles' at ')'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "loadfiles(//a:one, //b:two)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "loadfiles(//a:one, //b:two)"
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "loadfiles_too_many_arguments",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'loadfiles(//a:one, //b:two)': too many arguments to function 'loadfiles' at ', //b:two )'",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: f2656edb-6bdd-48b8-b958-ad918d70d86b\nLoading: 0 packages loaded\nERROR: Error while parsing 'loadfiles(//a:one, //b:two)': too many arguments to function 'loadfiles' at ', //b:two )'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles("
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles("
+      ],
+      "exit_code": 2,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_syntax_failure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles(': premature end of input",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 43317a67-cc1c-4ec8-86a9-4dffd54bd9ca\nLoading: 0 packages loaded\nERROR: Error while parsing 'buildfiles(': premature end of input\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//a:missing)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//a:missing)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_missing_target",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such target '//a:missing': target 'missing' not declared in package 'a' defined by <workspace>/a/BUILD.bazel",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: a8605803-f14b-4708-a553-5842903f68ce\nLoading: 0 packages loaded\nERROR: no such target '//a:missing': target 'missing' not declared in package 'a' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/query-build-load-files-provenance/20260723-043649-655650-bazel/workspace/a/BUILD.bazel\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "buildfiles(//a:one union //missing:target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "buildfiles(//a:one union //missing:target)"
+      ],
+      "exit_code": 7,
+      "manifest": [],
+      "mutations": [],
+      "name": "buildfiles_later_error",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: a2f16f5b-47d7-40cc-8738-2e62c2474fc0\nLoading: 0 packages loaded\nERROR: no such package 'missing': BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - missing\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//a:one) intersect loadfiles(//b:two))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//a:one) intersect loadfiles(//b:two))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_loadfiles_intersect_ab",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one",
+      "stderr": "INFO: Invocation ID: 7f51f529-727f-49b4-b8bd-119f75884491\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//b:two) intersect loadfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//b:two) intersect loadfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_loadfiles_intersect_ba",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//b:BUILD.bazel\n//b:two",
+      "stderr": "INFO: Invocation ID: 7a52546d-21e5-4e4c-874b-19ca0ac8f6a9\nLoading: 0 packages loaded\n",
+      "stdout": "//b:BUILD.bazel\n//b:two\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//a:one) except loadfiles(//b:two))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//a:one) except loadfiles(//b:two))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_loadfiles_except_ab",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: f0268861-49df-461c-877b-248ea9d0554d\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//b:two) except loadfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//b:two) except loadfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_loadfiles_except_ba",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 795a2b02-befa-4d6b-b355-1a80cb63844a\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//shared:one.bzl intersect loadfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//shared:one.bzl intersect loadfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_real_fake_intersect",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl",
+      "stderr": "INFO: Invocation ID: cdf07c6b-6f94-4880-b634-a683049aaacf\nLoading: 0 packages loaded\n",
+      "stdout": "//shared:BUILD.bazel\n//shared:one.bzl\n//shared:shared_rule\n//shared:two.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//a:one) intersect //shared:one.bzl)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//a:one) intersect //shared:one.bzl)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_fake_real_intersect",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one",
+      "stderr": "INFO: Invocation ID: 69bc2382-8486-4905-ad9c-ade2ace56310\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n"
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(//shared:one.bzl except loadfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(//shared:one.bzl except loadfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_real_fake_except",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 2a411c91-c6ae-410d-a7fc-cda9d37cb4cd\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "siblings(loadfiles(//a:one) except //shared:one.bzl)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "siblings(loadfiles(//a:one) except //shared:one.bzl)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "siblings_fake_real_except",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//a:BUILD.bazel\n//a:one",
+      "stderr": "INFO: Invocation ID: 8e75a62f-555a-4244-aabb-714321b2657c\nLoading: 0 packages loaded\n",
+      "stdout": "//a:BUILD.bazel\n//a:one\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "loadfiles(//a:one)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "loadfiles(//a:one)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_graph_loadfiles_direct",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:one.bzl/n//shared:two.bzl\"\n}",
+      "stderr": "INFO: Invocation ID: fcef9fc6-de48-4398-bb42-ac57b33b99c5\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(//:root)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(//:root)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_graph_buildfiles_root",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n}",
+      "stderr": "INFO: Invocation ID: a553f6dc-f2aa-4c1a-867f-65fad193b2d3\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(//fallback:only)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(//fallback:only)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_graph_buildfiles_fallback",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:BUILD.bazel/n//shared:one.bzl/n//shared:two.bzl\"\n}",
+      "stderr": "INFO: Invocation ID: c724a913-c34b-42dd-86ef-33b03bf9eaf3\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:BUILD.bazel\\n//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(//diamond:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(//diamond:probe)"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_graph_buildfiles_diamond",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//diamond:leaf.bzl/n//diamond:left.bzl/n//diamond:right.bzl\"\n}",
+      "stderr": "INFO: Invocation ID: 50f5908c-31f3-42f9-a5d3-dba45b51a33d\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//diamond:leaf.bzl\\n//diamond:left.bzl\\n//diamond:right.bzl\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(set(//a:one //fallback:only))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(set(//a:one //fallback:only))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_graph_buildfiles_multi_package",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:BUILD.bazel/n//shared:one.bzl/n//shared:two.bzl\"\n}",
+      "stderr": "INFO: Invocation ID: edbf39c4-7adc-4ec5-a648-5005966bcf4f\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//shared:BUILD.bazel\\n//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "deps(buildfiles(//a:one))"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "deps(buildfiles(//a:one))"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_graph_deps_buildfiles_direct",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//a:BUILD.bazel/n//shared:BUILD.bazel/n//shared:one.bzl/n//shared:two.bzl\"\n}",
+      "stderr": "INFO: Invocation ID: e1283639-b1b3-4bcd-b8d0-2f79aaf78190\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//a:BUILD.bazel\\n//shared:BUILD.bazel\\n//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(//a:one) union //a:one"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--order_output=full",
+        "--output=graph",
+        "--graph:factored",
+        "buildfiles(//a:one) union //a:one"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "full_graph_buildfiles_union_real",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//a:one/n//shared:BUILD.bazel/n//shared:one.bzl/n//shared:two.bzl\"\n}",
+      "stderr": "INFO: Invocation ID: 20fedf77-4610-4b51-899a-2faf022dd8d3\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//a:one\\n//shared:BUILD.bazel\\n//shared:one.bzl\\n//shared:two.bzl\"\n}\n"
+    }
+  ],
+  "fixture": "query-build-load-files-provenance",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

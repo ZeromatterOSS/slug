@@ -1,0 +1,5 @@
+load(":left.bzl", "left")
+load(":right.bzl", "right")
+
+exports_files(["BUILD.bazel", "left.bzl", "right.bzl", "leaf.bzl"])
+filegroup(name = "probe")

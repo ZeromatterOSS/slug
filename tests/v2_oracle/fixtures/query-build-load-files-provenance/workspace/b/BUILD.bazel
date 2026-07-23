@@ -1,0 +1,4 @@
+load("//shared:one.bzl", "marker")
+
+exports_files(["BUILD.bazel"])
+filegroup(name = "two")
