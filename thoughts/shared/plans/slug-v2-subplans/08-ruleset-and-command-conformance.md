@@ -2022,8 +2022,10 @@ final `ACCEPT`; M3 remains open and this is never a 31/31 claim.
 
 ## WP-4-8-m3-executables-rule-capability: Stage 8 Gate B (2026-07-23)
 
-The next reviewed packet is `executables(EXPR)` only, after its immutable
-Bazel 9.2 oracle and Stage 4 Gate A receive Sol acceptance. Authority is
+Oracle gate `c8e469f5` is landed and Sol-accepted. It has 32 semantic rows plus
+eight Bazel-only `label_kind` rows pinning rule-class identity; those eight are
+not Slug formatter acceptance. Stage 4 Gate A remains the prerequisite before
+the `executables(EXPR)`-only activation. Authority is
 `ExecutablesFunction.java`, `BlazeTargetAccessor`, and `TargetUtils` at
 `8220c619…`: filter the once-evaluated operand by retained per-target
 `Rule.isExecutable()` / `$is_executable` and a rule-class name not ending
@@ -2042,10 +2044,11 @@ a separate oracle/substrate gate, not an inferred subset. Both capability
 fields participate in `QueryNode` and `UnconfiguredPackageGraphKey`
 equality/invalidation at this projection boundary.
 
-The oracle-first matrix includes executable and non-executable Starlark rules;
-`test=true` iff `_test` suffix and test-implies-executable; executable `_test`
-exclusion; native/non-rule negatives; nested/set/let compositions; exact order
-and graph rows; syntax/arity/no-partial-output diagnostics; and retained-daemon
+The oracle matrix includes executable and non-executable Starlark rules;
+export validation of test/non-test `_test` suffixes, test-implies-executable,
+and executable `_test` exclusion; native/non-rule negatives; nested/set/let
+compositions; exact order and graph rows; syntax/arity/no-partial-output
+diagnostics. Activation evidence must additionally cover retained-daemon
 false→true executable, false→true test, export rename, target rename crossing
 `_test` without class change, formatting-only reuse, and delete/recreate.
 Hard-stop on any need for a DICE key, direct filesystem/query-time Starlark,

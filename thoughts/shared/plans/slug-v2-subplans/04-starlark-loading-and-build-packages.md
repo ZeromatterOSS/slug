@@ -626,14 +626,22 @@ reuse and same-daemon metadata transitions passed; no loading scope expands.
 
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
-After the immutable Bazel 9.2 oracle, retain V2-owned immutable `Allocative`
+Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight
+Bazel-only rule-class representation rows passed Terra update/clean and root
+clean runs `085202-880190`, `085213-881221`, and `085303-889108`. The explicit
+`test=True, executable=False` row observes accepted syntax plus `_test`
+exclusion only; Bazel's pinned `createRule`/test-base source establishes that
+test still implies executable capability. Stage 4 is now the next gate.
+
+Retain V2-owned immutable `Allocative`
 `RuleCapability { rule_class: CompactString, executable: bool }` for every
 loadable rule and include both fields in `StarlarkRuleImplementation` and
 `LoadedPackage` semantic equality. For Starlark rules, `RuleDefinitionGen`
 captures the exact exported `.bzl` name via `StarlarkValue::export_as`, using
 the bounded Buck2 rule pattern and the existing V2 provider `OnceCell`/freeze
-shape; never use implementation identity or BUILD target name. The oracle
-fixes `test=true` iff the class ends `_test`, with test implying executable.
+shape; never use implementation identity or BUILD target name. Export
+validation requires test classes to end `_test` and non-test classes not to;
+test implies executable even when `executable=False` is explicitly supplied.
 
 Project exact fixed native classifications only: `filegroup`, `alias`, and
 `config_setting` have their Bazel class names and `executable=false`; an alias

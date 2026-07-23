@@ -826,3 +826,26 @@ rows including two graph stdout rows; two label-kind rows stay Bazel-only
 formatter constraints. Same-DICE/daemon transitions pass (loading 37/query
 42/CLI 21 [1+17+3]/server 15/analysis 11, fmt/diff); Sol `ACCEPT`. Six ordinary
 functions/M3 remain open; no 31/31 claim or credential exposure.
+
+### Executable rule-capability oracle landed (2026-07-23)
+
+`c8e469f5` adds the generated Bazel 9.2
+`query-executables-rule-capability` fixture at immutable upstream commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Its 40 commands comprise 32
+semantic `executables()` rows and eight representation-only
+`--output=label_kind` rows. The semantic matrix covers executable/nonexecutable
+Starlark rules, exported `_test` exclusion, target-name nonclassification,
+native/non-rule negatives, set/let/nesting, exact order and graph behavior,
+and failure/no-partial-output contracts. The representation rows pin exact
+exported Starlark names plus `filegroup`, `alias`, and `config_setting`; they
+are excluded from Stage 8 Slug formatter acceptance.
+
+The accepted `rule(test=True, executable=False)` probe yields an empty query
+because its exported class is a test. It does not observe a false executable
+capability: pinned `StarlarkRuleClassFunctions#createRule` and
+`getTestBaseRule` establish that test forces executable capability
+independently. Terra update `085202-880190`, Terra clean `085213-881221`, and
+root clean `085303-889108` passed; Sol-low final review returned `ACCEPT`.
+Native `genrule` and `test_suite` remain separate substrate gates. Bazel used
+ordinary external RC discovery only; no agent inspected or persisted
+`~/.bazelrc` or BuildBuddy credentials.

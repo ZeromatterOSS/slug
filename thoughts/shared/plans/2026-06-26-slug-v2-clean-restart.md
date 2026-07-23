@@ -717,9 +717,9 @@ Archive-status baseline failures (v1-archive/stale allowlists) are unrelated.
 
 ## Authoritative Next M3 Packet: Executable Rule Capability (2026-07-23)
 
-`WP-4-8-m3-executables-rule-capability` supersedes the labels packet. It is an
-oracle-first, three-gate vertical: immutable Bazel 9.2.0 evidence; Stage 4
-load-only capability retention; then, only after Sol acceptance, Stage 8
+`WP-4-8-m3-executables-rule-capability` supersedes the labels packet. Oracle
+commit `c8e469f5` has completed the first gate; the remaining vertical is Stage
+4 load-only capability retention and, only after Sol acceptance, Stage 8
 activation of `executables(EXPR)`. Bazel authority is
 `ExecutablesFunction`, `BlazeTargetAccessor#isExecutableNonTestRule`, and
 `TargetUtils#isExecutableNonTestRule` at `8220c619…`: the predicate is the
@@ -727,17 +727,30 @@ per-target `Rule.isExecutable()` / `$is_executable` capability *and* a retained
 rule-class name not ending in `_test`. It is never inferred from a BUILD target
 name or from a frozen implementation identity.
 
+The generated Bazel 9.2 fixture has 40 commands: 32 semantic
+`executables()`/composition/order/graph/diagnostic rows and eight Bazel-only
+`label_kind` representation rows pinning five exported Starlark and three
+supported native rule-class names. The latter are not Stage 8 formatter
+acceptance. Terra update `085202-880190`, clean `085213-881221`, and root clean
+`085303-889108` passed; Sol returned `ACCEPT`. The
+`test=true, executable=false` row proves accepted syntax and `_test` exclusion,
+not capability by itself; pinned `StarlarkRuleClassFunctions#createRule` and
+`getTestBaseRule` establish that test still implies executable capability.
+Ordinary Bazel RC discovery was allowed, but no agent or tool inspected or
+persisted `~/.bazelrc` or BuildBuddy credentials.
+
 Stage 4 retains immutable, `Allocative` `RuleCapability { rule_class:
 CompactString, executable: bool }` in each Starlark rule instance and in all
 semantic equality paths. `RuleDefinitionGen` must retain the exact exported
 `.bzl` rule name through `StarlarkValue::export_as`, following the bounded
 Buck2 rule shape and the existing V2 provider `OnceCell`/freeze pattern; the
-exported rule name, not a target name, is the class. Gate A proves `test=true`
-iff the class suffix is `_test`, test implies executable, and an executable
-test is excluded. Supported native `filegroup`, `alias`, and `config_setting`
-receive exact class names and `executable=false`; alias never inherits;
-source/BUILD/generated nodes are non-rules. Do not add `test_suite` while its
-global is absent. Native `genrule` executable true/false is a separate
+exported rule name, not a target name, is the class. Gate A proves that export
+validation requires test classes to end `_test` and non-test classes not to,
+test implies executable, and an executable test is excluded. Supported native
+`filegroup`, `alias`, and `config_setting` receive exact class names and
+`executable=false`; alias never inherits; source/BUILD/generated nodes are
+non-rules. Do not add `test_suite` while its global is absent. Native `genrule`
+executable true/false is a separate
 oracle/substrate gate: the current-loadable-graph boundary must be stated, and
 the packet stops if full native-positive coverage is required rather than
 inferring it.

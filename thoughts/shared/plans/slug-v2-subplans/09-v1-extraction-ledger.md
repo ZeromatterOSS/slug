@@ -1264,7 +1264,10 @@ no V1/Buck import or 31/31 claim.
 
 ### WP-4-8-m3-executables-rule-capability — prospective extraction decision
 
-Pending oracle/implementation. Stage 4 owns a V2 `RuleCapability {
+Oracle `c8e469f5` is landed and Sol-accepted; implementation remains pending.
+Its 32 semantic rows and eight representation-only `label_kind` rows establish
+the current-loadable rule-capability boundary without importing V1 behavior.
+Stage 4 owns a V2 `RuleCapability {
 rule_class: CompactString, executable: bool }`, exported-name capture through
 starlark-rust `StarlarkValue::export_as`, and equality/invalidation. Stage 8
 owns only `executables(EXPR)` projection/filtering. Use the bounded Buck2 rule
@@ -1274,4 +1277,7 @@ semantics, or `fancy-regex`. V1 query target capability hooks are
 reference-only, not a Bazel source of truth. Bazel 9.2
 `ExecutablesFunction`, `BlazeTargetAccessor`, and `TargetUtils` at
 `8220c619…` are the oracle: per-target executable capability plus rule class
-not ending `_test`. Native genrule behavior remains a separate oracle gate.
+not ending `_test`. Pinned `StarlarkRuleClassFunctions#createRule`,
+`getTestBaseRule`, and `StarlarkRuleFunction.export` establish exported class
+identity and test-implies-executable even when `executable=False` is explicit.
+Native genrule behavior remains a separate oracle gate.
