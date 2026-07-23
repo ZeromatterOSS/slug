@@ -1077,3 +1077,20 @@ do not replace that with global `QueryLabel` identity or a request-global
 winner. Factored FULL (`--output=graph --graph:factored`) confirms zero fake
 edges and forbids synthetic projection edges. Gate A/B remain unimplemented;
 nine ordinary functions remain deferred.
+
+#### Stage 4 Gate A half landed (2026-07-23)
+
+Commit `b0670e33` is a V2-owned implementation, not a V1/Buck import. It
+adds compact public `BzlLoadManifest`/`BzlModuleIdentity` and aligned
+`FrozenBzlLifetimeEntry`: canonical label/path, source-order label-first direct
+IDs, first-seen transitive closure, `[u8; 32]` SHA-256, semantic package
+equality, and separately retained opaque frozen modules. It also reuses the
+existing `WorkspaceDirectoryKey` for parse-independent primary/fallback
+companion discovery, including symlinks and explicit missing/read-error paths.
+
+Stage 4 is accepted but Gate A remains partial: no Stage 8 fake-target
+algebra, no function activation, and nine deferred functions. Root validation
+passed 27 loading, 11 analysis, and 22 query integrations; Sol-low `ACCEPT`
+followed corrections for shared validation, alignment truncation, direct/
+transitive edge lifecycle plus BUILD non-over-invalidation, and memory
+accounting.

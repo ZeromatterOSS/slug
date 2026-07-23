@@ -1828,3 +1828,15 @@ real/fake except is asymmetric. Fake nodes are zero-edge; direct FULL
 observer materializes it, while `deps(buildfiles(...))` includes result nodes.
 This is oracle evidence only: Gate A and activation remain pending and nine
 ordinary functions remain deferred.
+
+#### Gate A Stage 4 half evidence (2026-07-23)
+
+`b0670e33` accepts the Stage 4 manifest/lifetime/companion-helper half only.
+The Stage 8 fake-target algebra needed to realize `(printed label, consuming
+package, real/fake)` remains pending, so neither function registry entry moves
+and all nine ordinary functions remain deferred. `LoadedPackage` now has
+semantic direct-root/reachable/fingerprint equality with aligned retained
+frozen-module lifetimes; the helper is DICE-observation-only and
+parse-independent. Root passed 27 loading, 11 analysis, and 22 query
+integrations; Sol-low final `ACCEPT` required the symlink, validation,
+alignment, lifecycle/non-over-invalidation, and memory-accounting corrections.

@@ -508,3 +508,25 @@ consuming package, real/fake)`; Gate B may not use a request-global winner or
 selected real BUILD unless another graph observer materializes it,
 `deps(buildfiles(...))` includes result nodes, and no synthetic projection
 edge is allowed.
+
+Stage 4 half evidence landed in `b0670e33` (`feat: retain load provenance
+manifests`). Gate A is partial: Stage 4 is accepted, while Stage 8 fake-target
+algebra remains pending; the registry and all nine deferred functions are
+unchanged. Public `BzlLoadManifest`/`BzlModuleIdentity` retain canonical
+label/normalized path, source-order label-first direct IDs, first-seen closure,
+and `[u8; 32]` SHA-256 fingerprint. `LoadedPackage` equality now includes
+direct roots/reachable closure/fingerprint: BUILD comment/format edits remain
+equal, but leaf/direct/transitive edge create-delete-recreate changes then
+restores the value. Aligned `FrozenBzlLifetimeEntry` retains every transitive
+`FrozenModule` outside equality; identity/path are `Allocative`-accounted and
+the opaque frozen module is skipped.
+
+The public companion helper uses only `WorkspaceDirectoryKey`, primary before
+fallback, regular or symlink entries, `None` for missing, explicit read errors,
+and shared normalized-path validation; it is parse-independent and adds no
+key/cache/lock/filesystem/package-load boundary. Worker/root loading tests had
+27 integrations (the worker reported 26 by omitting pre-existing
+`native_removed`); root also passed 11 `slug_analysis_v2` and 22
+`slug_query_v2` integrations. Sol-low accepted corrections for symlinks,
+shared validation, non-truncating alignment, edge lifecycle/BUILD
+non-over-invalidation, and memory accounting.

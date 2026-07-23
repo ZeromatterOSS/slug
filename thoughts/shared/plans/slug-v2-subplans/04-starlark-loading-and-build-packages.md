@@ -518,3 +518,26 @@ consuming package, real/fake)`, retain `seenBzlLabels` label dedup only within
 an invocation, and use no request-global winner. Factored FULL uses
 `--output=graph --graph:factored` and confirms zero fake edges/no synthetic
 projection edges. Nine ordinary functions remain deferred.
+
+### Gate A Stage 4 half accepted (2026-07-23)
+
+`b0670e33` (`feat: retain load provenance manifests`) accepts only the Stage 4
+half of Gate A. Public `BzlLoadManifest`/`BzlModuleIdentity` hold canonical
+label + normalized path, source-order label-first direct identities,
+first-seen closure, and `[u8; 32]` SHA-256. `LoadedPackage` direct roots,
+reachable closure, and fingerprint are semantic equality: BUILD
+comment/format-only edits remain equal; leaf/direct/transitive load-edge
+create-delete-recreate changes then restores the value. An aligned
+`FrozenBzlLifetimeEntry` structurally retains each transitive `FrozenModule`
+outside Eq; identity/path are `Allocative`-accounted and opaque frozen modules
+are skipped.
+
+The companion helper reuses only `WorkspaceDirectoryKey`: primary before
+fallback, regular/symlink acceptance, missing `None`, explicit read error,
+broken-BUILD parse independence, and shared normalized-path validation. It
+adds no key/cache/lock/filesystem/package-load seam. Worker/root loading tests
+covered 27 integrations (worker's 26 omitted pre-existing `native_removed`);
+root also passed analysis 11 and query 22 integrations. Sol-low accepted
+symlink, validator, alignment, lifecycle/non-over-invalidation, and memory
+accounting corrections. Stage 8 algebra and registry activation remain
+pending; nine functions remain deferred.
