@@ -261,23 +261,27 @@ Listing identity is exact for this packet:
 - an absent/read-error value for any required directory fails the listing
   instead of becoming an empty directory.
 
-The exact Starlark callable for both global and native forms is:
+The Bazel 9.2.0 oracle corrected the exact callable for both global and native
+forms to:
 
 ```text
-glob(include, exclude=[], exclude_directories=1, allow_empty=True)
+glob(include=[], exclude=[], exclude_directories=1, allow_empty=<unbound>)
 ```
 
-Accept list or tuple string arguments and preserve Starlark type errors and
-defaults. The M1 pattern subset is normalized UTF-8 forward-relative patterns
-made of literal path segments and `*` wildcards within a segment, including
-the existing oracle's `*.txt` and nested `sub/*.txt` forms. Reject empty,
-absolute, dot/uplevel, doubled-separator, trailing-separator, backslash,
-`**`, `?`, character-class, brace, and escape forms until a Bazel 9 oracle
-packet approves their exact semantics. `exclude_directories=0` filters both
-regular files and non-boundary directories; the default filters files only.
-Per-include `allow_empty=False` remains required. A `.bzl` macro invoked from a
-BUILD file uses that caller's package listing; a top-level `.bzl` call without
-package context errors.
+Accept omitted include plus list or tuple string arguments and preserve
+Starlark type errors. `allow_empty` is semantically unbound: OSS Bazel 9.2.0
+defaults `--incompatible_disallow_empty_glob=true`, so omission behaves as
+False; explicit True permits empty matches. The M1 pattern subset is normalized
+UTF-8 forward-relative patterns made of literal path segments and `*`
+wildcards within a segment, including the existing oracle's `*.txt` and nested
+`sub/*.txt` forms. Reject empty patterns, absolute, dot/uplevel,
+doubled-separator, trailing-separator, backslash, `**`, `?`, character-class,
+brace, and escape forms until a Bazel 9 oracle packet approves their exact
+semantics. `exclude_directories=0` filters both regular files and non-boundary
+directories; the default filters files only. Per-include
+`allow_empty=False` remains required. A `.bzl` macro invoked from a BUILD file
+uses that caller's package listing; a top-level `.bzl` call without package
+context errors.
 
 The outer `PackageLoadKey` is the only async bridge. Prohibit a nested runtime,
 blocking channel, injected input during compute, lock across DICE/evaluator
@@ -302,8 +306,9 @@ Implementation and test order:
 1. Add pure package-listing/glob tests for deterministic files/directories,
    excludes, per-pattern `allow_empty = False`, nested package boundaries,
    absence/read errors, unsupported symlinks, and the exact Bazel argument
-   surface. Capture Bazel 9.2.0 behavior for defaults, type errors, and
-   `exclude_directories` before encoding assertions.
+   surface. Use the generated Bazel 9.2.0 `glob-callable-contract` oracle for
+   defaults, sequence inputs, type errors, macro context, and
+   `exclude_directories` assertions.
 2. Add `PackageListingKey` and compact immutable listing values using only
    injected directory observations.
 3. Pass the listing through package evaluation and implement global plus

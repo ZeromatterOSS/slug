@@ -1,0 +1,51 @@
+[fixture]
+name = "glob-callable-contract"
+description = "Bazel 9.2.0 glob callable defaults, sequence inputs, filtering, directory results, macro context, and diagnostics."
+comparison = "message_shape"
+oracle_notes = "Focused M1 callable contract oracle; full pattern syntax, symlinks, external repositories, and query semantics are out of scope."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkNativeModuleApi.java#glob",
+  "src/main/java/com/google/devtools/build/lib/packages/StarlarkNativeModule.java#glob",
+  "src/main/java/com/google/devtools/build/lib/packages/GlobberUtils.java",
+  "src/main/java/com/google/devtools/build/lib/packages/semantics/BuildLanguageOptions.java#incompatible_disallow_empty_glob",
+  "src/test/java/com/google/devtools/build/lib/packages/PackageFactoryTest.java#testGlobDirectoryExclusion",
+  "src/test/java/com/google/devtools/build/lib/skyframe/PackageFunctionTest.java#testGlobAllowEmpty_paramValueMustBeBoolean",
+]
+translation_notes = "Rule names encode sorted glob results so query output captures the callable contract without depending on analysis. Separate invalid packages isolate default-empty, explicit allow_empty=False, and type-error diagnostics."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture glob-callable-contract --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture glob-callable-contract --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "valid_callable_forms"
+argv = ["query", "//pkg:all"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:dirs_subdir\\n//pkg:empty_allowed\\n//pkg:empty_default_include_allowed\\n//pkg:exclude_alpha\\.txt\\n//pkg:global_alpha\\.txt\\n//pkg:global_skip\\.txt\\n//pkg:macro_macro_caller\\.txt\\n//pkg:tuple_alpha\\.txt\\n//pkg:tuple_nested_child\\.txt\\n//pkg:tuple_skip\\.txt\\Z"]
+
+[[commands]]
+name = "omitted_allow_empty_uses_bazel9_default"
+argv = ["query", "//default_empty:all"]
+expected_exit = 7
+stderr_patterns = [
+  "all files in the glob have been excluded",
+  "allow_empty is set to False",
+  "default value of allow_empty can be set with --incompatible_disallow_empty_glob",
+]
+
+[[commands]]
+name = "explicit_allow_empty_false_rejects_empty_match"
+argv = ["query", "//empty_false:all"]
+expected_exit = 7
+stderr_patterns = [
+  "glob pattern 'missing\\*\\.txt' didn't match anything",
+  "allow_empty is set to False",
+]
+
+[[commands]]
+name = "allow_empty_requires_bool"
+argv = ["query", "//type_error:all"]
+expected_exit = 7
+stderr_patterns = ["expected boolean for argument `allow_empty`, got `5`"]

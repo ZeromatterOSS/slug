@@ -1,0 +1,4 @@
+filegroup(
+    name = "never",
+    srcs = glob(["missing*.txt"], allow_empty = False),
+)

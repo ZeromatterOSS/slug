@@ -1,0 +1,45 @@
+load("//macros:defs.bzl", "declare_macro_glob_targets")
+
+[
+    filegroup(
+        name = "global_" + path.replace("/", "_"),
+        srcs = [path],
+    )
+    for path in glob(["*.txt"])
+]
+
+[
+    filegroup(
+        name = "tuple_" + path.replace("/", "_"),
+        srcs = [path],
+    )
+    for path in glob(("*.txt", "nested/*.txt"))
+]
+
+[
+    filegroup(
+        name = "exclude_" + path.replace("/", "_"),
+        srcs = [path],
+    )
+    for path in glob(["*.txt"], exclude = ["skip.txt"])
+]
+
+[
+    filegroup(
+        name = "dirs_" + path.replace("/", "_"),
+        srcs = [path],
+    )
+    for path in glob(("sub*",), exclude_directories = 0)
+]
+
+filegroup(
+    name = "empty_allowed",
+    srcs = glob(["missing*.txt"], allow_empty = True),
+)
+
+filegroup(
+    name = "empty_default_include_allowed",
+    srcs = glob(allow_empty = True),
+)
+
+declare_macro_glob_targets()

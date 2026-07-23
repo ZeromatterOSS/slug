@@ -301,6 +301,35 @@ Accepted evidence (2026-07-22):
   check/use races inside the private copied workspace remain intentional
   residuals.
 
+### Bazel 9.2.0 glob callable contract evidence (2026-07-22)
+
+`tests/v2_oracle/fixtures/glob-callable-contract` is the oracle-first input for
+the reviewed Stage 4 prepared-listing bridge. Its rule names encode glob
+results so ordinary Bazel query output captures loading semantics without
+requiring Slug query or analysis.
+
+- The generated Bazel 9.2.0 oracle at commit
+  `8220c6198837d5c13d53fea211cf3282aa12408a` proves list and tuple inputs,
+  explicit excludes, result membership, `exclude_directories=0` returning a
+  non-package directory, nested-package exclusion, and a `.bzl` macro's
+  `native.glob()` using its caller BUILD package.
+- It corrects the earlier draft contract: `include` may be omitted and defaults
+  to `[]`; `allow_empty` is unbound, and OSS Bazel 9.2.0 defaults
+  `--incompatible_disallow_empty_glob=true`, so omission behaves as False.
+  Explicit `allow_empty=True` permits both an empty include and an unmatched
+  pattern.
+- Separate negative packages capture omitted/default empty failure, explicit
+  `allow_empty=False` per-pattern failure, and the non-boolean diagnostic
+  `expected boolean for argument \`allow_empty\`, got \`5\``.
+- Generation and an independent rerun with normal Bazel RC handling passed.
+  Fixture discovery and `git diff --check` passed; a credential/header scan
+  returned zero matches. No home-RC contents or authentication material were
+  read into, copied to, or captured by the repository. The focused pytest suite
+  remains unavailable because this environment has no `pytest` module. Query
+  sorts the encoded rule labels independently, so this artifact does not claim
+  to prove the order returned by `glob()`; Bazel source plus the focused pure
+  matcher regression own that ordering evidence.
+
 ## Acceptance Criteria
 
 - The harness records command line, exit code, stdout/stderr, output manifest,
