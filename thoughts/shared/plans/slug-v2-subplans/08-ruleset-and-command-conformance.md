@@ -2809,3 +2809,15 @@ predicate callers are materialized by label through `TargetKeyExtractor`, so
 the generic function must use the existing `eval_all` and pass
 `TargetSet` plus streamed input `Set`. Re-review only this corrected activation
 design before editing query production code.
+
+Independent re-review returned `ACCEPT` for the corrected Stage 8 activation
+design. The implementation packet owns only `expr`, generic dispatch, the
+request-local loading accessor, focused query/loading tests, the exact 25-row
+CLI gate, and daemon/lifecycle evidence. Predicate callers materialize by
+label, inputs stay streamed, passing candidates become singleton deliveries,
+and visibility lookup records no query topology.
+
+The lifecycle gate must remove and recreate the included `package_group`
+definition while leaving its BUILD package present, then assert the pinned
+top-root-wrapped missing-target diagnostic and recovery. Missing-package
+semantics remain unclaimed.

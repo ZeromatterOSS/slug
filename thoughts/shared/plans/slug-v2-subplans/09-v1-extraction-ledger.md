@@ -1555,3 +1555,9 @@ query uses label-keyed predicate materialization, not `FakeLoadTarget` object
 equality. The future implementation can reuse V2's existing label-materialized
 `TargetSet`, streamed candidate batches, compact cycle sets, and package-graph
 DICE keys without changing provenance representation or extracting V1.
+
+The corrected Stage 8 design is accepted for implementation with no V1 reuse
+beyond already approved compact worklist/set shapes. It uses existing V2
+candidate IDs, label materialization, typed graph nodes, and package-graph DICE
+ownership. No V1 visibility parser, registry, evaluator, global state, or
+fallback enters the bounded activation.

@@ -826,3 +826,19 @@ returned `ACCEPT`. The executable third row corrected the audit's
 full-target-equality inference: ordinary query predicate materialization uses
 the label-keyed `TargetKeyExtractor`, matching Slug's existing `eval_all`.
 Stage 8 design re-review may resume; production remains unchanged.
+
+### Corrected Stage 8 visible activation design accepted
+
+Independent re-review returned `ACCEPT`. The generic function materializes the
+once-evaluated predicate through existing label-keyed `eval_all`, retains the
+input's callback batches, and delegates `TargetSet` plus `Set`. The loading
+accessor owns non-recording real-node lookup, fake-public handling,
+same-package/Java access, complete iterative group expansion, exact top-root
+diagnostic wrapping, and singleton result deliveries.
+
+Implementation is limited to query `expr`, `generic`, `loading_environment`,
+their query/loading tests, CLI tests, and compact evidence. Same-DICE lifecycle
+deletes and recreates the included package-group definition while its BUILD
+package remains, so it exercises the pinned missing-target error. No loading
+representation, graph/provenance representation, DICE key, formatter, command
+policy, repository mapping, V1 code, or Cargo manifest is authorized.
