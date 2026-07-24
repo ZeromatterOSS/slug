@@ -1,0 +1,330 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:ordinary_consumer",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:ordinary_consumer",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "deb748cb2337be68a21e9899c41bb12ab53f592f421ccd1682190825ab9dc240",
+          "mode": "0o555",
+          "path": "ordinary_consumer.txt",
+          "root": "bazel-bin/ordinary_consumer.txt",
+          "size": 26,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "ordinary_nonroot_toolchain_and_platform_consumer_succeeds",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:ordinary_consumer (3 packages loaded, 2 targets configured)\nAnalyzing: target //:ordinary_consumer (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:ordinary_consumer (79 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nTarget //:ordinary_consumer up-to-date:\n  bazel-bin/ordinary_consumer.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-module-consumers/20260724-024636-1691844-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-module-consumers/20260724-024827-1695287-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: b4d5ac32-b7fc-4379-94ea-41e59e34d1eb\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b4d5ac32-b7fc-4379-94ea-41e59e34d1eb\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:ordinary_consumer (3 packages loaded, 2 targets configured)\nAnalyzing: target //:ordinary_consumer (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:ordinary_consumer (79 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nTarget //:ordinary_consumer up-to-date:\n  bazel-bin/ordinary_consumer.txt\nINFO: Elapsed time: 4.916s, Critical Path: 0.01s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b4d5ac32-b7fc-4379-94ea-41e59e34d1eb\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:dev_toolchain_consumer",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:dev_toolchain_consumer",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [],
+      "name": "nonroot_dev_toolchain_registration_is_suppressed",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:dev_toolchain_consumer (0 packages loaded, 0 targets configured)\nAnalyzing: target //:dev_toolchain_consumer (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:19:23: While resolving toolchains for target //:dev_toolchain_consumer (26258b9): No matching toolchains found for types:\n  @@subject+//:dev_toolchain_type\nTo debug, rerun with --toolchain_resolution_debug='/Q@@subject+//:dev_toolchain_type/E'\nFor more information on platforms or toolchains see https://bazel.build/concepts/platforms-intro.\nERROR: Analysis of target '//:dev_toolchain_consumer' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: bbbb2081-b31f-481e-83bc-fbc2d4bddea1\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/bbbb2081-b31f-481e-83bc-fbc2d4bddea1\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:dev_toolchain_consumer (0 packages loaded, 0 targets configured)\nAnalyzing: target //:dev_toolchain_consumer (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-module-consumers/20260724-024827-1695287-bazel/workspace/BUILD.bazel:19:23: While resolving toolchains for target //:dev_toolchain_consumer (26258b9): No matching toolchains found for types:\n  @@subject+//:dev_toolchain_type\nTo debug, rerun with --toolchain_resolution_debug='\\Q@@subject+//:dev_toolchain_type\\E'\nFor more information on platforms or toolchains see https://bazel.build/concepts/platforms-intro.\nERROR: Analysis of target '//:dev_toolchain_consumer' failed; build aborted\nINFO: Elapsed time: 0.061s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/bbbb2081-b31f-481e-83bc-fbc2d4bddea1\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:dev_toolchain_consumer",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:dev_toolchain_consumer",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "88ddb4a36adf780a9335fe17c43d26d5f3ae929c5604db940239d8a99ff69a22",
+          "mode": "0o555",
+          "path": "dev_toolchain_consumer.txt",
+          "root": "bazel-bin/dev_toolchain_consumer.txt",
+          "size": 21,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "register_toolchains(\"//:dev_toolchain\", dev_dependency = True)",
+          "old_digest_hint": "401",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "register_toolchains(\"//:dev_toolchain\")"
+        },
+        {
+          "find": "version = \"0.1.0\"",
+          "old_digest_hint": "376",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.1\""
+        }
+      ],
+      "name": "nonroot_dev_toolchain_registers_after_only_dev_flag_removed",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:dev_toolchain_consumer (3 packages loaded, 2 targets configured)\nAnalyzing: target //:dev_toolchain_consumer (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:dev_toolchain_consumer (79 packages loaded, 440 targets configured).\nINFO: Found 1 target...\nTarget //:dev_toolchain_consumer up-to-date:\n  bazel-bin/dev_toolchain_consumer.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 65435774-5865-44d3-9e38-33fb81315db5\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/65435774-5865-44d3-9e38-33fb81315db5\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:dev_toolchain_consumer (3 packages loaded, 2 targets configured)\nAnalyzing: target //:dev_toolchain_consumer (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:dev_toolchain_consumer (79 packages loaded, 440 targets configured).\nINFO: Found 1 target...\nTarget //:dev_toolchain_consumer up-to-date:\n  bazel-bin/dev_toolchain_consumer.txt\nINFO: Elapsed time: 2.695s, Critical Path: 0.00s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/65435774-5865-44d3-9e38-33fb81315db5\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:dev_platform_consumer",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:dev_platform_consumer",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [],
+      "name": "nonroot_dev_execution_platform_registration_is_suppressed",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:dev_platform_consumer (0 packages loaded, 0 targets configured)\nAnalyzing: target //:dev_platform_consumer (0 packages loaded, 0 targets configured)\n\nERROR: <workspace>/BUILD.bazel:20:22: While resolving toolchains for target //:dev_platform_consumer (26258b9): No matching toolchains found for types:\n  @@subject+//:dev_platform_toolchain_type\nTo debug, rerun with --toolchain_resolution_debug='/Q@@subject+//:dev_platform_toolchain_type/E'\nFor more information on platforms or toolchains see https://bazel.build/concepts/platforms-intro.\nERROR: Analysis of target '//:dev_platform_consumer' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 539b026c-cf0b-4ee8-83e0-300c834046da\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/539b026c-cf0b-4ee8-83e0-300c834046da\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:dev_platform_consumer (0 packages loaded, 0 targets configured)\nAnalyzing: target //:dev_platform_consumer (0 packages loaded, 0 targets configured)\n\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-module-consumers/20260724-024827-1695287-bazel/workspace/BUILD.bazel:20:22: While resolving toolchains for target //:dev_platform_consumer (26258b9): No matching toolchains found for types:\n  @@subject+//:dev_platform_toolchain_type\nTo debug, rerun with --toolchain_resolution_debug='\\Q@@subject+//:dev_platform_toolchain_type\\E'\nFor more information on platforms or toolchains see https://bazel.build/concepts/platforms-intro.\nERROR: Analysis of target '//:dev_platform_consumer' failed; build aborted\nINFO: Elapsed time: 0.032s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/539b026c-cf0b-4ee8-83e0-300c834046da\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:dev_platform_consumer",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:dev_platform_consumer",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "8c6444a9252d77acd6e97151efb67948c45ba45ff1a2a1e096f3b16e66ebb66c",
+          "mode": "0o555",
+          "path": "dev_platform_consumer.txt",
+          "root": "bazel-bin/dev_platform_consumer.txt",
+          "size": 20,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "register_execution_platforms(\"//:dev_platform\", dev_dependency = True)",
+          "old_digest_hint": "378",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "register_execution_platforms(\"//:dev_platform\")"
+        },
+        {
+          "find": "version = \"0.1.1\"",
+          "old_digest_hint": "376",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.2\""
+        }
+      ],
+      "name": "nonroot_dev_execution_platform_registers_after_only_dev_flag_removed",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:dev_platform_consumer (3 packages loaded, 2 targets configured)\nAnalyzing: target //:dev_platform_consumer (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:dev_platform_consumer (79 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nTarget //:dev_platform_consumer up-to-date:\n  bazel-bin/dev_platform_consumer.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 130831b2-e17a-419b-a264-f71aa1b1df4a\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/130831b2-e17a-419b-a264-f71aa1b1df4a\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:dev_platform_consumer (3 packages loaded, 2 targets configured)\nAnalyzing: target //:dev_platform_consumer (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:dev_platform_consumer (79 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nTarget //:dev_platform_consumer up-to-date:\n  bazel-bin/dev_platform_consumer.txt\nINFO: Elapsed time: 2.597s, Critical Path: 0.00s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/130831b2-e17a-419b-a264-f71aa1b1df4a\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:alias_consumer",
+        "--compilation_mode=opt",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:alias_consumer",
+        "--compilation_mode=opt",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "e89a6728b7fc634c1fc4ed180f7ce306a7eaf6f14fb6b6d93738598f5b33584d",
+          "mode": "0o555",
+          "path": "alias_consumer.txt",
+          "root": "bazel-bin/alias_consumer.txt",
+          "size": 21,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "later_subject_flag_alias_wins_and_is_consumed_globally",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --@@subject+//:subject_mode has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:alias_consumer (0 packages loaded, 0 targets configured)\nAnalyzing: target //:alias_consumer (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:alias_consumer (0 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:alias_consumer up-to-date:\n  bazel-bin/alias_consumer.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8cdb1bf6-4f5f-4d1d-9a56-2e947f7cff60\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8cdb1bf6-4f5f-4d1d-9a56-2e947f7cff60\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --@@subject+//:subject_mode has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:alias_consumer (0 packages loaded, 0 targets configured)\nAnalyzing: target //:alias_consumer (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:alias_consumer (0 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:alias_consumer up-to-date:\n  bazel-bin/alias_consumer.txt\nINFO: Elapsed time: 0.047s, Critical Path: 0.00s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8cdb1bf6-4f5f-4d1d-9a56-2e947f7cff60\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:alias_consumer",
+        "--compilation_mode=opt",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:alias_consumer",
+        "--compilation_mode=opt",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "815ee2a649ff00d655ac98d3f0719c57f95029182cad5508bbeddc01cd6885fc",
+          "mode": "0o555",
+          "path": "alias_consumer.txt",
+          "root": "bazel-bin/alias_consumer.txt",
+          "size": 18,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "flag_alias(name = \"compilation_mode\", starlark_flag = \"//:subject_mode\")",
+          "old_digest_hint": "355",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "# subject compilation_mode alias intentionally removed"
+        },
+        {
+          "find": "version = \"0.1.2\"",
+          "old_digest_hint": "376",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.3\""
+        }
+      ],
+      "name": "removing_subject_flag_alias_falls_back_to_root_alias",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 1 packages loaded\nWARNING: Build options --//:root_mode, --@@subject+//:subject_mode, and --flag_alias have changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:alias_consumer (3 packages loaded, 2 targets configured)\nAnalyzing: target //:alias_consumer (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:alias_consumer (4 packages loaded, 15 targets configured).\nINFO: Found 1 target...\nTarget //:alias_consumer up-to-date:\n  bazel-bin/alias_consumer.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 228eb929-53cd-48e1-9233-3f7520d6d940\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/228eb929-53cd-48e1-9233-3f7520d6d940\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 1 packages loaded\nWARNING: Build options --//:root_mode, --@@subject+//:subject_mode, and --flag_alias have changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:alias_consumer (3 packages loaded, 2 targets configured)\nAnalyzing: target //:alias_consumer (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:alias_consumer (4 packages loaded, 15 targets configured).\nINFO: Found 1 target...\nTarget //:alias_consumer up-to-date:\n  bazel-bin/alias_consumer.txt\nINFO: Elapsed time: 2.663s, Critical Path: 0.00s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/228eb929-53cd-48e1-9233-3f7520d6d940\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:alias_consumer",
+        "--compilation_mode=opt",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:alias_consumer",
+        "--compilation_mode=opt",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "e89a6728b7fc634c1fc4ed180f7ce306a7eaf6f14fb6b6d93738598f5b33584d",
+          "mode": "0o555",
+          "path": "alias_consumer.txt",
+          "root": "bazel-bin/alias_consumer.txt",
+          "size": 21,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "# subject compilation_mode alias intentionally removed",
+          "old_digest_hint": "337",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "flag_alias(name = \"compilation_mode\", starlark_flag = \"//:subject_mode\")"
+        },
+        {
+          "find": "version = \"0.1.3\"",
+          "old_digest_hint": "376",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.4\""
+        }
+      ],
+      "name": "restoring_subject_flag_alias_recovers_subject_marker",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 1 packages loaded\nWARNING: Build options --//:root_mode, --@@subject+//:subject_mode, and --flag_alias have changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:alias_consumer (4 packages loaded, 2 targets configured)\nAnalyzing: target //:alias_consumer (4 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:alias_consumer (4 packages loaded, 15 targets configured).\nINFO: Found 1 target...\nTarget //:alias_consumer up-to-date:\n  bazel-bin/alias_consumer.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1cd3a949-feb2-494d-9e5c-349cd1ee765b\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1cd3a949-feb2-494d-9e5c-349cd1ee765b\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 1 packages loaded\nWARNING: Build options --//:root_mode, --@@subject+//:subject_mode, and --flag_alias have changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:alias_consumer (4 packages loaded, 2 targets configured)\nAnalyzing: target //:alias_consumer (4 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:alias_consumer (4 packages loaded, 15 targets configured).\nINFO: Found 1 target...\nTarget //:alias_consumer up-to-date:\n  bazel-bin/alias_consumer.txt\nINFO: Elapsed time: 2.604s, Critical Path: 0.00s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1cd3a949-feb2-494d-9e5c-349cd1ee765b\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "nonroot-module-consumers",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

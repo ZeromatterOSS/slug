@@ -1,0 +1,118 @@
+[fixture]
+name = "nonroot-module-consumers"
+description = "Bazel 9.2 nonroot module registration consumers and global flag aliases."
+comparison = "message_shape"
+daemon = true
+oracle_notes = "The fixture is local-path-only. Subject toolchains require fixture-private constraint values, so Bazel's default host platform remains present but cannot satisfy any asserted toolchain. Every successful consumer action is ctx.actions.write."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleBase.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/RegisteredExecutionPlatformsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/RegisteredToolchainsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/SkyframeExecutor.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/BlazeCommandDispatcher.java",
+]
+translation_notes = "ModuleFileFunction evaluates nonroot modules with ignoreDevDeps=true. ModuleFileGlobals therefore drops only dev registrations, while flag_alias is retained, normalized in the subject context, aggregated across selected modules, and injected before command-option reparsing."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-module-consumers --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-module-consumers --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "ordinary_nonroot_toolchain_and_platform_consumer_succeeds"
+argv = ["build", "//:ordinary_consumer", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+manifest_roots = ["bazel-bin/ordinary_consumer.txt"]
+
+[[commands]]
+name = "nonroot_dev_toolchain_registration_is_suppressed"
+argv = ["build", "//:dev_toolchain_consumer", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["No matching toolchains found for types:", "@@subject+//:dev_toolchain_type"]
+stderr_patterns = ["(?s)\\A(?=.*No matching toolchains found for types:)(?=.*@@subject[+]//:dev_toolchain_type)(?!.*dev_platform_toolchain_type).*"]
+
+[[commands]]
+name = "nonroot_dev_toolchain_registers_after_only_dev_flag_removed"
+argv = ["build", "//:dev_toolchain_consumer", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+manifest_roots = ["bazel-bin/dev_toolchain_consumer.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "register_toolchains(\"//:dev_toolchain\", dev_dependency = True)"
+  replace = "register_toolchains(\"//:dev_toolchain\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.0\""
+  replace = "version = \"0.1.1\""
+
+[[commands]]
+name = "nonroot_dev_execution_platform_registration_is_suppressed"
+argv = ["build", "//:dev_platform_consumer", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["No matching toolchains found for types:", "@@subject+//:dev_platform_toolchain_type"]
+stderr_patterns = ["(?s)\\A(?=.*No matching toolchains found for types:)(?=.*@@subject[+]//:dev_platform_toolchain_type)(?!.*dev_toolchain_type).*"]
+
+[[commands]]
+name = "nonroot_dev_execution_platform_registers_after_only_dev_flag_removed"
+argv = ["build", "//:dev_platform_consumer", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+manifest_roots = ["bazel-bin/dev_platform_consumer.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "register_execution_platforms(\"//:dev_platform\", dev_dependency = True)"
+  replace = "register_execution_platforms(\"//:dev_platform\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.1\""
+  replace = "version = \"0.1.2\""
+
+[[commands]]
+name = "later_subject_flag_alias_wins_and_is_consumed_globally"
+argv = ["build", "//:alias_consumer", "--compilation_mode=opt", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+manifest_roots = ["bazel-bin/alias_consumer.txt"]
+
+[[commands]]
+name = "removing_subject_flag_alias_falls_back_to_root_alias"
+argv = ["build", "//:alias_consumer", "--compilation_mode=opt", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+manifest_roots = ["bazel-bin/alias_consumer.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "flag_alias(name = \"compilation_mode\", starlark_flag = \"//:subject_mode\")"
+  replace = "# subject compilation_mode alias intentionally removed"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.2\""
+  replace = "version = \"0.1.3\""
+
+[[commands]]
+name = "restoring_subject_flag_alias_recovers_subject_marker"
+argv = ["build", "//:alias_consumer", "--compilation_mode=opt", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+manifest_roots = ["bazel-bin/alias_consumer.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "# subject compilation_mode alias intentionally removed"
+  replace = "flag_alias(name = \"compilation_mode\", starlark_flag = \"//:subject_mode\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.3\""
+  replace = "version = \"0.1.4\""

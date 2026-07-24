@@ -1,0 +1,10 @@
+module(name = "subject", version = "1.0.0")
+
+register_execution_platforms("//:ordinary_platform")
+register_execution_platforms("//:dev_platform", dev_dependency = True)
+
+register_toolchains("//:ordinary_toolchain")
+register_toolchains("//:dev_toolchain", dev_dependency = True)
+register_toolchains("//:dev_platform_toolchain")
+
+flag_alias(name = "compilation_mode", starlark_flag = "//:subject_mode")

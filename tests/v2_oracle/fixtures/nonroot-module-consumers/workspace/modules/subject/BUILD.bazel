@@ -1,0 +1,84 @@
+load(":defs.bzl", "string_flag", "toolchain_impl")
+
+constraint_setting(
+    name = "ordinary_constraint",
+    visibility = ["//visibility:public"],
+)
+
+constraint_value(
+    name = "ordinary_value",
+    constraint_setting = ":ordinary_constraint",
+    visibility = ["//visibility:public"],
+)
+
+constraint_setting(
+    name = "dev_constraint",
+    visibility = ["//visibility:public"],
+)
+
+constraint_value(
+    name = "dev_value",
+    constraint_setting = ":dev_constraint",
+    visibility = ["//visibility:public"],
+)
+
+platform(
+    name = "ordinary_platform",
+    constraint_values = [":ordinary_value"],
+    visibility = ["//visibility:public"],
+)
+
+platform(
+    name = "dev_platform",
+    constraint_values = [":dev_value"],
+    visibility = ["//visibility:public"],
+)
+
+toolchain_type(
+    name = "ordinary_toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+toolchain_type(
+    name = "dev_toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+toolchain_type(
+    name = "dev_platform_toolchain_type",
+    visibility = ["//visibility:public"],
+)
+
+toolchain_impl(name = "ordinary_impl", marker = "ordinary-toolchain-marker\n")
+toolchain_impl(name = "dev_toolchain_impl", marker = "dev-toolchain-marker\n")
+toolchain_impl(name = "dev_platform_impl", marker = "dev-platform-marker\n")
+
+toolchain(
+    name = "ordinary_toolchain",
+    toolchain = ":ordinary_impl",
+    toolchain_type = ":ordinary_toolchain_type",
+    exec_compatible_with = [":ordinary_value"],
+    visibility = ["//visibility:public"],
+)
+
+toolchain(
+    name = "dev_toolchain",
+    toolchain = ":dev_toolchain_impl",
+    toolchain_type = ":dev_toolchain_type",
+    exec_compatible_with = [":ordinary_value"],
+    visibility = ["//visibility:public"],
+)
+
+toolchain(
+    name = "dev_platform_toolchain",
+    toolchain = ":dev_platform_impl",
+    toolchain_type = ":dev_platform_toolchain_type",
+    exec_compatible_with = [":dev_value"],
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "subject_mode",
+    build_setting_default = "default",
+    visibility = ["//visibility:public"],
+)

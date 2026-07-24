@@ -1,0 +1,29 @@
+load(":defs.bzl", "alias_consumer", "dev_platform_consumer", "dev_toolchain_consumer", "ordinary_consumer", "root_string_flag")
+
+root_string_flag(
+    name = "root_mode",
+    build_setting_default = "default",
+)
+
+config_setting(
+    name = "root_mode_subject",
+    flag_values = {":root_mode": "opt"},
+)
+
+config_setting(
+    name = "subject_mode_subject",
+    flag_values = {"@subject//:subject_mode": "opt"},
+)
+
+ordinary_consumer(name = "ordinary_consumer")
+dev_toolchain_consumer(name = "dev_toolchain_consumer")
+dev_platform_consumer(name = "dev_platform_consumer")
+
+alias_consumer(
+    name = "alias_consumer",
+    marker = select({
+        ":subject_mode_subject": "subject-alias-marker\n",
+        ":root_mode_subject": "root-alias-marker\n",
+        "//conditions:default": "default-alias-marker\n",
+    }),
+)
