@@ -593,6 +593,23 @@ complete compact value and supplied-byte Starlark seam before any Rust.
 Typed preparation provenance and stable discovery composition remain later
 serial owners.
 
+Fresh independent review accepts that design after one correction: extension
+tag and innate repo-rule attributes retain arbitrary-precision Starlark
+integers, while the existing root override owner remains exactly i32-bounded.
+The evaluator value therefore uses canonical heap-independent small/large
+integers and remains distinct from the later provenance-bearing interim
+module. Supplied includes cross the seam in BFS order, are compiled before
+execution, and later execute inline with isolated bindings and one shared
+evaluator-local semantic context. Logical source IDs and spans participate in
+equality; bytes, physical paths, registry provenance, attempts, IO, and DICE
+do not.
+
+The current packet is only
+`WP-5-m1-nonroot-schema-syntax-implementation`: add the compact retained schema
+and public-AST MODULE syntax/include inspector under the canonical four-file
+allowlist. Directive evaluation, include closure composition, preparation
+provenance, and discovery remain serial later packets.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
