@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4` | command/daemon transport and loading's repository-mapping dependency are absent; visible lockfile, registry/yanked, MVS/extensions, materialization, cquery, and aquery remain unwired; the recursive observer remains migration scaffolding | design the command/daemon handoff and loading mapping dependency as the next serial Stage 5 vertical |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 root-module command/daemon handoff design is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 root-module command/daemon handoff design is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; command/daemon/loading handoff design accepted | command/daemon transport and loading's repository-mapping dependency are absent; visible lockfile, registry/yanked, MVS/extensions, materialization, cquery, and aquery remain unwired; the recursive observer remains migration scaffolding | implement the bounded root-module command/daemon/loading handoff |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 root-module command/daemon/loading handoff is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 root-module command/daemon/loading handoff is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,28 +33,32 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only the read-only
-`WP-5-m1-root-module-command-daemon-handoff-design`.
+Run only `WP-5-m1-root-module-command-daemon-handoff`.
 
-Trace the normalized command/environment/lockfile-mode inputs from CLI and
-daemon protocol request construction into the retained `WorkspaceRuntime`, and
-trace the smallest cycle-free edge by which every `PackageLoadKey` computes
-the accepted `RootModuleGraphKey` repository mapping before BUILD evaluation,
-including packages with no `load()`. Produce:
+Implement the accepted design recorded in the Stage 5 owner plan:
 
-- an exact request/protocol/runtime/loading ownership table;
-- the command and daemon same-process default→override→default test matrix;
-- the standalone-loading injection strategy, without defaults inside a DICE
-  key;
-- one bounded implementation allowlist, dependency direction, stop
-  conditions, and independent-review gate.
+- normalize command flags in `slug_commands_v2`, capture the allowlisted
+  environment once per implemented CLI request, and carry stable primitive
+  request values through backward-compatible build/query daemon DTOs;
+- inject command, environment, and lockfile mode on the existing updater before
+  its sole commit for both build and query; never retain request policy in the
+  daemon or read process state inside a DICE key;
+- make `PackageLoadKey` compute the accepted `RootModuleGraphKey` as its first
+  dependency, before package listing or BUILD observation/parsing, including a
+  BUILD with no `load()`; and
+- explicitly inject those fail-closed inputs in standalone loading, analysis,
+  and query tests.
 
-This design packet changes no Rust, fixtures, protocol, or plans beyond its
-eventual compact result. Visible lockfile v28, registry/yanked resolution,
-MVS/extensions, hidden lockfile, network/fetch/materialization, cquery, and
-aquery remain later serial packets. Stop if the loading edge creates a Cargo
-cycle, requires a second DICE graph/commit, or forces an unmodeled default into
-standalone loading transactions.
+Prove default→override→default transport and reuse on one retained runtime and
+daemon, backward-compatible protocol defaults, request-local malformed-input
+failure, and the exact
+`PackageLoadKey → RootModuleGraphKey → PackageListingKey/BUILD` boundary.
+Visible lockfile v28, registry/yanked resolution, MVS/extensions, hidden
+lockfile, network/fetch/materialization, external repository loading,
+cquery/aquery activation, and run/test transport remain deferred. Stop on a
+Cargo/DICE cycle, second graph or commit, a default/environment read inside a
+key, retained daemon policy, direct serde on semantic DICE types, or required
+public output expansion.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine

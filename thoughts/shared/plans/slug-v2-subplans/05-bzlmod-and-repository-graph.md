@@ -183,6 +183,43 @@ correction. The current packet is the read-only
 transport, standalone-loading injection, and the cycle-free loading mapping
 edge before any Packet B Rust edit.
 
+The design packet returned `ACCEPT` after one representation correction.
+`slug_commands_v2` owns pure flag/environment-value normalization;
+`slug_cli_v2` captures `BZLMOD_ALLOW_YANKED_VERSIONS` once per implemented
+request; and `slug_server_v2` owns a backward-compatible primitive wire DTO
+that normalizes each request without retaining policy in the daemon.
+Build/query runtime entry points inject all three fail-closed values on their
+existing updater before its sole commit.
+
+The cycle-free production edge is
+`slug_loading_v2 -> slug_bzlmod_v2 -> slug_workspace_v2/slug_identity_v2`.
+A bzlmod-owned helper performs only the three `changed_to` calls on a caller's
+updater and supplies neither defaults nor a commit. `PackageLoadKey` enters,
+computes `RootModuleGraphKey` as its first dependency, and only after that
+succeeds may package listing or BUILD observation/parsing begin; this holds
+even for a BUILD with no `load()`. Loading, analysis, and query tests inject
+explicit inputs rather than hiding defaults in a key.
+
+The implementation packet is
+`WP-5-m1-root-module-command-daemon-handoff`. Its bounded surface is the
+bzlmod injection helper; the loading edge; commands/build/query normalization;
+core build/query runtime wrappers; server build/query DTO and daemon handoff;
+CLI build/query capture; the necessary loading/server and downstream test-only
+Cargo edges; and focused bzlmod/loading/commands/core/server/CLI plus
+analysis/query tests. It must prove primitive protocol default/override/default
+round trips, same-runtime and same-daemon A→B→A without leakage, request-local
+malformed-input recovery, and
+`PackageLoadKey -> RootModuleGraphKey -> PackageListingKey/BUILD`.
+
+No fixture refresh, lockfile implementation, registry/network/fetch, yanked
+resolution, MVS/extensions, repository materialization, external-repository
+load resolution, cquery/aquery activation, run/test transport, second DICE
+graph/commit, new DICE key, or semantic output field is authorized. Stop and
+replan on a Cargo/DICE cycle, default/environment/filesystem read inside a key,
+retained daemon request policy, direct serde on semantic DICE types, required
+external mapping activation, or inability to observe transport without public
+output expansion.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
