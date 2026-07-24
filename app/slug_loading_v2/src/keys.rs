@@ -17,49 +17,11 @@ use compact_str::CompactString;
 use dice::InjectedKey;
 use dupe::Dupe;
 use slug_identity_v2::ApparentLabel;
+pub use slug_workspace_v2::WorkspaceFileKey;
+pub use slug_workspace_v2::WorkspaceFileValue;
+pub use slug_workspace_v2::WorkspaceSnapshot;
+pub use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::sorted_map::SortedMap;
-
-/// An observation supplied to the workspace DICE graph before loading begins.
-///
-/// The value deliberately distinguishes a file that does not exist from a
-/// read failure.  A missing BUILD file is meaningful to package loading, while
-/// a permission or I/O failure must be reported instead of being cached as an
-/// absence.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-pub enum WorkspaceFileValue {
-    Present(Arc<String>),
-    Absent,
-    ReadError(Arc<String>),
-}
-
-/// Immutable, externally observed workspace state for one DICE revision.
-///
-/// A snapshot lets `WorkspaceFileKey` answer for any requested path: files not
-/// represented in the observed state are explicitly absent rather than an
-/// uninitialized injected key. `Arc` keeps the long-lived input cheap to clone.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct WorkspaceSnapshot {
-    pub files: Arc<SortedMap<PathBuf, WorkspaceFileValue>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-pub struct WorkspaceSnapshotKey {
-    pub workspace: PathBuf,
-}
-
-impl fmt::Display for WorkspaceSnapshotKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "workspace-snapshot:{}", self.workspace.display())
-    }
-}
-
-impl InjectedKey for WorkspaceSnapshotKey {
-    type Value = Arc<WorkspaceSnapshot>;
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x == y
-    }
-}
 
 /// The direct kind of a directory entry observed before a DICE request.
 ///
@@ -161,18 +123,6 @@ pub struct WorkspaceDirectoryKey {
 impl fmt::Display for WorkspaceDirectoryKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "workspace-directory:{}", self.directory.display())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-pub struct WorkspaceFileKey {
-    pub workspace: PathBuf,
-    pub path: PathBuf,
-}
-
-impl fmt::Display for WorkspaceFileKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "workspace-file:{}", self.path.display())
     }
 }
 

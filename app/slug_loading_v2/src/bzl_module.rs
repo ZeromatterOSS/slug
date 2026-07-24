@@ -45,7 +45,6 @@ use crate::keys::WorkspaceDirectorySnapshotKey;
 use crate::keys::WorkspaceDirectoryValue;
 use crate::keys::WorkspaceFileKey;
 use crate::keys::WorkspaceFileValue;
-use crate::keys::WorkspaceSnapshotKey;
 use crate::load_label::LoadLabel;
 use crate::package::LoadedPackage;
 use crate::package::PackageRecorder;
@@ -244,38 +243,6 @@ impl Key for BzlLoadCyclePoisonKey {
 
     fn validity(_value: &Self::Value) -> bool {
         false
-    }
-}
-
-#[async_trait]
-impl Key for WorkspaceFileKey {
-    type Value = WorkspaceFileValue;
-
-    async fn compute(
-        &self,
-        ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
-    ) -> Self::Value {
-        match ctx
-            .compute(&WorkspaceSnapshotKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(snapshot) => snapshot
-                .files
-                .get(&self.path)
-                .cloned()
-                .unwrap_or(WorkspaceFileValue::Absent),
-            Err(error) => WorkspaceFileValue::ReadError(Arc::new(format!(
-                "reading workspace snapshot for {}: {error}",
-                self.path.display()
-            ))),
-        }
-    }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x == y
     }
 }
 
