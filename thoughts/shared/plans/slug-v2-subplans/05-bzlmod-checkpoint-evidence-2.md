@@ -758,3 +758,13 @@ Design summary: A new compact evaluator-owned semantic value covers every `Modul
 Representation: Retained values use `CompactString`, Arc slices, Buck2 `SmallMap`/`SmallSet`, `Dupe`, and `Allocative`. Extension attributes preserve arbitrary Starlark integers as i32-small or canonical-decimal large values without frozen heaps; root override attributes remain separately i32-bounded. `originalDeps` shares the finalized dependency map only after exact singleton `bazel_tools` insertion and collision handling.
 Validation: two read-only pinned-source/live-owner audits, root include/equality/finalization adjudication, independent ownership review `ACCEPT`, initial representation review `REPLAN` for arbitrary-precision tag integers, and fresh corrected representation review `ACCEPT`
 Residual risk: The recursive inline include evaluator and full directive surface remain unimplemented. Implement only `WP-5-m1-nonroot-schema-syntax-implementation` under the four-file allowlist; stop before directive evaluation, source preparation, or discovery.
+
+### Stage 5 nonroot schema and syntax implementation
+
+Status: Accepted
+V2 commit: `c663fe46 feat: add nonroot module schema`
+Bazel source inspected: pinned commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleBase`, `InterimModule`, `ModuleThreadContext`, `ModuleExtensionUsage`, and `CompiledModuleFile`
+Expected evidence artifact: evaluator-owned compact semantic schema and pure supplied-byte MODULE syntax/include inspector
+Implementation summary: Added `EvaluatedNonrootModule`, its transient builder, fixed `-1` nodep dependencies, opaque canonical arbitrary-precision attribute integers, complete ordered extension/proxy/tag/import/isolation/innate state, exact singleton `bazel_tools` insertion and original-dependency snapshot, and logical source spans. The one-file public-AST inspector enforces Bazel's restricted MODULE dialect and exact direct-include classification and precedence while excluding bytes, physical paths, preparation provenance, IO, and DICE from retained equality.
+Validation: focused nonroot structural/syntax tests 8/8; existing root evaluator/DICE tests 12/12; all 188 `slug_bzlmod_v2` tests; `cargo fmt --check -p slug_bzlmod_v2`; `git diff --check`; two fresh independent final reviews `ACCEPT`
+Residual risk: Directive execution, include closure composition, typed preparation success/exhaustion/fatal provenance, and discovery remain unimplemented. Design only `WP-5-m1-nonroot-directive-evaluator-design`; no Rust is authorized before fresh acceptance.

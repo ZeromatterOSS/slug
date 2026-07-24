@@ -604,11 +604,22 @@ evaluator-local semantic context. Logical source IDs and spans participate in
 equality; bytes, physical paths, registry provenance, attempts, IO, and DICE
 do not.
 
-The current packet is only
-`WP-5-m1-nonroot-schema-syntax-implementation`: add the compact retained schema
-and public-AST MODULE syntax/include inspector under the canonical four-file
-allowlist. Directive evaluation, include closure composition, preparation
-provenance, and discovery remain serial later packets.
+Commit `c663fe46` accepts that implementation. The new evaluator-owned compact
+schema preserves every reviewed semantic field, opaque canonical
+arbitrary-precision integers, exact `-1` nodep dependencies, singleton
+`bazel_tools` finalization, and logical source spans. The supplied-byte
+MODULE inspector enforces the restricted dialect and exact direct-include
+classification without retaining bytes or physical paths. Focused nonroot
+tests, existing root evaluator tests, all `slug_bzlmod_v2` tests, formatting,
+diff checks, and two fresh independent reviews passed.
+
+The current packet is the read-only
+`WP-5-m1-nonroot-directive-evaluator-design`. It must freeze only the
+single-supplied-file directive evaluator, exact validation/mutation ordering,
+dynamic extension proxy/tag behavior, dev suppression, and public
+starlark-rust seam. Include composition, preparation provenance, and discovery
+remain later serial owners; no Rust is authorized before fresh design
+acceptance.
 
 ## Implementation Slices
 

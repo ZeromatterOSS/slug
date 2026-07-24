@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a`; nonroot registration/flag-alias consumer oracle accepted in `eeea40a6`; complete compact evaluator/schema design accepted | evaluator implementation, typed preparation provenance, and discovery composition remain; preparation loses exhaustion attempts and typed fatal causes | implement only the compact nonroot schema and pure MODULE syntax inspector |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a`; nonroot registration/flag-alias consumer oracle accepted in `eeea40a6`; complete compact evaluator/schema design accepted; compact nonroot schema and MODULE syntax inspector accepted in `c663fe46` | single-file directive evaluation, include composition, typed preparation provenance, and discovery composition remain; preparation loses exhaustion attempts and typed fatal causes | design only the supplied-byte single-file nonroot directive evaluator |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,60 +33,35 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-nonroot-schema-syntax-implementation`.
+Run only `WP-5-m1-nonroot-directive-evaluator-design`.
 
-Add the accepted compact schema and pure supplied-byte MODULE syntax inspector.
-The exact file allowlist is:
+This is a read-only design packet for evaluating one already-supplied main
+`MODULE.bazel` file into the accepted `EvaluatedNonrootModule`. Inspect the live
+schema/compiler seam and the pinned Bazel 9.2 `ModuleFileGlobals`,
+`ModuleThreadContext`, and `ModuleExtensionUsageBuilder` implementations. Freeze
+the exact directive behavior, validation and mutation order, caller/export
+locations, dev-dependency suppression, built-in/finalization order, and the
+public starlark-rust APIs needed by:
 
-- `app/slug_bzlmod_v2/src/interim_module.rs` (new);
-- `app/slug_bzlmod_v2/src/module_eval.rs`;
-- `app/slug_bzlmod_v2/src/lib.rs`; and
-- `app/slug_bzlmod_v2/tests/nonroot_module_eval.rs` (new).
+- `module`, `bazel_dep`, platform/toolchain registration, and `flag_alias`;
+- `use_extension`, dynamic tag calls, `use_repo`, isolation, and proxy export;
+- ignored nonroot `override_repo`/`inject_repo` with their exact validation
+  boundary; and
+- `use_repo_rule` as Bazel's synthetic innate extension usage.
 
-`interim_module.rs` must define an evaluator-owned
-`EvaluatedNonrootModule`, not misname it as Bazel's final `InterimModule`.
-Retain compact declared name/version distinct from the expected compact key,
-final repo name, compatibility `0`, ordered Bazel compatibility, Arc-backed
-ordinary/original dependency maps, ordered nodep deps with max compatibility
-`-1`, raw ordered registrations, complete ordered extension
-usage/proxy/tag/import/repo-override/isolation/innate-repo-rule values, and
-module-local flag aliases. Include empty nonroot repo-override state explicitly.
-The future discovery wrapper alone adds nullable registry/source provenance
-and ordered preparation evidence to form the actual interim module.
+Preserve the root evaluator and the accepted heap-independent schema. The
+design may reserve a small correction to that schema only if pinned source
+proves an exact missing semantic field. It must define focused tests from the
+three accepted nonroot fixtures plus source-only hidden constants, and an exact
+later implementation allowlist.
 
-Use `CompactString`, `Arc` slices, Buck2 `SmallMap`/`SmallSet`, `Dupe`, and
-`Allocative` for retained values. Locations are logical module-file IDs plus
-line/column spans, never physical paths. Extension and innate-repo-rule
-attributes use a heap-independent recursive value. Integers are
-`Small(i32)` or a constructor-validated canonical base-10
-`BigDecimal(CompactString)` so values such as `10**20` survive evaluation.
-Do not widen the existing root `OverrideAttributeValue::Int(i32)` domain or
-refactor it into this type.
-
-The inspector must use the public starlark-rust AST and a MODULE-specific
-dialect to reject `load`, `def`, `lambda`, top-level control flow, `*args`,
-and non-literal-dict `**kwargs`. Extract only direct top-level
-`include("literal")`, exactly preserving the pinned assignment-shadowing and
-member `.include` exceptions, and return ordered requests with logical spans.
-The later evaluator accepts main bytes plus an exact BFS-ordered supplied
-include slice; it will compile the whole closure before execution and then
-execute includes inline with isolated bindings and one evaluator-local
-semantic context. This packet implements only the schema and one-file
-compiler/inspector seam, not directive execution or closure composition.
-
-Add focused structural tests for every retained field and equality boundary,
-the hidden `0`/`-1` constants and post-built-in original-dependency snapshot,
-canonical small/large signed integers and nesting, exact restricted syntax,
-valid/invalid include classification, logical spans, and masking of source
-bytes and physical paths. Preserve the existing root out-of-i32 rejection and
-root evaluator tests.
-
-Do not edit Cargo, `parser.rs`, `resolution.rs`, source preparation, discovery,
-DICE keys, fixtures, or expected artifacts. Stop and replan if public AST
-inspection cannot match `CompiledModuleFile.checkModuleFileSyntax`, retained
-values require a frozen heap or a new dependency, the compact key forces a
-legacy graph-wide migration, or root evaluation changes. No full nonroot
-directive evaluator is authorized in this packet.
+Do not edit Rust, Cargo, fixtures, expected artifacts, source preparation,
+discovery, DICE keys, resolution, or plans outside the terminal packet
+closeout. Includes, source IO/provenance, registry attempts, graph discovery,
+MVS, extension execution, and command activation remain later serial owners.
+Stop and replan if the public starlark-rust API requires a patch or frozen
+heaps, if correct evaluation requires include composition in the same packet,
+or if the root evaluator must be redesigned.
 
 ### Accepted transport evidence
 
