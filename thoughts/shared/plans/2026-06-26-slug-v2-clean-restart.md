@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; command/daemon registry transport design independently accepted; Bazel 9.2 registry-command transport oracle accepted in `3bc88fd9` | command/daemon registry transport must land before discovery; MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | implement only the accepted registry command/daemon transport contract |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; command/daemon registry transport design independently accepted; Bazel 9.2 registry-command transport oracle accepted in `3bc88fd9` | the first transport draft exposed a URI-parser scope gap and an existing Rustls provider ambiguity before daemon handling; command/daemon registry transport must land before discovery; MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | correct only the registry transport parser/TLS validation scope, then rereview the preserved draft |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry policy/IO substrate is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry policy/IO substrate is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,7 +33,7 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-registry-command-transport`.
+Run only `WP-5-m1-registry-command-transport-scope-correction`.
 
 Oracle `3bc88fd9` is accepted against Bazel 9.2 commit
 `8220c6198837d5c13d53fea211cf3282aa12408a`. Its eight rows pin the absent-only
@@ -45,13 +45,41 @@ the independent reviewer returned `ACCEPT`. The all-missing diagnostic proves
 normalized dedup/order, while filtered request-count deltas prove only the
 404/fatal fallback boundaries.
 
-Implement the accepted transport contract below under its exact allowlist.
-Add or strengthen the narrow command/server/core/CLI regressions before each
-owning change. Run the focused owner and downstream suites serially, rebuild
-`slug_cli_v2` before oracle-facing CLI validation, and clean stale `slugd`
-processes before and after daemon-sensitive tests. Do not edit the accepted
-oracle, add registry discovery/fallback/content fetching, expand rc handling,
-or enter MVS/yanked/final-hash/writer behavior.
+The first 14-file implementation draft is preserved but not accepted. Focused
+bzlmod, command, core, and primitive-wire tests passed, but independent review
+returned `REPLAN` for two scope gaps. Its manual URL prefix checks admit
+whitespace, malformed percent escapes, and broken authorities that
+`java.net.URI` rejects. Separately, the retained Hyper-Rustls client enables
+AWS-LC while the server's Tonic graph enables Ring, so server/CLI requests can
+panic before request handling. Root reproduced that panic in the focused
+daemon test.
+
+Correct only those gates:
+
+1. Use the already-locked `url` parser from
+   `app/slug_bzlmod_v2/src/registry.rs`, retaining explicit raw checks where
+   WHATWG parsing differs from Java URI. Add whitespace, malformed-percent,
+   broken-authority, exact-lowercase-scheme, opaque-file, and non-local-file
+   regressions. Bazel's actual boundary is `URI.getPath() != null`, not
+   nonempty path: host-only HTTP(S) is valid, as both pinned source and a
+   Bazel 9.2 `--registry=https://bcr.bazel.build` run prove.
+2. Configure the workspace Hyper-Rustls dependency with no default features
+   and the same Ring provider used by Tonic, retaining native roots, HTTP/1,
+   HTTP/2, TLS 1.2, and logging. `cargo tree` must show one Rustls provider.
+   Do not change `RegistryIo`, registry policy, or transport semantics.
+3. Make the CLI rows discriminating by proving malformed equality-form
+   registry values reach pre-commit normalization in one-shot and daemon
+   build/query paths, then pass the focused server/CLI tests and full serial
+   downstream suites.
+
+The correction adds only root `Cargo.toml`, `Cargo.lock`, and
+`app/slug_bzlmod_v2/Cargo.toml` to the implementation allowlist below. No
+`registry_io.rs` or core Cargo edit is authorized unless the feature-only fix
+fails, in which case stop and replan. Add or strengthen narrow regressions
+before each correction, rebuild `slug_cli_v2` before CLI validation, and clean
+stale `slugd` processes before and after daemon-sensitive tests. Do not edit
+the accepted oracle, add registry discovery/fallback/content fetching, expand
+rc handling, or enter MVS/yanked/final-hash/writer behavior.
 
 ### Accepted transport contract
 
@@ -85,9 +113,10 @@ The implementation must:
    trailing slash and first-occurrence-deduplicates in raw encounter order,
    then performs `%workspace%` substitution and URI validation for each
    surviving entry. Validation accepts only exact lowercase `http`, `https`,
-   and `file` schemes with a nonempty path and preserves Bazel's factory
-   diagnostic shapes. The stored compact `RegistryUrls` are the resolved
-   effective URLs; no later layer repeats normalization or substitution.
+   and `file` schemes with a non-null hierarchical path, preserving host-only
+   HTTP(S) and Bazel's factory diagnostic shapes. The stored compact
+   `RegistryUrls` are the resolved effective URLs; no later layer repeats
+   normalization or substitution.
 5. The existing `RootModuleRegistryUrlsKey`, request generation,
    `RegistryPolicyKey`, `RegistryFileKey`, IO capability, root graph, and
    loading ownership remain unchanged. Malformed input fails before the sole
@@ -100,9 +129,10 @@ The implementation must:
    both one-shot and daemon equality-form transport.
 
 The implementation allowlist is
+root `Cargo.toml`,
+root `Cargo.lock`,
 `app/slug_bzlmod_v2/src/registry.rs`,
-`app/slug_bzlmod_v2/Cargo.toml` only if the accepted oracle requires the
-already-workspace `url` parser,
+`app/slug_bzlmod_v2/Cargo.toml` for the already-locked `url` parser,
 `app/slug_commands_v2/src/common.rs`,
 `app/slug_commands_v2/src/build.rs`,
 `app/slug_commands_v2/src/query.rs`,
