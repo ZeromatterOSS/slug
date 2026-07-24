@@ -16,6 +16,7 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_identity_v2::ApparentRepoName;
+use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
@@ -28,9 +29,15 @@ use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
+use starlark::values::Value;
+use starlark::values::ValueIdentity;
+use starlark::values::dict::DictRef;
+use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
+use starlark::values::tuple::TupleRef;
+use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::BzlmodCommandPolicyKey;
@@ -57,9 +64,89 @@ pub struct RootModuleDependency {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct RootModuleLocalPathOverride {
-    pub module_name: CompactString,
-    pub path: CompactString,
+pub struct RootModuleOverrides(Arc<SmallMap<CompactString, RootModuleOverride>>);
+
+impl RootModuleOverrides {
+    pub fn get(&self, module_name: &str) -> Option<&RootModuleOverride> {
+        self.0.get(module_name)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&CompactString, &RootModuleOverride)> {
+        self.0.iter()
+    }
+}
+
+impl Default for RootModuleOverrides {
+    fn default() -> Self {
+        Self(Arc::new(SmallMap::new()))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum RootModuleOverride {
+    RegistrySingle(RegistrySingleOverride),
+    RegistryMultiple(RegistryMultipleOverride),
+    NonRegistry(RepoSpec),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RegistrySingleOverride {
+    pub version: CompactString,
+    pub registry: CompactString,
+    pub patches: Arc<[CanonicalLabel]>,
+    pub patch_cmds: Arc<[CompactString]>,
+    pub patch_strip: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RegistryMultipleOverride {
+    pub versions: Arc<[CompactString]>,
+    pub registry: CompactString,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepoSpec {
+    pub rule_id: RepoRuleId,
+    pub attributes: Arc<SmallMap<CompactString, OverrideAttributeValue>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepoRuleId {
+    pub bzl_file: CanonicalLabel,
+    pub rule_name: CompactString,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum OverrideAttributeValue {
+    None,
+    Bool(bool),
+    Int(i32),
+    String(CompactString),
+    Label(CanonicalLabel),
+    Iterable(Arc<[OverrideAttributeValue]>),
+    Map(Arc<SmallMap<OverrideAttributeKey, OverrideAttributeValue>>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
+pub enum OverrideAttributeKey {
+    String(CompactString),
+    Label(CanonicalLabel),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum RecordedRootModuleOverride {
+    RegistrySingle {
+        version: CompactString,
+        registry: CompactString,
+        patches: Arc<[CompactString]>,
+        patch_cmds: Arc<[CompactString]>,
+        patch_strip: i32,
+    },
+    RegistryMultiple(RegistryMultipleOverride),
+    NonRegistry {
+        repo_spec: RepoSpec,
+        patches_to_validate: Arc<[CompactString]>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -123,7 +210,14 @@ pub struct ModuleFileEvaluation {
     pub header: Option<RootModuleHeader>,
     pub includes: Arc<[CompactString]>,
     pub dependencies: Arc<[RootModuleDependency]>,
-    pub local_path_overrides: Arc<[RootModuleLocalPathOverride]>,
+    override_contributions: Arc<SmallMap<CompactString, RecordedRootModuleOverride>>,
+}
+
+impl ModuleFileEvaluation {
+    fn stripped_override_contributions(mut self) -> Self {
+        self.override_contributions = Arc::new(SmallMap::new());
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -131,6 +225,7 @@ pub struct RootModuleFiles {
     pub root: ModuleFileEvaluation,
     pub includes: Arc<[ModuleFileEvaluation]>,
     pub visible_lockfile: VisibleLockfileRead,
+    pub overrides: RootModuleOverrides,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -142,6 +237,7 @@ pub struct RootModuleGraph {
     pub command_policy: RootModuleCommandPolicy,
     pub environment_policy: RootModuleEnvironmentPolicy,
     pub lockfile_mode: RootModuleLockfileMode,
+    pub overrides: RootModuleOverrides,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -413,10 +509,30 @@ impl Key for RootModuleFilesKey {
             },
             Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
         };
+        let mut overrides = SmallMap::new();
+        for file in std::iter::once(&root).chain(&includes) {
+            for (module_name, override_) in file.override_contributions.iter() {
+                let override_ = match materialize_override(override_, root.header.as_ref()) {
+                    Ok(override_) => override_,
+                    Err(error) => {
+                        return Arc::new(Err(CompactString::new(error.to_string())));
+                    }
+                };
+                if overrides.insert(module_name.clone(), override_).is_some() {
+                    return Arc::new(Err(CompactString::new(format!(
+                        "multiple overrides for module {module_name}"
+                    ))));
+                }
+            }
+        }
         Arc::new(Ok(RootModuleFiles {
-            root,
-            includes: includes.into(),
+            root: root.stripped_override_contributions(),
+            includes: includes
+                .into_iter()
+                .map(ModuleFileEvaluation::stripped_override_contributions)
+                .collect(),
             visible_lockfile,
+            overrides: RootModuleOverrides(Arc::new(overrides)),
         }))
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -490,6 +606,7 @@ impl Key for RootModuleGraphKey {
             command_policy,
             environment_policy,
             lockfile_mode,
+            overrides: files.overrides,
         }))
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -640,6 +757,184 @@ fn validate_bazel_compatibility(value: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn normalize_patch_label(
+    value: &str,
+    header: Option<&RootModuleHeader>,
+) -> anyhow::Result<CanonicalLabel> {
+    let canonical = if let Some(value) = value.strip_prefix("@//") {
+        format!("@@//{value}")
+    } else if value.starts_with("//") {
+        format!("@@{value}")
+    } else if value.starts_with("@@") {
+        value.to_owned()
+    } else if let Some(value) = value.strip_prefix(':') {
+        format!("@@//:{value}")
+    } else if let Some(value) = value.strip_prefix('@') {
+        let Some((repo, rest)) = value.split_once("//") else {
+            anyhow::bail!("invalid patch label: @{value}");
+        };
+        let own_repo = header
+            .and_then(|header| header.repo_name.as_deref().or(Some(header.name.as_str())))
+            .is_some_and(|own| own == repo);
+        if repo.is_empty() || own_repo {
+            format!("@@//{rest}")
+        } else {
+            anyhow::bail!("patch label is not visible from the root module: @{value}");
+        }
+    } else {
+        format!("@@//:{value}")
+    };
+    CanonicalLabel::parse(&canonical).map_err(anyhow::Error::msg)
+}
+
+fn repo_rule_id(bzl_file: &str, rule_name: &str) -> RepoRuleId {
+    RepoRuleId {
+        bzl_file: CanonicalLabel::parse(bzl_file)
+            .expect("pinned Bazel repository rule label must be canonical"),
+        rule_name: rule_name.into(),
+    }
+}
+
+fn materialize_override(
+    override_: &RecordedRootModuleOverride,
+    header: Option<&RootModuleHeader>,
+) -> anyhow::Result<RootModuleOverride> {
+    Ok(match override_ {
+        RecordedRootModuleOverride::RegistrySingle {
+            version,
+            registry,
+            patches,
+            patch_cmds,
+            patch_strip,
+        } => RootModuleOverride::RegistrySingle(RegistrySingleOverride {
+            version: version.clone(),
+            registry: registry.clone(),
+            patches: patches
+                .iter()
+                .map(|patch| normalize_patch_label(patch, header))
+                .collect::<anyhow::Result<_>>()?,
+            patch_cmds: patch_cmds.clone(),
+            patch_strip: *patch_strip,
+        }),
+        RecordedRootModuleOverride::RegistryMultiple(override_) => {
+            RootModuleOverride::RegistryMultiple(override_.clone())
+        }
+        RecordedRootModuleOverride::NonRegistry {
+            repo_spec,
+            patches_to_validate,
+        } => {
+            for patch in patches_to_validate.iter() {
+                normalize_patch_label(patch, header)?;
+            }
+            RootModuleOverride::NonRegistry(repo_spec.clone())
+        }
+    })
+}
+
+fn collect_patch_strings<'v>(
+    values: impl Iterator<Item = Value<'v>>,
+) -> anyhow::Result<Arc<[CompactString]>> {
+    values
+        .map(|value| {
+            value
+                .unpack_str()
+                .map(CompactString::new)
+                .ok_or_else(|| anyhow::anyhow!("patches must be a sequence of strings"))
+        })
+        .collect()
+}
+
+fn patch_strings(attrs: &DictRef) -> anyhow::Result<Arc<[CompactString]>> {
+    let Some((_, patches)) = attrs
+        .iter()
+        .find(|(key, _)| key.unpack_str() == Some("patches"))
+    else {
+        return Ok(Arc::new([]));
+    };
+    if let Some(values) = ListRef::from_value(patches) {
+        return collect_patch_strings(values.iter());
+    }
+    if let Some(values) = TupleRef::from_value(patches) {
+        return collect_patch_strings(values.iter());
+    }
+    anyhow::bail!("patches must be a sequence of strings")
+}
+
+fn override_attributes(
+    attrs: DictRef,
+) -> anyhow::Result<SmallMap<CompactString, OverrideAttributeValue>> {
+    attrs
+        .iter()
+        .map(|(key, value)| {
+            let key = key.unpack_str().ok_or_else(|| {
+                anyhow::anyhow!("repository override keyword names must be strings")
+            })?;
+            Ok((
+                CompactString::new(key),
+                override_attribute_value(value, &mut SmallSet::new())?,
+            ))
+        })
+        .collect::<anyhow::Result<SmallMap<CompactString, OverrideAttributeValue>>>()
+}
+
+fn override_attribute_value<'v>(
+    value: Value<'v>,
+    active: &mut SmallSet<ValueIdentity<'v>>,
+) -> anyhow::Result<OverrideAttributeValue> {
+    if value.is_none() {
+        return Ok(OverrideAttributeValue::None);
+    }
+    if let Some(value) = value.unpack_bool() {
+        return Ok(OverrideAttributeValue::Bool(value));
+    }
+    if let Some(value) = value.unpack_i32() {
+        return Ok(OverrideAttributeValue::Int(value));
+    }
+    if let Some(value) = value.unpack_str() {
+        return Ok(OverrideAttributeValue::String(value.into()));
+    }
+    let identity = value.identity();
+    if !active.insert(identity) {
+        anyhow::bail!("repository override attributes must not contain cyclic values");
+    }
+    if let Some(values) = ListRef::from_value(value) {
+        let result = values
+            .iter()
+            .map(|value| override_attribute_value(value, active))
+            .collect::<anyhow::Result<Arc<_>>>()
+            .map(OverrideAttributeValue::Iterable);
+        active.shift_remove(&identity);
+        return result;
+    }
+    if let Some(values) = TupleRef::from_value(value) {
+        let result = values
+            .iter()
+            .map(|value| override_attribute_value(value, active))
+            .collect::<anyhow::Result<Arc<_>>>()
+            .map(OverrideAttributeValue::Iterable);
+        active.shift_remove(&identity);
+        return result;
+    }
+    if let Some(values) = DictRef::from_value(value) {
+        let result = values
+            .iter()
+            .map(|(key, value)| {
+                let key = if let Some(key) = key.unpack_str() {
+                    OverrideAttributeKey::String(key.into())
+                } else {
+                    anyhow::bail!("repository override map keys must be strings or labels");
+                };
+                Ok((key, override_attribute_value(value, active)?))
+            })
+            .collect::<anyhow::Result<SmallMap<_, _>>>()
+            .map(|values| OverrideAttributeValue::Map(Arc::new(values)));
+        active.shift_remove(&identity);
+        return result;
+    }
+    active.shift_remove(&identity);
+    anyhow::bail!("unsupported repository override attribute value: {value}")
+}
+
 fn root_mapping(
     root: &ModuleFileEvaluation,
     includes: &[ModuleFileEvaluation],
@@ -674,7 +969,24 @@ struct RecordedModuleFile {
     non_module_called: bool,
     includes: Vec<CompactString>,
     dependencies: Vec<RootModuleDependency>,
-    overrides: Vec<RootModuleLocalPathOverride>,
+    overrides: SmallMap<CompactString, RecordedRootModuleOverride>,
+}
+
+fn record_override(
+    state: &mut RecordedModuleFile,
+    module_name: &str,
+    override_: RecordedRootModuleOverride,
+) -> anyhow::Result<()> {
+    validate_module_name(module_name)?;
+    if state
+        .overrides
+        .insert(module_name.into(), override_)
+        .is_some()
+    {
+        anyhow::bail!("multiple overrides for module {module_name}");
+    }
+    state.non_module_called = true;
+    Ok(())
 }
 
 fn recorder<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Recorder> {
@@ -758,13 +1070,123 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] path: &str,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        validate_module_name(module_name)?;
         let mut state = recorder(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        state.overrides.push(RootModuleLocalPathOverride {
-            module_name: module_name.into(),
-            path: path.into(),
-        });
+        record_override(
+            &mut state,
+            module_name,
+            RecordedRootModuleOverride::NonRegistry {
+                repo_spec: RepoSpec {
+                    rule_id: repo_rule_id(
+                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                        "local_repository",
+                    ),
+                    attributes: Arc::new(SmallMap::from_iter([(
+                        CompactString::new("path"),
+                        OverrideAttributeValue::String(path.into()),
+                    )])),
+                },
+                patches_to_validate: Arc::new([]),
+            },
+        )?;
+        Ok(NoneType)
+    }
+
+    fn single_version_override(
+        #[starlark(require = named)] module_name: &str,
+        #[starlark(require = named, default = "")] version: &str,
+        #[starlark(require = named, default = "")] registry: &str,
+        #[starlark(require = named, default = UnpackList::default())] patches: UnpackList<&str>,
+        #[starlark(require = named, default = UnpackList::default())] patch_cmds: UnpackList<&str>,
+        #[starlark(require = named, default = 0)] patch_strip: i32,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        validate_version(version, "single_version_override")?;
+        let mut state = recorder(eval)?.state.borrow_mut();
+        record_override(
+            &mut state,
+            module_name,
+            RecordedRootModuleOverride::RegistrySingle {
+                version: version.into(),
+                registry: registry.into(),
+                patches: patches.items.into_iter().map(Into::into).collect(),
+                patch_cmds: patch_cmds.items.into_iter().map(Into::into).collect(),
+                patch_strip,
+            },
+        )?;
+        Ok(NoneType)
+    }
+
+    fn multiple_version_override(
+        #[starlark(require = named)] module_name: &str,
+        #[starlark(require = named)] versions: UnpackList<&str>,
+        #[starlark(require = named, default = "")] registry: &str,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        if versions.items.len() < 2 {
+            anyhow::bail!("multiple_version_override() requires at least two versions");
+        }
+        for version in &versions.items {
+            validate_version(version, "multiple_version_override")?;
+        }
+        let mut state = recorder(eval)?.state.borrow_mut();
+        record_override(
+            &mut state,
+            module_name,
+            RecordedRootModuleOverride::RegistryMultiple(RegistryMultipleOverride {
+                versions: versions.items.into_iter().map(Into::into).collect(),
+                registry: registry.into(),
+            }),
+        )?;
+        Ok(NoneType)
+    }
+
+    fn archive_override<'v>(
+        #[starlark(require = named)] module_name: &str,
+        #[starlark(kwargs)] attrs: DictRef<'v>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let patches_to_validate = patch_strings(&attrs)?;
+        let attributes = override_attributes(attrs)?;
+        let mut state = recorder(eval)?.state.borrow_mut();
+        record_override(
+            &mut state,
+            module_name,
+            RecordedRootModuleOverride::NonRegistry {
+                repo_spec: RepoSpec {
+                    rule_id: repo_rule_id(
+                        "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                        "http_archive",
+                    ),
+                    attributes: Arc::new(attributes),
+                },
+                patches_to_validate,
+            },
+        )?;
+        Ok(NoneType)
+    }
+
+    fn git_override<'v>(
+        #[starlark(require = named)] module_name: &str,
+        #[starlark(kwargs)] attrs: DictRef<'v>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let patches_to_validate = patch_strings(&attrs)?;
+        let attributes = override_attributes(attrs)?;
+        let mut state = recorder(eval)?.state.borrow_mut();
+        record_override(
+            &mut state,
+            module_name,
+            RecordedRootModuleOverride::NonRegistry {
+                repo_spec: RepoSpec {
+                    rule_id: repo_rule_id(
+                        "@@bazel_tools//tools/build_defs/repo:git.bzl",
+                        "git_repository",
+                    ),
+                    attributes: Arc::new(attributes),
+                },
+                patches_to_validate,
+            },
+        )?;
         Ok(NoneType)
     }
 }
@@ -792,6 +1214,6 @@ fn evaluate_module_file(path: &Path, source: &str) -> Result<ModuleFileEvaluatio
         header: recorder.header,
         includes: recorder.includes.into(),
         dependencies: recorder.dependencies.into(),
-        local_path_overrides: recorder.overrides.into(),
+        override_contributions: Arc::new(recorder.overrides),
     })
 }

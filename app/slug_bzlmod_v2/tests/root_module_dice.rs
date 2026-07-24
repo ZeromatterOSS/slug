@@ -404,7 +404,21 @@ async fn root_graph_preserves_bazel_global_shapes_and_repository_mapping() {
 
     let default = graph(&dice, files.clone()).await.unwrap();
     assert_eq!(default.root.header.as_ref().unwrap().name, "root");
-    assert_eq!(default.root.local_path_overrides[0].path, "../root_dep");
+    let Some(slug_bzlmod_v2::RootModuleOverride::NonRegistry(local)) =
+        default.overrides.get("root_dep")
+    else {
+        panic!("root_dep local_path_override was not captured");
+    };
+    assert_eq!(
+        local.rule_id.bzl_file.to_string(),
+        "@@bazel_tools//tools/build_defs/repo:local.bzl"
+    );
+    assert_eq!(local.rule_id.rule_name, "local_repository");
+    assert!(matches!(
+        local.attributes.get("path"),
+        Some(slug_bzlmod_v2::OverrideAttributeValue::String(path))
+            if path == "../root_dep"
+    ));
     assert!(default.root.dependencies[2].nodep);
     for (apparent, canonical) in [
         ("root_dep", "root_dep+"),
@@ -442,6 +456,190 @@ async fn root_graph_preserves_bazel_global_shapes_and_repository_mapping() {
             .as_str(),
         "dev_dep"
     );
+}
+
+#[tokio::test]
+async fn root_override_owner_captures_all_forms_and_defaults() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let graph = graph(
+        &dice,
+        snapshot([(
+            "MODULE.bazel",
+            WorkspaceFileValue::Present(Arc::new(
+                "module(name = 'root')\n\
+                 local_path_override(module_name = 'local', path = 'third_party/local')\n\
+                 single_version_override(module_name = 'single', patches = ['//:one.patch', ':short.patch', 'bare.patch', '@root//:own.patch', '@@visible//:two.patch'], patch_cmds = ['first', 'second'], patch_strip = -1)\n\
+                 multiple_version_override(module_name = 'multiple', versions = ['1.0.0', '2.0.0'])\n\
+                 archive_override(module_name = 'archive', urls = ['file:///archive'], patches = [':archive.patch'], nested = {'flag': True, 'number': -2147483648, 'items': ('value', None)})\n\
+                 git_override(module_name = 'git', remote = 'file:///repo', commit = 'abc', patches = ('git.patch',), options = {'enabled': False})\n"
+                    .to_owned(),
+            )),
+        )]),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(graph.overrides.iter().count(), 5);
+    let Some(slug_bzlmod_v2::RootModuleOverride::RegistrySingle(single)) =
+        graph.overrides.get("single")
+    else {
+        panic!("single override was not captured");
+    };
+    assert_eq!(single.version, "");
+    assert_eq!(single.registry, "");
+    assert_eq!(single.patch_strip, -1);
+    assert_eq!(single.patch_cmds.as_ref(), ["first", "second"]);
+    assert_eq!(single.patches[0].to_string(), "@@//:one.patch");
+    assert_eq!(single.patches[1].to_string(), "@@//:short.patch");
+    assert_eq!(single.patches[2].to_string(), "@@//:bare.patch");
+    assert_eq!(single.patches[3].to_string(), "@@//:own.patch");
+    assert_eq!(single.patches[4].to_string(), "@@visible//:two.patch");
+
+    let Some(slug_bzlmod_v2::RootModuleOverride::RegistryMultiple(multiple)) =
+        graph.overrides.get("multiple")
+    else {
+        panic!("multiple override was not captured");
+    };
+    assert_eq!(multiple.versions.as_ref(), ["1.0.0", "2.0.0"]);
+    assert_eq!(multiple.registry, "");
+
+    let Some(slug_bzlmod_v2::RootModuleOverride::NonRegistry(archive)) =
+        graph.overrides.get("archive")
+    else {
+        panic!("archive override was not captured");
+    };
+    assert_eq!(
+        archive.rule_id.bzl_file.to_string(),
+        "@@bazel_tools//tools/build_defs/repo:http.bzl"
+    );
+    assert_eq!(archive.rule_id.rule_name, "http_archive");
+    assert!(matches!(
+        archive.attributes.get("nested"),
+        Some(slug_bzlmod_v2::OverrideAttributeValue::Map(_))
+    ));
+    assert!(matches!(
+        archive.attributes.get("patches"),
+        Some(slug_bzlmod_v2::OverrideAttributeValue::Iterable(patches))
+            if matches!(
+                patches.as_ref(),
+                [slug_bzlmod_v2::OverrideAttributeValue::String(patch)]
+                    if patch == ":archive.patch"
+            )
+    ));
+    let Some(slug_bzlmod_v2::RootModuleOverride::NonRegistry(git)) = graph.overrides.get("git")
+    else {
+        panic!("git override was not captured");
+    };
+    assert_eq!(
+        git.rule_id.bzl_file.to_string(),
+        "@@bazel_tools//tools/build_defs/repo:git.bzl"
+    );
+    assert_eq!(git.rule_id.rule_name, "git_repository");
+}
+
+#[tokio::test]
+async fn root_override_owner_rejects_duplicates_and_invalid_boundaries() {
+    let cases = [
+        (
+            "single_version_override(module_name = 'dup')\nsingle_version_override(module_name = 'dup')",
+            "multiple overrides for module dup",
+        ),
+        (
+            "multiple_version_override(module_name = 'versions', versions = ['1.0.0'])",
+            "at least two versions",
+        ),
+        (
+            "bazel_dep(name = 'visible', version = '1.0.0')\nsingle_version_override(module_name = 'label', patches = ['@visible//:patch'])",
+            "not visible",
+        ),
+        (
+            "archive_override(module_name = 'label', patches = ['@invisible//:patch'])",
+            "not visible",
+        ),
+        (
+            "single_version_override(module_name = 'version', version = 'not valid')",
+            "Invalid version",
+        ),
+        (
+            "archive_override(module_name = 'integer', value = 2147483648)",
+            "unsupported repository override attribute value",
+        ),
+        (
+            "cycle = []\ncycle.append(cycle)\narchive_override(module_name = 'cycle', value = cycle)",
+            "must not contain cyclic values",
+        ),
+    ];
+    for (directives, expected) in cases {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let error = graph(
+            &dice,
+            snapshot([(
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(format!(
+                    "module(name = 'root')\n{directives}\n"
+                ))),
+            )]),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.contains(expected), "{error}");
+    }
+}
+
+#[tokio::test]
+async fn root_override_owner_merges_includes_and_replays_a_b_a() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let files = |root: &str| {
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(root.to_owned())),
+            ),
+            (
+                "included.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "single_version_override(module_name = 'included', patches = ['@root//:included.patch'])\n"
+                        .to_owned(),
+                )),
+            ),
+        ])
+    };
+    let a_source = "module(name = 'root')\ninclude('//:included.MODULE.bazel')\nsingle_version_override(module_name = 'route', registry = 'file:///a')\n";
+    let b_source = "module(name = 'root')\ninclude('//:included.MODULE.bazel')\nsingle_version_override(module_name = 'route', version = '2.0.0', registry = 'file:///b')\n";
+    let a = graph(&dice, files(a_source)).await.unwrap();
+    let b = graph(&dice, files(b_source)).await.unwrap();
+    let a_again = graph(&dice, files(a_source)).await.unwrap();
+    assert_eq!(a.overrides.iter().count(), 2);
+    let Some(slug_bzlmod_v2::RootModuleOverride::RegistrySingle(included)) =
+        a.overrides.get("included")
+    else {
+        panic!("included override was not captured");
+    };
+    assert_eq!(included.patches[0].to_string(), "@@//:included.patch");
+    assert_ne!(a.overrides, b.overrides);
+    assert_eq!(a.overrides, a_again.overrides);
+
+    let ordered = graph(
+        &dice,
+        files("module(name = 'root')\ninclude('//:included.MODULE.bazel')\nsingle_version_override(module_name = 'alpha')\nsingle_version_override(module_name = 'omega')\n"),
+    )
+    .await
+    .unwrap();
+    let reordered = graph(
+        &dice,
+        files("module(name = 'root')\ninclude('//:included.MODULE.bazel')\nsingle_version_override(module_name = 'omega')\nsingle_version_override(module_name = 'alpha')\n"),
+    )
+    .await
+    .unwrap();
+    assert_eq!(ordered.overrides, reordered.overrides);
+
+    let duplicate = graph(
+        &dice,
+        files("module(name = 'root')\ninclude('//:included.MODULE.bazel')\nsingle_version_override(module_name = 'included')\n"),
+    )
+    .await
+    .unwrap_err();
+    assert!(duplicate.contains("multiple overrides for module included"));
 }
 
 #[tokio::test]
