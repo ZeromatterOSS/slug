@@ -1,6 +1,9 @@
 use std::fs;
 use std::sync::Arc;
 
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
 use slug_core_v2::runtime::WorkspaceDirectoryObservation;
 use slug_core_v2::runtime::WorkspaceFileObservation;
 use slug_core_v2::runtime::WorkspaceObservation;
@@ -10,6 +13,7 @@ use slug_core_v2::runtime::evaluate_workspace_query;
 use slug_core_v2::runtime::evaluate_workspace_query_with_policy;
 use slug_core_v2::runtime::evaluate_workspace_targets;
 use slug_core_v2::runtime::observe_workspace;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
@@ -88,6 +92,119 @@ fn root_module_and_build_are_evaluated_through_dice_and_starlark() {
 
     assert!(result.module.error.is_none(), "{result:?}");
     assert!(result.build.error.is_none(), "{result:?}");
+}
+
+#[test]
+fn retained_runtime_exposes_typed_root_graph_for_a_b_a_request_inputs() {
+    let workspace = tempfile::tempdir().unwrap();
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"runtime_test\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let observe = || observe_workspace(workspace.path()).unwrap();
+    let command_a = BzlmodCommandPolicyKey::from_flags(None, false).unwrap();
+    let environment_a =
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap();
+    let command_b = BzlmodCommandPolicyKey::from_flags(None, true).unwrap();
+    let environment_b =
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap();
+
+    let first = runtime
+        .evaluate_observations_with_bzlmod_inputs(
+            observe(),
+            &[],
+            command_a.clone(),
+            environment_a.clone(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+    let middle = runtime
+        .evaluate_observations_with_bzlmod_inputs(
+            observe(),
+            &[],
+            command_b,
+            environment_b,
+            LockfileMode::Off,
+        )
+        .unwrap();
+    let last = runtime
+        .evaluate_observations_with_bzlmod_inputs(
+            observe(),
+            &[],
+            command_a,
+            environment_a,
+            LockfileMode::Update,
+        )
+        .unwrap();
+
+    assert_eq!(
+        first.root_module_graph.root.header.as_ref().unwrap().name,
+        "runtime_test"
+    );
+    assert_ne!(
+        first.root_module_graph.command_policy,
+        middle.root_module_graph.command_policy
+    );
+    assert_eq!(
+        first.root_module_graph.command_policy,
+        last.root_module_graph.command_policy
+    );
+    assert_eq!(
+        first.root_module_graph.environment_policy,
+        last.root_module_graph.environment_policy
+    );
+}
+
+#[test]
+fn retained_runtime_uses_root_graph_for_supported_module_directives() {
+    let workspace = tempfile::tempdir().unwrap();
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"runtime_test\")\ninclude(\"//deps:deps.MODULE.bazel\")\nbazel_dep(name = \"root_dep\", version = \"1.0\")\nlocal_path_override(module_name = \"root_dep\", path = \"../root_dep\")\n",
+    )
+    .unwrap();
+    fs::create_dir_all(workspace.path().join("deps")).unwrap();
+    fs::write(
+        workspace.path().join("deps/deps.MODULE.bazel"),
+        "bazel_dep(name = \"included_dep\", version = \"2.0\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
+
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let result = runtime
+        .evaluate_observations(observe_workspace(workspace.path()).unwrap(), &[])
+        .unwrap();
+
+    assert!(result.workspace.module.error.is_none(), "{result:?}");
+    assert_eq!(
+        result.root_module_graph.root.header.as_ref().unwrap().name,
+        "runtime_test"
+    );
+    assert_eq!(
+        result.root_module_graph.root.dependencies[0].name,
+        "root_dep"
+    );
+    assert_eq!(
+        result.root_module_graph.root.local_path_overrides[0].path,
+        "../root_dep"
+    );
+    assert_eq!(result.root_module_graph.includes.len(), 1);
+    assert_eq!(
+        result.root_module_graph.includes[0].dependencies[0].name,
+        "included_dep"
+    );
+    assert_eq!(
+        result
+            .root_module_graph
+            .repository_mapping
+            .resolve(&ApparentRepoName::new("included_dep").unwrap())
+            .as_str(),
+        "included_dep+"
+    );
 }
 
 #[test]

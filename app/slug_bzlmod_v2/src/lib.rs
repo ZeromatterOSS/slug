@@ -10,6 +10,7 @@
 
 pub mod dice;
 pub mod lockfile;
+pub mod module_eval;
 pub mod parser;
 pub mod registry;
 pub mod resolution;
@@ -69,6 +70,16 @@ pub use lockfile::validate_module_extension_replay_inputs;
 pub use lockfile::validate_module_extension_usage_digests;
 pub use lockfile::validate_registry_file_hashes;
 pub use lockfile::validate_required_registry_file_hashes;
+pub use module_eval::ModuleFileEvaluation;
+pub use module_eval::ModuleFileEvaluationKey;
+pub use module_eval::RootModuleCommandPolicy;
+pub use module_eval::RootModuleCommandPolicyKey;
+pub use module_eval::RootModuleEnvironmentPolicy;
+pub use module_eval::RootModuleEnvironmentPolicyKey;
+pub use module_eval::RootModuleGraph;
+pub use module_eval::RootModuleGraphKey;
+pub use module_eval::RootModuleLockfileMode;
+pub use module_eval::RootModuleLockfileModeKey;
 pub use parser::ArchiveOverride;
 pub use parser::BazelDep;
 pub use parser::Directive;

@@ -29,6 +29,17 @@ use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredTargetAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::RootModuleCommandPolicy;
+use slug_bzlmod_v2::RootModuleCommandPolicyKey;
+use slug_bzlmod_v2::RootModuleEnvironmentPolicy;
+use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
+use slug_bzlmod_v2::RootModuleGraph;
+use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_bzlmod_v2::RootModuleLockfileMode;
+use slug_bzlmod_v2::RootModuleLockfileModeKey;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
@@ -256,6 +267,7 @@ pub struct RequestedPackageEvaluation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceBuildEvaluation {
     pub workspace: WorkspaceEvaluation,
+    pub root_module_graph: Arc<RootModuleGraph>,
     pub packages: Vec<RequestedPackageEvaluation>,
     pub revision: WorkspaceRevision,
 }
@@ -325,11 +337,29 @@ async fn evaluate_workspace_files(
     ctx: &mut DiceComputations<'_>,
     workspace: &Path,
 ) -> WorkspaceEvaluation {
-    let module_path = workspace.join("MODULE.bazel");
     WorkspaceEvaluation {
-        module: evaluate_workspace_file(ctx, workspace, &module_path, true).await,
+        module: evaluate_root_module_graph(ctx, workspace).await,
         build: evaluate_workspace_build_file(ctx, workspace).await,
         revision: WorkspaceRevision(0),
+    }
+}
+
+async fn evaluate_root_module_graph(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+) -> EvaluatedFile {
+    let module_path = workspace.join("MODULE.bazel");
+    match ctx
+        .compute(&RootModuleGraphKey {
+            workspace: workspace.to_path_buf(),
+        })
+        .await
+    {
+        Ok(graph) => match graph.as_ref() {
+            Ok(_) => EvaluatedFile::success(&module_path),
+            Err(error) => EvaluatedFile::failure(&module_path, error),
+        },
+        Err(error) => EvaluatedFile::failure(&module_path, error),
     }
 }
 
@@ -510,8 +540,34 @@ impl WorkspaceRuntime {
         observations: WorkspaceObservation,
         targets: &[TargetPattern],
     ) -> anyhow::Result<WorkspaceBuildEvaluation> {
-        self.evaluate_observations_with_directory_probes(observations, targets, &[])
-            .map(|(evaluation, _)| evaluation)
+        self.evaluate_observations_with_bzlmod_inputs(
+            observations,
+            targets,
+            BzlmodCommandPolicyKey::from_flags(None, false).expect("default bzlmod policy"),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+                .expect("default bzlmod environment policy"),
+            LockfileMode::Update,
+        )
+    }
+
+    /// Evaluate with explicit normalized bzlmod request inputs on this retained graph.
+    pub fn evaluate_observations_with_bzlmod_inputs(
+        &self,
+        observations: WorkspaceObservation,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+    ) -> anyhow::Result<WorkspaceBuildEvaluation> {
+        self.evaluate_observations_with_directory_probes_and_bzlmod_inputs(
+            observations,
+            targets,
+            &[],
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+        )
+        .map(|(evaluation, _)| evaluation)
     }
 
     /// Internal evidence hook for selected directory keys.
@@ -524,6 +580,29 @@ impl WorkspaceRuntime {
         observations: WorkspaceObservation,
         targets: &[TargetPattern],
         directory_probes: &[PathBuf],
+    ) -> anyhow::Result<(
+        WorkspaceBuildEvaluation,
+        Vec<(PathBuf, WorkspaceDirectoryValue, WorkspaceRevision)>,
+    )> {
+        self.evaluate_observations_with_directory_probes_and_bzlmod_inputs(
+            observations,
+            targets,
+            directory_probes,
+            BzlmodCommandPolicyKey::from_flags(None, false).expect("default bzlmod policy"),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+                .expect("default bzlmod environment policy"),
+            LockfileMode::Update,
+        )
+    }
+
+    fn evaluate_observations_with_directory_probes_and_bzlmod_inputs(
+        &self,
+        observations: WorkspaceObservation,
+        targets: &[TargetPattern],
+        directory_probes: &[PathBuf],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
     ) -> anyhow::Result<(
         WorkspaceBuildEvaluation,
         Vec<(PathBuf, WorkspaceDirectoryValue, WorkspaceRevision)>,
@@ -579,7 +658,41 @@ impl WorkspaceRuntime {
                     directory_snapshot,
                 )])
                 .context("injecting workspace-directory observations")?;
+            updater
+                .changed_to(vec![(
+                    RootModuleCommandPolicyKey {
+                        workspace: self.workspace.clone(),
+                    },
+                    RootModuleCommandPolicy::from(command_policy),
+                )])
+                .context("injecting root module command policy")?;
+            updater
+                .changed_to(vec![(
+                    RootModuleEnvironmentPolicyKey {
+                        workspace: self.workspace.clone(),
+                    },
+                    RootModuleEnvironmentPolicy::from(environment_policy),
+                )])
+                .context("injecting root module environment policy")?;
+            updater
+                .changed_to(vec![(
+                    RootModuleLockfileModeKey {
+                        workspace: self.workspace.clone(),
+                    },
+                    RootModuleLockfileMode::from(lockfile_mode),
+                )])
+                .context("injecting root module lockfile mode")?;
             let mut transaction = updater.commit().await;
+            let root_module_graph = transaction
+                .compute(&RootModuleGraphKey {
+                    workspace: self.workspace.clone(),
+                })
+                .await
+                .context("computing root module graph through DICE")?
+                .as_ref()
+                .as_ref()
+                .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                .clone();
             let mut workspace = transaction
                 .compute(&WorkspaceEvaluationKey {
                     workspace: self.workspace.clone(),
@@ -665,6 +778,7 @@ impl WorkspaceRuntime {
             Ok((
                 WorkspaceBuildEvaluation {
                     workspace,
+                    root_module_graph: Arc::new(root_module_graph),
                     packages,
                     revision,
                 },
