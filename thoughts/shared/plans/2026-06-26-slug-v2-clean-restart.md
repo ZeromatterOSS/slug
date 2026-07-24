@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10` | registry/yanked resolution, exact lockfile writing, MVS/extensions, materialization, cquery, and aquery remain unwired; the recursive observer remains migration scaffolding | design only the registry/yanked resolution owner |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry/yanked design is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry/yanked design is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan | deterministic remote update/refresh/error evidence, registry policy/IO, discovery, MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired; the recursive observer remains migration scaffolding | add only the controlled HTTP registry/yanked lockfile-mode oracle |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry/yanked oracle is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry/yanked oracle is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,48 +33,41 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-registry-yanked-resolution-design`.
+Run only `WP-5-m1-registry-yanked-lockfile-mode-oracle`.
 
-Perform a read-only design audit before any registry, fetch, or resolution
-implementation. Bind Bazel 9.2 source at
-`8220c6198837d5c13d53fea211cf3282aa12408a`—especially
-`RegistryFunction`, `RegistryFactoryImpl`, `IndexRegistry`,
-`ModuleFileFunction`, `YankedVersionsFunction`, `YankedVersionsUtil`,
-`RepoSpecFunction`, `BazelDepGraphFunction`, and `BazelLockFileModule`—to the
-live V2 registry/digest/policy substrate and the parsed
-`RootModuleGraph.visible_lockfile`.
+Add one deterministic Bazel 9.2 oracle fixture backed by a fixture-local
+loopback HTTP registry. The service and fixture must remain source-controlled
+and offline after checkout; do not depend on mutable live BCR metadata.
 
-The design must establish:
+In one retained workspace and Bazel output base, prove:
 
-- the exact DICE key/value and dependency graph for ordered registry policy,
-  registry metadata/module/source observations, selected yanked versions, and
-  produced visible-lockfile hashes, including which owner performs remote or
-  local-registry IO and how every observation invalidates in one retained
-  runtime;
-- how update, refresh, and error consume parsed lockfile hashes and selected
-  yanked versions, including the real registry cache/refetch distinction and
-  error precedence, without writing the visible lockfile in this packet;
-- the smallest resolved-registry value needed before the later MVS/extensions
-  packet, with semantic equality, compact immutable representation, request
-  command/environment policy, and root mapping/loading consequences stated
-  explicitly;
-- whether the accepted `lockfile-mode-update-refresh` and
-  `yanked-version-command-env-union` fixtures discriminate every claimed
-  behavior; if not, select exactly one bounded Bazel 9.2 oracle correction
-  before implementation; and
-- one implementation allowlist, focused retained-DICE transition matrix,
-  downstream validation set, source citations, and stop conditions.
+1. `update` with an allowed yanked module records lockfile version 28, remote
+   registry hashes, and selected-yanked reason A.
+2. After only the served metadata changes A→B, `update` replays A without a
+   metadata request, while `refresh` requests mutable metadata and records B.
+3. A lockfile-recorded JSON-null absence remains authoritative in `update`
+   but `refresh` retries it and observes a fixture mutation from 404 to
+   present.
+4. With a corrupt selected-module `MODULE.bazel` checksum and the same module
+   disallowed as yanked, `error` reports the checksum/discovery failure before
+   yanked rejection.
+5. Every failing command leaves the visible lockfile manifest unchanged, and
+   the request log plus final manifest discriminate cache reuse from refetch.
 
-Do not edit Rust, Cargo manifests, fixtures, expected outputs, or lockfiles
-during this design packet. Do not import V1 registry clients or restore a
-fresh graph, process-global cache, direct filesystem scan, untracked network
-read, or lock-held DICE compute. The exact command-owned semantic plan/write
-packet remains after registry/yanked acceptance; hidden/output-base lockfiles,
-full MVS/extensions, materialization, external loading, cquery/aquery, and
-run/test remain deferred. Stop and schedule an oracle packet if executable
-evidence cannot distinguish update from refresh or pin registry/yanked error
-ordering; never synthesize the accepted 25,647-byte BCR-backed lockfile from
-fixture constants.
+The allowlist is `tools/v2_oracle_lib/fixture.py`,
+`tools/v2_oracle_lib/runner.py`, one new fixture-local HTTP service module,
+the focused oracle-harness test, and one new fixture directory under
+`tests/v2_oracle/fixtures/`. Any endpoint token expansion must be fixture
+scoped and normalized out of expected output. Do not edit Rust, Cargo
+manifests, existing fixtures, unrelated expected output, or implementation
+plans beyond compact acceptance evidence.
+
+After independent oracle acceptance, proceed serially with registry
+policy/IO substrate, command/daemon registry transport, registry discovery,
+MVS, selected-yanked plus RepoSpec/final hash aggregation, and only then the
+command-owned semantic lockfile write. Do not restore the superseded unified
+registry/yanked-before-MVS packet: pinned Bazel produces selected-yanked state
+and final registry hashes only after selection.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine

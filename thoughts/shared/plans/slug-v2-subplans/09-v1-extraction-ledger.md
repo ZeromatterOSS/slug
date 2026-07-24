@@ -409,6 +409,18 @@ Implementation summary: The earlier V2 validator is now corrected to visible loc
 Validation: full `slug_bzlmod_v2`, `slug_loading_v2`, and `slug_core_v2` suites; focused scan/equality/lifecycle activation tests; formatting, diff, archive checks; independent final review `ACCEPT`
 Residual risk: Registry/yanked hash enforcement and production, command-owned writes, exact external exit 48, hidden lockfiles, and later replay/materialization remain serial Stage 5 work.
 
+### Stage 5 registry/yanked owner design
+
+Status: Accepted as an oracle-first replan
+V2 commit(s): N/A (documentation-only design checkpoint)
+Companion evidence: [Stage 5 evidence shard 2](./05-bzlmod-checkpoint-evidence-2.md), entry "Stage 5 registry/yanked resolution owner design"
+Source inspected: no V1 registry client was selected; ownership is grounded directly in pinned Bazel 9.2 registry, module-discovery, resolution, yanked, RepoSpec, and lockfile-update source
+Bazel oracle: accepted pinned update/refresh and command/environment-union fixtures are insufficient; older version-26/local-registry fixtures remain non-acceptance corroboration
+Expected evidence artifact: one controlled loopback HTTP registry fixture pinning version-28 update replay, refresh refetch, recorded absence, checksum enforcement, error precedence, and no write after failure
+Design summary: Final selected-yanked and registry-hash products are post-MVS in Bazel, so the superseded pre-MVS unified packet is rejected. The serial replacement is controlled oracle, DICE-owned policy/IO, request transport, per-module discovery, MVS, selected-yanked/RepoSpec aggregation, then command-owned writing.
+Validation: pinned-source/live-substrate/fixture audits and independent corrected-design review `ACCEPT`
+Residual risk: All implementation remains pending; no V1 cache, HTTP client, pure MVS helper, raw writer, or process-global state is authorized.
+
 ### Stage 5 registry checksum lockfile error substrate
 
 Status: Partially landed

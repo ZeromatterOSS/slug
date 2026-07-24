@@ -320,6 +320,123 @@ filesystem/network read, process-global registry cache, fresh graph, lock-held
 DICE compute, pre-registry byte synthesis, or a claim that the existing
 raw-text planner is live.
 
+The design returned `REPLAN`, and the corrected independent rereview returned
+`ACCEPT`. Pinned Bazel does not have the serial boundary previously implied by
+“registry/yanked, then MVS”: ordered registry module discovery produces
+`MODULE.bazel` observations first, MVS selects the graph, selected-yanked
+evidence and selected RepoSpecs then produce the final selected-yanked and
+registry-hash maps, and only a successful resolution can reach lockfile
+writing. A pre-MVS packet may therefore return only per-module registry
+observations; it must not claim a resolved graph or final lockfile products.
+
+The accepted pair is insufficient. `lockfile-mode-update-refresh` performs no
+registry mutation, and `yanked-version-command-env-union` proves only positive
+flag/environment union through a local `file:` registry. Older checksum,
+selected-yanked, and registry-mutation fixtures remain useful conceptual
+evidence, but their Bazel 9.1.1/version-26 or local-registry boundaries cannot
+pin remote Bazel 9.2 behavior. File registries use `IGNORE` in every mode and
+cannot distinguish remote `USE_AND_UPDATE`, `USE_IMMUTABLE_AND_UPDATE`, and
+`ENFORCE`.
+
+Proceed first with exactly one
+`WP-5-m1-registry-yanked-lockfile-mode-oracle`. Add a source-controlled
+fixture-local loopback HTTP registry and one fixture that, in one workspace
+and output base:
+
+- records version-28 hashes and allowed selected-yanked reason A in update;
+- changes served metadata A→B, proves update replays A without a metadata
+  request, and proves refresh requests and records B;
+- records a remote JSON-null absence, proves update preserves the negative
+  observation, then changes 404→present and proves refresh retries it;
+- corrupts the selected `MODULE.bazel` checksum under error mode while the
+  module is disallowed as yanked, proving checksum/discovery failure precedes
+  yanked rejection; and
+- manifests the unchanged visible lockfile after every failed command plus a
+  normalized request log that discriminates reuse from refetch.
+
+The oracle allowlist is `tools/v2_oracle_lib/fixture.py`,
+`tools/v2_oracle_lib/runner.py`, one new fixture-local HTTP-service module,
+the focused harness test, and one new fixture directory. It may mutate
+Bazel-generated lockfile bytes; it must not synthesize the accepted
+25,647-byte BCR lockfile or depend on live BCR state.
+
+After oracle acceptance, the cycle-free design is:
+
+1. `RootModuleFilesKey` owns only evaluated root/includes and semantic
+   `VisibleLockfileRead`. It does not depend on command, environment,
+   registry policy, or observation epochs.
+2. A downstream discovery key separately consumes root files, normalized
+   ordered-unique registry policy, lockfile mode, command/environment policy,
+   and demand-driven registry keys. It never depends on `RootModuleGraphKey`
+   or `PackageLoadKey`.
+3. `RegistryFileKey` owns one exact registry URL observation through a
+   non-semantic `RegistryIo` capability installed in DICE computation data.
+   The capability may retain only stateless HTTP/file plumbing and a
+   content-addressed byte cache; it retains no mode, policy, absence, yanked,
+   or selection result. No lock is held across `ctx.compute`, file IO, or a
+   network await.
+4. Lockfile expectation is typed as `Unrecorded`, `RecordedAbsent`, or
+   `RecordedSha256([u8; 32])`. Known hashes are checksum-verified and stable
+   across refresh; recorded absence is authoritative in update/error and
+   retried in refresh; error rejects an unrecorded required remote file before
+   IO.
+5. Workspace-local file registries depend on exact neutral file observations.
+   External file paths use demanded exact-path observations injected before
+   the next request's sole commit. A newly demanded path is read under the
+   current request generation, published after compute, and forced to
+   recompute before it can persist unobserved. No recursive registry scan is
+   authorized.
+6. Ordinary remote discovery 404 and transport failure are distinct from
+   lockfile-recorded absence and remain retryable request facts. Mutable
+   refresh/metadata observations depend on refresh generation; immutable
+   known-hash content does not. Yanked metadata failure is typed unavailable
+   and fails open. Metadata produces no lockfile hash.
+7. `RegistryModuleFileKey(ModuleKey)` tries registries in order, falls through
+   only on not-found, evaluates the selected module file, and returns compact
+   semantic content, registry identity, and optional observed hash.
+   `YankedEvidenceKey` later distinguishes replay, known-source-not-yanked,
+   fetched, and unavailable.
+8. MVS consumes discovery; selected-yanked and selected RepoSpec keys consume
+   the selected graph; final resolution aggregates hashes and mapping; only
+   then may `RootModuleGraphKey` expose selected mapping to loading and a
+   command-owned writer compare semantic old/new lockfile values.
+
+Values use `Arc`, `CompactString`, compact immutable slices/maps,
+`Allocative`, and `Dupe`; SHA-256 is stored as `[u8; 32]`, absence is explicit,
+and sorted maps are reserved for canonical digest/JSON boundaries. Equality
+compares semantic values, not provenance digests or request generations.
+
+The first post-oracle substrate allowlist is exactly:
+
+- `app/slug_bzlmod_v2/src/registry.rs`;
+- new `app/slug_bzlmod_v2/src/registry_dice.rs`;
+- `app/slug_bzlmod_v2/src/module_eval.rs`;
+- `app/slug_bzlmod_v2/src/lockfile.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`;
+- new `app/slug_bzlmod_v2/tests/registry_dice.rs`;
+- `app/slug_core_v2/src/runtime/dice.rs`;
+- new `app/slug_core_v2/src/runtime/registry_io.rs`;
+- `app/slug_core_v2/src/runtime/mod.rs`;
+- `app/slug_core_v2/tests/runtime.rs`; and
+- `app/slug_core_v2/Cargo.toml`, only for already-workspace HTTP/TLS
+  dependencies authorized by the accepted oracle.
+
+CLI/server/`.bazelrc`/`mod` activation requires the separately named transport
+packet.
+
+Focused retained evidence must distinguish registry order A→B→A; exact local
+create/edit/delete; ordinary 404 from recorded-null absence; remote
+404→present only after refresh; known/missing/wrong hashes;
+update→refresh→error; lockfile create/edit/delete; metadata A→B replay versus
+refetch; command/environment union; and semantic A→B→A reuse.
+
+Hard stops are the old pure MVS helper becoming production, final
+selected-yanked/hash aggregation before MVS, synthetic lockfile bytes,
+`RootModuleGraphKey`↔resolution cycles, digest-only owners, eager runtime graph
+discovery, untracked IO, a global semantic cache, a lock-held compute, old
+fixtures treated as pinned proof, or command-surface expansion outside its
+named packet.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
