@@ -220,6 +220,34 @@ retained daemon request policy, direct serde on semantic DICE types, required
 external mapping activation, or inability to observe transport without public
 output expansion.
 
+Commit `3f84e34d` accepts
+`WP-5-m1-root-module-command-daemon-handoff`. Build and query now normalize
+command/environment/mode values per request, capture the allowlisted
+environment once in the CLI, carry a backward-compatible primitive daemon DTO,
+and inject all three values on the retained runtime's existing updater before
+its sole commit. The daemon retains no semantic request policy.
+
+`PackageLoadKey` computes `RootModuleGraphKey` as its first dependency before
+listing or BUILD observation, including load-free BUILD files; standalone
+loading, analysis, and query transactions supply explicit inputs. Retained
+runtime, package-load, and same-daemon A→B→A regressions prove mapping and all
+three request values restore without leakage. Protocol defaults and malformed
+command/environment/lock-mode recovery are request-local. Focused bzlmod,
+loading, commands, core, server, analysis, query, and CLI validation passed,
+as did formatting, diff, daemon cleanup, and archive checks; independent final
+review returned `ACCEPT` after the one permitted evidence correction.
+
+The current packet is the read-only
+`WP-5-m1-visible-lockfile-v28-design`. It must bind the accepted Bazel 9.2
+visible-lockfile rows to the live parser/renderer/planner substrate, neutral
+workspace-file observation, root-graph dependency, request modes, and a
+command-owned atomic write plan. No Rust, fixture, Cargo, or lockfile edit is
+authorized until the design fixes exact ownership/equality, same-daemon
+transitions, an implementation allowlist, and stop conditions. Hidden
+output-base lockfiles, registry-produced hashes/fetching, yanked selection,
+MVS/extensions, materialization, external loading, cquery/aquery, and run/test
+remain deferred.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
