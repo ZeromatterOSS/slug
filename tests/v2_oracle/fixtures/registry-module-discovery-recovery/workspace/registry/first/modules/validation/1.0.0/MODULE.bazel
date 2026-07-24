@@ -1,0 +1,3 @@
+module(name = "wrong_validation", version = "2.0.0")
+include("//:validation.MODULE.bazel")
+fail("validation execution sentinel")
