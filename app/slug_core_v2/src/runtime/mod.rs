@@ -11,6 +11,7 @@
 pub mod dice;
 pub mod events;
 pub mod reapi;
+mod registry_io;
 pub mod starlark;
 
 pub use dice::WorkspaceBuildEvaluation;

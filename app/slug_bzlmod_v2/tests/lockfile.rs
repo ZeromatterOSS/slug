@@ -47,8 +47,8 @@ fn parses_visible_lockfile_registry_and_yanked_fields() {
         r#"{
   "lockFileVersion": 28,
   "registryFileHashes": {
-    "file:///workspace/registry/bazel_registry.json": "abc123",
-    "file:///workspace/registry/modules/yyy/1.0.0/MODULE.bazel": "def456"
+    "file:///workspace/registry/bazel_registry.json": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "file:///workspace/registry/modules/yyy/1.0.0/MODULE.bazel": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   },
   "selectedYankedVersions": {
     "yyy@1.0.0": "bad release"
@@ -64,7 +64,7 @@ fn parses_visible_lockfile_registry_and_yanked_fields() {
         lockfile
             .registry_file_hashes
             .get("file:///workspace/registry/bazel_registry.json"),
-        Some(&"abc123".to_owned())
+        Some(&"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned())
     );
     assert_eq!(
         lockfile
@@ -74,6 +74,21 @@ fn parses_visible_lockfile_registry_and_yanked_fields() {
     );
     assert!(lockfile.module_extensions.is_empty());
     assert!(lockfile.facts.is_empty());
+}
+
+#[test]
+fn rejects_malformed_registry_checksum_during_lockfile_parsing() {
+    let error = parse_bazel_lockfile(
+        r#"{
+  "lockFileVersion": 28,
+  "registryFileHashes": {
+    "https://example.test/unused": "not-a-sha256"
+  }
+}"#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("Invalid checksum for registry file https://example.test/unused"));
 }
 
 #[test]
@@ -517,7 +532,7 @@ fn validates_required_registry_file_hash_entries() {
         r#"{
   "lockFileVersion": 28,
   "registryFileHashes": {
-    "https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel": "wanted"
+    "https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   }
 }"#,
     )
@@ -550,14 +565,14 @@ fn validates_registry_hashes_against_observed_digest_map() {
         r#"{
   "lockFileVersion": 28,
   "registryFileHashes": {
-    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "wanted"
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
   }
 }"#,
     )
     .unwrap();
     let observed = std::collections::BTreeMap::from([(
         "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel".to_owned(),
-        "wanted".to_owned(),
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
     )]);
 
     validate_registry_file_hashes(&lockfile, &observed).unwrap();
@@ -569,7 +584,7 @@ fn rejects_mismatched_registry_hash_like_bazel() {
         r#"{
   "lockFileVersion": 28,
   "registryFileHashes": {
-    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "000000"
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "0000000000000000000000000000000000000000000000000000000000000000"
   }
 }"#,
     )
@@ -584,7 +599,7 @@ fn rejects_mismatched_registry_hash_like_bazel() {
     assert!(err.contains(
         "Failed to fetch registry file https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel"
     ));
-    assert!(err.contains("Checksum was 184960 but wanted 000000"));
+    assert!(err.contains("Checksum was 184960 but wanted 0000000000000000000000000000000000000000000000000000000000000000"));
 }
 
 #[test]
@@ -593,8 +608,8 @@ fn renders_visible_lockfile_with_bazel_top_level_shape() {
         r#"{
   "lockFileVersion": 28,
   "registryFileHashes": {
-    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "module-digest",
-    "https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json": "source-digest"
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
   },
   "selectedYankedVersions": {
     "rules_cc@0.2.17": "test yanked reason"
@@ -613,8 +628,8 @@ fn renders_visible_lockfile_with_bazel_top_level_shape() {
             "{\n",
             "  \"lockFileVersion\": 28,\n",
             "  \"registryFileHashes\": {\n",
-            "    \"https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel\": \"module-digest\",\n",
-            "    \"https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json\": \"source-digest\"\n",
+            "    \"https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel\": \"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\n",
+            "    \"https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json\": \"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"\n",
             "  },\n",
             "  \"selectedYankedVersions\": {\n",
             "    \"rules_cc@0.2.17\": \"test yanked reason\"\n",
@@ -707,8 +722,8 @@ fn render_bazel_lockfile_is_deterministic_across_input_order() {
         r#"{
   "lockFileVersion": 28,
   "registryFileHashes": {
-    "https://z.example.test/MODULE.bazel": "z-digest",
-    "https://a.example.test/MODULE.bazel": "a-digest"
+    "https://z.example.test/MODULE.bazel": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "https://a.example.test/MODULE.bazel": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   "selectedYankedVersions": {
     "zzz@1.0.0": "z reason",
@@ -744,8 +759,8 @@ fn render_bazel_lockfile_is_deterministic_across_input_order() {
         r#"{
   "lockFileVersion": 28,
   "registryFileHashes": {
-    "https://a.example.test/MODULE.bazel": "a-digest",
-    "https://z.example.test/MODULE.bazel": "z-digest"
+    "https://a.example.test/MODULE.bazel": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "https://z.example.test/MODULE.bazel": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
   },
   "selectedYankedVersions": {
     "aaa@1.0.0": "a reason",
@@ -841,7 +856,10 @@ fn visible_lockfile_error_mode_rejects_missing_stale_and_bad_versions() {
         assert!(message.contains("--lockfile_mode=update"));
     }
 
-    let stale = rendered.replace("module-digest", "old-digest");
+    let stale = rendered.replace(
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    );
     let stale_plan = plan_visible_lockfile(&LockfileMode::Error, Some(&stale), &desired).unwrap();
     assert!(matches!(stale_plan, VisibleLockfilePlan::Error { .. }));
     if let VisibleLockfilePlan::Error { message } = stale_plan {
@@ -894,7 +912,10 @@ fn applies_visible_lockfile_plan_with_atomic_write_boundary() {
     );
     assert_eq!(fs::read_to_string(&lockfile_path).unwrap(), rendered);
 
-    let updated = rendered.replace("module-digest", "updated-digest");
+    let updated = rendered.replace(
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    );
     apply_visible_lockfile_plan(
         &lockfile_path,
         &VisibleLockfilePlan::Write {
@@ -990,7 +1011,7 @@ fn hidden_lockfile_input_rejects_invalid_utf8() {
 #[test]
 fn hidden_lockfile_parse_fail_open_keeps_current_valid_content() {
     let input = HiddenLockfileInput::from_optional_bytes(Some(
-        br#"{"lockFileVersion":28,"registryFileHashes":{"https://example.test/MODULE.bazel":"abc"}}"#,
+        br#"{"lockFileVersion":28,"registryFileHashes":{"https://example.test/MODULE.bazel":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}"#,
     ))
     .unwrap();
 
@@ -1001,7 +1022,7 @@ fn hidden_lockfile_parse_fail_open_keeps_current_valid_content() {
         parsed
             .registry_file_hashes
             .get("https://example.test/MODULE.bazel"),
-        Some(&"abc".to_owned())
+        Some(&"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned())
     );
 }
 
@@ -1026,7 +1047,7 @@ fn hidden_lockfile_parse_fail_open_uses_empty_for_absent_malformed_or_old_versio
 #[test]
 fn visible_lockfile_read_honors_bazel_modes() {
     let current = VisibleLockfileInput::from_optional_bytes(Some(
-        br#"{"lockFileVersion":28,"registryFileHashes":{"https://example.test/MODULE.bazel":"abc"}}"#,
+        br#"{"lockFileVersion":28,"registryFileHashes":{"https://example.test/MODULE.bazel":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}"#,
     ))
     .unwrap();
     let visible = parse_visible_lockfile_for_mode(&LockfileMode::Update, &current).unwrap();
@@ -1035,7 +1056,7 @@ fn visible_lockfile_read_honors_bazel_modes() {
         lockfile
             .registry_file_hashes
             .get("https://example.test/MODULE.bazel"),
-        Some(&"abc".to_owned())
+        Some(&"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned())
     );
 
     let absent = VisibleLockfileInput::absent();
@@ -1239,7 +1260,7 @@ fn simple_visible_lockfile() -> slug_bzlmod_v2::BazelLockfile {
         r#"{
   "lockFileVersion": 28,
   "registryFileHashes": {
-    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "module-digest"
+    "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {},

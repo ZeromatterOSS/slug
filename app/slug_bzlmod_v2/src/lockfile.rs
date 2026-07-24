@@ -24,6 +24,7 @@ use crate::ModuleKey;
 use crate::dice::LockfileMode;
 
 pub const BAZEL_9_LOCK_FILE_VERSION: u64 = 28;
+pub const REGISTRY_FILE_NOT_FOUND_MARKER: &str = "not found";
 
 impl Allocative for ModuleKey {
     fn visit<'a, 'b: 'a>(&self, visitor: &'a mut Visitor<'b>) {
@@ -42,6 +43,22 @@ pub struct BazelLockfile {
     pub module_extensions: BTreeMap<String, BazelLockfileModuleExtension>,
     pub facts: BTreeMap<String, Value>,
     pub facts_versions: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
+pub enum RegistryFileExpectation {
+    Unrecorded,
+    RecordedAbsent,
+    RecordedSha256([u8; 32]),
+}
+
+impl BazelLockfile {
+    pub fn registry_file_expectation(&self, url: &str) -> Result<RegistryFileExpectation, String> {
+        let Some(value) = self.registry_file_hashes.get(url) else {
+            return Ok(RegistryFileExpectation::Unrecorded);
+        };
+        parse_registry_file_expectation(value)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -104,7 +121,7 @@ pub fn parse_bazel_lockfile(content: &str) -> Result<BazelLockfile, String> {
 
     Ok(BazelLockfile {
         lock_file_version,
-        registry_file_hashes: optional_string_map(object, "registryFileHashes")?,
+        registry_file_hashes: parse_registry_file_hashes(object)?,
         selected_yanked_versions: parse_selected_yanked_versions(object)?,
         module_extensions: parse_module_extensions(object)?,
         facts: optional_value_map(object, "facts")?,
@@ -913,6 +930,26 @@ fn optional_string_map(
         result.insert(key.clone(), text.clone());
     }
     Ok(result)
+}
+
+fn parse_registry_file_hashes(
+    object: &serde_json::Map<String, Value>,
+) -> Result<BTreeMap<String, String>, String> {
+    let hashes = optional_string_map(object, "registryFileHashes")?;
+    for (url, value) in &hashes {
+        parse_registry_file_expectation(value)
+            .map_err(|error| format!("Invalid checksum for registry file {url}: {error}"))?;
+    }
+    Ok(hashes)
+}
+
+fn parse_registry_file_expectation(value: &str) -> Result<RegistryFileExpectation, String> {
+    if value == REGISTRY_FILE_NOT_FOUND_MARKER {
+        return Ok(RegistryFileExpectation::RecordedAbsent);
+    }
+    let mut digest = [0; 32];
+    hex::decode_to_slice(value, &mut digest).map_err(|error| format!("{value}: {error}"))?;
+    Ok(RegistryFileExpectation::RecordedSha256(digest))
 }
 
 fn optional_value_map(

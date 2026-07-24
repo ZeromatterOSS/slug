@@ -22,6 +22,7 @@ use async_trait::async_trait;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceComputations;
+use dice::DiceTransactionUpdater;
 use dice::Key;
 use dice::UserComputationData;
 use dice_futures::cancellation::CancellationContext;
@@ -32,8 +33,11 @@ use slug_analysis_v2::ConfiguredTargetKey;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::RegistryRequestGeneration;
+use slug_bzlmod_v2::RegistryUrls;
 use slug_bzlmod_v2::RootModuleGraph;
 use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
@@ -247,6 +251,7 @@ pub struct WorkspaceRuntime {
     loader: BzlModuleEvaluator,
     runtime: tokio::runtime::Runtime,
     next_revision: AtomicU64,
+    next_registry_generation: AtomicU64,
 }
 
 /// Stage 4 package-loading evidence attached to a requested target pattern.
@@ -427,17 +432,47 @@ impl WorkspaceRuntime {
             .enable_all()
             .build()
             .context("creating workspace DICE runtime")?;
+        let mut dice_builder = Dice::builder();
+        super::registry_io::install(&mut dice_builder);
         Ok(Self {
             workspace,
-            dice: Dice::builder().build(DetectCycles::Enabled),
+            dice: dice_builder.build(DetectCycles::Enabled),
             loader,
             runtime,
             next_revision: AtomicU64::new(1),
+            next_registry_generation: AtomicU64::new(1),
         })
     }
 
     pub fn workspace(&self) -> &Path {
         &self.workspace
+    }
+
+    fn inject_bzlmod_request_inputs(
+        &self,
+        updater: &mut DiceTransactionUpdater,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+    ) -> anyhow::Result<()> {
+        inject_root_module_request_inputs(
+            updater,
+            &self.workspace,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+        )
+        .context("injecting normalized root module request inputs")?;
+        inject_registry_request_inputs(
+            updater,
+            &self.workspace,
+            RegistryUrls::default_bazel_registry(),
+            RegistryRequestGeneration(
+                self.next_registry_generation
+                    .fetch_add(1, Ordering::Relaxed),
+            ),
+        )
+        .context("injecting registry request inputs")
     }
 
     /// Evaluate one loading query in this runtime's retained DICE graph.
@@ -529,17 +564,14 @@ impl WorkspaceRuntime {
                     directory_snapshot,
                 )])
                 .map_err(|error| QueryError::evaluation(error.to_string()))?;
-            inject_root_module_request_inputs(
+            self.inject_bzlmod_request_inputs(
                 &mut updater,
-                &self.workspace,
                 command_policy,
                 environment_policy,
                 lockfile_mode,
             )
             .map_err(|error| {
-                QueryError::evaluation(format!(
-                    "injecting normalized root module request inputs: {error}"
-                ))
+                QueryError::evaluation(format!("injecting bzlmod request inputs: {error}"))
             })?;
             let mut transaction = updater.commit().await;
             evaluate_loading_query_with_policy(
@@ -688,14 +720,13 @@ impl WorkspaceRuntime {
                     directory_snapshot,
                 )])
                 .context("injecting workspace-directory observations")?;
-            inject_root_module_request_inputs(
+            self.inject_bzlmod_request_inputs(
                 &mut updater,
-                &self.workspace,
                 command_policy,
                 environment_policy,
                 lockfile_mode,
             )
-            .context("injecting normalized root module request inputs")?;
+            .context("injecting bzlmod request inputs")?;
             let mut transaction = updater.commit().await;
             let root_module_graph = transaction
                 .compute(&RootModuleGraphKey {
@@ -965,8 +996,121 @@ pub fn package_path_for_target(
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::io::Read;
+    use std::io::Write;
+    use std::net::TcpListener;
+    use std::thread;
 
     use super::*;
+
+    fn serve_registry_once(body: &'static [u8]) -> (String, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 4096];
+            let _ = stream.read(&mut request).unwrap();
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n",
+                body.len()
+            )
+            .unwrap();
+            stream.write_all(body).unwrap();
+        });
+        (format!("http://{address}/registry-file"), handle)
+    }
+
+    fn current_registry_inputs(
+        runtime: &WorkspaceRuntime,
+    ) -> (
+        slug_bzlmod_v2::RootModuleRegistryUrls,
+        slug_bzlmod_v2::RegistryRequestGeneration,
+    ) {
+        runtime.runtime.block_on(async {
+            let updater = runtime.dice.updater();
+            let mut transaction = updater.existing_state().await;
+            let urls = transaction
+                .compute(&slug_bzlmod_v2::RootModuleRegistryUrlsKey {
+                    workspace: runtime.workspace.clone(),
+                })
+                .await
+                .unwrap();
+            let generation = transaction
+                .compute(&slug_bzlmod_v2::RegistryRequestGenerationKey {
+                    workspace: runtime.workspace.clone(),
+                })
+                .await
+                .unwrap();
+            (urls, generation)
+        })
+    }
+
+    fn fetch_registry_file(
+        runtime: &WorkspaceRuntime,
+        url: &str,
+    ) -> Arc<Result<slug_bzlmod_v2::RegistryFileValue, slug_bzlmod_v2::RegistryFileError>> {
+        runtime.runtime.block_on(async {
+            let updater = runtime.dice.updater();
+            let mut transaction = updater.existing_state().await;
+            transaction
+                .compute(&slug_bzlmod_v2::RegistryFileKey {
+                    workspace: runtime.workspace.clone(),
+                    url: slug_bzlmod_v2::RegistryFileUrl::new(url),
+                })
+                .await
+                .unwrap()
+        })
+    }
+
+    #[test]
+    fn query_and_build_share_registry_request_inputs_and_io_capability() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        fs::write(root.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+        fs::write(root.join("BUILD.bazel"), "").unwrap();
+        fs::create_dir(root.join("pkg")).unwrap();
+        fs::write(
+            root.join("pkg/BUILD.bazel"),
+            "filegroup(name = \"probe\")\n",
+        )
+        .unwrap();
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+
+        runtime
+            .query_observations(
+                observe_workspace(&root).unwrap(),
+                "//pkg:probe",
+                QueryOrder::Auto,
+            )
+            .unwrap();
+        let (query_urls, query_generation) = current_registry_inputs(&runtime);
+        assert_eq!(
+            query_urls,
+            slug_bzlmod_v2::RootModuleRegistryUrls::from(RegistryUrls::default_bazel_registry())
+        );
+        let (query_url, query_server) = serve_registry_once(b"query");
+        assert!(matches!(
+            fetch_registry_file(&runtime, &query_url).as_ref(),
+            Ok(slug_bzlmod_v2::RegistryFileValue::Found { bytes, .. })
+                if bytes.as_ref() == b"query"
+        ));
+        query_server.join().unwrap();
+
+        runtime
+            .evaluate_observations(observe_workspace(&root).unwrap(), &[])
+            .unwrap();
+        let (build_urls, build_generation) = current_registry_inputs(&runtime);
+        assert_eq!(query_urls, build_urls);
+        assert_ne!(query_generation, build_generation);
+        let (build_url, build_server) = serve_registry_once(b"build");
+        assert!(matches!(
+            fetch_registry_file(&runtime, &build_url).as_ref(),
+            Ok(slug_bzlmod_v2::RegistryFileValue::Found { bytes, .. })
+                if bytes.as_ref() == b"build"
+        ));
+        build_server.join().unwrap();
+    }
 
     #[test]
     fn selected_directory_keys_preserve_absent_read_error_and_request_revision() {

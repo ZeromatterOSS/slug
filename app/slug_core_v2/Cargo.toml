@@ -10,8 +10,13 @@ version = "0.1.0"
 allocative = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bytes = { workspace = true }
 dice = { workspace = true }
 dice_futures = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-rustls = { workspace = true }
+hyper-util = { workspace = true, features = ["client-legacy", "http1", "http2", "tokio"] }
 slug_identity_v2 = { workspace = true }
 slug_analysis_v2 = { workspace = true }
 slug_bzlmod_v2 = { workspace = true }

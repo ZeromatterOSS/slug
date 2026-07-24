@@ -106,7 +106,7 @@ impl From<LockfileMode> for RootModuleLockfileMode {
 }
 
 impl RootModuleLockfileMode {
-    fn semantic_mode(&self) -> LockfileMode {
+    pub(crate) fn semantic_mode(&self) -> LockfileMode {
         match self.0.as_ref() {
             "off" => LockfileMode::Off,
             "update" => LockfileMode::Update,
@@ -124,6 +124,13 @@ pub struct ModuleFileEvaluation {
     pub includes: Arc<[CompactString]>,
     pub dependencies: Arc<[RootModuleDependency]>,
     pub local_path_overrides: Arc<[RootModuleLocalPathOverride]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RootModuleFiles {
+    pub root: ModuleFileEvaluation,
+    pub includes: Arc<[ModuleFileEvaluation]>,
+    pub visible_lockfile: VisibleLockfileRead,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -333,49 +340,21 @@ impl fmt::Display for RootModuleGraphKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RootModuleFilesKey {
+    pub workspace: PathBuf,
+}
+
+impl fmt::Display for RootModuleFilesKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "root-module-files:{}", self.workspace.display())
+    }
+}
+
 #[async_trait]
-impl Key for RootModuleGraphKey {
-    type Value = Arc<Result<RootModuleGraph, CompactString>>;
+impl Key for RootModuleFilesKey {
+    type Value = Arc<Result<RootModuleFiles, CompactString>>;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let command_policy = match ctx
-            .compute(&RootModuleCommandPolicyKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(policy) => policy,
-            Err(error) => {
-                return Arc::new(Err(CompactString::new(format!(
-                    "missing injected root module command policy: {error}"
-                ))));
-            }
-        };
-        let environment_policy = match ctx
-            .compute(&RootModuleEnvironmentPolicyKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(policy) => policy,
-            Err(error) => {
-                return Arc::new(Err(CompactString::new(format!(
-                    "missing injected root module environment policy: {error}"
-                ))));
-            }
-        };
-        let lockfile_mode = match ctx
-            .compute(&RootModuleLockfileModeKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(mode) => mode,
-            Err(error) => {
-                return Arc::new(Err(CompactString::new(format!(
-                    "missing injected root module lockfile mode: {error}"
-                ))));
-            }
-        };
         let root_path = self.workspace.join("MODULE.bazel");
         let root = match ctx
             .compute(&ModuleFileEvaluationKey {
@@ -434,14 +413,80 @@ impl Key for RootModuleGraphKey {
             },
             Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
         };
-        Arc::new(Ok(RootModuleGraph {
-            repository_mapping: match root_mapping(&root, &includes, &command_policy) {
-                Ok(mapping) => mapping,
-                Err(error) => return Arc::new(Err(error)),
-            },
+        Arc::new(Ok(RootModuleFiles {
             root,
             includes: includes.into(),
             visible_lockfile,
+        }))
+    }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[async_trait]
+impl Key for RootModuleGraphKey {
+    type Value = Arc<Result<RootModuleGraph, CompactString>>;
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let files = match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(value) => match value.as_ref().clone() {
+                Ok(value) => value,
+                Err(error) => return Arc::new(Err(error)),
+            },
+            Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
+        };
+        let command_policy = match ctx
+            .compute(&RootModuleCommandPolicyKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(policy) => policy,
+            Err(error) => {
+                return Arc::new(Err(CompactString::new(format!(
+                    "missing injected root module command policy: {error}"
+                ))));
+            }
+        };
+        let environment_policy = match ctx
+            .compute(&RootModuleEnvironmentPolicyKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(policy) => policy,
+            Err(error) => {
+                return Arc::new(Err(CompactString::new(format!(
+                    "missing injected root module environment policy: {error}"
+                ))));
+            }
+        };
+        let lockfile_mode = match ctx
+            .compute(&RootModuleLockfileModeKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(mode) => mode,
+            Err(error) => {
+                return Arc::new(Err(CompactString::new(format!(
+                    "missing injected root module lockfile mode: {error}"
+                ))));
+            }
+        };
+        Arc::new(Ok(RootModuleGraph {
+            repository_mapping: match root_mapping(&files.root, &files.includes, &command_policy) {
+                Ok(mapping) => mapping,
+                Err(error) => return Arc::new(Err(error)),
+            },
+            root: files.root,
+            includes: files.includes,
+            visible_lockfile: files.visible_lockfile,
             command_policy,
             environment_policy,
             lockfile_mode,

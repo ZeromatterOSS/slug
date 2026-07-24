@@ -12,8 +12,12 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::VecDeque;
+use std::sync::Arc;
 
+use allocative::Allocative;
+use dupe::Dupe;
 use serde_json::Value;
+use starlark_map::small_set::SmallSet;
 
 use crate::BazelDep;
 use crate::Directive;
@@ -35,6 +39,40 @@ use crate::resolution::active_bazel_deps;
 use crate::resolution::bazel_canonical_module_repo_name;
 use crate::resolution::bazel_deps;
 use crate::resolution::validate_root_overrides_have_targets;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd, Allocative, Dupe)]
+pub struct RegistryBaseUrl(Arc<str>);
+
+impl RegistryBaseUrl {
+    pub fn new(value: impl AsRef<str>) -> Self {
+        Self(Arc::from(value.as_ref().trim_end_matches('/')))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct RegistryUrls(Arc<[RegistryBaseUrl]>);
+
+impl RegistryUrls {
+    pub fn new(urls: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
+        let mut unique = SmallSet::new();
+        for url in urls {
+            unique.insert(RegistryBaseUrl::new(url));
+        }
+        Self(unique.into_iter().collect())
+    }
+
+    pub fn default_bazel_registry() -> Self {
+        Self::new(["https://bcr.bazel.build/"])
+    }
+
+    pub fn as_slice(&self) -> &[RegistryBaseUrl] {
+        &self.0
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistryModule {
