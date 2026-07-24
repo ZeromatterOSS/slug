@@ -483,3 +483,12 @@ Bazel oracle: accepted `registry-yanked-lockfile-mode`; pinned source additional
 Design summary: Global DICE computation data is accepted for an immutable non-semantic IO capability, but the proposed implementation key initially embedded request generations, retained ignored file policy, erased fatal errors into strings, and then still applied stale lockfile expectations in off mode. No Rust or Cargo edit began.
 Validation: two read-only live/source audits and two independent design-review rounds; the second material correction triggered the orchestration replan rule
 Residual risk: The replacement `WP-5-m1-registry-policy-io-design-correction` must freeze a policy-free root-files owner, injected generation dependency, stable file/remote identity, typed errors, and off-mode behavior before implementation.
+
+### Stage 5 corrected registry policy/IO design
+
+Status: Accepted
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, including `BazelRepositoryModule.normalizeBaseUrls`, `RegistryFactoryImpl.createRegistry`, `IndexRegistry.doGrabFile`, `ModuleFileFunction.getModuleFile`, and `GsonTypeAdapterUtil.OptionalChecksumTypeAdapter`
+Bazel oracle: accepted `registry-yanked-lockfile-mode`, supplemented by pinned source for URL normalization/dedup, file-registry ignore, off-mode isolation, and typed IO boundaries
+Design summary: A policy-free `RootModuleFilesKey` separates root/include/visible-lockfile ownership from registry policy. Ordered URLs and request generation are injected; a normal policy key consumes URLs/mode/root files. One stable exact-resource key bypasses policy for local files and conditionally depends on generation only for retryable remote outcomes. Off ignores all lockfile expectations; values/errors preserve not-found versus fatal transport/checksum identity; only immutable IO plumbing lives in global DICE data. Known-SHA transient 404/transport acquires generation on the failure branch and drops it after verified success.
+Validation: fresh independent design review required one focused correction for known-SHA transient retry; corrected rereview returned `ACCEPT`
+Residual risk: No Rust landed. Implement only `WP-5-m1-registry-policy-io-substrate`; command transport, external file-demand publication, discovery, MVS, selected-yanked/RepoSpec/final hashes, and writing remain serially deferred.
