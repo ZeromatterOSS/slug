@@ -546,6 +546,17 @@ observable Bazel 9.2 evidence and the serial evaluator/schema → typed
 preparation provenance → discovery split. No dependency-only discovery subset
 is authorized.
 
+Fresh review accepted a three-fixture serial design. Graph/repo-mapping,
+extension usage/generated repos, and toolchain/platform/flag consumers have
+different observability and stop conditions and must not be combined into one
+fixture. Hidden Bazel 9 no-op constants remain pinned-source-backed structural
+owner tests rather than false graph claims.
+
+The current packet is only
+`WP-5-m1-nonroot-interim-module-graph-oracle`. The canonical plan owns its new
+fixture-directory allowlist and exact retained rows. No Rust or later
+extension/consumer fixture work is authorized in that packet.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
