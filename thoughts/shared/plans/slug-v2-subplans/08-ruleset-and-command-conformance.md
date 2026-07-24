@@ -2787,14 +2787,25 @@ correction for `native.config_setting` in loaded macros, then returned final
 The first Stage 8 design audit returned `REPLAN` only for missing executable
 discriminators. Append three Bazel rows before activation: cross-package
 top-level plus included-group resolution, real-first real/fake same-label input
-identity, and universal filtering over two same-label fake callers with
-different consuming packages. The corrected fixture count is 39: 25
-`visible()` rows, 12 accepted Stage 4 rows, and two final Bazel-only rows.
+identity, and label-keyed predicate materialization over two same-label fake
+callers with different consuming packages. The corrected fixture count is 39:
+25 `visible()` rows, 12 accepted Stage 4 rows, and two final Bazel-only rows.
 
-The corrected activation seam passes both once-evaluated sets unmaterialized to
-the request-local accessor; it must not use the current printed-label
-`eval_all` for predicate callers. The accessor deduplicates full candidate IDs,
-uses fake consuming-package ownership, emits singleton passing deliveries,
-resolves groups without recording query topology, and reuses existing DICE
-package graphs. Production work remains blocked until the three-row oracle is
-generated, independently verified, and accepted.
+The executable correction shows that the activation seam must use the current
+printed-label `eval_all` for the once-evaluated predicate, retain the
+once-evaluated input's callback batches, and pass
+`TargetSet` plus `Set` to the request-local accessor. The accessor uses the
+retained fake representative's consuming-package ownership, emits singleton
+passing deliveries, resolves groups without recording query topology, and
+reuses existing DICE package graphs. Production work remains blocked until the
+three-row oracle is generated, independently verified, and accepted.
+
+Commit `a376e30e` accepts that oracle prerequisite. Generation plus two clean
+Bazel runs passed, the prior 36 normalized records are unchanged, all 27
+source anchors resolve, and independent evidence review returned `ACCEPT`.
+
+The observed same-label fake-caller result corrected the initial design audit:
+predicate callers are materialized by label through `TargetKeyExtractor`, so
+the generic function must use the existing `eval_all` and pass
+`TargetSet` plus streamed input `Set`. Re-review only this corrected activation
+design before editing query production code.

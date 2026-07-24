@@ -792,18 +792,37 @@ explicit-restricted regression; final review returned `ACCEPT`.
 
 The read-only source and ownership audit accepted the Stage 4 representation
 and the future request-local accessor boundary, but stopped activation on a
-narrow oracle gap. Pinned Bazel materializes predicate targets by full target
-equality; `FakeLoadTarget` equality and package metadata preserve the
-consuming BUILD package. Slug's current generic `eval_all` instead
-materializes by printed label, so Stage 8 must pass both once-evaluated sets
-unmaterialized to the loading accessor and deduplicate callers by full
-candidate ID.
+narrow oracle gap. The first executable correction disproved the initial
+full-target-equality reading: ordinary Bazel query's
+`TargetKeyExtractor`-backed set materializes predicate targets by label.
+Slug's current printed-label `eval_all` is therefore the correct predicate
+boundary, while the input must remain streamed so a later public fake can
+survive an earlier private real target with the same label.
 
 Before any Rust edit, append three Bazel rows: cross-package top-level and
 included-group traversal, real-first real/fake same-label input identity, and
-two same-label fake callers from different consuming packages under universal
-visibility. This makes the fixture 39 rows: 25 Stage 8 `visible()` rows, the
-accepted 12 Stage 4 rows, and two Bazel-only rows. The activation design
+label-keyed materialization of two same-label fake callers while retaining the
+first caller's consuming package. This makes the fixture 39 rows: 25 Stage 8
+`visible()` rows, the accepted 12 Stage 4 rows, and two Bazel-only rows. The
+activation design
 otherwise passed review: non-recording existing-key lookup, singleton passing
 deliveries, full error-discovering group walks, fresh compact cycle state per
 top-level root, exact diagnostics, and no loading/graph/DICE redesign.
+
+### Stage 8 visible oracle correction accepted
+
+Commit `a376e30e` extends `query-visible-visibility` from 36 to 39 Bazel 9.2
+commands. The 25 `visible()` rows now include cross-package top-level plus
+included-group resolution, streamed real-first real/fake same-label input, and
+label-materialized same-label fake predicate callers retaining the first
+representative's consuming package. The 12 Stage 4 rows and two final
+Bazel-only rows remain separate.
+
+Generation `20260723-165513-1276896-bazel` and clean runs
+`20260723-165704-1280783-bazel` and
+`20260723-165747-1284410-bazel` passed. All stable fields from the prior 36
+records are unchanged, all 27 pinned anchors resolve, and independent review
+returned `ACCEPT`. The executable third row corrected the audit's
+full-target-equality inference: ordinary query predicate materialization uses
+the label-keyed `TargetKeyExtractor`, matching Slug's existing `eval_all`.
+Stage 8 design re-review may resume; production remains unchanged.

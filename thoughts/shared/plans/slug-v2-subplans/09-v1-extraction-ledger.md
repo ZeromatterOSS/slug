@@ -1538,11 +1538,20 @@ remains the already approved Buck-derived compact collection pattern.
 Stage 8's first design audit retained the V2-only ownership and rejected any V1
 import, but found three missing Bazel discriminators before activation:
 cross-package group/include lookup, real-first real/fake same-label input
-identity, and two same-label fake callers with distinct consuming packages.
-The fixture must grow from 22 to 25 `visible()` rows first.
+identity, and label-keyed materialization of two same-label fake callers while
+retaining the first representative's consuming package. The fixture must grow
+from 22 to 25 `visible()` rows first.
 
 The corrected design uses the existing candidate arena, compact request-local
 sets, typed visibility graph, and package-graph DICE keys. It passes predicate
-and input sets unmaterialized to preserve full fake identity, performs no
-query-topology recording during visibility lookup, and imports no V1 registry,
-pattern parser, fallback, evaluator, lock, or cache.
+callers through the existing printed-label `eval_all`, leaves streamed input
+batches unmaterialized, performs no query-topology recording during visibility
+lookup, and imports no V1 registry, pattern parser, fallback, evaluator, lock,
+or cache.
+
+Oracle commit `a376e30e` accepts the three missing discriminators and imports
+no production or V1 code. It also corrects the source audit: ordinary Bazel
+query uses label-keyed predicate materialization, not `FakeLoadTarget` object
+equality. The future implementation can reuse V2's existing label-materialized
+`TargetSet`, streamed candidate batches, compact cycle sets, and package-graph
+DICE keys without changing provenance representation or extracting V1.
