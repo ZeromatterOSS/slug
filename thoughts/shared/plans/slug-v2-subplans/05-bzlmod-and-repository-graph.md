@@ -521,6 +521,17 @@ or name before version. The current packet is the five-row, fixture-only
 its exact allowlist and stop conditions. No discovery Rust is authorized until
 that evidence and a fresh implementation rereview are accepted.
 
+Commit `51bfc915` accepts that oracle. The original six local replay rows and
+their normalized records remain unchanged; five isolated validation rows now
+pin include → execution → name → version → success under root-version
+invalidation. Generation, independent replay, source/diff/archive checks, and
+fresh evidence review passed.
+
+The current packet is the read-only
+`WP-5-m1-registry-module-discovery-implementation-rereview`. It must either
+accept or replan the frozen five-file key/provenance/evaluator design before
+any discovery Rust.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

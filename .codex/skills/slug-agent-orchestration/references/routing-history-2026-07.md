@@ -22,6 +22,7 @@ Change these recommendations only from observed results, not model reputation.
 
 | Date | Packet / task class | Route | Context / parallelism | Tokens / cost | Outcome and validation | Rework / escalation | Next-use recommendation |
 |------|---------------------|-------|-----------------------|---------------|------------------------|---------------------|-------------------------|
+| 2026-07-23 | M1 Stage 5 per-module registry discovery design | Two read-only pinned-source/live-owner audits, root observation correction, independent design review | live repo; two audits, root synthesis, one reviewer | not exposed; medium | Bazel keys one module by effective `ModuleKey`, tries URL-keyed registries in order, records every SHA/absence attempt, and falls through only on typed not-found; live policy/file/evaluator owners supported one cycle-free five-file boundary | Existing oracles did not cover same-daemon local create/delete plus malformed repair; root corrected the remote-only premise because Bazel also posts local module-file hashes | Add the local discovery-recovery oracle and rereview before Rust; retain the stable-key boundary |
 
 Use exact token or cost data only when the orchestration surface exposes it.
 Otherwise record `not exposed` and one qualitative band: `low`, `medium`, or
