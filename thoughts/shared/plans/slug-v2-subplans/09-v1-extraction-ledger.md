@@ -419,7 +419,11 @@ Bazel oracle: accepted pinned update/refresh and command/environment-union fixtu
 Expected evidence artifact: one controlled loopback HTTP registry fixture pinning version-28 update replay, refresh refetch, recorded absence, checksum enforcement, error precedence, and no write after failure
 Design summary: Final selected-yanked and registry-hash products are post-MVS in Bazel, so the superseded pre-MVS unified packet is rejected. The serial replacement is controlled oracle, DICE-owned policy/IO, request transport, per-module discovery, MVS, selected-yanked/RepoSpec aggregation, then command-owned writing.
 Validation: pinned-source/live-substrate/fixture audits and independent corrected-design review `ACCEPT`
-Residual risk: All implementation remains pending; no V1 cache, HTTP client, pure MVS helper, raw writer, or process-global state is authorized.
+Residual risk: The controlled remote oracle, DICE-owned registry policy/IO,
+and primitive command/daemon transport are accepted through `2777b6f8`.
+Per-module discovery, MVS, selected-yanked/RepoSpec aggregation, semantic
+writing, extensions, and materialization remain pending; no V1 cache, pure
+MVS helper, raw writer, or process-global semantic state is authorized.
 
 ### Stage 5 registry checksum lockfile error substrate
 

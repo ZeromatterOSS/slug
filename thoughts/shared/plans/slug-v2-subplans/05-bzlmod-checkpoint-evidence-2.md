@@ -492,3 +492,15 @@ Bazel oracle: accepted `registry-yanked-lockfile-mode`, supplemented by pinned s
 Design summary: A policy-free `RootModuleFilesKey` separates root/include/visible-lockfile ownership from registry policy. Ordered URLs and request generation are injected; a normal policy key consumes URLs/mode/root files. One stable exact-resource key bypasses policy for local files and conditionally depends on generation only for retryable remote outcomes. Off ignores all lockfile expectations; values/errors preserve not-found versus fatal transport/checksum identity; only immutable IO plumbing lives in global DICE data. Known-SHA transient 404/transport acquires generation on the failure branch and drops it after verified success.
 Validation: fresh independent design review required one focused correction for known-SHA transient retry; corrected rereview returned `ACCEPT`
 Residual risk: No Rust landed. Implement only `WP-5-m1-registry-policy-io-substrate`; command transport, external file-demand publication, discovery, MVS, selected-yanked/RepoSpec/final hashes, and writing remain serially deferred.
+
+### Stage 5 registry command/daemon transport
+
+Status: Accepted
+V2 commits: `3bc88fd9 test: pin registry command transport`; `2777b6f8 feat: transport registry request policy`
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `RepositoryOptions.java`, `BazelRepositoryModule.java`, `RegistryFunction.java`, `RegistryFactoryImpl.java`, and `ModuleFileFunction.java`
+Bazel oracle: accepted `registry-command-transport` fixture for absent-only BCR, explicit replacement, raw trim/dedup/order, 404 fallback, fatal no-fallback, `%workspace%`, and invalid URL diagnostics
+V2 fixture: owner-local bzlmod, commands, core, server, and CLI transport/recovery tests
+Expected evidence artifact: primitive ordered request strings normalize once before any DICE change or generation allocation; malformed requests consume no generation; build/query and one-shot/daemon paths restore default→override→default
+Implementation summary: Added repeatable equality-form registry parsing, serde-defaulted primitive daemon transport, one pre-commit `RegistryUrls::from_request`, compact first-occurrence raw dedup, workspace substitution, Java-URI-compatible supported-scheme validation, and request-local injection through the existing registry input owner. The TLS dependency graph now selects Ring consistently with Tonic. No `RegistryIo`, DICE key, discovery, MVS, lockfile writer, or loading owner changed.
+Validation: full `slug_bzlmod_v2` (165), `slug_commands_v2` (16), `slug_core_v2` (20), `slug_server_v2` (20), and `slug_cli_v2` (32) suites; clean `slug_cli_v2` build; locked Cargo metadata; Ring-only feature tree; formatting, diff, archive, and daemon cleanup; fresh independent final review `ACCEPT`
+Residual risk: Per-module registry discovery, selected registry module evaluation/digests, MVS, selected-yanked/RepoSpec aggregation, semantic lockfile writing, external repository loading, extensions, and materialization remain later serial packets.
