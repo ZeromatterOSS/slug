@@ -439,6 +439,30 @@ discovery, untracked IO, a global semantic cache, a lock-held compute, old
 fixtures treated as pinned proof, or command-surface expansion outside its
 named packet.
 
+### Root override routing and owner correction (2026-07-23)
+
+Commit `256c02e2` accepts the Bazel 9.2
+`registry-root-override-routing` oracle. Eight retained-daemon rows prove the
+registry/non-registry category split, single-version registry/version routing,
+ordered root patches and `patch_strip`, fatal patch failure without fallback,
+ordered multiple versions, malformed/absent-registry local-path bypass, and
+semantic A→B→A replay. Generation, independent replay, source, syntax, diff,
+and fresh evidence review passed.
+
+The first owner design reached `REPLAN` before Rust. The sealed override map
+and aggregate `RootModuleFilesKey` owner are sound, but frozen Starlark values
+have fallible equality and cannot define DICE semantics. The first structural
+correction then retained arbitrary integers, exceeding Bazel's exact signed
+32-bit `AttributeValuesAdapter` domain and exhausting the packet's correction
+budget.
+
+Fresh review accepted
+`WP-5-m1-root-module-override-owner-design-correction`. The current packet is
+`WP-5-m1-root-module-override-owner-implementation`, under the exact
+structural contract and four-file maximum allowlist recorded in the canonical
+plan. No Cargo, discovery, MVS, loading, core, fixture, lockfile, extension, or
+materialization edit is authorized.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

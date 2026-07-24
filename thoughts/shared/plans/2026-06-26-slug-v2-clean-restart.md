@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a` | discovery rereview found that the live root value cannot represent Bazel's pre-discovery registry/non-registry override routing; expanding that Starlark surface requires Bazel 9.2 evidence first | add only the root override routing oracle |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 root override oracle is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 root override oracle is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; corrected compact owner design accepted | the live root value still lacks the accepted registry/non-registry override map and four production Starlark globals | implement only the compact root override owner |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 root override owner implementation is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 root override owner implementation is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,67 +33,73 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-root-module-override-routing-oracle`.
+Run only `WP-5-m1-root-module-override-owner-implementation`.
 
-Commit `6491a55a` is accepted. Local exact-resource reads now use the immutable
-async IO capability, retry absence/read failure through request generation,
-preserve successful bytes across raw mutations under equal semantic inputs,
-and reread after semantic root or ordered policy changes. The stable file key,
-local SHA/absence values, and remote policy remain intact. Focused and full
-bzlmod/core suites, formatting, diff, archive, and fresh review passed.
+Commit `256c02e2` is accepted. Its eight-command Bazel 9.2 fixture proves
+default ordered registry choice, single-version registry and version
+replacement, ordered patches plus `patch_strip`, fatal override patch failure
+without fallback, multiple-version order and registry routing, local-path
+bypass of malformed/absent registries, and semantic A→B→A replay in one
+daemon. Generation and independent replay passed; the five pinned source
+anchors resolve; fixture/TOML/diff checks and fresh evidence review passed.
 
-The discovery rereview reached `REPLAN` before Rust. Pinned Bazel selects the
-requested module's root `ModuleOverride` before ordinary registry iteration:
-a `RegistryOverride` can replace the registry and retain version/patch state,
-while a `NonRegistryOverride` routes away from registry discovery. Live
-`RootModuleFiles` records only `local_path_override`; its production Starlark
-evaluator rejects `single_version_override`, `multiple_version_override`,
-`archive_override`, and `git_override`. A discovery key cannot truthfully
-model Bazel's boundary from that value, and adding those globals inside the
-discovery implementation would violate the oracle-first rule.
+The first compact-owner design reached `REPLAN` before Rust. Pinned Bazel owns
+one map from module name to a sealed registry/non-registry override. The first
+proposal incorrectly placed fallibly comparable frozen Starlark values in
+DICE. Its bounded correction replaced those with a recursive structural
+attribute domain, but retained arbitrary-sized integers where Bazel's
+`AttributeValuesAdapter` accepts exact signed 32-bit integers. That second
+material correction exhausted the packet budget.
 
-Add one source-controlled Bazel 9.2 fixture,
-`registry-root-override-routing`, using deterministic local registries and
-non-registry inputs with `--lockfile_mode=off`. In one retained workspace,
-server, and output base, discriminate:
+Fresh independent review accepted this corrected owner contract:
 
-1. default ordered registry selection;
-2. `single_version_override(registry=...)` replacing the default registry even
-   when the first default registry contains the requested module;
-3. its `version` field replacing the requested version before module-file
-   discovery;
-4. registry override patch application, including retained patch label/order
-   and `patch_strip`, by changing an observable dependency from the selected
-   registry module;
-5. a fatal malformed or patch failure in the override registry not falling
-   back to the default list;
-6. `multiple_version_override` retaining its ordered versions and optional
-   registry routing without collapsing the two concepts;
-7. `local_path_override` routing away from deliberately malformed/absent
-   registries; and
-8. semantic root override A→B→A changes replaying the selected route in the
-   same daemon.
+1. `RootModuleOverrides` is a Buck2-derived `SmallMap` keyed by compact module
+   name. Map equality ignores directive order across distinct names; a second
+   override for one name is the exact evaluation error. Its values retain the
+   sealed `RegistrySingle`, `RegistryMultiple`, and `NonRegistry(RepoSpec)`
+   categories rather than flattening source kind.
+2. A single-version value retains the empty-version and empty-registry
+   sentinels, ordered normalized patch labels, ordered `patch_cmds`, and signed
+   32-bit `patch_strip`. A multiple-version value retains ordered parsed
+   versions and the empty-registry sentinel; it rejects fewer than two.
+3. `RepoSpec` retains the local-repository, `http_archive`, or
+   `git_repository` rule id and every generic kwarg. Its compact recursive
+   attribute value is exactly `None`, bool, signed i32, string, canonical
+   label, ordered iterable, or deterministic map with string/canonical-label
+   keys. Unsupported executable/struct/cyclic values and out-of-range
+   integers fail during evaluation. Do not replace archive/git attrs with a
+   partial bespoke field list.
+4. Per-file override contributions stay private to
+   `ModuleFileEvaluationKey`. `RootModuleFilesKey` drains them while merging
+   one aggregate map, so public root/include values carry no file-placement
+   copy. `RootModuleFiles` and `RootModuleGraph` may share that Arc-backed
+   aggregate, and their equality compares only ordinary file semantics plus
+   the aggregate owner. Discovery later depends directly on
+   `RootModuleFilesKey`.
+5. Patch labels follow pinned `convertAndValidatePatchLabel`: normalize in the
+   empty-package root context, map the empty/own root repository to main,
+   retain visible external labels for the later phase, and reject invalid or
+   invisible labels. Paths, registry URLs, repo-rule execution, patch
+   execution, and materialization are not normalized or activated here.
 
-Use distinct graph-visible module bodies or canonical repo mappings for every
-selected route. Source citations may own inactive `patch_cmds` and
-archive/git `RepoSpec` field shapes if exercising them would add shell,
-archive, Git, fetch, or materialization behavior; the fixture must still prove
-the registry-versus-non-registry category boundary. Do not use HTTP, BCR,
-network access, visible-lockfile hashes, extensions, or repository
-materialization as evidence. Local embedded-tools shims are allowed only as
-bounded non-evidence scaffolding if the installed Bazel closure requires them.
+The owner-only implementation allowlist is
+`app/slug_bzlmod_v2/src/module_eval.rs`,
+`app/slug_bzlmod_v2/src/lib.rs`,
+`app/slug_bzlmod_v2/tests/root_module_dice.rs`, and only if its existing direct
+root-files replay assertion requires strengthening,
+`app/slug_bzlmod_v2/tests/registry_dice.rs`. No Cargo, core, loading, registry
+discovery, fixture, lockfile, MVS, selected-yanked, extension, or
+materialization edit is authorized.
 
-The allowlist is only
-`tests/v2_oracle/fixtures/registry-root-override-routing/**`. A generic harness
-change, existing fixture edit, or inability to discriminate the eight rows
-requires a stop and replan. Generate and replay with Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`, inspect normalized and raw
-records, require fixture/TOML/source/diff checks and fresh independent evidence
-review, and preserve no generated cache/process artifacts. Do not edit Rust,
-Cargo, existing fixtures, lockfiles, or expected output outside the new
-fixture. After acceptance, design the compact root override owner before
-rereviewing discovery. MVS, selected-yanked/RepoSpec aggregation, semantic
-writing, loading, extensions, and materialization remain deferred.
+The implementation must first add owning-abstraction tests for exact five-form
+capture and defaults, ordered fields, generic attributes, duplicate overrides
+across root/includes, invalid version/count/label/i32 boundaries, directive
+order-insensitive map equality, local-path migration, and retained DICE
+A→B→A. Stop on a new dependency, public serde, fallible DICE equality, a
+parallel local-path owner, per-file placement leaking into aggregate equality,
+or a discovery/materialization consumer change. Focused and full owner-crate
+tests, formatting, diff/archive checks, and fresh independent implementation
+review are required before acceptance.
 
 ### Accepted transport evidence
 
