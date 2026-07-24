@@ -664,3 +664,14 @@ Expected evidence artifact: registry/non-registry MODULE-byte routing and ordere
 Implementation summary: The draft added the stable preparation key, typed routing errors, existing registry/source-key dependencies, and a pure bounded patcher. Root corrected two initial outcome/path-filter defects, but the worker stopped without the required fake-registry retained-DICE matrix.
 Validation: focused source-preparation and full bzlmod suites passed before root rereview; fmt, diff, and archive checks passed
 Residual risk: Root rereview found the second material defect: strip zero silently removed `a/` and `b/` instead of emitting Bazel's forgotten-strip failure. Run only `WP-5-m1-module-source-preparation-scope-correction`; freeze the owner contract and add the missing matrix before fresh review.
+
+### Stage 5 module-source preparation scope correction
+
+Status: Accepted
+V2 commit: `0445cafd feat: prepare module source bytes`
+Bazel source inspected: pinned commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileFunction.getModuleFile`, `maybePatchModuleFile`, and `PatchUtil.applyToSingleFile`
+Bazel oracle: accepted `module-source-preparation` from `183970d9`
+Expected evidence artifact: registry/non-registry MODULE-byte preparation with ordered main-repository root patches
+Implementation summary: Added stable effective-version preparation identity, non-registry source routing, ordered registry lookup with only typed not-found fallback, fatal typed boundaries, exact raw main-repository patch dependencies, and a pure bounded single-file unified patcher. Non-main patches and patch commands remain inactive. The scope correction fixed strip-zero a/b failure, negative/no-strip behavior, unrelated-section skipping after structural validation, complete hunk counts/header grammar, and removed transient registry-vector churn.
+Validation: focused retained-DICE 9 covers ordered fallback/fatality, override registry/effective version, non-registry bypass, raw-byte preservation, patch A→B→absent/malformed→recovery→A without local-registry refetch, ordered patches/strip, non-main/command inactivity, empty version, exhaustion, and cycle completion; full `slug_bzlmod_v2`, fmt, diff, archive; fresh independent rereview found one malformed-header gap, whose focused correction passed final `ACCEPT`
+Residual risk: Prepared bytes are not yet evaluated or consumed by discovery. Registry identity/hash-attempt evidence, nonregistry includes, name/version checks, MVS, selected-yanked/RepoSpec aggregation, graph resolution, and lockfile writing remain later serial owners.
