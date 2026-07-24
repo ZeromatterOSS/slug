@@ -536,3 +536,13 @@ Expected evidence artifact: ordered absent failure; transient retry after first 
 Implementation summary: Added only the six-row fixture and expected evidence. Minimal local module declarations, local-path repo specs, and exact rules_java/buildozer/rules_cc redirect stubs prevent BCR or network closure content from becoming evidence; their behavior is not asserted.
 Validation: Bazel 9.2 generation, worker replay, and independent root replay passed; fixture listing, six-row TOML/no-BCR checks, all pinned source anchors, normalized/raw record inspection, diff checks, and fresh independent evidence review returned `ACCEPT`
 Residual risk: Slug's accepted local `RegistryFileKey` still depends on exact `WorkspaceFileKey` state and therefore invalidates successful reads more eagerly than Bazel. Design the non-semantic local IO, transient-failure generation, and root/registry replay epoch correction before discovery implementation.
+
+### Stage 5 local registry replay correction design
+
+Status: Accepted
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileValue.Key`, `ModuleFileFunction`, `ModuleFileFunctionException`, `RegistryFunction`, `RegistryFactoryImpl`, and `IndexRegistry`
+Bazel oracle: accepted `registry-module-discovery-recovery` from `0211982c`
+Expected evidence artifact: local exact-resource values retry absence/read failure on request generation, preserve successful bytes across raw local mutation under equal semantic inputs, and reread after semantic root or ordered registry-policy changes
+Design summary: Keep stable `(workspace, URL)` identity. The local branch depends directly on `RegistryPolicyKey` and `RootModuleFilesKey`, then reads through the immutable global IO capability rather than `WorkspaceFileKey`; the direct root-files edge is required because current policy equality projects root semantics away. Found drops generation, while not-found/read failure conditionally acquire it. Core uses nonblocking `tokio::fs`; remote policy remains unchanged. `RootModuleGraphKey` and a raw-file epoch are rejected as overbroad and contrary to Bazel's sticky-success behavior.
+Validation: two read-only pinned-source/live-owner audits, root source/equality adjudication, explicit correction of one overbroad raw-file invalidation recommendation, Tokio feature verification, and fresh independent design review `ACCEPT`
+Residual risk: No Rust landed. Implement only `WP-5-m1-registry-local-replay-correction` in the three accepted files, prove all named lifecycle transitions, and obtain fresh final review before resuming per-module discovery.
