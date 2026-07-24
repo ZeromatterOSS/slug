@@ -653,3 +653,14 @@ Expected evidence artifact: raw/local/materialized owner A from the accepted two
 Implementation summary: Added single-read raw/text workspace snapshots injected with directory state on one updater; stable materialization and exact source-file DICE keys; live local source roots; retained immutable fixed tar/Git generations with operational paths excluded from equality; and request-generation retry only for failed materialization. Production materialization is bounded to workspace-contained `local_repository`, SHA-pinned local tar `http_archive`, and local bare-Git exact commits.
 Validation: full `slug_workspace_v2`, `slug_bzlmod_v2`, and `slug_core_v2` suites; raw equality, local main/include A→B→A, failure recovery, fixed archive/Git, generation-independent equality, retained-root, timeout-bounded cycle, fmt, diff, and archive checks; fresh independent final review `ACCEPT`
 Residual risk: Implement only `WP-5-m1-module-source-preparation-key`; registry patch preparation is not yet consumed by evaluation or discovery, and fixed archive/Git source mutation remains unclaimed.
+
+### Stage 5 module-source preparation owner first attempt
+
+Status: Replan
+V2 commit: none; bounded four-file draft preserved uncommitted
+Bazel source inspected: pinned commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileFunction.maybePatchModuleFile` and `PatchUtil.applyToSingleFile`
+Bazel oracle: accepted `module-source-preparation` from `183970d9`
+Expected evidence artifact: registry/non-registry MODULE-byte routing and ordered main-repository root patches
+Implementation summary: The draft added the stable preparation key, typed routing errors, existing registry/source-key dependencies, and a pure bounded patcher. Root corrected two initial outcome/path-filter defects, but the worker stopped without the required fake-registry retained-DICE matrix.
+Validation: focused source-preparation and full bzlmod suites passed before root rereview; fmt, diff, and archive checks passed
+Residual risk: Root rereview found the second material defect: strip zero silently removed `a/` and `b/` instead of emitting Bazel's forgotten-strip failure. Run only `WP-5-m1-module-source-preparation-scope-correction`; freeze the owner contract and add the missing matrix before fresh review.
