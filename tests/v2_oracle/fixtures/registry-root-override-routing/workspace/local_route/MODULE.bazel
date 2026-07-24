@@ -1,0 +1,2 @@
+module(name = "route")
+bazel_dep(name = "local_dep", version = "1.0.0")

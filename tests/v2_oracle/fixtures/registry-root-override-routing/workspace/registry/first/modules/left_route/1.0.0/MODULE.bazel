@@ -1,0 +1,2 @@
+module(name = "left_route", version = "1.0.0")
+bazel_dep(name = "route", version = "1.0.0")

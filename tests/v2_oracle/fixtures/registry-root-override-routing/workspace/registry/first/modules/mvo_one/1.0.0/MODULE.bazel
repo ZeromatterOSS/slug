@@ -1,0 +1,1 @@
+module(name = "mvo_one", version = "1.0.0")

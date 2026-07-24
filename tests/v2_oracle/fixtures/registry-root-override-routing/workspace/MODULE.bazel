@@ -1,0 +1,3 @@
+module(name = "registry_root_override_routing", version = "0.1.0")
+bazel_dep(name = "route", version = "1.0.0")
+# routing-stage: default

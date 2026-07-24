@@ -1,0 +1,154 @@
+[fixture]
+name = "registry-root-override-routing"
+description = "Bazel 9.2 root module override routing before registry discovery."
+comparison = "message_shape"
+oracle_notes = "One retained local-file-registry workspace proves default routing, registry override replacement/version/ordered patches and fatal patch handling, multiple-version registry routing, local-path bypass, and semantic override A-to-B-to-A replay. Embedded-tools stubs under registry/first are bounded non-evidence scaffolding."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileValue.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java",
+]
+translation_notes = "Every command uses only local file registries and lockfile-off mode. After the default route, the first three override states are A, B, A in one retained daemon; B changes single_version_override.version and registry while the final A restores the original route before patch coverage. Patch command order and patch_strip are source-owned evidence; patch_cmds, archive, and Git materialization are intentionally inactive."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture registry-root-override-routing --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture registry-root-override-routing --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "default_first_registry_route"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "default_dep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*second_dep@1\\.0\\.0).*default_dep@1\\.0\\.0"]
+
+[[commands]]
+name = "single_version_registry_override_replaces_default"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "a_dep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*default_dep@1\\.0\\.0).*a_dep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# routing-stage: default"
+  replace = "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\")\n# routing-stage: registry-a"
+
+[[commands]]
+name = "single_version_override_version_and_registry_route_b"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["route@2.0.0", "b_dep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*route@1\\.0\\.0)(?!.*a_dep@1\\.0\\.0).*b_dep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\")"
+  replace = "single_version_override(module_name = \"route\", version = \"2.0.0\", registry = \"file://%workspace%/registry/override-b\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# routing-stage: registry-a"
+  replace = "# routing-stage: registry-b-version"
+
+[[commands]]
+name = "semantic_override_a_b_a_replays_a_route"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "a_dep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*route@2\\.0\\.0)(?!.*b_dep@1\\.0\\.0).*a_dep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "single_version_override(module_name = \"route\", version = \"2.0.0\", registry = \"file://%workspace%/registry/override-b\")"
+  replace = "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# routing-stage: registry-b-version"
+  replace = "# routing-stage: registry-a-restored"
+
+[[commands]]
+name = "registry_override_patches_apply_in_label_order"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "patched_dep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*a_dep@1\\.0\\.0)(?!.*patch_mid@1\\.0\\.0).*patched_dep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\")"
+  replace = "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\", patches = [\"//:route-first.patch\", \"//:route-second.patch\"], patch_strip = 1)"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# routing-stage: registry-a-restored"
+  replace = "# routing-stage: patched-a"
+
+[[commands]]
+name = "override_patch_failure_does_not_fallback"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 37
+stderr_contains = ["error applying single_version_override patch", "did you forget to set patch_strip = 1?"]
+stderr_patterns = ["(?s)\\A(?!.*default_dep@1\\.0\\.0)(?!.*second_dep@1\\.0\\.0).*error applying single_version_override patch"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\", patches = [\"//:route-first.patch\", \"//:route-second.patch\"], patch_strip = 1)"
+  replace = "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\", patches = [\"//:route-first.patch\", \"//:route-second.patch\"], patch_strip = 0)"
+
+[[commands]]
+name = "multiple_version_override_keeps_versions_and_registry_route"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "route@2.0.0", "mvo_one@1.0.0", "mvo_two@1.0.0"]
+stdout_patterns = ["(?s)left_route@1\\.0\\.0.*route@1\\.0\\.0.*mvo_one@1\\.0\\.0", "(?s)right_route@1\\.0\\.0.*route@2\\.0\\.0.*mvo_two@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "bazel_dep(name = \"route\", version = \"1.0.0\")"
+  replace = "bazel_dep(name = \"left_route\", version = \"1.0.0\")\nbazel_dep(name = \"right_route\", version = \"1.0.0\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\", patches = [\"//:route-first.patch\", \"//:route-second.patch\"], patch_strip = 0)"
+  replace = "multiple_version_override(module_name = \"route\", versions = [\"1.0.0\", \"2.0.0\"], registry = \"file://%workspace%/registry/override-a\")"
+
+  [[commands.mutations]]
+  path = "registry/override-a/modules/route/1.0.0/MODULE.bazel"
+  find = "a_dep"
+  replace = "mvo_one"
+
+[[commands]]
+name = "local_path_override_bypasses_malformed_and_absent_registries"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["local_dep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*default_dep@1\\.0\\.0)(?!.*second_dep@1\\.0\\.0).*local_dep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "bazel_dep(name = \"left_route\", version = \"1.0.0\")\nbazel_dep(name = \"right_route\", version = \"1.0.0\")"
+  replace = "bazel_dep(name = \"route\", version = \"1.0.0\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "multiple_version_override(module_name = \"route\", versions = [\"1.0.0\", \"2.0.0\"], registry = \"file://%workspace%/registry/override-a\")"
+  replace = "local_path_override(module_name = \"route\", path = \"local_route\")"
+
+  [[commands.mutations]]
+  path = "registry/first/modules/route/1.0.0/MODULE.bazel"
+  find = "module(name = \"route\", version = \"1.0.0\")\nbazel_dep(name = \"default_dep\", version = \"1.0.0\")"
+  replace = "module(name = \"route\", version = \"1.0.0\")\ndef broken("
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "registry/second/modules/route/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# routing-stage: patched-a"
+  replace = "# routing-stage: local-path"

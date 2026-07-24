@@ -1,0 +1,345 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "default_first_registry_route",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500default_dep@1.0.0",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/registry-root-override-routing/20260723-233049-1559573-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/registry-root-override-routing/20260723-233205-1561043-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 9e93a054-4c8c-404a-90a1-55a3b5e0b0c1\n no actions running\n",
+      "stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500default_dep@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "# routing-stage: default",
+          "old_digest_hint": "137",
+          "path": "MODULE.bazel",
+          "replace": "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\")\n# routing-stage: registry-a"
+        }
+      ],
+      "name": "single_version_registry_override_replaces_default",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500a_dep@1.0.0",
+      "stderr": "INFO: Invocation ID: 0a40c835-2420-4200-8f4c-34b991407131\n no actions running\n",
+      "stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500a_dep@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\")",
+          "old_digest_hint": "240",
+          "path": "MODULE.bazel",
+          "replace": "single_version_override(module_name = \"route\", version = \"2.0.0\", registry = \"file://%workspace%/registry/override-b\")"
+        },
+        {
+          "find": "# routing-stage: registry-a",
+          "old_digest_hint": "259",
+          "path": "MODULE.bazel",
+          "replace": "# routing-stage: registry-b-version"
+        }
+      ],
+      "name": "single_version_override_version_and_registry_route_b",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@2.0.0 \n    \u2514\u2500\u2500\u2500b_dep@1.0.0",
+      "stderr": "INFO: Invocation ID: d068adb0-5403-457d-aa73-0ba2cc228313\n no actions running\n",
+      "stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@2.0.0 \n    \u2514\u2500\u2500\u2500b_dep@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "single_version_override(module_name = \"route\", version = \"2.0.0\", registry = \"file://%workspace%/registry/override-b\")",
+          "old_digest_hint": "267",
+          "path": "MODULE.bazel",
+          "replace": "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\")"
+        },
+        {
+          "find": "# routing-stage: registry-b-version",
+          "old_digest_hint": "248",
+          "path": "MODULE.bazel",
+          "replace": "# routing-stage: registry-a-restored"
+        }
+      ],
+      "name": "semantic_override_a_b_a_replays_a_route",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500a_dep@1.0.0",
+      "stderr": "INFO: Invocation ID: 888e44cb-09b7-43d7-81ba-481441e48668\n no actions running\n",
+      "stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500a_dep@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\")",
+          "old_digest_hint": "249",
+          "path": "MODULE.bazel",
+          "replace": "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\", patches = [\"//:route-first.patch\", \"//:route-second.patch\"], patch_strip = 1)"
+        },
+        {
+          "find": "# routing-stage: registry-a-restored",
+          "old_digest_hint": "327",
+          "path": "MODULE.bazel",
+          "replace": "# routing-stage: patched-a"
+        }
+      ],
+      "name": "registry_override_patches_apply_in_label_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patched_dep@1.0.0",
+      "stderr": "INFO: Invocation ID: 921d74f4-b74e-4ef0-9282-794aa5315475\n no actions running\n",
+      "stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patched_dep@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\", patches = [\"//:route-first.patch\", \"//:route-second.patch\"], patch_strip = 1)",
+          "old_digest_hint": "317",
+          "path": "MODULE.bazel",
+          "replace": "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\", patches = [\"//:route-first.patch\", \"//:route-second.patch\"], patch_strip = 0)"
+        }
+      ],
+      "name": "override_patch_failure_does_not_fallback",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error applying single_version_override patch <workspace>/route-first.patch to module file: error at line 2: the patch file contains a/b prefixes, did you forget to set patch_strip = 1?",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 12eea488-16b0-4d74-aafa-5e76b034b721\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error applying single_version_override patch /run/media/system/Colossus/dev/slug/target/v2o/runs/registry-root-override-routing/20260723-233205-1561043-bazel/workspace/route-first.patch to module file: error at line 2: the patch file contains a/b prefixes, did you forget to set patch_strip = 1?\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "bazel_dep(name = \"route\", version = \"1.0.0\")",
+          "old_digest_hint": "317",
+          "path": "MODULE.bazel",
+          "replace": "bazel_dep(name = \"left_route\", version = \"1.0.0\")\nbazel_dep(name = \"right_route\", version = \"1.0.0\")"
+        },
+        {
+          "find": "single_version_override(module_name = \"route\", registry = \"file://%workspace%/registry/override-a\", patches = [\"//:route-first.patch\", \"//:route-second.patch\"], patch_strip = 0)",
+          "old_digest_hint": "373",
+          "path": "MODULE.bazel",
+          "replace": "multiple_version_override(module_name = \"route\", versions = [\"1.0.0\", \"2.0.0\"], registry = \"file://%workspace%/registry/override-a\")"
+        },
+        {
+          "find": "a_dep",
+          "old_digest_hint": "87",
+          "path": "registry/override-a/modules/route/1.0.0/MODULE.bazel",
+          "replace": "mvo_one"
+        }
+      ],
+      "name": "multiple_version_override_keeps_versions_and_registry_route",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_root_override_routing@0.1.0)\n\u251c\u2500\u2500\u2500left_route@1.0.0 \n\u2502   \u2514\u2500\u2500\u2500route@1.0.0 \n\u2502       \u2514\u2500\u2500\u2500mvo_one@1.0.0 \n\u2514\u2500\u2500\u2500right_route@1.0.0 \n    \u2514\u2500\u2500\u2500route@2.0.0 \n        \u2514\u2500\u2500\u2500mvo_two@1.0.0",
+      "stderr": "INFO: Invocation ID: b4b33626-c95f-455f-9cdd-126a5b69a53a\n no actions running\n",
+      "stdout": "<root> (registry_root_override_routing@0.1.0)\n\u251c\u2500\u2500\u2500left_route@1.0.0 \n\u2502   \u2514\u2500\u2500\u2500route@1.0.0 \n\u2502       \u2514\u2500\u2500\u2500mvo_one@1.0.0 \n\u2514\u2500\u2500\u2500right_route@1.0.0 \n    \u2514\u2500\u2500\u2500route@2.0.0 \n        \u2514\u2500\u2500\u2500mvo_two@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "bazel_dep(name = \"left_route\", version = \"1.0.0\")\nbazel_dep(name = \"right_route\", version = \"1.0.0\")",
+          "old_digest_hint": "328",
+          "path": "MODULE.bazel",
+          "replace": "bazel_dep(name = \"route\", version = \"1.0.0\")"
+        },
+        {
+          "find": "multiple_version_override(module_name = \"route\", versions = [\"1.0.0\", \"2.0.0\"], registry = \"file://%workspace%/registry/override-a\")",
+          "old_digest_hint": "272",
+          "path": "MODULE.bazel",
+          "replace": "local_path_override(module_name = \"route\", path = \"local_route\")"
+        },
+        {
+          "find": "module(name = \"route\", version = \"1.0.0\")\nbazel_dep(name = \"default_dep\", version = \"1.0.0\")",
+          "old_digest_hint": "93",
+          "path": "registry/first/modules/route/1.0.0/MODULE.bazel",
+          "replace": "module(name = \"route\", version = \"1.0.0\")\ndef broken("
+        },
+        {
+          "op": "delete",
+          "path": "registry/second/modules/route/1.0.0/MODULE.bazel"
+        },
+        {
+          "find": "# routing-stage: patched-a",
+          "old_digest_hint": "204",
+          "path": "MODULE.bazel",
+          "replace": "# routing-stage: local-path"
+        }
+      ],
+      "name": "local_path_override_bypasses_malformed_and_absent_registries",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500local_dep@1.0.0",
+      "stderr": "INFO: Invocation ID: 1c6c7417-3268-4168-b4c0-ba3e413c6f88\n no actions running\n",
+      "stdout": "<root> (registry_root_override_routing@0.1.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500local_dep@1.0.0 \n\n"
+    }
+  ],
+  "fixture": "registry-root-override-routing",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

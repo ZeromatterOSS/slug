@@ -1,0 +1,2 @@
+module(name = "route", version = "2.0.0")
+bazel_dep(name = "mvo_two", version = "1.0.0")
