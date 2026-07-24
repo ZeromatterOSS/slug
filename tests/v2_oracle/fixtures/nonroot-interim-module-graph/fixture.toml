@@ -1,0 +1,91 @@
+[fixture]
+name = "nonroot-interim-module-graph"
+description = "Bazel 9.2 registry nonroot InterimModule graph semantics."
+comparison = "message_shape"
+daemon = true
+oracle_notes = "A retained local registry isolates nonroot graph semantics. subject's nodep shared@2 request upgrades root-introduced shared@1 without becoming a subject edge; the subject's dev dependency and single_version_override are ignored. Nonzero compatibility_level and max_compatibility_level are Bazel 9 no-op source inputs only."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleThreadContext.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/InterimModule.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleBase.java",
+]
+translation_notes = "Bazel 9.2 ModuleFileGlobals stores compatibility_level as 0 and max_compatibility_level as -1; this fixture does not infer those internal values from command output. Nonroot execution ignores dev dependencies and module overrides."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-interim-module-graph --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-interim-module-graph --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "nonroot_graph_keeps_ordinary_edge_suppresses_dev_and_nodep_edge"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 0
+stdout_contains = ["subject@1.0.0", "dep@1.0.0", "shared@2.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*devonly@1\\.0\\.0)(?!.*dep@2\\.0\\.0)(?=.*subject@1\\.0\\.0)(?=.*dep@1\\.0\\.0)(?=.*shared@2\\.0\\.0).*"]
+
+[[commands]]
+name = "nodep_upgrades_root_shared_but_is_not_subject_dependency"
+argv = ["mod", "deps", "subject@1.0.0", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 0
+stdout_contains = ["subject@1.0.0", "dep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*shared@2\\.0\\.0)(?!.*devonly@1\\.0\\.0)(?!.*dep@2\\.0\\.0).*subject@1\\.0\\.0.*dep@1\\.0\\.0.*"]
+
+[[commands]]
+name = "subject_apparent_dependency_alias_maps_to_canonical_repo"
+argv = ["mod", "dump_repo_mapping", "subject+", "--output=json", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 0
+stdout_contains = ["dep_alias", "dep+"]
+stdout_patterns = ["(?s)\\A(?!.*devonly).*dep_alias.*dep\\+.*"]
+
+[[commands]]
+name = "incompatible_nonroot_bazel_compatibility_fails_after_root_invalidation"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 37
+stderr_contains = ["Bazel version 9.2.0 is not compatible with module \"subject@1.0.0\"", "Bazel compatibility check failed"]
+
+  [[commands.mutations]]
+  path = "registry/modules/subject/1.0.0/MODULE.bazel"
+  find = "bazel_compatibility = [\">=9.0.0\"]"
+  replace = "bazel_compatibility = [\"<=9.1.0\"]"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.0\""
+  replace = "version = \"0.1.1\""
+
+[[commands]]
+name = "compatible_nonroot_bazel_compatibility_recovers_after_root_invalidation"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 0
+stdout_contains = ["subject@1.0.0", "shared@2.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*devonly@1\\.0\\.0)(?!.*dep@2\\.0\\.0)(?=.*subject@1\\.0\\.0)(?=.*shared@2\\.0\\.0).*"]
+
+  [[commands.mutations]]
+  path = "registry/modules/subject/1.0.0/MODULE.bazel"
+  find = "bazel_compatibility = [\"<=9.1.0\"]"
+  replace = "bazel_compatibility = [\">=9.0.0\"]"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.1\""
+  replace = "version = \"0.1.2\""
+
+[[commands]]
+name = "nonroot_builtin_apparent_name_collision_is_fatal"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 37
+stderr_contains = ["The repo name 'bazel_tools' cannot be defined as a built-in dependency", "by a bazel_dep"]
+stderr_patterns = ["(?s)\\A(?!.*dep@2\\.0\\.0).*bazel_tools.*built-in dependency.*"]
+
+  [[commands.mutations]]
+  path = "registry/modules/subject/1.0.0/MODULE.bazel"
+  find = "single_version_override(module_name = \"dep\", version = \"2.0.0\")"
+  replace = "single_version_override(module_name = \"dep\", version = \"2.0.0\")\nbazel_dep(name = \"collision\", version = \"1.0.0\", repo_name = \"bazel_tools\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.2\""
+  replace = "version = \"0.1.3\""

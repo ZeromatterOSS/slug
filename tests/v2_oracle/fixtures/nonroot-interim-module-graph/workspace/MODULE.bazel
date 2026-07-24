@@ -1,0 +1,3 @@
+module(name = "nonroot_interim_module_graph", version = "0.1.0")
+bazel_dep(name = "subject", version = "1.0.0")
+bazel_dep(name = "shared", version = "1.0.0")
