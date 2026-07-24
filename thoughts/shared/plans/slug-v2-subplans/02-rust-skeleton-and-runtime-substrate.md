@@ -321,6 +321,23 @@ Accepted implementation evidence (2026-07-22):
   input, symlink resolution, full Bazel glob syntax, and repository-aware
   listing identity remain later work.
 
+#### Current review packet — `WP-2-m1-spine-exit-audit` (2026-07-23)
+
+Review the complete Section 2.5 gate against the live checkout before changing
+production code. Trace the retained `WorkspaceRuntime` and every transaction
+handoff through root evaluation, loading, bzlmod, configured analysis, query,
+and the command/daemon paths. Separately inventory explicit present/absent file
+and directory inputs, create/edit/delete behavior, remaining production
+filesystem scans or fresh DICE construction, lock ownership across
+computations, and same-daemon tests that explain reuse and invalidation.
+
+The result is an exact pass/gap evidence table, not an M1 acceptance claim.
+Passing narrow fixtures and the serialized validation wrapper are supporting
+evidence only. If any clause is incomplete, return `REPLAN` with the smallest
+independently reviewable implementation packet, its exact file allowlist,
+oracle/source anchors, lifecycle evidence, exclusions, and stop conditions.
+This audit authorizes no Rust, fixture, dependency, DICE-key, or lock change.
+
 ### 2.6 First-Real-Build Promotion
 
 Before Stage 5-8 work can advance beyond scaffold status:

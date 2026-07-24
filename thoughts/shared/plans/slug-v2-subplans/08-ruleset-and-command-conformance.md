@@ -2821,3 +2821,24 @@ The lifecycle gate must remove and recreate the included `package_group`
 definition while leaving its BUILD package present, then assert the pinned
 top-root-wrapped missing-target diagnostic and recovery. Missing-package
 semantics remain unclaimed.
+
+Implementation commit `76025ede` activates `visible()` as the thirteenth of
+the 16 Bazel default loading-query functions. The once-evaluated predicate is
+materialized by printed label, input callback batches remain streamed, each
+passing candidate is emitted as a singleton delivery, fake callers retain the
+first representative's consuming-package ownership, and fake inputs are
+public. Real visibility uses non-recording existing-key lookups and fully
+resolves every restricted group root with fresh cycle state, include-first
+source order, local negatives, wrong-kind ignore, and top-root-wrapped missing
+target errors.
+
+All 25 exact `visible()` rows pass one-shot and through one retained daemon;
+the prior 12 non-`visible()` visibility rows remain green. Same-DICE tests prove
+formatting-only reuse of leaf/target/top/viewer, semantic reevaluation only of
+the changed leaf graph, included-group definition delete/recreate recovery,
+no filtering topology, and ordered singleton delivery shape. Root passed all
+61 query tests and 28 CLI/graph tests after rebuilding `slug_cli_v2`, plus
+formatting, diff, archive, and stale-daemon checks. Independent final review
+used one focused evidence correction, then returned `ACCEPT`. The remaining
+three functions depend on an exact Java-compatible `Pattern` substrate and
+remain deferred.

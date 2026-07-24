@@ -1561,3 +1561,12 @@ beyond already approved compact worklist/set shapes. It uses existing V2
 candidate IDs, label materialization, typed graph nodes, and package-graph DICE
 ownership. No V1 visibility parser, registry, evaluator, global state, or
 fallback enters the bounded activation.
+
+Commit `76025ede` lands that activation without importing V1 code or adding a
+DICE key, cache, lock, provenance representation, formatter, or fallback.
+Existing V2 candidate IDs, label materialization, streamed batches, typed
+visibility nodes, compact `SmallSet` cycle state, and package-graph DICE
+ownership were sufficient. The exact 25-row one-shot/daemon gate, ordered
+singleton-delivery regression, no-topology assertion, and cross-package
+format/restrict/delete/recreate lifecycle passed; independent final review
+returned `ACCEPT` after one evidence-only test strengthening.

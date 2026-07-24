@@ -883,3 +883,25 @@ three CLI `output_base_` daemon-reuse tests, and eight server
 because `/usr/bin/python3` has no `pytest` module; this remains an explicit
 environment residual, not a pass or a reason to weaken the daemon lanes.
 Sol-low returned final `ACCEPT`.
+
+### Visibility oracle and activation accepted (2026-07-23)
+
+Oracle commit `a376e30e` pins 39 Bazel 9.2 rows at immutable upstream commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`: 25 exact `visible()` commands,
+12 accepted non-`visible()` Stage 4 rows, and two Bazel-only flag-structure
+rows. Generation and two clean runs passed; all stable fields of the prior 36
+records remained unchanged and all 27 pinned source anchors resolved. The
+three final discriminators prove cross-package top/include traversal,
+real-first real/fake same-label streamed input, and label-keyed predicate
+materialization retaining the first fake caller's consuming package.
+Independent evidence review returned `ACCEPT`.
+
+Stage 8 implementation `76025ede` passes all 25 semantic rows exactly both
+one-shot and through one retained daemon, while preserving the 12-row Stage 4
+gate. Focused evidence covers universal and empty predicates, source/generated/
+BUILD/package-group/fake kinds, local-negative groups, cycles, wrong-kind and
+missing-target behavior, one-way Java visibility, no filtering topology,
+ordered singleton callback deliveries, and exact same-DICE cross-package
+reuse/invalidation/recovery. The two flag-structure rows remain Bazel-only.
+This activates the thirteenth default function; three Java `Pattern`-dependent
+functions and the rest of M3 remain open.
