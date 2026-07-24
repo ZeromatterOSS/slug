@@ -6,6 +6,10 @@ use std::time::SystemTime;
 
 use dice::DetectCycles;
 use dice::Dice;
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
@@ -140,6 +144,14 @@ fn try_load_package_with_extra_bzl(
                     Arc::new(directory_snapshot(workspace)),
                 )])
                 .unwrap();
+            inject_root_module_request_inputs(
+                &mut updater,
+                workspace,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+            )
+            .unwrap();
             let mut transaction = updater.commit().await;
             evaluator.evaluate_package(&mut transaction, package).await
         })

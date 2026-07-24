@@ -80,6 +80,7 @@ pub use module_eval::RootModuleGraph;
 pub use module_eval::RootModuleGraphKey;
 pub use module_eval::RootModuleLockfileMode;
 pub use module_eval::RootModuleLockfileModeKey;
+pub use module_eval::inject_root_module_request_inputs;
 pub use parser::ArchiveOverride;
 pub use parser::BazelDep;
 pub use parser::Directive;

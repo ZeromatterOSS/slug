@@ -11,6 +11,7 @@
 use std::fmt;
 
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
 
@@ -282,6 +283,21 @@ pub(crate) fn bzlmod_lockfile_mode(
     LockfileMode::from_bazel_flag_value(value).map_err(|message| {
         CommandParseError::InvalidFlagValue {
             flag: flag.raw.clone(),
+            message,
+        }
+    })
+}
+
+/// Normalize the value captured from `BZLMOD_ALLOW_YANKED_VERSIONS`.
+///
+/// Environment access belongs to the CLI request boundary; this function is
+/// deliberately pure so one-shot and daemon requests share identical parsing.
+pub fn normalize_bzlmod_environment_value(
+    value: Option<&str>,
+) -> Result<BzlmodEnvironmentPolicyKey, CommandParseError> {
+    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(value).map_err(|message| {
+        CommandParseError::InvalidFlagValue {
+            flag: "BZLMOD_ALLOW_YANKED_VERSIONS".to_owned(),
             message,
         }
     })

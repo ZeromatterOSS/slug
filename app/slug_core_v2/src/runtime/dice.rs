@@ -32,14 +32,9 @@ use slug_analysis_v2::ConfiguredTargetKey;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
-use slug_bzlmod_v2::RootModuleCommandPolicy;
-use slug_bzlmod_v2::RootModuleCommandPolicyKey;
-use slug_bzlmod_v2::RootModuleEnvironmentPolicy;
-use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
 use slug_bzlmod_v2::RootModuleGraph;
 use slug_bzlmod_v2::RootModuleGraphKey;
-use slug_bzlmod_v2::RootModuleLockfileMode;
-use slug_bzlmod_v2::RootModuleLockfileModeKey;
+use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
@@ -466,6 +461,29 @@ impl WorkspaceRuntime {
         order: QueryOrder,
         policy: QueryPolicy,
     ) -> Result<QueryOutput, QueryError> {
+        self.query_observations_with_policy_and_bzlmod_inputs(
+            observations,
+            expression,
+            order,
+            policy,
+            BzlmodCommandPolicyKey::from_flags(None, false).expect("default bzlmod policy"),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+                .expect("default bzlmod environment policy"),
+            LockfileMode::Update,
+        )
+    }
+
+    /// Evaluate a query with explicit normalized bzlmod request inputs.
+    pub fn query_observations_with_policy_and_bzlmod_inputs(
+        &self,
+        observations: WorkspaceObservation,
+        expression: &str,
+        order: QueryOrder,
+        policy: QueryPolicy,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+    ) -> Result<QueryOutput, QueryError> {
         let files = observations
             .files
             .into_iter()
@@ -511,6 +529,18 @@ impl WorkspaceRuntime {
                     directory_snapshot,
                 )])
                 .map_err(|error| QueryError::evaluation(error.to_string()))?;
+            inject_root_module_request_inputs(
+                &mut updater,
+                &self.workspace,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+            )
+            .map_err(|error| {
+                QueryError::evaluation(format!(
+                    "injecting normalized root module request inputs: {error}"
+                ))
+            })?;
             let mut transaction = updater.commit().await;
             evaluate_loading_query_with_policy(
                 &mut transaction,
@@ -658,30 +688,14 @@ impl WorkspaceRuntime {
                     directory_snapshot,
                 )])
                 .context("injecting workspace-directory observations")?;
-            updater
-                .changed_to(vec![(
-                    RootModuleCommandPolicyKey {
-                        workspace: self.workspace.clone(),
-                    },
-                    RootModuleCommandPolicy::from(command_policy),
-                )])
-                .context("injecting root module command policy")?;
-            updater
-                .changed_to(vec![(
-                    RootModuleEnvironmentPolicyKey {
-                        workspace: self.workspace.clone(),
-                    },
-                    RootModuleEnvironmentPolicy::from(environment_policy),
-                )])
-                .context("injecting root module environment policy")?;
-            updater
-                .changed_to(vec![(
-                    RootModuleLockfileModeKey {
-                        workspace: self.workspace.clone(),
-                    },
-                    RootModuleLockfileMode::from(lockfile_mode),
-                )])
-                .context("injecting root module lockfile mode")?;
+            inject_root_module_request_inputs(
+                &mut updater,
+                &self.workspace,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+            )
+            .context("injecting normalized root module request inputs")?;
             let mut transaction = updater.commit().await;
             let root_module_graph = transaction
                 .compute(&RootModuleGraphKey {
@@ -787,6 +801,27 @@ impl WorkspaceRuntime {
         })
     }
 
+    #[cfg(test)]
+    fn current_root_module_graph_for_test(&self) -> anyhow::Result<Arc<RootModuleGraph>> {
+        self.runtime.block_on(async {
+            let updater = self.dice.updater();
+            let mut transaction = updater.existing_state().await;
+            let graph = transaction
+                .compute(&RootModuleGraphKey {
+                    workspace: self.workspace.clone(),
+                })
+                .await
+                .context("reading retained root module graph through DICE")?;
+            Ok(Arc::new(
+                graph
+                    .as_ref()
+                    .as_ref()
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                    .clone(),
+            ))
+        })
+    }
+
     fn validate_file_observation(
         &self,
         observation: WorkspaceFileObservation,
@@ -872,12 +907,37 @@ pub fn evaluate_workspace_targets(
     workspace: impl Into<PathBuf>,
     targets: &[TargetPattern],
 ) -> anyhow::Result<WorkspaceBuildEvaluation> {
+    evaluate_workspace_targets_with_bzlmod_inputs(
+        workspace,
+        targets,
+        BzlmodCommandPolicyKey::from_flags(None, false).expect("default bzlmod policy"),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+            .expect("default bzlmod environment policy"),
+        LockfileMode::Update,
+    )
+}
+
+/// Evaluate root files and requested packages with explicit normalized
+/// bzlmod inputs on the one-shot retained runtime.
+pub fn evaluate_workspace_targets_with_bzlmod_inputs(
+    workspace: impl Into<PathBuf>,
+    targets: &[TargetPattern],
+    command_policy: BzlmodCommandPolicyKey,
+    environment_policy: BzlmodEnvironmentPolicyKey,
+    lockfile_mode: LockfileMode,
+) -> anyhow::Result<WorkspaceBuildEvaluation> {
     let workspace = workspace.into();
     let workspace = workspace
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
     let runtime = WorkspaceRuntime::new(&workspace)?;
-    runtime.evaluate_observations(observe_workspace(&workspace)?, targets)
+    runtime.evaluate_observations_with_bzlmod_inputs(
+        observe_workspace(&workspace)?,
+        targets,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+    )
 }
 
 /// Resolve a target pattern to its workspace-relative package directory.
@@ -1050,6 +1110,84 @@ mod tests {
             unchanged,
             probed_directory_value(&deleted_directories, &unrelated)
         );
+    }
+
+    #[test]
+    fn explicit_query_inputs_restore_all_root_module_values_a_b_a() {
+        use slug_identity_v2::ApparentRepoName;
+
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        fs::write(
+            root.join("MODULE.bazel"),
+            "module(name = \"root\")\nbazel_dep(name = \"dev_dep\", version = \"1.0\", dev_dependency = True)\n",
+        )
+        .unwrap();
+        fs::create_dir(root.join("pkg")).unwrap();
+        fs::write(
+            root.join("pkg/BUILD.bazel"),
+            "filegroup(name = \"probe\")\n",
+        )
+        .unwrap();
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let query = |command, environment, mode| {
+            runtime
+                .query_observations_with_policy_and_bzlmod_inputs(
+                    observe_workspace(&root).unwrap(),
+                    "//pkg:probe",
+                    QueryOrder::Auto,
+                    QueryPolicy::default(),
+                    command,
+                    environment,
+                    mode,
+                )
+                .unwrap()
+        };
+
+        assert_eq!(
+            query(
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+            )
+            .stdout(),
+            "//pkg:probe\n"
+        );
+        let first = runtime.current_root_module_graph_for_test().unwrap();
+        assert_eq!(
+            query(
+                BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+                LockfileMode::Off,
+            )
+            .stdout(),
+            "//pkg:probe\n"
+        );
+        let middle = runtime.current_root_module_graph_for_test().unwrap();
+        assert_eq!(
+            query(
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+            )
+            .stdout(),
+            "//pkg:probe\n"
+        );
+        let last = runtime.current_root_module_graph_for_test().unwrap();
+
+        let dev_dep = ApparentRepoName::new("dev_dep").unwrap();
+        assert_eq!(
+            first.repository_mapping.resolve(&dev_dep).as_str(),
+            "dev_dep+"
+        );
+        assert_eq!(
+            middle.repository_mapping.resolve(&dev_dep).as_str(),
+            "dev_dep"
+        );
+        assert_ne!(first.command_policy, middle.command_policy);
+        assert_ne!(first.environment_policy, middle.environment_policy);
+        assert_ne!(first.lockfile_mode, middle.lockfile_mode);
+        assert_eq!(first.as_ref(), last.as_ref());
     }
 
     fn probed_directory_value(

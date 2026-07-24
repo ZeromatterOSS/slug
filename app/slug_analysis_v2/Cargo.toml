@@ -21,4 +21,5 @@ starlark = { workspace = true }
 starlark_map = { workspace = true }
 
 [dev-dependencies]
+slug_bzlmod_v2 = { workspace = true }
 tokio = { workspace = true }

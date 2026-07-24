@@ -10,27 +10,45 @@
 
 use slug_commands_v2::CommandKind;
 use slug_commands_v2::QueryOutputFormat;
+use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::query::QueryRequest;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::evaluate_workspace_query_with_policy;
+use slug_core_v2::runtime::evaluate_workspace_query_with_policy_and_bzlmod_inputs;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    if let Some(output_base) = super::build::extract_output_base(&argv) {
-        return run_daemon_query(&argv, &output_base);
-    }
     let request = match QueryRequest::parse(&argv) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Query, argv, Err(error)),
     };
+    let environment_value = match super::build::capture_bzlmod_allow_yanked_versions() {
+        Ok(value) => value,
+        Err(error) => return super::emit_result(CommandKind::Query, argv, Err(error)),
+    };
+    let environment_policy = match normalize_bzlmod_environment_value(environment_value.as_deref())
+    {
+        Ok(policy) => policy,
+        Err(error) => return super::emit_result(CommandKind::Query, argv, Err(error)),
+    };
+    if let Some(output_base) = super::build::extract_output_base(&argv) {
+        let bzlmod = slug_server_v2::BzlmodRequestInputs::from_normalized(
+            &request.bzlmod_policy,
+            &environment_policy,
+            &request.lockfile_mode,
+        );
+        return run_daemon_query(&output_base, request, bzlmod);
+    }
     let workspace = match std::env::current_dir() {
         Ok(workspace) => workspace,
         Err(error) => return emit_error(7, &error.to_string(), "one-shot"),
     };
-    match evaluate_workspace_query_with_policy(
+    match evaluate_workspace_query_with_policy_and_bzlmod_inputs(
         &workspace,
         &request.expression,
         request.order,
         request.policy,
+        request.bzlmod_policy,
+        environment_policy,
+        request.lockfile_mode,
     ) {
         Ok(output) => {
             let stdout = match request.output {
@@ -53,7 +71,11 @@ pub fn run(argv: Vec<String>) -> i32 {
     }
 }
 
-fn run_daemon_query(argv: &[String], output_base: &str) -> i32 {
+fn run_daemon_query(
+    output_base: &str,
+    request: QueryRequest,
+    bzlmod: slug_server_v2::BzlmodRequestInputs,
+) -> i32 {
     let output_base = std::path::Path::new(output_base);
     if let Err(error) = std::fs::create_dir_all(output_base) {
         return emit_error(7, &error.to_string(), "daemon");
@@ -64,18 +86,13 @@ fn run_daemon_query(argv: &[String], output_base: &str) -> i32 {
             return emit_error(7, &error.to_string(), "daemon");
         }
     }
-    let request = match QueryRequest::parse(argv) {
-        Ok(request) => request,
-        Err(error) => {
-            return super::emit_result(CommandKind::Query, argv.to_vec(), Err(error));
-        }
-    };
     let request = slug_server_v2::QueryRequest {
         expression: request.expression,
         order_output: request.order.to_string(),
         output: request.output.to_string(),
         graph_factored: request.graph_factored,
         strict_test_suite: request.policy.strict_test_suite,
+        bzlmod,
     };
     match slug_server_v2::send_query_request(&socket, &request) {
         Ok(response) => {

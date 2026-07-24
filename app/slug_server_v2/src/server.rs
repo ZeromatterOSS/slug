@@ -21,6 +21,10 @@ use std::path::PathBuf;
 use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_identity_v2::TargetPattern;
 use slug_reapi_v2::RemoteConfig;
 
@@ -32,6 +36,8 @@ pub struct BuildRequest {
     pub targets: Vec<String>,
     pub executor: Option<String>,
     pub default_exec_properties: Vec<(String, String)>,
+    #[serde(default)]
+    pub bzlmod: BzlmodRequestInputs,
 }
 
 /// A loading query request sent over the same daemon protocol.
@@ -45,6 +51,91 @@ pub struct QueryRequest {
     pub graph_factored: bool,
     #[serde(default)]
     pub strict_test_suite: bool,
+    #[serde(default)]
+    pub bzlmod: BzlmodRequestInputs,
+}
+
+/// Stable primitive wire representation for one bzlmod request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BzlmodRequestInputs {
+    #[serde(default)]
+    pub command_allow_yanked_versions: Option<String>,
+    #[serde(default)]
+    pub ignore_dev_dependency: bool,
+    #[serde(default)]
+    pub environment_allow_yanked_versions: Option<String>,
+    #[serde(default = "default_lockfile_mode")]
+    pub lockfile_mode: String,
+}
+
+impl Default for BzlmodRequestInputs {
+    fn default() -> Self {
+        Self {
+            command_allow_yanked_versions: None,
+            ignore_dev_dependency: false,
+            environment_allow_yanked_versions: None,
+            lockfile_mode: default_lockfile_mode(),
+        }
+    }
+}
+
+impl BzlmodRequestInputs {
+    pub fn from_normalized(
+        command: &BzlmodCommandPolicyKey,
+        environment: &BzlmodEnvironmentPolicyKey,
+        mode: &LockfileMode,
+    ) -> Self {
+        Self {
+            command_allow_yanked_versions: canonical_yanked_policy(
+                command.yanked_versions_policy(),
+            ),
+            ignore_dev_dependency: command.ignore_dev_dependency(),
+            environment_allow_yanked_versions: canonical_yanked_policy(
+                environment.yanked_versions_policy(),
+            ),
+            lockfile_mode: mode.as_str().to_owned(),
+        }
+    }
+
+    fn normalize(
+        &self,
+    ) -> Result<
+        (
+            BzlmodCommandPolicyKey,
+            BzlmodEnvironmentPolicyKey,
+            LockfileMode,
+        ),
+        String,
+    > {
+        Ok((
+            BzlmodCommandPolicyKey::from_flags(
+                self.command_allow_yanked_versions.as_deref(),
+                self.ignore_dev_dependency,
+            )?,
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
+                self.environment_allow_yanked_versions.as_deref(),
+            )?,
+            LockfileMode::from_bazel_flag_value(&self.lockfile_mode)?,
+        ))
+    }
+}
+
+fn canonical_yanked_policy(policy: &YankedVersionPolicy) -> Option<String> {
+    match policy {
+        YankedVersionPolicy::Reject => None,
+        YankedVersionPolicy::AllowAll => Some("all".to_owned()),
+        YankedVersionPolicy::AllowList(allowed) => Some(
+            allowed
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(","),
+        ),
+    }
+}
+
+fn default_lockfile_mode() -> String {
+    "update".to_owned()
 }
 
 fn default_query_output() -> String {
@@ -113,7 +204,7 @@ pub fn serve(socket_path: impl AsRef<Path>, workspace: impl AsRef<Path>) -> anyh
     Ok(())
 }
 
-fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
+pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
     let request: DaemonRequest = match serde_json::from_str(request_json) {
         Ok(req) => req,
         Err(error) => {
@@ -130,13 +221,25 @@ fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
     };
     match request {
         DaemonRequest::Build(request) => {
+            let (command_policy, environment_policy, lockfile_mode) =
+                match request.bzlmod.normalize() {
+                    Ok(inputs) => inputs,
+                    Err(error) => return malformed_bzlmod_response(error),
+                };
             let targets: Vec<TargetPattern> = request
                 .targets
                 .iter()
                 .filter_map(|t| TargetPattern::parse(t).ok())
                 .collect();
             let remote = build_remote_config(&request);
-            let result = daemon.build(&targets, &remote, &[]);
+            let result = daemon.build_with_bzlmod_inputs(
+                &targets,
+                &remote,
+                &[],
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+            );
             DaemonResponse {
                 exit_code: result.exit_code,
                 stdout: result.stdout,
@@ -145,6 +248,11 @@ fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
             }
         }
         DaemonRequest::Query(request) => {
+            let (command_policy, environment_policy, lockfile_mode) =
+                match request.bzlmod.normalize() {
+                    Ok(inputs) => inputs,
+                    Err(error) => return malformed_bzlmod_response(error),
+                };
             let order = match slug_query_v2::QueryOrder::parse(&request.order_output) {
                 Ok(order) => order,
                 Err(error) => {
@@ -156,7 +264,7 @@ fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
                     };
                 }
             };
-            let result = daemon.query_with_output_and_policy(
+            let result = daemon.query_with_output_policy_and_bzlmod_inputs(
                 &request.expression,
                 order,
                 &request.output,
@@ -164,6 +272,9 @@ fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
                 slug_query_v2::QueryPolicy {
                     strict_test_suite: request.strict_test_suite,
                 },
+                command_policy,
+                environment_policy,
+                lockfile_mode,
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -172,6 +283,18 @@ fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonResponse {
                 invalidated_files: result.invalidated_files,
             }
         }
+    }
+}
+
+fn malformed_bzlmod_response(error: String) -> DaemonResponse {
+    DaemonResponse {
+        exit_code: 2,
+        stdout: String::new(),
+        stderr: format!(
+            "{{\"error\":\"bzlmod_request_error\",\"message\":\"{}\"}}",
+            slug_core_v2::error::json_escape(&error)
+        ),
+        invalidated_files: 0,
     }
 }
 
@@ -216,6 +339,7 @@ pub fn send_build_request(
         targets: request.targets.clone(),
         executor: request.executor.clone(),
         default_exec_properties: request.default_exec_properties.clone(),
+        bzlmod: request.bzlmod.clone(),
     }))
     .context("serializing build request for daemon")?;
     write!(stream, "{json}\n").context("sending build request to daemon")?;
@@ -238,6 +362,7 @@ pub fn send_query_request(
         output: request.output.clone(),
         graph_factored: request.graph_factored,
         strict_test_suite: request.strict_test_suite,
+        bzlmod: request.bzlmod.clone(),
     }))
     .context("serializing query request for daemon")?;
     write!(stream, "{json}\n").context("sending query request to daemon")?;

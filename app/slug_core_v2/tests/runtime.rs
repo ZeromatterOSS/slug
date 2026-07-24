@@ -159,6 +159,47 @@ fn retained_runtime_exposes_typed_root_graph_for_a_b_a_request_inputs() {
 }
 
 #[test]
+fn explicit_query_bzlmod_inputs_initialize_fresh_runtime_and_do_not_leak() {
+    let workspace = tempfile::tempdir().unwrap();
+    fs::write(
+        workspace.path().join("MODULE.bazel"),
+        "module(name = \"runtime_test\")\nbazel_dep(name = \"dev_dep\", version = \"1.0\", dev_dependency = True)\n",
+    )
+    .unwrap();
+    fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
+    fs::create_dir_all(workspace.path().join("pkg")).unwrap();
+    fs::write(
+        workspace.path().join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    )
+    .unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+    let observe = || observe_workspace(workspace.path()).unwrap();
+    let query = runtime
+        .query_observations_with_policy_and_bzlmod_inputs(
+            observe(),
+            "//pkg:probe",
+            QueryOrder::Auto,
+            QueryPolicy::default(),
+            BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+            LockfileMode::Off,
+        )
+        .unwrap();
+    assert_eq!(query.stdout(), "//pkg:probe\n");
+
+    let default_build = runtime.evaluate_observations(observe(), &[]).unwrap();
+    assert_eq!(
+        default_build
+            .root_module_graph
+            .repository_mapping
+            .resolve(&ApparentRepoName::new("dev_dep").unwrap())
+            .as_str(),
+        "dev_dep+"
+    );
+}
+
+#[test]
 fn retained_runtime_uses_root_graph_for_supported_module_directives() {
     let workspace = tempfile::tempdir().unwrap();
     fs::write(

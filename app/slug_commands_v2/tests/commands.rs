@@ -15,6 +15,7 @@ use slug_commands_v2::QueryOutputFormat;
 use slug_commands_v2::aquery::AqueryRequest;
 use slug_commands_v2::build::BuildRequest;
 use slug_commands_v2::cquery::CqueryRequest;
+use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::query::QueryRequest;
 use slug_commands_v2::run::RunRequest;
 use slug_commands_v2::test::TestRequest;
@@ -129,6 +130,49 @@ fn bzlmod_policy_flags_report_structured_parse_errors() {
     assert!(allow_error.contains("module@version"));
     assert!(bool_error.contains("expected a boolean value"));
     assert!(lockfile_error.contains("Not a valid Lockfile mode"));
+}
+
+#[test]
+fn build_bzlmod_inputs_normalize_default_override_default_without_state() {
+    let default_a = BuildRequest::parse(&["//pkg:bin"]).unwrap();
+    let override_request = BuildRequest::parse(&[
+        "--allow_yanked_versions=yyy@1.0.0",
+        "--ignore_dev_dependency",
+        "--lockfile_mode=error",
+        "//pkg:bin",
+    ])
+    .unwrap();
+    let default_b = BuildRequest::parse(&["//pkg:bin"]).unwrap();
+
+    assert_eq!(
+        default_a.bzlmod_policy.stable_serialize(),
+        "allow_yanked=reject;ignore_dev_dependency=false"
+    );
+    assert_eq!(
+        override_request.bzlmod_policy.stable_serialize(),
+        "allow_yanked=[yyy@1.0.0];ignore_dev_dependency=true"
+    );
+    assert_eq!(override_request.lockfile_mode, LockfileMode::Error);
+    assert_eq!(default_a.bzlmod_policy, default_b.bzlmod_policy);
+    assert_eq!(default_a.lockfile_mode, default_b.lockfile_mode);
+}
+
+#[test]
+fn environment_value_normalization_is_pure_and_source_specific() {
+    let default_a = normalize_bzlmod_environment_value(None).unwrap();
+    let allow = normalize_bzlmod_environment_value(Some("zzz@2.0.0, yyy@1.0.0")).unwrap();
+    let default_b = normalize_bzlmod_environment_value(None).unwrap();
+    assert_eq!(default_a, default_b);
+    assert_eq!(
+        allow.stable_serialize(),
+        "allow_yanked=[yyy@1.0.0,zzz@2.0.0]"
+    );
+
+    let error = normalize_bzlmod_environment_value(Some("not-a-module"))
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("BZLMOD_ALLOW_YANKED_VERSIONS"), "{error}");
+    assert!(error.contains("module@version"), "{error}");
 }
 
 #[test]

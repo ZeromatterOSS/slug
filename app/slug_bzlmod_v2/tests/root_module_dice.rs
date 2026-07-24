@@ -15,6 +15,7 @@ use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLockfileMode;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
+use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_identity_v2::ApparentRepoName;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceSnapshot;
@@ -185,6 +186,39 @@ async fn root_graph_requires_explicit_injected_request_values() {
             .to_string();
         assert!(error.contains(expected), "{error}");
     }
+}
+
+#[tokio::test]
+async fn request_input_helper_populates_the_complete_fail_closed_triplet() {
+    let workspace = workspace();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            snapshot([(
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new("module(name = 'root')".to_owned())),
+            )]),
+        )])
+        .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        &workspace,
+        BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("dep@1.0")).unwrap(),
+        LockfileMode::Off,
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let graph = transaction
+        .compute(&RootModuleGraphKey { workspace })
+        .await
+        .unwrap();
+    let graph = graph.as_ref().as_ref().unwrap();
+    assert!(graph.command_policy.ignore_dev_dependency());
 }
 
 #[tokio::test]

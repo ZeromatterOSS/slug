@@ -17,6 +17,9 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::WorkspaceObservation;
 use slug_core_v2::runtime::WorkspaceRuntime;
@@ -37,6 +40,8 @@ pub struct Daemon {
     workspace: PathBuf,
     runtime: WorkspaceRuntime,
     observations: FilesystemObservationAdapter,
+    #[cfg(test)]
+    forwarded_bzlmod_inputs: Vec<crate::server::BzlmodRequestInputs>,
 }
 
 impl Daemon {
@@ -50,6 +55,8 @@ impl Daemon {
             workspace,
             runtime,
             observations: FilesystemObservationAdapter::default(),
+            #[cfg(test)]
+            forwarded_bzlmod_inputs: Vec::new(),
         })
     }
 
@@ -62,13 +69,46 @@ impl Daemon {
         remote: &RemoteConfig,
         argv: &[String],
     ) -> BuildResult {
+        self.build_with_bzlmod_inputs(
+            targets,
+            remote,
+            argv,
+            BzlmodCommandPolicyKey::from_flags(None, false).expect("default bzlmod policy"),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+                .expect("default bzlmod environment policy"),
+            LockfileMode::Update,
+        )
+    }
+
+    pub fn build_with_bzlmod_inputs(
+        &mut self,
+        targets: &[TargetPattern],
+        remote: &RemoteConfig,
+        argv: &[String],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+    ) -> BuildResult {
         let (observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
                 return BuildResult::error("build_runtime_error", &error.to_string());
             }
         };
-        let evaluation = match self.runtime.evaluate_observations(observations, targets) {
+        #[cfg(test)]
+        self.forwarded_bzlmod_inputs
+            .push(crate::server::BzlmodRequestInputs::from_normalized(
+                &command_policy,
+                &environment_policy,
+                &lockfile_mode,
+            ));
+        let evaluation = match self.runtime.evaluate_observations_with_bzlmod_inputs(
+            observations,
+            targets,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+        ) {
             Ok(eval) => eval,
             Err(error) => {
                 return BuildResult::error("build_runtime_error", &error.to_string());
@@ -174,16 +214,54 @@ impl Daemon {
         graph_factored: bool,
         policy: QueryPolicy,
     ) -> QueryResult {
+        self.query_with_output_policy_and_bzlmod_inputs(
+            expression,
+            order,
+            output_format,
+            graph_factored,
+            policy,
+            BzlmodCommandPolicyKey::from_flags(None, false).expect("default bzlmod policy"),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+                .expect("default bzlmod environment policy"),
+            LockfileMode::Update,
+        )
+    }
+
+    pub fn query_with_output_policy_and_bzlmod_inputs(
+        &mut self,
+        expression: &str,
+        order: QueryOrder,
+        output_format: &str,
+        graph_factored: bool,
+        policy: QueryPolicy,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+    ) -> QueryResult {
         let (observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
                 return QueryResult::error(7, &error.to_string());
             }
         };
+        #[cfg(test)]
+        self.forwarded_bzlmod_inputs
+            .push(crate::server::BzlmodRequestInputs::from_normalized(
+                &command_policy,
+                &environment_policy,
+                &lockfile_mode,
+            ));
         match self
             .runtime
-            .query_observations_with_policy(observations, expression, order, policy)
-        {
+            .query_observations_with_policy_and_bzlmod_inputs(
+                observations,
+                expression,
+                order,
+                policy,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+            ) {
             Ok(output) => {
                 let stdout = match output_format {
                     "text" => output.stdout(),
@@ -213,6 +291,11 @@ impl Daemon {
                 invalidated_files: invalidated,
             },
         }
+    }
+
+    #[cfg(test)]
+    fn take_forwarded_bzlmod_inputs_for_test(&mut self) -> Vec<crate::server::BzlmodRequestInputs> {
+        std::mem::take(&mut self.forwarded_bzlmod_inputs)
     }
 }
 
@@ -304,6 +387,7 @@ mod server;
 
 pub use server::BuildRequest;
 pub use server::BuildResponse;
+pub use server::BzlmodRequestInputs;
 pub use server::DaemonRequest;
 pub use server::DaemonResponse;
 pub use server::QueryRequest;

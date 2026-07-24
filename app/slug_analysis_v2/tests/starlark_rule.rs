@@ -25,6 +25,10 @@ use slug_analysis_v2::ConfiguredTargetAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ProviderId;
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
@@ -162,6 +166,14 @@ async fn analyze_revision(
             Arc::new(directory_snapshot(workspace)),
         )])
         .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
     let mut transaction = updater.commit().await;
     let result = transaction
         .compute(&ConfiguredTargetAnalysisKey {
@@ -253,6 +265,14 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
                     Arc::new(directory_snapshot(&workspace)),
                 )])
                 .unwrap();
+            inject_root_module_request_inputs(
+                &mut updater,
+                &workspace,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+            )
+            .unwrap();
             let mut transaction = updater.commit().await;
             let value = transaction
                 .compute(&ConfiguredTargetAnalysisKey {
@@ -341,6 +361,14 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
             Arc::new(directory_snapshot(&workspace)),
         )])
         .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        &workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
     let mut transaction = updater.commit().await;
     let configuration = ConfigurationKey::target("recursive").unwrap();
     let result = transaction

@@ -13,16 +13,21 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryPolicy;
 use slug_reapi_v2::RemoteConfig;
 
 use crate::BuildRequest;
+use crate::BzlmodRequestInputs;
 use crate::Daemon;
 use crate::DaemonRequest;
 use crate::DaemonResponse;
 use crate::QueryRequest;
+use crate::server::handle_request;
 
 fn scratch(name: &str) -> PathBuf {
     let nanos = SystemTime::now()
@@ -55,6 +60,74 @@ fn remote_disabled() -> RemoteConfig {
 
 fn target(label: &str) -> TargetPattern {
     TargetPattern::parse(label).unwrap()
+}
+
+#[test]
+fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
+    let workspace = scratch("bzlmod-request-local");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"demo\")\nbazel_dep(name = \"dev_dep\", version = \"1.0\", dev_dependency = True)\n",
+    );
+    write(&workspace.join("BUILD.bazel"), "");
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let defaults = || {
+        (
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+    };
+    let overrides = || {
+        (
+            BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+            LockfileMode::Off,
+        )
+    };
+    let expected = vec![
+        BzlmodRequestInputs::default(),
+        BzlmodRequestInputs {
+            command_allow_yanked_versions: Some("all".to_owned()),
+            ignore_dev_dependency: true,
+            environment_allow_yanked_versions: Some("all".to_owned()),
+            lockfile_mode: "off".to_owned(),
+        },
+        BzlmodRequestInputs::default(),
+    ];
+
+    for inputs in [defaults(), overrides(), defaults()] {
+        let result = daemon.build_with_bzlmod_inputs(
+            &[target("//pkg:probe")],
+            &remote_disabled(),
+            &[],
+            inputs.0,
+            inputs.1,
+            inputs.2,
+        );
+        assert!(!result.stderr.contains("build_runtime_error"), "{result:?}");
+    }
+    assert_eq!(daemon.take_forwarded_bzlmod_inputs_for_test(), expected);
+
+    for inputs in [defaults(), overrides(), defaults()] {
+        let result = daemon.query_with_output_policy_and_bzlmod_inputs(
+            "//pkg:probe",
+            QueryOrder::Auto,
+            "text",
+            true,
+            QueryPolicy::default(),
+            inputs.0,
+            inputs.1,
+            inputs.2,
+        );
+        assert_eq!(result.exit_code, 0, "{result:?}");
+        assert_eq!(result.stdout, "//pkg:probe\n");
+    }
+    assert_eq!(daemon.take_forwarded_bzlmod_inputs_for_test(), expected);
 }
 
 const DEFS_BZL: &str = "\
@@ -201,6 +274,7 @@ fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
         output: "graph".to_owned(),
         graph_factored: false,
         strict_test_suite: true,
+        bzlmod: BzlmodRequestInputs::default(),
     });
     let json = serde_json::to_value(request).unwrap();
     assert_eq!(json["kind"], "query");
@@ -209,7 +283,7 @@ fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
     assert_eq!(json["request"]["output"], "graph");
     assert_eq!(json["request"]["graph_factored"], false);
     assert_eq!(json["request"]["strict_test_suite"], true);
-    assert_eq!(json["request"].as_object().unwrap().len(), 5);
+    assert_eq!(json["request"].as_object().unwrap().len(), 6);
 
     let old: DaemonRequest = serde_json::from_str(
         r#"{"kind":"query","request":{"expression":"//pkg:bin","order_output":"auto"}}"#,
@@ -221,6 +295,7 @@ fn tagged_query_protocol_carries_output_and_preserves_old_request_defaults() {
     assert_eq!(old.output, "text");
     assert!(old.graph_factored);
     assert!(!old.strict_test_suite);
+    assert_eq!(old.bzlmod, BzlmodRequestInputs::default());
 }
 
 #[test]
@@ -296,6 +371,7 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
             ("cpu".to_owned(), "x86_64".to_owned()),
             ("os".to_owned(), "linux".to_owned()),
         ],
+        bzlmod: BzlmodRequestInputs::default(),
     });
     let json = serde_json::to_string(&request).unwrap();
     let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
@@ -324,6 +400,88 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     assert!(response.stdout.is_empty());
     assert_eq!(response.stderr, "{\"error\":\"analysis_not_implemented\"}");
     assert_eq!(response.invalidated_files, 3);
+}
+
+#[test]
+fn bzlmod_protocol_is_primitive_canonical_and_backward_compatible() {
+    let default_command = BzlmodCommandPolicyKey::from_flags(None, false).unwrap();
+    let override_command =
+        BzlmodCommandPolicyKey::from_flags(Some("zzz@2.0.0,yyy@1.0.0"), true).unwrap();
+    let default_environment =
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap();
+    let override_environment =
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap();
+    let default_a = BzlmodRequestInputs::from_normalized(
+        &default_command,
+        &default_environment,
+        &LockfileMode::Update,
+    );
+    let override_inputs = BzlmodRequestInputs::from_normalized(
+        &override_command,
+        &override_environment,
+        &LockfileMode::Error,
+    );
+    let default_b = BzlmodRequestInputs::from_normalized(
+        &default_command,
+        &default_environment,
+        &LockfileMode::Update,
+    );
+    assert_eq!(default_a, default_b);
+    assert_eq!(
+        override_inputs.command_allow_yanked_versions.as_deref(),
+        Some("yyy@1.0.0,zzz@2.0.0")
+    );
+    assert_eq!(
+        override_inputs.environment_allow_yanked_versions.as_deref(),
+        Some("all")
+    );
+    assert!(override_inputs.ignore_dev_dependency);
+    assert_eq!(override_inputs.lockfile_mode, "error");
+
+    let old: DaemonRequest = serde_json::from_str(
+        r#"{"kind":"build","request":{"targets":["//pkg:probe"],"executor":null,"default_exec_properties":[]}}"#,
+    )
+    .unwrap();
+    let DaemonRequest::Build(old) = old else {
+        panic!("expected old build request");
+    };
+    assert_eq!(old.bzlmod, BzlmodRequestInputs::default());
+}
+
+#[test]
+fn malformed_bzlmod_protocol_input_is_request_local() {
+    let workspace = scratch("bzlmod-malformed-request");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    for (request, expected_error) in [
+        (
+            r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"command_allow_yanked_versions":"not-a-module"}}}"#,
+            "module@version",
+        ),
+        (
+            r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"environment_allow_yanked_versions":"not-a-module"}}}"#,
+            "BZLMOD_ALLOW_YANKED_VERSIONS",
+        ),
+        (
+            r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"lockfile_mode":"invalid"}}}"#,
+            "Not a valid Lockfile mode",
+        ),
+    ] {
+        let malformed = handle_request(&mut daemon, request);
+        assert_eq!(malformed.exit_code, 2);
+        assert!(malformed.stderr.contains(expected_error), "{malformed:?}");
+
+        let recovered = handle_request(
+            &mut daemon,
+            r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto"}}"#,
+        );
+        assert_eq!(recovered.exit_code, 0, "{recovered:?}");
+        assert_eq!(recovered.stdout, "//pkg:probe\n");
+    }
 }
 
 #[test]

@@ -23,6 +23,7 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_identity_v2::CanonicalLabel;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
@@ -885,6 +886,20 @@ impl Key for PackageLoadKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        let root_module_graph_value = match ctx
+            .compute(&RootModuleGraphKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+        };
+        let root_module_graph = match root_module_graph_value.as_ref() {
+            Ok(graph) => graph,
+            Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+        };
+        let _repository_mapping = &root_module_graph.repository_mapping;
         let listing = match ctx
             .compute(&PackageListingKey {
                 workspace: self.workspace.clone(),

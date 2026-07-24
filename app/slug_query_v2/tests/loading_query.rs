@@ -11,6 +11,10 @@ use dice::DetectCycles;
 use dice::Dice;
 use dice::DynKey;
 use dice::UserComputationData;
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::VisibilitySource;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
@@ -110,6 +114,14 @@ async fn transaction(dice: &Arc<Dice>, workspace: &Path) -> dice::DiceTransactio
             Arc::new(directories),
         )])
         .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
     updater.commit().await
 }
 
@@ -225,6 +237,14 @@ async fn query_revision_order_with_policy(
             Arc::new(directories),
         )])
         .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
     let mut transaction = updater.commit().await;
     let result = evaluate_loading_query_with_policy(
         &mut transaction,

@@ -22,6 +22,7 @@ pub use dice::WorkspaceRevision;
 pub use dice::WorkspaceRuntime;
 pub use dice::evaluate_workspace;
 pub use dice::evaluate_workspace_targets;
+pub use dice::evaluate_workspace_targets_with_bzlmod_inputs;
 pub use dice::observe_workspace;
 pub use dice::observe_workspace_files;
 
@@ -46,11 +47,41 @@ pub fn evaluate_workspace_query_with_policy(
     order: slug_query_v2::QueryOrder,
     policy: slug_query_v2::QueryPolicy,
 ) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
+    evaluate_workspace_query_with_policy_and_bzlmod_inputs(
+        workspace,
+        expression,
+        order,
+        policy,
+        slug_bzlmod_v2::BzlmodCommandPolicyKey::from_flags(None, false)
+            .expect("default bzlmod policy"),
+        slug_bzlmod_v2::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+            .expect("default bzlmod environment policy"),
+        slug_bzlmod_v2::LockfileMode::Update,
+    )
+}
+
+pub fn evaluate_workspace_query_with_policy_and_bzlmod_inputs(
+    workspace: &std::path::Path,
+    expression: &str,
+    order: slug_query_v2::QueryOrder,
+    policy: slug_query_v2::QueryPolicy,
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
     let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
     let observations = observe_workspace(workspace)
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
-    runtime.query_observations_with_policy(observations, expression, order, policy)
+    runtime.query_observations_with_policy_and_bzlmod_inputs(
+        observations,
+        expression,
+        order,
+        policy,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

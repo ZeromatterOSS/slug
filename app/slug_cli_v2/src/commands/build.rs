@@ -9,23 +9,40 @@
  */
 
 use slug_commands_v2::CommandKind;
+use slug_commands_v2::CommandParseError;
 use slug_commands_v2::build::BuildRequest;
+use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::evaluate_workspace_targets;
+use slug_core_v2::runtime::evaluate_workspace_targets_with_bzlmod_inputs;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    // Daemon mode: when --output_base is set, route through the persistent
-    // daemon so DICE state survives across builds (gate clause 5).
-    if let Some(output_base) = extract_output_base(&argv) {
-        return run_daemon_build(&argv, &output_base);
-    }
-
     let request = match BuildRequest::parse(&argv) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
     };
+    let environment_value = match capture_bzlmod_allow_yanked_versions() {
+        Ok(value) => value,
+        Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
+    };
+    let environment_policy = match normalize_bzlmod_environment_value(environment_value.as_deref())
+    {
+        Ok(policy) => policy,
+        Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
+    };
+
+    // Daemon mode: when --output_base is set, route through the persistent
+    // daemon so DICE state survives across builds (gate clause 5).
+    if let Some(output_base) = extract_output_base(&argv) {
+        let bzlmod = slug_server_v2::BzlmodRequestInputs::from_normalized(
+            &request.bzlmod_policy,
+            &environment_policy,
+            &request.lockfile_mode,
+        );
+        return run_daemon_build(&argv, &output_base, request, bzlmod);
+    }
+
     let workspace = match std::env::current_dir() {
         Ok(workspace) => workspace,
         Err(error) => {
@@ -37,7 +54,13 @@ pub fn run(argv: Vec<String>) -> i32 {
         }
     };
 
-    match evaluate_workspace_targets(&workspace, &request.targets) {
+    match evaluate_workspace_targets_with_bzlmod_inputs(
+        &workspace,
+        &request.targets,
+        request.bzlmod_policy.clone(),
+        environment_policy,
+        request.lockfile_mode.clone(),
+    ) {
         Ok(evaluation) => {
             let argv_json = argv
                 .iter()
@@ -259,7 +282,12 @@ pub(super) fn extract_output_base(argv: &[String]) -> Option<String> {
 /// Run a build through the persistent daemon. If the daemon is not running,
 /// start it as a background process first. The daemon holds DICE state across
 /// builds so `.bzl` edits are invalidated and replayed in the same process.
-fn run_daemon_build(argv: &[String], output_base: &str) -> i32 {
+fn run_daemon_build(
+    argv: &[String],
+    output_base: &str,
+    request: BuildRequest,
+    bzlmod: slug_server_v2::BzlmodRequestInputs,
+) -> i32 {
     let output_base_path = std::path::Path::new(output_base);
     let _ = std::fs::create_dir_all(output_base_path);
     let socket = slug_server_v2::socket_path(output_base_path);
@@ -275,11 +303,6 @@ fn run_daemon_build(argv: &[String], output_base: &str) -> i32 {
         }
     }
 
-    // Parse targets and remote config from argv.
-    let request = match BuildRequest::parse(argv) {
-        Ok(request) => request,
-        Err(error) => return super::emit_result(CommandKind::Build, argv.to_vec(), Err(error)),
-    };
     let remote_args: Vec<&str> = argv.iter().map(String::as_str).collect();
     let remote = match RemoteConfig::from_args(&remote_args) {
         Ok(remote) => remote,
@@ -300,6 +323,7 @@ fn run_daemon_build(argv: &[String], output_base: &str) -> i32 {
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect(),
+        bzlmod,
     };
 
     match slug_server_v2::send_build_request(&socket, &daemon_request) {
@@ -320,6 +344,19 @@ fn run_daemon_build(argv: &[String], output_base: &str) -> i32 {
             2
         }
     }
+}
+
+pub(super) fn capture_bzlmod_allow_yanked_versions() -> Result<Option<String>, CommandParseError> {
+    std::env::var_os("BZLMOD_ALLOW_YANKED_VERSIONS")
+        .map(|value| {
+            value
+                .into_string()
+                .map_err(|_| CommandParseError::InvalidFlagValue {
+                    flag: "BZLMOD_ALLOW_YANKED_VERSIONS".to_owned(),
+                    message: "environment value is not valid Unicode".to_owned(),
+                })
+        })
+        .transpose()
 }
 
 /// Start the daemon as a background process. The current binary re-execs

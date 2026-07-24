@@ -11,6 +11,12 @@ use dice::DetectCycles;
 use dice::Dice;
 use dice::DynKey;
 use dice::UserComputationData;
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_identity_v2::ApparentRepoName;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::keys::PackageListingKey;
@@ -21,15 +27,18 @@ use slug_loading_v2::keys::WorkspaceDirectoryKey;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
+use slug_loading_v2::keys::WorkspaceFileKey;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Identity {
+    RootModuleGraph,
     Listing(PathBuf),
     Load(PathBuf),
     Directory(PathBuf),
+    File(PathBuf),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,11 +50,31 @@ enum EventKind {
 #[derive(Default)]
 struct Tracker {
     events: Mutex<Vec<(Identity, EventKind)>>,
+    package_load_dependencies: Mutex<Vec<Vec<Identity>>>,
 }
 
 impl Tracker {
     fn take(&self) -> Vec<(Identity, EventKind)> {
         std::mem::take(&mut *self.events.lock().unwrap())
+    }
+
+    fn take_package_load_dependencies(&self) -> Vec<Vec<Identity>> {
+        std::mem::take(&mut *self.package_load_dependencies.lock().unwrap())
+    }
+}
+
+fn tracked_identity(key: &DynKey) -> Option<Identity> {
+    if key.downcast_ref::<RootModuleGraphKey>().is_some() {
+        Some(Identity::RootModuleGraph)
+    } else if let Some(key) = key.downcast_ref::<PackageListingKey>() {
+        Some(Identity::Listing(key.package.clone()))
+    } else if let Some(key) = key.downcast_ref::<PackageLoadKey>() {
+        Some(Identity::Load(key.package.clone()))
+    } else if let Some(key) = key.downcast_ref::<WorkspaceDirectoryKey>() {
+        Some(Identity::Directory(key.directory.clone()))
+    } else {
+        key.downcast_ref::<WorkspaceFileKey>()
+            .map(|key| Identity::File(key.path.clone()))
     }
 }
 
@@ -53,17 +82,16 @@ impl ActivationTracker for Tracker {
     fn key_activated(
         &self,
         key: &DynKey,
-        _deps: &mut dyn Iterator<Item = &DynKey>,
+        deps: &mut dyn Iterator<Item = &DynKey>,
         activation_data: ActivationData,
     ) {
-        let identity = if let Some(key) = key.downcast_ref::<PackageListingKey>() {
-            Some(Identity::Listing(key.package.clone()))
-        } else if let Some(key) = key.downcast_ref::<PackageLoadKey>() {
-            Some(Identity::Load(key.package.clone()))
-        } else {
-            key.downcast_ref::<WorkspaceDirectoryKey>()
-                .map(|key| Identity::Directory(key.directory.clone()))
-        };
+        if key.downcast_ref::<PackageLoadKey>().is_some() {
+            self.package_load_dependencies
+                .lock()
+                .unwrap()
+                .push(deps.filter_map(tracked_identity).collect());
+        }
+        let identity = tracked_identity(key);
         if let Some(identity) = identity {
             let kind = match activation_data {
                 ActivationData::Evaluated(_) => EventKind::Evaluated,
@@ -141,6 +169,30 @@ async fn load_revision(
     workspace: &Path,
     package: &Path,
 ) -> (Vec<String>, Vec<(Identity, EventKind)>) {
+    let (srcs, events, _) = load_revision_with_inputs(
+        dice,
+        tracker,
+        evaluator,
+        workspace,
+        package,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .await;
+    (srcs, events)
+}
+
+async fn load_revision_with_inputs(
+    dice: &Arc<Dice>,
+    tracker: &Arc<Tracker>,
+    evaluator: &BzlModuleEvaluator,
+    workspace: &Path,
+    package: &Path,
+    command_policy: BzlmodCommandPolicyKey,
+    environment_policy: BzlmodEnvironmentPolicyKey,
+    lockfile_mode: LockfileMode,
+) -> (Vec<String>, Vec<(Identity, EventKind)>, String) {
     let (files, directories) = observations(workspace);
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker.clone()),
@@ -162,14 +214,15 @@ async fn load_revision(
             Arc::new(directories),
         )])
         .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+    )
+    .unwrap();
     let mut transaction = updater.commit().await;
-    transaction
-        .compute(&PackageListingKey {
-            workspace: workspace.to_path_buf(),
-            package: package.to_path_buf(),
-        })
-        .await
-        .unwrap();
     let loaded = evaluator
         .evaluate_package(&mut transaction, package)
         .await
@@ -186,7 +239,21 @@ async fn load_revision(
             _ => None,
         })
         .unwrap();
-    (srcs, tracker.take())
+    let graph = transaction
+        .compute(&RootModuleGraphKey {
+            workspace: workspace.to_path_buf(),
+        })
+        .await
+        .unwrap();
+    let mapping = graph
+        .as_ref()
+        .as_ref()
+        .unwrap()
+        .repository_mapping
+        .resolve(&ApparentRepoName::new("dev_dep").unwrap())
+        .as_str()
+        .to_owned();
+    (srcs, tracker.take(), mapping)
 }
 
 fn assert_once(events: &[(Identity, EventKind)], identity: Identity, kind: EventKind) {
@@ -238,11 +305,39 @@ async fn retained_dice_reuses_or_recomputes_globs_at_directory_boundaries() {
     let evaluator = BzlModuleEvaluator::new(&workspace).unwrap();
 
     let (srcs, events) = load_revision(&dice, &tracker, &evaluator, &workspace, &package).await;
+    let package_load_dependencies = tracker.take_package_load_dependencies();
     assert_eq!(srcs, ["child/child.txt", "keep.txt"]);
+    assert_eq!(package_load_dependencies.len(), 1);
+    assert_eq!(
+        package_load_dependencies[0].first(),
+        Some(&Identity::RootModuleGraph),
+        "PackageLoadKey direct dependencies were not rooted in RootModuleGraphKey: {package_load_dependencies:#?}"
+    );
+    assert_once(&events, Identity::RootModuleGraph, EventKind::Evaluated);
     assert_once(
         &events,
         Identity::Listing(package.clone()),
         EventKind::Evaluated,
+    );
+    let root_graph_index = events
+        .iter()
+        .position(|event| event.0 == Identity::RootModuleGraph)
+        .unwrap();
+    let listing_index = events
+        .iter()
+        .position(|event| event.0 == Identity::Listing(package.clone()))
+        .unwrap();
+    let build_index = events
+        .iter()
+        .position(|event| event.0 == Identity::File(package.join("BUILD.bazel")))
+        .unwrap();
+    let load_index = events
+        .iter()
+        .position(|event| event.0 == Identity::Load(package.clone()))
+        .unwrap();
+    assert!(
+        root_graph_index < listing_index && listing_index < build_index && build_index < load_index,
+        "PackageLoad dependency order was not root graph -> listing -> BUILD -> load: {events:#?}"
     );
     assert_once(
         &events,
@@ -368,6 +463,119 @@ async fn retained_dice_reuses_or_recomputes_globs_at_directory_boundaries() {
     );
     assert_once(&events, Identity::Load(package), EventKind::Evaluated);
     assert_once(&events, Identity::Directory(child), EventKind::Evaluated);
+}
+
+#[tokio::test]
+async fn retained_package_load_recomputes_and_restores_for_mapping_policy_a_b_a() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"root\")\nbazel_dep(name = \"dev_dep\", version = \"1.0\", dev_dependency = True)\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "filegroup(name = \"all\", srcs = [])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(Tracker::default());
+    let evaluator = BzlModuleEvaluator::new(&workspace).unwrap();
+
+    let (_, first_events, first_mapping) = load_revision_with_inputs(
+        &dice,
+        &tracker,
+        &evaluator,
+        &workspace,
+        &package,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .await;
+    let (_, middle_events, middle_mapping) = load_revision_with_inputs(
+        &dice,
+        &tracker,
+        &evaluator,
+        &workspace,
+        &package,
+        BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+        LockfileMode::Off,
+    )
+    .await;
+    let (_, last_events, last_mapping) = load_revision_with_inputs(
+        &dice,
+        &tracker,
+        &evaluator,
+        &workspace,
+        &package,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .await;
+
+    assert_eq!(first_mapping, "dev_dep+");
+    assert_eq!(middle_mapping, "dev_dep");
+    assert_eq!(last_mapping, first_mapping);
+    for events in [&first_events, &middle_events, &last_events] {
+        assert_once(
+            events,
+            Identity::Load(package.clone()),
+            EventKind::Evaluated,
+        );
+    }
+}
+
+#[tokio::test]
+async fn root_module_graph_error_blocks_listing_and_build_observation() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    write(&workspace.join("MODULE.bazel"), "module(name = )\n");
+    write(&package.join("BUILD.bazel"), "this is also invalid\n");
+    let (files, directories) = observations(&workspace);
+    let tracker = Arc::new(Tracker::default());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.clone()),
+        ..Default::default()
+    });
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            Arc::new(files),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceDirectorySnapshotKey {
+                workspace: workspace.clone(),
+            },
+            Arc::new(directories),
+        )])
+        .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        &workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let error = BzlModuleEvaluator::new(&workspace)
+        .unwrap()
+        .evaluate_package(&mut transaction, &package)
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("MODULE.bazel"), "{error}");
+    let events = tracker.take();
+    assert_once(&events, Identity::RootModuleGraph, EventKind::Evaluated);
+    assert_not_activated(&events, Identity::Listing(package.clone()));
+    assert_not_activated(&events, Identity::File(package.join("BUILD.bazel")));
 }
 
 async fn listing_error(workspace: &Path, package: &Path, value: WorkspaceDirectoryValue) -> String {

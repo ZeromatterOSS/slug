@@ -22,6 +22,7 @@ pub use common::CommandPlaceholderError;
 pub use common::FlagDisposition;
 pub use common::ParsedFlag;
 pub use common::QueryOutputFormat;
+pub use common::normalize_bzlmod_environment_value;
 
 pub const HELP_SUMMARY: &str = "\
 Slug V2 commands:\n\

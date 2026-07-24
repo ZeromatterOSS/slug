@@ -10,6 +10,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use compact_str::CompactString;
 use dice::DiceComputations;
+use dice::DiceTransactionUpdater;
 use dice::InjectedKey;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
@@ -172,6 +173,39 @@ impl InjectedKey for RootModuleLockfileModeKey {
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
     }
+}
+
+/// Inject one normalized bzlmod request into a caller-owned DICE updater.
+///
+/// This helper deliberately supplies no defaults and does not commit. The
+/// runtime owns the request transaction and must install all three values
+/// before its sole commit.
+pub fn inject_root_module_request_inputs(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &Path,
+    command_policy: BzlmodCommandPolicyKey,
+    environment_policy: BzlmodEnvironmentPolicyKey,
+    lockfile_mode: LockfileMode,
+) -> anyhow::Result<()> {
+    updater.changed_to(vec![(
+        RootModuleCommandPolicyKey {
+            workspace: workspace.to_path_buf(),
+        },
+        RootModuleCommandPolicy::from(command_policy),
+    )])?;
+    updater.changed_to(vec![(
+        RootModuleEnvironmentPolicyKey {
+            workspace: workspace.to_path_buf(),
+        },
+        RootModuleEnvironmentPolicy::from(environment_policy),
+    )])?;
+    updater.changed_to(vec![(
+        RootModuleLockfileModeKey {
+            workspace: workspace.to_path_buf(),
+        },
+        RootModuleLockfileMode::from(lockfile_mode),
+    )])?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]

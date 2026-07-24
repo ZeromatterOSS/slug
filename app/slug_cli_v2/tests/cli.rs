@@ -2628,6 +2628,148 @@ fn output_base_query_reuses_one_daemon_across_build_edits() {
 }
 
 #[test]
+fn bzlmod_environment_is_captured_per_one_shot_and_daemon_query_child() {
+    let workspace = scratch("bzlmod-env-workspace");
+    let output_base = scratch("bzlmod-env-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+
+    let one_shot = slug()
+        .current_dir(&workspace)
+        .env("BZLMOD_ALLOW_YANKED_VERSIONS", "yyy@1.0.0")
+        .args(["query", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert!(one_shot.status.success(), "{one_shot:?}");
+    assert_eq!(String::from_utf8(one_shot.stdout).unwrap(), "//pkg:probe\n");
+
+    let invalid = slug()
+        .current_dir(&workspace)
+        .env("BZLMOD_ALLOW_YANKED_VERSIONS", "not-a-module")
+        .args(["query", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert_eq!(invalid.status.code(), Some(2), "{invalid:?}");
+    assert!(
+        String::from_utf8(invalid.stderr)
+            .unwrap()
+            .contains("BZLMOD_ALLOW_YANKED_VERSIONS")
+    );
+
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let daemon_a = slug()
+        .current_dir(&workspace)
+        .env_remove("BZLMOD_ALLOW_YANKED_VERSIONS")
+        .args([output_base_arg.as_str(), "query", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert!(daemon_a.status.success(), "{daemon_a:?}");
+    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let daemon_b = slug()
+        .current_dir(&workspace)
+        .env("BZLMOD_ALLOW_YANKED_VERSIONS", "all")
+        .args([output_base_arg.as_str(), "query", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert!(daemon_b.status.success(), "{daemon_b:?}");
+    let daemon_a_again = slug()
+        .current_dir(&workspace)
+        .env_remove("BZLMOD_ALLOW_YANKED_VERSIONS")
+        .args([output_base_arg.as_str(), "query", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert!(daemon_a_again.status.success(), "{daemon_a_again:?}");
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        pid
+    );
+}
+
+#[test]
+fn bzlmod_environment_is_captured_per_one_shot_and_daemon_build_child() {
+    let workspace = scratch("bzlmod-build-env-workspace");
+    let output_base = scratch("bzlmod-build-env-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(workspace.join("BUILD.bazel"), "");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+
+    let one_shot = slug()
+        .current_dir(&workspace)
+        .env("BZLMOD_ALLOW_YANKED_VERSIONS", "all")
+        .args(["build", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert_eq!(one_shot.status.code(), Some(2), "{one_shot:?}");
+    assert!(
+        String::from_utf8(one_shot.stderr)
+            .unwrap()
+            .contains("analysis_not_implemented")
+    );
+
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let daemon_b = slug()
+        .current_dir(&workspace)
+        .env("BZLMOD_ALLOW_YANKED_VERSIONS", "yyy@1.0.0")
+        .args([output_base_arg.as_str(), "build", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert_eq!(daemon_b.status.code(), Some(2), "{daemon_b:?}");
+    assert!(
+        String::from_utf8(daemon_b.stderr)
+            .unwrap()
+            .contains("analysis_not_implemented")
+    );
+    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+    let daemon_a = slug()
+        .current_dir(&workspace)
+        .env_remove("BZLMOD_ALLOW_YANKED_VERSIONS")
+        .args([output_base_arg.as_str(), "build", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert_eq!(daemon_a.status.code(), Some(2), "{daemon_a:?}");
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        pid
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn non_unicode_bzlmod_environment_is_rejected_before_one_shot_evaluation() {
+    use std::os::unix::ffi::OsStringExt;
+
+    let workspace = scratch("bzlmod-env-non-unicode");
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let output = slug()
+        .current_dir(&workspace)
+        .env(
+            "BZLMOD_ALLOW_YANKED_VERSIONS",
+            std::ffi::OsString::from_vec(vec![0xff]),
+        )
+        .args(["query", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("environment value is not valid Unicode"),
+        "{stderr}"
+    );
+}
+
+#[test]
 fn only_package_loading_query_errors_receive_evaluation_context() {
     let workspace = scratch("query-error-context");
     let output_base = scratch("query-error-context-output-base");

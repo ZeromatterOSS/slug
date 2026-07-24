@@ -17,6 +17,10 @@ use dice::DiceComputations;
 use dice::DynKey;
 use dice::Key;
 use dice::UserComputationData;
+use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::BzlModuleEvalKey;
@@ -365,6 +369,13 @@ async fn load_package_request(
         }),
         Arc::new(directory_snapshot(workspace)),
     )])?;
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )?;
     let mut transaction = updater.commit().await;
     if consume_metadata {
         let value = transaction
@@ -431,6 +442,13 @@ async fn load_rule_capability_request(
         },
         Arc::new(directory_snapshot(workspace)),
     )])?;
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )?;
     let mut transaction = updater.commit().await;
     let value = transaction
         .compute(&RuleCapabilityObserverKey(RuleCapabilityConsumerKey {
