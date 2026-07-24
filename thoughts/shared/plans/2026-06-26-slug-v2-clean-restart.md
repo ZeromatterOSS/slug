@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; corrected policy/IO key design independently accepted; lockfile-test scope correction accepted | registry policy/IO implementation needs fresh terminal review under its corrected allowlist; discovery, MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | rereview only the frozen registry policy/IO implementation |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d` | command/daemon registry transport, discovery, MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | design only command/daemon registry transport |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry policy/IO substrate is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry policy/IO substrate is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,66 +33,27 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-registry-policy-io-substrate-rereview`.
+Run only `WP-5-m1-registry-command-transport-design`.
 
-The design-only test-scope correction is independently accepted:
-`app/slug_bzlmod_v2/tests/lockfile.rs` is now explicitly authorized because
-eager Bazel-parity validation requires replacing its legacy placeholder
-digests and adding the malformed-unused-hash regression. Rereview the frozen
-implementation against the contract and corrected allowlist below. Do not
-change Rust in this packet unless the fresh reviewer finds a concrete material
-miss; any such miss returns to `REPLAN`.
+This is a read-only design packet. Trace Bazel 9.2's repeatable `--registry`
+option from its option/default producer through trailing-slash normalization,
+first-occurrence deduplication, ordering, `%workspace%` substitution, and URI
+validation. Trace Slug's current build/query CLI, daemon DTO, and retained
+runtime request paths.
 
-### Frozen implementation contract
+Produce an independently reviewed implementation contract that:
 
-Implement the independently accepted contract:
+1. carries primitive ordered registry strings through both one-shot and daemon
+   build/query paths without serializing semantic Rust types;
+2. normalizes exactly once into `RegistryUrls` before the sole request commit,
+   with Bazel's default BCR behavior and fail-closed diagnostics;
+3. restores A→B→A request-local values without leaking between build and query;
+4. keeps the already accepted `RegistryFileKey`, generation, IO capability,
+   root graph, and loading owners unchanged; and
+5. names a narrow implementation allowlist and exact CLI/server/core tests.
 
-1. `RootModuleFilesKey` owns root/includes plus `VisibleLockfileRead`;
-   `RootModuleGraphKey` consumes it without any registry dependency.
-2. Inject ordered trailing-slash-normalized, first-occurrence registry URLs and
-   a workspace request generation. `RegistryPolicyKey` consumes URLs,
-   lockfile mode, and root files; generation never enters key identity.
-3. `RegistryFileKey` identity is workspace plus exact resource. `file:`
-   resources bypass remote policy, generation, and IO capability and depend
-   only on exact `WorkspaceFileKey`. Remote resources derive unrecorded,
-   recorded-absent, or SHA-256 policy from the visible lockfile.
-4. `off` always fetches as unrecorded. `update`/`error` replay recorded
-   absence, `refresh` retries it, `error` rejects unrecorded before IO, and
-   known SHA-256 is enforced only when the lockfile is read.
-5. Retryable unrecorded results depend on request generation. Known-SHA
-   success and checksum mismatch do not; known-SHA 404/transport acquire the
-   generation only on the failure branch so the same key retries next request
-   and drops that dependency after verified success.
-6. Preserve typed values and fatal errors; only not-found is
-   fallthrough-capable. Install an immutable non-semantic `RegistryIo` in
-   global DICE data and implement the retained Hyper/TLS adapter without
-   semantic caches or a lock across await.
-
-Focused tests must cover URL/policy A→B→A without root-file churn; exact local
-create/edit/delete/recreate; every off/update/refresh/error expectation cell;
-pre-IO error; same-generation dedup and next-generation retry for unrecorded
-and known-SHA 404/transport; verified known-SHA reuse; typed checksum/transport
-separation; missing capability/input failures; and core loopback
-200/404/non-success/connection failure plus identical query/build injection.
-
-The allowlist is `app/slug_bzlmod_v2/src/registry.rs`, new
-`app/slug_bzlmod_v2/src/registry_dice.rs`,
-`app/slug_bzlmod_v2/src/module_eval.rs`,
-`app/slug_bzlmod_v2/src/lockfile.rs`, `app/slug_bzlmod_v2/src/lib.rs`,
-`app/slug_bzlmod_v2/tests/lockfile.rs`, new
-`app/slug_bzlmod_v2/tests/registry_dice.rs`,
-`app/slug_core_v2/src/runtime/dice.rs`, new
-`app/slug_core_v2/src/runtime/registry_io.rs`,
-`app/slug_core_v2/src/runtime/mod.rs`, `app/slug_core_v2/tests/runtime.rs`,
-and `app/slug_core_v2/Cargo.toml` only for already-workspace Hyper/TLS
-dependencies.
-
-Do not add direct IO in keys, external local-path demand, recursive scans,
-registry discovery/fallback, metadata/yanked behavior, MVS,
-RepoSpec/final-hash aggregation, lockfile writing, CLI/server/rc transport,
-semantic DICE data, global result caches, or locks across awaits. After
-acceptance, proceed serially with command/daemon registry transport,
-discovery, MVS, selected-yanked/RepoSpec/final hashes, then semantic writing.
+Do not edit Rust, add discovery/fallback, fetch registry content, expand rc
+handling, or design MVS/yanked/final-hash/writer behavior in this packet.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine
