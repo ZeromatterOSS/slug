@@ -15,6 +15,7 @@ use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLockfileMode;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
+use slug_bzlmod_v2::VisibleLockfileRead;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_identity_v2::ApparentRepoName;
 use slug_workspace_v2::WorkspaceFileValue;
@@ -475,6 +476,187 @@ async fn normalized_request_inputs_reuse_module_evaluation_across_a_b_a() {
     assert_eq!(graph_a.environment_policy, graph_a_again.environment_policy);
     assert!(Arc::ptr_eq(&module_a, &module_b));
     assert!(Arc::ptr_eq(&module_a, &module_a_again));
+}
+
+#[tokio::test]
+async fn visible_lockfile_transitions_are_semantic_and_recover_on_retained_dice() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let module = WorkspaceFileValue::Present(Arc::new("module(name = 'root')\n".to_owned()));
+    let files = |lockfile: Option<WorkspaceFileValue>| {
+        let mut entries = vec![("MODULE.bazel", module.clone())];
+        if let Some(lockfile) = lockfile {
+            entries.push(("MODULE.bazel.lock", lockfile));
+        }
+        snapshot(entries)
+    };
+
+    let (absent, module_absent) =
+        graph_and_module_value(&dice, files(None), RequestInputs::defaults()).await;
+    let absent = absent.as_ref().as_ref().unwrap().clone();
+    assert_eq!(
+        absent.visible_lockfile,
+        VisibleLockfileRead::Parsed(slug_bzlmod_v2::empty_bazel_lockfile().into())
+    );
+
+    let (formatted, module_formatted) = graph_and_module_value(
+        &dice,
+        files(Some(WorkspaceFileValue::Present(Arc::new(
+            "{\n  \"facts\": {},\n  \"lockFileVersion\": 28,\n  \"moduleExtensions\": {},\n  \"registryFileHashes\": {},\n  \"selectedYankedVersions\": {}\n}\n"
+                .to_owned(),
+        )))),
+        RequestInputs::defaults(),
+    )
+    .await;
+    assert_eq!(&absent, formatted.as_ref().as_ref().unwrap());
+    assert!(Arc::ptr_eq(&module_absent, &module_formatted));
+
+    let malformed = graph_and_module_value(
+        &dice,
+        files(Some(WorkspaceFileValue::Present(Arc::new(
+            "{\"lockFileVersion\":28, nope".to_owned(),
+        )))),
+        RequestInputs::defaults(),
+    )
+    .await
+    .0;
+    let error = malformed.as_ref().as_ref().unwrap_err().to_string();
+    assert!(
+        error.contains("Failed to read and parse the MODULE.bazel.lock file"),
+        "{error}"
+    );
+
+    let restored = graph(
+        &dice,
+        files(Some(WorkspaceFileValue::Present(Arc::new(
+            "{\"lockFileVersion\":28}\n".to_owned(),
+        )))),
+    )
+    .await
+    .unwrap();
+    assert_eq!(restored, absent);
+
+    let (deleted, module_deleted) =
+        graph_and_module_value(&dice, files(None), RequestInputs::defaults()).await;
+    assert_eq!(deleted.as_ref().as_ref().unwrap(), &absent);
+    assert!(Arc::ptr_eq(&module_absent, &module_deleted));
+
+    let (recreated, module_recreated) = graph_and_module_value(
+        &dice,
+        files(Some(WorkspaceFileValue::Present(Arc::new(
+            "{\"lockFileVersion\":28}\n".to_owned(),
+        )))),
+        RequestInputs::defaults(),
+    )
+    .await;
+    assert_eq!(recreated.as_ref().as_ref().unwrap(), &absent);
+    assert!(Arc::ptr_eq(&module_absent, &module_recreated));
+
+    for mode in [
+        LockfileMode::Update,
+        LockfileMode::Refresh,
+        LockfileMode::Error,
+    ] {
+        let read_error = graph_and_module_value(
+            &dice,
+            files(Some(WorkspaceFileValue::ReadError(Arc::new(
+                "permission denied".to_owned(),
+            )))),
+            RequestInputs {
+                lockfile_mode: Some(mode),
+                ..RequestInputs::defaults()
+            },
+        )
+        .await
+        .0;
+        let error = read_error.as_ref().as_ref().unwrap_err().to_string();
+        assert!(error.contains("permission denied"), "{error}");
+        assert!(error.contains("Try deleting it"), "{error}");
+    }
+
+    let stale_error = graph_and_module_value(
+        &dice,
+        files(Some(WorkspaceFileValue::Present(Arc::new(
+            "{\"lockFileVersion\":27, nope".to_owned(),
+        )))),
+        RequestInputs {
+            lockfile_mode: Some(LockfileMode::Error),
+            ..RequestInputs::defaults()
+        },
+    )
+    .await
+    .0;
+    let error = stale_error.as_ref().as_ref().unwrap_err().to_string();
+    assert_eq!(
+        error,
+        "The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+    );
+
+    let ignored = graph_and_module_value(
+        &dice,
+        files(Some(WorkspaceFileValue::ReadError(Arc::new(
+            "permission denied".to_owned(),
+        )))),
+        RequestInputs {
+            lockfile_mode: Some(LockfileMode::Off),
+            ..RequestInputs::defaults()
+        },
+    )
+    .await
+    .0;
+    assert_eq!(
+        ignored.as_ref().as_ref().unwrap().visible_lockfile,
+        VisibleLockfileRead::Ignored
+    );
+}
+
+#[tokio::test]
+async fn module_and_include_errors_precede_visible_lockfile_errors() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let cases = [
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "bazel_dep(name = 'dep')\nmodule(name = 'root')\n".to_owned(),
+                )),
+            ),
+            (
+                "MODULE.bazel.lock",
+                WorkspaceFileValue::Present(Arc::new("{\"lockFileVersion\":28, nope".to_owned())),
+            ),
+        ]),
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "module(name = 'root')\ninclude('//pkg:child.MODULE.bazel')\n".to_owned(),
+                )),
+            ),
+            (
+                "pkg/child.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new("module(name = 'included')\n".to_owned())),
+            ),
+            (
+                "MODULE.bazel.lock",
+                WorkspaceFileValue::Present(Arc::new("{\"lockFileVersion\":28, nope".to_owned())),
+            ),
+        ]),
+    ];
+    for files in cases {
+        let error = graph_and_module_value(
+            &dice,
+            files,
+            RequestInputs {
+                lockfile_mode: Some(LockfileMode::Error),
+                ..RequestInputs::defaults()
+            },
+        )
+        .await
+        .0;
+        let error = error.as_ref().as_ref().unwrap_err().to_string();
+        assert!(error.contains("module()"), "{error}");
+        assert!(!error.contains("MODULE.bazel.lock"), "{error}");
+    }
 }
 
 #[tokio::test]

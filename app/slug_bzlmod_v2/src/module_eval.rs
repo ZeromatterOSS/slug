@@ -36,6 +36,9 @@ use starlark_map::small_set::SmallSet;
 use crate::BzlmodCommandPolicyKey;
 use crate::BzlmodEnvironmentPolicyKey;
 use crate::LockfileMode;
+use crate::VisibleLockfileRead;
+use crate::lockfile::bad_visible_lockfile_message;
+use crate::lockfile::parse_visible_lockfile_content_for_mode;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RootModuleHeader {
@@ -102,6 +105,18 @@ impl From<LockfileMode> for RootModuleLockfileMode {
     }
 }
 
+impl RootModuleLockfileMode {
+    fn semantic_mode(&self) -> LockfileMode {
+        match self.0.as_ref() {
+            "off" => LockfileMode::Off,
+            "update" => LockfileMode::Update,
+            "refresh" => LockfileMode::Refresh,
+            "error" => LockfileMode::Error,
+            mode => unreachable!("injected lockfile mode was not normalized: {mode}"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct ModuleFileEvaluation {
     pub path: PathBuf,
@@ -115,6 +130,7 @@ pub struct ModuleFileEvaluation {
 pub struct RootModuleGraph {
     pub root: ModuleFileEvaluation,
     pub includes: Arc<[ModuleFileEvaluation]>,
+    pub visible_lockfile: VisibleLockfileRead,
     pub repository_mapping: RepositoryMapping,
     pub command_policy: RootModuleCommandPolicy,
     pub environment_policy: RootModuleEnvironmentPolicy,
@@ -170,6 +186,66 @@ impl fmt::Display for RootModuleLockfileModeKey {
 }
 impl InjectedKey for RootModuleLockfileModeKey {
     type Value = RootModuleLockfileMode;
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct VisibleLockfileKey {
+    pub workspace: PathBuf,
+}
+
+impl fmt::Display for VisibleLockfileKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "visible-lockfile:{}", self.workspace.display())
+    }
+}
+
+#[async_trait]
+impl Key for VisibleLockfileKey {
+    type Value = Arc<Result<VisibleLockfileRead, CompactString>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let mode = match ctx
+            .compute(&RootModuleLockfileModeKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(mode) => mode.semantic_mode(),
+            Err(error) => {
+                return Arc::new(Err(CompactString::new(format!(
+                    "missing injected root module lockfile mode: {error}"
+                ))));
+            }
+        };
+        if matches!(mode, LockfileMode::Off) {
+            return Arc::new(Ok(VisibleLockfileRead::Ignored));
+        }
+
+        let value = match ctx
+            .compute(&WorkspaceFileKey {
+                workspace: self.workspace.clone(),
+                path: self.workspace.join("MODULE.bazel.lock"),
+            })
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
+        };
+        let parsed = match value {
+            WorkspaceFileValue::Present(source) => {
+                parse_visible_lockfile_content_for_mode(&mode, Some(source.as_str()))
+            }
+            WorkspaceFileValue::Absent => parse_visible_lockfile_content_for_mode(&mode, None),
+            WorkspaceFileValue::ReadError(error) => {
+                Err(bad_visible_lockfile_message(error.as_str()))
+            }
+        };
+        Arc::new(parsed.map_err(CompactString::new))
+    }
+
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
     }
@@ -346,6 +422,18 @@ impl Key for RootModuleGraphKey {
             horizon.extend(value.includes.iter().cloned());
             includes.push(value);
         }
+        let visible_lockfile = match ctx
+            .compute(&VisibleLockfileKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(value) => match value.as_ref().clone() {
+                Ok(value) => value,
+                Err(error) => return Arc::new(Err(error)),
+            },
+            Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
+        };
         Arc::new(Ok(RootModuleGraph {
             repository_mapping: match root_mapping(&root, &includes, &command_policy) {
                 Ok(mapping) => mapping,
@@ -353,6 +441,7 @@ impl Key for RootModuleGraphKey {
             },
             root,
             includes: includes.into(),
+            visible_lockfile,
             command_policy,
             environment_policy,
             lockfile_mode,

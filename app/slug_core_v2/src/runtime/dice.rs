@@ -1154,6 +1154,11 @@ mod tests {
             "//pkg:probe\n"
         );
         let first = runtime.current_root_module_graph_for_test().unwrap();
+        fs::write(
+            root.join("MODULE.bazel.lock"),
+            "{\"lockFileVersion\":28, nope\n",
+        )
+        .unwrap();
         assert_eq!(
             query(
                 BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
@@ -1164,6 +1169,7 @@ mod tests {
             "//pkg:probe\n"
         );
         let middle = runtime.current_root_module_graph_for_test().unwrap();
+        fs::remove_file(root.join("MODULE.bazel.lock")).unwrap();
         assert_eq!(
             query(
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
@@ -1187,6 +1193,14 @@ mod tests {
         assert_ne!(first.command_policy, middle.command_policy);
         assert_ne!(first.environment_policy, middle.environment_policy);
         assert_ne!(first.lockfile_mode, middle.lockfile_mode);
+        assert!(matches!(
+            first.visible_lockfile,
+            slug_bzlmod_v2::VisibleLockfileRead::Parsed(_)
+        ));
+        assert_eq!(
+            middle.visible_lockfile,
+            slug_bzlmod_v2::VisibleLockfileRead::Ignored
+        );
         assert_eq!(first.as_ref(), last.as_ref());
     }
 

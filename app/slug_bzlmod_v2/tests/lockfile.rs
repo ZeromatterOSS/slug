@@ -45,7 +45,7 @@ use slug_bzlmod_v2::validate_required_registry_file_hashes;
 fn parses_visible_lockfile_registry_and_yanked_fields() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "file:///workspace/registry/bazel_registry.json": "abc123",
     "file:///workspace/registry/modules/yyy/1.0.0/MODULE.bazel": "def456"
@@ -59,7 +59,7 @@ fn parses_visible_lockfile_registry_and_yanked_fields() {
     )
     .unwrap();
 
-    assert_eq!(lockfile.lock_file_version, 26);
+    assert_eq!(lockfile.lock_file_version, 28);
     assert_eq!(
         lockfile
             .registry_file_hashes
@@ -80,7 +80,7 @@ fn parses_visible_lockfile_registry_and_yanked_fields() {
 fn parses_module_extension_generated_repo_specs() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -126,7 +126,7 @@ fn parses_module_extension_generated_repo_specs() {
 fn parses_module_extension_recorded_env_inputs() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -153,7 +153,7 @@ fn parses_module_extension_recorded_env_inputs() {
 fn validates_module_extension_recorded_env_inputs_against_observed_map() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -174,7 +174,7 @@ fn validates_module_extension_recorded_env_inputs_against_observed_map() {
 fn rejects_stale_module_extension_recorded_env_input_like_bazel() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -200,7 +200,7 @@ fn rejects_stale_module_extension_recorded_env_input_like_bazel() {
 fn parses_module_extension_recorded_file_inputs() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -229,7 +229,7 @@ fn parses_module_extension_recorded_file_inputs() {
 fn validates_module_extension_recorded_file_inputs_against_observed_map() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -252,7 +252,7 @@ fn validates_module_extension_recorded_file_inputs_against_observed_map() {
 fn rejects_stale_module_extension_recorded_file_input_like_bazel() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -363,9 +363,9 @@ fn replay_inputs_propagate_bazel_shaped_stale_usage_error() {
 
 #[test]
 fn accepts_absent_optional_visible_lockfile_fields() {
-    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 26}"#).unwrap();
+    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 28}"#).unwrap();
 
-    assert_eq!(lockfile.lock_file_version, 26);
+    assert_eq!(lockfile.lock_file_version, 28);
     assert!(lockfile.registry_file_hashes.is_empty());
     assert!(lockfile.selected_yanked_versions.is_empty());
     assert!(lockfile.module_extensions.is_empty());
@@ -375,7 +375,7 @@ fn accepts_absent_optional_visible_lockfile_fields() {
 
 #[test]
 fn validates_supported_lockfile_version() {
-    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 26}"#).unwrap();
+    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 28}"#).unwrap();
 
     validate_lockfile_version(&lockfile, BAZEL_9_LOCK_FILE_VERSION).unwrap();
 }
@@ -395,7 +395,7 @@ fn rejects_unsupported_lockfile_version_like_bazel() {
 fn rejects_malformed_selected_yanked_key() {
     let err = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "selectedYankedVersions": {"yyy": "bad release"}
 }"#,
     )
@@ -408,7 +408,7 @@ fn rejects_malformed_selected_yanked_key() {
 fn rejects_malformed_module_extension_shape() {
     let err = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -436,7 +436,7 @@ fn rejects_missing_lockfile_version() {
 fn validates_module_extension_usage_digests_against_observed_map() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -459,7 +459,7 @@ fn validates_module_extension_usage_digests_against_observed_map() {
 fn rejects_stale_module_extension_usage_digest_like_bazel() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -486,7 +486,7 @@ fn rejects_stale_module_extension_usage_digest_like_bazel() {
 fn rejects_stale_module_extension_bzl_digest_like_bazel() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -515,7 +515,7 @@ fn rejects_stale_module_extension_bzl_digest_like_bazel() {
 fn validates_required_registry_file_hash_entries() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "https://bcr.bazel.build/modules/rules_shell/0.6.1/MODULE.bazel": "wanted"
   }
@@ -532,7 +532,7 @@ fn validates_required_registry_file_hash_entries() {
 
 #[test]
 fn rejects_missing_registry_file_hash_like_bazel_error_mode() {
-    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 26}"#).unwrap();
+    let lockfile = parse_bazel_lockfile(r#"{"lockFileVersion": 28}"#).unwrap();
 
     let err = validate_required_registry_file_hashes(
         &lockfile,
@@ -548,7 +548,7 @@ fn rejects_missing_registry_file_hash_like_bazel_error_mode() {
 fn validates_registry_hashes_against_observed_digest_map() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "wanted"
   }
@@ -567,7 +567,7 @@ fn validates_registry_hashes_against_observed_digest_map() {
 fn rejects_mismatched_registry_hash_like_bazel() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "000000"
   }
@@ -591,7 +591,7 @@ fn rejects_mismatched_registry_hash_like_bazel() {
 fn renders_visible_lockfile_with_bazel_top_level_shape() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "module-digest",
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json": "source-digest"
@@ -611,7 +611,7 @@ fn renders_visible_lockfile_with_bazel_top_level_shape() {
         rendered,
         concat!(
             "{\n",
-            "  \"lockFileVersion\": 26,\n",
+            "  \"lockFileVersion\": 28,\n",
             "  \"registryFileHashes\": {\n",
             "    \"https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel\": \"module-digest\",\n",
             "    \"https://bcr.bazel.build/modules/rules_cc/0.2.17/source.json\": \"source-digest\"\n",
@@ -631,7 +631,7 @@ fn renders_visible_lockfile_with_bazel_top_level_shape() {
 fn renders_module_extension_lockfile_replay_shape() {
     let lockfile = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {},
   "selectedYankedVersions": {},
   "moduleExtensions": {
@@ -668,7 +668,7 @@ fn renders_module_extension_lockfile_replay_shape() {
         rendered,
         concat!(
             "{\n",
-            "  \"lockFileVersion\": 26,\n",
+            "  \"lockFileVersion\": 28,\n",
             "  \"registryFileHashes\": {},\n",
             "  \"selectedYankedVersions\": {},\n",
             "  \"moduleExtensions\": {\n",
@@ -705,7 +705,7 @@ fn renders_module_extension_lockfile_replay_shape() {
 fn render_bazel_lockfile_is_deterministic_across_input_order() {
     let first = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "https://z.example.test/MODULE.bazel": "z-digest",
     "https://a.example.test/MODULE.bazel": "a-digest"
@@ -742,7 +742,7 @@ fn render_bazel_lockfile_is_deterministic_across_input_order() {
     .unwrap();
     let second = parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "https://a.example.test/MODULE.bazel": "a-digest",
     "https://z.example.test/MODULE.bazel": "z-digest"
@@ -849,7 +849,7 @@ fn visible_lockfile_error_mode_rejects_missing_stale_and_bad_versions() {
         assert!(message.contains("--lockfile_mode=update"));
     }
 
-    let unsupported = rendered.replace("\"lockFileVersion\": 26", "\"lockFileVersion\": 25");
+    let unsupported = rendered.replace("\"lockFileVersion\": 28", "\"lockFileVersion\": 27");
     let unsupported_plan =
         plan_visible_lockfile(&LockfileMode::Error, Some(&unsupported), &desired).unwrap();
     assert!(matches!(
@@ -934,7 +934,7 @@ fn visible_lockfile_input_bridges_dice_bytes_to_planner() {
     assert_eq!(absent.digest(), &BzlmodVisibleLockfileDigest::absent());
     assert_eq!(absent.existing_content(), None);
 
-    let existing = b"{\"lockFileVersion\":26}\n";
+    let existing = b"{\"lockFileVersion\":28}\n";
     let present = VisibleLockfileInput::from_optional_bytes(Some(existing)).unwrap();
     assert_eq!(
         present.digest(),
@@ -942,7 +942,7 @@ fn visible_lockfile_input_bridges_dice_bytes_to_planner() {
     );
     assert_eq!(
         present.existing_content(),
-        Some("{\"lockFileVersion\":26}\n")
+        Some("{\"lockFileVersion\":28}\n")
     );
 
     let desired = simple_visible_lockfile();
@@ -965,7 +965,7 @@ fn hidden_lockfile_input_bridges_dice_bytes_to_replay_parser() {
     assert_eq!(absent.digest(), &BzlmodHiddenLockfileDigest::absent());
     assert_eq!(absent.existing_content(), None);
 
-    let existing = br#"{"lockFileVersion":26,"moduleExtensions":{}}"#;
+    let existing = br#"{"lockFileVersion":28,"moduleExtensions":{}}"#;
     let present = HiddenLockfileInput::from_optional_bytes(Some(existing)).unwrap();
     assert_eq!(
         present.digest(),
@@ -990,7 +990,7 @@ fn hidden_lockfile_input_rejects_invalid_utf8() {
 #[test]
 fn hidden_lockfile_parse_fail_open_keeps_current_valid_content() {
     let input = HiddenLockfileInput::from_optional_bytes(Some(
-        br#"{"lockFileVersion":26,"registryFileHashes":{"https://example.test/MODULE.bazel":"abc"}}"#,
+        br#"{"lockFileVersion":28,"registryFileHashes":{"https://example.test/MODULE.bazel":"abc"}}"#,
     ))
     .unwrap();
 
@@ -1026,7 +1026,7 @@ fn hidden_lockfile_parse_fail_open_uses_empty_for_absent_malformed_or_old_versio
 #[test]
 fn visible_lockfile_read_honors_bazel_modes() {
     let current = VisibleLockfileInput::from_optional_bytes(Some(
-        br#"{"lockFileVersion":26,"registryFileHashes":{"https://example.test/MODULE.bazel":"abc"}}"#,
+        br#"{"lockFileVersion":28,"registryFileHashes":{"https://example.test/MODULE.bazel":"abc"}}"#,
     ))
     .unwrap();
     let visible = parse_visible_lockfile_for_mode(&LockfileMode::Update, &current).unwrap();
@@ -1041,21 +1041,118 @@ fn visible_lockfile_read_honors_bazel_modes() {
     let absent = VisibleLockfileInput::absent();
     assert_eq!(
         parse_visible_lockfile_for_mode(&LockfileMode::Error, &absent).unwrap(),
-        VisibleLockfileRead::Parsed(empty_bazel_lockfile())
+        VisibleLockfileRead::Parsed(empty_bazel_lockfile().into())
     );
 
     let old_version =
         VisibleLockfileInput::from_optional_bytes(Some(br#"{"lockFileVersion":24}"#)).unwrap();
     assert_eq!(
         parse_visible_lockfile_for_mode(&LockfileMode::Update, &old_version).unwrap(),
-        VisibleLockfileRead::Parsed(empty_bazel_lockfile())
+        VisibleLockfileRead::Parsed(empty_bazel_lockfile().into())
     );
     let err = parse_visible_lockfile_for_mode(&LockfileMode::Error, &old_version).unwrap_err();
     assert!(err.contains("version of MODULE.bazel.lock is not supported"));
 
-    let malformed = VisibleLockfileInput::from_optional_bytes(Some(b"{ nope")).unwrap();
-    let err = parse_visible_lockfile_for_mode(&LockfileMode::Refresh, &malformed).unwrap_err();
-    assert!(err.contains("Failed to read and parse the MODULE.bazel.lock file"));
+    let malformed_without_marker =
+        VisibleLockfileInput::from_optional_bytes(Some(b"{ nope")).unwrap();
+    assert_eq!(
+        parse_visible_lockfile_for_mode(&LockfileMode::Refresh, &malformed_without_marker).unwrap(),
+        VisibleLockfileRead::Parsed(empty_bazel_lockfile().into())
+    );
+}
+
+#[test]
+fn visible_lockfile_read_scans_version_before_json_like_bazel() {
+    let read = |mode: LockfileMode, content: &[u8]| {
+        let input = VisibleLockfileInput::from_optional_bytes(Some(content)).unwrap();
+        parse_visible_lockfile_for_mode(&mode, &input)
+    };
+    let empty = VisibleLockfileRead::Parsed(empty_bazel_lockfile().into());
+
+    assert_eq!(read(LockfileMode::Update, b"{ nope").unwrap(), empty);
+    assert!(
+        read(LockfileMode::Error, b"{ nope")
+            .unwrap_err()
+            .contains("version of MODULE.bazel.lock is not supported")
+    );
+
+    let stale_and_malformed = br#"{"lockFileVersion":27, nope"#;
+    assert_eq!(
+        read(LockfileMode::Refresh, stale_and_malformed).unwrap(),
+        empty
+    );
+    assert!(
+        read(LockfileMode::Error, stale_and_malformed)
+            .unwrap_err()
+            .contains("version of MODULE.bazel.lock is not supported")
+    );
+
+    let current_and_malformed = br#"{"lockFileVersion":28, nope"#;
+    for mode in [
+        LockfileMode::Update,
+        LockfileMode::Refresh,
+        LockfileMode::Error,
+    ] {
+        let error = read(mode, current_and_malformed).unwrap_err();
+        assert!(
+            error.contains("Failed to read and parse the MODULE.bazel.lock file"),
+            "{error}"
+        );
+    }
+
+    let first_numeric_marker_wins = br#"{"lockFileVersion":27,"lockFileVersion":28}"#;
+    assert_eq!(
+        read(LockfileMode::Update, first_numeric_marker_wins).unwrap(),
+        empty
+    );
+    assert!(
+        read(LockfileMode::Error, first_numeric_marker_wins)
+            .unwrap_err()
+            .contains("version of MODULE.bazel.lock is not supported")
+    );
+
+    let overflow = br#"{"lockFileVersion":2147483648}"#;
+    for mode in [
+        LockfileMode::Update,
+        LockfileMode::Refresh,
+        LockfileMode::Error,
+    ] {
+        let error = read(mode, overflow).unwrap_err();
+        assert!(
+            error.contains("For input string: \"2147483648\""),
+            "{error}"
+        );
+    }
+
+    let negative = br#"{"lockFileVersion":-1}"#;
+    assert_eq!(read(LockfileMode::Update, negative).unwrap(), empty);
+
+    let ascii_whitespace_first = b"{\"lockFileVersion\":\x0b27,\"lockFileVersion\":28}";
+    assert_eq!(
+        read(LockfileMode::Update, ascii_whitespace_first).unwrap(),
+        empty
+    );
+    let unicode_whitespace_first =
+        "{\"lockFileVersion\":\u{00a0}27,\"lockFileVersion\":28}".as_bytes();
+    assert!(
+        read(LockfileMode::Update, unicode_whitespace_first)
+            .unwrap_err()
+            .contains("Failed to read and parse the MODULE.bazel.lock file")
+    );
+
+    let reordered = read(
+        LockfileMode::Update,
+        br#"{
+  "facts": {},
+  "moduleExtensions": {},
+  "lockFileVersion": 28,
+  "selectedYankedVersions": {},
+  "registryFileHashes": {}
+}"#,
+    )
+    .unwrap();
+    let compact = read(LockfileMode::Update, br#"{"lockFileVersion":28}"#).unwrap();
+    assert_eq!(reordered, compact);
 }
 
 #[test]
@@ -1084,7 +1181,7 @@ fn lockfile_read_inputs_skip_all_reads_in_off_mode_and_parse_hidden_fail_open() 
     .unwrap();
     assert_eq!(
         update.visible,
-        VisibleLockfileRead::Parsed(empty_bazel_lockfile())
+        VisibleLockfileRead::Parsed(empty_bazel_lockfile().into())
     );
     assert_eq!(update.hidden, Some(empty_bazel_lockfile()));
 }
@@ -1092,7 +1189,7 @@ fn lockfile_read_inputs_skip_all_reads_in_off_mode_and_parse_hidden_fail_open() 
 fn module_extension_replay_lockfile() -> slug_bzlmod_v2::BazelLockfile {
     parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "moduleExtensions": {
     "//:ext.bzl%ext": {
       "general": {
@@ -1140,7 +1237,7 @@ fn observed_generated_repo_specs(
 fn simple_visible_lockfile() -> slug_bzlmod_v2::BazelLockfile {
     parse_bazel_lockfile(
         r#"{
-  "lockFileVersion": 26,
+  "lockFileVersion": 28,
   "registryFileHashes": {
     "https://bcr.bazel.build/modules/rules_cc/0.2.17/MODULE.bazel": "module-digest"
   },

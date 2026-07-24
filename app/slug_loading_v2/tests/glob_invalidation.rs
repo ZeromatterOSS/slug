@@ -15,6 +15,7 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_bzlmod_v2::VisibleLockfileKey;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_identity_v2::ApparentRepoName;
 use slug_loading_v2::BzlModuleEvaluator;
@@ -35,6 +36,7 @@ use slug_loading_v2::keys::WorkspaceSnapshotKey;
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Identity {
     RootModuleGraph,
+    VisibleLockfile,
     Listing(PathBuf),
     Load(PathBuf),
     Directory(PathBuf),
@@ -51,6 +53,7 @@ enum EventKind {
 struct Tracker {
     events: Mutex<Vec<(Identity, EventKind)>>,
     package_load_dependencies: Mutex<Vec<Vec<Identity>>>,
+    visible_lockfile_dependencies: Mutex<Vec<Vec<Identity>>>,
 }
 
 impl Tracker {
@@ -61,11 +64,17 @@ impl Tracker {
     fn take_package_load_dependencies(&self) -> Vec<Vec<Identity>> {
         std::mem::take(&mut *self.package_load_dependencies.lock().unwrap())
     }
+
+    fn take_visible_lockfile_dependencies(&self) -> Vec<Vec<Identity>> {
+        std::mem::take(&mut *self.visible_lockfile_dependencies.lock().unwrap())
+    }
 }
 
 fn tracked_identity(key: &DynKey) -> Option<Identity> {
     if key.downcast_ref::<RootModuleGraphKey>().is_some() {
         Some(Identity::RootModuleGraph)
+    } else if key.downcast_ref::<VisibleLockfileKey>().is_some() {
+        Some(Identity::VisibleLockfile)
     } else if let Some(key) = key.downcast_ref::<PackageListingKey>() {
         Some(Identity::Listing(key.package.clone()))
     } else if let Some(key) = key.downcast_ref::<PackageLoadKey>() {
@@ -87,6 +96,12 @@ impl ActivationTracker for Tracker {
     ) {
         if key.downcast_ref::<PackageLoadKey>().is_some() {
             self.package_load_dependencies
+                .lock()
+                .unwrap()
+                .push(deps.filter_map(tracked_identity).collect());
+        }
+        if key.downcast_ref::<VisibleLockfileKey>().is_some() {
+            self.visible_lockfile_dependencies
                 .lock()
                 .unwrap()
                 .push(deps.filter_map(tracked_identity).collect());
@@ -254,6 +269,51 @@ async fn load_revision_with_inputs(
         .as_str()
         .to_owned();
     (srcs, tracker.take(), mapping)
+}
+
+async fn evaluate_package_revision(
+    dice: &Arc<Dice>,
+    tracker: &Arc<Tracker>,
+    evaluator: &BzlModuleEvaluator,
+    workspace: &Path,
+    package: &Path,
+    lockfile_mode: LockfileMode,
+) -> Result<(), String> {
+    let (files, directories) = observations(workspace);
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.clone()),
+        ..Default::default()
+    });
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            Arc::new(files),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceDirectorySnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            Arc::new(directories),
+        )])
+        .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        lockfile_mode,
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    evaluator
+        .evaluate_package(&mut transaction, package)
+        .await
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 fn assert_once(events: &[(Identity, EventKind)], identity: Identity, kind: EventKind) {
@@ -525,6 +585,175 @@ async fn retained_package_load_recomputes_and_restores_for_mapping_policy_a_b_a(
             EventKind::Evaluated,
         );
     }
+}
+
+#[tokio::test]
+async fn retained_visible_lockfile_uses_semantic_equality_and_off_skips_file_dependency() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    let lockfile = workspace.join("MODULE.bazel.lock");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        &package.join("BUILD.bazel"),
+        "filegroup(name = \"all\", srcs = [])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(Tracker::default());
+    let evaluator = BzlModuleEvaluator::new(&workspace).unwrap();
+
+    let (_, first_events, _) = load_revision_with_inputs(
+        &dice,
+        &tracker,
+        &evaluator,
+        &workspace,
+        &package,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .await;
+    let visible_dependencies = tracker.take_visible_lockfile_dependencies();
+    assert_eq!(
+        visible_dependencies,
+        [vec![Identity::File(lockfile.clone())]]
+    );
+    assert_once(
+        &first_events,
+        Identity::VisibleLockfile,
+        EventKind::Evaluated,
+    );
+
+    for content in [
+        "{\"lockFileVersion\":28}\n",
+        "{\n  \"facts\": {},\n  \"lockFileVersion\": 28,\n  \"registryFileHashes\": {},\n  \"selectedYankedVersions\": {},\n  \"moduleExtensions\": {}\n}\n",
+        "{\"lockFileVersion\":27, nope\n",
+    ] {
+        write(&lockfile, content);
+        let (_, events, _) = load_revision_with_inputs(
+            &dice,
+            &tracker,
+            &evaluator,
+            &workspace,
+            &package,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .await;
+        tracker.take_visible_lockfile_dependencies();
+        assert_once(&events, Identity::VisibleLockfile, EventKind::Evaluated);
+        assert_once(&events, Identity::RootModuleGraph, EventKind::Reused);
+        assert_once(&events, Identity::Load(package.clone()), EventKind::Reused);
+    }
+
+    write(&lockfile, "{\"lockFileVersion\":28, nope\n");
+    let (_, off_events, _) = load_revision_with_inputs(
+        &dice,
+        &tracker,
+        &evaluator,
+        &workspace,
+        &package,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Off,
+    )
+    .await;
+    let visible_dependencies = tracker.take_visible_lockfile_dependencies();
+    assert_eq!(visible_dependencies, [Vec::<Identity>::new()]);
+    assert_once(&off_events, Identity::VisibleLockfile, EventKind::Evaluated);
+    assert_not_activated(&off_events, Identity::File(lockfile));
+}
+
+#[tokio::test]
+async fn visible_lockfile_failure_blocks_package_observation_and_recovers_a_b_a() {
+    let workspace = scratch();
+    let package = workspace.join("pkg");
+    let lockfile = workspace.join("MODULE.bazel.lock");
+    let build = package.join("BUILD.bazel");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(&build, "filegroup(name = \"all\", srcs = [\"kept.txt\"])\n");
+    write(&package.join("kept.txt"), "kept\n");
+    write(&lockfile, "{\"lockFileVersion\":28, nope\n");
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(Tracker::default());
+    let evaluator = BzlModuleEvaluator::new(&workspace).unwrap();
+
+    for expected_attempt in 0..2 {
+        let error = evaluate_package_revision(
+            &dice,
+            &tracker,
+            &evaluator,
+            &workspace,
+            &package,
+            LockfileMode::Update,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            error.contains("Failed to read and parse the MODULE.bazel.lock file"),
+            "{error}"
+        );
+        let events = tracker.take();
+        assert_once(&events, Identity::VisibleLockfile, EventKind::Evaluated);
+        assert_once(&events, Identity::RootModuleGraph, EventKind::Evaluated);
+        assert_not_activated(&events, Identity::Listing(package.clone()));
+        assert_not_activated(&events, Identity::File(build.clone()));
+        assert_once(
+            &events,
+            Identity::Load(package.clone()),
+            EventKind::Evaluated,
+        );
+        tracker.take_visible_lockfile_dependencies();
+
+        if expected_attempt == 0 {
+            evaluate_package_revision(
+                &dice,
+                &tracker,
+                &evaluator,
+                &workspace,
+                &package,
+                LockfileMode::Off,
+            )
+            .await
+            .unwrap();
+            let events = tracker.take();
+            assert_once(&events, Identity::VisibleLockfile, EventKind::Evaluated);
+            assert_once(
+                &events,
+                Identity::Load(package.clone()),
+                EventKind::Evaluated,
+            );
+            assert_once(
+                &events,
+                Identity::Listing(package.clone()),
+                EventKind::Evaluated,
+            );
+            assert_once(&events, Identity::File(build.clone()), EventKind::Evaluated);
+            assert_not_activated(&events, Identity::File(lockfile.clone()));
+            assert_eq!(
+                tracker.take_visible_lockfile_dependencies(),
+                [Vec::<Identity>::new()]
+            );
+        }
+    }
+
+    write(&lockfile, "{\"lockFileVersion\":28}\n");
+    evaluate_package_revision(
+        &dice,
+        &tracker,
+        &evaluator,
+        &workspace,
+        &package,
+        LockfileMode::Update,
+    )
+    .await
+    .unwrap();
+    let events = tracker.take();
+    assert_once(&events, Identity::VisibleLockfile, EventKind::Evaluated);
+    assert_once(&events, Identity::RootModuleGraph, EventKind::Evaluated);
+    assert_once(&events, Identity::File(build), EventKind::Evaluated);
+    assert_once(&events, Identity::Load(package), EventKind::Evaluated);
 }
 
 #[tokio::test]

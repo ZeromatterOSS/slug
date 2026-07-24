@@ -11,7 +11,11 @@
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::Path;
+use std::sync::Arc;
 
+use allocative::Allocative;
+use allocative::Key;
+use allocative::Visitor;
 use serde_json::Value;
 
 use crate::BzlmodHiddenLockfileDigest;
@@ -19,9 +23,18 @@ use crate::BzlmodVisibleLockfileDigest;
 use crate::ModuleKey;
 use crate::dice::LockfileMode;
 
-pub const BAZEL_9_LOCK_FILE_VERSION: u64 = 26;
+pub const BAZEL_9_LOCK_FILE_VERSION: u64 = 28;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl Allocative for ModuleKey {
+    fn visit<'a, 'b: 'a>(&self, visitor: &'a mut Visitor<'b>) {
+        let mut visitor = visitor.enter_self_sized::<Self>();
+        visitor.visit_field(Key::new("name"), &self.name);
+        visitor.visit_field(Key::new("version"), &self.version);
+        visitor.exit();
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BazelLockfile {
     pub lock_file_version: u64,
     pub registry_file_hashes: BTreeMap<String, String>,
@@ -31,12 +44,12 @@ pub struct BazelLockfile {
     pub facts_versions: BTreeMap<String, Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BazelLockfileModuleExtension {
     pub general: Option<BazelLockfileModuleExtensionGeneral>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BazelLockfileModuleExtensionGeneral {
     pub bzl_transitive_digest: Option<String>,
     pub usages_digest: Option<String>,
@@ -44,13 +57,13 @@ pub struct BazelLockfileModuleExtensionGeneral {
     pub generated_repo_specs: BTreeMap<String, BazelLockfileRepoSpec>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct BazelLockfileRepoSpec {
     pub repo_rule_id: String,
     pub attributes: BTreeMap<String, Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum BazelLockfileRecordedInput {
     Env { name: String, value: String },
     File { label: String, digest: String },
@@ -250,10 +263,10 @@ pub fn parse_hidden_lockfile_fail_open(existing_content: Option<&str>) -> BazelL
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum VisibleLockfileRead {
     Ignored,
-    Parsed(BazelLockfile),
+    Parsed(Arc<BazelLockfile>),
 }
 
 impl VisibleLockfileRead {
@@ -269,28 +282,85 @@ pub fn parse_visible_lockfile_for_mode(
     mode: &LockfileMode,
     input: &VisibleLockfileInput,
 ) -> Result<VisibleLockfileRead, String> {
+    parse_visible_lockfile_content_for_mode(mode, input.existing_content())
+}
+
+pub(crate) fn parse_visible_lockfile_content_for_mode(
+    mode: &LockfileMode,
+    existing_content: Option<&str>,
+) -> Result<VisibleLockfileRead, String> {
     if matches!(mode, LockfileMode::Off) {
         return Ok(VisibleLockfileRead::Ignored);
     }
 
-    let Some(existing_content) = input.existing_content() else {
-        return Ok(VisibleLockfileRead::Parsed(empty_bazel_lockfile()));
+    let Some(existing_content) = existing_content else {
+        return Ok(VisibleLockfileRead::Parsed(
+            Arc::new(empty_bazel_lockfile()),
+        ));
     };
 
-    let lockfile = parse_bazel_lockfile(existing_content).map_err(|err| {
-        format!(
-            "Failed to read and parse the MODULE.bazel.lock file with error: {err}. Try deleting it and rerun the build."
-        )
-    })?;
-
-    if lockfile.lock_file_version == BAZEL_9_LOCK_FILE_VERSION {
-        return Ok(VisibleLockfileRead::Parsed(lockfile));
+    let version =
+        scan_visible_lockfile_version(existing_content).map_err(bad_visible_lockfile_message)?;
+    if version != Some(BAZEL_9_LOCK_FILE_VERSION as i32) {
+        if matches!(mode, LockfileMode::Error) {
+            return Err(unsupported_lockfile_version_message());
+        }
+        return Ok(VisibleLockfileRead::Parsed(
+            Arc::new(empty_bazel_lockfile()),
+        ));
     }
 
-    if matches!(mode, LockfileMode::Error) {
-        validate_lockfile_version(&lockfile, BAZEL_9_LOCK_FILE_VERSION)?;
+    parse_bazel_lockfile(existing_content)
+        .map(|lockfile| VisibleLockfileRead::Parsed(Arc::new(lockfile)))
+        .map_err(bad_visible_lockfile_message)
+}
+
+pub(crate) fn bad_visible_lockfile_message(error: impl std::fmt::Display) -> String {
+    format!(
+        "Failed to read and parse the MODULE.bazel.lock file with error: {error}. Try deleting it and rerun the build."
+    )
+}
+
+fn unsupported_lockfile_version_message() -> String {
+    "The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+        .to_owned()
+}
+
+fn scan_visible_lockfile_version(content: &str) -> Result<Option<i32>, String> {
+    const PREFIX: &[u8] = b"\"lockFileVersion\":";
+    let bytes = content.as_bytes();
+    let mut search_from = 0;
+    while search_from + PREFIX.len() <= bytes.len() {
+        let Some(relative) = bytes[search_from..]
+            .windows(PREFIX.len())
+            .position(|window| window == PREFIX)
+        else {
+            return Ok(None);
+        };
+        let marker = search_from + relative;
+        let mut cursor = marker + PREFIX.len();
+        while cursor < bytes.len() && is_java_ascii_whitespace(bytes[cursor]) {
+            cursor += 1;
+        }
+        let digits_start = cursor;
+        while cursor < bytes.len() && bytes[cursor].is_ascii_digit() {
+            cursor += 1;
+        }
+        if cursor == digits_start {
+            search_from = marker + 1;
+            continue;
+        }
+        let digits = &content[digits_start..cursor];
+        return digits
+            .parse::<i32>()
+            .map(Some)
+            .map_err(|_| format!("For input string: \"{digits}\""));
     }
-    Ok(VisibleLockfileRead::Parsed(empty_bazel_lockfile()))
+    Ok(None)
+}
+
+const fn is_java_ascii_whitespace(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r')
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
