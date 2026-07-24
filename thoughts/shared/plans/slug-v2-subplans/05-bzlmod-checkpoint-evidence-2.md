@@ -558,3 +558,13 @@ Expected evidence artifact: transient local absence/read failures retry only aft
 Implementation summary: Preserved stable `(workspace, URL)` identity, replaced the local `WorkspaceFileKey` edge with direct `RegistryPolicyKey` plus `RootModuleFilesKey` dependencies and immutable global IO, and conditionally acquired request generation only after local not-found/read failure. The core adapter dispatches `file://` through nonblocking Tokio filesystem IO before HTTP/TLS initialization state. Remote checksum, recorded-absence, refresh, and retry behavior are unchanged.
 Validation: focused registry DICE 12 and core adapter 1; full `slug_bzlmod_v2` 167 and `slug_core_v2` 21; formatting, diff, archive; root full-diff/source adjudication; fresh independent final review `ACCEPT`
 Residual risk: Per-module discovery is still absent. Rereview its prior design against the corrected local cache boundary and exact nonroot semantic dependencies before any discovery Rust.
+
+### Stage 5 corrected per-module registry discovery rereview
+
+Status: Replanned before Rust for root override evidence
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileValue`, `ModuleFileFunction`, `RegistryOverride`, `NonRegistryOverride`, `RegistryFunction`, and `IndexRegistry`
+Bazel oracle: accepted registry transport, remote lockfile-mode, and local replay fixtures cover ordinary registry discovery but not root override routing
+Expected evidence artifact: a root semantic value must distinguish default registry order, an override registry/version/patch policy, and non-registry routing before the stable `(workspace, ModuleKey)` discovery key can be implemented
+Design summary: Stable discovery identity, direct root/policy dependencies, exact file-key iteration, typed SHA/absence attempts, fatal boundaries, and the factored nonroot Starlark evaluator remain viable. However, Bazel chooses `ModuleOverride` before discovery, while live production root evaluation records only local-path overrides and rejects all registry override globals. A partial default-registry API would not be parity, and adding the missing root Starlark surface inside discovery lacks Bazel 9.2 evidence.
+Validation: two read-only pinned-source/live-owner audits, root evaluator/source adjudication, and fresh independent reserved-boundary review `REPLAN`; no Rust, Cargo, fixture, test, or lockfile edit
+Residual risk: Add only `registry-root-override-routing`, then design and implement a compact semantic root override owner before returning to discovery.
