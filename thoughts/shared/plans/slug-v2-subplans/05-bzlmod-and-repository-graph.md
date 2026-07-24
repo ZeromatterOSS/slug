@@ -76,14 +76,14 @@ record, parser result, or isolated policy helper is not completion until the
 analysis/query path computes through it. Refresh any fixture used for current
 acceptance from historical Bazel 9.1.1 to the Stage 1 Bazel 9.2.0 baseline.
 
-### Current prerequisite — `WP-5-m1-bzlmod-runtime-input-oracle` (2026-07-23)
+### Accepted prerequisite — `WP-5-m1-bzlmod-runtime-input-oracle` (2026-07-23)
 
 The M1 exit-gate audit returned `REPLAN`: `BzlmodDiceInputs` and
 `ResolvedBzlmodGraphDiceKey` are value/identity records, not real DICE
-dependencies in `WorkspaceRuntime`, and current Stage 5 fixtures cannot
-authorize the bridge because they retain Bazel 9.1.1 evidence.
+dependencies in `WorkspaceRuntime`, and the then-current Stage 5 fixtures
+could not authorize the bridge because they retained Bazel 9.1.1 evidence.
 
-Refresh only `module-include-change-invalidation`,
+Commit `911f16f2` refreshes only `module-include-change-invalidation`,
 `module-root-dev-dependency-visibility`, `lockfile-mode-update-refresh`,
 `lockfile-version-error`, `yanked-version-command-env-union`, and
 `repo-mapping-canonical-names` at Bazel 9.2.0 commit
@@ -94,17 +94,37 @@ absence/presence/version/modes, command/environment yanked-policy union, and
 root repo-mapping identity with exact diagnostics, manifests, immutable
 provenance, and source anchors.
 
-Hidden lockfile ownership is deferred: it belongs to output-base and
+Generation and two independent clean replay sets passed all six fixtures.
+All pinned source anchors resolve, the visible lockfile records version 28 and
+digest `38731963ff6d7df650a7355090c4388b7218e064bc75f839531902dc92f98023`,
+normalized output is host-portable, and independent final review returned
+`ACCEPT`. Hidden lockfile ownership is deferred: it belongs to output-base and
 module-extension replay and cannot be inferred from visible lockfile rows.
-The exact allowlist is those six fixture directories plus compact plan/routing
-evidence after acceptance. No Rust, Cargo, dependency, registry networking,
-module extension, materialization, repository fetching, cquery/aquery, or
-command activation is authorized. Stop on an unpinned source, nonlocal network
-dependency, hidden-lockfile claim, or need to broaden semantics. After
-independent oracle acceptance, review the exact raw-content/digest input
-owners, real DICE keys/equality, Starlark module evaluator boundary, policy
-source, minimal resolution value, and same-runtime activation expectations
-before implementing a bridge.
+
+### Current design packet — `WP-5-m1-root-module-dice-bridge-design` (2026-07-23)
+
+Perform a read-only design review before any Rust change. Trace live core,
+loading, and bzlmod ownership and produce an exact table for:
+
+- raw root/include module content and absence inputs, with create/edit/delete
+  equality;
+- command-policy, allowlisted environment, and visible-lockfile keys/equality;
+- the minimal resolved module and repository-mapping value consumed by
+  loading;
+- the starlark-rust module evaluator that replaces the handwritten directive
+  recorder in production;
+- the retained `WorkspaceRuntime` transaction handoff and exact same-daemon
+  activation evidence; and
+- one bounded implementation allowlist, dependency direction, focused tests,
+  exclusions, and stop conditions.
+
+No production, fixture, Cargo dependency, lockfile implementation, registry
+network, extension, materialization, repository fetch, cquery/aquery, or
+command activation change is authorized. Hidden output-base lockfile ownership
+stays deferred. Reject any design that creates a fresh graph/scanner, treats a
+digest-only record as the semantic owner, holds a lock across a DICE compute,
+or promotes the handwritten parser to production. Independent review must
+return `ACCEPT` or `REPLAN` before implementation.
 
 ## Implementation Slices
 

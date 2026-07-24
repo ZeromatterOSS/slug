@@ -351,9 +351,13 @@ partly the adapter's compatibility counter rather than key activation.
 
 The proposed direct Rust bridge was rejected because Stage 5's input bundles
 are value-only records, not real DICE keys, and their owning fixtures still
-encode Bazel 9.1.1 behavior. The next packet is the pinned Bazel 9.2
-`WP-5-m1-bzlmod-runtime-input-oracle` prerequisite recorded in Stage 5 and the
-canonical plan. M1 remains partial.
+encoded Bazel 9.1.1 behavior. Commit `911f16f2` accepts the pinned Bazel 9.2
+six-fixture runtime-input oracle prerequisite after generation, two independent
+clean replay sets, source-anchor checks, and final evidence review. The current
+packet is the read-only Stage 5
+`WP-5-m1-root-module-dice-bridge-design`; no Rust is authorized until it names
+the exact input owners, equality, evaluator boundary, runtime handoff, and
+same-daemon evidence. M1 remains partial.
 
 ### 2.6 First-Real-Build Promotion
 

@@ -905,3 +905,25 @@ ordered singleton callback deliveries, and exact same-DICE cross-package
 reuse/invalidation/recovery. The two flag-structure rows remain Bazel-only.
 This activates the thirteenth default function; three Java `Pattern`-dependent
 functions and the rest of M3 remain open.
+
+### Bzlmod runtime-input oracle accepted (2026-07-23)
+
+Commit `911f16f2` refreshes six Stage 5 fixtures at Bazel 9.2.0 and immutable
+upstream commit `8220c6198837d5c13d53fea211cf3282aa12408a`.
+`module-include-change-invalidation` covers edit, delete failure, and recreate
+recovery in one output base; `module-root-dev-dependency-visibility` covers
+default/ignore/default policy; `lockfile-mode-update-refresh` and
+`lockfile-version-error` pin visible lockfile creation, preservation, version
+28, and exact error behavior; `yanked-version-command-env-union` proves union
+of flag and environment policy; and `repo-mapping-canonical-names` pins root,
+dependency, multi-version, and extension-generated mapping identities without
+claiming materialization.
+
+Generation and two independent clean replay sets passed all six fixtures.
+Pinned source anchors resolve, normalized output contains no host paths, the
+visible lockfile manifest digest is
+`38731963ff6d7df650a7355090c4388b7218e064bc75f839531902dc92f98023`,
+diff/archive/credential checks passed, and independent final review returned
+`ACCEPT`. Hidden output-base lockfile ownership, network, fetch,
+materialization, and module-extension replay remain explicitly outside this
+oracle checkpoint.

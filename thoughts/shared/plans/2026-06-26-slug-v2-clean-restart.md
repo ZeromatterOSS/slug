@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; exit-gate audit completed in `REPLAN` | bzlmod/environment/lockfile/repo-map/materialization inputs are not real dependencies in the retained graph; the recursive observer remains migration scaffolding; cquery/aquery are unwired | refresh the exact bzlmod runtime-input oracle slice at pinned Bazel 9.2 before bridge design |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 bzlmod oracle prerequisite is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 bzlmod oracle prerequisite is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; exit-gate audit completed in `REPLAN`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2` | bzlmod/environment/lockfile/repo-map/materialization inputs are not real dependencies in the retained graph; the recursive observer remains migration scaffolding; cquery/aquery are unwired | review the exact root-module DICE owner/equality and Starlark evaluation bridge before any Rust change |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 bzlmod bridge design is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 bzlmod bridge design is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,35 +33,32 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only the Stage 5 `WP-5-m1-bzlmod-runtime-input-oracle` prerequisite. Refresh
-and narrowly strengthen these existing fixtures at Bazel 9.2.0 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`:
+Run only the read-only Stage 5
+`WP-5-m1-root-module-dice-bridge-design` packet. Starting from accepted oracle
+commit `911f16f2`, trace the live `WorkspaceRuntime` transaction into current
+root-module evaluation and the Stage 5 value-only input records. Produce one
+reviewable design table that names:
 
-- `module-include-change-invalidation`: root/include edit, delete failure, and
-  recreate recovery through one output base;
-- `module-root-dev-dependency-visibility`: default, ignored, then restored
-  command-policy behavior through one output base;
-- `lockfile-mode-update-refresh` and `lockfile-version-error`: visible
-  lockfile absence/presence, Bazel 9 version, and mode behavior;
-- `yanked-version-command-env-union`: exact command/environment policy union;
+- the raw-content/absence owners for root `MODULE.bazel` and included module
+  files, including create/edit/delete equality;
+- real DICE keys and equality for command policy, allowlisted environment,
+  visible `MODULE.bazel.lock`, and the minimal resolved module/repo-mapping
+  value consumed by loading;
+- the starlark-rust module evaluator boundary that replaces the handwritten
+  directive recorder in production;
+- the exact runtime/transaction handoff and same-daemon activation evidence;
   and
-- `repo-mapping-canonical-names`: exact root mapping identity.
+- the smallest Rust implementation allowlist, dependency direction, focused
+  tests, exclusions, and stop conditions.
 
-Add immutable provenance and pinned source anchors from `ModuleFileFunction`,
-`ModuleFileGlobals`, `BazelLockFileFunction`/`BazelLockFileValue`,
-`BazelDepGraph*`, repo-mapping, and yanked-policy owners. Preserve exact
-diagnostics, manifests, and same-server transitions. Hidden lockfile ownership
-is explicitly deferred because it is tied to output-base and module-extension
-replay; do not infer it from visible lockfile evidence.
-
-The allowlist is only those six fixture directories plus compact Stage 1/2/5,
-canonical, and routing evidence after acceptance. Add no Rust, dependency,
-lockfile implementation, registry network, extension, materialization,
-repository fetch, cquery/aquery, or command activation. Stop on nonlocal
-network dependence, unpinned source, a required hidden-lockfile claim, or
-semantic scope beyond the named rows. After independent oracle acceptance,
-review the exact root-module DICE owner/equality and Starlark evaluation bridge
-before any Rust change.
+Hidden output-base lockfile ownership, module extensions, registry networking,
+repository fetching/materialization, cquery/aquery, and command activation
+remain deferred. The design must not infer a semantic input from a digest-only
+record, add a fresh DICE graph or scanner, hold a lock across a DICE compute,
+or treat the current handwritten MODULE parser as the production evaluator.
+This packet authorizes no production, fixture, dependency, or lockfile change;
+after independent review, record either `ACCEPT` with one bounded
+implementation packet or `REPLAN` with the missing oracle/source prerequisite.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine
