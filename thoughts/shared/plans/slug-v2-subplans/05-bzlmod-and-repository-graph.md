@@ -470,11 +470,24 @@ input/application owner, while non-registry discovery first materializes the
 full local/archive/Git `RepoSpec` and evaluates its MODULE plus includes.
 Returning a deferred non-registry bypass would not match Bazel's discovery.
 
-The current fixture-only packet is
-`WP-5-m1-module-source-preparation-oracle`. Its exact nine retained-daemon
-rows and no-Rust allowlist are recorded in the canonical plan. After evidence
-acceptance, design one shared module-source preparation boundary before
-returning to discovery Rust.
+The fixture-only `WP-5-m1-module-source-preparation-oracle` stopped because the
+harness cannot inject the copied workspace's absolute URI into MODULE source
+or mutation text. Relative archive paths work, but Git resolves its relative
+remote from an external-helper directory; `%workspace%` is registry-option
+syntax only, and `/proc/self/cwd` is not a portable substitute.
+
+Fresh independent review accepted
+`WP-5-m1-oracle-workspace-uri-design`: exact `{{workspace_uri}}` expansion is
+limited to copied UTF-8 nonsymlink files and mutation text operands, raw
+templates remain in provenance, encoded URIs normalize to
+`file://<workspace>`, binary/symlink/outside paths remain untouched, and no
+generic unknown-token failure disturbs conditional `{{http_registry}}`.
+
+The current packet is
+`WP-5-m1-oracle-workspace-uri-scope-correction`. The canonical plan owns its
+exact three-file allowlist and validation boundary. After accepted
+implementation, regenerate the same nine-row oracle before designing
+module-source preparation.
 
 ## Implementation Slices
 

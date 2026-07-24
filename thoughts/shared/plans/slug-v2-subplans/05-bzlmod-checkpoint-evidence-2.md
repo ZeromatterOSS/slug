@@ -590,3 +590,23 @@ Expected evidence artifact: retained-daemon patch edit/delete/recreate plus inde
 Design summary: The stable registry key and corrected local retry boundary remain viable, but V2 has no exact root patch-file DICE/application owner and no materialized-repository MODULE source for non-registry overrides. Bazel applies root patches before registry nonroot evaluation and obtains local/archive/Git MODULE files only after `RepositoryDirectoryValue`; a registry-only result or deferred non-registry bypass would be a partial owner.
 Validation: two independent read-only pinned-source/live-owner audits, root source/live-code adjudication, and fresh independent review returned `REPLAN`; no Rust, Cargo, fixture, lockfile, or existing evidence edit
 Residual risk: Add only the nine-row `module-source-preparation` Bazel 9.2 oracle, then design a shared source-preparation boundary before discovery Rust.
+
+### Stage 5 module-source preparation oracle first attempt
+
+Status: Stopped before evidence
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, including registry URL expansion, `http_archive`, and `git_repository` worker paths
+Bazel oracle: invalid uncommitted `module-source-preparation` draft; all generated failing records were discarded
+Expected evidence artifact: unchanged nine-row retained-daemon patch/local/archive/Git lifecycle oracle
+Implementation summary: A fixture-local deterministic archive and ordinary-file Git object store are representable, but the runner cannot inject the copied workspace's absolute local URI into MODULE source or mutation text. Relative archive URLs work; relative Git remotes resolve from the external helper repository, `%workspace%` is not expanded in repo-rule attrs, and `/proc/self/cwd` is both nonportable and wrong for the Git child.
+Validation: pinned Bazel executable failures, harness/source inspection, and two independent read-only fixture-support audits; the exact untracked invalid fixture directory was removed
+Residual risk: Design and implement a narrowly tested portable `{{workspace_uri}}` harness seam before regenerating this oracle. No source-preparation or discovery Rust is authorized.
+
+### Stage 5 oracle workspace-URI harness design
+
+Status: Accepted before implementation
+Bazel source inspected: none; this is a representation-only correction to the existing Bazel 9.2 oracle harness
+Bazel oracle: unchanged pending nine-row `module-source-preparation` fixture
+Expected evidence artifact: copied-workspace absolute URI expansion without host-path leakage or fixture-confinement regressions
+Design summary: Exact `{{workspace_uri}}` becomes `Path.resolve().as_uri()` for the copied workspace only. Initial expansion touches copied UTF-8 regular nonsymlink files; later expansion touches only mutation `find`, `replace`, and `content` operands while provenance retains raw templates. Binary/symlink/outside paths remain untouched, encoded URIs normalize to `file://<workspace>`, and there is no generic unknown-token failure because `{{http_registry}}` is conditional and unsupported operands intentionally remain literal.
+Validation: fresh independent representation review returned `ACCEPT` for the three-file runner/normalizer/test allowlist, including space/non-ASCII, initial/mutation, provenance, confinement, binary/symlink, and existing HTTP/registry regressions
+Residual risk: Implement only `WP-5-m1-oracle-workspace-uri-scope-correction`, then regenerate the unchanged nine-row source-preparation oracle. No fixture, expected artifact, Rust, Cargo, or lockfile edit is authorized in the correction.
