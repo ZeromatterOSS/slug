@@ -641,4 +641,15 @@ Bazel oracle: accepted `module-source-preparation` from `183970d9`
 Expected evidence artifact: owner A for raw/local/materialized source files, followed by owner B for registry iteration and ordered root MODULE patches
 Design summary: One stable module-source key will eventually route registry bytes or non-registry materialized roots before evaluation. The accepted serial split first adds raw workspace files plus stable materialization/source-file keys. Local repositories are live exact-file views; fixed archive/Git sources use retained immutable generations whose operational paths are excluded from equality. The second owner will iterate typed registry results and apply only ordered root-main single-version patches; all non-not-found and patch errors are fatal, patch commands stay inactive, and parsing/includes remain downstream.
 Validation: independent pinned-source and live-owner audits; root verified current Bazel checkout differs from the pinned commit but the source-preparation core files are byte-identical and re-read the pinned Git objects; first review rejected generation-in-key identity and stale copied-local semantics; the focused stable-key/live-local correction received fresh `ACCEPT`
-Residual risk: Implement only `WP-5-m1-source-input-materialization-owner`, then owner B. Fixed archive/Git mutation invalidation, registry repository materialization, and discovery remain unclaimed.
+Residual risk: Owner A is accepted in `9c2a6814`; implement only owner B. Fixed archive/Git mutation invalidation, registry repository materialization, and discovery remain unclaimed.
+
+### Stage 5 source-input materialization owner
+
+Status: Accepted
+V2 commit: `9c2a6814 feat: materialize module source inputs`
+Bazel source inspected: pinned commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileFunction`, `RepositoryDirectoryValue`, `NonRegistryOverride`, and repository materialization functions
+Bazel oracle: accepted `module-source-preparation` from `183970d9`
+Expected evidence artifact: raw/local/materialized owner A from the accepted two-owner design
+Implementation summary: Added single-read raw/text workspace snapshots injected with directory state on one updater; stable materialization and exact source-file DICE keys; live local source roots; retained immutable fixed tar/Git generations with operational paths excluded from equality; and request-generation retry only for failed materialization. Production materialization is bounded to workspace-contained `local_repository`, SHA-pinned local tar `http_archive`, and local bare-Git exact commits.
+Validation: full `slug_workspace_v2`, `slug_bzlmod_v2`, and `slug_core_v2` suites; raw equality, local main/include A→B→A, failure recovery, fixed archive/Git, generation-independent equality, retained-root, timeout-bounded cycle, fmt, diff, and archive checks; fresh independent final review `ACCEPT`
+Residual risk: Implement only `WP-5-m1-module-source-preparation-key`; registry patch preparation is not yet consumed by evaluation or discovery, and fixed archive/Git source mutation remains unclaimed.
