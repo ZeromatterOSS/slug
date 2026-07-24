@@ -579,6 +579,20 @@ for host-independent nonroot platform/toolchain registration, independent dev
 suppression, and globally consumed flag aliases. All Rust remains deferred
 until this third serial fixture is accepted.
 
+Commit `eeea40a6` accepts the eight-row consumer fixture. Three Bazel 9.2
+runs, exact per-command manifests, pinned-source and local-closure checks, and
+fresh evidence review passed. Custom constraint values exclude the default
+host, each successful action reads the resolved `ToolchainInfo`, the two dev
+registration fields fail and recover independently, and the shared
+`compilation_mode` alias produces exact subject → root → subject markers.
+
+All three complete-nonroot evidence fixtures are now accepted. The current
+packet is the read-only
+`WP-5-m1-nonroot-interim-module-evaluator-schema-design`. It must freeze the
+complete compact value and supplied-byte Starlark seam before any Rust.
+Typed preparation provenance and stable discovery composition remain later
+serial owners.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
