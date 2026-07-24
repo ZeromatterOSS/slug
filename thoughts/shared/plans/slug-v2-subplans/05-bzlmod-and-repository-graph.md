@@ -621,6 +621,23 @@ starlark-rust seam. Include composition, preparation provenance, and discovery
 remain later serial owners; no Rust is authorized before fresh design
 acceptance.
 
+That design returned `REPLAN` before Rust. Pinned `TagCallable` retains raw
+Starlark kwargs directly in `AttributeValues`; the adapter-backed
+`None`/bool/int/string/label/iterable/dict domain is only the serializable
+subset. A confined Bazel 9.2 nonroot probe accepted both `3.14` and the builtin
+`print` callable through MODULE evaluation, then rejected each during later
+string-tag validation with its exact value and Starlark type. Rejecting either
+inside the directive evaluator would change the phase and diagnostic, while
+the current compact schema cannot retain them.
+
+The current packet is the read-only
+`WP-5-m1-nonroot-raw-attribute-oracle-design`. It must define bounded
+network-free evidence for supported, deferred-invalid, nested, cyclic, tag,
+and innate repo-rule attribute values and then decide whether a compact
+heap-independent deferred-invalid representation is sound. No schema or
+directive-evaluator Rust is authorized before that evidence design is freshly
+accepted.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
