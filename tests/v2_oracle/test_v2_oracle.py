@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import socket
 import subprocess
 import sys
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -15,7 +18,13 @@ if str(ROOT) not in sys.path:
 
 from tools.v2_oracle_lib.compare import compare_result, write_failure_artifacts
 from tools.v2_oracle_lib.evidence import validate_evidence
-from tools.v2_oracle_lib.fixture import FixtureCommand, Mutation, discover_fixtures, load_fixture
+from tools.v2_oracle_lib.fixture import (
+    Fixture,
+    FixtureCommand,
+    Mutation,
+    discover_fixtures,
+    load_fixture,
+)
 from tools.v2_oracle_lib.manifest import collect_manifest
 from tools.v2_oracle_lib.normalize import normalize_text, path_replacements
 from tools.v2_oracle_lib.runner import (
@@ -68,6 +77,109 @@ def test_fixture_parser_reads_file_operations_and_provenance() -> None:
     assert fixture.provenance.bazel_release == "9.2.0"
     assert fixture.provenance.bazel_commit == "8220c6198837d5c13d53fea211cf3282aa12408a"
     assert len(fixture.provenance.source_anchors) == 3
+
+
+def _http_registry_fixture(root: Path, name: str, port: int = 0) -> Fixture:
+    fixture_root = root / "fixture"
+    workspace = fixture_root / "workspace"
+    expected = fixture_root / "expected"
+    registry = workspace / "registry" / "first"
+    registry.mkdir(parents=True)
+    expected.mkdir()
+    (registry / "bazel_registry.json").write_text("{}\n", encoding="utf-8")
+    shutil.copy2(
+        FIXTURES / "registry-yanked-lockfile-mode" / "http_registry.py",
+        fixture_root / "http_registry.py",
+    )
+    (fixture_root / "fixture.toml").write_text(
+        f"""
+[fixture]
+name = "{name}"
+comparison = "semantic"
+http_registry = true
+http_registry_port = {port}
+manifest_roots = ["http_registry_request_counts.json"]
+
+[[commands]]
+name = "fetch_registry_index"
+argv = [
+  "-c",
+  "import sys, urllib.request; print(urllib.request.urlopen(sys.argv[1] + '/first/bazel_registry.json').read().decode())",
+  "{{{{http_registry}}}}",
+]
+expected_exit = 0
+stdout_contains = ["{{}}"]
+""".strip(),
+        encoding="utf-8",
+    )
+    return load_fixture(fixture_root)
+
+
+def test_fixture_http_registry_concurrent_lifecycle_and_request_manifest() -> None:
+    roots = [
+        scratch_dir("http-registry-runner-a"),
+        scratch_dir("http-registry-runner-b"),
+    ]
+    fixtures = [
+        _http_registry_fixture(root, f"http-registry-runner-{index}")
+        for index, root in enumerate(roots)
+    ]
+    for fixture in fixtures:
+        assert fixture.http_registry is True
+        assert fixture.http_registry_port == 0
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(
+            executor.map(
+                lambda pair: run_fixture(
+                    pair[1],
+                    ToolConfig(name="slug", executable=Path(sys.executable)),
+                    RunOptions(run_root=pair[0] / "runs", timeout_seconds=30),
+                ),
+                zip(roots, fixtures),
+            )
+        )
+
+    endpoints: set[str] = set()
+    for fixture, result in zip(fixtures, results):
+        assert compare_result(fixture, result, expected=None) == []
+        record = result["commands"][0]
+        assert record["argv"][-1] == "{{http_registry}}"
+        endpoint = record["executed_argv"][-1]
+        assert endpoint.startswith("http://127.0.0.1:")
+        endpoints.add(endpoint)
+        assert record["http_registry_request_counts"] == {
+            "/first/bazel_registry.json": 1
+        }
+        assert [entry["path"] for entry in record["manifest"]] == [
+            "http_registry_request_counts.json"
+        ]
+        with pytest.raises(OSError):
+            socket.create_connection(
+                ("127.0.0.1", int(endpoint.rsplit(":", 1)[1])), timeout=0.2
+            )
+    assert len(endpoints) == 2
+
+
+def test_fixture_http_registry_bind_failure_is_bounded_and_reports_stderr() -> None:
+    root = scratch_dir("http-registry-bind-failure")
+    occupied = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    occupied.bind(("127.0.0.1", 0))
+    occupied.listen()
+    port = occupied.getsockname()[1]
+    fixture = _http_registry_fixture(root, "http-registry-bind-failure", port)
+
+    try:
+        with pytest.raises(RuntimeError, match="failed to start") as error:
+            run_fixture(
+                fixture,
+                ToolConfig(name="slug", executable=Path(sys.executable)),
+                RunOptions(run_root=root / "runs", timeout_seconds=30),
+            )
+    finally:
+        occupied.close()
+
+    assert "Address already in use" in str(error.value)
 
 
 @pytest.mark.parametrize(

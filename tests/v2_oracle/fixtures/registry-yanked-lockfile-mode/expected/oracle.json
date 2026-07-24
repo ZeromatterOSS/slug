@@ -1,0 +1,448 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=update",
+        "--allow_yanked_versions=yyy@1.0.0",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=update",
+        "--allow_yanked_versions=yyy@1.0.0",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "exit_code": 0,
+      "http_registry_request_counts": {
+        "/first/bazel_registry.json": 1,
+        "/first/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/first/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/source.json": 1,
+        "/first/modules/yyy/metadata.json": 1,
+        "/second/bazel_registry.json": 1,
+        "/second/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/second/modules/aaa/1.0.0/source.json": 1,
+        "/second/modules/aaa/metadata.json": 1,
+        "/second/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/second/modules/olddep/1.0.0/source.json": 1,
+        "/second/modules/olddep/metadata.json": 1
+      },
+      "manifest": [
+        {
+          "digest": "20c0ba77ffd83ef124f33bbc21a24398035c9ff69d652b6e95f5b1b882008665",
+          "http_registry_endpoint_normalized": true,
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 77574,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0a61621abe82aa7a98d715bd71ae1319d57bb3eb27488d5a3391602386cbed25",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 552,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "update_records_selected_yanked_a",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\n no actions running",
+      "normalized_stdout": "<root> (registry_yanked_lockfile_mode@0.1.0)\n\u251c\u2500\u2500\u2500aaa@1.0.0 \n\u2502   \u2514\u2500\u2500\u2500olddep@1.0.0 \n\u2514\u2500\u2500\u2500yyy@1.0.0",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/registry-yanked-lockfile-mode/20260723-203957-1432634-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/registry-yanked-lockfile-mode/20260723-204337-1435963-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 8af6d0fb-e942-470f-9913-7ea22a8ecc85\n no actions running\n no actions running\n no actions running\n no actions running\n no actions running\n",
+      "stdout": "<root> (registry_yanked_lockfile_mode@0.1.0)\n\u251c\u2500\u2500\u2500aaa@1.0.0 \n\u2502   \u2514\u2500\u2500\u2500olddep@1.0.0 \n\u2514\u2500\u2500\u2500yyy@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=update",
+        "--allow_yanked_versions=yyy@1.0.0",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=update",
+        "--allow_yanked_versions=yyy@1.0.0",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "exit_code": 0,
+      "http_registry_request_counts": {
+        "/first/bazel_registry.json": 1,
+        "/first/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/first/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/source.json": 1,
+        "/first/modules/yyy/metadata.json": 1,
+        "/second/bazel_registry.json": 1,
+        "/second/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/second/modules/aaa/1.0.0/source.json": 1,
+        "/second/modules/aaa/metadata.json": 1,
+        "/second/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/second/modules/olddep/1.0.0/source.json": 1,
+        "/second/modules/olddep/metadata.json": 1
+      },
+      "manifest": [
+        {
+          "digest": "20c0ba77ffd83ef124f33bbc21a24398035c9ff69d652b6e95f5b1b882008665",
+          "http_registry_endpoint_normalized": true,
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 77574,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0a61621abe82aa7a98d715bd71ae1319d57bb3eb27488d5a3391602386cbed25",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 552,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "reason-a",
+          "old_digest_hint": "62",
+          "path": "registry/first/modules/yyy/metadata.json",
+          "replace": "reason-b"
+        },
+        {
+          "destination": "registry/first/modules/aaa/1.0.0/MODULE.bazel",
+          "op": "rename",
+          "path": "registry/first/modules/aaa/1.0.0/module.pending"
+        }
+      ],
+      "name": "update_replays_absence_after_served_create",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "<root> (registry_yanked_lockfile_mode@0.1.0)\n\u251c\u2500\u2500\u2500aaa@1.0.0 \n\u2502   \u2514\u2500\u2500\u2500olddep@1.0.0 \n\u2514\u2500\u2500\u2500yyy@1.0.0",
+      "stderr": "INFO: Invocation ID: 92f46098-5942-4c0b-9095-552ae4c117d7\n",
+      "stdout": "<root> (registry_yanked_lockfile_mode@0.1.0)\n\u251c\u2500\u2500\u2500aaa@1.0.0 \n\u2502   \u2514\u2500\u2500\u2500olddep@1.0.0 \n\u2514\u2500\u2500\u2500yyy@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=update",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=update",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "exit_code": 37,
+      "http_registry_request_counts": {
+        "/first/bazel_registry.json": 1,
+        "/first/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/first/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/source.json": 1,
+        "/first/modules/yyy/metadata.json": 1,
+        "/second/bazel_registry.json": 1,
+        "/second/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/second/modules/aaa/1.0.0/source.json": 1,
+        "/second/modules/aaa/metadata.json": 1,
+        "/second/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/second/modules/olddep/1.0.0/source.json": 1,
+        "/second/modules/olddep/metadata.json": 1
+      },
+      "manifest": [
+        {
+          "digest": "20c0ba77ffd83ef124f33bbc21a24398035c9ff69d652b6e95f5b1b882008665",
+          "http_registry_endpoint_normalized": true,
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 77574,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "0a61621abe82aa7a98d715bd71ae1319d57bb3eb27488d5a3391602386cbed25",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 552,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "update_replays_selected_yanked_reason_a",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Yanked version detected in your resolved dependency graph: yyy@1.0.0, for the reason: reason-a.\nYanked versions may contain serious vulnerabilities and should not be used. To fix this, use a bazel_dep on a newer version of this module. To continue using this version, allow it using the --allow_yanked_versions flag or the BZLMOD_ALLOW_YANKED_VERSIONS env variable.",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8dcb9788-0c58-41d4-8816-39bb57db190e\nERROR: Yanked version detected in your resolved dependency graph: yyy@1.0.0, for the reason: reason-a.\nYanked versions may contain serious vulnerabilities and should not be used. To fix this, use a bazel_dep on a newer version of this module. To continue using this version, allow it using the --allow_yanked_versions flag or the BZLMOD_ALLOW_YANKED_VERSIONS env variable.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=refresh",
+        "--allow_yanked_versions=yyy@1.0.0",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=refresh",
+        "--allow_yanked_versions=yyy@1.0.0",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "exit_code": 0,
+      "http_registry_request_counts": {
+        "/first/bazel_registry.json": 1,
+        "/first/modules/aaa/1.0.0/MODULE.bazel": 2,
+        "/first/modules/aaa/1.0.0/source.json": 1,
+        "/first/modules/aaa/metadata.json": 1,
+        "/first/modules/newdep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/newdep/1.0.0/source.json": 1,
+        "/first/modules/newdep/metadata.json": 1,
+        "/first/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/source.json": 1,
+        "/first/modules/yyy/metadata.json": 2,
+        "/second/bazel_registry.json": 1,
+        "/second/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/second/modules/aaa/1.0.0/source.json": 1,
+        "/second/modules/aaa/metadata.json": 1,
+        "/second/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/second/modules/olddep/1.0.0/source.json": 1,
+        "/second/modules/olddep/metadata.json": 1
+      },
+      "manifest": [
+        {
+          "digest": "0de5567d177bd8a22b4f622f0d64c7f76d314bfc77603ae32d88f01b7f246d4c",
+          "http_registry_endpoint_normalized": true,
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 77303,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "d93954f305fbb731f0459206ec647e88ccfc47ae61c6877dcc27a41e58cf553b",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 769,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "refresh_refetches_metadata_and_recorded_absence",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running",
+      "normalized_stdout": "<root> (registry_yanked_lockfile_mode@0.1.0)\n\u251c\u2500\u2500\u2500aaa@1.0.0 \n\u2502   \u2514\u2500\u2500\u2500newdep@1.0.0 \n\u2514\u2500\u2500\u2500yyy@1.0.0",
+      "stderr": "INFO: Invocation ID: f89447c6-b650-42a1-9d26-23fad6b459a2\n no actions running\n no actions running\n no actions running\n",
+      "stdout": "<root> (registry_yanked_lockfile_mode@0.1.0)\n\u251c\u2500\u2500\u2500aaa@1.0.0 \n\u2502   \u2514\u2500\u2500\u2500newdep@1.0.0 \n\u2514\u2500\u2500\u2500yyy@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=update",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=update",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "exit_code": 37,
+      "http_registry_request_counts": {
+        "/first/bazel_registry.json": 1,
+        "/first/modules/aaa/1.0.0/MODULE.bazel": 2,
+        "/first/modules/aaa/1.0.0/source.json": 1,
+        "/first/modules/aaa/metadata.json": 1,
+        "/first/modules/newdep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/newdep/1.0.0/source.json": 1,
+        "/first/modules/newdep/metadata.json": 1,
+        "/first/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/source.json": 1,
+        "/first/modules/yyy/metadata.json": 2,
+        "/second/bazel_registry.json": 1,
+        "/second/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/second/modules/aaa/1.0.0/source.json": 1,
+        "/second/modules/aaa/metadata.json": 1,
+        "/second/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/second/modules/olddep/1.0.0/source.json": 1,
+        "/second/modules/olddep/metadata.json": 1
+      },
+      "manifest": [
+        {
+          "digest": "0de5567d177bd8a22b4f622f0d64c7f76d314bfc77603ae32d88f01b7f246d4c",
+          "http_registry_endpoint_normalized": true,
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 77303,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "d93954f305fbb731f0459206ec647e88ccfc47ae61c6877dcc27a41e58cf553b",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 769,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "update_replays_selected_yanked_reason_b",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Yanked version detected in your resolved dependency graph: yyy@1.0.0, for the reason: reason-b.\nYanked versions may contain serious vulnerabilities and should not be used. To fix this, use a bazel_dep on a newer version of this module. To continue using this version, allow it using the --allow_yanked_versions flag or the BZLMOD_ALLOW_YANKED_VERSIONS env variable.",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1d284053-15cd-4ef6-8631-45a696b2faf6\nERROR: Yanked version detected in your resolved dependency graph: yyy@1.0.0, for the reason: reason-b.\nYanked versions may contain serious vulnerabilities and should not be used. To fix this, use a bazel_dep on a newer version of this module. To continue using this version, allow it using the --allow_yanked_versions flag or the BZLMOD_ALLOW_YANKED_VERSIONS env variable.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=error",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=error",
+        "--registry={{http_registry}}/first",
+        "--registry={{http_registry}}/second",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "exit_code": 37,
+      "http_registry_request_counts": {
+        "/first/bazel_registry.json": 1,
+        "/first/modules/aaa/1.0.0/MODULE.bazel": 2,
+        "/first/modules/aaa/1.0.0/source.json": 1,
+        "/first/modules/aaa/metadata.json": 1,
+        "/first/modules/newdep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/newdep/1.0.0/source.json": 1,
+        "/first/modules/newdep/metadata.json": 1,
+        "/first/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/first/modules/yyy/1.0.0/MODULE.bazel": 2,
+        "/first/modules/yyy/1.0.0/source.json": 1,
+        "/first/modules/yyy/metadata.json": 2,
+        "/second/bazel_registry.json": 1,
+        "/second/modules/aaa/1.0.0/MODULE.bazel": 1,
+        "/second/modules/aaa/1.0.0/source.json": 1,
+        "/second/modules/aaa/metadata.json": 1,
+        "/second/modules/olddep/1.0.0/MODULE.bazel": 1,
+        "/second/modules/olddep/1.0.0/source.json": 1,
+        "/second/modules/olddep/metadata.json": 1
+      },
+      "manifest": [
+        {
+          "digest": "d3c76d09ede8541f811c0cb9f3534bde847b10497a98c7e95122e5a38101aa7e",
+          "http_registry_endpoint_normalized": true,
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 77303,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "95fe38768235bd75c31f7b3374a2d6efaf4e65ae6c85eae1daca2b292c2f0eb8",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 769,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "9114f034663d930400ebc5993990181e4a83dc5f4d5e0c80f8b7b570ebe86969",
+          "old_digest_hint": "79536",
+          "path": "MODULE.bazel.lock",
+          "replace": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ],
+      "name": "error_checksum_precedes_yanked_rejection",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: Error accessing registry <http_registry>/first: Failed to fetch registry file <http_registry>/first/modules/yyy/1.0.0/MODULE.bazel: Checksum was 9114f034663d930400ebc5993990181e4a83dc5f4d5e0c80f8b7b570ebe86969 but wanted 0000000000000000000000000000000000000000000000000000000000000000",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 296dff5c-01d4-4329-b72c-b2f43a1553ae\n no actions running\nERROR: Error accessing registry http://127.0.0.1:34269/first: Failed to fetch registry file http://127.0.0.1:34269/first/modules/yyy/1.0.0/MODULE.bazel: Checksum was 9114f034663d930400ebc5993990181e4a83dc5f4d5e0c80f8b7b570ebe86969 but wanted 0000000000000000000000000000000000000000000000000000000000000000\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "registry-yanked-lockfile-mode",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

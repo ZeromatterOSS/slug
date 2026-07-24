@@ -1,0 +1,79 @@
+[fixture]
+name = "registry-yanked-lockfile-mode"
+description = "Bazel 9.2 visible-lockfile registry update versus refresh oracle."
+comparison = "semantic"
+http_registry = true
+http_registry_port = 0
+manifest_roots = ["MODULE.bazel.lock", "http_registry_request_counts.json"]
+oracle_notes = "A fixture-local loopback HTTP registry pins remote update replay, refresh refetch, lockfile-recorded absence, checksum enforcement, and checksum-before-yanked ordering. The BCR fallback is used only for Bazel's embedded-module closure; asserted transitions use the unique served modules."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFactoryImpl.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java",
+]
+translation_notes = "The first served registry initially returns 404 for aaa while the second serves aaa -> olddep. A later workspace mutation makes first serve aaa -> newdep. Request-count manifests and graph output distinguish update's recorded absence from refresh retry. The yyy metadata reason and MODULE checksum are independently mutated."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture registry-yanked-lockfile-mode --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture registry-yanked-lockfile-mode --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "update_records_selected_yanked_a"
+argv = ["mod", "graph", "--lockfile_mode=update", "--allow_yanked_versions=yyy@1.0.0", "--registry={{http_registry}}/first", "--registry={{http_registry}}/second", "--registry=https://bcr.bazel.build"]
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0", "aaa@1.0.0", "olddep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*newdep@1\\.0\\.0).*olddep@1\\.0\\.0"]
+
+[[commands]]
+name = "update_replays_absence_after_served_create"
+argv = ["mod", "graph", "--lockfile_mode=update", "--allow_yanked_versions=yyy@1.0.0", "--registry={{http_registry}}/first", "--registry={{http_registry}}/second", "--registry=https://bcr.bazel.build"]
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0", "aaa@1.0.0", "olddep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*newdep@1\\.0\\.0).*olddep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  path = "registry/first/modules/yyy/metadata.json"
+  find = "reason-a"
+  replace = "reason-b"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/first/modules/aaa/1.0.0/module.pending"
+  destination = "registry/first/modules/aaa/1.0.0/MODULE.bazel"
+
+[[commands]]
+name = "update_replays_selected_yanked_reason_a"
+argv = ["mod", "graph", "--lockfile_mode=update", "--registry={{http_registry}}/first", "--registry={{http_registry}}/second", "--registry=https://bcr.bazel.build"]
+expected_exit = 37
+stderr_contains = ["Yanked version detected in your resolved dependency graph: yyy@1.0.0", "reason-a"]
+stderr_patterns = ["(?s)\\A(?!.*reason-b).*reason-a"]
+
+[[commands]]
+name = "refresh_refetches_metadata_and_recorded_absence"
+argv = ["mod", "graph", "--lockfile_mode=refresh", "--allow_yanked_versions=yyy@1.0.0", "--registry={{http_registry}}/first", "--registry={{http_registry}}/second", "--registry=https://bcr.bazel.build"]
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0", "aaa@1.0.0", "newdep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*olddep@1\\.0\\.0).*newdep@1\\.0\\.0"]
+
+[[commands]]
+name = "update_replays_selected_yanked_reason_b"
+argv = ["mod", "graph", "--lockfile_mode=update", "--registry={{http_registry}}/first", "--registry={{http_registry}}/second", "--registry=https://bcr.bazel.build"]
+expected_exit = 37
+stderr_contains = ["Yanked version detected in your resolved dependency graph: yyy@1.0.0", "reason-b"]
+stderr_patterns = ["(?s)\\A(?!.*reason-a).*reason-b"]
+
+[[commands]]
+name = "error_checksum_precedes_yanked_rejection"
+argv = ["mod", "graph", "--lockfile_mode=error", "--registry={{http_registry}}/first", "--registry={{http_registry}}/second", "--registry=https://bcr.bazel.build"]
+expected_exit = 37
+stderr_contains = ["Error accessing registry <http_registry>/first", "yyy/1.0.0/MODULE.bazel", "Checksum was", "but wanted"]
+stderr_patterns = ["(?s)\\A(?!.*Yanked version detected).*Checksum was"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  find = "9114f034663d930400ebc5993990181e4a83dc5f4d5e0c80f8b7b570ebe86969"
+  replace = "0000000000000000000000000000000000000000000000000000000000000000"

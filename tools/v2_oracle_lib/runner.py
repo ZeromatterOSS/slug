@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import select
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +18,7 @@ from .nativelink import NativeLinkService, discover_nativelink_binary, start_nat
 from .normalize import normalize_text, path_replacements
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+HTTP_REGISTRY_STARTUP_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -42,6 +46,112 @@ def _copy_workspace(fixture: Fixture, run_dir: Path) -> Path:
         raise FileExistsError(f"refusing to reuse run workspace: {workspace}")
     shutil.copytree(fixture.workspace, workspace, symlinks=True)
     return workspace
+
+
+def _start_fixture_http_registry(
+    fixture: Fixture, workspace: Path
+) -> tuple[subprocess.Popen[bytes], str, Path]:
+    service = fixture.root / "http_registry.py"
+    registry = workspace / "registry"
+    log = workspace / "http_registry_requests.jsonl"
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            str(service),
+            "--root",
+            str(registry),
+            "--log",
+            str(log),
+            "--port",
+            str(fixture.http_registry_port or 0),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        assert process.stdout is not None
+        stdout = b""
+        deadline = time.monotonic() + HTTP_REGISTRY_STARTUP_TIMEOUT_SECONDS
+        while b"\n" not in stdout:
+            if process.poll() is not None:
+                raise RuntimeError("service exited before publishing its endpoint")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("timed out waiting for the service endpoint")
+            readable, _, _ = select.select(
+                [process.stdout], [], [], min(remaining, 0.1)
+            )
+            if readable:
+                chunk = os.read(process.stdout.fileno(), 4096)
+                if not chunk:
+                    raise RuntimeError("service closed stdout before publishing its endpoint")
+                stdout += chunk
+        endpoint = stdout.splitlines()[0].decode("utf-8").strip()
+        if not endpoint.startswith("http://127.0.0.1:"):
+            raise RuntimeError(f"invalid service endpoint: {endpoint!r}")
+    except Exception as error:
+        _stop_process(process)
+        assert process.stderr is not None
+        stderr = process.stderr.read().decode("utf-8", errors="replace").strip()
+        detail = f": {stderr}" if stderr else ""
+        raise RuntimeError(f"fixture HTTP registry failed to start{detail}") from error
+
+    try:
+        for path in workspace.rglob("*"):
+            if path.is_file() and path != log:
+                try:
+                    content = path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    continue
+                if "{{http_registry}}" in content:
+                    path.write_text(
+                        content.replace("{{http_registry}}", endpoint),
+                        encoding="utf-8",
+                        newline="",
+                    )
+    except Exception:
+        _stop_process(process)
+        raise
+    return process, endpoint, log
+
+
+def _stop_process(process: subprocess.Popen[bytes]) -> None:
+    if process.poll() is not None:
+        process.wait()
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def _collect_manifest(
+    workspace: Path,
+    roots: list[str] | tuple[str, ...],
+    http_registry_endpoint: str | None,
+) -> list[dict[str, Any]]:
+    manifest = collect_manifest_roots(workspace, roots)
+    if http_registry_endpoint is None or "MODULE.bazel.lock" not in roots:
+        return manifest
+
+    lockfile = workspace / "MODULE.bazel.lock"
+    if not lockfile.is_file():
+        return manifest
+    normalized = lockfile.read_bytes().replace(
+        http_registry_endpoint.encode("utf-8"), b"<http_registry>"
+    )
+    for entry in manifest:
+        if (
+            entry["root"] == "MODULE.bazel.lock"
+            and entry["path"] == "MODULE.bazel.lock"
+            and entry["type"] == "file"
+        ):
+            entry["digest"] = hashlib.sha256(normalized).hexdigest()
+            entry["size"] = len(normalized)
+            entry["http_registry_endpoint_normalized"] = True
+    return manifest
 
 
 def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str, str | None]]:
@@ -178,6 +288,9 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
     replacements = path_replacements(workspace=workspace, run_dir=run_dir, output_base=output_base)
 
     nativelink_service: NativeLinkService | None = None
+    registry_service: subprocess.Popen[bytes] | None = None
+    registry_log: Path | None = None
+    registry_endpoint: str | None = None
     if fixture.reapi.remote_executor and tool.name == "slug":
         binary = discover_nativelink_binary()
         if binary is None:
@@ -192,10 +305,20 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
         )
 
     try:
+        if fixture.http_registry:
+            registry_service, registry_endpoint, registry_log = _start_fixture_http_registry(
+                fixture, workspace
+            )
+            replacements.update(path_replacements(http_registry=registry_endpoint))
         records: list[dict[str, Any]] = []
         for command in fixture.commands:
             mutations = _apply_mutations(workspace, command)
             argv = _argv(tool, command, output_base, fixture.daemon)
+            if registry_endpoint is not None:
+                argv = [
+                    argument.replace("{{http_registry}}", registry_endpoint)
+                    for argument in argv
+                ]
             if nativelink_service is not None:
                 argv = _slug_reapi_argv(
                     argv,
@@ -218,6 +341,24 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
             )
             duration_ms = int((time.monotonic() - start) * 1000)
             manifest_roots = command.manifest_roots or fixture.manifest_roots
+            registry_request_counts: dict[str, int] | None = None
+            if registry_log is not None:
+                requests = (
+                    [
+                        json.loads(line)
+                        for line in registry_log.read_text(encoding="utf-8").splitlines()
+                    ]
+                    if registry_log.exists()
+                    else []
+                )
+                registry_request_counts = {
+                    path: sum(request["path"] == path for request in requests)
+                    for path in sorted({request["path"] for request in requests})
+                }
+                (workspace / "http_registry_request_counts.json").write_text(
+                    json.dumps(registry_request_counts, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
             record: dict[str, Any] = {
                 "name": command.name,
                 "argv": command.argv,
@@ -232,17 +373,23 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
                 "normalized_stderr": normalize_text(completed.stderr, replacements),
                 "duration_ms": duration_ms,
                 "mutations": mutations,
-                "manifest": collect_manifest_roots(workspace, manifest_roots),
+                "manifest": _collect_manifest(
+                    workspace, manifest_roots, registry_endpoint
+                ),
             }
             if nativelink_service is not None:
                 record["reapi_evidence"] = _extract_reapi_evidence(completed.stderr)
                 record["reapi_endpoint"] = nativelink_service.endpoint
+            if registry_request_counts is not None:
+                record["http_registry_request_counts"] = registry_request_counts
             records.append(record)
     finally:
         if fixture.daemon and tool.name == "slug":
             _shutdown_slug_daemon(output_base)
         if nativelink_service is not None:
             stop_nativelink(nativelink_service)
+        if registry_service is not None:
+            _stop_process(registry_service)
 
     result = {
         "schema_version": 1,

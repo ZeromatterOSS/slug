@@ -1,0 +1,3 @@
+module(name = "registry_yanked_lockfile_mode", version = "0.1.0")
+bazel_dep(name = "yyy", version = "1.0.0")
+bazel_dep(name = "aaa", version = "1.0.0")

@@ -72,6 +72,8 @@ class Fixture:
     reapi: ReapiConfig = field(default_factory=ReapiConfig)
     provenance: FixtureProvenance = field(default_factory=FixtureProvenance)
     daemon: bool = False
+    http_registry: bool = False
+    http_registry_port: int | None = None
 
     @property
     def expected_oracle(self) -> Path:
@@ -249,6 +251,15 @@ def load_fixture(path: Path) -> Fixture:
             )
         )
 
+    http_registry = bool(fixture_data.get("http_registry", False))
+    http_registry_port = _as_optional_int(
+        fixture_data.get("http_registry_port"), "fixture.http_registry_port"
+    )
+    if http_registry_port is not None and not 0 <= http_registry_port <= 65535:
+        raise ValueError("fixture.http_registry_port must be between 0 and 65535")
+    if http_registry_port is not None and not http_registry:
+        raise ValueError("fixture.http_registry_port requires fixture.http_registry = true")
+
     return Fixture(
         name=name,
         root=path,
@@ -262,6 +273,8 @@ def load_fixture(path: Path) -> Fixture:
         reapi=_parse_reapi(raw.get("reapi")),
         provenance=_parse_provenance(raw.get("provenance")),
         daemon=bool(fixture_data.get("daemon", False)),
+        http_registry=http_registry,
+        http_registry_port=http_registry_port,
     )
 
 
