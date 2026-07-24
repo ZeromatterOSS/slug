@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; command/daemon registry transport design independently accepted | the registry-option oracle must land before command/daemon registry transport; discovery, MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | add only the Bazel 9.2 registry-command transport oracle |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; command/daemon registry transport design independently accepted; Bazel 9.2 registry-command transport oracle accepted in `3bc88fd9` | command/daemon registry transport must land before discovery; MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | implement only the accepted registry command/daemon transport contract |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry policy/IO substrate is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry policy/IO substrate is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,28 +33,31 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-registry-command-transport-oracle`.
+Run only `WP-5-m1-registry-command-transport`.
 
-The command/daemon transport contract below is independently accepted. Before
-any Rust, add one source-controlled Bazel 9.2 fixture that discriminates:
-no-option BCR default; `A/`, duplicate `A`, then `B///` normalization/order
-with one first-registry miss; first-404 fallback versus first-fatal
-no-fallback; `%workspace%` file substitution; and unsupported, no-scheme, and
-malformed-file diagnostics. Request counts must prove first-occurrence dedup.
+Oracle `3bc88fd9` is accepted against Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Its eight rows pin the absent-only
+BCR default; explicit-registry replacement; trailing-slash normalization,
+first-occurrence dedup, and order; first-404 fallback; first-fatal no-fallback;
+`%workspace%` file substitution; and no-scheme, unsupported-scheme, and
+malformed-file diagnostics. Generation, worker replay, and root replay passed;
+the independent reviewer returned `ACCEPT`. The all-missing diagnostic proves
+normalized dedup/order, while filtered request-count deltas prove only the
+404/fatal fallback boundaries.
 
-Use a fixture-local dynamic HTTP registry and bounded startup/cleanup. Pin
-Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
-endpoint-normalize portable evidence, preserve raw diagnostics, and validate
-the full oracle harness. The allowlist is a new
-`tests/v2_oracle/fixtures/registry-command-transport/**` plus
-`tests/v2_oracle/test_v2_oracle.py` only if a fixture-service regression is
-required. Do not edit Rust or another fixture.
+Implement the accepted transport contract below under its exact allowlist.
+Add or strengthen the narrow command/server/core/CLI regressions before each
+owning change. Run the focused owner and downstream suites serially, rebuild
+`slug_cli_v2` before oracle-facing CLI validation, and clean stale `slugd`
+processes before and after daemon-sensitive tests. Do not edit the accepted
+oracle, add registry discovery/fallback/content fetching, expand rc handling,
+or enter MVS/yanked/final-hash/writer behavior.
 
 ### Accepted transport contract
 
-The future implementation must:
+The implementation must:
 
-1. carries primitive ordered registry strings through both one-shot and daemon
+1. carry primitive ordered registry strings through both one-shot and daemon
    build/query paths without serializing semantic Rust types;
 2. normalizes exactly once into `RegistryUrls` before the sole request commit,
    with Bazel's default BCR behavior and fail-closed diagnostics;
