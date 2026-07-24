@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; visible-lockfile design split accepted | visible lockfile reads/version 28, registry/yanked, exact lockfile writing, MVS/extensions, materialization, cquery, and aquery remain unwired; the recursive observer remains migration scaffolding | implement only the bounded visible-lockfile-v28 read owner |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 visible-lockfile-v28 read owner is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 visible-lockfile-v28 read owner is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10` | registry/yanked resolution, exact lockfile writing, MVS/extensions, materialization, cquery, and aquery remain unwired; the recursive observer remains migration scaffolding | design only the registry/yanked resolution owner |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry/yanked design is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry/yanked design is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,51 +33,48 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-visible-lockfile-v28-read`.
+Run only `WP-5-m1-registry-yanked-resolution-design`.
 
-Implement the accepted read-side design:
+Perform a read-only design audit before any registry, fetch, or resolution
+implementation. Bind Bazel 9.2 source at
+`8220c6198837d5c13d53fea211cf3282aa12408a`—especially
+`RegistryFunction`, `RegistryFactoryImpl`, `IndexRegistry`,
+`ModuleFileFunction`, `YankedVersionsFunction`, `YankedVersionsUtil`,
+`RepoSpecFunction`, `BazelDepGraphFunction`, and `BazelLockFileModule`—to the
+live V2 registry/digest/policy substrate and the parsed
+`RootModuleGraph.visible_lockfile`.
 
-- set the Bazel 9 visible lockfile version to 28 and add a bzlmod-owned
-  workspace-scoped `VisibleLockfileKey`;
-- make that key consume the injected `RootModuleLockfileModeKey`; `off`
-  returns `Ignored` before acquiring a workspace-file dependency, while the
-  other modes conditionally read `<workspace>/MODULE.bazel.lock` through the
-  neutral `WorkspaceFileKey`;
-- match `BazelLockFileFunction` precedence exactly: scan the first
-  `"lockFileVersion":\s*(\d+)` marker using Java's ASCII whitespace/digit and
-  signed-32-bit parse behavior before JSON parsing; update/refresh treat a
-  missing or non-28 marker as semantic EMPTY, error reports the pinned
-  unsupported-version diagnostic, a recognized 28 marker requires full
-  parsing, integer overflow fails before mode handling, and file read errors
-  fail in every mode except `off`;
-- compute the visible key from `RootModuleGraphKey` only after successful
-  root/include evaluation and before repository mapping, and retain the parsed
-  semantic `VisibleLockfileRead` on `RootModuleGraph`; and
-- preserve the existing `PackageLoadKey` first-dependency boundary so
-  lockfile failures block mapping, listing, and BUILD observation and recover
-  on restoration.
+The design must establish:
 
-Allow production edits only in
-`app/slug_bzlmod_v2/src/{lockfile.rs,module_eval.rs,lib.rs}` and focused tests
-only in `app/slug_bzlmod_v2/tests/{lockfile.rs,root_module_dice.rs}`,
-`app/slug_loading_v2/tests/glob_invalidation.rs`, and the test section of
-`app/slug_core_v2/src/runtime/dice.rs`. Prove conditional dependency,
-absence/current/stale/malformed/read-error precedence, create/edit/delete and
-mode A→B→A on retained DICE, module-evaluation reuse, mapping/loading blocking
-and recovery, and semantic equality: formatting/key-order-only v28 edits
-reevaluate the visible key without dirtying root/package values, while
-absence, stale-version update, and equivalent empty v28 compare as EMPTY.
+- the exact DICE key/value and dependency graph for ordered registry policy,
+  registry metadata/module/source observations, selected yanked versions, and
+  produced visible-lockfile hashes, including which owner performs remote or
+  local-registry IO and how every observation invalidates in one retained
+  runtime;
+- how update, refresh, and error consume parsed lockfile hashes and selected
+  yanked versions, including the real registry cache/refetch distinction and
+  error precedence, without writing the visible lockfile in this packet;
+- the smallest resolved-registry value needed before the later MVS/extensions
+  packet, with semantic equality, compact immutable representation, request
+  command/environment policy, and root mapping/loading consequences stated
+  explicitly;
+- whether the accepted `lockfile-mode-update-refresh` and
+  `yanked-version-command-env-union` fixtures discriminate every claimed
+  behavior; if not, select exactly one bounded Bazel 9.2 oracle correction
+  before implementation; and
+- one implementation allowlist, focused retained-DICE transition matrix,
+  downstream validation set, source citations, and stop conditions.
 
-This packet does not write a lockfile or claim the update/create fixture or
-exact external-dependency exit 48. Registry/yanked resolution must next
-consume this parsed value and produce exact remote registry hashes, including
-the real update/refresh distinction. Only then may a reviewed command-owned
-semantic plan/write packet replace the current raw-text planner behavior.
-Hidden/output-base lockfiles, MVS/extensions, materialization, external
-loading, cquery/aquery, and run/test remain deferred. Stop on a filesystem
-read/write or default inside DICE, a raw-content equality owner, a second
-graph/commit, a new Cargo dependency, public command/output expansion, or any
-attempt to synthesize pre-registry lockfile bytes.
+Do not edit Rust, Cargo manifests, fixtures, expected outputs, or lockfiles
+during this design packet. Do not import V1 registry clients or restore a
+fresh graph, process-global cache, direct filesystem scan, untracked network
+read, or lock-held DICE compute. The exact command-owned semantic plan/write
+packet remains after registry/yanked acceptance; hidden/output-base lockfiles,
+full MVS/extensions, materialization, external loading, cquery/aquery, and
+run/test remain deferred. Stop and schedule an oracle packet if executable
+evidence cannot distinguish update from refresh or pin registry/yanked error
+ordering; never synthesize the accepted 25,647-byte BCR-backed lockfile from
+fixture constants.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine

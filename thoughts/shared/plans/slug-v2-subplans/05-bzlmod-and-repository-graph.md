@@ -284,6 +284,42 @@ and any post-compute write stay deferred to the next two reviewed packets.
 Independent rereview returned `REPLAN` with no remaining blocker to the
 bounded read implementation.
 
+Commit `6d354e10` accepts `WP-5-m1-visible-lockfile-v28-read`. A
+workspace-scoped bzlmod `VisibleLockfileKey` consumes the fail-closed injected
+mode and, except in `off`, the neutral observed `MODULE.bazel.lock` value.
+Version 28 and the first Java-ASCII marker/signed-32-bit scan precede semantic
+JSON parsing exactly; absence and stale content collapse to EMPTY where Bazel
+does, while malformed v28, overflow, read errors, and error-mode stale content
+remain failures.
+
+`RootModuleGraphKey` computes root and includes before the visible key, then
+mapping. Arc-backed parsed equality prevents formatting/key-order edits,
+absence/current-empty/stale-update transitions, and delete/recreate from
+dirtying root or package values. Retained loading and runtime regressions prove
+the conditional `off` dependency, update→off→update restoration,
+module-evaluation reuse, lockfile failure before listing/BUILD observation,
+and recovery. Full bzlmod/loading/core suites, formatting, diff/archive
+checks, and independent final review passed. No fixture, lockfile write,
+registry behavior, or exit-48 claim landed.
+
+The current packet is the read-only
+`WP-5-m1-registry-yanked-resolution-design`. Trace pinned Bazel 9.2 registry,
+yanked-version, repo-spec, dependency-graph, and lockfile-update owners into
+the live V2 registry/digest/policy substrate and parsed visible value. Fix the
+real DICE ownership for local/remote registry observations, ordered registry
+selection, produced hashes, selected-yanked replay, update/refresh/error
+semantics, retained invalidation, semantic equality, and the boundary before
+later MVS/extensions and command-owned writing.
+
+The design must explicitly assess whether the accepted
+`lockfile-mode-update-refresh` and `yanked-version-command-env-union` fixtures
+discriminate every claimed transition. If not, schedule exactly one bounded
+Bazel 9.2 oracle correction before Rust. No Rust, Cargo, fixture, expected
+output, or lockfile edit is authorized during design; stop on an untracked
+filesystem/network read, process-global registry cache, fresh graph, lock-held
+DICE compute, pre-registry byte synthesis, or a claim that the existing
+raw-text planner is live.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
