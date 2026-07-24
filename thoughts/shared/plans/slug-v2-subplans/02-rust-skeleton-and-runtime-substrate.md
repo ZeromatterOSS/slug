@@ -369,6 +369,15 @@ snapshot/value/key and unchanged `Key` implementation into neutral
 `slug_workspace_v2`, preserve loading re-exports, and prove no semantic change.
 Directory inputs and all bzlmod behavior remain outside that prerequisite.
 
+Commit `00422fdc` accepts that prerequisite. `slug_workspace_v2` now owns the
+unchanged compact file snapshot/value/key and DICE propagation; loading
+preserves exact public re-exports and core imports the neutral owner directly.
+Independent validation passed two owner tests, 48 loading tests, 13 core tests,
+server/CLI compilation, formatting, diff, and archive checks. The current work
+returns to the read-only Stage 5 root-module vertical final design. Follow-up
+`97f0fe2a` adds the newly tracked V2 crate to the archive checker's explicit
+allowlist; the post-commit archive gate is green.
+
 ### 2.6 First-Real-Build Promotion
 
 Before Stage 5-8 work can advance beyond scaffold status:

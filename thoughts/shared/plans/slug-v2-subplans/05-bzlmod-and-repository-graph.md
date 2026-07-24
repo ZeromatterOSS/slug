@@ -142,6 +142,12 @@ equality and loading re-exports. Hidden lockfile, module evaluation, policy,
 lockfile version 28, repo mapping, extensions, network/fetch/materialization,
 and cquery/aquery remain deferred until that mechanical move is accepted.
 
+Commit `00422fdc` accepts the prerequisite with exact re-exports and unchanged
+file equality/compute behavior. The current packet is the read-only
+`WP-5-m1-root-module-dice-vertical-final-design`: turn the reviewed bridge
+shape into one exact, cycle-free implementation allowlist and acceptance
+matrix before editing Stage 5 or command/runtime code.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

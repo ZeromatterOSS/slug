@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; exit-gate audit completed in `REPLAN`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; root-module bridge design returned reviewed `REPLAN` | bzlmod/environment/lockfile/repo-map/materialization inputs are not real dependencies in the retained graph; the file-input owner sits above the required Stage 5 dependency direction; the recursive observer remains migration scaffolding; cquery/aquery are unwired | move only the existing workspace-file input boundary into a neutral lower crate |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 file-input ownership prerequisite is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 file-input ownership prerequisite is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner accepted in `00422fdc` | bzlmod/environment/lockfile/repo-map/materialization inputs are not real dependencies in the retained graph; the recursive observer remains migration scaffolding; cquery/aquery are unwired | finalize the now-cycle-free root-module evaluator/DICE implementation packet |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 root-module vertical design is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 root-module vertical design is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,27 +33,30 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-2-m1-shared-workspace-file-input-owner`. Move the existing
-`WorkspaceFileValue`, `WorkspaceSnapshot`, injected `WorkspaceSnapshotKey`,
-`WorkspaceFileKey`, and its unchanged `Key` implementation from
-`slug_loading_v2` into a new lower `slug_workspace_v2` crate. Preserve the
-loading `keys` re-exports so downstream source remains compatible, and rewire
-core to import the neutral owner directly.
+Run only the read-only Stage 5
+`WP-5-m1-root-module-dice-vertical-final-design`. Starting from `00422fdc`,
+finalize one independently implementable vertical with exact file allowlist,
+types, equality, command/daemon handoff, tests, and stop conditions for:
 
-The exact allowlist is `Cargo.toml`, `Cargo.lock` only if Cargo updates it,
-`app/slug_workspace_v2/{Cargo.toml,src/lib.rs}`,
-`app/slug_loading_v2/{Cargo.toml,src/keys.rs,src/bzl_module.rs}`, and
-`app/slug_core_v2/{Cargo.toml,src/runtime/dice.rs}`. Add narrow new-owner
-equality/absence tests, then pass the full loading/core suites and downstream
-server/CLI compilation.
+- a bzlmod-owned starlark-rust root/include evaluator that returns semantic
+  module directives without using the handwritten parser in production;
+- real DICE keys consuming `slug_workspace_v2::WorkspaceFileKey` for root,
+  discovered includes, and visible `MODULE.bazel.lock`;
+- normalized command policy, allowlisted yanked-version environment, and
+  lockfile mode injected on the retained runtime's single updater/commit;
+- an immutable minimal resolved root graph and
+  `slug_identity_v2::RepositoryMapping` consumed before loading; and
+- Bazel 9.2 visible lockfile version 28 plus a post-compute command-boundary
+  write plan, never a side effect inside DICE.
 
-This is a mechanical ownership move only. Do not move directory inputs, alter
-file equality or observation/scanner behavior, add bzlmod/policy/lockfile/
-mapping semantics, create another DICE graph, read filesystem/environment
-state inside a compute, reinject digests, or hold a lock across DICE/Starlark.
-Stop if preserving the public loading re-export or exact runtime activation
-requires broader production edits. The reviewed Stage 5 module evaluator/key
-design remains deferred until this cycle-free dependency prerequisite lands.
+Use the accepted six fixtures as the post-implementation matrix and name exact
+same-daemon activation assertions. Hidden output-base lockfile, module
+extensions, registry networking, repository fetch/materialization,
+cquery/aquery, and unrelated command activation remain deferred. This packet
+authorizes no production, fixture, dependency, or lockfile edits. Return
+`ACCEPT` only if the vertical is cycle-free, bounded, and all required
+diagnostics are already oracle-backed; otherwise `REPLAN` to the smallest
+missing prerequisite.
 
 The rejected regex candidate does not authorize a UTF-16 engine fork.
 `filter`, `attr`, and regex-based `kind` remain deferred; any V2-owned engine
