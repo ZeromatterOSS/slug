@@ -23,12 +23,20 @@ use slug_identity_v2::RepositoryMappingId;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
 use starlark::any::ProvidesStaticType;
+use starlark::codemap::Span;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
+use starlark::syntax::ast::Argument;
+use starlark::syntax::ast::AssignTarget;
+use starlark::syntax::ast::AstExpr;
+use starlark::syntax::ast::AstLiteral;
+use starlark::syntax::ast::AstStmt;
+use starlark::syntax::ast::Expr;
+use starlark::syntax::ast::Stmt;
 use starlark::values::Value;
 use starlark::values::ValueIdentity;
 use starlark::values::dict::DictRef;
@@ -43,9 +51,314 @@ use starlark_map::small_set::SmallSet;
 use crate::BzlmodCommandPolicyKey;
 use crate::BzlmodEnvironmentPolicyKey;
 use crate::LockfileMode;
+use crate::LogicalModuleFileId;
+use crate::LogicalSpan;
 use crate::VisibleLockfileRead;
 use crate::lockfile::bad_visible_lockfile_message;
 use crate::lockfile::parse_visible_lockfile_content_for_mode;
+
+/// A direct, literal `include()` request found while compiling one non-root
+/// MODULE file. The later closure evaluator supplies and executes these files.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct NonrootIncludeRequest {
+    pub path: CompactString,
+    pub location: LogicalSpan,
+}
+
+/// Parser-backed syntax information for a single non-root MODULE file. Source
+/// bytes and physical paths are intentionally not retained.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct NonrootModuleFileInspection {
+    pub logical_id: LogicalModuleFileId,
+    pub includes: Arc<[NonrootIncludeRequest]>,
+}
+
+/// Compile and inspect one non-root MODULE file. This deliberately does not
+/// execute directives or compose an include closure.
+pub fn inspect_nonroot_module_file(
+    logical_id: LogicalModuleFileId,
+    source: &[u8],
+) -> anyhow::Result<NonrootModuleFileInspection> {
+    let source = std::str::from_utf8(source).context("MODULE file is not valid UTF-8")?;
+    let dialect = nonroot_module_dialect();
+    let ast = AstModule::parse(logical_id.0.as_str(), source.to_owned(), &dialect)
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    let mut includes = Vec::new();
+    let mut include_is_shadowed = false;
+
+    inspect_nonroot_statement(
+        ast.statement(),
+        &ast,
+        &logical_id,
+        &mut include_is_shadowed,
+        &mut includes,
+    )?;
+
+    Ok(NonrootModuleFileInspection {
+        logical_id,
+        includes: Arc::from(includes),
+    })
+}
+
+fn nonroot_module_dialect() -> Dialect {
+    let mut dialect = Dialect::Standard;
+    dialect.enable_def = false;
+    dialect.enable_lambda = false;
+    dialect.enable_load = false;
+    dialect.enable_top_level_stmt = false;
+    dialect
+}
+
+fn inspect_nonroot_statement(
+    statement: &AstStmt,
+    ast: &AstModule,
+    logical_id: &LogicalModuleFileId,
+    include_is_shadowed: &mut bool,
+    includes: &mut Vec<NonrootIncludeRequest>,
+) -> anyhow::Result<()> {
+    match &statement.node {
+        Stmt::Statements(statements) => {
+            for statement in statements {
+                inspect_nonroot_statement(
+                    statement,
+                    ast,
+                    logical_id,
+                    include_is_shadowed,
+                    includes,
+                )?;
+            }
+        }
+        Stmt::Expression(expression) => {
+            if !inspect_direct_include(expression, ast, logical_id, *include_is_shadowed, includes)?
+            {
+                inspect_nonroot_expression(expression, *include_is_shadowed, false)?;
+            }
+        }
+        Stmt::Assign(assignment) => {
+            // The right hand side is evaluated before the assignment changes
+            // `include`, so only then does the binding become shadowed.
+            inspect_nonroot_expression(&assignment.rhs, *include_is_shadowed, false)?;
+            inspect_assignment_target(&assignment.lhs, *include_is_shadowed, true)?;
+            if matches!(&assignment.lhs.node, AssignTarget::Identifier(name) if name.node.ident == "include")
+            {
+                *include_is_shadowed = true;
+            }
+        }
+        Stmt::AssignModify(lhs, _, rhs) => {
+            inspect_nonroot_expression(rhs, *include_is_shadowed, false)?;
+            inspect_assignment_target(lhs, *include_is_shadowed, true)?;
+            if matches!(&lhs.node, AssignTarget::Identifier(name) if name.node.ident == "include") {
+                *include_is_shadowed = true;
+            }
+        }
+        // The parser dialect rejects these before this inspector runs. Keep
+        // explicit errors here so a dialect regression cannot silently widen
+        // the MODULE language.
+        Stmt::Def(_) | Stmt::Load(_) | Stmt::If(_, _) | Stmt::IfElse(_, _) | Stmt::For(_) => {
+            anyhow::bail!("restricted MODULE syntax is not permitted")
+        }
+        Stmt::Break | Stmt::Continue | Stmt::Pass | Stmt::Return(_) => {
+            anyhow::bail!("restricted MODULE syntax is not permitted")
+        }
+    }
+    Ok(())
+}
+
+fn inspect_direct_include(
+    expression: &AstExpr,
+    ast: &AstModule,
+    logical_id: &LogicalModuleFileId,
+    include_is_shadowed: bool,
+    includes: &mut Vec<NonrootIncludeRequest>,
+) -> anyhow::Result<bool> {
+    let Expr::Call(callee, arguments) = &expression.node else {
+        return Ok(false);
+    };
+    match &callee.node {
+        Expr::Identifier(identifier)
+            if identifier.node.ident == "include" && !include_is_shadowed =>
+        {
+            let [argument] = arguments.args.as_slice() else {
+                anyhow::bail!("include() requires exactly one literal string argument")
+            };
+            let Argument::Positional(argument) = &argument.node else {
+                anyhow::bail!("include() requires exactly one literal string argument")
+            };
+            let Expr::Literal(AstLiteral::String(path)) = &argument.node else {
+                anyhow::bail!("include() requires exactly one literal string argument")
+            };
+            includes.push(NonrootIncludeRequest {
+                path: CompactString::from(path.node.as_str()),
+                location: logical_span(ast, logical_id, expression.span),
+            });
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+fn inspect_assignment_target(
+    target: &starlark::syntax::ast::AstAssignTarget,
+    include_is_shadowed: bool,
+    plain_include_assignment: bool,
+) -> anyhow::Result<()> {
+    match &target.node {
+        AssignTarget::Identifier(identifier)
+            if identifier.node.ident == "include" && !include_is_shadowed =>
+        {
+            if !plain_include_assignment {
+                anyhow::bail!("include may only be used as a direct top-level call")
+            }
+        }
+        AssignTarget::Identifier(_) => {}
+        AssignTarget::Tuple(targets) => {
+            for target in targets {
+                inspect_assignment_target(target, include_is_shadowed, false)?;
+            }
+        }
+        AssignTarget::Dot(receiver, _) => {
+            inspect_nonroot_expression(receiver, include_is_shadowed, false)?;
+        }
+        AssignTarget::Index(values) => {
+            inspect_nonroot_expression(&values.0, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&values.1, include_is_shadowed, false)?;
+        }
+    }
+    Ok(())
+}
+
+fn inspect_nonroot_expression(
+    expression: &AstExpr,
+    include_is_shadowed: bool,
+    direct_top_level_expression: bool,
+) -> anyhow::Result<()> {
+    match &expression.node {
+        Expr::Tuple(values) | Expr::List(values) => {
+            for value in values {
+                inspect_nonroot_expression(value, include_is_shadowed, false)?;
+            }
+        }
+        Expr::Dot(receiver, _)
+        | Expr::Not(receiver)
+        | Expr::Minus(receiver)
+        | Expr::Plus(receiver)
+        | Expr::BitNot(receiver) => {
+            inspect_nonroot_expression(receiver, include_is_shadowed, false)?
+        }
+        Expr::Call(callee, arguments) => {
+            let is_direct_builtin_include = direct_top_level_expression
+                && !include_is_shadowed
+                && matches!(&callee.node, Expr::Identifier(identifier) if identifier.node.ident == "include");
+            if !is_direct_builtin_include {
+                inspect_nonroot_expression(callee, include_is_shadowed, false)?;
+            }
+            for argument in &arguments.args {
+                match &argument.node {
+                    Argument::Args(_) => anyhow::bail!("*args is not permitted in MODULE files"),
+                    Argument::KwArgs(value) => {
+                        if !matches!(&value.node, Expr::Dict(_)) {
+                            anyhow::bail!("**kwargs must be a literal dictionary in MODULE files")
+                        }
+                        inspect_nonroot_expression(value, include_is_shadowed, false)?;
+                    }
+                    Argument::Positional(value) | Argument::Named(_, value) => {
+                        inspect_nonroot_expression(value, include_is_shadowed, false)?;
+                    }
+                }
+            }
+        }
+        Expr::Index(values) => {
+            inspect_nonroot_expression(&values.0, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&values.1, include_is_shadowed, false)?;
+        }
+        Expr::Index2(values) => {
+            inspect_nonroot_expression(&values.0, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&values.1, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&values.2, include_is_shadowed, false)?;
+        }
+        Expr::Slice(receiver, start, end, step) => {
+            inspect_nonroot_expression(receiver, include_is_shadowed, false)?;
+            for value in [start.as_deref(), end.as_deref(), step.as_deref()]
+                .into_iter()
+                .flatten()
+            {
+                inspect_nonroot_expression(value, include_is_shadowed, false)?;
+            }
+        }
+        Expr::Op(left, _, right) => {
+            inspect_nonroot_expression(left, include_is_shadowed, false)?;
+            inspect_nonroot_expression(right, include_is_shadowed, false)?;
+        }
+        Expr::If(values) => {
+            inspect_nonroot_expression(&values.0, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&values.1, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&values.2, include_is_shadowed, false)?;
+        }
+        Expr::Dict(values) => {
+            for (key, value) in values {
+                inspect_nonroot_expression(key, include_is_shadowed, false)?;
+                inspect_nonroot_expression(value, include_is_shadowed, false)?;
+            }
+        }
+        Expr::ListComprehension(value, clause, clauses) => {
+            inspect_assignment_target(&clause.var, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&clause.over, include_is_shadowed, false)?;
+            for clause in clauses {
+                match clause {
+                    starlark::syntax::ast::Clause::For(clause) => {
+                        inspect_assignment_target(&clause.var, include_is_shadowed, false)?;
+                        inspect_nonroot_expression(&clause.over, include_is_shadowed, false)?
+                    }
+                    starlark::syntax::ast::Clause::If(condition) => {
+                        inspect_nonroot_expression(condition, include_is_shadowed, false)?
+                    }
+                }
+            }
+            inspect_nonroot_expression(value, include_is_shadowed, false)?;
+        }
+        Expr::DictComprehension(values, clause, clauses) => {
+            inspect_assignment_target(&clause.var, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&clause.over, include_is_shadowed, false)?;
+            for clause in clauses {
+                match clause {
+                    starlark::syntax::ast::Clause::For(clause) => {
+                        inspect_assignment_target(&clause.var, include_is_shadowed, false)?;
+                        inspect_nonroot_expression(&clause.over, include_is_shadowed, false)?
+                    }
+                    starlark::syntax::ast::Clause::If(condition) => {
+                        inspect_nonroot_expression(condition, include_is_shadowed, false)?
+                    }
+                }
+            }
+            inspect_nonroot_expression(&values.0, include_is_shadowed, false)?;
+            inspect_nonroot_expression(&values.1, include_is_shadowed, false)?;
+        }
+        Expr::Lambda(_) => anyhow::bail!("lambda is not permitted in MODULE files"),
+        Expr::FString(value) => {
+            for expression in &value.expressions {
+                inspect_nonroot_expression(expression, include_is_shadowed, false)?;
+            }
+        }
+        Expr::Identifier(identifier)
+            if identifier.node.ident == "include" && !include_is_shadowed =>
+        {
+            anyhow::bail!("include may only be used as a direct top-level call")
+        }
+        Expr::Identifier(_) | Expr::Literal(_) => {}
+    }
+    Ok(())
+}
+
+fn logical_span(ast: &AstModule, logical_id: &LogicalModuleFileId, span: Span) -> LogicalSpan {
+    let span = ast.file_span(span).resolve_span();
+    LogicalSpan {
+        file: logical_id.clone(),
+        start_line: u32::try_from(span.begin.line + 1).expect("Starlark line fits u32"),
+        start_column: u32::try_from(span.begin.column + 1).expect("Starlark column fits u32"),
+        end_line: u32::try_from(span.end.line + 1).expect("Starlark line fits u32"),
+        end_column: u32::try_from(span.end.column + 1).expect("Starlark column fits u32"),
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RootModuleHeader {
