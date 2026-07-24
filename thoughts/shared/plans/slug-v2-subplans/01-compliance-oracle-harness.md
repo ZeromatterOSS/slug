@@ -927,3 +927,21 @@ diff/archive/credential checks passed, and independent final review returned
 `ACCEPT`. Hidden output-base lockfile ownership, network, fetch,
 materialization, and module-extension replay remain explicitly outside this
 oracle checkpoint.
+
+### Fixture-growth hygiene baseline (2026-07-24)
+
+The first bounded hygiene review establishes accepted-tree baseline
+`3afc1c5a` for `tests/v2_oracle/fixtures`: 1,231 regular files and 27,626
+newline-counted lines. It reviewed the five accepted oracle packets
+`183970d9`, `51bfc915`, `908c7c62`, `8824135a`, and `eeea40a6`; their retained
+fixtures respectively contain 92/1,454, 54/776, 52/398, 50/441, and 14/704
+files/lines.
+
+Repeated fixture-local platform and registry subtrees remain necessary for
+immutable provenance, isolated local overrides, hermetic topology, and
+per-row failure isolation. The pending raw-attribute fixture's copied
+six-file/50-line platforms module is explicitly required by its owner packet.
+No unused or nondiscriminating module, registry, mutation, manifest field,
+expected field, or negative assertion was established, so the pruning
+allowlist and affected replay set are empty. The next checkpoint starts from
+this baseline and counts accepted oracle packets after `eeea40a6`.

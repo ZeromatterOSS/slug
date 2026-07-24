@@ -24,6 +24,15 @@ commits. Delegate bounded work to the least-cost capable agent.
    from Live Status. Clear a red M0 or other named baseline blocker before
    beginning another feature packet. Read only matching Stage 9 rows unless
    reuse scope expands.
+6. Before selecting another oracle packet, check the fixture-growth checkpoint
+   in the oracle-harness owner plan. Each checkpoint records its fixture scope,
+   aggregate text-file and line counts, and the accepted oracle packet count
+   and IDs covered since the preceding checkpoint. Route one bounded
+   fixture-hygiene review before adding more fixture breadth when five packets
+   have been accepted, or fixture growth reaches 100 net files or 10,000 net
+   text lines, since that checkpoint. If no checkpoint exists, first inventory
+   the current accepted tree as the baseline and review all identifiable
+   accepted oracle packets since the latest owner-plan evidence.
 
 ## Routing
 
@@ -54,6 +63,15 @@ Use `references/implementation-worker.md`. Every packet has:
 - focused validation and stop conditions; and
 - a residual-risk report.
 
+Oracle packets also name their net fixture file/line growth, reused versus
+copied scaffolding, and the last fixture-growth checkpoint. New duplication
+needs an isolation, provenance, or discriminating-behavior reason.
+
+Fixture-hygiene packets additionally record aggregate before/after counts,
+exact accepted packet IDs, repeated-subtree inventory, retained-row
+discrimination results, the exact pruning allowlist or `none`, and replay
+results for every affected oracle.
+
 The root retains new DICE keys/locks, public or cross-crate APIs, identity and
 ownership models, formatter semantics, regex engines, stage boundaries, and
 destructive actions. Obtain Sol review before implementing such a decision.
@@ -78,6 +96,12 @@ Use `references/design-reviewer.md` for reserved or risky boundaries. The
 verdict is `ACCEPT`, `REVISE`, or `REPLAN`. Allow one focused correction after
 a concrete miss. A second material correction ends the packet in `REPLAN`.
 
+A fixture-hygiene packet is read-only until it identifies exact redundant,
+unused, or nondiscriminating material. Any pruning then uses a bounded allowlist
+and replays every affected oracle. Preserve immutable Bazel provenance,
+hermeticity, per-row failure isolation, and exact outputs; shared mutable test
+state is not an acceptable size optimization.
+
 ## Root Validation and Closeout
 
 Run only what the risk requires, serially:
@@ -91,13 +115,25 @@ Run only what the risk requires, serially:
 6. daemon tests in a socket-capable environment, with stale `slugd` cleanup
    before and after.
 
-Do not weaken environment-limited tests. After a terminal result, update Live
-Status and compact owner evidence once, append one terminal packet rollup to
-the bounded routing log, and commit only accepted work.
+Do not weaken environment-limited tests. After a terminal result:
+
+1. update the owner plan once with compact evidence;
+2. update canonical Live Status only if milestone state, blocker, or current
+   packet changed;
+3. append exactly one terminal packet rollup to the bounded routing log;
+4. do not also edit a routing-history archive unless rotating old live rows;
+5. fold status into the accepted code/oracle commit when practical, otherwise
+   use at most one terminal status commit; and
+6. commit only accepted work.
+
+Do not publish separate status commits for packet definition, each audit,
+worker return, correction, review, and acceptance. Keep those details in the
+packet handoff unless they change an architectural decision that future owners
+must read.
 
 ## Log Use
 
 `references/routing-guide.md` is the normal routing input.
 `references/routing-log.md` keeps at most 20 terminal packet rows or 250 lines.
 Archive older rows by month as `references/routing-history-YYYY-MM.md`;
-histories are not routine startup context.
+histories are not routine startup context and receive rows only during rollover.

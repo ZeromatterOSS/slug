@@ -37,6 +37,22 @@ Forbidden:
 Oracle contract:
 <exact fixture rows or source-derived behavior>
 
+Fixture budget (oracle packets):
+- Last growth checkpoint: <owner-plan reference and baseline>
+- Net growth: <files and lines by fixture>
+- Aggregate before/after: <fixture scope, text files, text lines>
+- Accepted packets since checkpoint: <count and exact IDs>
+- Reused assets/scaffolding: <paths or none>
+- New duplication: <exact reason required for isolation/provenance, or none>
+- De-slop check: <unused modules/mutations/manifests/fields/negatives removed
+  or demonstrated necessary>
+
+Fixture-hygiene evidence:
+- Repeated subtrees: <paths, hashes/relationship, and disposition>
+- Retained-row discrimination: <result by reviewed fixture/row set>
+- Pruning allowlist: <exact paths or none>
+- Affected oracle replays: <commands and results, or none>
+
 Reuse decision:
 - Candidates checked: <exact paths/Stage 9 rows>
 - Decision: <adopt/port/rewrite/reference-only/reject for each>
@@ -64,6 +80,8 @@ Return:
 3. Oracle/source anchors used
 4. Residual risk and explicitly unsupported boundaries
 5. Whether any stop condition was encountered
+6. For oracle work, exact per-fixture and aggregate growth, accepted packet
+   count/IDs, and any redundant or nondiscriminating material found
 
 Stop immediately if:
 - Dirty files overlap another owner

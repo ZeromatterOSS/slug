@@ -25,6 +25,11 @@ Check:
 8. Are retained compact utilities used appropriately on hot paths?
 9. Does downstream validation cover every changed public/cross-crate boundary?
 10. Is any acceptance claim broader than the actual fixture/test set?
+11. For oracle work, is every copied registry/module subtree, mutation,
+    manifest, expected field, and negative assertion necessary to discriminate
+    the claimed behavior?
+12. Has the fixture-growth checkpoint fired, and if so was a bounded hygiene
+    review completed before adding more fixture breadth?
 
 Return exactly one verdict:
 
