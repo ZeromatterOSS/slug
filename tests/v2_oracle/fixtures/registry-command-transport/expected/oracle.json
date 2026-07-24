@@ -1,0 +1,413 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph"
+      ],
+      "exit_code": 0,
+      "http_registry_request_counts": {},
+      "manifest": [
+        {
+          "digest": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 3,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "default_bcr",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running",
+      "normalized_stdout": "<root> (registry_command_transport@0.1.0)\n\u2514\u2500\u2500\u2500rules_shell@0.6.1 \n    \u251c\u2500\u2500\u2500bazel_features@1.42.1 \n    \u2502   \u2514\u2500\u2500\u2500bazel_skylib@1.8.2 (*) \n    \u251c\u2500\u2500\u2500bazel_skylib@1.8.2 \n    \u2502   \u251c\u2500\u2500\u2500platforms@1.0.0 (*) \n    \u2502   \u2514\u2500\u2500\u2500rules_license@1.0.0 \n    \u2514\u2500\u2500\u2500platforms@1.0.0 \n        \u2514\u2500\u2500\u2500rules_license@1.0.0 (*)",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/registry-command-transport/20260723-214220-1480483-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/registry-command-transport/20260723-214332-1482674-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 1257083c-c6b8-4c2d-bb6e-55f3c3ee02ba\n no actions running\n no actions running\n no actions running\n no actions running\n",
+      "stdout": "<root> (registry_command_transport@0.1.0)\n\u2514\u2500\u2500\u2500rules_shell@0.6.1 \n    \u251c\u2500\u2500\u2500bazel_features@1.42.1 \n    \u2502   \u2514\u2500\u2500\u2500bazel_skylib@1.8.2 (*) \n    \u251c\u2500\u2500\u2500bazel_skylib@1.8.2 \n    \u2502   \u251c\u2500\u2500\u2500platforms@1.0.0 (*) \n    \u2502   \u2514\u2500\u2500\u2500rules_license@1.0.0 \n    \u2514\u2500\u2500\u2500platforms@1.0.0 \n        \u2514\u2500\u2500\u2500rules_license@1.0.0 (*) \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry={{http_registry}}/a/",
+        "--registry={{http_registry}}/a",
+        "--registry={{http_registry}}/b///",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry={{http_registry}}/a/",
+        "--registry={{http_registry}}/a",
+        "--registry={{http_registry}}/b///",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "exit_code": 0,
+      "http_registry_request_counts": {
+        "/a/modules/yyy/1.0.0/MODULE.bazel": 2,
+        "/b/bazel_registry.json": 1,
+        "/b/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/b/modules/yyy/1.0.0/source.json": 1,
+        "/b/modules/yyy/metadata.json": 2
+      },
+      "manifest": [
+        {
+          "digest": "3d0c3203f6d9c92481f5e74893ddc03e23dc53748a8c0e3f4639a3ff58e84651",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 184,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "bazel_dep(name = \"rules_shell\", version = \"0.6.1\")",
+          "old_digest_hint": "114",
+          "path": "MODULE.bazel",
+          "replace": "bazel_dep(name = \"yyy\", version = \"1.0.0\")"
+        }
+      ],
+      "name": "ordered_404_fallback",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\n no actions running",
+      "normalized_stdout": "<root> (registry_command_transport@0.1.0)\n\u2514\u2500\u2500\u2500yyy@1.0.0",
+      "stderr": "INFO: Invocation ID: 57bff1c7-5b37-427b-8287-8409b6eadf6c\n no actions running\n no actions running\n",
+      "stdout": "<root> (registry_command_transport@0.1.0)\n\u2514\u2500\u2500\u2500yyy@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry={{http_registry}}/a/",
+        "--registry={{http_registry}}/a",
+        "--registry={{http_registry}}/b///"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry={{http_registry}}/a/",
+        "--registry={{http_registry}}/a",
+        "--registry={{http_registry}}/b///"
+      ],
+      "exit_code": 37,
+      "http_registry_request_counts": {
+        "/a/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/a/modules/yyy/1.0.0/MODULE.bazel": 2,
+        "/b/bazel_registry.json": 1,
+        "/b/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/b/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/b/modules/yyy/1.0.0/source.json": 1,
+        "/b/modules/yyy/metadata.json": 2
+      },
+      "manifest": [
+        {
+          "digest": "14717cec838ddd4432d2c3d8b7ae5a017d6d8fff885a92759a54753cde0e9485",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 282,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "bazel_dep(name = \"yyy\", version = \"1.0.0\")",
+          "old_digest_hint": "106",
+          "path": "MODULE.bazel",
+          "replace": "bazel_dep(name = \"missingprobe\", version = \"1.0.0\")"
+        }
+      ],
+      "name": "ordered_dedup_missing",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: in module dependency chain <root> -> missingprobe@1.0.0: module missingprobe@1.0.0 not found in registries:\n* <http_registry>/a/modules/missingprobe/1.0.0/MODULE.bazel: not found\n* <http_registry>/b/modules/missingprobe/1.0.0/MODULE.bazel: not found",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 279e013d-4b20-480e-ac95-224cc4342504\nERROR: in module dependency chain <root> -> missingprobe@1.0.0: module missingprobe@1.0.0 not found in registries:\n* http://127.0.0.1:39023/a/modules/missingprobe/1.0.0/MODULE.bazel: not found\n* http://127.0.0.1:39023/b/modules/missingprobe/1.0.0/MODULE.bazel: not found\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry={{http_registry}}/fatal",
+        "--registry={{http_registry}}/b"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry={{http_registry}}/fatal",
+        "--registry={{http_registry}}/b"
+      ],
+      "exit_code": 37,
+      "http_registry_request_counts": {
+        "/a/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/a/modules/yyy/1.0.0/MODULE.bazel": 2,
+        "/b/bazel_registry.json": 1,
+        "/b/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/b/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/b/modules/yyy/1.0.0/source.json": 1,
+        "/b/modules/yyy/metadata.json": 2,
+        "/fatal/modules/fatalprobe/1.0.0/MODULE.bazel": 16
+      },
+      "manifest": [
+        {
+          "digest": "0f2e3622c9ad4b295de22123fa2ccec40208be474cebd8c2c745c97cb6f77d09",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 334,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "bazel_dep(name = \"missingprobe\", version = \"1.0.0\")",
+          "old_digest_hint": "115",
+          "path": "MODULE.bazel",
+          "replace": "bazel_dep(name = \"fatalprobe\", version = \"1.0.0\")"
+        }
+      ],
+      "name": "fatal_does_not_fallback",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Error accessing registry <http_registry>/fatal: Failed to fetch registry file <http_registry>/fatal/modules/fatalprobe/1.0.0/MODULE.bazel: GET returned 500 fixture fatal registry response",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 5426a182-6d87-40d3-9a9a-48d2900530f9\nERROR: Error accessing registry http://127.0.0.1:39023/fatal: Failed to fetch registry file http://127.0.0.1:39023/fatal/modules/fatalprobe/1.0.0/MODULE.bazel: GET returned 500 fixture fatal registry response\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/b",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/b",
+        "--registry=https://bcr.bazel.build"
+      ],
+      "exit_code": 0,
+      "http_registry_request_counts": {
+        "/a/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/a/modules/yyy/1.0.0/MODULE.bazel": 2,
+        "/b/bazel_registry.json": 1,
+        "/b/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/b/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/b/modules/yyy/1.0.0/source.json": 1,
+        "/b/modules/yyy/metadata.json": 2,
+        "/fatal/modules/fatalprobe/1.0.0/MODULE.bazel": 16
+      },
+      "manifest": [
+        {
+          "digest": "0f2e3622c9ad4b295de22123fa2ccec40208be474cebd8c2c745c97cb6f77d09",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 334,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "bazel_dep(name = \"fatalprobe\", version = \"1.0.0\")",
+          "old_digest_hint": "113",
+          "path": "MODULE.bazel",
+          "replace": "bazel_dep(name = \"yyy\", version = \"1.0.0\")"
+        }
+      ],
+      "name": "workspace_file_registry",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_command_transport@0.1.0)\n\u2514\u2500\u2500\u2500yyy@1.0.0",
+      "stderr": "INFO: Invocation ID: 90c37e6d-1c38-4826-861b-22f19fb30b28\n no actions running\n",
+      "stdout": "<root> (registry_command_transport@0.1.0)\n\u2514\u2500\u2500\u2500yyy@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=not-a-url"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=not-a-url"
+      ],
+      "exit_code": 37,
+      "http_registry_request_counts": {
+        "/a/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/a/modules/yyy/1.0.0/MODULE.bazel": 2,
+        "/b/bazel_registry.json": 1,
+        "/b/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/b/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/b/modules/yyy/1.0.0/source.json": 1,
+        "/b/modules/yyy/metadata.json": 2,
+        "/fatal/modules/fatalprobe/1.0.0/MODULE.bazel": 16
+      },
+      "manifest": [
+        {
+          "digest": "0f2e3622c9ad4b295de22123fa2ccec40208be474cebd8c2c745c97cb6f77d09",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 334,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "no_scheme",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Invalid registry URL: not-a-url: Registry URL has no scheme -- supported schemes are: http://, https:// and file://: not-a-url",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 28e90192-be9a-4a01-bb11-bbaa9c990c0d\nERROR: Invalid registry URL: not-a-url: Registry URL has no scheme -- supported schemes are: http://, https:// and file://: not-a-url\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=ftp://example.invalid/modules"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=ftp://example.invalid/modules"
+      ],
+      "exit_code": 37,
+      "http_registry_request_counts": {
+        "/a/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/a/modules/yyy/1.0.0/MODULE.bazel": 2,
+        "/b/bazel_registry.json": 1,
+        "/b/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/b/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/b/modules/yyy/1.0.0/source.json": 1,
+        "/b/modules/yyy/metadata.json": 2,
+        "/fatal/modules/fatalprobe/1.0.0/MODULE.bazel": 16
+      },
+      "manifest": [
+        {
+          "digest": "0f2e3622c9ad4b295de22123fa2ccec40208be474cebd8c2c745c97cb6f77d09",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 334,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "unsupported_scheme",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Invalid registry URL: ftp://example.invalid/modules: Unrecognized registry URL protocol: ftp://example.invalid/modules",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ff0282c4-9540-4761-88e5-9085361fb303\nERROR: Invalid registry URL: ftp://example.invalid/modules: Unrecognized registry URL protocol: ftp://example.invalid/modules\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://bad"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://bad"
+      ],
+      "exit_code": 37,
+      "http_registry_request_counts": {
+        "/a/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/a/modules/yyy/1.0.0/MODULE.bazel": 2,
+        "/b/bazel_registry.json": 1,
+        "/b/modules/missingprobe/1.0.0/MODULE.bazel": 2,
+        "/b/modules/yyy/1.0.0/MODULE.bazel": 1,
+        "/b/modules/yyy/1.0.0/source.json": 1,
+        "/b/modules/yyy/metadata.json": 2,
+        "/fatal/modules/fatalprobe/1.0.0/MODULE.bazel": 16
+      },
+      "manifest": [
+        {
+          "digest": "0f2e3622c9ad4b295de22123fa2ccec40208be474cebd8c2c745c97cb6f77d09",
+          "mode": "0o644",
+          "path": "http_registry_request_counts.json",
+          "root": "http_registry_request_counts.json",
+          "size": 334,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "malformed_file",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Error accessing registry file://bad: Failed to fetch registry file file://bad/modules/yyy/1.0.0/MODULE.bazel: Unsupported non-local file URL",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 6c49307e-de4b-4b31-ad0e-2649db21f8fd\nERROR: Error accessing registry file://bad: Failed to fetch registry file file://bad/modules/yyy/1.0.0/MODULE.bazel: Unsupported non-local file URL\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "registry-command-transport",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

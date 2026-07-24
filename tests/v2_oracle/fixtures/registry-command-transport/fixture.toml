@@ -1,0 +1,89 @@
+[fixture]
+name = "registry-command-transport"
+description = "Bazel 9.2 registry option normalization and ordered fallback."
+comparison = "message_shape"
+http_registry = true
+http_registry_port = 0
+manifest_roots = ["http_registry_request_counts.json"]
+oracle_notes = "Default resolution proves the BCR path with rules_shell@0.6.1. Lockfile-off option rows isolate registry command transport: yyy records a first A 404 then B success, missingprobe records normalized ordered diagnostics, and fatalprobe proves a fatal first registry stops before the B-served copy."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/BazelRepositoryModule.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryOptions.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFactoryImpl.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+]
+translation_notes = "The response log deliberately retains only bazel_registry.json and the fixture's three probe modules. The all-missing row, rather than retry counts, is the order/dedup assertion: Bazel's diagnostic lists normalized A then B exactly once. BCR is appended only where Bazel's embedded-module closure needs it."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture registry-command-transport --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture registry-command-transport --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "default_bcr"
+argv = ["mod", "graph"]
+expected_exit = 0
+
+[[commands]]
+name = "ordered_404_fallback"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry={{http_registry}}/a/", "--registry={{http_registry}}/a", "--registry={{http_registry}}/b///", "--registry=https://bcr.bazel.build"]
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "bazel_dep(name = \"rules_shell\", version = \"0.6.1\")"
+  replace = "bazel_dep(name = \"yyy\", version = \"1.0.0\")"
+
+[[commands]]
+name = "ordered_dedup_missing"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry={{http_registry}}/a/", "--registry={{http_registry}}/a", "--registry={{http_registry}}/b///"]
+expected_exit = 37
+stderr_contains = ["module missingprobe@1.0.0 not found in registries:"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "bazel_dep(name = \"yyy\", version = \"1.0.0\")"
+  replace = "bazel_dep(name = \"missingprobe\", version = \"1.0.0\")"
+
+[[commands]]
+name = "fatal_does_not_fallback"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry={{http_registry}}/fatal", "--registry={{http_registry}}/b"]
+expected_exit = 37
+stderr_contains = ["GET returned 500 fixture fatal registry response"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "bazel_dep(name = \"missingprobe\", version = \"1.0.0\")"
+  replace = "bazel_dep(name = \"fatalprobe\", version = \"1.0.0\")"
+
+[[commands]]
+name = "workspace_file_registry"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/b", "--registry=https://bcr.bazel.build"]
+expected_exit = 0
+stdout_contains = ["yyy@1.0.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "bazel_dep(name = \"fatalprobe\", version = \"1.0.0\")"
+  replace = "bazel_dep(name = \"yyy\", version = \"1.0.0\")"
+
+[[commands]]
+name = "no_scheme"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=not-a-url"]
+expected_exit = 37
+stderr_contains = ["Registry URL has no scheme"]
+
+[[commands]]
+name = "unsupported_scheme"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=ftp://example.invalid/modules"]
+expected_exit = 37
+stderr_contains = ["Unrecognized registry URL protocol"]
+
+[[commands]]
+name = "malformed_file"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://bad"]
+expected_exit = 37
+stderr_contains = ["Unsupported non-local file URL"]
