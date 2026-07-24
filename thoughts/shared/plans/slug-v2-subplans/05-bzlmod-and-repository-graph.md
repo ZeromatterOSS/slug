@@ -700,6 +700,31 @@ adapter-before-schema failure. Do not edit `lib.rs`, activate directives,
 compose includes, or touch DICE, Cargo, parser, lockfile, preparation,
 discovery, command, server, or oracle files.
 
+Commit `d4fb5d65` accepts that packet. The retained tree now distinguishes
+lists and tuples, keeps ordered `SmallMap` dictionaries with structural
+order-insensitive equality, and admits only the exact oracle-proven float,
+builtin `print`, extension proxy, float-key, and one-element self-list
+deferred forms. A private evaluator-local walker copies final mutated contents
+through transient `ValueIdentity`; a separate location-free adapter projection
+preserves kwargs/dict order and rejects exact float and out-of-i32 integer
+values before later schema validation. Other floats, callables, opaque values,
+keys, and cycle shapes fail closed. Focused snapshot 6, public schema 9, full
+`slug_bzlmod_v2` 195, formatting, and diff checks passed. Independent review
+required and then accepted exact adapter integer bounds, arbitrary-precision
+snapshot coverage, nested ordering, allocation accounting, and negative
+identity/cycle/key tests. The helper remains intentionally uncalled until the
+directive evaluator owns the source identities and post-file boundary.
+
+The current packet is read-only
+`WP-5-m1-nonroot-directive-evaluator-redesign`. Revisit the previously
+replanned single-supplied-file evaluator now that raw-value evidence and the
+bounded snapshot exist. Freeze exact globals, evaluator-local proxy/usage/tag
+state, validation and mutation order, nonroot dev suppression, finalization,
+source-identity plumbing, and adapter-versus-schema phase ordering. Do not edit
+Rust, compose includes, add DICE/public seams, change preparation/discovery,
+or implement lockfile hashing. Stop for a new oracle if any value or cycle
+outside the accepted bounded domain is required.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
