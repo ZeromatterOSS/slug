@@ -648,15 +648,31 @@ deferred-invalid nodes only where the oracle proves stable, identity-insensitive
 failure. Snapshotting at the tag call is forbidden because later list/dict
 mutation remains visible.
 
-The current packet is only
-`WP-5-m1-nonroot-raw-attribute-oracle`. Under the new-fixture-only allowlist,
-generate and replay the accepted local retained-daemon matrix for valid
-structures, post-call alias mutation, ordinary and innate deferred-invalid
-values, one bounded cycle, and lockfile update ordering. Each failure owns a
-unique never-successful output. Observe rather than presume lockfile
-publication. Stop on any network/harness expansion, unstable identity
-formatting, cycle timeout, or result requiring a retained evaluator heap; no
-Rust is authorized.
+Commit `cffc39b0` accepts the 12-row local retained-daemon raw-attribute
+oracle. Two success rows and ten failure rows pin post-call list/dict mutation,
+ordinary float/callable/proxy/nested/cyclic validation, innate
+float/callable/nested validation, and update-mode adapter hashing before tag
+schema validation. Independent and root Bazel 9.2 semantic replays passed; the
+prime and final failed update retain the same 25,883-byte visible lockfile
+digest. Exact source anchors, archive status, unique never-successful outputs,
+mutation restoration/version sequence, source closure, and credential checks
+passed. The fixture adds 15 files/1,183 lines, taking the recorded accepted
+fixture tree from 1,231/27,626 to 1,246/28,809; it is packet one after the
+fixture-hygiene checkpoint. Its copied six-file/50-line platforms module is
+required for fixture-local override isolation, and no redundant or
+nondiscriminating material was established. Harness pytest remains unavailable
+because the system Python lacks `pytest`; this did not weaken the two executable
+Bazel replays.
+
+The current packet is the read-only
+`WP-5-m1-nonroot-deferred-attribute-snapshot-design`. It must freeze the
+post-file, heap-independent raw-kwarg snapshot and the compact
+deferred-invalid nodes required by the accepted oracle, including structural
+sharing/cycles, semantic equality, identity-free diagnostics, ordinary versus
+innate later validation, and update-mode adapter ordering. It must not retain a
+live/frozen evaluator heap, generalize unsupported opaque values, edit Rust,
+add DICE/public seams, activate directive evaluation, compose includes, or
+change preparation/discovery ownership.
 
 ## Implementation Slices
 
