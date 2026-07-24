@@ -454,6 +454,7 @@ impl WorkspaceRuntime {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
+        registry_urls: RegistryUrls,
     ) -> anyhow::Result<()> {
         inject_root_module_request_inputs(
             updater,
@@ -466,7 +467,7 @@ impl WorkspaceRuntime {
         inject_registry_request_inputs(
             updater,
             &self.workspace,
-            RegistryUrls::default_bazel_registry(),
+            registry_urls,
             RegistryRequestGeneration(
                 self.next_registry_generation
                     .fetch_add(1, Ordering::Relaxed),
@@ -505,6 +506,7 @@ impl WorkspaceRuntime {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
                 .expect("default bzlmod environment policy"),
             LockfileMode::Update,
+            &[],
         )
     }
 
@@ -518,7 +520,10 @@ impl WorkspaceRuntime {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
+        registry_urls: &[String],
     ) -> Result<QueryOutput, QueryError> {
+        let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
+            .map_err(|error| QueryError::evaluation(error.to_string()))?;
         let files = observations
             .files
             .into_iter()
@@ -569,6 +574,7 @@ impl WorkspaceRuntime {
                 command_policy,
                 environment_policy,
                 lockfile_mode,
+                registry_urls,
             )
             .map_err(|error| {
                 QueryError::evaluation(format!("injecting bzlmod request inputs: {error}"))
@@ -609,6 +615,7 @@ impl WorkspaceRuntime {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
                 .expect("default bzlmod environment policy"),
             LockfileMode::Update,
+            &[],
         )
     }
 
@@ -620,6 +627,7 @@ impl WorkspaceRuntime {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
+        registry_urls: &[String],
     ) -> anyhow::Result<WorkspaceBuildEvaluation> {
         self.evaluate_observations_with_directory_probes_and_bzlmod_inputs(
             observations,
@@ -628,6 +636,7 @@ impl WorkspaceRuntime {
             command_policy,
             environment_policy,
             lockfile_mode,
+            registry_urls,
         )
         .map(|(evaluation, _)| evaluation)
     }
@@ -654,6 +663,7 @@ impl WorkspaceRuntime {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
                 .expect("default bzlmod environment policy"),
             LockfileMode::Update,
+            &[],
         )
     }
 
@@ -665,10 +675,13 @@ impl WorkspaceRuntime {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
+        registry_urls: &[String],
     ) -> anyhow::Result<(
         WorkspaceBuildEvaluation,
         Vec<(PathBuf, WorkspaceDirectoryValue, WorkspaceRevision)>,
     )> {
+        let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
+            .map_err(anyhow::Error::msg)?;
         let files = observations
             .files
             .into_iter()
@@ -725,6 +738,7 @@ impl WorkspaceRuntime {
                 command_policy,
                 environment_policy,
                 lockfile_mode,
+                registry_urls,
             )
             .context("injecting bzlmod request inputs")?;
             let mut transaction = updater.commit().await;
@@ -945,6 +959,7 @@ pub fn evaluate_workspace_targets(
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
             .expect("default bzlmod environment policy"),
         LockfileMode::Update,
+        &[],
     )
 }
 
@@ -956,6 +971,7 @@ pub fn evaluate_workspace_targets_with_bzlmod_inputs(
     command_policy: BzlmodCommandPolicyKey,
     environment_policy: BzlmodEnvironmentPolicyKey,
     lockfile_mode: LockfileMode,
+    registry_urls: &[String],
 ) -> anyhow::Result<WorkspaceBuildEvaluation> {
     let workspace = workspace.into();
     let workspace = workspace
@@ -968,6 +984,7 @@ pub fn evaluate_workspace_targets_with_bzlmod_inputs(
         command_policy,
         environment_policy,
         lockfile_mode,
+        registry_urls,
     )
 }
 
@@ -1110,6 +1127,53 @@ mod tests {
                 if bytes.as_ref() == b"build"
         ));
         build_server.join().unwrap();
+    }
+
+    #[test]
+    fn registry_request_inputs_restore_a_b_a_and_malformed_input_consumes_nothing() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        fs::write(root.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+        fs::create_dir(root.join("pkg")).unwrap();
+        fs::write(
+            root.join("pkg/BUILD.bazel"),
+            "filegroup(name = \"probe\")\n",
+        )
+        .unwrap();
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let query = |registry_urls: &[String]| {
+            runtime.query_observations_with_policy_and_bzlmod_inputs(
+                observe_workspace(&root).unwrap(),
+                "//pkg:probe",
+                QueryOrder::Auto,
+                QueryPolicy::default(),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                registry_urls,
+            )
+        };
+
+        query(&[]).unwrap();
+        let (default_urls, default_generation) = current_registry_inputs(&runtime);
+        let override_urls = vec!["https://registry.example/a/".to_owned()];
+        query(&override_urls).unwrap();
+        let (override_value, override_generation) = current_registry_inputs(&runtime);
+        assert_ne!(default_urls, override_value);
+        assert_ne!(default_generation, override_generation);
+
+        let malformed = query(&["file://bad".to_owned()]).unwrap_err().to_string();
+        assert!(
+            malformed.contains("Unsupported non-local file URL"),
+            "{malformed}"
+        );
+        let (_, after_malformed_generation) = current_registry_inputs(&runtime);
+        assert_eq!(after_malformed_generation, override_generation);
+
+        query(&[]).unwrap();
+        let (last_urls, last_generation) = current_registry_inputs(&runtime);
+        assert_eq!(last_urls, default_urls);
+        assert_ne!(last_generation, after_malformed_generation);
     }
 
     #[test]
@@ -1284,6 +1348,7 @@ mod tests {
                     command,
                     environment,
                     mode,
+                    &[],
                 )
                 .unwrap()
         };

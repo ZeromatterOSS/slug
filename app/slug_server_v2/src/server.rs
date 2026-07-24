@@ -66,6 +66,8 @@ pub struct BzlmodRequestInputs {
     pub environment_allow_yanked_versions: Option<String>,
     #[serde(default = "default_lockfile_mode")]
     pub lockfile_mode: String,
+    #[serde(default)]
+    pub registry_urls: Vec<String>,
 }
 
 impl Default for BzlmodRequestInputs {
@@ -75,6 +77,7 @@ impl Default for BzlmodRequestInputs {
             ignore_dev_dependency: false,
             environment_allow_yanked_versions: None,
             lockfile_mode: default_lockfile_mode(),
+            registry_urls: Vec::new(),
         }
     }
 }
@@ -94,7 +97,19 @@ impl BzlmodRequestInputs {
                 environment.yanked_versions_policy(),
             ),
             lockfile_mode: mode.as_str().to_owned(),
+            registry_urls: Vec::new(),
         }
+    }
+
+    pub fn from_normalized_with_registry_urls(
+        command: &BzlmodCommandPolicyKey,
+        environment: &BzlmodEnvironmentPolicyKey,
+        mode: &LockfileMode,
+        registry_urls: &[String],
+    ) -> Self {
+        let mut inputs = Self::from_normalized(command, environment, mode);
+        inputs.registry_urls = registry_urls.to_vec();
+        inputs
     }
 
     fn normalize(
@@ -104,6 +119,7 @@ impl BzlmodRequestInputs {
             BzlmodCommandPolicyKey,
             BzlmodEnvironmentPolicyKey,
             LockfileMode,
+            Vec<String>,
         ),
         String,
     > {
@@ -116,6 +132,7 @@ impl BzlmodRequestInputs {
                 self.environment_allow_yanked_versions.as_deref(),
             )?,
             LockfileMode::from_bazel_flag_value(&self.lockfile_mode)?,
+            self.registry_urls.clone(),
         ))
     }
 }
@@ -221,7 +238,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
     };
     match request {
         DaemonRequest::Build(request) => {
-            let (command_policy, environment_policy, lockfile_mode) =
+            let (command_policy, environment_policy, lockfile_mode, registry_urls) =
                 match request.bzlmod.normalize() {
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
@@ -239,6 +256,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 command_policy,
                 environment_policy,
                 lockfile_mode,
+                registry_urls,
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -248,7 +266,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
             }
         }
         DaemonRequest::Query(request) => {
-            let (command_policy, environment_policy, lockfile_mode) =
+            let (command_policy, environment_policy, lockfile_mode, registry_urls) =
                 match request.bzlmod.normalize() {
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
@@ -275,6 +293,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 command_policy,
                 environment_policy,
                 lockfile_mode,
+                registry_urls,
             );
             DaemonResponse {
                 exit_code: result.exit_code,

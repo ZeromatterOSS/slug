@@ -35,10 +35,11 @@ pub fn run(argv: Vec<String>) -> i32 {
     // Daemon mode: when --output_base is set, route through the persistent
     // daemon so DICE state survives across builds (gate clause 5).
     if let Some(output_base) = extract_output_base(&argv) {
-        let bzlmod = slug_server_v2::BzlmodRequestInputs::from_normalized(
+        let bzlmod = slug_server_v2::BzlmodRequestInputs::from_normalized_with_registry_urls(
             &request.bzlmod_policy,
             &environment_policy,
             &request.lockfile_mode,
+            &request.registry_urls,
         );
         return run_daemon_build(&argv, &output_base, request, bzlmod);
     }
@@ -60,6 +61,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         request.bzlmod_policy.clone(),
         environment_policy,
         request.lockfile_mode.clone(),
+        &request.registry_urls,
     ) {
         Ok(evaluation) => {
             let argv_json = argv

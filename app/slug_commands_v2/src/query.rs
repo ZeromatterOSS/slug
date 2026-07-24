@@ -19,6 +19,7 @@ use crate::common::ParsedFlag;
 use crate::common::QueryOutputFormat;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_lockfile_mode;
+use crate::common::bzlmod_registry_urls;
 use crate::common::output_format;
 use crate::common::parse_bool_flag;
 use crate::common::parse_query_expression_for;
@@ -34,6 +35,7 @@ pub struct QueryRequest {
     pub flags: Vec<ParsedFlag>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
+    pub registry_urls: Vec<String>,
 }
 
 impl QueryRequest {
@@ -49,7 +51,7 @@ pub(crate) fn parse_query_like(
     let parsed = split_args(args);
     let expression = parse_query_expression_for(command, &parsed.positionals)?;
     let output = output_format(&parsed.flags);
-    let (order, graph_factored, policy, bzlmod_policy, lockfile_mode) =
+    let (order, graph_factored, policy, bzlmod_policy, lockfile_mode, registry_urls) =
         if command == CommandKind::Query {
             let (order, graph_factored, policy) = validate_query_flags(&parsed.flags)?;
             (
@@ -58,6 +60,7 @@ pub(crate) fn parse_query_like(
                 policy,
                 bzlmod_command_policy(&[])?,
                 bzlmod_lockfile_mode(&[])?,
+                bzlmod_registry_urls(&parsed.flags)?,
             )
         } else {
             (
@@ -66,6 +69,7 @@ pub(crate) fn parse_query_like(
                 QueryPolicy::default(),
                 bzlmod_command_policy(&parsed.flags)?,
                 bzlmod_lockfile_mode(&parsed.flags)?,
+                bzlmod_registry_urls(&parsed.flags)?,
             )
         };
     Ok(QueryRequest {
@@ -77,6 +81,7 @@ pub(crate) fn parse_query_like(
         flags: parsed.flags,
         bzlmod_policy,
         lockfile_mode,
+        registry_urls,
     })
 }
 
@@ -110,6 +115,9 @@ fn validate_query_flags(
             }
             "output_base" => {
                 required_query_flag_value(flag, "a non-empty path")?;
+            }
+            "registry" => {
+                required_query_flag_value(flag, "a non-empty registry URL")?;
             }
             "graph:factored" => {
                 graph_factored = parse_bool_flag(flag, false)?;

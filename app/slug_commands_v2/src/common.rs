@@ -288,6 +288,23 @@ pub(crate) fn bzlmod_lockfile_mode(
     })
 }
 
+pub(crate) fn bzlmod_registry_urls(flags: &[ParsedFlag]) -> Result<Vec<String>, CommandParseError> {
+    flags
+        .iter()
+        .filter(|flag| flag.name == "registry")
+        .map(|flag| {
+            flag.value
+                .as_deref()
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned)
+                .ok_or_else(|| CommandParseError::InvalidFlagValue {
+                    flag: flag.raw.clone(),
+                    message: "expected a non-empty registry URL".to_owned(),
+                })
+        })
+        .collect()
+}
+
 /// Normalize the value captured from `BZLMOD_ALLOW_YANKED_VERSIONS`.
 ///
 /// Environment access belongs to the CLI request boundary; this function is
@@ -370,7 +387,8 @@ fn classify_flag(name: &str) -> FlagDisposition {
         | "allow_yanked_versions"
         | "ignore_dev_dependency"
         | "noignore_dev_dependency"
-        | "lockfile_mode" => FlagDisposition::ParseOnly,
+        | "lockfile_mode"
+        | "registry" => FlagDisposition::ParseOnly,
         "color" | "show_progress" | "noshow_progress" | "keep_going" => {
             FlagDisposition::IgnoredCompatible
         }

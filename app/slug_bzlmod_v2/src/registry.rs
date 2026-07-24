@@ -18,6 +18,7 @@ use allocative::Allocative;
 use dupe::Dupe;
 use serde_json::Value;
 use starlark_map::small_set::SmallSet;
+use url::Url;
 
 use crate::BazelDep;
 use crate::Directive;
@@ -69,9 +70,111 @@ impl RegistryUrls {
         Self::new(["https://bcr.bazel.build/"])
     }
 
+    /// Normalize the primitive registry command inputs at the request boundary.
+    ///
+    /// Bazel removes trailing slashes and deduplicates before it substitutes
+    /// `%workspace%`; keep that ordering so the stored value is the sole
+    /// semantic representation used by the retained graph.
+    pub fn from_request(workspace: &std::path::Path, raw: &[String]) -> Result<Self, String> {
+        if raw.is_empty() {
+            return Ok(Self::default_bazel_registry());
+        }
+
+        let mut normalized_raw = SmallSet::with_capacity(raw.len());
+        for raw_url in raw {
+            normalized_raw.insert(raw_url.trim_end_matches('/'));
+        }
+
+        let mut resolved_urls = Vec::with_capacity(normalized_raw.len());
+        for raw_url in normalized_raw {
+            let resolved = raw_url.replace("%workspace%", &workspace.to_string_lossy());
+            validate_registry_url(&resolved)
+                .map_err(|reason| format!("Invalid registry URL: {raw_url}: {reason}"))?;
+            resolved_urls.push(RegistryBaseUrl::new(resolved));
+        }
+        Ok(Self(Arc::from(resolved_urls)))
+    }
+
     pub fn as_slice(&self) -> &[RegistryBaseUrl] {
         &self.0
     }
+}
+
+fn validate_registry_url(url: &str) -> Result<(), String> {
+    let Some((scheme, rest)) = url.split_once(':') else {
+        return Err(
+            "Registry URL has no scheme -- supported schemes are: http://, https:// and file://"
+                .to_owned(),
+        );
+    };
+    if url.chars().any(|ch| {
+        ch.is_whitespace()
+            || ch.is_control()
+            || matches!(ch, '"' | '<' | '>' | '\\' | '^' | '`' | '{' | '|' | '}')
+    }) {
+        return Err("Invalid registry URL syntax".to_owned());
+    }
+    if !has_valid_percent_escapes(url) {
+        return Err("Invalid registry URL syntax".to_owned());
+    }
+    match scheme {
+        "http" | "https" | "file" => {}
+        _ => return Err("Unrecognized registry URL protocol".to_owned()),
+    }
+    if !rest.starts_with('/') {
+        return Err(
+            "Registry URL path is not valid -- did you mean to use file:///foo/bar or file:///c:/foo/bar for Windows?"
+                .to_owned(),
+        );
+    }
+    let (authority, suffix) = match rest.strip_prefix("//") {
+        Some(value) => {
+            let end = value.find(['/', '?', '#']).unwrap_or(value.len());
+            (Some(&value[..end]), &value[end..])
+        }
+        None => (None, rest),
+    };
+    let has_authority = authority.is_some_and(|authority| !authority.is_empty());
+    let syntax_url = match authority {
+        Some("") => format!("{scheme}://registry.invalid{}", &rest[2..]),
+        Some(_) => url.to_owned(),
+        None if scheme == "file" => format!("file://{rest}"),
+        None => format!("{scheme}://registry.invalid{rest}"),
+    };
+    let parsed = Url::parse(&syntax_url).map_err(|_| "Invalid registry URL syntax".to_owned())?;
+    if parsed.cannot_be_a_base() {
+        return Err("Invalid registry URL syntax".to_owned());
+    }
+    if suffix.contains(['[', ']'])
+        || authority.is_some_and(|authority| {
+            authority.contains(['[', ']']) && !matches!(parsed.host(), Some(url::Host::Ipv6(_)))
+        })
+    {
+        return Err("Invalid registry URL syntax".to_owned());
+    }
+    if scheme == "file" && has_authority {
+        return Err("Unsupported non-local file URL".to_owned());
+    }
+    Ok(())
+}
+
+fn has_valid_percent_escapes(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len()
+                || !bytes[index + 1].is_ascii_hexdigit()
+                || !bytes[index + 2].is_ascii_hexdigit()
+            {
+                return false;
+            }
+            index += 3;
+        } else {
+            index += 1;
+        }
+    }
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1163,5 +1266,102 @@ mod tests {
         assert!(compare_versions("2.0.0", "1.0.0").is_gt());
         assert!(compare_versions("1.10.0", "1.2.0").is_gt());
         assert!(compare_versions("1.0.0", "1").is_eq());
+    }
+
+    #[test]
+    fn request_registry_urls_default_replace_normalize_and_validate() {
+        let workspace = std::path::Path::new("/tmp/registry-workspace");
+        let defaults = RegistryUrls::from_request(workspace, &[]).unwrap();
+        assert_eq!(
+            defaults
+                .as_slice()
+                .iter()
+                .map(RegistryBaseUrl::as_str)
+                .collect::<Vec<_>>(),
+            ["https://bcr.bazel.build"]
+        );
+
+        let raw = vec![
+            "https://one.example/registry/".to_owned(),
+            "https://one.example/registry".to_owned(),
+            "file://%workspace%/registry///".to_owned(),
+            "https://two.example".to_owned(),
+        ];
+        let urls = RegistryUrls::from_request(workspace, &raw).unwrap();
+        assert_eq!(
+            urls.as_slice()
+                .iter()
+                .map(RegistryBaseUrl::as_str)
+                .collect::<Vec<_>>(),
+            [
+                "https://one.example/registry",
+                "file:///tmp/registry-workspace/registry",
+                "https://two.example",
+            ]
+        );
+
+        let duplicate_placeholder = vec![
+            "file://%workspace%/registry/".to_owned(),
+            "file://%workspace%/registry///".to_owned(),
+        ];
+        let urls = RegistryUrls::from_request(workspace, &duplicate_placeholder).unwrap();
+        assert_eq!(
+            urls.as_slice()
+                .iter()
+                .map(RegistryBaseUrl::as_str)
+                .collect::<Vec<_>>(),
+            ["file:///tmp/registry-workspace/registry"]
+        );
+
+        let distinct_raw_spellings = vec![
+            "file://%workspace%/registry".to_owned(),
+            "file:///tmp/registry-workspace/registry".to_owned(),
+        ];
+        let urls = RegistryUrls::from_request(workspace, &distinct_raw_spellings).unwrap();
+        assert_eq!(urls.as_slice().len(), 2);
+        assert_eq!(urls.as_slice()[0].as_str(), urls.as_slice()[1].as_str());
+
+        for (raw, expected) in [
+            ("not-a-url", "Registry URL has no scheme"),
+            (
+                "ftp://example.invalid/modules",
+                "Unrecognized registry URL protocol",
+            ),
+            (
+                "HTTP://example.invalid",
+                "Unrecognized registry URL protocol",
+            ),
+            ("file://bad", "Unsupported non-local file URL"),
+            (
+                "https://example.invalid/a path",
+                "Invalid registry URL syntax",
+            ),
+            (
+                "https://example.invalid/<path",
+                "Invalid registry URL syntax",
+            ),
+            ("file:///tmp/a path", "Invalid registry URL syntax"),
+            ("https://example.invalid/%zz", "Invalid registry URL syntax"),
+            ("https://[example.invalid", "Invalid registry URL syntax"),
+            ("https://example.invalid/a[b", "Invalid registry URL syntax"),
+            ("file:///tmp/a]b", "Invalid registry URL syntax"),
+            ("file:c:/registry", "Registry URL path is not valid"),
+        ] {
+            let error = RegistryUrls::from_request(workspace, &[raw.to_owned()]).unwrap_err();
+            assert!(error.contains(expected), "{error}");
+            assert!(error.contains(raw), "{error}");
+        }
+
+        for raw in [
+            "http:/registry",
+            "http:///registry",
+            "file:/tmp/registry",
+            "https://[::1]/registry",
+        ] {
+            assert!(
+                RegistryUrls::from_request(workspace, &[raw.to_owned()]).is_ok(),
+                "{raw}"
+            );
+        }
     }
 }

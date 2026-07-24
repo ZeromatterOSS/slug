@@ -58,6 +58,7 @@ pub fn evaluate_workspace_query_with_policy(
         slug_bzlmod_v2::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
             .expect("default bzlmod environment policy"),
         slug_bzlmod_v2::LockfileMode::Update,
+        &[],
     )
 }
 
@@ -69,6 +70,7 @@ pub fn evaluate_workspace_query_with_policy_and_bzlmod_inputs(
     command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
     environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
     lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
 ) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
     let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
@@ -82,6 +84,7 @@ pub fn evaluate_workspace_query_with_policy_and_bzlmod_inputs(
         command_policy,
         environment_policy,
         lockfile_mode,
+        registry_urls,
     )
 }
 

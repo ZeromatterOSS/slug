@@ -80,6 +80,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
+            Vec::new(),
         )
     };
     let overrides = || {
@@ -87,6 +88,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
             LockfileMode::Off,
+            vec!["https://registry.example/override/".to_owned()],
         )
     };
     let expected = vec![
@@ -96,6 +98,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             ignore_dev_dependency: true,
             environment_allow_yanked_versions: Some("all".to_owned()),
             lockfile_mode: "off".to_owned(),
+            registry_urls: vec!["https://registry.example/override/".to_owned()],
         },
         BzlmodRequestInputs::default(),
     ];
@@ -108,6 +111,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             inputs.0,
             inputs.1,
             inputs.2,
+            inputs.3,
         );
         assert!(!result.stderr.contains("build_runtime_error"), "{result:?}");
     }
@@ -123,6 +127,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             inputs.0,
             inputs.1,
             inputs.2,
+            inputs.3,
         );
         assert_eq!(result.exit_code, 0, "{result:?}");
         assert_eq!(result.stdout, "//pkg:probe\n");
@@ -457,22 +462,30 @@ fn malformed_bzlmod_protocol_input_is_request_local() {
         "filegroup(name = \"probe\")\n",
     );
     let mut daemon = Daemon::new(&workspace).unwrap();
-    for (request, expected_error) in [
+    for (request, expected_exit, expected_error) in [
         (
             r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"command_allow_yanked_versions":"not-a-module"}}}"#,
+            2,
             "module@version",
         ),
         (
             r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"environment_allow_yanked_versions":"not-a-module"}}}"#,
+            2,
             "BZLMOD_ALLOW_YANKED_VERSIONS",
         ),
         (
             r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"lockfile_mode":"invalid"}}}"#,
+            2,
             "Not a valid Lockfile mode",
+        ),
+        (
+            r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"registry_urls":["file://bad"]}}}"#,
+            7,
+            "Unsupported non-local file URL",
         ),
     ] {
         let malformed = handle_request(&mut daemon, request);
-        assert_eq!(malformed.exit_code, 2);
+        assert_eq!(malformed.exit_code, expected_exit);
         assert!(malformed.stderr.contains(expected_error), "{malformed:?}");
 
         let recovered = handle_request(
@@ -482,6 +495,24 @@ fn malformed_bzlmod_protocol_input_is_request_local() {
         assert_eq!(recovered.exit_code, 0, "{recovered:?}");
         assert_eq!(recovered.stdout, "//pkg:probe\n");
     }
+}
+
+#[test]
+fn bzlmod_registry_wire_field_is_primitive_and_omitted_field_defaults() {
+    let inputs: BzlmodRequestInputs = serde_json::from_str("{}").unwrap();
+    assert!(inputs.registry_urls.is_empty());
+    let inputs = BzlmodRequestInputs {
+        registry_urls: vec![
+            "https://a.example/".to_owned(),
+            "file:///tmp/registry".to_owned(),
+        ],
+        ..BzlmodRequestInputs::default()
+    };
+    let json = serde_json::to_value(&inputs).unwrap();
+    assert_eq!(
+        json["registry_urls"],
+        serde_json::json!(["https://a.example/", "file:///tmp/registry"])
+    );
 }
 
 #[test]

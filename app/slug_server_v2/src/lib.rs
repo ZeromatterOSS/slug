@@ -77,6 +77,7 @@ impl Daemon {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
                 .expect("default bzlmod environment policy"),
             LockfileMode::Update,
+            Vec::new(),
         )
     }
 
@@ -88,6 +89,7 @@ impl Daemon {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
     ) -> BuildResult {
         let (observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
@@ -96,18 +98,21 @@ impl Daemon {
             }
         };
         #[cfg(test)]
-        self.forwarded_bzlmod_inputs
-            .push(crate::server::BzlmodRequestInputs::from_normalized(
+        self.forwarded_bzlmod_inputs.push(
+            crate::server::BzlmodRequestInputs::from_normalized_with_registry_urls(
                 &command_policy,
                 &environment_policy,
                 &lockfile_mode,
-            ));
+                &registry_urls,
+            ),
+        );
         let evaluation = match self.runtime.evaluate_observations_with_bzlmod_inputs(
             observations,
             targets,
             command_policy,
             environment_policy,
             lockfile_mode,
+            &registry_urls,
         ) {
             Ok(eval) => eval,
             Err(error) => {
@@ -224,6 +229,7 @@ impl Daemon {
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
                 .expect("default bzlmod environment policy"),
             LockfileMode::Update,
+            Vec::new(),
         )
     }
 
@@ -237,6 +243,7 @@ impl Daemon {
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
     ) -> QueryResult {
         let (observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
@@ -245,12 +252,14 @@ impl Daemon {
             }
         };
         #[cfg(test)]
-        self.forwarded_bzlmod_inputs
-            .push(crate::server::BzlmodRequestInputs::from_normalized(
+        self.forwarded_bzlmod_inputs.push(
+            crate::server::BzlmodRequestInputs::from_normalized_with_registry_urls(
                 &command_policy,
                 &environment_policy,
                 &lockfile_mode,
-            ));
+                &registry_urls,
+            ),
+        );
         match self
             .runtime
             .query_observations_with_policy_and_bzlmod_inputs(
@@ -261,6 +270,7 @@ impl Daemon {
                 command_policy,
                 environment_policy,
                 lockfile_mode,
+                &registry_urls,
             ) {
             Ok(output) => {
                 let stdout = match output_format {

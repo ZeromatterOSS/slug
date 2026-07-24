@@ -2690,6 +2690,80 @@ fn bzlmod_environment_is_captured_per_one_shot_and_daemon_query_child() {
 }
 
 #[test]
+fn equality_form_registry_reaches_one_shot_and_daemon_build_and_query() {
+    let workspace = scratch("registry-command-transport");
+    let output_base = scratch("registry-command-transport-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(workspace.join("BUILD.bazel"), "");
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let registry_a = "--registry=https://registry-a.example/";
+    let registry_b = "--registry=https://registry-b.example";
+    let output_base_arg = format!("--output_base={}", output_base.display());
+
+    for args in [
+        vec!["query", registry_a, registry_b, "//pkg:probe"],
+        vec![
+            output_base_arg.as_str(),
+            "query",
+            registry_a,
+            registry_b,
+            "//pkg:probe",
+        ],
+    ] {
+        let output = slug().current_dir(&workspace).args(args).output().unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), "//pkg:probe\n");
+    }
+    for args in [
+        vec!["build", registry_a, registry_b, "//pkg:probe"],
+        vec![
+            output_base_arg.as_str(),
+            "build",
+            registry_a,
+            registry_b,
+            "//pkg:probe",
+        ],
+    ] {
+        let output = slug().current_dir(&workspace).args(args).output().unwrap();
+        assert_eq!(output.status.code(), Some(2), "{output:?}");
+        assert!(
+            String::from_utf8(output.stderr)
+                .unwrap()
+                .contains("analysis_not_implemented")
+        );
+    }
+    for args in [
+        vec!["query", "--registry=file://bad", "//pkg:probe"],
+        vec![
+            output_base_arg.as_str(),
+            "query",
+            "--registry=file://bad",
+            "//pkg:probe",
+        ],
+        vec!["build", "--registry=file://bad", "//pkg:probe"],
+        vec![
+            output_base_arg.as_str(),
+            "build",
+            "--registry=file://bad",
+            "//pkg:probe",
+        ],
+    ] {
+        let output = slug().current_dir(&workspace).args(args).output().unwrap();
+        assert!(!output.status.success(), "{output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("Invalid registry URL: file://bad: Unsupported non-local file URL"),
+            "{stderr}"
+        );
+        assert!(!stderr.contains("analysis_not_implemented"), "{stderr}");
+    }
+}
+
+#[test]
 fn bzlmod_environment_is_captured_per_one_shot_and_daemon_build_child() {
     let workspace = scratch("bzlmod-build-env-workspace");
     let output_base = scratch("bzlmod-build-env-output-base");

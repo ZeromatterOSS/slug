@@ -18,6 +18,7 @@ use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_lockfile_mode;
+use crate::common::bzlmod_registry_urls;
 use crate::common::parse_target_patterns;
 use crate::common::split_args;
 
@@ -27,6 +28,7 @@ pub struct BuildRequest {
     pub flags: Vec<ParsedFlag>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
+    pub registry_urls: Vec<String>,
 }
 
 impl BuildRequest {
@@ -34,11 +36,13 @@ impl BuildRequest {
         let parsed = split_args(args);
         let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
+        let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
         Ok(Self {
             targets: parse_target_patterns(CommandKind::Build, &parsed.positionals)?,
             flags: parsed.flags,
             bzlmod_policy,
             lockfile_mode,
+            registry_urls,
         })
     }
 

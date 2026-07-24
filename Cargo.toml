@@ -123,7 +123,7 @@ httptest = "0.16"
 humantime = "2.0.1"
 hyper = { version = "1.5.1", features = ["client", "http1", "http2"] }
 hyper-http-proxy = "1.0"
-hyper-rustls = { version = "0.27.0", features = ["http2"] }
+hyper-rustls = { version = "0.27.0", default-features = false, features = ["http1", "http2", "logging", "native-tokio", "ring", "tls12"] }
 hyper-timeout = "0.5"
 hyper-util = "0.1.10"
 hyperlocal = { version = "0.9", features = ["client"] }
@@ -250,6 +250,7 @@ twox-hash = "1.6.1"
 typed-arena = "2.0"
 unicode-segmentation = "1.7"
 uuid = { version = "=1.19.0", features = ["v4"] }
+url = "2.5.8"
 walkdir = "2.3.2"
 which = "4.3.0"
 winapi = { version = "0.3", features = ["everything", "std"] }

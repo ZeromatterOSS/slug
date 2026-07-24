@@ -158,6 +158,57 @@ fn build_bzlmod_inputs_normalize_default_override_default_without_state() {
 }
 
 #[test]
+fn registry_flags_are_repeatable_equality_only_and_query_is_narrowly_allowed() {
+    let build = BuildRequest::parse(&[
+        "--registry=https://a.example/",
+        "--registry=https://a.example",
+        "--registry=file:///tmp/registry",
+        "//pkg:bin",
+    ])
+    .unwrap();
+    assert_eq!(
+        build.registry_urls,
+        [
+            "https://a.example/".to_owned(),
+            "https://a.example".to_owned(),
+            "file:///tmp/registry".to_owned(),
+        ]
+    );
+    let default = BuildRequest::parse(&["//pkg:bin"]).unwrap();
+    assert!(default.registry_urls.is_empty());
+
+    let query = QueryRequest::parse(&[
+        "--registry=https://a.example/",
+        "--registry=file:///tmp/registry",
+        "//pkg:bin",
+    ])
+    .unwrap();
+    assert_eq!(
+        query.registry_urls,
+        ["https://a.example/", "file:///tmp/registry"]
+    );
+    for args in [
+        vec!["--registry", "//pkg:bin"],
+        vec!["--registry=", "//pkg:bin"],
+        vec!["--registry", "https://a.example", "//pkg:bin"],
+    ] {
+        let error = BuildRequest::parse(&args).unwrap_err().to_string();
+        assert!(error.contains("non-empty registry URL"), "{error}");
+    }
+    let query_error = QueryRequest::parse(&["--registry", "https://a.example", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
+    assert!(
+        query_error.contains("non-empty registry URL"),
+        "{query_error}"
+    );
+    let unsupported = QueryRequest::parse(&["--lockfile_mode=off", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
+    assert!(unsupported.contains("not supported by loading query"));
+}
+
+#[test]
 fn environment_value_normalization_is_pure_and_source_specific() {
     let default_a = normalize_bzlmod_environment_value(None).unwrap();
     let allow = normalize_bzlmod_environment_value(Some("zzz@2.0.0, yyy@1.0.0")).unwrap();

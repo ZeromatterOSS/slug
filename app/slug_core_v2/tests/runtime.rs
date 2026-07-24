@@ -119,6 +119,7 @@ fn retained_runtime_exposes_typed_root_graph_for_a_b_a_request_inputs() {
             command_a.clone(),
             environment_a.clone(),
             LockfileMode::Update,
+            &[],
         )
         .unwrap();
     let middle = runtime
@@ -128,6 +129,7 @@ fn retained_runtime_exposes_typed_root_graph_for_a_b_a_request_inputs() {
             command_b,
             environment_b,
             LockfileMode::Off,
+            &[],
         )
         .unwrap();
     let last = runtime
@@ -137,6 +139,7 @@ fn retained_runtime_exposes_typed_root_graph_for_a_b_a_request_inputs() {
             command_a,
             environment_a,
             LockfileMode::Update,
+            &[],
         )
         .unwrap();
 
@@ -184,6 +187,7 @@ fn explicit_query_bzlmod_inputs_initialize_fresh_runtime_and_do_not_leak() {
             BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
             LockfileMode::Off,
+            &[],
         )
         .unwrap();
     assert_eq!(query.stdout(), "//pkg:probe\n");

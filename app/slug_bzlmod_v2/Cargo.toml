@@ -22,6 +22,7 @@ slug_workspace_v2 = { workspace = true }
 starlark = { workspace = true }
 starlark_map = { workspace = true }
 tempfile = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
