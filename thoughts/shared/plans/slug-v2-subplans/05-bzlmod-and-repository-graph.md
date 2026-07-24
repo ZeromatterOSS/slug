@@ -163,6 +163,26 @@ MVS/extension repo mapping. The six accepted fixtures remain the terminal
 matrix; no current packet may claim rows whose required owner is still
 deferred.
 
+Commit `58e9faa4` accepts `WP-5-m1-root-module-dice-core`. The bzlmod-owned
+starlark-rust evaluator implements the authorized Bazel 9 root/include globals
+without the handwritten parser, and real module-file/root-graph DICE keys
+consume the neutral workspace file input. Workspace-scoped command,
+environment, and lockfile-mode values fail closed when absent; the retained
+runtime injects them on its existing updater before the sole commit, computes
+the immutable graph before package loading, and exposes
+`Arc<RootModuleGraph>`.
+
+Focused tests prove root/include present, absent, read-error,
+edit/delete/recreate, unchanged reuse, normalized A→B→A with module-evaluation
+reuse, breadth-first package includes, root/included/aliased/nodep/dev mapping,
+and each missing injected value. Full `slug_bzlmod_v2` and `slug_core_v2`
+suites, server/CLI checks, formatting, diff checks, and the archive guard
+passed; independent review returned `ACCEPT` after one bounded semantic
+correction. The current packet is the read-only
+`WP-5-m1-root-module-command-daemon-handoff-design`; it must fix exact request
+transport, standalone-loading injection, and the cycle-free loading mapping
+edge before any Packet B Rust edit.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

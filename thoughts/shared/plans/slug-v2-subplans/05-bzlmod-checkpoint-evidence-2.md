@@ -417,3 +417,15 @@ Expected evidence artifact: Stage 1 oracle expected output proving `--ignore_dev
 Implementation summary: Extended `BzlmodCommandPolicyKey` with an explicit `ignore_dev_dependency` bit, a `from_flags` constructor, accessor, and stable serialization so resolved bzlmod graph keys can distinguish default root-dev behavior from `--ignore_dev_dependency` runs without process-global command state
 Validation: `cargo fmt -p slug_bzlmod_v2`; `CARGO_TARGET_DIR=.codex-cargo-target CARGO_BUILD_JOBS=1 cargo test -p slug_bzlmod_v2`; `USE_BAZEL_VERSION=9.1.1 py -3 -B -m tools.v2_oracle run --fixture module-root-dev-dependency-visibility --tool bazel --bazel C:\ProgramData\chocolatey\bin\bazel.exe --timeout 120`; same command for `module-registration-dev-dependency`; bundled `pytest -q -p no:cacheprovider tests/v2_oracle/test_v2_oracle.py`; Stage 5 guardrail grep and diff checks before commit
 Residual risk: The key identity is ready, but V2 still needs CLI flag parsing and command plumbing into bzlmod graph construction, DICE compute producers for resolved graphs, and same-daemon invalidation proving flag flips replay the affected graph and registrations.
+
+### Stage 5 root-module DICE core
+
+Status: Accepted
+V2 commit: `58e9faa4 feat: add root module dice core`
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileFunction.java`, `ModuleFileGlobals.java`, `Version.java`, `LabelValidator.java`, and `RepositoryName.java`
+Bazel oracle: Accepted six-fixture runtime-input oracle in `911f16f2`; this packet claims only its root/include and normalized-input owner rows
+V2 fixture: owner-local `root_module_dice` plus retained `slug_core_v2` runtime tests
+Expected evidence artifact: real starlark-rust module evaluation and DICE invalidation/reuse for raw root/include file values and explicit normalized request inputs, with a typed repository mapping observable before package loading
+Implementation summary: Added bzlmod-owned `ModuleFileEvaluationKey` and `RootModuleGraphKey`, fail-closed workspace-scoped injected command/environment/lockfile-mode keys, breadth-first repo-relative includes, Bazel-shaped basic call/validation behavior for `module`, `include`, `bazel_dep`, and `local_path_override`, and immutable root/included declarations plus typed mapping. `WorkspaceRuntime` injects every value on its existing updater, commits once, computes the graph before loading, and returns `Arc<RootModuleGraph>`; production does not call `ModuleFile::parse`.
+Validation: `cargo test -p slug_bzlmod_v2` (all owner tests, including 6 root-module DICE tests); `cargo test -p slug_core_v2` (3 unit and 12 runtime tests); `cargo check -p slug_server_v2 -p slug_cli_v2`; `cargo fmt --all -- --check`; `git diff --check`; `scripts/v2_archive_status.sh`; independent final review `ACCEPT`
+Residual risk: Command/daemon request transport and loading's mapping dependency remain Packet B; visible lockfile v28, registry/yanked resolution, MVS/extensions, hidden lockfile, fetch/materialization, cquery, and aquery remain later serial packets.
