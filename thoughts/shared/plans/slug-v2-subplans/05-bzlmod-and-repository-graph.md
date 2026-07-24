@@ -488,10 +488,16 @@ Commit `de58ba16` implements
 38/38; list, diff, archive, exact-scope checks, and fresh rereview passed after
 raw-byte expansion preserved CRLF outside the exact token.
 
-The current packet is `WP-5-m1-module-source-preparation-oracle`. The canonical
-plan owns its exact nine-row, fixture-only, generation/replay boundary. No
-module-source preparation or discovery Rust is authorized before that evidence
-is accepted.
+Commit `183970d9` accepts `WP-5-m1-module-source-preparation-oracle`: nine
+retained-daemon rows cover patch A→B→error→recovery, local main/include
+replay, and deterministic local archive/Git module sources. Generation,
+multiple clean replays, source-closure checks, focused harness 38/38, Git fsck,
+diff/archive checks, and fresh evidence rereview passed.
+
+The current design-only packet is
+`WP-5-m1-module-source-preparation-design`. The canonical plan owns its pinned
+source/live-owner audit and no-edit boundary. Discovery Rust remains blocked
+until the shared preparation owner is accepted and implemented.
 
 ## Implementation Slices
 

@@ -621,3 +621,14 @@ Expected evidence artifact: copied-workspace absolute URI expansion without host
 Implementation summary: Exact `{{workspace_uri}}` expands to the copied workspace's resolved file URI in initial UTF-8 regular nonsymlink files and mutation text operands only. Raw mutation templates remain recorded, paths/destinations stay literal, binary/symlink/outside paths remain untouched, and encoded workspace URIs normalize to `file://<workspace>`. Raw-byte decode/replace/encode preserves CRLF and every non-token byte; existing `%workspace%` registry argv and conditional HTTP substitution remain unchanged.
 Validation: focused oracle harness 38/38; fixture list, exact three-file scope, `git diff --check`, archive check; fresh independent final review found the newline defect and accepted the bounded raw-byte correction
 Residual risk: Generate and independently replay only the unchanged nine-row `module-source-preparation` fixture before designing any source-preparation or discovery Rust.
+
+### Stage 5 module-source preparation oracle
+
+Status: Accepted
+V2 commit: `183970d9 test: add module source preparation oracle`
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileFunction`, `ModuleFileGlobals`, `http.bzl`, `git.bzl`, and `git_worker.bzl`
+Bazel oracle: `module-source-preparation`
+Expected evidence artifact: nine retained-daemon rows with exits `0,0,37,0,0,0,0,0,0`
+Implementation summary: Checked-in local inputs prove patch A, patch-bytes-only B, fatal deletion without fallback, recreation recovery, local-path route bypass ahead of malformed/absent registries, independent main MODULE and include mutations, deterministic SHA-pinned archive evaluation, and an ordinary-file bare Git repository at a fixed commit. A first local registry contains only the graph leaves and bounded embedded-tools closure; it intentionally has no route module in the non-registry rows.
+Validation: pinned Bazel generation; worker replay plus multiple root clean-run-root replays; exact nine-row/TOML/list/source-closure checks; archive SHA/content; bare Git `fsck`, fixed commit/tree, and non-gitlink dry-add; focused harness 38/38; diff/archive checks; fresh independent evidence review and final pruned-source rereview `ACCEPT`
+Residual risk: Design and implement a DICE-owned shared preparation boundary for exact root patch inputs and complete local/archive/Git repository-root MODULE sources before returning to discovery.
