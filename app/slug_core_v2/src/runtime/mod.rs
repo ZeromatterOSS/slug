@@ -12,6 +12,7 @@ pub mod dice;
 pub mod events;
 pub mod reapi;
 mod registry_io;
+mod repository_io;
 pub mod starlark;
 
 pub use dice::WorkspaceBuildEvaluation;
@@ -19,6 +20,7 @@ pub use dice::WorkspaceDirectoryObservation;
 pub use dice::WorkspaceEvaluation;
 pub use dice::WorkspaceFileObservation;
 pub use dice::WorkspaceObservation;
+pub use dice::WorkspaceRawFileObservation;
 pub use dice::WorkspaceRevision;
 pub use dice::WorkspaceRuntime;
 pub use dice::evaluate_workspace;

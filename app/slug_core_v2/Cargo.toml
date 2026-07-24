@@ -23,8 +23,12 @@ slug_bzlmod_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }
 slug_workspace_v2 = { workspace = true }
 slug_query_v2 = { workspace = true }
+sha2 = { workspace = true }
 starlark = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true }
+url = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
+compact_str = { workspace = true }
+starlark_map = { workspace = true }

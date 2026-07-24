@@ -35,6 +35,8 @@ use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryUrls;
+use slug_bzlmod_v2::RepositoryMaterializationGeneration;
+use slug_bzlmod_v2::RepositoryMaterializationGenerationKey;
 use slug_bzlmod_v2::RootModuleGraph;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::inject_registry_request_inputs;
@@ -57,6 +59,9 @@ use slug_query_v2::QueryPolicy;
 use slug_query_v2::evaluate_loading_query_with_policy;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
 
@@ -113,6 +118,30 @@ impl WorkspaceFileObservation {
     }
 }
 
+/// A complete raw-byte observation of one workspace file.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct WorkspaceRawFileObservation {
+    pub path: PathBuf,
+    pub value: WorkspaceRawFileValue,
+}
+
+impl WorkspaceRawFileObservation {
+    fn from_text(observation: &WorkspaceFileObservation) -> Self {
+        Self {
+            path: observation.path.clone(),
+            value: match &observation.value {
+                WorkspaceFileValue::Present(source) => {
+                    WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                }
+                WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                WorkspaceFileValue::ReadError(error) => {
+                    WorkspaceRawFileValue::ReadError(error.clone())
+                }
+            },
+        }
+    }
+}
+
 /// A complete external observation of one direct workspace directory.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct WorkspaceDirectoryObservation {
@@ -127,13 +156,19 @@ pub struct WorkspaceDirectoryObservation {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct WorkspaceObservation {
     pub files: Vec<WorkspaceFileObservation>,
+    pub raw_files: Vec<WorkspaceRawFileObservation>,
     pub directories: Vec<WorkspaceDirectoryObservation>,
 }
 
 impl WorkspaceObservation {
     pub fn from_files(files: impl IntoIterator<Item = WorkspaceFileObservation>) -> Self {
+        let files = files.into_iter().collect::<Vec<_>>();
         Self {
-            files: files.into_iter().collect(),
+            raw_files: files
+                .iter()
+                .map(WorkspaceRawFileObservation::from_text)
+                .collect(),
+            files,
             directories: Vec::new(),
         }
     }
@@ -227,7 +262,9 @@ fn collect_workspace_observations(directory: &Path, observation: &mut WorkspaceO
         });
         match kind {
             WorkspaceDirectoryEntryKind::RegularFile => {
-                observation.files.push(WorkspaceFileObservation::read(path));
+                let (text, raw) = read_file_observations(path);
+                observation.files.push(text);
+                observation.raw_files.push(raw);
             }
             WorkspaceDirectoryEntryKind::Directory => children.push(path),
             WorkspaceDirectoryEntryKind::Symlink | WorkspaceDirectoryEntryKind::Other => {}
@@ -244,6 +281,37 @@ fn collect_workspace_observations(directory: &Path, observation: &mut WorkspaceO
     }
 }
 
+fn read_file_observations(
+    path: PathBuf,
+) -> (WorkspaceFileObservation, WorkspaceRawFileObservation) {
+    let (text, raw) = match std::fs::read(&path) {
+        Ok(bytes) => {
+            let text = match String::from_utf8(bytes.clone()) {
+                Ok(source) => WorkspaceFileValue::Present(Arc::new(source)),
+                Err(error) => WorkspaceFileValue::ReadError(Arc::new(error.to_string())),
+            };
+            (text, WorkspaceRawFileValue::Present(Arc::from(bytes)))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            (WorkspaceFileValue::Absent, WorkspaceRawFileValue::Absent)
+        }
+        Err(error) => {
+            let error = Arc::new(error.to_string());
+            (
+                WorkspaceFileValue::ReadError(error.clone()),
+                WorkspaceRawFileValue::ReadError(error),
+            )
+        }
+    };
+    (
+        WorkspaceFileObservation {
+            path: path.clone(),
+            value: text,
+        },
+        WorkspaceRawFileObservation { path, value: raw },
+    )
+}
+
 /// The sole DICE owner for one canonical workspace identity.
 pub struct WorkspaceRuntime {
     workspace: PathBuf,
@@ -252,6 +320,7 @@ pub struct WorkspaceRuntime {
     runtime: tokio::runtime::Runtime,
     next_revision: AtomicU64,
     next_registry_generation: AtomicU64,
+    next_repository_materialization_generation: AtomicU64,
 }
 
 /// Stage 4 package-loading evidence attached to a requested target pattern.
@@ -434,6 +503,7 @@ impl WorkspaceRuntime {
             .context("creating workspace DICE runtime")?;
         let mut dice_builder = Dice::builder();
         super::registry_io::install(&mut dice_builder);
+        super::repository_io::install(&mut dice_builder);
         Ok(Self {
             workspace,
             dice: dice_builder.build(DetectCycles::Enabled),
@@ -441,6 +511,7 @@ impl WorkspaceRuntime {
             runtime,
             next_revision: AtomicU64::new(1),
             next_registry_generation: AtomicU64::new(1),
+            next_repository_materialization_generation: AtomicU64::new(1),
         })
     }
 
@@ -473,7 +544,18 @@ impl WorkspaceRuntime {
                     .fetch_add(1, Ordering::Relaxed),
             ),
         )
-        .context("injecting registry request inputs")
+        .context("injecting registry request inputs")?;
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationGenerationKey {
+                    workspace: self.workspace.clone(),
+                },
+                RepositoryMaterializationGeneration(
+                    self.next_repository_materialization_generation
+                        .fetch_add(1, Ordering::Relaxed),
+                ),
+            )])
+            .context("injecting repository materialization generation")
     }
 
     /// Evaluate one loading query in this runtime's retained DICE graph.
@@ -533,6 +615,15 @@ impl WorkspaceRuntime {
             })
             .collect::<anyhow::Result<_>>()
             .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        let raw_files = observations
+            .raw_files
+            .into_iter()
+            .map(|observation| {
+                self.validate_raw_file_observation(observation)
+                    .map(|observation| (observation.path, observation.value))
+            })
+            .collect::<anyhow::Result<_>>()
+            .map_err(|error| QueryError::evaluation(error.to_string()))?;
         let directories = observations
             .directories
             .into_iter()
@@ -544,6 +635,9 @@ impl WorkspaceRuntime {
             .map_err(|error| QueryError::evaluation(error.to_string()))?;
         let snapshot = Arc::new(WorkspaceSnapshot {
             files: Arc::new(files),
+        });
+        let raw_snapshot = Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(raw_files),
         });
         let directory_snapshot = Arc::new(WorkspaceDirectorySnapshot {
             directories: Arc::new(directories.into_iter().collect()),
@@ -559,6 +653,14 @@ impl WorkspaceRuntime {
                         workspace: self.workspace.clone(),
                     },
                     snapshot,
+                )])
+                .map_err(|error| QueryError::evaluation(error.to_string()))?;
+            updater
+                .changed_to(vec![(
+                    (WorkspaceRawSnapshotKey {
+                        workspace: self.workspace.clone(),
+                    }),
+                    raw_snapshot,
                 )])
                 .map_err(|error| QueryError::evaluation(error.to_string()))?;
             updater
@@ -690,6 +792,14 @@ impl WorkspaceRuntime {
                     .map(|observation| (observation.path, observation.value))
             })
             .collect::<anyhow::Result<_>>()?;
+        let raw_files = observations
+            .raw_files
+            .into_iter()
+            .map(|observation| {
+                self.validate_raw_file_observation(observation)
+                    .map(|observation| (observation.path, observation.value))
+            })
+            .collect::<anyhow::Result<_>>()?;
         let directories = observations
             .directories
             .into_iter()
@@ -704,6 +814,9 @@ impl WorkspaceRuntime {
             .collect::<anyhow::Result<Vec<_>>>()?;
         let snapshot = Arc::new(WorkspaceSnapshot {
             files: Arc::new(files),
+        });
+        let raw_snapshot = Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(raw_files),
         });
         let directory_snapshot = Arc::new(WorkspaceDirectorySnapshot {
             directories: Arc::new(directories.into_iter().collect()),
@@ -722,6 +835,14 @@ impl WorkspaceRuntime {
                     snapshot,
                 )])
                 .context("injecting workspace-file observations")?;
+            updater
+                .changed_to(vec![(
+                    (WorkspaceRawSnapshotKey {
+                        workspace: self.workspace.clone(),
+                    }),
+                    raw_snapshot,
+                )])
+                .context("injecting raw workspace-file observations")?;
             // DICE's typed 'changed_to' batches one key type per call. Both
             // snapshots are scheduled on this single updater before its sole
             // commit, so no transaction can see one without the other.
@@ -872,6 +993,16 @@ impl WorkspaceRuntime {
         observation: WorkspaceFileObservation,
     ) -> anyhow::Result<WorkspaceFileObservation> {
         Ok(WorkspaceFileObservation {
+            path: self.validate_observation_path(&observation.path)?,
+            value: observation.value,
+        })
+    }
+
+    fn validate_raw_file_observation(
+        &self,
+        observation: WorkspaceRawFileObservation,
+    ) -> anyhow::Result<WorkspaceRawFileObservation> {
+        Ok(WorkspaceRawFileObservation {
             path: self.validate_observation_path(&observation.path)?,
             value: observation.value,
         })
@@ -1197,6 +1328,7 @@ mod tests {
                         WorkspaceFileObservation::read(root.join("MODULE.bazel")),
                         WorkspaceFileObservation::read(root.join("BUILD.bazel")),
                     ],
+                    raw_files: Vec::new(),
                     directories: vec![
                         WorkspaceDirectoryObservation {
                             path: unknown.clone(),

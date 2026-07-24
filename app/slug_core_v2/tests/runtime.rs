@@ -4,6 +4,8 @@ use std::sync::Arc;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::RootModuleOverride;
 use slug_core_v2::runtime::WorkspaceDirectoryObservation;
 use slug_core_v2::runtime::WorkspaceFileObservation;
 use slug_core_v2::runtime::WorkspaceObservation;
@@ -233,10 +235,14 @@ fn retained_runtime_uses_root_graph_for_supported_module_directives() {
         result.root_module_graph.root.dependencies[0].name,
         "root_dep"
     );
-    assert_eq!(
-        result.root_module_graph.root.local_path_overrides[0].path,
-        "../root_dep"
-    );
+    assert!(matches!(
+        result.root_module_graph.overrides.get("root_dep"),
+        Some(RootModuleOverride::NonRegistry(repo_spec))
+            if matches!(
+                repo_spec.attributes.get("path"),
+                Some(OverrideAttributeValue::String(path)) if path == "../root_dep"
+            )
+    ));
     assert_eq!(result.root_module_graph.includes.len(), 1);
     assert_eq!(
         result.root_module_graph.includes[0].dependencies[0].name,
@@ -475,6 +481,7 @@ fn directory_observation_paths_must_be_normalized_and_contained() {
                     WorkspaceFileObservation::read(workspace.path().join("MODULE.bazel")),
                     WorkspaceFileObservation::read(workspace.path().join("BUILD.bazel")),
                 ],
+                raw_files: Vec::new(),
                 directories: vec![WorkspaceDirectoryObservation {
                     path: workspace.path().join("nested/../outside"),
                     value: WorkspaceDirectoryValue::Absent,
@@ -507,6 +514,7 @@ fn directory_observation_paths_must_not_alias_through_symlinks() {
                     WorkspaceFileObservation::read(workspace.path().join("MODULE.bazel")),
                     WorkspaceFileObservation::read(workspace.path().join("BUILD.bazel")),
                 ],
+                raw_files: Vec::new(),
                 directories: vec![WorkspaceDirectoryObservation {
                     path: workspace.path().join("alias"),
                     value: WorkspaceDirectoryValue::Absent,

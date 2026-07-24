@@ -33,6 +33,18 @@ pub enum WorkspaceFileValue {
     ReadError(Arc<String>),
 }
 
+/// The exact raw-byte state of an observed workspace file.
+///
+/// This stays separate from [`WorkspaceFileValue`]: a Starlark source reader
+/// needs UTF-8 text, whereas repository materialization must preserve bytes
+/// without treating non-UTF-8 input as a read failure.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum WorkspaceRawFileValue {
+    Present(Arc<[u8]>),
+    Absent,
+    ReadError(Arc<String>),
+}
+
 /// Immutable, externally observed workspace state for one DICE revision.
 ///
 /// A snapshot lets `WorkspaceFileKey` answer for any requested path: files not
@@ -43,8 +55,19 @@ pub struct WorkspaceSnapshot {
     pub files: Arc<SortedMap<PathBuf, WorkspaceFileValue>>,
 }
 
+/// One raw-byte workspace snapshot injected for a request transaction.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct WorkspaceRawSnapshot {
+    pub files: Arc<SortedMap<PathBuf, WorkspaceRawFileValue>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct WorkspaceSnapshotKey {
+    pub workspace: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct WorkspaceRawSnapshotKey {
     pub workspace: PathBuf,
 }
 
@@ -54,8 +77,22 @@ impl fmt::Display for WorkspaceSnapshotKey {
     }
 }
 
+impl fmt::Display for WorkspaceRawSnapshotKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "workspace-raw-snapshot:{}", self.workspace.display())
+    }
+}
+
 impl InjectedKey for WorkspaceSnapshotKey {
     type Value = Arc<WorkspaceSnapshot>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+impl InjectedKey for WorkspaceRawSnapshotKey {
+    type Value = Arc<WorkspaceRawSnapshot>;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
@@ -68,9 +105,22 @@ pub struct WorkspaceFileKey {
     pub path: PathBuf,
 }
 
+/// Computes the raw observation for one exact workspace/path identity.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct WorkspaceRawFileKey {
+    pub workspace: PathBuf,
+    pub path: PathBuf,
+}
+
 impl fmt::Display for WorkspaceFileKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "workspace-file:{}", self.path.display())
+    }
+}
+
+impl fmt::Display for WorkspaceRawFileKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "workspace-raw-file:{}", self.path.display())
     }
 }
 
@@ -106,6 +156,34 @@ impl Key for WorkspaceFileKey {
     }
 }
 
+#[async_trait]
+impl Key for WorkspaceRawFileKey {
+    type Value = WorkspaceRawFileValue;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match ctx
+            .compute(&WorkspaceRawSnapshotKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(snapshot) => snapshot
+                .files
+                .get(&self.path)
+                .cloned()
+                .unwrap_or(WorkspaceRawFileValue::Absent),
+            Err(error) => WorkspaceRawFileValue::ReadError(Arc::new(format!(
+                "reading raw workspace snapshot for {}: {error}",
+                self.path.display()
+            ))),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -119,6 +197,10 @@ mod tests {
 
     use super::WorkspaceFileKey;
     use super::WorkspaceFileValue;
+    use super::WorkspaceRawFileKey;
+    use super::WorkspaceRawFileValue;
+    use super::WorkspaceRawSnapshot;
+    use super::WorkspaceRawSnapshotKey;
     use super::WorkspaceSnapshot;
     use super::WorkspaceSnapshotKey;
 
@@ -154,6 +236,27 @@ mod tests {
         assert!(!WorkspaceFileKey::equality(
             &WorkspaceFileValue::Absent,
             &WorkspaceFileValue::ReadError(Arc::new("permission denied".to_owned()))
+        ));
+
+        let raw_present = Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(SortedMap::from_iter([(
+                PathBuf::from("/workspace/raw.bin"),
+                WorkspaceRawFileValue::Present(Arc::from(&b"\x00raw"[..])),
+            )])),
+        });
+        let raw_same = Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(SortedMap::from_iter([(
+                PathBuf::from("/workspace/raw.bin"),
+                WorkspaceRawFileValue::Present(Arc::from(&b"\x00raw"[..])),
+            )])),
+        });
+        assert!(<WorkspaceRawSnapshotKey as InjectedKey>::equality(
+            &raw_present,
+            &raw_same
+        ));
+        assert!(!WorkspaceRawFileKey::equality(
+            &WorkspaceRawFileValue::Absent,
+            &WorkspaceRawFileValue::ReadError(Arc::new("permission denied".to_owned()))
         ));
     }
 
