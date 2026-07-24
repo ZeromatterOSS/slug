@@ -501,9 +501,25 @@ while fixed archive/Git sources retain immutable operational roots behind
 generation-independent semantic equality. Registry patch preparation remains
 a separate serial owner.
 
-The current packet is `WP-5-m1-source-input-materialization-owner`. The
-canonical plan owns the exact nine-file raw-input/materialization/source-file
-allowlist. Registry routing/patching, evaluation, and discovery remain blocked.
+Commits `9c2a6814` and `0445cafd` accept the two serial source-preparation
+owners. Raw/local/immutable materialization and registry/non-registry
+MODULE-byte routing with ordered root patches are now DICE-owned.
+
+The subsequent
+`WP-5-m1-registry-module-discovery-design-rereview` returned `REPLAN` before
+Rust. `ModuleSourcePreparation` currently returns only bytes, so a discovery
+consumer cannot preserve Bazel's selected registry and ordered
+URL-to-SHA-or-absence evidence without illegally duplicating registry
+iteration. The corrected boundary widens preparation success to compact
+registry/non-registry provenance and keeps discovery dependent on that sole
+owner.
+
+Existing oracles also do not directly discriminate registry include rejection
+after compile but before execution, execution before declaration validation,
+or name before version. The current packet is the five-row, fixture-only
+`WP-5-m1-nonroot-module-evaluation-ordering-oracle`; the canonical plan owns
+its exact allowlist and stop conditions. No discovery Rust is authorized until
+that evidence and a fresh implementation rereview are accepted.
 
 ## Implementation Slices
 
