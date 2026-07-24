@@ -1,0 +1,1 @@
+bazel_dep(name = "local_include_a", version = "1.0.0")

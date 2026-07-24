@@ -1,0 +1,337 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "svo_patch_graph_a",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_a@1.0.0",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260724-004152-1598315-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260724-004340-1600142-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 9a3b83e5-61aa-488c-8b34-fd0fcf212790\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_a@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "201",
+          "path": "route.patch",
+          "replace": null
+        }
+      ],
+      "name": "patch_bytes_only_graph_b",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_b@1.0.0",
+      "stderr": "INFO: Invocation ID: 69c010d4-6164-4007-bbc0-fb71d8c1b0fa\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_b@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "route.patch"
+        }
+      ],
+      "name": "patch_delete_is_fatal_without_fallback",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error reading single_version_override patch [<workspace>]/[route.patch]: is a directory or doesn't exist",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: c5db83ce-86bb-4c7d-a76f-8ce2648b1e91\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error reading single_version_override patch [/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260724-004340-1600142-bazel/workspace]/[route.patch]: is a directory or doesn't exist\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "route.patch"
+        }
+      ],
+      "name": "patch_recreate_recovers_graph_b",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_b@1.0.0",
+      "stderr": "INFO: Invocation ID: dec70960-5b19-4a55-be44-024a42b7d6ce\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_b@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:route.patch\"],\n    patch_strip = 1,\n)",
+          "old_digest_hint": "218",
+          "path": "MODULE.bazel",
+          "replace": "local_path_override(module_name = \"route\", path = \"local-route\")"
+        }
+      ],
+      "name": "local_path_bypasses_malformed_and_absent_registries",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_a@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_a@1.0.0",
+      "stderr": "INFO: Invocation ID: 232ae734-df7c-4dc0-8e76-d891d60ed32c\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_a@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_a@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "local_main_a",
+          "old_digest_hint": "132",
+          "path": "local-route/MODULE.bazel",
+          "replace": "local_main_b"
+        }
+      ],
+      "name": "local_main_module_only_mutation_changes_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_a@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0",
+      "stderr": "INFO: Invocation ID: 154df932-9c7b-47ee-a5ee-6660c1ec1b53\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_a@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "local_include_a",
+          "old_digest_hint": "55",
+          "path": "local-route/route-deps.MODULE.bazel",
+          "replace": "local_include_b"
+        }
+      ],
+      "name": "local_include_module_only_mutation_changes_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_b@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0",
+      "stderr": "INFO: Invocation ID: 5acedc60-a2c8-4758-8a9a-fe2cbea17c16\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_b@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "local_path_override(module_name = \"route\", path = \"local-route\")",
+          "old_digest_hint": "174",
+          "path": "MODULE.bazel",
+          "replace": "archive_override(module_name = \"route\", urls = [\"{{workspace_uri}}/artifacts/route-module.tar\"], sha256 = \"9431711bb4f8353a0912cebfb0221b052763f58e847534ec4ea9ff3e5875ff9a\", type = \"tar\")"
+        }
+      ],
+      "name": "local_archive_override_evaluates_module_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500archive_leaf@1.0.0",
+      "stderr": "INFO: Invocation ID: a98a0950-3be7-4296-80db-14eea751c38c\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500archive_leaf@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "archive_override(module_name = \"route\", urls = [\"{{workspace_uri}}/artifacts/route-module.tar\"], sha256 = \"9431711bb4f8353a0912cebfb0221b052763f58e847534ec4ea9ff3e5875ff9a\", type = \"tar\")",
+          "old_digest_hint": "404",
+          "path": "MODULE.bazel",
+          "replace": "git_override(module_name = \"route\", remote = \"{{workspace_uri}}/repos/route-module.git\", commit = \"b2734e3d4d9c2676c12b41f8abdc9ba36a812952\")"
+        }
+      ],
+      "name": "local_bare_git_override_fixed_commit_evaluates_module_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500git_leaf@1.0.0",
+      "stderr": "INFO: Invocation ID: 26cb2e02-6143-4240-acf6-ec44e0fe0bfa\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500git_leaf@1.0.0 \n\n"
+    }
+  ],
+  "fixture": "module-source-preparation",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

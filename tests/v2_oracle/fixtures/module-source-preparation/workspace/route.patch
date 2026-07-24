@@ -1,0 +1,6 @@
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -1,2 +1,2 @@
+ module(name = "route", version = "1.0.0")
+-bazel_dep(name = "patch_base", version = "1.0.0")
++bazel_dep(name = "patch_leaf_a", version = "1.0.0")

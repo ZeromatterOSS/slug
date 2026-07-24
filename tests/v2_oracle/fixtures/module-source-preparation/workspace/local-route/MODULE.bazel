@@ -1,0 +1,3 @@
+module(name = "route", version = "2.0.0")
+bazel_dep(name = "local_main_a", version = "1.0.0")
+include("//:route-deps.MODULE.bazel")

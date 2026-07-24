@@ -1,0 +1,119 @@
+[fixture]
+name = "module-source-preparation"
+description = "Bazel 9.2 source preparation before module discovery: root patches and local/archive/Git module sources."
+comparison = "message_shape"
+daemon = true
+oracle_notes = "Nine retained-daemon rows use only checked-in local sources. The valid registry is evidence only for root patch routing and bounded embedded-tools scaffolding; malformed and absent registries follow it for non-registry bypass rows and must not be consulted for route."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
+  "tools/build_defs/repo/http.bzl",
+  "tools/build_defs/repo/git.bzl",
+  "tools/build_defs/repo/git_worker.bzl",
+]
+translation_notes = "{{workspace_uri}} expands only in the copied workspace. archive_override pins the deterministic tar SHA-256; git_override pins a checked-in bare repository commit."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture module-source-preparation --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture module-source-preparation --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "svo_patch_graph_a"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/valid"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "patch_leaf_a@1.0.0"]
+
+[[commands]]
+name = "patch_bytes_only_graph_b"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/valid"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "patch_leaf_b@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*patch_leaf_a@1\\.0\\.0).*"]
+
+  [[commands.mutations]]
+  path = "route.patch"
+  content = "--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1,2 +1,2 @@\n module(name = \"route\", version = \"1.0.0\")\n-bazel_dep(name = \"patch_base\", version = \"1.0.0\")\n+bazel_dep(name = \"patch_leaf_b\", version = \"1.0.0\")\n"
+
+[[commands]]
+name = "patch_delete_is_fatal_without_fallback"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/valid", "--registry=file://%workspace%/registry/absent"]
+expected_exit = 37
+stderr_contains = ["error reading single_version_override patch"]
+stderr_patterns = ["(?s)\\A(?!.*registry/absent).*error reading single_version_override patch.*"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "route.patch"
+
+[[commands]]
+name = "patch_recreate_recovers_graph_b"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/valid"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "patch_leaf_b@1.0.0"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "route.patch"
+  content = "--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1,2 +1,2 @@\n module(name = \"route\", version = \"1.0.0\")\n-bazel_dep(name = \"patch_base\", version = \"1.0.0\")\n+bazel_dep(name = \"patch_leaf_b\", version = \"1.0.0\")\n"
+
+[[commands]]
+name = "local_path_bypasses_malformed_and_absent_registries"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/malformed", "--registry=file://%workspace%/registry/absent"]
+expected_exit = 0
+stdout_contains = ["route@_", "local_main_a@1.0.0", "local_include_a@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*patch_leaf_a@1\\.0\\.0)(?!.*patch_leaf_b@1\\.0\\.0).*"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:route.patch\"],\n    patch_strip = 1,\n)"
+  replace = "local_path_override(module_name = \"route\", path = \"local-route\")"
+
+[[commands]]
+name = "local_main_module_only_mutation_changes_graph"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/malformed", "--registry=file://%workspace%/registry/absent"]
+expected_exit = 0
+stdout_contains = ["local_main_b@1.0.0", "local_include_a@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*local_main_a@1\\.0\\.0).*"]
+
+  [[commands.mutations]]
+  path = "local-route/MODULE.bazel"
+  find = "local_main_a"
+  replace = "local_main_b"
+
+[[commands]]
+name = "local_include_module_only_mutation_changes_graph"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/malformed", "--registry=file://%workspace%/registry/absent"]
+expected_exit = 0
+stdout_contains = ["local_main_b@1.0.0", "local_include_b@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*local_include_a@1\\.0\\.0).*"]
+
+  [[commands.mutations]]
+  path = "local-route/route-deps.MODULE.bazel"
+  find = "local_include_a"
+  replace = "local_include_b"
+
+[[commands]]
+name = "local_archive_override_evaluates_module_graph"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/malformed", "--registry=file://%workspace%/registry/absent"]
+expected_exit = 0
+stdout_contains = ["route@_", "archive_leaf@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*local_main_b@1\\.0\\.0)(?!.*local_include_b@1\\.0\\.0).*"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "local_path_override(module_name = \"route\", path = \"local-route\")"
+  replace = "archive_override(module_name = \"route\", urls = [\"{{workspace_uri}}/artifacts/route-module.tar\"], sha256 = \"9431711bb4f8353a0912cebfb0221b052763f58e847534ec4ea9ff3e5875ff9a\", type = \"tar\")"
+
+[[commands]]
+name = "local_bare_git_override_fixed_commit_evaluates_module_graph"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/malformed", "--registry=file://%workspace%/registry/absent"]
+expected_exit = 0
+stdout_contains = ["route@_", "git_leaf@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*archive_leaf@1\\.0\\.0).*"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "archive_override(module_name = \"route\", urls = [\"{{workspace_uri}}/artifacts/route-module.tar\"], sha256 = \"9431711bb4f8353a0912cebfb0221b052763f58e847534ec4ea9ff3e5875ff9a\", type = \"tar\")"
+  replace = "git_override(module_name = \"route\", remote = \"{{workspace_uri}}/repos/route-module.git\", commit = \"b2734e3d4d9c2676c12b41f8abdc9ba36a812952\")"

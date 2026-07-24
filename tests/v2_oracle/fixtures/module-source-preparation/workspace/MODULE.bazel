@@ -1,0 +1,9 @@
+module(name = "module_source_preparation", version = "1.0.0")
+
+bazel_dep(name = "route", version = "1.0.0")
+
+single_version_override(
+    module_name = "route",
+    patches = ["//:route.patch"],
+    patch_strip = 1,
+)
