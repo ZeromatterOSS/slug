@@ -674,6 +674,32 @@ live/frozen evaluator heap, generalize unsupported opaque values, edit Rust,
 add DICE/public seams, activate directive evaluation, compose includes, or
 change preparation/discovery ownership.
 
+Fresh pinned-source, live-schema/utility, and independent architecture reviews
+accept the bounded design. Raw kwargs remain evaluator-local through successful
+file execution and are then copied into the compact retained value. Bazel's
+`ListType`/`DictType` conversion allocates fresh containers, so acyclic alias
+topology is not semantic after final contents are observed; list/tuple identity
+and tag order remain semantic, while dict equality ignores insertion order.
+Adapter-compatible evaluation hashing separately preserves kwargs/dict
+iteration order and omits locations. The accepted one-element self-list is an
+explicit lockfile-off diagnostic form, not a general cycle graph; distinct
+cycles, other opaque values, and callable/proxy/cycle update/error modes remain
+unsupported. Existing `SmallMap`, `CompactString`, `Arc`, `Allocative`, and
+evaluator-local `ValueIdentity` are sufficient; no new interner, retained heap,
+DICE owner, or cross-crate seam is justified.
+
+The current packet is only
+`WP-5-m1-nonroot-deferred-attribute-snapshot-schema`. It may edit
+`interim_module.rs`, `module_eval.rs`, and `tests/nonroot_module_eval.rs`.
+Replace the conflated iterable with distinct list/tuple forms, extend compact
+keys/values only for the proven deferred-invalid tokens, add a private
+post-execution snapshot helper and ordered adapter projection, and test final
+mutation, alias-insensitive equality, dict order versus adapter order,
+identity-free invalid values, exact self-cycle rejection boundaries, and
+adapter-before-schema failure. Do not edit `lib.rs`, activate directives,
+compose includes, or touch DICE, Cargo, parser, lockfile, preparation,
+discovery, command, server, or oracle files.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
