@@ -566,6 +566,19 @@ The current packet is only
 directory and must stop rather than widen the harness or rely on unstable
 extension output. The consumer fixture and all Rust remain deferred.
 
+Commit `8824135a` accepts the five-row extension-semantics fixture. Three
+Bazel 9.2 runs, exact detailed/aggregate extension output, deterministic
+archive and local-closure checks, generated-repository build evidence, and
+fresh evidence review passed. The rows distinguish isolated flag gating,
+ordered nondev tags/imports, suppressed dev usage, ignored nonroot
+override/inject redirections, and duplicate-import collision.
+
+The current packet is only
+`WP-5-m1-nonroot-module-consumers-oracle`. It owns one new local-only fixture
+for host-independent nonroot platform/toolchain registration, independent dev
+suppression, and globally consumed flag aliases. All Rust remains deferred
+until this third serial fixture is accepted.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

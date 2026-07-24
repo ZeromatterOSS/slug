@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62` | extension and consumer evidence remain absent; preparation also loses exhaustion attempts and typed fatal causes | add only the nonroot extension-semantics oracle |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a` | consumer evidence remains absent; preparation also loses exhaustion attempts and typed fatal causes | add only the nonroot platform/toolchain/flag-alias consumer oracle |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,42 +33,54 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-nonroot-module-extension-semantics-oracle`.
+Run only `WP-5-m1-nonroot-module-consumers-oracle`.
 
 Create one new self-contained Bazel 9.2 fixture directory:
-`tests/v2_oracle/fixtures/nonroot-module-extension-semantics/**`. Do not edit
-the harness, Rust, Cargo, an existing fixture, lockfile code, or plans during
-the evidence packet. Use a local file registry and a deterministic local
-archive for `subject@1.0.0` containing its MODULE, extension implementation,
-BUILD data, and generated-repository rule. Use lockfile off and a retained
-daemon. The exact evidence must discriminate:
+`tests/v2_oracle/fixtures/nonroot-module-consumers/**`. Do not edit the
+harness, Rust, Cargo, an existing fixture, lockfile code, or plans during the
+evidence packet. Use a local-path-overridden nonroot `subject@1.0.0`, a
+fixture-local minimal `platforms@1.0.0`, lockfile off, and a retained daemon.
+All consumer actions must use `ctx.actions.write`; no compiler, shell, host
+executable, BCR, or network input is allowed.
 
-1. `bazel mod show_extension <extension>` detailed nonroot usage, proxy
-   assignment/location, ordered tags, and `use_repo` imports; use
-   `--extension_usages` only as a separate filter row if needed;
-2. a build through the imported generated repository, proving the retained
-   usage/import/tag semantics are executable;
-3. nonroot `override_repo` and `inject_repo` redirection with independently
-   distinguishable marker content and exact collision/error boundaries;
-4. isolated extension usage: failure without
-   `--experimental_isolated_extension_usages`, success with it, and a
-   discriminator for the isolated proxy/import; and
-5. nonroot dev extension usage/import/tag suppression, distinguished from the
-   nondev usage.
+The subject must define unique ordinary and dev constraint values, execution
+platforms, toolchain types/implementations, a string build setting, and exact
+single-label MODULE registrations. The matrix must discriminate:
 
-If aggregate output helps, use a separate
-`bazel mod graph --extension_info=all`; never pass `--extension_info` to
-`show_extension`. Stop and replan rather than widening scope if detailed
-output is unstable, the deterministic archive cannot remain confined to the
-new fixture, the harness needs modification, or a row cannot distinguish the
-specific proxy/tag/import/isolation/override behavior. Cite only pinned commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`, generate and independently
-replay with `/usr/bin/bazel`, verify archive bytes/source anchors/negative
-assertions, and obtain fresh evidence review.
+1. an ordinary consumer succeeds only through both the subject's nondev
+   `register_toolchains` and custom-constraint
+   `register_execution_platforms`; Bazel's default host platform must be
+   incompatible with the asserted toolchain;
+2. nonroot dev toolchain registration is suppressed while the compatible
+   nondev execution platform remains available, then succeeds after a
+   root-version-invalidated mutation removes only `dev_dependency = True`;
+3. nonroot dev execution-platform registration is suppressed while its
+   matching toolchain remains nondev, then succeeds after an independently
+   invalidated mutation removes only `dev_dependency = True`;
+4. a root and subject `flag_alias` share one name but map to distinct string
+   build settings; a manifested marker proves the later subject alias is
+   normalized in the subject's repo context and consumed globally;
+5. removing only the subject alias with a root version bump changes the
+   marker to the root setting, and restoring it with another bump recovers
+   the subject marker in the same daemon.
 
-The host-free platform/toolchain/flag-alias consumer fixture remains the third
-serial packet. No evaluator/schema, preparation provenance, or discovery Rust
-is authorized until all three evidence packets are accepted.
+Use distinct output digests or equally exact markers for every success, and
+anchored negative assertions for each failed resolution. Explicitly prove
+that the default host platform cannot satisfy the custom constraints; do not
+claim that Bazel has no default host platform. Cite only pinned commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, especially the nonroot
+`ignoreDevDeps` call sites, directive globals, `ModuleBase`, registered
+toolchain/platform consumers, flag-alias aggregation, and command-option
+reparse. Generate and independently replay with `/usr/bin/bazel`, verify the
+local closure/source anchors/negative assertions, and obtain fresh evidence
+review.
+
+Stop and replan rather than widening scope if the dev-platform diagnostic is
+unstable, the two dev fields cannot be isolated, a default platform can
+satisfy an asserted row, the manifest cannot distinguish root versus subject
+alias ownership, the local closure fetches network content, or the harness
+needs modification. No evaluator/schema, preparation provenance, or discovery
+Rust is authorized until this third evidence packet is accepted.
 
 ### Accepted transport evidence
 
