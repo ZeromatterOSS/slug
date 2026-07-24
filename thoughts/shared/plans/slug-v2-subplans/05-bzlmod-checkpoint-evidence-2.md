@@ -546,3 +546,15 @@ Expected evidence artifact: local exact-resource values retry absence/read failu
 Design summary: Keep stable `(workspace, URL)` identity. The local branch depends directly on `RegistryPolicyKey` and `RootModuleFilesKey`, then reads through the immutable global IO capability rather than `WorkspaceFileKey`; the direct root-files edge is required because current policy equality projects root semantics away. Found drops generation, while not-found/read failure conditionally acquire it. Core uses nonblocking `tokio::fs`; remote policy remains unchanged. `RootModuleGraphKey` and a raw-file epoch are rejected as overbroad and contrary to Bazel's sticky-success behavior.
 Validation: two read-only pinned-source/live-owner audits, root source/equality adjudication, explicit correction of one overbroad raw-file invalidation recommendation, Tokio feature verification, and fresh independent design review `ACCEPT`
 Residual risk: No Rust landed. Implement only `WP-5-m1-registry-local-replay-correction` in the three accepted files, prove all named lifecycle transitions, and obtain fresh final review before resuming per-module discovery.
+
+### Stage 5 local registry replay correction
+
+Status: Accepted
+V2 commit: `6491a55a fix: match local registry replay semantics`
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileValue.Key`, `ModuleFileFunction`, `ModuleFileFunctionException`, `RegistryFunction`, `RegistryFactoryImpl`, and `IndexRegistry`
+Bazel oracle: accepted `registry-module-discovery-recovery` from `0211982c`; retained remote mode and transport oracles remain unchanged
+V2 fixture: owner-local `registry_dice` lifecycle tests and core exact-adapter tests
+Expected evidence artifact: transient local absence/read failures retry only after generation changes; successful local bytes remain sticky across raw mutations under equal semantic inputs; semantic root A→B→C and registry A→B→A reread
+Implementation summary: Preserved stable `(workspace, URL)` identity, replaced the local `WorkspaceFileKey` edge with direct `RegistryPolicyKey` plus `RootModuleFilesKey` dependencies and immutable global IO, and conditionally acquired request generation only after local not-found/read failure. The core adapter dispatches `file://` through nonblocking Tokio filesystem IO before HTTP/TLS initialization state. Remote checksum, recorded-absence, refresh, and retry behavior are unchanged.
+Validation: focused registry DICE 12 and core adapter 1; full `slug_bzlmod_v2` 167 and `slug_core_v2` 21; formatting, diff, archive; root full-diff/source adjudication; fresh independent final review `ACCEPT`
+Residual risk: Per-module discovery is still absent. Rereview its prior design against the corrected local cache boundary and exact nonroot semantic dependencies before any discovery Rust.

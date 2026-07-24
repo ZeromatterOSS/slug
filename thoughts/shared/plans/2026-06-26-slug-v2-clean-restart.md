@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; local replay correction design accepted from pinned source and fresh review | the accepted local `RegistryFileKey` still has the eager `WorkspaceFileKey` dependency rejected by the oracle; the bounded correction must land before discovery | implement only the local registry replay correction |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry replay design is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry replay correction is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a` | the prior per-module discovery design predates the corrected local cache boundary and must be rereviewed before Rust | rereview only the corrected per-module registry discovery design |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry discovery design is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry discovery design is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,65 +33,54 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-registry-local-replay-correction`.
+Run only `WP-5-m1-registry-module-discovery-design-rereview`.
 
-Oracle `0211982c` is accepted against Bazel 9.2 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`. Its six retained-daemon rows prove
-ordered transient absence and retry after creation; successful local module
-content replay after a malformed mutation under equal semantic inputs;
-root-version invalidation exposing fatal malformed content without fallback;
-repair recovery; and delete fallback to the second registry. Generation,
-worker replay, root replay, fixture/TOML/source-anchor checks, diff checks, and
-fresh independent evidence review passed. Embedded-tools local-path shims are
-deterministic scaffolding, not extension or repository evidence.
+Commit `6491a55a` is accepted. Local exact-resource reads now use the immutable
+async IO capability, retry absence/read failure through request generation,
+preserve successful bytes across raw mutations under equal semantic inputs,
+and reread after semantic root or ordered policy changes. The stable file key,
+local SHA/absence values, and remote policy remain intact. Focused and full
+bzlmod/core suites, formatting, diff, archive, and fresh review passed.
 
-The pinned-source audit and independent design review accepted this correction:
+Reread the prior discovery design together with pinned Bazel
+`ModuleFileValue.Key`, `ModuleFileFunction`, `RegistryFunction`, and
+`IndexRegistry`, accepted oracles `3bc88fd9`, `2e9a3a56`, and `0211982c`, and
+the live corrected key graph. Freeze one implementation-ready design that:
 
-1. preserves one stable exact-resource key identity without request generation
-   or content in the key;
-2. makes the local branch depend directly on both `RegistryPolicyKey` and
-   `RootModuleFilesKey`; the first owns ordered normalized URLs, mode, and the
-   visible lockfile, while the direct root-files edge prevents
-   `RegistryPolicy` equality from projecting away a semantic root/include
-   change;
-3. reads local registry files through the existing immutable global
-   `RegistryIo` capability, not `WorkspaceFileKey`, so a successful value
-   remains cached while those semantic inputs are equal;
-4. depends on request generation only for local absence and local read
-   failures, so the next request retries a transient failure;
-5. retains local SHA-or-absence values without making either a visible-lockfile
-   expectation, and leaves the HTTP(S) checksum, recorded-absence, refresh, and
-   conditional-generation branch unchanged;
-6. extends the core adapter to dispatch `file://` reads through
-   `tokio::fs::read` before HTTP-client initialization failure is considered,
-   maps filesystem not-found separately from other read errors, and holds no
-   lock across the await; and
-7. adds focused DICE lifecycle coverage for absent→created and read
-   error→repair generation retry, successful→malformed/delete sticky replay
-   under equal inputs, root semantic A→B→C rereads, and ordered registry
-   A→B→A rereads, plus real adapter success/not-found/error coverage.
+1. keeps stable discovery identity at `(workspace, ModuleKey)` without request
+   generation, registry bytes, selected URL, or content digest in the key;
+2. names the direct semantic root, override, ordered registry-policy,
+   allowed-yanked environment, and Starlark-semantics dependencies required by
+   Bazel's nonroot `ModuleFileValue`, without depending on the post-MVS graph
+   or creating a root/discovery cycle;
+3. constructs each exact
+   `modules/<name>/<version>/MODULE.bazel` URL in normalized registry order and
+   consumes the corrected `RegistryFileKey`, so transient local absence/read
+   failure retries while successful local bytes and parse failures remain
+   sticky until a semantic invalidator;
+4. falls through only on typed not-found, stops immediately on transport,
+   checksum, local read, UTF-8, parse/compile/evaluation, include, and declared
+   name/version failures, and retains the ordered not-found trace;
+5. returns a compact immutable selected-registry/module value plus every
+   attempted URL's SHA-or-absence observation, including local files, without
+   owning IO, generation, MVS, selected-yanked aggregation, final lockfile
+   hashes, or writing;
+6. factors and reuses the existing Starlark module evaluator without the
+   legacy parser or a second semantic representation; and
+7. names exact tests for ordered 404 fallback, fatal no-fallback, local
+   absent→created retry, sticky successful→malformed replay, root-invalidated
+   malformed failure, repair, invalidated delete fallback, registry A→B→A,
+   evaluator validation, equality, and downstream compilation.
 
-`RootModuleGraphKey` is deliberately excluded: it would add unrelated command,
-environment, repository-mapping, and loading coupling. A raw-file epoch is also
-excluded because Bazel does not invalidate a successful local module value on
-registry-file create/edit/delete alone. The future discovery key, not this
-exact-resource correction, owns the `ModuleKey`, override, allowed-yanked
-environment, Starlark-semantics, and selected-registry computation boundary.
-
-The implementation allowlist is:
-
-- `app/slug_bzlmod_v2/src/registry_dice.rs`;
-- `app/slug_bzlmod_v2/tests/registry_dice.rs`; and
-- `app/slug_core_v2/src/runtime/registry_io.rs`.
-
-No Cargo edit is authorized because workspace Tokio already enables `full`.
-Run the two focused crate test targets serially, then the full
-`slug_bzlmod_v2` and `slug_core_v2` suites, formatting, diff, archive, and a
-fresh independent review. Stop and replan on any required edit outside the
-allowlist, remote behavior change, DICE cycle, blocking filesystem call, or
-inability to prove all named lifecycle transitions. Discovery, MVS,
-selected-yanked/RepoSpec aggregation, writing, loading, extensions, and
-materialization remain deferred.
+Audit whether the discovery key should depend directly on
+`RootModuleFilesKey`, individual root policy inputs, or a smaller semantic
+value; do not let `RegistryPolicy` equality mask root/override changes. Decide
+where allowed-yanked environment and fixed Starlark semantics belong now versus
+the later MVS/selected-yanked packet. Recheck the earlier five-file allowlist
+against the corrected IO boundary and exact evaluator owner. This is read-only:
+do not edit Rust, Cargo, fixtures, tests, expected output, or lockfiles.
+MVS, selected-yanked/RepoSpec aggregation, semantic writing, loading,
+extensions, and materialization remain deferred.
 
 ### Accepted transport evidence
 
