@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d` | command/daemon registry transport, discovery, MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | design only command/daemon registry transport |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; command/daemon registry transport design independently accepted | the registry-option oracle must land before command/daemon registry transport; discovery, MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | add only the Bazel 9.2 registry-command transport oracle |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry policy/IO substrate is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry policy/IO substrate is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,15 +33,26 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-registry-command-transport-design`.
+Run only `WP-5-m1-registry-command-transport-oracle`.
 
-This is a read-only design packet. Trace Bazel 9.2's repeatable `--registry`
-option from its option/default producer through trailing-slash normalization,
-first-occurrence deduplication, ordering, `%workspace%` substitution, and URI
-validation. Trace Slug's current build/query CLI, daemon DTO, and retained
-runtime request paths.
+The command/daemon transport contract below is independently accepted. Before
+any Rust, add one source-controlled Bazel 9.2 fixture that discriminates:
+no-option BCR default; `A/`, duplicate `A`, then `B///` normalization/order
+with one first-registry miss; first-404 fallback versus first-fatal
+no-fallback; `%workspace%` file substitution; and unsupported, no-scheme, and
+malformed-file diagnostics. Request counts must prove first-occurrence dedup.
 
-Produce an independently reviewed implementation contract that:
+Use a fixture-local dynamic HTTP registry and bounded startup/cleanup. Pin
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
+endpoint-normalize portable evidence, preserve raw diagnostics, and validate
+the full oracle harness. The allowlist is a new
+`tests/v2_oracle/fixtures/registry-command-transport/**` plus
+`tests/v2_oracle/test_v2_oracle.py` only if a fixture-service regression is
+required. Do not edit Rust or another fixture.
+
+### Accepted transport contract
+
+The future implementation must:
 
 1. carries primitive ordered registry strings through both one-shot and daemon
    build/query paths without serializing semantic Rust types;
@@ -51,6 +62,57 @@ Produce an independently reviewed implementation contract that:
 4. keeps the already accepted `RegistryFileKey`, generation, IO capability,
    root graph, and loading owners unchanged; and
 5. names a narrow implementation allowlist and exact CLI/server/core tests.
+
+1. Add an ordered raw `Vec<String>` registry field to build/query command
+   requests and a `#[serde(default)]` primitive registry list to
+   `BzlmodRequestInputs`. Empty means unspecified. This packet supports
+   repeatable `--registry=URL`; generic `--registry URL` parsing is not
+   expanded.
+2. `slug_commands_v2` only collects required nonempty values in encounter
+   order. Ordinary `query` accepts `registry` in its existing flag validator
+   and continues rejecting the other currently unsupported bzlmod flags.
+   CLI, JSON, and daemon code do not trim, deduplicate, substitute, validate,
+   or carry `RegistryUrls`.
+3. Both one-shot and daemon paths pass the primitive list through the existing
+   explicit bzlmod methods. The common retained-runtime injection helper calls
+   one fallible `RegistryUrls::from_request(workspace, raw)` before allocating
+   the request generation or scheduling any `changed_to`.
+4. `from_request` supplies only `https://bcr.bazel.build/` when the raw list is
+   empty; a nonempty list fully replaces that default. It removes every
+   trailing slash and first-occurrence-deduplicates in raw encounter order,
+   then performs `%workspace%` substitution and URI validation for each
+   surviving entry. Validation accepts only exact lowercase `http`, `https`,
+   and `file` schemes with a nonempty path and preserves Bazel's factory
+   diagnostic shapes. The stored compact `RegistryUrls` are the resolved
+   effective URLs; no later layer repeats normalization or substitution.
+5. The existing `RootModuleRegistryUrlsKey`, request generation,
+   `RegistryPolicyKey`, `RegistryFileKey`, IO capability, root graph, and
+   loading ownership remain unchanged. Malformed input fails before the sole
+   commit and does not consume a generation.
+6. Command tests pin default/override ordering, duplicate raw values, missing
+   values, and query acceptance. Server tests pin omitted-field compatibility,
+   primitive JSON round trips, malformed recovery, and build/query
+   default→override→default isolation. Core tests inspect injected registry
+   URLs and generation across the same A→B→A sequence. CLI tests exercise
+   both one-shot and daemon equality-form transport.
+
+The implementation allowlist is
+`app/slug_bzlmod_v2/src/registry.rs`,
+`app/slug_bzlmod_v2/Cargo.toml` only if the accepted oracle requires the
+already-workspace `url` parser,
+`app/slug_commands_v2/src/common.rs`,
+`app/slug_commands_v2/src/build.rs`,
+`app/slug_commands_v2/src/query.rs`,
+`app/slug_commands_v2/tests/commands.rs`,
+`app/slug_cli_v2/src/commands/build.rs`,
+`app/slug_cli_v2/src/commands/query.rs`,
+`app/slug_cli_v2/tests/cli.rs`,
+`app/slug_server_v2/src/server.rs`,
+`app/slug_server_v2/src/lib.rs`,
+`app/slug_server_v2/src/tests.rs`,
+`app/slug_core_v2/src/runtime/mod.rs`,
+`app/slug_core_v2/src/runtime/dice.rs`, and
+`app/slug_core_v2/tests/runtime.rs`.
 
 Do not edit Rust, add discovery/fallback, fetch registry content, expand rc
 handling, or design MVS/yanked/final-hash/writer behavior in this packet.
