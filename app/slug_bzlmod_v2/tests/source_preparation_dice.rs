@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
@@ -11,6 +12,15 @@ use dice::UserComputationData;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::ModuleSourcePreparation;
+use slug_bzlmod_v2::ModuleSourcePreparationError;
+use slug_bzlmod_v2::ModuleSourcePreparationKey;
+use slug_bzlmod_v2::RegistryFileUrl;
+use slug_bzlmod_v2::RegistryIo;
+use slug_bzlmod_v2::RegistryIoOutcome;
+use slug_bzlmod_v2::RegistryRequestGeneration;
+use slug_bzlmod_v2::RegistryTransportError;
+use slug_bzlmod_v2::RegistryUrls;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryIo;
 use slug_bzlmod_v2::RepositoryIoOutcome;
@@ -19,7 +29,10 @@ use slug_bzlmod_v2::RepositoryMaterializationGenerationKey;
 use slug_bzlmod_v2::RepositorySourceFileKey;
 use slug_bzlmod_v2::RepositorySourceFileValue;
 use slug_bzlmod_v2::RepositoryTransportError;
+use slug_bzlmod_v2::apply_unified_patch;
+use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_bzlmod_v2::install_registry_io;
 use slug_bzlmod_v2::install_repository_io;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceRawFileValue;
@@ -39,6 +52,53 @@ struct LocalIo {
 
 struct FlakyIo {
     calls: AtomicUsize,
+}
+
+#[derive(Clone)]
+enum FakeRegistryResponse {
+    Found(Arc<[u8]>),
+    NotFound,
+    Error(&'static str),
+}
+
+struct FakeRegistryIo {
+    responses: Mutex<std::collections::BTreeMap<String, FakeRegistryResponse>>,
+    calls: Mutex<Vec<String>>,
+}
+
+impl FakeRegistryIo {
+    fn new(responses: impl IntoIterator<Item = (impl Into<String>, FakeRegistryResponse)>) -> Self {
+        Self {
+            responses: Mutex::new(
+                responses
+                    .into_iter()
+                    .map(|(url, response)| (url.into(), response))
+                    .collect(),
+            ),
+            calls: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn calls(&self) -> Vec<String> {
+        self.calls.lock().unwrap().clone()
+    }
+}
+
+#[async_trait]
+impl RegistryIo for FakeRegistryIo {
+    async fn read_exact(
+        &self,
+        url: &RegistryFileUrl,
+    ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+        self.calls.lock().unwrap().push(url.as_str().to_owned());
+        match self.responses.lock().unwrap().get(url.as_str()).cloned() {
+            Some(FakeRegistryResponse::Found(bytes)) => Ok(RegistryIoOutcome::Found(bytes)),
+            Some(FakeRegistryResponse::NotFound) | None => Ok(RegistryIoOutcome::NotFound),
+            Some(FakeRegistryResponse::Error(message)) => Err(RegistryTransportError {
+                message: message.into(),
+            }),
+        }
+    }
 }
 
 #[async_trait]
@@ -83,6 +143,29 @@ fn text_snapshot() -> Arc<WorkspaceSnapshot> {
                     .to_owned(),
             )),
         )])),
+    })
+}
+
+fn text_snapshot_with(source: &str) -> Arc<WorkspaceSnapshot> {
+    let workspace = workspace();
+    Arc::new(WorkspaceSnapshot {
+        files: Arc::new(SortedMap::from_iter([(
+            workspace.join("MODULE.bazel"),
+            WorkspaceFileValue::Present(Arc::new(source.to_owned())),
+        )])),
+    })
+}
+
+fn raw_workspace_snapshot(
+    values: impl IntoIterator<Item = (&'static str, WorkspaceRawFileValue)>,
+) -> Arc<WorkspaceRawSnapshot> {
+    let workspace = workspace();
+    Arc::new(WorkspaceRawSnapshot {
+        files: Arc::new(SortedMap::from_iter(
+            values
+                .into_iter()
+                .map(|(path, value)| (workspace.join(path), value)),
+        )),
     })
 }
 
@@ -145,6 +228,66 @@ async fn source(
             workspace,
             module_name: "dep".into(),
             repo_relative_path: PathBuf::from(repo_relative_path),
+        })
+        .await
+        .unwrap()
+}
+
+async fn prepare(
+    dice: &Arc<Dice>,
+    root_source: &str,
+    raw: Arc<WorkspaceRawSnapshot>,
+    registries: &[&str],
+    generation: u64,
+    version: &str,
+) -> Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>> {
+    let workspace = workspace();
+    let mut updater = dice.updater_with_data(UserComputationData::default());
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            text_snapshot_with(root_source),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            raw,
+        )])
+        .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        &workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    inject_registry_request_inputs(
+        &mut updater,
+        &workspace,
+        RegistryUrls::new(registries.iter().copied()),
+        RegistryRequestGeneration(generation),
+    )
+    .unwrap();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationGenerationKey {
+                workspace: workspace.clone(),
+            },
+            RepositoryMaterializationGeneration(generation),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    transaction
+        .compute(&ModuleSourcePreparationKey {
+            workspace,
+            module_name: "dep".into(),
+            version: version.into(),
         })
         .await
         .unwrap()
@@ -289,4 +432,363 @@ async fn materialization_failure_retries_when_the_generation_changes() {
         RepositorySourceFileValue::Present(Arc::from(&b"module(name = 'recovered')"[..]))
     );
     assert_eq!(io.calls.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn registry_preparation_falls_through_only_not_found_and_preserves_raw_bytes() {
+    let first = "https://first.invalid/modules/dep/1.0.0/MODULE.bazel";
+    let second = "https://second.invalid/modules/dep/1.0.0/MODULE.bazel";
+    let raw_module: Arc<[u8]> = Arc::from(&b"\xffraw module bytes\r\n"[..]);
+    let io = Arc::new(FakeRegistryIo::new([
+        (first, FakeRegistryResponse::NotFound),
+        (second, FakeRegistryResponse::Found(raw_module.clone())),
+    ]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+
+    let prepared = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        prepare(
+            &dice,
+            "module(name = 'root')\nbazel_dep(name = 'dep', version = '1.0.0')\n",
+            raw_workspace_snapshot([]),
+            &["https://first.invalid", "https://second.invalid"],
+            1,
+            "1.0.0",
+        ),
+    )
+    .await
+    .expect("source preparation must not introduce a DICE cycle");
+    assert!(matches!(
+        prepared.as_ref(),
+        Ok(ModuleSourcePreparation::Found(bytes)) if bytes == &raw_module
+    ));
+    assert_eq!(io.calls(), [first, second]);
+
+    let io = Arc::new(FakeRegistryIo::new([
+        (first, FakeRegistryResponse::Error("fatal transport")),
+        (
+            second,
+            FakeRegistryResponse::Found(Arc::from(&b"must not be read"[..])),
+        ),
+    ]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let prepared = prepare(
+        &dice,
+        "module(name = 'root')\nbazel_dep(name = 'dep', version = '1.0.0')\n",
+        raw_workspace_snapshot([]),
+        &["https://first.invalid", "https://second.invalid"],
+        1,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        prepared.as_ref(),
+        Err(ModuleSourcePreparationError::Registry(message))
+            if message.as_str().contains("fatal transport")
+    ));
+    assert_eq!(io.calls(), [first]);
+}
+
+#[tokio::test]
+async fn override_registry_uses_the_effective_version_and_bypasses_defaults() {
+    let expected = "https://override.invalid/modules/dep/9.0.0/MODULE.bazel";
+    let io = Arc::new(FakeRegistryIo::new([(
+        expected,
+        FakeRegistryResponse::Found(Arc::from(&b"effective override"[..])),
+    )]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let prepared = prepare(
+        &dice,
+        "module(name = 'root')\n\
+         bazel_dep(name = 'dep', version = '1.0.0')\n\
+         single_version_override(module_name = 'dep', version = '9.0.0', registry = 'https://override.invalid/')\n",
+        raw_workspace_snapshot([]),
+        &["https://default.invalid"],
+        1,
+        "9.0.0",
+    )
+    .await;
+
+    assert!(matches!(
+        prepared.as_ref(),
+        Ok(ModuleSourcePreparation::Found(bytes)) if bytes.as_ref() == b"effective override"
+    ));
+    assert_eq!(io.calls(), [expected]);
+}
+
+#[tokio::test]
+async fn nonregistry_preparation_bypasses_registry_io() {
+    let registry_io = Arc::new(FakeRegistryIo::new([(
+        "https://default.invalid/modules/dep/1.0.0/MODULE.bazel",
+        FakeRegistryResponse::Error("must not be called"),
+    )]));
+    let repository_io = Arc::new(LocalIo {
+        calls: AtomicUsize::new(0),
+    });
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, registry_io.clone());
+    install_repository_io(&mut builder, repository_io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let prepared = prepare(
+        &dice,
+        "module(name = 'root')\n\
+         bazel_dep(name = 'dep')\n\
+         local_path_override(module_name = 'dep', path = 'vendor/dep')\n",
+        raw_workspace_snapshot([(
+            "vendor/dep/MODULE.bazel",
+            WorkspaceRawFileValue::Present(Arc::from(&b"local module"[..])),
+        )]),
+        &["https://default.invalid"],
+        1,
+        "",
+    )
+    .await;
+
+    assert!(matches!(
+        prepared.as_ref(),
+        Ok(ModuleSourcePreparation::Found(bytes)) if bytes.as_ref() == b"local module"
+    ));
+    assert!(registry_io.calls().is_empty());
+    assert_eq!(repository_io.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn selected_patch_replays_a_b_errors_recovery_and_a_without_refetch() {
+    let module_url = "file:///registry/modules/dep/1.0.0/MODULE.bazel";
+    let original = b"module(name = 'dep', version = '1.0.0')\n\
+bazel_dep(name = 'base', version = '1.0.0')\n";
+    let patch = |leaf: &'static str| {
+        WorkspaceRawFileValue::Present(Arc::from(
+            format!(
+                concat!(
+                    "--- a/MODULE.bazel\n",
+                    "+++ b/MODULE.bazel\n",
+                    "@@ -1,2 +1,2 @@\n",
+                    " module(name = 'dep', version = '1.0.0')\n",
+                    "-bazel_dep(name = 'base', version = '1.0.0')\n",
+                    "+bazel_dep(name = '{}', version = '1.0.0')\n",
+                ),
+                leaf
+            )
+            .into_bytes(),
+        ))
+    };
+    let io = Arc::new(FakeRegistryIo::new([(
+        module_url,
+        FakeRegistryResponse::Found(Arc::from(&original[..])),
+    )]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let root = "module(name = 'root')\n\
+                bazel_dep(name = 'dep', version = '1.0.0')\n\
+                single_version_override(module_name = 'dep', patches = ['//:route.patch'], patch_strip = 1)\n";
+
+    for (generation, value, expected) in [
+        (1, patch("leaf_a"), Some("leaf_a")),
+        (2, patch("leaf_b"), Some("leaf_b")),
+        (3, WorkspaceRawFileValue::Absent, None),
+        (
+            4,
+            WorkspaceRawFileValue::Present(Arc::from(&b"not a patch"[..])),
+            None,
+        ),
+        (5, patch("leaf_b"), Some("leaf_b")),
+        (6, patch("leaf_a"), Some("leaf_a")),
+    ] {
+        let prepared = prepare(
+            &dice,
+            root,
+            raw_workspace_snapshot([("route.patch", value)]),
+            &["file:///registry"],
+            generation,
+            "1.0.0",
+        )
+        .await;
+        match expected {
+            Some(leaf) => assert!(
+                matches!(
+                    prepared.as_ref(),
+                    Ok(ModuleSourcePreparation::Found(bytes))
+                        if String::from_utf8_lossy(bytes).contains(leaf)
+                ),
+                "{prepared:?}"
+            ),
+            None => assert!(matches!(
+                prepared.as_ref(),
+                Err(ModuleSourcePreparationError::Patch(_))
+            )),
+        }
+    }
+    assert_eq!(io.calls(), [module_url]);
+}
+
+#[tokio::test]
+async fn ordered_patches_apply_strip_while_nonmain_and_commands_stay_inactive() {
+    let module_url = "https://registry.invalid/modules/dep/1.0.0/MODULE.bazel";
+    let io = Arc::new(FakeRegistryIo::new([(
+        module_url,
+        FakeRegistryResponse::Found(Arc::from(&b"value = 'base'\n"[..])),
+    )]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let prepared = prepare(
+        &dice,
+        "module(name = 'root')\n\
+         bazel_dep(name = 'dep', version = '1.0.0')\n\
+         bazel_dep(name = 'visible', version = '1.0.0')\n\
+         single_version_override(module_name = 'dep', patches = ['//:one.patch', '@@visible//:ignored.patch', '//:two.patch'], patch_cmds = ['exit 37'], patch_strip = 1)\n",
+        raw_workspace_snapshot([
+            (
+                "one.patch",
+                WorkspaceRawFileValue::Present(Arc::from(
+                    &b"--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1 +1 @@\n-value = 'base'\n+value = 'middle'\n"[..],
+                )),
+            ),
+            (
+                "two.patch",
+                WorkspaceRawFileValue::Present(Arc::from(
+                    &b"--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1 +1 @@\n-value = 'middle'\n+value = 'final'\n"[..],
+                )),
+            ),
+        ]),
+        &["https://registry.invalid"],
+        1,
+        "1.0.0",
+    )
+    .await;
+
+    assert!(
+        matches!(
+            prepared.as_ref(),
+            Ok(ModuleSourcePreparation::Found(bytes)) if bytes.as_ref() == b"value = 'final'\n"
+        ),
+        "{prepared:?}"
+    );
+}
+
+#[tokio::test]
+async fn empty_version_and_registry_exhaustion_are_typed_failures() {
+    let first = "https://first.invalid/modules/dep/1.0.0/MODULE.bazel";
+    let second = "https://second.invalid/modules/dep/1.0.0/MODULE.bazel";
+    let io = Arc::new(FakeRegistryIo::new([
+        (first, FakeRegistryResponse::NotFound),
+        (second, FakeRegistryResponse::NotFound),
+    ]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let root = "module(name = 'root')\nbazel_dep(name = 'dep', version = '1.0.0')\n";
+
+    let missing_version = prepare(
+        &dice,
+        root,
+        raw_workspace_snapshot([]),
+        &["https://first.invalid", "https://second.invalid"],
+        1,
+        "",
+    )
+    .await;
+    assert!(matches!(
+        missing_version.as_ref(),
+        Err(ModuleSourcePreparationError::MissingVersion)
+    ));
+    assert!(io.calls().is_empty());
+
+    let exhausted = prepare(
+        &dice,
+        root,
+        raw_workspace_snapshot([]),
+        &["https://first.invalid", "https://second.invalid"],
+        2,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        exhausted.as_ref(),
+        Err(ModuleSourcePreparationError::ModuleNotFound)
+    ));
+    assert_eq!(io.calls(), [first, second]);
+}
+
+#[test]
+fn bounded_patcher_preserves_raw_bytes_without_a_patch_and_applies_ordered_hunks() {
+    let original: Arc<[u8]> = Arc::from(&b"module(name = 'a')\n"[..]);
+    let first = apply_unified_patch(
+        original.clone(),
+        b"--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1 +1 @@\n-module(name = 'a')\n+module(name = 'b')\n",
+        1,
+    )
+    .unwrap();
+    let second = apply_unified_patch(
+        first,
+        b"--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1 +1 @@\n-module(name = 'b')\n+module(name = 'c')\n",
+        1,
+    )
+    .unwrap();
+    assert_eq!(second.as_ref(), b"module(name = 'c')\n");
+    assert!(apply_unified_patch(original, b"not a patch", 0).is_err());
+    assert!(apply_unified_patch(
+        Arc::from(&b"module(name = 'a')\n"[..]),
+        b"--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1 +1 @@\n-module(name = 'a')\n+module(name = 'b')\n",
+        0,
+    )
+    .is_err());
+    assert!(apply_unified_patch(
+        Arc::from(&b"module(name = 'a')\n"[..]),
+        b"--- MODULE.bazel\n+++ MODULE.bazel\n@@ -1,2 +1,1 @@\n-module(name = 'a')\n+module(name = 'b')\n",
+        -1,
+    )
+    .is_err());
+    assert_eq!(
+        apply_unified_patch(
+            Arc::from(&b"module(name = 'a')\n"[..]),
+            b"--- MODULE.bazel\n+++ MODULE.bazel\n@@ -1 +1 @@\n-module(name = 'a')\n+module(name = 'b')\n",
+            -1,
+        )
+        .unwrap()
+        .as_ref(),
+        b"module(name = 'b')\n"
+    );
+    assert_eq!(
+        apply_unified_patch(
+            Arc::from(&b"module(name = 'a')\n"[..]),
+            b"--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-old\n+new\n",
+            1,
+        )
+        .unwrap()
+        .as_ref(),
+        b"module(name = 'a')\n"
+    );
+    assert_eq!(
+        apply_unified_patch(
+            Arc::from(&b"module(name = 'a')\n"[..]),
+            b"--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-old\n+new\n",
+            0,
+        )
+        .unwrap()
+        .as_ref(),
+        b"module(name = 'a')\n"
+    );
+    assert!(
+        apply_unified_patch(
+            Arc::from(&b"module(name = 'a')\n"[..]),
+            b"--- a/README.md\n+++ b/README.md\n@@ -1,2 +1 @@\n-old\n+new\n",
+            1,
+        )
+        .is_err()
+    );
+    assert!(apply_unified_patch(
+        Arc::from(&b"module(name = 'a')\n"[..]),
+        b"--- MODULE.bazel\n+++ MODULE.bazel\n@@ -1 +1 bogus @@\n-module(name = 'a')\n+module(name = 'b')\n",
+        0,
+    )
+    .is_err());
 }

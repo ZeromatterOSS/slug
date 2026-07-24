@@ -24,18 +24,62 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::WorkspaceRawFileKey;
 use slug_workspace_v2::WorkspaceRawFileValue;
 
+use crate::ModuleKey;
+use crate::RegistryFileKey;
+use crate::RegistryFileUrl;
+use crate::RegistryFileValue;
+use crate::RegistryPolicyKey;
 use crate::RepoSpec;
 use crate::RootModuleFilesKey;
 use crate::RootModuleOverride;
+use crate::apply_unified_patch;
+use crate::registry_module_file_url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RepositoryMaterializationKey {
     pub workspace: PathBuf,
     pub module_name: CompactString,
+}
+
+/// Prepares one module's raw MODULE.bazel bytes. `version` is already the
+/// effective version chosen by the upstream owner; this key never resolves or
+/// rewrites it.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct ModuleSourcePreparationKey {
+    pub workspace: PathBuf,
+    pub module_name: CompactString,
+    pub version: CompactString,
+}
+
+impl fmt::Display for ModuleSourcePreparationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "module-source-preparation:{}@{}",
+            self.module_name, self.version
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum ModuleSourcePreparation {
+    Found(Arc<[u8]>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum ModuleSourcePreparationError {
+    RootModuleFiles(CompactString),
+    RegistryPolicy(CompactString),
+    Registry(CompactString),
+    Source(Arc<str>),
+    Patch(CompactString),
+    MissingVersion,
+    ModuleNotFound,
 }
 
 impl fmt::Display for RepositoryMaterializationKey {
@@ -358,6 +402,211 @@ impl Key for RepositorySourceFileKey {
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
     }
+}
+
+#[async_trait]
+impl Key for ModuleSourcePreparationKey {
+    type Value = Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let root = match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                return Arc::new(Err(ModuleSourcePreparationError::RootModuleFiles(
+                    error.to_string().into(),
+                )));
+            }
+        };
+        let root = match root.as_ref() {
+            Ok(value) => value,
+            Err(error) => {
+                return Arc::new(Err(ModuleSourcePreparationError::RootModuleFiles(
+                    error.clone(),
+                )));
+            }
+        };
+        let override_ = root.overrides.get(self.module_name.as_str()).cloned();
+        if matches!(override_, Some(RootModuleOverride::NonRegistry(_))) {
+            let value = match ctx
+                .compute(&RepositorySourceFileKey {
+                    workspace: self.workspace.clone(),
+                    module_name: self.module_name.clone(),
+                    repo_relative_path: PathBuf::from("MODULE.bazel"),
+                })
+                .await
+            {
+                Ok(RepositorySourceFileValue::Present(bytes)) => {
+                    Ok(ModuleSourcePreparation::Found(bytes))
+                }
+                Ok(RepositorySourceFileValue::Absent) => {
+                    Err(ModuleSourcePreparationError::ModuleNotFound)
+                }
+                Ok(RepositorySourceFileValue::ReadError(error)) => {
+                    Err(ModuleSourcePreparationError::Source(error))
+                }
+                Err(error) => Err(ModuleSourcePreparationError::Source(
+                    error.to_string().into(),
+                )),
+            };
+            return Arc::new(value);
+        }
+        if self.version.is_empty() {
+            return Arc::new(Err(ModuleSourcePreparationError::MissingVersion));
+        }
+        let policy = match ctx
+            .compute(&RegistryPolicyKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                return Arc::new(Err(ModuleSourcePreparationError::RegistryPolicy(
+                    error.to_string().into(),
+                )));
+            }
+        };
+        let policy = match policy.as_ref() {
+            Ok(value) => value,
+            Err(error) => {
+                return Arc::new(Err(ModuleSourcePreparationError::RegistryPolicy(
+                    format!("{error:?}").into(),
+                )));
+            }
+        };
+        let override_registry = match override_.as_ref() {
+            Some(RootModuleOverride::RegistrySingle(value)) if !value.registry.is_empty() => {
+                Some(value.registry.as_str())
+            }
+            Some(RootModuleOverride::RegistryMultiple(value)) if !value.registry.is_empty() => {
+                Some(value.registry.as_str())
+            }
+            _ => None,
+        };
+        let module = ModuleKey::new(self.module_name.as_str(), self.version.as_str());
+        if let Some(registry) = override_registry {
+            return Arc::new(
+                match self
+                    .prepare_from_registry(ctx, override_.as_ref(), registry, &module)
+                    .await
+                {
+                    Ok(Some(value)) => Ok(value),
+                    Ok(None) => Err(ModuleSourcePreparationError::ModuleNotFound),
+                    Err(error) => Err(error),
+                },
+            );
+        }
+        for registry in policy.urls().as_slice() {
+            match self
+                .prepare_from_registry(ctx, override_.as_ref(), registry.as_str(), &module)
+                .await
+            {
+                Ok(Some(value)) => return Arc::new(Ok(value)),
+                Ok(None) => {}
+                Err(error) => return Arc::new(Err(error)),
+            }
+        }
+        Arc::new(Err(ModuleSourcePreparationError::ModuleNotFound))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+impl ModuleSourcePreparationKey {
+    async fn prepare_from_registry(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        override_: Option<&RootModuleOverride>,
+        registry: &str,
+        module: &ModuleKey,
+    ) -> Result<Option<ModuleSourcePreparation>, ModuleSourcePreparationError> {
+        let url = RegistryFileUrl::new(registry_module_file_url(registry, module));
+        let file = ctx
+            .compute(&RegistryFileKey {
+                workspace: self.workspace.clone(),
+                url,
+            })
+            .await
+            .map_err(|error| ModuleSourcePreparationError::Registry(error.to_string().into()))?;
+        match file.as_ref() {
+            Ok(RegistryFileValue::NotFound { .. }) => Ok(None),
+            Ok(RegistryFileValue::Found { bytes, .. }) => Ok(Some(ModuleSourcePreparation::Found(
+                self.apply_root_patches(ctx, override_, bytes.clone())
+                    .await?,
+            ))),
+            Err(error) => Err(ModuleSourcePreparationError::Registry(
+                format!("{error:?}").into(),
+            )),
+        }
+    }
+
+    async fn apply_root_patches(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        override_: Option<&RootModuleOverride>,
+        mut bytes: Arc<[u8]>,
+    ) -> Result<Arc<[u8]>, ModuleSourcePreparationError> {
+        let Some(RootModuleOverride::RegistrySingle(override_)) = override_ else {
+            return Ok(bytes);
+        };
+        // PatchUtil filters this list to main-repository labels. `patch_cmds`
+        // are deliberately inactive for module-file patching.
+        for label in override_.patches.iter() {
+            let Some(path) = main_repo_patch_path(label) else {
+                continue;
+            };
+            let patch = match ctx
+                .compute(&WorkspaceRawFileKey {
+                    workspace: self.workspace.clone(),
+                    path: self.workspace.join(path),
+                })
+                .await
+            {
+                Ok(WorkspaceRawFileValue::Present(bytes)) => bytes,
+                Ok(WorkspaceRawFileValue::Absent) => {
+                    return Err(ModuleSourcePreparationError::Patch(
+                        "patch file is absent".into(),
+                    ));
+                }
+                Ok(WorkspaceRawFileValue::ReadError(error)) => {
+                    return Err(ModuleSourcePreparationError::Patch(
+                        error.to_string().into(),
+                    ));
+                }
+                Err(error) => {
+                    return Err(ModuleSourcePreparationError::Patch(
+                        error.to_string().into(),
+                    ));
+                }
+            };
+            bytes = apply_unified_patch(bytes, &patch, override_.patch_strip)
+                .map_err(|error| ModuleSourcePreparationError::Patch(error.0))?;
+        }
+        Ok(bytes)
+    }
+}
+
+fn main_repo_patch_path(label: &CanonicalLabel) -> Option<PathBuf> {
+    if !label.package().repo().as_str().is_empty() {
+        return None;
+    }
+    let mut path = PathBuf::new();
+    let package = label.package().package().as_str();
+    if !package.is_empty() {
+        path.push(package);
+    }
+    path.push(label.target().as_str());
+    (!path
+        .components()
+        .any(|component| !matches!(component, Component::Normal(_))))
+    .then_some(path)
 }
 
 fn checked_relative_path(path: &Path) -> Result<&Path, CompactString> {
