@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; discovery rereview replanned on missing patch/non-registry source preparation; portable workspace-URI harness design accepted | the accepted nine-row source-preparation oracle still needs the copied-workspace URI harness correction before it can be generated | implement only the accepted workspace-URI harness seam |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 harness correction is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 harness correction is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; discovery rereview replanned on missing patch/non-registry source preparation; portable workspace-URI harness accepted in `de58ba16` | no Bazel 9.2 lifecycle evidence yet freezes root patch inputs or local/archive/Git MODULE preparation before discovery | add only the module-source-preparation oracle |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 module-source oracle is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 module-source oracle is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,37 +33,34 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-oracle-workspace-uri-scope-correction`.
+Run only `WP-5-m1-module-source-preparation-oracle`.
 
-Fresh independent review accepted the exact-token harness design. Implement
-only this boundary:
+The portable copied-workspace URI seam is accepted in `de58ba16`. Add exactly
+one Bazel 9.2 fixture, `module-source-preparation`, with one retained
+daemon/output base, lockfile off, source-controlled local inputs, and no BCR or
+external-network evidence. Its nine rows are:
 
-1. Define exact `{{workspace_uri}}` expansion as the copied workspace's
-   `Path.resolve().as_uri()`, never the source fixture path.
-2. Before command one, replace every exact occurrence only in copied UTF-8
-   regular nonsymlink files within that workspace.
-3. At mutation application time, expand exact occurrences in the `find`,
-   `replace`, and `content` operands only. Do not template a mutation path or
-   destination, and retain the raw template operands in recorded provenance.
-4. Do not open or rewrite binary files, symlinks, or paths outside the copied
-   workspace. Do not introduce a generic unknown-token error: conditional
-   `{{http_registry}}` and tokens in intentionally unsupported operands remain
-   unchanged, while supported text operands replace all exact
-   `{{workspace_uri}}` occurrences.
-5. Normalize the exact percent-encoded URI to `file://<workspace>` so run roots
-   with spaces or non-ASCII characters cannot leak host paths.
-6. Preserve existing `%workspace%` registry argv expansion and conditional
-   `{{http_registry}}` substitution byte-for-byte.
+1. a single-version override patch produces graph A;
+2. mutating only patch bytes produces graph B with root and registry unchanged;
+3. deleting the patch is fatal and does not fall back;
+4. recreating the patch recovers;
+5. switching to `local_path_override` bypasses malformed/absent registries;
+6. mutating only that repository's main `MODULE.bazel` changes the graph;
+7. mutating only its included module file changes the graph independently;
+8. a local-file `archive_override` yields and evaluates the archive module
+   graph; and
+9. a local bare-repository `git_override` at a fixed commit yields and
+   evaluates the Git module graph.
 
-The exact implementation allowlist is
-`tools/v2_oracle_lib/runner.py`, `tools/v2_oracle_lib/normalize.py`, and
-`tests/v2_oracle/test_v2_oracle.py`. Add focused regressions for initial and
-mutation expansion, raw-template provenance, encoded space/non-ASCII
-normalization, binary/symlink preservation and confinement, and unchanged
-HTTP/registry behavior. Run the focused harness suite, list/diff/archive
-checks, and fresh independent review. Do not edit fixtures, expected
-artifacts, Rust, Cargo, lockfiles, or any other test/tool file. After
-`ACCEPT`, regenerate the original nine-row source-preparation oracle.
+Use exact `{{workspace_uri}}` only where Bazel requires absolute local registry,
+archive, or Git URIs. This packet may add only
+`tests/v2_oracle/fixtures/module-source-preparation/**` and its generated
+expected artifact. Do not edit existing fixtures, the harness, Rust, Cargo,
+lockfiles, plans during evidence generation, loading, MVS, extensions, or
+materialization. Generation plus an independent clean replay, fixture listing,
+exact nine-row/TOML/source-closure checks, diff/archive checks, and fresh
+evidence review are required. After acceptance, design a shared module-source
+preparation boundary before returning to discovery Rust.
 
 ### Accepted transport evidence
 

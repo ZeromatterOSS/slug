@@ -483,11 +483,15 @@ templates remain in provenance, encoded URIs normalize to
 `file://<workspace>`, binary/symlink/outside paths remain untouched, and no
 generic unknown-token failure disturbs conditional `{{http_registry}}`.
 
-The current packet is
-`WP-5-m1-oracle-workspace-uri-scope-correction`. The canonical plan owns its
-exact three-file allowlist and validation boundary. After accepted
-implementation, regenerate the same nine-row oracle before designing
-module-source preparation.
+Commit `de58ba16` implements
+`WP-5-m1-oracle-workspace-uri-scope-correction`. Focused harness tests passed
+38/38; list, diff, archive, exact-scope checks, and fresh rereview passed after
+raw-byte expansion preserved CRLF outside the exact token.
+
+The current packet is `WP-5-m1-module-source-preparation-oracle`. The canonical
+plan owns its exact nine-row, fixture-only, generation/replay boundary. No
+module-source preparation or discovery Rust is authorized before that evidence
+is accepted.
 
 ## Implementation Slices
 

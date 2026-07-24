@@ -610,3 +610,14 @@ Expected evidence artifact: copied-workspace absolute URI expansion without host
 Design summary: Exact `{{workspace_uri}}` becomes `Path.resolve().as_uri()` for the copied workspace only. Initial expansion touches copied UTF-8 regular nonsymlink files; later expansion touches only mutation `find`, `replace`, and `content` operands while provenance retains raw templates. Binary/symlink/outside paths remain untouched, encoded URIs normalize to `file://<workspace>`, and there is no generic unknown-token failure because `{{http_registry}}` is conditional and unsupported operands intentionally remain literal.
 Validation: fresh independent representation review returned `ACCEPT` for the three-file runner/normalizer/test allowlist, including space/non-ASCII, initial/mutation, provenance, confinement, binary/symlink, and existing HTTP/registry regressions
 Residual risk: Implement only `WP-5-m1-oracle-workspace-uri-scope-correction`, then regenerate the unchanged nine-row source-preparation oracle. No fixture, expected artifact, Rust, Cargo, or lockfile edit is authorized in the correction.
+
+### Stage 5 oracle workspace-URI harness correction
+
+Status: Accepted
+V2 commit: `de58ba16 test: add portable oracle workspace uri`
+Bazel source inspected: none; this is a representation-only correction to the existing Bazel 9.2 oracle harness
+Bazel oracle: unchanged pending nine-row `module-source-preparation` fixture
+Expected evidence artifact: copied-workspace absolute URI expansion without host-path leakage or fixture-confinement regressions
+Implementation summary: Exact `{{workspace_uri}}` expands to the copied workspace's resolved file URI in initial UTF-8 regular nonsymlink files and mutation text operands only. Raw mutation templates remain recorded, paths/destinations stay literal, binary/symlink/outside paths remain untouched, and encoded workspace URIs normalize to `file://<workspace>`. Raw-byte decode/replace/encode preserves CRLF and every non-token byte; existing `%workspace%` registry argv and conditional HTTP substitution remain unchanged.
+Validation: focused oracle harness 38/38; fixture list, exact three-file scope, `git diff --check`, archive check; fresh independent final review found the newline defect and accepted the bounded raw-byte correction
+Residual risk: Generate and independently replay only the unchanged nine-row `module-source-preparation` fixture before designing any source-preparation or discovery Rust.
