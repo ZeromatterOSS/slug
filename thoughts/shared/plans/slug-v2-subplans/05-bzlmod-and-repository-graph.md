@@ -248,6 +248,42 @@ output-base lockfiles, registry-produced hashes/fetching, yanked selection,
 MVS/extensions, materialization, external loading, cquery/aquery, and run/test
 remain deferred.
 
+The design returned `REPLAN` after one source-precedence correction. Bazel
+9.2's accepted no-dependency update result is not a pre-registry empty
+lockfile: it is a 25,647-byte version-28 file containing produced remote BCR
+hashes. `refresh` also differs from `update` in registry cache/hash behavior,
+not in the visible-only read/write gate. A unified pre-registry read/plan/write
+packet would therefore emit fixture-shaped bytes rather than Bazel output and
+hit the explicit registry-activation stop.
+
+Proceed serially with `WP-5-m1-visible-lockfile-v28-read`, then
+registry/yanked resolution, then a command-owned semantic plan/write packet.
+The read packet owns a bzlmod `VisibleLockfileKey` over the injected mode and
+conditional neutral workspace-file dependency. `off` does not acquire the
+file; update/refresh/error follow Bazel's version-scan-before-JSON precedence.
+The first Java-pattern-compatible
+`"lockFileVersion":\s*(\d+)` match uses ASCII whitespace/digits and signed
+32-bit parsing. Missing/non-28 markers become EMPTY in update/refresh and the
+exact unsupported-version error in error mode; a recognized 28 marker then
+requires full JSON parsing; overflow and file-read failures remain errors.
+
+`RootModuleGraphKey` computes the visible key only after root/include success
+and retains semantic `VisibleLockfileRead` before mapping. Parsed equality
+must suppress downstream churn from formatting/key-order-only v28 edits;
+absence, stale-version update, and an equivalent empty v28 file compare as
+EMPTY. Malformed v28, read errors, and error-mode stale versions block mapping
+and `PackageLoadKey` listing/BUILD work, then recover on restoration. Packet A
+may edit only bzlmod lockfile/module-eval exports and focused bzlmod,
+loading-activation, and core-runtime test sections.
+
+The existing raw-text write planner is not live-authorized: Bazel compares
+parsed old/new `BazelLockFileValue`s, while Slug's helper currently compares
+rendered text and invents a missing-file error in error mode. Exact desired
+registry hashes, update/refresh semantics, typed external-dependency exit 48,
+and any post-compute write stay deferred to the next two reviewed packets.
+Independent rereview returned `REPLAN` with no remaining blocker to the
+bounded read implementation.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
