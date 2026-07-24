@@ -568,3 +568,15 @@ Expected evidence artifact: a root semantic value must distinguish default regis
 Design summary: Stable discovery identity, direct root/policy dependencies, exact file-key iteration, typed SHA/absence attempts, fatal boundaries, and the factored nonroot Starlark evaluator remain viable. However, Bazel chooses `ModuleOverride` before discovery, while live production root evaluation records only local-path overrides and rejects all registry override globals. A partial default-registry API would not be parity, and adding the missing root Starlark surface inside discovery lacks Bazel 9.2 evidence.
 Validation: two read-only pinned-source/live-owner audits, root evaluator/source adjudication, and fresh independent reserved-boundary review `REPLAN`; no Rust, Cargo, fixture, test, or lockfile edit
 Residual risk: Add only `registry-root-override-routing`, then design and implement a compact semantic root override owner before returning to discovery.
+
+### Stage 5 compact root override owner
+
+Status: Accepted
+V2 commit: `a5f13bf9 feat: own root module overrides`
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileGlobals.convertAndValidatePatchLabel`, all five override globals, `RepoRuleId`, `ArchiveRepoSpecBuilder`, `GitRepoSpecBuilder`, and `LocalPathRepoSpecs`
+Bazel oracle: accepted `registry-root-override-routing` from `256c02e2`
+V2 fixture: owner-local `root_module_dice`
+Expected evidence artifact: one compact root aggregate preserves exact registry/non-registry forms, defaults, ordered fields, generic attrs, canonical rule IDs and patch labels, duplicate errors, placement-insensitive equality, and retained A→B→A replay before discovery
+Implementation summary: Added an Arc-backed Buck2 `SmallMap` owner with sealed single-version, multiple-version, and non-registry variants; exact canonical `.bzl` label plus rule-name IDs; recursive deterministic i32-bounded attribute values with active-cycle rejection; and private raw per-file contributions normalized and stripped at `RootModuleFilesKey`. Root/include duplicates fail, apparent external patch labels remain invisible, canonical external labels survive, archive/Git patches are validated while their raw kwargs are retained, and no discovery, execution, loading, MVS, or materialization consumer was activated.
+Validation: focused `root_module_dice` 12/12; full `slug_bzlmod_v2` 170/170; `cargo fmt --all -- --check`; `git diff --check`; `scripts/v2_archive_status.sh`; pinned-source rule-ID and module-environment checks; fresh independent final rereview `ACCEPT`
+Residual risk: Per-module discovery remains absent. Rereview its prior stable-key design against the landed override categories, patch-file DICE/application owner, fatal no-fallback behavior, and non-registry bypass before any Rust.

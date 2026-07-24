@@ -457,11 +457,19 @@ correction then retained arbitrary integers, exceeding Bazel's exact signed
 budget.
 
 Fresh review accepted
-`WP-5-m1-root-module-override-owner-design-correction`. The current packet is
-`WP-5-m1-root-module-override-owner-implementation`, under the exact
-structural contract and four-file maximum allowlist recorded in the canonical
-plan. No Cargo, discovery, MVS, loading, core, fixture, lockfile, extension, or
-materialization edit is authorized.
+`WP-5-m1-root-module-override-owner-design-correction`, and commit `a5f13bf9`
+implements it. The compact aggregate preserves all five override forms, exact
+canonical repo-rule IDs, recursive i32-bounded attributes, normalized
+single-version patch labels, private stripped file contributions, duplicate
+errors, and order-insensitive DICE equality. Focused owner tests passed 12/12,
+the full bzlmod crate passed 170/170, and final rereview returned `ACCEPT`.
+
+The current packet is the design-only
+`WP-5-m1-registry-module-discovery-design-rereview`. It must reconcile the
+landed owner with the prior stable discovery key, exact single/multiple
+registry routing, patch-file observation/application and fatal no-fallback
+behavior, and non-registry bypass before any discovery Rust. The canonical
+plan owns the exact rereview boundary and stop conditions.
 
 ## Implementation Slices
 
