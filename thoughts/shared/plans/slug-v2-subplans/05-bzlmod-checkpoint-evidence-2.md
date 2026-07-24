@@ -716,3 +716,14 @@ Expected evidence artifact: serial `nonroot-interim-module-graph`, `nonroot-modu
 Design summary: One graph command cannot expose a complete `InterimModule`. Fixture 1 owns ordinary/nodep/dev dependency behavior, apparent aliases, ignored nonroot overrides, Bazel compatibility, and built-in collision. Fixture 2 owns extension usage/proxy/import/tag/isolation/override/inject semantics through exact `mod show_extension`, optional separate graph extension output, and generated-repo builds. Fixture 3 owns host-free nonroot platform/toolchain registrations, dev suppression, and global flag-alias consumption. Bazel 9 stores compatibility/max-compatibility as `0`/`-1` no-ops; CLI rows may prove only no-op behavior, while the future compact owner structurally tests the constants from pinned source. After all evidence, serial owners are complete evaluator/schema, typed preparation provenance for success/exhaustion/fatal causes, then stable discovery composition.
 Validation: two read-only pinned-source/live-representation audits, root command/source correction, and fresh independent review `ACCEPT`; no Rust, Cargo, fixture, expected artifact, or lockfile edit
 Residual risk: Implement only `WP-5-m1-nonroot-interim-module-graph-oracle`. Stop later extension/consumer fixtures rather than widening the harness or relying on unstable output/host defaults.
+
+### Stage 5 nonroot InterimModule graph oracle
+
+Status: Accepted
+V2 commit: `908c7c62 test: pin nonroot module graph semantics`
+Bazel source inspected: pinned commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileFunction`, `ModuleFileGlobals`, `ModuleThreadContext`, `InterimModule`, and `ModuleBase`
+Bazel oracle: `nonroot-interim-module-graph`
+Expected evidence artifact: six retained-daemon local-registry rows for ordinary/dev/nodep dependency behavior, apparent mapping, ignored nonroot override, Bazel compatibility recovery, and built-in collision
+Implementation summary: The root introduces shared@1 while subject's nodep requests shared@2; the resolved graph upgrades shared but subject-scoped deps exclude the nodep edge. Subject's ordinary aliased dep remains dep@1, its dev dep is absent, and its own SVO to dep@2 is ignored. Exact JSON preserves `subject_self` and `dep_alias` mappings. Root-version-invalidated compatibility failure/recovery and a built-in `bazel_tools` apparent-name collision complete the matrix. Nonzero compatibility/max inputs are explicitly no-op source evidence, not claims about hidden stored constants.
+Validation: Bazel 9.2 generation `20260724-021408-1654566-bazel`; worker replay `20260724-021412-1655384-bazel`; independent root replay `20260724-021515-1656486-bazel`; fixture list, pinned anchors, no-BCR closure, diff and archive checks; fresh independent evidence review `ACCEPT`
+Residual risk: Extension usages and platform/toolchain/flag consumers remain unproven. Add only `WP-5-m1-nonroot-module-extension-semantics-oracle`.

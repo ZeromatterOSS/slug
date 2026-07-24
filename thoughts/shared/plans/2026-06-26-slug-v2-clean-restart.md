@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted | graph/repo-mapping, extension, and consumer evidence remain absent; preparation also loses exhaustion attempts and typed fatal causes | add only the nonroot graph/repo-mapping oracle |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62` | extension and consumer evidence remain absent; preparation also loses exhaustion attempts and typed fatal causes | add only the nonroot extension-semantics oracle |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,43 +33,42 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-nonroot-interim-module-graph-oracle`.
+Run only `WP-5-m1-nonroot-module-extension-semantics-oracle`.
 
 Create one new self-contained Bazel 9.2 fixture directory:
-`tests/v2_oracle/fixtures/nonroot-interim-module-graph/**`. Do not edit the
-harness, Rust, Cargo, an existing fixture, lockfile code, or plans during the
-evidence packet. Use a local file registry and retained daemon with lockfile
-off. The exact rows must independently prove:
+`tests/v2_oracle/fixtures/nonroot-module-extension-semantics/**`. Do not edit
+the harness, Rust, Cargo, an existing fixture, lockfile code, or plans during
+the evidence packet. Use a local file registry and a deterministic local
+archive for `subject@1.0.0` containing its MODULE, extension implementation,
+BUILD data, and generated-repository rule. Use lockfile off and a retained
+daemon. The exact evidence must discriminate:
 
-1. a registry `subject@1.0.0` ordinary dependency edge while its nonroot
-   `dev_dependency` is absent;
-2. a nodep declaration remains non-edge but affects a shared module already
-   introduced by the root, with a discriminator against an ordinary edge;
-3. `mod dump_repo_mapping subject+ --output=json` preserves the subject's
-   apparent dependency alias to the canonical dependency repo;
-4. a version override declared inside the nonroot subject is ignored, retaining
-   the unoverridden dependency version and excluding the overridden version;
-5. ordered valid `bazel_compatibility` succeeds, an incompatible mutation plus
-   root-version invalidation fails with the pinned diagnostic, and restoration
-   plus invalidation recovers; and
-6. a subject apparent-name collision with a pinned built-in dependency fails
-   with the exact collision kind.
+1. `bazel mod show_extension <extension>` detailed nonroot usage, proxy
+   assignment/location, ordered tags, and `use_repo` imports; use
+   `--extension_usages` only as a separate filter row if needed;
+2. a build through the imported generated repository, proving the retained
+   usage/import/tag semantics are executable;
+3. nonroot `override_repo` and `inject_repo` redirection with independently
+   distinguishable marker content and exact collision/error boundaries;
+4. isolated extension usage: failure without
+   `--experimental_isolated_extension_usages`, success with it, and a
+   discriminator for the isolated proxy/import; and
+5. nonroot dev extension usage/import/tag suppression, distinguished from the
+   nondev usage.
 
-Keep nonzero `compatibility_level` and `max_compatibility_level` inputs only as
-Bazel 9 no-op source evidence; do not claim their internal stored constants
-from graph output. The later evaluator owner must structurally test pinned
-values `0` and `-1`. Reuse old fixtures only as scaffolding references. Cite
-only commit `8220c6198837d5c13d53fea211cf3282aa12408a`, generate with
-`/usr/bin/bazel`, independently replay, verify all source anchors and negative
+If aggregate output helps, use a separate
+`bazel mod graph --extension_info=all`; never pass `--extension_info` to
+`show_extension`. Stop and replan rather than widening scope if detailed
+output is unstable, the deterministic archive cannot remain confined to the
+new fixture, the harness needs modification, or a row cannot distinguish the
+specific proxy/tag/import/isolation/override behavior. Cite only pinned commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, generate and independently
+replay with `/usr/bin/bazel`, verify archive bytes/source anchors/negative
 assertions, and obtain fresh evidence review.
 
-After this fixture is accepted, run the extension-semantics oracle as a
-separate packet. It must use `bazel mod show_extension <extension>` for
-detailed usages, optional `--extension_usages` filtering, and a separate
-`bazel mod graph --extension_info=all` if aggregate graph evidence is useful.
-The platform/toolchain/flag-alias consumer fixture remains third. Only after
-all three evidence packets may the serial compact evaluator/schema, typed
-preparation provenance, and stable discovery owners begin.
+The host-free platform/toolchain/flag-alias consumer fixture remains the third
+serial packet. No evaluator/schema, preparation provenance, or discovery Rust
+is authorized until all three evidence packets are accepted.
 
 ### Accepted transport evidence
 

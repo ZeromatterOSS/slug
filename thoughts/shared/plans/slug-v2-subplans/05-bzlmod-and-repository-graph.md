@@ -557,6 +557,15 @@ The current packet is only
 fixture-directory allowlist and exact retained rows. No Rust or later
 extension/consumer fixture work is authorized in that packet.
 
+Commit `908c7c62` accepts the six-row graph/repo-mapping fixture. Three Bazel
+9.2 runs, exact mapping/output inspection, source/closure/diff/archive checks,
+and fresh evidence review passed without claiming hidden no-op constants.
+
+The current packet is only
+`WP-5-m1-nonroot-module-extension-semantics-oracle`. It owns one new fixture
+directory and must stop rather than widen the harness or rely on unstable
+extension output. The consumer fixture and all Rust remain deferred.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
