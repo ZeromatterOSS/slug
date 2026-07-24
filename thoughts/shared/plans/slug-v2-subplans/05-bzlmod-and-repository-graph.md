@@ -126,6 +126,22 @@ digest-only record as the semantic owner, holds a lock across a DICE compute,
 or promotes the handwritten parser to production. Independent review must
 return `ACCEPT` or `REPLAN` before implementation.
 
+Design result: `REPLAN`. The accepted Bazel oracle is sufficient, and the
+future bridge shape is sound: a bzlmod-owned starlark-rust module evaluator and
+real DICE key consume raw file values plus normalized request inputs, return an
+immutable graph and `slug_identity_v2::RepositoryMapping`, and hand any visible
+lockfile write plan to the command boundary after compute. The live file key,
+however, is owned by `slug_loading_v2`. A bzlmod dependency on loading followed
+by loading's resolved-mapping dependency on bzlmod would cycle; owning the key
+in loading would invert Stage 5 semantics.
+
+The current prerequisite is the Stage 2
+`WP-2-m1-shared-workspace-file-input-owner` packet. It moves only the existing
+file snapshot/value/key into neutral `slug_workspace_v2` with unchanged
+equality and loading re-exports. Hidden lockfile, module evaluation, policy,
+lockfile version 28, repo mapping, extensions, network/fetch/materialization,
+and cquery/aquery remain deferred until that mechanical move is accepted.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

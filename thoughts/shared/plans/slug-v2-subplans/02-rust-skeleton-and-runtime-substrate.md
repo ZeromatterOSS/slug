@@ -359,6 +359,16 @@ packet is the read-only Stage 5
 the exact input owners, equality, evaluator boundary, runtime handoff, and
 same-daemon evidence. M1 remains partial.
 
+The root-module bridge design review then returned `REPLAN`. The raw file
+input boundary is correctly semantic, but it is owned by `slug_loading_v2`;
+making Stage 5 depend on loading and later making loading consume the resolved
+mapping would create a crate cycle, while putting Stage 5 keys in loading would
+invert ownership. Independent review accepted
+`WP-2-m1-shared-workspace-file-input-owner`: move only the existing file
+snapshot/value/key and unchanged `Key` implementation into neutral
+`slug_workspace_v2`, preserve loading re-exports, and prove no semantic change.
+Directory inputs and all bzlmod behavior remain outside that prerequisite.
+
 ### 2.6 First-Real-Build Promotion
 
 Before Stage 5-8 work can advance beyond scaffold status:
