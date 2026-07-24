@@ -1,0 +1,2 @@
+module(name = "nonroot_module_extension_semantics", version = "0.1.0")
+bazel_dep(name = "subject", version = "1.0.0")

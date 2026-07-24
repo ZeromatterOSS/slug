@@ -1,0 +1,62 @@
+[fixture]
+name = "nonroot-module-extension-semantics"
+description = "Bazel 9.2 nonroot module-extension usage, imports, isolation, and ignored redirection semantics."
+comparison = "message_shape"
+daemon = true
+oracle_notes = "subject@1.0.0 comes from a deterministic local archive. Its nonroot override_repo and inject_repo calls target direct repositories with different marker names, so a build through imported extension repositories proves those redirections were ignored."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleThreadContext.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionUsage.java",
+]
+translation_notes = "Bazel 9.2 requires --experimental_isolated_extension_usages for isolate=True. In a nonroot module, dev extension usage and override_repo/inject_repo are ignored; the show_extension and build rows assert the retained nondev usage/import/tags instead."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-module-extension-semantics --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-module-extension-semantics --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "isolated_nonroot_extension_requires_experimental_flag"
+argv = ["mod", "show_extension", "subject//:ext.bzl%ext", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 37
+stderr_contains = ["experimental_isolated_extension_usages"]
+
+[[commands]]
+name = "show_extension_records_nonroot_proxy_ordered_tags_and_imports"
+argv = ["mod", "show_extension", "subject//:ext.bzl%ext", "--experimental_isolated_extension_usages", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 0
+stdout_contains = ["subject@1.0.0", "generated", "injected", "first_tag", "second_tag"]
+stdout_patterns = ["(?s)\\A(?!.*dev_generated)(?!.*dev_tag)(?=.*first_tag.*second_tag)(?=.*generated)(?=.*injected).*"]
+
+[[commands]]
+name = "aggregate_extension_graph_discriminates_isolated_proxy_and_import"
+argv = ["mod", "graph", "--extension_info=all", "--experimental_isolated_extension_usages", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 0
+stdout_contains = ["isolated", "isolated_tag"]
+stdout_patterns = ["(?s)\\A(?!.*dev_generated)(?!.*dev_tag)(?=.*isolated)(?=.*isolated_tag).*"]
+
+[[commands]]
+name = "nonroot_imported_extension_repos_build_with_unredirected_markers"
+argv = ["build", "@subject//:nonroot_extension_markers", "--experimental_isolated_extension_usages", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+
+[[commands]]
+name = "nonroot_duplicate_import_has_exact_collision_boundary"
+argv = ["mod", "show_extension", "subject//:ext.bzl%ext", "--experimental_isolated_extension_usages", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+expected_exit = 37
+stderr_contains = ["The repo name 'generated' cannot be defined", "already defined by a use_repo() call"]
+stderr_patterns = ["(?s)\\A(?!.*replacement_marker).*repo name 'generated'.*already defined by a use_repo\\(\\) call.*"]
+
+  [[commands.mutations]]
+  path = "registry/modules/subject/1.0.0/MODULE.bazel"
+  find = "use_repo(ext, \"generated\", \"injected\")"
+  replace = "use_repo(ext, \"generated\", \"injected\")\nuse_repo(ext, \"generated\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.0\""
+  replace = "version = \"0.1.1\""

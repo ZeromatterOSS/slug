@@ -1,0 +1,20 @@
+module(name = "subject", version = "1.0.0")
+
+ext = use_extension("//:ext.bzl", "ext")
+ext.marker(name = "generated", filename = "extension_generated.txt", message = "first_tag")
+ext.marker(name = "injected", filename = "extension_injected.txt", message = "second_tag")
+use_repo(ext, "generated", "injected")
+
+direct = use_repo_rule("//:ext.bzl", "marker_repo")
+direct(name = "replacement", filename = "replacement_marker.txt", message = "replacement")
+direct(name = "injected_direct", filename = "injected_marker.txt", message = "injected_direct")
+override_repo(ext, generated = "replacement")
+inject_repo(ext, injected = "injected_direct")
+
+dev = use_extension("//:ext.bzl", "ext", dev_dependency = True)
+dev.marker(name = "dev_generated", filename = "dev_marker.txt", message = "dev_tag")
+use_repo(dev, "dev_generated")
+
+isolated = use_extension("//:ext.bzl", "ext", isolate = True)
+isolated.marker(name = "isolated_tag", filename = "isolated_marker.txt", message = "isolated_tag")
+use_repo(isolated, "isolated_tag")

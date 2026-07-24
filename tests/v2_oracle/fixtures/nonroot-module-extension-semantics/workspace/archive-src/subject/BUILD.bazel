@@ -1,0 +1,7 @@
+filegroup(
+    name = "nonroot_extension_markers",
+    srcs = [
+        "@generated//:extension_generated.txt",
+        "@injected//:extension_injected.txt",
+    ],
+)
