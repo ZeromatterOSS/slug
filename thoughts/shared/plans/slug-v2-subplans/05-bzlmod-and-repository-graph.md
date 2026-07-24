@@ -358,7 +358,9 @@ The oracle allowlist is `tools/v2_oracle_lib/fixture.py`,
 `tools/v2_oracle_lib/runner.py`, one new fixture-local HTTP-service module,
 the focused harness test, and one new fixture directory. It may mutate
 Bazel-generated lockfile bytes; it must not synthesize the accepted
-25,647-byte BCR lockfile or depend on live BCR state.
+25,647-byte BCR lockfile. All asserted state and transitions must be
+source-controlled; the retained BCR fallback may supply only Bazel's embedded
+module closure and must not participate in an asserted transition.
 
 After oracle acceptance, the cycle-free design is:
 
