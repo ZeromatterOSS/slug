@@ -39,7 +39,9 @@ use starlark::syntax::ast::Expr;
 use starlark::syntax::ast::Stmt;
 use starlark::values::Value;
 use starlark::values::ValueIdentity;
+use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
+use starlark::values::float::StarlarkFloat;
 use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::none::NoneOr;
@@ -53,6 +55,8 @@ use crate::BzlmodEnvironmentPolicyKey;
 use crate::LockfileMode;
 use crate::LogicalModuleFileId;
 use crate::LogicalSpan;
+use crate::NonrootAttributeKey;
+use crate::NonrootAttributeValue;
 use crate::VisibleLockfileRead;
 use crate::lockfile::bad_visible_lockfile_message;
 use crate::lockfile::parse_visible_lockfile_content_for_mode;
@@ -357,6 +361,275 @@ fn logical_span(ast: &AstModule, logical_id: &LogicalModuleFileId, span: Span) -
         start_column: u32::try_from(span.begin.column + 1).expect("Starlark column fits u32"),
         end_line: u32::try_from(span.end.line + 1).expect("Starlark line fits u32"),
         end_column: u32::try_from(span.end.column + 1).expect("Starlark column fits u32"),
+    }
+}
+
+#[cfg(test)]
+mod deferred_attribute_snapshot_tests {
+    use super::*;
+    use crate::interim_module::NonrootAttributeAdapterError;
+    use crate::interim_module::NonrootAttributeAdapterKey;
+    use crate::interim_module::NonrootAttributeAdapterProjection;
+    use crate::interim_module::NonrootAttributeAdapterValue;
+    use crate::interim_module::project_nonroot_attributes_for_adapter;
+
+    fn evaluated_module(source: &str) -> (Module, starlark::environment::Globals) {
+        let module = Module::new();
+        let globals = starlark::environment::Globals::extended_internal();
+        let ast = AstModule::parse(
+            "snapshot.MODULE.bazel",
+            source.to_owned(),
+            &Dialect::Standard,
+        )
+        .unwrap();
+        Evaluator::new(&module).eval_module(ast, &globals).unwrap();
+        (module, globals)
+    }
+
+    fn snapshot_attrs(
+        module: &Module,
+        globals: &starlark::environment::Globals,
+        extension_proxy: Option<ValueIdentity<'_>>,
+    ) -> anyhow::Result<SmallMap<CompactString, NonrootAttributeValue>> {
+        let attrs = DictRef::from_value(module.get("attrs").unwrap()).unwrap();
+        let builtin_print = globals
+            .iter()
+            .find_map(|(name, value)| (name == "print").then_some(value.to_value().identity()))
+            .context("source-backed builtin print is absent")?;
+        snapshot_deferred_attribute_values(
+            attrs,
+            deferred_attribute_snapshot_identities(builtin_print, extension_proxy),
+        )
+    }
+
+    #[test]
+    fn snapshot_observes_final_mutation_without_retaining_alias_identity() {
+        let (module, globals) = evaluated_module(
+            r#"
+shared = ["before"]
+alias = shared
+shared.append("after")
+attrs = {"first": shared, "second": alias}
+"#,
+        );
+        let snapshot = snapshot_attrs(&module, &globals, None).unwrap();
+        let expected = NonrootAttributeValue::List(Arc::from([
+            NonrootAttributeValue::String("before".into()),
+            NonrootAttributeValue::String("after".into()),
+        ]));
+        assert_eq!(snapshot.get("first"), Some(&expected));
+        assert_eq!(snapshot.get("second"), Some(&expected));
+    }
+
+    #[test]
+    fn snapshot_keeps_list_tuple_and_exact_deferred_tokens_distinct() {
+        let (module, globals) = evaluated_module(
+            r#"
+proxy = []
+lookalike = []
+attrs = {
+    "list": ["item"],
+    "tuple": ("item",),
+    "float": 3.14,
+    "print": print,
+    "proxy": proxy,
+    "lookalike": lookalike,
+    "float_key": {3.14: "value"},
+}
+"#,
+        );
+        let proxy = module.get("proxy").unwrap().identity();
+        let snapshot = snapshot_attrs(&module, &globals, Some(proxy)).unwrap();
+        assert_ne!(snapshot.get("list"), snapshot.get("tuple"));
+        assert_eq!(
+            snapshot.get("float"),
+            Some(&NonrootAttributeValue::Float314)
+        );
+        assert_eq!(
+            snapshot.get("print"),
+            Some(&NonrootAttributeValue::BuiltinPrint)
+        );
+        assert_eq!(
+            snapshot.get("proxy"),
+            Some(&NonrootAttributeValue::ExtensionProxy)
+        );
+        assert!(matches!(
+            snapshot.get("lookalike"),
+            Some(NonrootAttributeValue::List(values)) if values.is_empty()
+        ));
+        assert!(matches!(
+            snapshot.get("float_key"),
+            Some(NonrootAttributeValue::Dict(values))
+                if values.contains_key(&NonrootAttributeKey::DeferredFloat314)
+        ));
+    }
+
+    #[test]
+    fn snapshot_accepts_only_the_exact_self_list_cycle() {
+        let (module, globals) = evaluated_module(
+            r#"
+self_cycle = []
+self_cycle.append(self_cycle)
+attrs = {"cycle": self_cycle}
+"#,
+        );
+        assert_eq!(
+            snapshot_attrs(&module, &globals, None)
+                .unwrap()
+                .get("cycle"),
+            Some(&NonrootAttributeValue::SelfList)
+        );
+
+        let (module, globals) = evaluated_module(
+            r#"
+first = []
+second = [first]
+first.append(second)
+attrs = {"cycle": first}
+"#,
+        );
+        assert!(
+            snapshot_attrs(&module, &globals, None)
+                .unwrap_err()
+                .to_string()
+                .contains("cycle")
+        );
+
+        let (module, globals) = evaluated_module(
+            r#"
+two_element_self_cycle = ["value"]
+two_element_self_cycle.append(two_element_self_cycle)
+attrs = {"cycle": two_element_self_cycle}
+"#,
+        );
+        assert!(
+            snapshot_attrs(&module, &globals, None)
+                .unwrap_err()
+                .to_string()
+                .contains("cycle")
+        );
+    }
+
+    #[test]
+    fn snapshot_rejects_unproven_float_and_opaque_boundaries() {
+        for source in [
+            "attrs = {\"value\": 3.15}",
+            "attrs = {\"value\": range(1)}",
+            "attrs = {\"value\": len}",
+            "attrs = {\"value\": {3.15: \"not the oracle key\"}}",
+        ] {
+            let (module, globals) = evaluated_module(source);
+            assert!(snapshot_attrs(&module, &globals, None).is_err());
+        }
+    }
+
+    #[test]
+    fn snapshot_keeps_positive_and_negative_arbitrary_precision_integers() {
+        let (module, globals) = evaluated_module(
+            r#"
+attrs = {
+    "positive": 100000000000000000000,
+    "negative": -100000000000000000000,
+}
+"#,
+        );
+        let snapshot = snapshot_attrs(&module, &globals, None).unwrap();
+        let NonrootAttributeValue::Int(positive) = snapshot.get("positive").unwrap() else {
+            panic!("positive arbitrary-precision integer was not retained");
+        };
+        assert_eq!(positive.as_i32(), None);
+        assert_eq!(positive.to_decimal(), "100000000000000000000");
+        let NonrootAttributeValue::Int(negative) = snapshot.get("negative").unwrap() else {
+            panic!("negative arbitrary-precision integer was not retained");
+        };
+        assert_eq!(negative.as_i32(), None);
+        assert_eq!(negative.to_decimal(), "-100000000000000000000");
+    }
+
+    #[test]
+    fn adapter_preserves_iteration_order_while_semantic_dict_equality_does_not() {
+        let first = SmallMap::from_iter([
+            (
+                CompactString::from("first"),
+                NonrootAttributeValue::String("one".into()),
+            ),
+            (
+                CompactString::from("second"),
+                NonrootAttributeValue::String("two".into()),
+            ),
+        ]);
+        let second = SmallMap::from_iter([
+            (
+                CompactString::from("second"),
+                NonrootAttributeValue::String("two".into()),
+            ),
+            (
+                CompactString::from("first"),
+                NonrootAttributeValue::String("one".into()),
+            ),
+        ]);
+        assert_eq!(first, second);
+        let projection = project_nonroot_attributes_for_adapter(&first).unwrap();
+        let projected_names: Vec<_> = projection
+            .attributes
+            .iter()
+            .map(|(key, _)| key.as_str())
+            .collect();
+        assert_eq!(projected_names, ["first", "second"]);
+
+        let mut adapter_first = SmallMap::new();
+        adapter_first.insert(
+            CompactString::from("float"),
+            NonrootAttributeValue::Float314,
+        );
+        adapter_first.insert(
+            CompactString::from("later_schema"),
+            NonrootAttributeValue::BuiltinPrint,
+        );
+        assert_eq!(
+            project_nonroot_attributes_for_adapter(&adapter_first),
+            Err(NonrootAttributeAdapterError::ExactFloat314)
+        );
+
+        let small_integer = SmallMap::from_iter([(
+            CompactString::from("small"),
+            NonrootAttributeValue::integer("7").unwrap(),
+        )]);
+        assert!(matches!(
+            project_nonroot_attributes_for_adapter(&small_integer),
+            Ok(NonrootAttributeAdapterProjection {
+                attributes
+            }) if matches!(&attributes[0].1, NonrootAttributeAdapterValue::Int(value) if value.as_i32() == Some(7))
+        ));
+        let large_integer = SmallMap::from_iter([(
+            CompactString::from("large"),
+            NonrootAttributeValue::integer("100000000000000000000").unwrap(),
+        )]);
+        assert_eq!(
+            project_nonroot_attributes_for_adapter(&large_integer),
+            Err(NonrootAttributeAdapterError::IntegerOutsideI32)
+        );
+
+        let dict_projection = project_nonroot_attributes_for_adapter(&SmallMap::from_iter([(
+            CompactString::from("dict"),
+            NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([
+                (
+                    NonrootAttributeKey::String("first".into()),
+                    NonrootAttributeValue::String("one".into()),
+                ),
+                (
+                    NonrootAttributeKey::String("second".into()),
+                    NonrootAttributeValue::String("two".into()),
+                ),
+            ]))),
+        )]))
+        .unwrap();
+        assert!(matches!(
+            &dict_projection.attributes[0].1,
+            NonrootAttributeAdapterValue::Dict(values)
+                if matches!(&values[0].0, NonrootAttributeAdapterKey::String(key) if key == "first")
+                    && matches!(&values[1].0, NonrootAttributeAdapterKey::String(key) if key == "second")
+        ));
     }
 }
 
@@ -1246,6 +1519,153 @@ fn override_attribute_value<'v>(
     }
     active.shift_remove(&identity);
     anyhow::bail!("unsupported repository override attribute value: {value}")
+}
+
+/// Source-backed identities that are valid only while a MODULE evaluator is
+/// alive. They are used while copying the final raw kwargs into compact state;
+/// neither the identities nor the source values escape the snapshot boundary.
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+struct DeferredAttributeSnapshotIdentities<'v> {
+    builtin_print: ValueIdentity<'v>,
+    extension_proxy: Option<ValueIdentity<'v>>,
+}
+
+#[allow(dead_code)]
+fn deferred_attribute_snapshot_identities<'v>(
+    builtin_print: ValueIdentity<'v>,
+    extension_proxy: Option<ValueIdentity<'v>>,
+) -> DeferredAttributeSnapshotIdentities<'v> {
+    DeferredAttributeSnapshotIdentities {
+        builtin_print,
+        extension_proxy,
+    }
+}
+
+/// Copy final evaluator-local kwargs into the heap-independent retained tree.
+///
+/// This runs only after file execution has observed post-call mutation. Acyclic
+/// aliases are copied by final structural contents, while the single
+/// oracle-proven `[self]` shape receives a bounded diagnostic token. The
+/// caller supplies the exact print/proxy identities from the evaluator's
+/// source-backed globals/directive state; there is deliberately no repr or
+/// type-name recognition fallback.
+#[allow(dead_code)]
+fn snapshot_deferred_attribute_values<'v>(
+    attributes: DictRef<'v>,
+    identities: DeferredAttributeSnapshotIdentities<'v>,
+) -> anyhow::Result<SmallMap<CompactString, NonrootAttributeValue>> {
+    attributes
+        .iter()
+        .map(|(key, value)| {
+            let key = key
+                .unpack_str()
+                .context("module attribute names must be strings")?;
+            Ok((
+                CompactString::from(key),
+                snapshot_deferred_attribute_value(value, identities, &mut SmallSet::new())?,
+            ))
+        })
+        .collect::<anyhow::Result<SmallMap<CompactString, NonrootAttributeValue>>>()
+}
+
+#[allow(dead_code)]
+fn snapshot_deferred_attribute_value<'v>(
+    value: Value<'v>,
+    identities: DeferredAttributeSnapshotIdentities<'v>,
+    active: &mut SmallSet<ValueIdentity<'v>>,
+) -> anyhow::Result<NonrootAttributeValue> {
+    let identity = value.identity();
+    if identity == identities.builtin_print {
+        return Ok(NonrootAttributeValue::BuiltinPrint);
+    }
+    if identities.extension_proxy == Some(identity) {
+        return Ok(NonrootAttributeValue::ExtensionProxy);
+    }
+    if value.is_none() {
+        return Ok(NonrootAttributeValue::None);
+    }
+    if let Some(value) = value.unpack_bool() {
+        return Ok(NonrootAttributeValue::Bool(value));
+    }
+    if let Some(value) = value.unpack_i32() {
+        return NonrootAttributeValue::integer(&value.to_string()).map_err(anyhow::Error::msg);
+    }
+    // starlark-rust exposes only the i32 fast path publicly. For larger
+    // Starlark integers, its canonical integer display is the source-backed
+    // decimal spelling consumed immediately by the compact integer validator;
+    // no type/repr marker is retained.
+    if value.get_type() == "int" {
+        return NonrootAttributeValue::integer(&value.to_string()).map_err(anyhow::Error::msg);
+    }
+    if let Some(value) = value.downcast_ref::<StarlarkFloat>() {
+        if value.0.to_bits() == 3.14f64.to_bits() {
+            return Ok(NonrootAttributeValue::Float314);
+        }
+        anyhow::bail!("unsupported deferred attribute float")
+    }
+    if let Some(value) = value.unpack_str() {
+        return Ok(NonrootAttributeValue::String(value.into()));
+    }
+    if let Some(values) = ListRef::from_value(value) {
+        if values.len() == 1 && values[0].identity() == identity {
+            return Ok(NonrootAttributeValue::SelfList);
+        }
+        if !active.insert(identity) {
+            anyhow::bail!("unsupported deferred attribute cycle")
+        }
+        let result = values
+            .iter()
+            .map(|value| snapshot_deferred_attribute_value(value, identities, active))
+            .collect::<anyhow::Result<Arc<_>>>()
+            .map(NonrootAttributeValue::List);
+        active.shift_remove(&identity);
+        return result;
+    }
+    if let Some(values) = TupleRef::from_value(value) {
+        if !active.insert(identity) {
+            anyhow::bail!("unsupported deferred attribute cycle")
+        }
+        let result = values
+            .iter()
+            .map(|value| snapshot_deferred_attribute_value(value, identities, active))
+            .collect::<anyhow::Result<Arc<_>>>()
+            .map(NonrootAttributeValue::Tuple);
+        active.shift_remove(&identity);
+        return result;
+    }
+    if let Some(values) = DictRef::from_value(value) {
+        if !active.insert(identity) {
+            anyhow::bail!("unsupported deferred attribute cycle")
+        }
+        let result = values
+            .iter()
+            .map(|(key, value)| {
+                let key = snapshot_deferred_attribute_key(key)?;
+                Ok((
+                    key,
+                    snapshot_deferred_attribute_value(value, identities, active)?,
+                ))
+            })
+            .collect::<anyhow::Result<SmallMap<_, _>>>()
+            .map(|values| NonrootAttributeValue::Dict(Arc::new(values)));
+        active.shift_remove(&identity);
+        return result;
+    }
+    anyhow::bail!("unsupported deferred attribute value")
+}
+
+#[allow(dead_code)]
+fn snapshot_deferred_attribute_key<'v>(value: Value<'v>) -> anyhow::Result<NonrootAttributeKey> {
+    if let Some(value) = value.unpack_str() {
+        return Ok(NonrootAttributeKey::String(value.into()));
+    }
+    if let Some(value) = value.downcast_ref::<StarlarkFloat>() {
+        if value.0.to_bits() == 3.14f64.to_bits() {
+            return Ok(NonrootAttributeKey::DeferredFloat314);
+        }
+    }
+    anyhow::bail!("unsupported deferred attribute dictionary key")
 }
 
 fn root_mapping(

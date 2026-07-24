@@ -75,8 +75,17 @@ pub enum NonrootAttributeValue {
     Int(NonrootAttributeInt),
     String(CompactString),
     Label(CompactString),
-    Iterable(Arc<[NonrootAttributeValue]>),
+    /// Starlark lists remain distinct from tuples in retained module state.
+    List(Arc<[NonrootAttributeValue]>),
+    /// Starlark tuples remain distinct from lists in retained module state.
+    Tuple(Arc<[NonrootAttributeValue]>),
     Dict(Arc<SmallMap<NonrootAttributeKey, NonrootAttributeValue>>),
+    /// The exact deferred-invalid values established by the raw-attribute
+    /// oracle. These are diagnostic tokens, never evaluator values.
+    Float314,
+    BuiltinPrint,
+    ExtensionProxy,
+    SelfList,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -92,6 +101,45 @@ enum NonrootAttributeIntRepr {
 pub enum NonrootAttributeKey {
     String(CompactString),
     Label(CompactString),
+    /// The sole non-string/non-label dictionary key retained by the oracle.
+    DeferredFloat314,
+}
+
+/// An ordered, location-free projection for the later lockfile adapter phase.
+/// It deliberately does not define retained semantic equality: `SmallMap`
+/// remains the retained dictionary representation and keeps its
+/// order-insensitive equality.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)]
+pub(crate) struct NonrootAttributeAdapterProjection {
+    pub attributes: Arc<[(CompactString, NonrootAttributeAdapterValue)]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)]
+pub(crate) enum NonrootAttributeAdapterValue {
+    None,
+    Bool(bool),
+    Int(NonrootAttributeInt),
+    String(CompactString),
+    Label(CompactString),
+    Sequence(Arc<[NonrootAttributeAdapterValue]>),
+    Dict(Arc<[(NonrootAttributeAdapterKey, NonrootAttributeAdapterValue)]>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)]
+pub(crate) enum NonrootAttributeAdapterKey {
+    String(CompactString),
+    Label(CompactString),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+#[allow(dead_code)]
+pub(crate) enum NonrootAttributeAdapterError {
+    ExactFloat314,
+    IntegerOutsideI32,
+    UnsupportedDeferredValue,
 }
 
 impl NonrootAttributeInt {
@@ -134,6 +182,74 @@ impl NonrootAttributeInt {
 impl NonrootAttributeValue {
     pub fn integer(decimal: &str) -> Result<Self, CompactString> {
         Ok(Self::Int(NonrootAttributeInt::from_decimal(decimal)?))
+    }
+}
+
+/// Project a finalized compact snapshot into the ordered shape consumed by the
+/// lockfile adapter. This is intentionally separate from retained semantic
+/// state: it omits locations and preserves the iteration order that `SmallMap`
+/// recorded for kwargs and dictionaries.
+#[allow(dead_code)]
+pub(crate) fn project_nonroot_attributes_for_adapter(
+    attributes: &SmallMap<CompactString, NonrootAttributeValue>,
+) -> Result<NonrootAttributeAdapterProjection, NonrootAttributeAdapterError> {
+    attributes
+        .iter()
+        .map(|(key, value)| {
+            Ok((
+                key.clone(),
+                project_nonroot_attribute_value_for_adapter(value)?,
+            ))
+        })
+        .collect::<Result<Arc<_>, _>>()
+        .map(|attributes| NonrootAttributeAdapterProjection { attributes })
+}
+
+fn project_nonroot_attribute_value_for_adapter(
+    value: &NonrootAttributeValue,
+) -> Result<NonrootAttributeAdapterValue, NonrootAttributeAdapterError> {
+    match value {
+        NonrootAttributeValue::None => Ok(NonrootAttributeAdapterValue::None),
+        NonrootAttributeValue::Bool(value) => Ok(NonrootAttributeAdapterValue::Bool(*value)),
+        NonrootAttributeValue::Int(value) if value.as_i32().is_some() => {
+            Ok(NonrootAttributeAdapterValue::Int(value.clone()))
+        }
+        NonrootAttributeValue::Int(_) => Err(NonrootAttributeAdapterError::IntegerOutsideI32),
+        NonrootAttributeValue::String(value) => {
+            Ok(NonrootAttributeAdapterValue::String(value.clone()))
+        }
+        NonrootAttributeValue::Label(value) => {
+            Ok(NonrootAttributeAdapterValue::Label(value.clone()))
+        }
+        NonrootAttributeValue::List(values) | NonrootAttributeValue::Tuple(values) => values
+            .iter()
+            .map(project_nonroot_attribute_value_for_adapter)
+            .collect::<Result<Arc<_>, _>>()
+            .map(NonrootAttributeAdapterValue::Sequence),
+        NonrootAttributeValue::Dict(values) => values
+            .iter()
+            .map(|(key, value)| {
+                let key = match key {
+                    NonrootAttributeKey::String(value) => {
+                        NonrootAttributeAdapterKey::String(value.clone())
+                    }
+                    NonrootAttributeKey::Label(value) => {
+                        NonrootAttributeAdapterKey::Label(value.clone())
+                    }
+                    NonrootAttributeKey::DeferredFloat314 => {
+                        return Err(NonrootAttributeAdapterError::ExactFloat314);
+                    }
+                };
+                Ok((key, project_nonroot_attribute_value_for_adapter(value)?))
+            })
+            .collect::<Result<Arc<_>, _>>()
+            .map(NonrootAttributeAdapterValue::Dict),
+        NonrootAttributeValue::Float314 => Err(NonrootAttributeAdapterError::ExactFloat314),
+        NonrootAttributeValue::BuiltinPrint
+        | NonrootAttributeValue::ExtensionProxy
+        | NonrootAttributeValue::SelfList => {
+            Err(NonrootAttributeAdapterError::UnsupportedDeferredValue)
+        }
     }
 }
 

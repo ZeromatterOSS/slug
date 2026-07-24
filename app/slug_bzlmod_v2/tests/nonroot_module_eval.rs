@@ -44,7 +44,7 @@ fn finalized_nonroot_module_keeps_every_compact_field_and_order() {
         CompactString::from("nested"),
         NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([(
             NonrootAttributeKey::Label(CompactString::from("@@subject+//:key")),
-            NonrootAttributeValue::Iterable(Arc::from([
+            NonrootAttributeValue::List(Arc::from([
                 NonrootAttributeValue::Bool(true),
                 NonrootAttributeValue::integer("-100000000000000000000").unwrap(),
             ])),
@@ -271,21 +271,52 @@ fn attribute_integers_preserve_small_large_signed_and_nested_values() {
     for noncanonical in ["", "+1", "01", "-0", "-01"] {
         assert!(NonrootAttributeValue::integer(noncanonical).is_err());
     }
-    let nested = NonrootAttributeValue::Iterable(Arc::from([
+    let nested = NonrootAttributeValue::List(Arc::from([
         NonrootAttributeValue::integer("2147483648").unwrap(),
         NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([(
             NonrootAttributeKey::String(CompactString::from("negative")),
             NonrootAttributeValue::integer("-2147483649").unwrap(),
         )]))),
     ]));
-    let NonrootAttributeValue::Iterable(values) = nested else {
-        panic!("nested value was not retained as an iterable");
+    let NonrootAttributeValue::List(values) = nested else {
+        panic!("nested value was not retained as a list");
     };
     let NonrootAttributeValue::Int(value) = &values[0] else {
         panic!("nested integer was not retained as an integer");
     };
     assert_eq!(value.as_i32(), None);
     assert_eq!(value.to_decimal(), "2147483648");
+}
+
+#[test]
+fn retained_attributes_keep_list_tuple_identity_and_order_insensitive_dict_equality() {
+    let list =
+        NonrootAttributeValue::List(Arc::from([NonrootAttributeValue::String("value".into())]));
+    let tuple =
+        NonrootAttributeValue::Tuple(Arc::from([NonrootAttributeValue::String("value".into())]));
+    assert_ne!(list, tuple);
+
+    let first = NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([
+        (
+            NonrootAttributeKey::String("first".into()),
+            NonrootAttributeValue::String("one".into()),
+        ),
+        (
+            NonrootAttributeKey::String("second".into()),
+            NonrootAttributeValue::String("two".into()),
+        ),
+    ])));
+    let second = NonrootAttributeValue::Dict(Arc::new(SmallMap::from_iter([
+        (
+            NonrootAttributeKey::String("second".into()),
+            NonrootAttributeValue::String("two".into()),
+        ),
+        (
+            NonrootAttributeKey::String("first".into()),
+            NonrootAttributeValue::String("one".into()),
+        ),
+    ])));
+    assert_eq!(first, second);
 }
 
 #[test]
