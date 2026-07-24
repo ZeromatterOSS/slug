@@ -17,7 +17,9 @@ use async_trait::async_trait;
 use compact_str::CompactString;
 use dice::DiceComputations;
 use dupe::Dupe;
+use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
+use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestRuleKind;
 use slug_loading_v2::discover_build_file_companion;
 use slug_loading_v2::keys::PackageLoadKey;
@@ -84,7 +86,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         value.as_ref().clone()
     }
 
-    async fn resolve_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
+    async fn lookup_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
         if !label.is_root_repository() {
             return Err(QueryError::evaluation(format!(
                 "external repository query labels are deferred: {label}"
@@ -110,11 +112,113 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                 label.package()
             ))
         })?;
+        Ok(node)
+    }
+
+    async fn resolve_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
+        let node = self.lookup_single(label.clone()).await?;
         if matches!(node.kind, crate::QueryNodeKind::GeneratedFile) {
             self.generated_file_labels.insert(label.dupe());
         }
         self.evaluation_graph.record_node(label);
         Ok(node)
+    }
+
+    async fn visible_in_package_group(
+        &mut self,
+        top_level: &QueryLabel,
+        caller_package: &slug_identity_v2::PackageIdentifier,
+    ) -> Result<bool, QueryError> {
+        enum WorkItem {
+            Enter(QueryLabel),
+            Contents(Arc<slug_loading_v2::PackageGroupContents>),
+        }
+
+        let mut seen = SmallSet::new();
+        let mut work = vec![WorkItem::Enter(top_level.clone())];
+        let mut matches = false;
+        while let Some(item) = work.pop() {
+            match item {
+                WorkItem::Contents(contents) => {
+                    matches |= contents.contains_package(caller_package);
+                }
+                WorkItem::Enter(label) => {
+                    if !seen.insert(label.clone()) {
+                        continue;
+                    }
+                    let node = self.lookup_single(label).await.map_err(|error| {
+                        let message = error.to_string();
+                        error.with_message(format!(
+                            "Invalid visibility label '{}': {message}",
+                            top_level
+                        ))
+                    })?;
+                    if !matches!(node.kind, crate::QueryNodeKind::PackageGroup) {
+                        continue;
+                    }
+                    let Some(contents) = node.package_group_contents else {
+                        continue;
+                    };
+                    let includes = node
+                        .edges
+                        .iter()
+                        .filter(|edge| {
+                            matches!(edge.kind, crate::QueryEdgeKind::PackageGroupInclude)
+                        })
+                        .map(|edge| edge.target.clone())
+                        .collect::<Vec<_>>();
+                    // LIFO work uses reverse-pushed includes. This evaluates
+                    // source-order includes before this group's local contents.
+                    work.push(WorkItem::Contents(contents));
+                    for include in includes.into_iter().rev() {
+                        work.push(WorkItem::Enter(include));
+                    }
+                }
+            }
+        }
+        Ok(matches)
+    }
+
+    async fn visible_to(
+        &mut self,
+        caller: QueryCandidateId,
+        target: QueryCandidateId,
+    ) -> Result<bool, QueryError> {
+        let caller_package = self.candidates.get(caller).owner_package();
+        let target = self.candidates.get(target).clone();
+        let Some(label) = target.evaluation_graph_label().cloned() else {
+            return Ok(true);
+        };
+        let node = self.lookup_single(label).await?;
+        let same_package_or_java = caller_package == node.label.package()
+            || matches!(
+                (
+                    caller_package.strip_prefix("javatests/"),
+                    node.label.package().strip_prefix("java/")
+                ),
+                (Some(caller_suffix), Some(target_suffix)) if caller_suffix == target_suffix
+            );
+        match &node.effective_visibility {
+            RuleVisibility::Public => Ok(true),
+            RuleVisibility::Private => Ok(same_package_or_java),
+            RuleVisibility::Restricted(restricted) => {
+                let caller = CanonicalLabel::parse(&format!("@@//{caller_package}:__pkg__"))
+                    .map_err(QueryError::evaluation)?;
+                let caller_package = caller.package().clone();
+                let mut visible = restricted
+                    .direct_packages()
+                    .contains_package(&caller_package);
+                // Do not short-circuit: Bazel resolves every top-level root so
+                // a positive alternative cannot mask a later missing group.
+                for group in restricted.package_groups() {
+                    let group = QueryLabel::from_canonical(group.clone());
+                    visible |= self
+                        .visible_in_package_group(&group, &caller_package)
+                        .await?;
+                }
+                Ok(same_package_or_java || visible)
+            }
+        }
     }
 
     fn record_pattern_graph(
@@ -596,6 +700,31 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         Ok(result)
     }
 
+    async fn visible(
+        &mut self,
+        callers: &TargetSet<Self::Target>,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        let mut result = QueryCandidateBatches::empty();
+        for batch in targets.batches() {
+            for target in batch.ids().iter().copied() {
+                let mut visible = true;
+                for caller in callers.iter().copied() {
+                    if !self.visible_to(caller, target).await? {
+                        visible = false;
+                        break;
+                    }
+                }
+                if visible {
+                    // VisibleFunction passes every retained candidate through
+                    // its own callback invocation; retain that delivery shape.
+                    result = result.union(QueryCandidateBatches::from_delivery_ids(vec![target]));
+                }
+            }
+        }
+        Ok(result)
+    }
+
     fn query_policy(&self) -> QueryPolicy {
         self.policy
     }
@@ -660,5 +789,51 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             members.push(self.candidates.intern(QueryCandidate::real(label)));
         }
         Ok(members.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use dice::DetectCycles;
+    use dice::Dice;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn visible_retains_each_passing_streamed_candidate_as_a_singleton_delivery() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = dice.updater().commit().await;
+        let mut environment =
+            LoadingQueryEnvironment::new(&mut transaction, PathBuf::new(), QueryPolicy::default());
+        let first = environment.candidates.intern(QueryCandidate::fake(
+            QueryLabel::parse_root("//loads:first.bzl").unwrap(),
+            "consumer",
+        ));
+        let second = environment.candidates.intern(QueryCandidate::fake(
+            QueryLabel::parse_root("//loads:second.bzl").unwrap(),
+            "consumer",
+        ));
+        let third = environment.candidates.intern(QueryCandidate::fake(
+            QueryLabel::parse_root("//loads:third.bzl").unwrap(),
+            "consumer",
+        ));
+        let targets = QueryCandidateBatches::from_delivery_ids(vec![first, second])
+            .union(QueryCandidateBatches::from_delivery_ids(vec![third]));
+
+        let result = environment
+            .visible(&TargetSet::default(), &targets)
+            .await
+            .unwrap();
+        assert_eq!(
+            result
+                .batches()
+                .iter()
+                .map(|batch| batch.ids())
+                .collect::<Vec<_>>(),
+            [first, second, third]
+                .iter()
+                .map(std::slice::from_ref)
+                .collect::<Vec<_>>()
+        );
     }
 }

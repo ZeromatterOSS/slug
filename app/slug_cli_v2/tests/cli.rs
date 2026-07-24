@@ -170,6 +170,291 @@ fn visibility_stage4_oracle_cases() -> [NamedQueryOracleCase; 12] {
     ]
 }
 
+fn visible_oracle_cases() -> [NamedQueryOracleCase; 25] {
+    [
+        NamedQueryOracleCase {
+            name: "visible_explicit_default_and_direct_specs",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//viewer:caller, set(//owner:explicit_public //owner:explicit_private //owner:default_private //defaults_public:default_public //owner:viewer_pkg //owner:viewer_subpackages //owner:other_subpackages))",
+                ],
+                expected_labels: &[
+                    "//defaults_public:default_public",
+                    "//owner:explicit_public",
+                    "//owner:viewer_pkg",
+                    "//owner:viewer_subpackages",
+                ],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_subpackage_distinguishes_pkg_from_subpackages",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//viewer/sub:caller, set(//owner:viewer_pkg //owner:viewer_subpackages))",
+                ],
+                expected_labels: &["//owner:viewer_subpackages"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_same_package_overrides_private",
+            case: QueryOracleCase {
+                args: &["visible(//owner:ordinary, //owner:explicit_private)"],
+                expected_labels: &["//owner:explicit_private"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_requires_all_callers",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(set(//viewer:caller //other:caller), set(//owner:explicit_public //owner:viewer_pkg))",
+                ],
+                expected_labels: &["//owner:explicit_public"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_empty_callers_is_vacuously_true",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(set(), set(//owner:explicit_private //owner:default_private //owner:viewer_pkg))",
+                ],
+                expected_labels: &[
+                    "//owner:default_private",
+                    "//owner:explicit_private",
+                    "//owner:viewer_pkg",
+                ],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_package_group_exact_positive",
+            case: QueryOracleCase {
+                args: &["visible(//viewer:caller, //owner:exact_only)"],
+                expected_labels: &["//owner:exact_only"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_package_group_exact_rejects_descendant",
+            case: QueryOracleCase {
+                args: &["visible(//viewer/sub:caller, //owner:exact_only)"],
+                expected_labels: &[],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_package_group_subtree_accepts_descendant",
+            case: QueryOracleCase {
+                args: &["visible(//viewer/sub:caller, //owner:subtree_only)"],
+                expected_labels: &["//owner:subtree_only"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_local_negative_separate_include_and_direct_reallow",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//viewer/blocked/reallowed:caller, set(//owner:base_only //owner:top_reallow //owner:direct_reallow))",
+                ],
+                expected_labels: &["//owner:direct_reallow", "//owner:top_reallow"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_local_negative_blocks_without_matching_reallow",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//viewer/blocked:caller, set(//owner:base_only //owner:top_reallow //owner:direct_reallow))",
+                ],
+                expected_labels: &["//owner:direct_reallow"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_package_group_include_cycle_terminates",
+            case: QueryOracleCase {
+                args: &["visible(//viewer:caller, //owner:cycle_visible)"],
+                expected_labels: &["//owner:cycle_visible"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_matching_javatests_caller_sees_private_java",
+            case: QueryOracleCase {
+                args: &["visible(//javatests/acme:caller, //java/acme:private)"],
+                expected_labels: &["//java/acme:private"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_private_java_caller_cannot_see_javatests",
+            case: QueryOracleCase {
+                args: &["visible(//java/acme:caller, //javatests/acme:private)"],
+                expected_labels: &[],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_mismatching_javatests_suffix_is_rejected",
+            case: QueryOracleCase {
+                args: &["visible(//javatests/other:caller, //java/acme:private)"],
+                expected_labels: &[],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_generated_source_build_and_package_group_kinds",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//viewer:caller, set(//artifacts:exported.txt //artifacts:implicit.txt //artifacts:public.out //artifacts:private.out //artifacts:BUILD.bazel //build_public:BUILD.bazel //artifacts:friends))",
+                ],
+                expected_labels: &[
+                    "//artifacts:exported.txt",
+                    "//artifacts:friends",
+                    "//artifacts:public.out",
+                    "//build_public:BUILD.bazel",
+                ],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_fake_load_target_is_public",
+            case: QueryOracleCase {
+                args: &["visible(//viewer:caller, loadfiles(//loads:consumer))"],
+                expected_labels: &["//loads:defs.bzl"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_real_same_label_load_source_uses_real_visibility",
+            case: QueryOracleCase {
+                args: &["visible(//viewer:caller, //loads:defs.bzl)"],
+                expected_labels: &[],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_wrong_kind_group_label_and_include_are_ignored",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//viewer:caller, set(//owner:wrong_direct //owner:wrong_include_target))",
+                ],
+                expected_labels: &[],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_missing_top_level_group_diagnostic",
+            case: QueryOracleCase {
+                args: &["visible(//viewer:caller, //errors/missing_top:target)"],
+                expected_labels: &[],
+                error_fragments: &[
+                    "Invalid visibility label '//errors/missing_top:does_not_exist': no such target '//errors/missing_top:does_not_exist'",
+                    "target 'does_not_exist' not declared",
+                ],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_missing_included_group_diagnostic",
+            case: QueryOracleCase {
+                args: &["visible(//viewer:caller, //errors/missing_include:target)"],
+                expected_labels: &[],
+                error_fragments: &[
+                    "Invalid visibility label '//errors/missing_include:top': no such target '//errors/missing_include:does_not_exist'",
+                    "target 'does_not_exist' not declared",
+                ],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_config_setting_omitted_default_public_and_explicit_group_positive",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//viewer:caller, set(//owner:config_omitted //owner:config_exact))",
+                ],
+                expected_labels: &["//owner:config_exact", "//owner:config_omitted"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_config_setting_explicit_group_restriction_rejects_other",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//other:caller, set(//owner:config_omitted //owner:config_exact))",
+                ],
+                expected_labels: &["//owner:config_omitted"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_cross_package_top_and_included_groups",
+            case: QueryOracleCase {
+                args: &["visible(//viewer:caller, //cross_target:visible)"],
+                expected_labels: &["//cross_target:visible"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_real_first_same_label_fake_input_survives",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(//viewer:caller, //loads:defs.bzl union loadfiles(//loads:consumer))",
+                ],
+                expected_labels: &["//loads:defs.bzl"],
+                error_fragments: &[],
+            },
+        },
+        NamedQueryOracleCase {
+            name: "visible_same_label_fake_callers_materialize_by_label",
+            case: QueryOracleCase {
+                args: &[
+                    "visible(loadfiles(//consumer_a:consumer) union loadfiles(//consumer_b:consumer), //consumer_a:restricted)",
+                ],
+                expected_labels: &["//consumer_a:restricted"],
+                error_fragments: &[],
+            },
+        },
+    ]
+}
+
+fn assert_visible_oracle_case(
+    workspace: &std::path::Path,
+    output_base_arg: Option<&str>,
+    named: &NamedQueryOracleCase,
+) {
+    let mut command = slug();
+    command.current_dir(workspace);
+    if let Some(output_base_arg) = output_base_arg {
+        command.arg(output_base_arg);
+    }
+    let output = command.arg("query").args(named.case.args).output().unwrap();
+    if named.case.error_fragments.is_empty() {
+        assert!(output.status.success(), "{}: {output:?}", named.name);
+        assert!(output.stderr.is_empty(), "{}: {output:?}", named.name);
+        let expected = named.case.expected_labels.join("\n")
+            + if named.case.expected_labels.is_empty() {
+                ""
+            } else {
+                "\n"
+            };
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            expected,
+            "{}",
+            named.name
+        );
+    } else {
+        assert_eq!(output.status.code(), Some(7), "{}: {output:?}", named.name);
+        assert!(output.stdout.is_empty(), "{}: {output:?}", named.name);
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        for fragment in named.case.error_fragments {
+            assert!(stderr.contains(fragment), "{}: {stderr}", named.name);
+        }
+    }
+}
+
 fn tests_function_oracle_cases() -> [QueryOracleCase; 21] {
     [
         QueryOracleCase {
@@ -516,6 +801,39 @@ fn visibility_stage4_fixture_matches_exact_twelve_non_visible_rows() {
     for named in cases {
         assert!(!named.name.starts_with("visible_"), "{}", named.name);
         assert_query_oracle_case(&workspace, None, named.case);
+    }
+}
+
+#[test]
+fn visible_fixture_matches_exact_twenty_five_rows_one_shot() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-visible-visibility/workspace");
+    let cases = visible_oracle_cases();
+    assert_eq!(cases.len(), 25);
+    for named in &cases {
+        assert!(named.name.starts_with("visible_"), "{}", named.name);
+        assert_visible_oracle_case(&workspace, None, named);
+    }
+}
+
+#[test]
+fn visible_fixture_matches_exact_twenty_five_rows_through_one_daemon() {
+    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-visible-visibility/workspace");
+    let output_base = scratch("visible-query-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let cases = visible_oracle_cases();
+    assert_eq!(cases.len(), 25);
+    let mut daemon_pid = None;
+    for named in &cases {
+        assert_visible_oracle_case(&workspace, Some(&output_base_arg), named);
+        let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+        if let Some(previous) = &daemon_pid {
+            assert_eq!(&pid, previous, "{}", named.name);
+        } else {
+            daemon_pid = Some(pid);
+        }
     }
 }
 

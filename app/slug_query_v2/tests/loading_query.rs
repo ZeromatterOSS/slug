@@ -1081,6 +1081,142 @@ emit(name = "generator", out = "generated.txt", visibility = [":default_group"])
 }
 
 #[tokio::test]
+async fn visible_filters_with_request_local_visibility_without_a_query_edge() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("owner/BUILD.bazel"),
+        "filegroup(name = \"private\", visibility = [\"//visibility:private\"])\nfilegroup(name = \"public\", visibility = [\"//visibility:public\"])\n",
+    );
+    write(
+        workspace.join("viewer/BUILD.bazel"),
+        "filegroup(name = \"caller\")\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(QueryTracker::default());
+    let (output, events) = query_revision(
+        &dice,
+        &tracker,
+        &workspace,
+        "visible(//viewer:caller, set(//owner:private //owner:public))",
+    )
+    .await;
+    let output = output.unwrap();
+    assert_eq!(output.labels.as_ref(), ["//owner:public"]);
+    assert_eq!(
+        output.graph_stdout(false, true),
+        "digraph mygraph {\n  node [shape=box];\n  \"//owner:public\"\n}\n"
+    );
+    assert_eq!(
+        events,
+        vec![
+            package("owner", ActivationKind::Evaluated),
+            package("viewer", ActivationKind::Evaluated),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn visible_reuses_cross_package_graphs_and_recovers_when_an_included_group_is_recreated() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("viewer/BUILD.bazel"),
+        "filegroup(name = \"caller\")\n",
+    );
+    write(
+        workspace.join("target/BUILD.bazel"),
+        "filegroup(name = \"item\", visibility = [\"//top:group\"])\n",
+    );
+    write(
+        workspace.join("top/BUILD.bazel"),
+        "package_group(name = \"group\", includes = [\"//leaf:friends\"])\n",
+    );
+    let leaf = workspace.join("leaf/BUILD.bazel");
+    write(
+        &leaf,
+        "package_group(name = \"friends\", packages = [\"//viewer\"])\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(QueryTracker::default());
+    let expression = "visible(//viewer:caller, //target:item)";
+
+    let (initial, _) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(initial.unwrap().labels.as_ref(), ["//target:item"]);
+    write(
+        &leaf,
+        "# formatting-only edit\npackage_group( name = \"friends\", packages = [\"//viewer\"] )\n",
+    );
+    let (formatted, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(formatted.unwrap().labels.as_ref(), ["//target:item"]);
+    assert_eq!(
+        events,
+        [
+            package("leaf", ActivationKind::Reused),
+            package("target", ActivationKind::Reused),
+            package("top", ActivationKind::Reused),
+            package("viewer", ActivationKind::Reused),
+        ]
+    );
+
+    write(
+        &leaf,
+        "package_group(name = \"friends\", packages = [\"//other\"])\n",
+    );
+    let (changed, events) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert!(changed.unwrap().labels.is_empty());
+    assert_eq!(
+        events,
+        [
+            package("leaf", ActivationKind::Evaluated),
+            package("target", ActivationKind::Reused),
+            package("top", ActivationKind::Reused),
+            package("viewer", ActivationKind::Reused),
+        ]
+    );
+
+    write(&leaf, "filegroup(name = \"unrelated\")\n");
+    let (missing, _) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert!(
+        missing
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid visibility label '//top:group': no such target '//leaf:friends'")
+    );
+
+    write(
+        &leaf,
+        "package_group(name = \"friends\", packages = [\"//viewer\"])\n",
+    );
+    let (recreated, _) = query_revision(&dice, &tracker, &workspace, expression).await;
+    assert_eq!(recreated.unwrap().labels.as_ref(), ["//target:item"]);
+}
+
+#[tokio::test]
+async fn visible_same_package_access_does_not_mask_a_missing_restricted_group() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("owner/BUILD.bazel"),
+        "filegroup(name = \"caller\")\nfilegroup(name = \"target\", visibility = [\":missing\"])\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(QueryTracker::default());
+    let (result, _) = query_revision(
+        &dice,
+        &tracker,
+        &workspace,
+        "visible(//owner:caller, //owner:target)",
+    )
+    .await;
+    assert!(
+        result.unwrap_err().to_string().contains(
+            "Invalid visibility label '//owner:missing': no such target '//owner:missing'"
+        )
+    );
+}
+
+#[tokio::test]
 async fn config_setting_is_a_loading_rule_without_configuration_evaluation() {
     let workspace = scratch();
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");

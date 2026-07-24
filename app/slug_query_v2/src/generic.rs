@@ -133,6 +133,12 @@ pub(crate) trait QueryEnvironment {
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
 
+    async fn visible(
+        &mut self,
+        callers: &TargetSet<Self::Target>,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError>;
+
     fn query_policy(&self) -> QueryPolicy;
 
     async fn test_target_info(
@@ -276,6 +282,7 @@ static LOADFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
 static LABELS_FUNCTION: LabelsFunction = LabelsFunction;
 static EXECUTABLES_FUNCTION: ExecutablesFunction = ExecutablesFunction;
 static TESTS_FUNCTION: TestsFunction = TestsFunction;
+static VISIBLE_FUNCTION: VisibleFunction = VisibleFunction;
 
 impl<E> QueryFunctions<E> for LoadingQueryFunctions
 where
@@ -299,6 +306,7 @@ where
             &SOME_FUNCTION as &dyn QueryFunction<E>,
             &SOMEPATH_FUNCTION as &dyn QueryFunction<E>,
             &TESTS_FUNCTION as &dyn QueryFunction<E>,
+            &VISIBLE_FUNCTION as &dyn QueryFunction<E>,
         ]
         .into_iter()
         .find(|function| std::ptr::eq(spec, function.spec()))
@@ -610,6 +618,35 @@ struct ExecutablesFunction;
 
 struct TestsFunction;
 
+struct VisibleFunction;
+
+impl<E> QueryFunction<E> for VisibleFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("visible").expect("visible is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
+        async move {
+            // QueryUtil.evalAll materializes the predicate by its printed-label
+            // key. The streamed input deliberately remains unmaterialized: a
+            // later fake candidate with the same label can still pass.
+            let callers = eval_set_arg(evaluator, args, variables, 0).await?;
+            let callers = evaluator.environment.eval_all(&callers);
+            let targets = eval_set_arg(evaluator, args, variables, 1).await?;
+            evaluator.environment.visible(&callers, &targets).await
+        }
+        .boxed()
+    }
+}
+
 impl<E> QueryFunction<E> for TestsFunction
 where
     E: QueryEnvironment + Send,
@@ -829,5 +866,145 @@ where
                 .await
         }
         .boxed()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct VisibleEnvironment {
+        events: std::sync::Mutex<Vec<String>>,
+    }
+
+    #[async_trait]
+    impl QueryEnvironment for VisibleEnvironment {
+        type Target = String;
+        type Set = Vec<String>;
+
+        fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
+            sets.iter().flatten().cloned().collect()
+        }
+
+        fn union(&self, mut left: Self::Set, right: Self::Set) -> Self::Set {
+            left.extend(right);
+            left
+        }
+
+        fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+            left.iter()
+                .filter(|value| right.contains(value))
+                .cloned()
+                .collect()
+        }
+
+        fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+            left.iter()
+                .filter(|value| !right.contains(value))
+                .cloned()
+                .collect()
+        }
+
+        fn eval_all(&self, set: &Self::Set) -> TargetSet<Self::Target> {
+            self.events.lock().unwrap().push("eval_all".to_owned());
+            let mut result = TargetSet::default();
+            for value in set {
+                result.insert(value.clone());
+            }
+            result
+        }
+
+        fn lift_one_delivery(&self, targets: TargetSet<Self::Target>) -> Self::Set {
+            targets.iter().cloned().collect()
+        }
+
+        async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
+            self.events
+                .lock()
+                .unwrap()
+                .push(format!("resolve:{literal}"));
+            Ok(vec![literal.to_owned()])
+        }
+
+        async fn dependencies(
+            &mut self,
+            _: &Self::Target,
+        ) -> Result<Arc<[Self::Target]>, QueryError> {
+            unreachable!()
+        }
+
+        async fn same_pkg_direct_rdeps(
+            &mut self,
+            _: &TargetSet<Self::Target>,
+        ) -> Result<TargetSet<Self::Target>, QueryError> {
+            unreachable!()
+        }
+
+        async fn siblings(&mut self, _: &Self::Set) -> Result<Self::Set, QueryError> {
+            unreachable!()
+        }
+
+        async fn loading_files(&mut self, _: &Self::Set, _: bool) -> Result<Self::Set, QueryError> {
+            unreachable!()
+        }
+
+        async fn labels(&mut self, _: &str, _: &Self::Set) -> Result<Self::Set, QueryError> {
+            unreachable!()
+        }
+
+        async fn executables(&mut self, _: &Self::Set) -> Result<Self::Set, QueryError> {
+            unreachable!()
+        }
+
+        async fn visible(
+            &mut self,
+            callers: &TargetSet<Self::Target>,
+            targets: &Self::Set,
+        ) -> Result<Self::Set, QueryError> {
+            self.events.lock().unwrap().push(format!(
+                "visible:{}:{:?}",
+                callers.iter().cloned().collect::<Vec<_>>().join(","),
+                targets
+            ));
+            Ok(targets.clone())
+        }
+
+        fn query_policy(&self) -> QueryPolicy {
+            QueryPolicy::default()
+        }
+
+        async fn test_target_info(
+            &mut self,
+            _: &Self::Target,
+        ) -> Result<TestTargetInfo, QueryError> {
+            unreachable!()
+        }
+
+        async fn test_suite_members(
+            &mut self,
+            _: &Self::Target,
+            _: TestSuiteAttribute,
+        ) -> Result<Arc<[Self::Target]>, QueryError> {
+            unreachable!()
+        }
+    }
+
+    #[test]
+    fn visible_materializes_only_the_once_evaluated_predicate_before_streaming_input() {
+        let expression = QueryExpression::parse("visible(predicate, input)").unwrap();
+        let mut evaluator = QueryEvaluator::new(VisibleEnvironment {
+            events: std::sync::Mutex::new(Vec::new()),
+        });
+        let result = futures::executor::block_on(evaluator.evaluate(&expression)).unwrap();
+        assert_eq!(result, ["input"]);
+        assert_eq!(
+            *evaluator.environment.events.lock().unwrap(),
+            [
+                "resolve:predicate",
+                "eval_all",
+                "resolve:input",
+                "visible:predicate:[\"input\"]",
+            ]
+        );
     }
 }
