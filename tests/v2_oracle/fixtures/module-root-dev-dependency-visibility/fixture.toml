@@ -1,8 +1,20 @@
 [fixture]
 name = "module-root-dev-dependency-visibility"
-description = "Stage 5 Bazel 9 oracle for root MODULE.bazel dev_dependency visibility and --ignore_dev_dependency."
+description = "Stage 5 Bazel 9.2 oracle for root MODULE.bazel dev_dependency visibility and --ignore_dev_dependency."
 comparison = "message_shape"
-oracle_notes = "Self-contained Bazel 9 oracle fixture: root dev dependencies are visible by default and hidden when --ignore_dev_dependency is set."
+oracle_notes = "One warm output base verifies that root dev dependencies are visible by default, hidden by --ignore_dev_dependency, and visible again when the command policy is restored."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java",
+]
+translation_notes = "The local root-only dev dependency makes command policy visible without registry or extension behavior."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture module-root-dev-dependency-visibility --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture module-root-dev-dependency-visibility --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
 name = "root_dev_dependency_visible_by_default"
@@ -17,3 +29,10 @@ argv = ["build", "--ignore_dev_dependency", "@root_dev//:target.txt"]
 compare = "message_shape"
 expected_exit = 1
 stderr_contains = ["No repository visible as '@root_dev'"]
+
+[[commands]]
+name = "root_dev_dependency_visible_after_policy_restore"
+argv = ["build", "@root_dev//:target.txt"]
+compare = "message_shape"
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]

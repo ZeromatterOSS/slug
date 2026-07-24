@@ -1,9 +1,29 @@
 [fixture]
 name = "lockfile-mode-update-refresh"
-description = "Bazel 9 fixture proving --lockfile_mode=update and refresh write or preserve MODULE.bazel.lock."
+description = "Bazel 9.2 fixture proving visible MODULE.bazel.lock absence, update creation, and refresh preservation."
 comparison = "semantic"
 manifest_roots = ["MODULE.bazel.lock"]
-oracle_notes = "Self-contained root module fixture. The update command starts without a visible lockfile and records a non-empty MODULE.bazel.lock manifest; the refresh command runs after update in the same copied workspace and records the visible lockfile again."
+oracle_notes = "The first command records the absence of the visible lockfile under off mode. Update then creates the Bazel 9 lockfile, and refresh preserves that visible file in the same workspace and output base. Hidden-lockfile state is deliberately excluded."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileValue.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java",
+]
+translation_notes = "Only MODULE.bazel.lock in the workspace is manifested. The exact generated digest records the Bazel 9.2 lockFileVersion and visible content; the output-base lockfile is not inspected or claimed."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture lockfile-mode-update-refresh --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "off_leaves_visible_lockfile_absent"
+argv = ["query", "//:data.txt", "--lockfile_mode=off"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["//:data.txt"]
+manifest_roots = ["MODULE.bazel.lock"]
 
 [[commands]]
 name = "update_writes_lockfile"

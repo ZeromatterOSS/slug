@@ -18,7 +18,7 @@
       "manifest": [
         {
           "digest": "2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806",
-          "mode": "0o444",
+          "mode": "0o555",
           "path": "version.out",
           "root": "bazel-bin/version.out",
           "size": 4,
@@ -28,9 +28,9 @@
       ],
       "mutations": [],
       "name": "build_before_include_edit",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 internal, 1 local.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-include-change-invalidation\\20260630-153927-7544-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\module-include-change-invalidation\\20260630-154020-62712-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 4.224s, Critical Path: 0.04s\nINFO: 2 processes: 1 internal, 1 local.\nINFO: Build completed successfully, 2 total actions\n",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 6692883e-f3de-4743-9349-219e9daa8053\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/6692883e-f3de-4743-9349-219e9daa8053\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 4.621s, Critical Path: 0.18s\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/6692883e-f3de-4743-9349-219e9daa8053\n",
       "stdout": ""
     },
     {
@@ -51,7 +51,7 @@
       "manifest": [
         {
           "digest": "27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a",
-          "mode": "0o444",
+          "mode": "0o555",
           "path": "version.out",
           "root": "bazel-bin/version.out",
           "size": 4,
@@ -74,9 +74,75 @@
         }
       ],
       "name": "build_after_include_edit",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:copy_version (3 packages loaded, 4 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 internal, 1 local.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:copy_version (3 packages loaded, 4 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:copy_version (3 packages loaded, 4 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 0.245s, Critical Path: 0.03s\nINFO: 2 processes: 1 internal, 1 local.\nINFO: Build completed successfully, 2 total actions\n",
+      "stderr": "INFO: Invocation ID: cb42f0f0-507c-4725-8c9c-9f35f95d5ddc\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/cb42f0f0-507c-4725-8c9c-9f35f95d5ddc\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:copy_version (3 packages loaded, 4 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 0.398s, Critical Path: 0.30s\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/cb42f0f0-507c-4725-8c9c-9f35f95d5ddc\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:copy_version"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:copy_version"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "deps.MODULE.bazel"
+        }
+      ],
+      "name": "build_after_include_delete",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: error reading '//:deps.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: not a regular file\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8a445cde-7678-4459-8264-f283beda0057\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8a445cde-7678-4459-8264-f283beda0057\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: error reading '//:deps.MODULE.bazel' included at /tmp/slug-wp5-gen.1oyBep/runs/module-include-change-invalidation/20260723-174418-1333268-bazel/workspace/MODULE.bazel:3:1: not a regular file\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8a445cde-7678-4459-8264-f283beda0057\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:copy_version"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:copy_version"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a",
+          "mode": "0o555",
+          "path": "version.out",
+          "root": "bazel-bin/version.out",
+          "size": 4,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "deps.MODULE.bazel"
+        }
+      ],
+      "name": "build_after_include_recreate",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 346f7360-f958-4978-b99d-504036d95c2e\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/346f7360-f958-4978-b99d-504036d95c2e\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 0.085s, Critical Path: 0.00s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/346f7360-f958-4978-b99d-504036d95c2e\n",
       "stdout": ""
     }
   ],

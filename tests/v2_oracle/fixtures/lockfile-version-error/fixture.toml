@@ -1,8 +1,20 @@
 [fixture]
 name = "lockfile-version-error"
-description = "Bazel 9 fixture proving --lockfile_mode=error rejects unsupported MODULE.bazel.lock versions."
+description = "Bazel 9.2 fixture proving --lockfile_mode=error rejects an unsupported visible MODULE.bazel.lock version."
 comparison = "message_shape"
-oracle_notes = "Self-contained root module fixture. The first command primes MODULE.bazel.lock with Bazel 9.1.1 lockFileVersion 26; the second command mutates only lockFileVersion to 25 and observes Bazel's unsupported-version diagnostic in error mode."
+oracle_notes = "The first command creates and manifests the Bazel 9.2 visible lockfile (lockFileVersion 28). The second mutates only that version to 27 and observes the error-mode diagnostic. Hidden-lockfile state is deliberately excluded."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileValue.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java",
+]
+translation_notes = "The manifested workspace lockfile is the only lockfile evidence. Mutating its exact Bazel 9.2 version isolates error-mode version validation."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture lockfile-version-error --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture lockfile-version-error --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
 name = "prime_lockfile"
@@ -10,6 +22,7 @@ argv = ["query", "//:data.txt"]
 compare = "message_shape"
 expected_exit = 0
 stdout_contains = ["//:data.txt"]
+manifest_roots = ["MODULE.bazel.lock"]
 
 [[commands]]
 name = "reject_unsupported_lockfile_version"
@@ -20,5 +33,5 @@ stderr_contains = ["The version of MODULE.bazel.lock is not supported by this ve
 
   [[commands.mutations]]
   path = "MODULE.bazel.lock"
-  find = '"lockFileVersion": 26'
-  replace = '"lockFileVersion": 25'
+  find = '"lockFileVersion": 28'
+  replace = '"lockFileVersion": 27'

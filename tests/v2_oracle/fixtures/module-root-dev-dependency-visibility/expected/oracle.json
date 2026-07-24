@@ -18,9 +18,9 @@
       "manifest": [],
       "mutations": [],
       "name": "root_dev_dependency_visible_by_default",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: <output_base>/external/root_dev+/BUILD.bazel:1:14: @@root_dev+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: <output_base>/external/root_dev+/BUILD.bazel:1:14: @@root_dev+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: C:/dev/kuro/target/v2o/ob/module-root-dev-dependency-visibility/bazel/external/root_dev+/BUILD.bazel:1:14: @@root_dev+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: 3.446s, Critical Path: 0.02s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 2cbe4167-2dce-4800-952a-84c3e41c76cc\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2cbe4167-2dce-4800-952a-84c3e41c76cc\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: /tmp/slug-wp5-gen.1oyBep/ob/module-root-dev-dependency-visibility/bazel/external/root_dev+/BUILD.bazel:1:14: @@root_dev+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: 4.396s, Critical Path: 0.01s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2cbe4167-2dce-4800-952a-84c3e41c76cc\n",
       "stdout": ""
     },
     {
@@ -43,9 +43,32 @@
       "manifest": [],
       "mutations": [],
       "name": "root_dev_dependency_hidden_when_ignored",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nERROR: No repository visible as '@root_dev' from main repository\nINFO: Elapsed time: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nERROR: No repository visible as '@root_dev' from main repository\nINFO: Elapsed time: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nERROR: No repository visible as '@root_dev' from main repository\nINFO: Elapsed time: 0.173s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stderr": "INFO: Invocation ID: e54d8448-6b0c-4b3d-a153-98ae656bf9b9\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e54d8448-6b0c-4b3d-a153-98ae656bf9b9\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nERROR: No repository visible as '@root_dev' from main repository\nINFO: Elapsed time: 0.071s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e54d8448-6b0c-4b3d-a153-98ae656bf9b9\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "@root_dev//:target.txt"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "@root_dev//:target.txt"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "root_dev_dependency_visible_after_policy_restore",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: <output_base>/external/root_dev+/BUILD.bazel:1:14: @@root_dev+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 04f60730-6148-49e2-aadc-7a3cea38e891\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/04f60730-6148-49e2-aadc-7a3cea38e891\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@root_dev+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: /tmp/slug-wp5-gen.1oyBep/ob/module-root-dev-dependency-visibility/bazel/external/root_dev+/BUILD.bazel:1:14: @@root_dev+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: 0.091s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/04f60730-6148-49e2-aadc-7a3cea38e891\n",
       "stdout": ""
     }
   ],

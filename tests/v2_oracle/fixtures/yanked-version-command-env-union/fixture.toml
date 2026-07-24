@@ -1,8 +1,20 @@
 [fixture]
 name = "yanked-version-command-env-union"
-description = "Bazel 9 fixture proving --allow_yanked_versions and BZLMOD_ALLOW_YANKED_VERSIONS combine instead of overriding each other."
+description = "Bazel 9.2 fixture proving --allow_yanked_versions and BZLMOD_ALLOW_YANKED_VERSIONS combine instead of overriding each other."
 comparison = "message_shape"
 oracle_notes = "The same local yanked registry accepts yyy@1.0.0 when either the command flag or the environment allowlist names it, even when the other source names zzz@2.0.0."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/YankedVersionsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/YankedVersionsUtil.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java",
+]
+translation_notes = "The fixture uses a local registry and deliberately mismatched command/environment entries so either source alone must be unioned to admit yyy@1.0.0."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture yanked-version-command-env-union --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture yanked-version-command-env-union --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
 name = "flag_allows_when_env_does_not"

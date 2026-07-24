@@ -1,8 +1,21 @@
 [fixture]
 name = "repo-mapping-canonical-names"
-description = "Stage 5 Bazel 9 repo mapping fixture covering root, registry deps, extension-generated repos, and multiple-version canonical repos."
+description = "Stage 5 Bazel 9.2 repo mapping fixture covering root, registry deps, extension-generated repos, and multiple-version canonical repos."
 comparison = "message_shape"
-oracle_notes = "Self-contained local registry plus local module extension. Bazel 9.1.1 dump_repo_mapping records root apparent mappings, dependency mappings, extension-generated canonical repo names, and bbb+<version> multiple-version canonical repos."
+oracle_notes = "Self-contained local registry plus local module extension. Bazel 9.2 dump_repo_mapping records root apparent mappings, dependency mappings, extension-generated canonical repo names, and bbb+<version> multiple-version canonical repos."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionRepoMappingEntriesFunction.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/RepositoryMappingFunction.java",
+  "src/main/java/com/google/devtools/build/lib/cmdline/RepositoryMapping.java",
+]
+translation_notes = "The command asks for the root, dependency, multi-version, and extension-generated canonical repository identities directly; no repository materialization or fetch behavior is claimed."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture repo-mapping-canonical-names --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
 name = "dump_repo_mappings"

@@ -15,12 +15,22 @@
         "//:data.txt"
       ],
       "exit_code": 0,
-      "manifest": [],
+      "manifest": [
+        {
+          "digest": "38731963ff6d7df650a7355090c4388b7218e064bc75f839531902dc92f98023",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 25647,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
       "mutations": [],
       "name": "prime_lockfile",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
       "normalized_stdout": "//:data.txt",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\lockfile-version-error\\20260630-165541-74420-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\lockfile-version-error\\20260630-165557-64160-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: abf35762-3a33-431a-8b72-3f10fdf784f5\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
       "stdout": "//:data.txt\n"
     },
     {
@@ -43,16 +53,16 @@
       "manifest": [],
       "mutations": [
         {
-          "find": "\"lockFileVersion\": 26",
-          "old_digest_hint": "25624",
+          "find": "\"lockFileVersion\": 28",
+          "old_digest_hint": "25647",
           "path": "MODULE.bazel.lock",
-          "replace": "\"lockFileVersion\": 25"
+          "replace": "\"lockFileVersion\": 27"
         }
       ],
       "name": "reject_unsupported_lockfile_version",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nERROR: Error computing the main repository mapping: The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Error computing the main repository mapping: The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
       "normalized_stdout": "",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nERROR: Error computing the main repository mapping: The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.\n",
+      "stderr": "INFO: Invocation ID: 7cd5e901-398a-47af-a233-bca08bb058b4\nERROR: Error computing the main repository mapping: The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.\n",
       "stdout": ""
     }
   ],
