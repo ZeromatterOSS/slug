@@ -494,10 +494,16 @@ replay, and deterministic local archive/Git module sources. Generation,
 multiple clean replays, source-closure checks, focused harness 38/38, Git fsck,
 diff/archive checks, and fresh evidence rereview passed.
 
-The current design-only packet is
-`WP-5-m1-module-source-preparation-design`. The canonical plan owns its pinned
-source/live-owner audit and no-edit boundary. Discovery Rust remains blocked
-until the shared preparation owner is accepted and implemented.
+Fresh review accepted the corrected
+`WP-5-m1-module-source-preparation-design`. Stable source-file keys depend on a
+stable materialization key; local repositories remain live exact-file views,
+while fixed archive/Git sources retain immutable operational roots behind
+generation-independent semantic equality. Registry patch preparation remains
+a separate serial owner.
+
+The current packet is `WP-5-m1-source-input-materialization-owner`. The
+canonical plan owns the exact nine-file raw-input/materialization/source-file
+allowlist. Registry routing/patching, evaluation, and discovery remain blocked.
 
 ## Implementation Slices
 
