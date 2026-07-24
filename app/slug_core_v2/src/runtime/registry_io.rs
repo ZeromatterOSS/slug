@@ -58,6 +58,9 @@ impl RegistryIo for HyperRegistryIo {
         &self,
         url: &RegistryFileUrl,
     ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+        if url.as_str().starts_with("file:") {
+            return read_local_file(url).await;
+        }
         let client = match self {
             Self::Ready(client) => client,
             Self::InitializationFailed(message) => {
@@ -100,6 +103,30 @@ impl RegistryIo for HyperRegistryIo {
             })?
             .to_bytes();
         Ok(RegistryIoOutcome::Found(Arc::from(body.as_ref())))
+    }
+}
+
+async fn read_local_file(
+    url: &RegistryFileUrl,
+) -> Result<RegistryIoOutcome, RegistryTransportError> {
+    let Some(path) = url.as_str().strip_prefix("file://") else {
+        return Err(RegistryTransportError {
+            message: format!("invalid local registry URL {}", url.as_str()).into(),
+        });
+    };
+    if !path.starts_with('/') {
+        return Err(RegistryTransportError {
+            message: format!("invalid local registry URL {}", url.as_str()).into(),
+        });
+    }
+    match tokio::fs::read(path).await {
+        Ok(bytes) => Ok(RegistryIoOutcome::Found(Arc::from(bytes))),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok(RegistryIoOutcome::NotFound)
+        }
+        Err(error) => Err(RegistryTransportError {
+            message: format!("reading local registry file {}: {error}", url.as_str()).into(),
+        }),
     }
 }
 
@@ -167,5 +194,44 @@ mod tests {
             .await
             .unwrap_err();
         assert!(error.message.contains("registry GET"));
+    }
+
+    #[tokio::test]
+    async fn exact_adapter_reads_local_file_success_not_found_and_error() {
+        let io = HyperRegistryIo::new();
+        let directory = tempfile::tempdir().unwrap();
+        let file = directory.path().join("MODULE.bazel");
+        tokio::fs::write(&file, b"module(name = 'local')")
+            .await
+            .unwrap();
+
+        let found = io
+            .read_exact(&RegistryFileUrl::new(format!("file://{}", file.display())))
+            .await
+            .unwrap();
+        assert_eq!(
+            found,
+            RegistryIoOutcome::Found(Arc::from(&b"module(name = 'local')"[..]))
+        );
+
+        let absent = directory.path().join("absent.MODULE.bazel");
+        assert_eq!(
+            io.read_exact(&RegistryFileUrl::new(format!(
+                "file://{}",
+                absent.display()
+            )))
+            .await
+            .unwrap(),
+            RegistryIoOutcome::NotFound
+        );
+
+        let error = io
+            .read_exact(&RegistryFileUrl::new(format!(
+                "file://{}",
+                directory.path().display()
+            )))
+            .await
+            .unwrap_err();
+        assert!(error.message.contains("reading local registry file"));
     }
 }

@@ -103,10 +103,18 @@ fn snapshot(
     lockfile: Option<&str>,
     extra: impl IntoIterator<Item = (PathBuf, WorkspaceFileValue)>,
 ) -> Arc<WorkspaceSnapshot> {
+    snapshot_with_root("module(name = 'root')", lockfile, extra)
+}
+
+fn snapshot_with_root(
+    root_module: &str,
+    lockfile: Option<&str>,
+    extra: impl IntoIterator<Item = (PathBuf, WorkspaceFileValue)>,
+) -> Arc<WorkspaceSnapshot> {
     let root = workspace();
     let mut files = vec![(
         root.join("MODULE.bazel"),
-        WorkspaceFileValue::Present(Arc::new("module(name = 'root')".to_owned())),
+        WorkspaceFileValue::Present(Arc::new(root_module.to_owned())),
     )];
     if let Some(lockfile) = lockfile {
         files.push((
@@ -158,19 +166,6 @@ async fn transaction(
         RegistryRequestGeneration(generation),
     )
     .unwrap();
-    updater.commit().await
-}
-
-async fn workspace_transaction(dice: &Arc<Dice>, files: Arc<WorkspaceSnapshot>) -> DiceTransaction {
-    let mut updater = dice.updater_with_data(UserComputationData::default());
-    updater
-        .changed_to(vec![(
-            WorkspaceSnapshotKey {
-                workspace: workspace(),
-            },
-            files,
-        )])
-        .unwrap();
     updater.commit().await
 }
 
@@ -428,87 +423,168 @@ async fn checksum_mismatch_is_typed_and_stable_for_the_same_expectation() {
 }
 
 #[tokio::test]
-async fn file_urls_use_only_the_exact_workspace_file_key() {
+async fn local_absence_and_read_error_retry_only_after_generation_changes() {
     let local_path = workspace().join("registry/modules/demo/MODULE.bazel");
     let local_url = RegistryFileUrl::new(format!("file://{}", local_path.display()));
-    let io = Arc::new(FakeRegistryIo::new(FakeResponse::Transport("must not run")));
+    let urls = RegistryUrls::new(["file:///registry-dice-test/registry"]);
+    let io = Arc::new(FakeRegistryIo::new(FakeResponse::NotFound));
     let dice = dice_with_io(io.clone());
 
-    let mut created = workspace_transaction(
-        &dice,
-        snapshot(
-            None,
-            [(
-                local_path.clone(),
-                WorkspaceFileValue::Present(Arc::new("created".to_owned())),
-            )],
-        ),
-    )
-    .await;
+    let files = snapshot(None, []);
+    let mut absent = transaction(&dice, files.clone(), LockfileMode::Off, 1, urls.clone()).await;
     assert!(matches!(
-        local_value(&mut created, &local_url).await.as_ref(),
-        Ok(RegistryFileValue::Found { bytes, recordable_remote_expectation: None, .. })
-            if bytes.as_ref() == b"created"
-    ));
-
-    let mut edited = workspace_transaction(
-        &dice,
-        snapshot(
-            None,
-            [(
-                local_path.clone(),
-                WorkspaceFileValue::Present(Arc::new("edited".to_owned())),
-            )],
-        ),
-    )
-    .await;
-    assert!(matches!(
-        local_value(&mut edited, &local_url).await.as_ref(),
-        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"edited"
-    ));
-
-    let mut deleted = workspace_transaction(&dice, snapshot(None, [])).await;
-    assert!(matches!(
-        local_value(&mut deleted, &local_url).await.as_ref(),
+        local_value(&mut absent, &local_url).await.as_ref(),
         Ok(RegistryFileValue::NotFound {
             source: RegistryNotFoundSource::LocalAbsence,
             recordable_remote_expectation: None,
         })
     ));
+    assert_eq!(io.calls(), 1);
 
-    let mut recreated = workspace_transaction(
+    io.set_response(FakeResponse::Found(b"created"));
+    let mut same_generation =
+        transaction(&dice, files.clone(), LockfileMode::Off, 1, urls.clone()).await;
+    assert!(matches!(
+        local_value(&mut same_generation, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::NotFound {
+            source: RegistryNotFoundSource::LocalAbsence,
+            ..
+        })
+    ));
+    assert_eq!(io.calls(), 1);
+
+    let mut created = transaction(&dice, files.clone(), LockfileMode::Off, 2, urls.clone()).await;
+    assert!(matches!(
+        local_value(&mut created, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, recordable_remote_expectation: None, .. })
+            if bytes.as_ref() == b"created"
+    ));
+    assert_eq!(io.calls(), 2);
+
+    io.set_response(FakeResponse::Transport("permission denied"));
+    let root_b = snapshot_with_root("module(name = 'root', version = '0.2')", None, []);
+    let mut read_error =
+        transaction(&dice, root_b.clone(), LockfileMode::Off, 3, urls.clone()).await;
+    assert!(matches!(
+        local_value(&mut read_error, &local_url).await.as_ref(),
+        Err(RegistryFileError::LocalRead { message, .. }) if message == "permission denied"
+    ));
+    assert_eq!(io.calls(), 3);
+
+    io.set_response(FakeResponse::Found(b"repaired"));
+    let mut same_error_generation =
+        transaction(&dice, root_b.clone(), LockfileMode::Off, 3, urls.clone()).await;
+    assert!(matches!(
+        local_value(&mut same_error_generation, &local_url)
+            .await
+            .as_ref(),
+        Err(RegistryFileError::LocalRead { .. })
+    ));
+    assert_eq!(io.calls(), 3);
+
+    let mut repaired = transaction(&dice, root_b, LockfileMode::Off, 4, urls).await;
+    assert!(matches!(
+        local_value(&mut repaired, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"repaired"
+    ));
+    assert_eq!(io.calls(), 4);
+}
+
+#[tokio::test]
+async fn local_success_sticks_across_raw_mutations_with_equal_semantic_inputs() {
+    let local_path = workspace().join("registry/modules/demo/MODULE.bazel");
+    let local_url = RegistryFileUrl::new(format!("file://{}", local_path.display()));
+    let urls = RegistryUrls::new(["file:///registry-dice-test/registry"]);
+    let io = Arc::new(FakeRegistryIo::new(FakeResponse::Found(b"first")));
+    let dice = dice_with_io(io.clone());
+    let first_root = snapshot_with_root("module(name = 'root', version = '0.1')", None, []);
+
+    let mut first = transaction(&dice, first_root, LockfileMode::Off, 1, urls.clone()).await;
+    assert!(matches!(
+        local_value(&mut first, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"first"
+    ));
+
+    io.set_response(FakeResponse::Found(b"def broken("));
+    let comment_only_root = snapshot_with_root(
+        "# changed comment\nmodule(name = 'root', version = '0.1')",
+        None,
+        [],
+    );
+    let mut malformed = transaction(
         &dice,
-        snapshot(
-            None,
-            [(
-                local_path.clone(),
-                WorkspaceFileValue::Present(Arc::new("recreated".to_owned())),
-            )],
-        ),
+        comment_only_root.clone(),
+        LockfileMode::Off,
+        2,
+        urls.clone(),
     )
     .await;
     assert!(matches!(
-        local_value(&mut recreated, &local_url).await.as_ref(),
-        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"recreated"
+        local_value(&mut malformed, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"first"
     ));
 
-    let mut failed = workspace_transaction(
-        &dice,
-        snapshot(
-            None,
-            [(
-                local_path,
-                WorkspaceFileValue::ReadError(Arc::new("permission denied".to_owned())),
-            )],
-        ),
-    )
-    .await;
+    io.set_response(FakeResponse::NotFound);
+    let mut deleted = transaction(&dice, comment_only_root, LockfileMode::Off, 3, urls).await;
     assert!(matches!(
-        local_value(&mut failed, &local_url).await.as_ref(),
-        Err(RegistryFileError::LocalRead { message, .. })
-            if message == "permission denied"
+        local_value(&mut deleted, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"first"
     ));
-    assert_eq!(io.calls(), 0);
+    assert_eq!(io.calls(), 1);
+}
+
+#[tokio::test]
+async fn local_success_rereads_for_root_semantics_and_ordered_registry_inputs() {
+    let local_path = workspace().join("registry/modules/demo/MODULE.bazel");
+    let local_url = RegistryFileUrl::new(format!("file://{}", local_path.display()));
+    let urls_ab = RegistryUrls::new([
+        "file:///registry-dice-test/registry/a",
+        "file:///registry-dice-test/registry/b",
+    ]);
+    let urls_ba = RegistryUrls::new([
+        "file:///registry-dice-test/registry/b",
+        "file:///registry-dice-test/registry/a",
+    ]);
+    let io = Arc::new(FakeRegistryIo::new(FakeResponse::Found(b"root-a")));
+    let dice = dice_with_io(io.clone());
+
+    let root_a = snapshot_with_root("module(name = 'root', version = '0.1')", None, []);
+    let mut first = transaction(&dice, root_a, LockfileMode::Off, 1, urls_ab.clone()).await;
+    assert!(matches!(
+        local_value(&mut first, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"root-a"
+    ));
+
+    io.set_response(FakeResponse::Found(b"root-b"));
+    let root_b = snapshot_with_root("module(name = 'root', version = '0.2')", None, []);
+    let mut second = transaction(&dice, root_b, LockfileMode::Off, 2, urls_ab.clone()).await;
+    assert!(matches!(
+        local_value(&mut second, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"root-b"
+    ));
+
+    io.set_response(FakeResponse::Found(b"root-c"));
+    let root_c = snapshot_with_root("module(name = 'root', version = '0.3')", None, []);
+    let mut third = transaction(&dice, root_c.clone(), LockfileMode::Off, 3, urls_ab.clone()).await;
+    assert!(matches!(
+        local_value(&mut third, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"root-c"
+    ));
+
+    io.set_response(FakeResponse::Found(b"registry-ba"));
+    let mut reordered = transaction(&dice, root_c.clone(), LockfileMode::Off, 4, urls_ba).await;
+    assert!(matches!(
+        local_value(&mut reordered, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"registry-ba"
+    ));
+
+    io.set_response(FakeResponse::Found(b"registry-ab"));
+    let mut restored = transaction(&dice, root_c, LockfileMode::Off, 5, urls_ab).await;
+    assert!(matches!(
+        local_value(&mut restored, &local_url).await.as_ref(),
+        Ok(RegistryFileValue::Found { bytes, .. }) if bytes.as_ref() == b"registry-ab"
+    ));
+    assert_eq!(io.calls(), 5);
 }
 
 #[tokio::test]

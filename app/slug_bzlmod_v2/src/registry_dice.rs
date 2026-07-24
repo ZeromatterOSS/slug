@@ -24,8 +24,6 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
-use slug_workspace_v2::WorkspaceFileKey;
-use slug_workspace_v2::WorkspaceFileValue;
 
 use crate::LockfileMode;
 use crate::RegistryFileExpectation;
@@ -313,33 +311,57 @@ impl RegistryFileKey {
             return Err(RegistryFileError::InvalidFileUrl(self.url.clone()));
         }
         let path = PathBuf::from(path);
-        let value = ctx
-            .compute(&WorkspaceFileKey {
+        let policy = ctx
+            .compute(&RegistryPolicyKey {
                 workspace: self.workspace.clone(),
-                path: path.clone(),
             })
             .await
-            .map_err(|error| RegistryFileError::LocalRead {
-                path: path.clone(),
-                message: CompactString::new(error.to_string()),
+            .map_err(|error| {
+                RegistryFileError::RootModuleFiles(CompactString::new(error.to_string()))
             })?;
-        match value {
-            WorkspaceFileValue::Present(content) => {
-                let bytes: Arc<[u8]> = Arc::from(content.as_bytes());
-                Ok(RegistryFileValue::Found {
-                    sha256: sha256(&bytes),
-                    bytes,
+        policy.as_ref().as_ref().map_err(|error| error.clone())?;
+        // Keep the direct edge even though RegistryPolicyKey also reads root files: the policy
+        // value deliberately projects them down to lockfile visibility, whereas a local registry
+        // success must replay when the root module's own semantics change.
+        let root_files = ctx
+            .compute(&RootModuleFilesKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+            .map_err(|error| {
+                RegistryFileError::RootModuleFiles(CompactString::new(error.to_string()))
+            })?;
+        root_files
+            .as_ref()
+            .as_ref()
+            .map_err(|error| RegistryFileError::RootModuleFiles(error.clone()))?;
+
+        let io = ctx
+            .global_data()
+            .get::<RegistryIoHandle>()
+            .map_err(|_| RegistryFileError::MissingIoCapability)?
+            .0
+            .clone();
+        match io.read_exact(&self.url).await {
+            Ok(RegistryIoOutcome::Found(bytes)) => Ok(RegistryFileValue::Found {
+                sha256: sha256(&bytes),
+                bytes,
+                recordable_remote_expectation: None,
+            }),
+            Ok(RegistryIoOutcome::NotFound) => {
+                self.request_generation(ctx).await?;
+                Ok(RegistryFileValue::NotFound {
+                    source: RegistryNotFoundSource::LocalAbsence,
                     recordable_remote_expectation: None,
                 })
             }
-            WorkspaceFileValue::Absent => Ok(RegistryFileValue::NotFound {
-                source: RegistryNotFoundSource::LocalAbsence,
-                recordable_remote_expectation: None,
-            }),
-            WorkspaceFileValue::ReadError(message) => Err(RegistryFileError::LocalRead {
-                path,
-                message: CompactString::new(message.as_str()),
-            }),
+            Err(error) => {
+                self.request_generation(ctx).await?;
+                Err(RegistryFileError::LocalRead {
+                    path,
+                    message: error.message,
+                })
+            }
         }
     }
 
