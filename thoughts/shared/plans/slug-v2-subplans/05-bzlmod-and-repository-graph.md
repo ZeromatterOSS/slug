@@ -464,12 +464,17 @@ single-version patch labels, private stripped file contributions, duplicate
 errors, and order-insensitive DICE equality. Focused owner tests passed 12/12,
 the full bzlmod crate passed 170/170, and final rereview returned `ACCEPT`.
 
-The current packet is the design-only
-`WP-5-m1-registry-module-discovery-design-rereview`. It must reconcile the
-landed owner with the prior stable discovery key, exact single/multiple
-registry routing, patch-file observation/application and fatal no-fallback
-behavior, and non-registry bypass before any discovery Rust. The canonical
-plan owns the exact rereview boundary and stop conditions.
+The design-only `WP-5-m1-registry-module-discovery-design-rereview` returned
+`REPLAN`. Registry discovery cannot proceed without an exact root patch-file
+input/application owner, while non-registry discovery first materializes the
+full local/archive/Git `RepoSpec` and evaluates its MODULE plus includes.
+Returning a deferred non-registry bypass would not match Bazel's discovery.
+
+The current fixture-only packet is
+`WP-5-m1-module-source-preparation-oracle`. Its exact nine retained-daemon
+rows and no-Rust allowlist are recorded in the canonical plan. After evidence
+acceptance, design one shared module-source preparation boundary before
+returning to discovery Rust.
 
 ## Implementation Slices
 

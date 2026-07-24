@@ -580,3 +580,13 @@ Expected evidence artifact: one compact root aggregate preserves exact registry/
 Implementation summary: Added an Arc-backed Buck2 `SmallMap` owner with sealed single-version, multiple-version, and non-registry variants; exact canonical `.bzl` label plus rule-name IDs; recursive deterministic i32-bounded attribute values with active-cycle rejection; and private raw per-file contributions normalized and stripped at `RootModuleFilesKey`. Root/include duplicates fail, apparent external patch labels remain invisible, canonical external labels survive, archive/Git patches are validated while their raw kwargs are retained, and no discovery, execution, loading, MVS, or materialization consumer was activated.
 Validation: focused `root_module_dice` 12/12; full `slug_bzlmod_v2` 170/170; `cargo fmt --all -- --check`; `git diff --check`; `scripts/v2_archive_status.sh`; pinned-source rule-ID and module-environment checks; fresh independent final rereview `ACCEPT`
 Residual risk: Per-module discovery remains absent. Rereview its prior stable-key design against the landed override categories, patch-file DICE/application owner, fatal no-fallback behavior, and non-registry bypass before any Rust.
+
+### Stage 5 post-owner registry discovery rereview
+
+Status: Replanned before Rust
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `Discovery.rewriteDepSpec`, `ModuleFileFunction.getModuleFile`, `maybePatchModuleFile`, `execNonRegistryModuleFile`, `RegistryOverride`, and `NonRegistryOverride`
+Bazel oracle: accepted `registry-root-override-routing` proves routing and static patch behavior, but not patch-file lifecycle or archive/Git module preparation
+Expected evidence artifact: retained-daemon patch edit/delete/recreate plus independently discriminated local main/include edits and local archive/Git MODULE evaluation
+Design summary: The stable registry key and corrected local retry boundary remain viable, but V2 has no exact root patch-file DICE/application owner and no materialized-repository MODULE source for non-registry overrides. Bazel applies root patches before registry nonroot evaluation and obtains local/archive/Git MODULE files only after `RepositoryDirectoryValue`; a registry-only result or deferred non-registry bypass would be a partial owner.
+Validation: two independent read-only pinned-source/live-owner audits, root source/live-code adjudication, and fresh independent review returned `REPLAN`; no Rust, Cargo, fixture, lockfile, or existing evidence edit
+Residual risk: Add only the nine-row `module-source-preparation` Bazel 9.2 oracle, then design a shared source-preparation boundary before discovery Rust.
