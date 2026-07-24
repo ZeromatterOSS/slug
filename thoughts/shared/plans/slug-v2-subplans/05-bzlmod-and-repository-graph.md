@@ -638,6 +638,26 @@ heap-independent deferred-invalid representation is sound. No schema or
 directive-evaluator Rust is authorized before that evidence design is freshly
 accepted.
 
+That design is accepted. Bazel retains raw kwarg references through the end of
+MODULE evaluation, validates ordinary tags in `TypeCheckedTag` and innate tags
+in `RepoRule.instantiate`, and separately hashes usages through the narrower
+`AttributeValuesAdapter`. Retaining live or frozen Starlark values across DICE
+is rejected. The only future candidate is a post-file heap-independent
+snapshot: exact structural nodes for later-valid values and bounded
+deferred-invalid nodes only where the oracle proves stable, identity-insensitive
+failure. Snapshotting at the tag call is forbidden because later list/dict
+mutation remains visible.
+
+The current packet is only
+`WP-5-m1-nonroot-raw-attribute-oracle`. Under the new-fixture-only allowlist,
+generate and replay the accepted local retained-daemon matrix for valid
+structures, post-call alias mutation, ordinary and innate deferred-invalid
+values, one bounded cycle, and lockfile update ordering. Each failure owns a
+unique never-successful output. Observe rather than presume lockfile
+publication. Stop on any network/harness expansion, unstable identity
+formatting, cycle timeout, or result requiring a retained evaluator heap; no
+Rust is authorized.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
