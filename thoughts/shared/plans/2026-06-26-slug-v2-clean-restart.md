@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; corrected policy/IO key design independently accepted | registry policy/IO implementation reached technically sound review but exhausted its correction budget on a missing lockfile-test allowlist entry; discovery, MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | correct only the registry policy/IO test allowlist |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; corrected policy/IO key design independently accepted; lockfile-test scope correction accepted | registry policy/IO implementation needs fresh terminal review under its corrected allowlist; discovery, MVS, selected-yanked/RepoSpec hashes, exact lockfile writing, extensions, materialization, cquery, and aquery remain unwired | rereview only the frozen registry policy/IO implementation |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry policy/IO substrate is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry policy/IO substrate is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,21 +33,15 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-registry-policy-io-test-scope-correction`.
+Run only `WP-5-m1-registry-policy-io-substrate-rereview`.
 
-The registry policy/IO implementation review found no remaining semantic or
-architectural defect after its focused correction. Its terminal result is
-nevertheless `REPLAN`: eager Bazel-parity validation of every
-`registryFileHashes` entry requires replacing legacy placeholder digests and
-adding the malformed-unused-hash regression in
-`app/slug_bzlmod_v2/tests/lockfile.rs`, but that existing test file was omitted
-from the implementation allowlist.
-
-This is a design-only correction. Authorize
-`app/slug_bzlmod_v2/tests/lockfile.rs` in addition to the frozen allowlist
-below, without changing the implementation contract or Rust in this packet.
-After fresh independent acceptance, rerun the implementation review as a new
-packet under the corrected allowlist.
+The design-only test-scope correction is independently accepted:
+`app/slug_bzlmod_v2/tests/lockfile.rs` is now explicitly authorized because
+eager Bazel-parity validation requires replacing its legacy placeholder
+digests and adding the malformed-unused-hash regression. Rereview the frozen
+implementation against the contract and corrected allowlist below. Do not
+change Rust in this packet unless the fresh reviewer finds a concrete material
+miss; any such miss returns to `REPLAN`.
 
 ### Frozen implementation contract
 
