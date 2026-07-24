@@ -1,0 +1,3 @@
+module(name = "registry_module_discovery_recovery", version = "0.1.0")
+bazel_dep(name = "aaa", version = "1.0.0")
+# discovery-transition: absent

@@ -1,0 +1,127 @@
+[fixture]
+name = "registry-module-discovery-recovery"
+description = "Bazel 9.2 same-workspace local registry discovery and recovery."
+comparison = "message_shape"
+oracle_notes = "One retained local file-registry workspace isolates discovery cache replay: absence, first creation, cached success after a malformed-first mutation, root-version invalidation, repair, and deletion fallback. All rows disable lockfile replay. Minimal Bazel 9.2 embedded-tools direct-module declarations and extension stubs are deterministic scaffolding only, not asserted registry evidence."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/BazelRepositoryModule.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFactoryImpl.java",
+]
+translation_notes = "The malformed mutation leaves the root module version unchanged, proving same-key cache replay. Subsequent distinct root versions force re-evaluation: malformed first data is fatal without second fallback, repair selects repaireddep, and deletion selects seconddep."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture registry-module-discovery-recovery --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture registry-module-discovery-recovery --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "both_absent_ordered_failure"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 37
+stderr_contains = ["module aaa@1.0.0 not found in registries:"]
+
+[[commands]]
+name = "create_first_selects_first"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "firstdep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*seconddep@1\\.0\\.0).*firstdep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/first/modules/aaa/1.0.0/MODULE.pending"
+  destination = "registry/first/modules/aaa/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# discovery-transition: absent"
+  replace = "# discovery-transition: first"
+
+
+[[commands]]
+name = "cached_success_after_malformed_first"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "firstdep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*repaireddep@1\\.0\\.0)(?!.*seconddep@1\\.0\\.0).*firstdep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/second/modules/aaa/1.0.0/MODULE.pending"
+  destination = "registry/second/modules/aaa/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  path = "registry/first/modules/aaa/1.0.0/MODULE.bazel"
+  find = "bazel_dep(name = \"firstdep\", version = \"1.0.0\")"
+  replace = "def broken("
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# discovery-transition: first"
+  replace = "# discovery-transition: malformed"
+
+
+[[commands]]
+name = "root_version_invalidation_rejects_malformed_first"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 37
+stderr_contains = ["registry/first/modules/aaa/1.0.0/MODULE.bazel", "error parsing MODULE.bazel file for aaa@1.0.0"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# discovery-transition: malformed"
+  replace = "# discovery-transition: malformed-invalidated"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.0\""
+  replace = "version = \"0.1.1\""
+
+
+[[commands]]
+name = "repair_first_after_root_invalidation"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "repaireddep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*firstdep@1\\.0\\.0)(?!.*seconddep@1\\.0\\.0).*repaireddep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  path = "registry/first/modules/aaa/1.0.0/MODULE.bazel"
+  find = "def broken("
+  replace = "bazel_dep(name = \"repaireddep\", version = \"1.0.0\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# discovery-transition: malformed-invalidated"
+  replace = "# discovery-transition: repaired"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.1\""
+  replace = "version = \"0.1.2\""
+
+
+[[commands]]
+name = "delete_first_after_root_invalidation_selects_second"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["aaa@1.0.0", "seconddep@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*repaireddep@1\\.0\\.0).*seconddep@1\\.0\\.0"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "registry/first/modules/aaa/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "# discovery-transition: repaired"
+  replace = "# discovery-transition: deleted"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.2\""
+  replace = "version = \"0.1.3\""
