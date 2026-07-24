@@ -1,0 +1,564 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:valid_tag",
+        "//:valid_innate",
+        "//:valid_update_prime",
+        "--lockfile_mode=update"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:valid_tag",
+        "//:valid_innate",
+        "//:valid_update_prime",
+        "--lockfile_mode=update"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "5289e110242b4ccade2dd8ce6827fe996bbac12892d57c4f60fb23ab044fabf0",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 25883,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "1e0ce3f1b17524f1ac5121c7bc4f817bc5f9e7bc9e286de990e7f46b4348ac24",
+          "mode": "0o555",
+          "path": "valid_innate.txt",
+          "root": "bazel-bin/valid_innate.txt",
+          "size": 42,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "1e0ce3f1b17524f1ac5121c7bc4f817bc5f9e7bc9e286de990e7f46b4348ac24",
+          "mode": "0o555",
+          "path": "valid_tag.txt",
+          "root": "bazel-bin/valid_tag.txt",
+          "size": 42,
+          "symlink_target": null,
+          "type": "file"
+        },
+        {
+          "digest": "9e0f3f17b855889fa29ba5042031c2b2b40b6afa5a000b5190f22a511b762b90",
+          "mode": "0o555",
+          "path": "valid_update_prime.txt",
+          "root": "bazel-bin/valid_update_prime.txt",
+          "size": 26,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "valid_structural_values_reach_tag_and_innate_consumers",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (3 packages loaded, 2 targets configured)\nAnalyzing: 3 targets (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed 3 targets (7 packages loaded, 11 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 7 processes: 7 internal.\nINFO: Build completed successfully, 7 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 58ec8626-f12e-4cbf-9f21-001d1a0f03e1\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/58ec8626-f12e-4cbf-9f21-001d1a0f03e1\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (3 packages loaded, 2 targets configured)\nAnalyzing: 3 targets (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed 3 targets (7 packages loaded, 11 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: 4.485s, Critical Path: 0.01s\nINFO: 7 processes: 7 internal.\nINFO: Build completed successfully, 7 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/58ec8626-f12e-4cbf-9f21-001d1a0f03e1\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:tag_alias",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:tag_alias",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "d0c48f8c677d43fc33a8b794d431cf55b704f1b38d8e5733f35e40342b753fb4",
+          "mode": "0o555",
+          "path": "tag_alias.txt",
+          "root": "bazel-bin/tag_alias.txt",
+          "size": 54,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "version = \"0.1.0\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.1\""
+        }
+      ],
+      "name": "ordinary_tag_values_retain_post_call_list_and_dict_aliasing",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_alias (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_alias (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:tag_alias (5 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nTarget //:tag_alias up-to-date:\n  bazel-bin/tag_alias.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 3 processes: 3 internal.\nINFO: Build completed successfully, 3 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 2b752b9a-f0bc-4991-864e-b3f537cc33dc\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2b752b9a-f0bc-4991-864e-b3f537cc33dc\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_alias (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_alias (3 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:tag_alias (5 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nTarget //:tag_alias up-to-date:\n  bazel-bin/tag_alias.txt\nINFO: Elapsed time: 0.092s, Critical Path: 0.00s\nINFO: 3 processes: 3 internal.\nINFO: Build completed successfully, 3 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2b752b9a-f0bc-4991-864e-b3f537cc33dc\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:tag_float",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:tag_float",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "tag_float_value = \"TAG_FLOAT_SENTINEL\"",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_float_value = 3.14"
+        },
+        {
+          "find": "version = \"0.1.1\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.2\""
+        }
+      ],
+      "name": "ordinary_tag_float_is_deferred_until_schema_validation",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_float (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_float (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_float' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 37, column 22, in <toplevel>\nError: in 'float_value' tag, expected value of type 'string' for attribute 'value', but got 3.14 (float)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 099a5924-1366-41f0-a7b2-ffb45964a9ac\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/099a5924-1366-41f0-a7b2-ffb45964a9ac\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_float (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_float (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_float' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 37, column 22, in <toplevel>\nError: in 'float_value' tag, expected value of type 'string' for attribute 'value', but got 3.14 (float)\nINFO: Elapsed time: 0.077s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/099a5924-1366-41f0-a7b2-ffb45964a9ac\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:tag_print",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:tag_print",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "tag_float_value = 3.14",
+          "old_digest_hint": "3064",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_float_value = \"TAG_FLOAT_SENTINEL\""
+        },
+        {
+          "find": "tag_print_value = \"TAG_PRINT_SENTINEL\"",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_print_value = print"
+        },
+        {
+          "find": "version = \"0.1.2\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.3\""
+        }
+      ],
+      "name": "ordinary_tag_builtin_callable_is_deferred_until_schema_validation",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_print (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_print (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_print' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 42, column 27, in <toplevel>\nError: in 'builtin_callable' tag, expected value of type 'string' for attribute 'value', but got <built-in function print> (builtin_function_or_method)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 40b81db8-79d1-4dbf-a033-8516cc24ad6f\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/40b81db8-79d1-4dbf-a033-8516cc24ad6f\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_print (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_print (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_print' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 42, column 27, in <toplevel>\nError: in 'builtin_callable' tag, expected value of type 'string' for attribute 'value', but got <built-in function print> (builtin_function_or_method)\nINFO: Elapsed time: 0.067s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/40b81db8-79d1-4dbf-a033-8516cc24ad6f\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:tag_proxy",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:tag_proxy",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "tag_print_value = print",
+          "old_digest_hint": "3065",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_print_value = \"TAG_PRINT_SENTINEL\""
+        },
+        {
+          "find": "tag_proxy_value = \"TAG_PROXY_SENTINEL\"",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_proxy_value = valid_tag"
+        },
+        {
+          "find": "version = \"0.1.3\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.4\""
+        }
+      ],
+      "name": "ordinary_tag_extension_proxy_is_deferred_until_schema_validation",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_proxy (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_proxy (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_proxy' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 47, column 26, in <toplevel>\nError: in 'extension_proxy' tag, expected value of type 'string' for attribute 'value', but got <unknown object com.google.devtools.build.lib.bazel.bzlmod.ModuleFileGlobals$ModuleExtensionProxy> (module_extension_proxy)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 76a404f0-51ff-4b35-a5bd-0f39cc092d28\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/76a404f0-51ff-4b35-a5bd-0f39cc092d28\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_proxy (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_proxy (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_proxy' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 47, column 26, in <toplevel>\nError: in 'extension_proxy' tag, expected value of type 'string' for attribute 'value', but got <unknown object com.google.devtools.build.lib.bazel.bzlmod.ModuleFileGlobals$ModuleExtensionProxy> (module_extension_proxy)\nINFO: Elapsed time: 0.054s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/76a404f0-51ff-4b35-a5bd-0f39cc092d28\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:tag_nested_list",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:tag_nested_list",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "tag_proxy_value = valid_tag",
+          "old_digest_hint": "3069",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_proxy_value = \"TAG_PROXY_SENTINEL\""
+        },
+        {
+          "find": "tag_nested_list_value = [\"ok\"]",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_nested_list_value = [\"ok\", 3.14]"
+        },
+        {
+          "find": "version = \"0.1.4\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.5\""
+        }
+      ],
+      "name": "ordinary_tag_nested_list_invalid_value_is_deferred",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_nested_list (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_nested_list (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_nested_list' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 52, column 28, in <toplevel>\nError: in 'nested_list' tag, expected value of type 'string' for element 1 of attribute 'value', but got 3.14 (float)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 65f83a97-55f7-497a-a402-873fd34b541a\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/65f83a97-55f7-497a-a402-873fd34b541a\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_nested_list (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_nested_list (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_nested_list' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 52, column 28, in <toplevel>\nError: in 'nested_list' tag, expected value of type 'string' for element 1 of attribute 'value', but got 3.14 (float)\nINFO: Elapsed time: 0.052s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/65f83a97-55f7-497a-a402-873fd34b541a\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:tag_nested_dict",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:tag_nested_dict",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "tag_nested_list_value = [\"ok\", 3.14]",
+          "old_digest_hint": "3086",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_nested_list_value = [\"ok\"]"
+        },
+        {
+          "find": "tag_nested_dict_value = {\"ok\": \"value\"}",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_nested_dict_value = {3.14: \"value\"}"
+        },
+        {
+          "find": "version = \"0.1.5\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.6\""
+        }
+      ],
+      "name": "ordinary_tag_nested_dict_key_invalid_value_is_deferred",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_nested_dict (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_nested_dict (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_nested_dict' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 57, column 28, in <toplevel>\nError: in 'nested_dict' tag, expected value of type 'string' for dict key element, but got 3.14 (float)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: bffcc799-8982-4e5c-a193-766be130089c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/bffcc799-8982-4e5c-a193-766be130089c\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_nested_dict (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_nested_dict (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_nested_dict' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 57, column 28, in <toplevel>\nError: in 'nested_dict' tag, expected value of type 'string' for dict key element, but got 3.14 (float)\nINFO: Elapsed time: 0.046s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/bffcc799-8982-4e5c-a193-766be130089c\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:tag_cycle",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:tag_cycle",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "tag_nested_dict_value = {3.14: \"value\"}",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_nested_dict_value = {\"ok\": \"value\"}"
+        },
+        {
+          "find": "cycle_value = [\"valid\"]",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "cycle_value = []\ncycle_value.append(cycle_value)"
+        },
+        {
+          "find": "version = \"0.1.6\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.7\""
+        }
+      ],
+      "name": "ordinary_tag_self_cycle_reaches_bounded_later_validation",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_cycle (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_cycle (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_cycle' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 63, column 21, in <toplevel>\nError: in 'self_cycle' tag, expected value of type 'string' for element 0 of attribute 'value', but got [...] (list)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 5445b7f5-21c0-4284-a846-a65a3ce15ab6\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/5445b7f5-21c0-4284-a846-a65a3ce15ab6\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_cycle (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_cycle (3 packages loaded, 2 targets configured)\n\nERROR: Analysis of target '//:tag_cycle' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 63, column 21, in <toplevel>\nError: in 'self_cycle' tag, expected value of type 'string' for element 0 of attribute 'value', but got [...] (list)\nINFO: Elapsed time: 0.045s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/5445b7f5-21c0-4284-a846-a65a3ce15ab6\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:innate_float",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:innate_float",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "cycle_value = []\ncycle_value.append(cycle_value)",
+          "old_digest_hint": "3105",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "cycle_value = [\"valid\"]"
+        },
+        {
+          "find": "innate_float_value = \"INNATE_FLOAT_SENTINEL\"",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "innate_float_value = 3.14"
+        },
+        {
+          "find": "version = \"0.1.7\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.8\""
+        }
+      ],
+      "name": "innate_float_is_deferred_until_repository_rule_validation",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:innate_float (3 packages loaded, 2 targets configured)\nAnalyzing: target //:innate_float (3 packages loaded, 2 targets configured)\n\nERROR: @@subject+//:MODULE.bazel:67:13: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 67, column 13, in <toplevel>\nError: in call to 'string_repo' repo rule with name 'innate_float_repo', expected value of type 'string' for attribute 'value', but got 3.14 (float)\nERROR: Analysis of target '//:innate_float' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 67, column 13, in <toplevel>\nError: in call to 'string_repo' repo rule with name 'innate_float_repo', expected value of type 'string' for attribute 'value', but got 3.14 (float)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 134564bb-6947-4414-98d6-01de22338609\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/134564bb-6947-4414-98d6-01de22338609\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:innate_float (3 packages loaded, 2 targets configured)\nAnalyzing: target //:innate_float (3 packages loaded, 2 targets configured)\n\nERROR: @@subject+//:MODULE.bazel:67:13: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 67, column 13, in <toplevel>\nError: in call to 'string_repo' repo rule with name 'innate_float_repo', expected value of type 'string' for attribute 'value', but got 3.14 (float)\nERROR: Analysis of target '//:innate_float' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 67, column 13, in <toplevel>\nError: in call to 'string_repo' repo rule with name 'innate_float_repo', expected value of type 'string' for attribute 'value', but got 3.14 (float)\nINFO: Elapsed time: 0.049s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/134564bb-6947-4414-98d6-01de22338609\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:innate_print",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:innate_print",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "innate_float_value = 3.14",
+          "old_digest_hint": "3061",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "innate_float_value = \"INNATE_FLOAT_SENTINEL\""
+        },
+        {
+          "find": "innate_print_value = \"INNATE_PRINT_SENTINEL\"",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "innate_print_value = print"
+        },
+        {
+          "find": "version = \"0.1.8\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.9\""
+        }
+      ],
+      "name": "innate_builtin_callable_is_deferred_until_repository_rule_validation",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:innate_print (3 packages loaded, 2 targets configured)\nAnalyzing: target //:innate_print (3 packages loaded, 2 targets configured)\n\nERROR: @@subject+//:MODULE.bazel:71:13: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 71, column 13, in <toplevel>\nError: in call to 'string_repo' repo rule with name 'innate_print_repo', expected value of type 'string' for attribute 'value', but got <built-in function print> (builtin_function_or_method)\nERROR: Analysis of target '//:innate_print' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 71, column 13, in <toplevel>\nError: in call to 'string_repo' repo rule with name 'innate_print_repo', expected value of type 'string' for attribute 'value', but got <built-in function print> (builtin_function_or_method)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 85c2b177-7ba1-493a-a9e8-9a08cf267e2a\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/85c2b177-7ba1-493a-a9e8-9a08cf267e2a\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:innate_print (3 packages loaded, 2 targets configured)\nAnalyzing: target //:innate_print (3 packages loaded, 2 targets configured)\n\nERROR: @@subject+//:MODULE.bazel:71:13: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 71, column 13, in <toplevel>\nError: in call to 'string_repo' repo rule with name 'innate_print_repo', expected value of type 'string' for attribute 'value', but got <built-in function print> (builtin_function_or_method)\nERROR: Analysis of target '//:innate_print' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 71, column 13, in <toplevel>\nError: in call to 'string_repo' repo rule with name 'innate_print_repo', expected value of type 'string' for attribute 'value', but got <built-in function print> (builtin_function_or_method)\nINFO: Elapsed time: 0.044s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/85c2b177-7ba1-493a-a9e8-9a08cf267e2a\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:innate_nested",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:innate_nested",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "innate_print_value = print",
+          "old_digest_hint": "3062",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "innate_print_value = \"INNATE_PRINT_SENTINEL\""
+        },
+        {
+          "find": "innate_nested_value = [\"ok\"]",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "innate_nested_value = [\"ok\", 3.14]"
+        },
+        {
+          "find": "version = \"0.1.9\"",
+          "old_digest_hint": "303",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.10\""
+        }
+      ],
+      "name": "innate_nested_invalid_value_is_deferred",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:innate_nested (3 packages loaded, 2 targets configured)\nAnalyzing: target //:innate_nested (3 packages loaded, 2 targets configured)\n\nERROR: @@subject+//:MODULE.bazel:75:14: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 75, column 14, in <toplevel>\nError: in call to 'list_repo' repo rule with name 'innate_nested_repo', expected value of type 'string' for element 1 of attribute 'value', but got 3.14 (float)\nERROR: Analysis of target '//:innate_nested' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 75, column 14, in <toplevel>\nError: in call to 'list_repo' repo rule with name 'innate_nested_repo', expected value of type 'string' for element 1 of attribute 'value', but got 3.14 (float)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e2e5adb8-aed9-4aa9-bd39-ae001b73207d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e2e5adb8-aed9-4aa9-bd39-ae001b73207d\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:innate_nested (3 packages loaded, 2 targets configured)\nAnalyzing: target //:innate_nested (3 packages loaded, 2 targets configured)\n\nERROR: @@subject+//:MODULE.bazel:75:14: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 75, column 14, in <toplevel>\nError: in call to 'list_repo' repo rule with name 'innate_nested_repo', expected value of type 'string' for element 1 of attribute 'value', but got 3.14 (float)\nERROR: Analysis of target '//:innate_nested' failed; build aborted: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 75, column 14, in <toplevel>\nError: in call to 'list_repo' repo rule with name 'innate_nested_repo', expected value of type 'string' for element 1 of attribute 'value', but got 3.14 (float)\nINFO: Elapsed time: 0.044s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e2e5adb8-aed9-4aa9-bd39-ae001b73207d\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:tag_float_update",
+        "--lockfile_mode=update"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:tag_float_update",
+        "--lockfile_mode=update"
+      ],
+      "exit_code": 37,
+      "manifest": [
+        {
+          "digest": "5289e110242b4ccade2dd8ce6827fe996bbac12892d57c4f60fb23ab044fabf0",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 25883,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "innate_nested_value = [\"ok\", 3.14]",
+          "old_digest_hint": "3086",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "innate_nested_value = [\"ok\"]"
+        },
+        {
+          "find": "tag_float_update_value = \"TAG_FLOAT_UPDATE_SENTINEL\"",
+          "old_digest_hint": "3080",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "tag_float_update_value = 3.14"
+        },
+        {
+          "find": "version = \"0.1.10\"",
+          "old_digest_hint": "304",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.11\""
+        }
+      ],
+      "name": "tag_invalid_update_pins_adapter_schema_and_lockfile_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_float_update (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_float_update (3 packages loaded, 2 targets configured)\n\nFATAL: bazel crashed due to an internal error. Printing stack trace:\njava.lang.RuntimeException: Unrecoverable error while evaluating node 'SINGLE_EXTENSION_EVAL:@@subject+//:ext.bzl%string_ext' (requested by nodes 'SINGLE_EXTENSION:@@subject+//:ext.bzl%string_ext')\n\tat com.google.devtools.build.skyframe.AbstractParallelEvaluator$Evaluate.run(AbstractParallelEvaluator.java:552)\n\tat com.google.devtools.build.lib.concurrent.AbstractQueueVisitor$WrappedRunnable.run(AbstractQueueVisitor.java:435)\n\tat java.base/java.util.concurrent.ForkJoinTask$RunnableExecuteAction.compute(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinTask$RunnableExecuteAction.compute(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinTask$InterruptibleTask.exec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinTask.doExec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinPool.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinWorkerThread.run(Unknown Source)\nCaused by: java.lang.IllegalArgumentException: Unsupported type: class net.starlark.java.eval.StarlarkFloat\n\tat com.google.devtools.build.lib.bazel.bzlmod.AttributeValuesAdapter.serializeObject(AttributeValuesAdapter.java:105)\n\tat com.google.devtools.build.lib.bazel.bzlmod.AttributeValuesAdapter.write(AttributeValuesAdapter.java:56)\n\tat com.google.devtools.build.lib.bazel.bzlmod.AttributeValuesAdapter.write(AttributeValuesAdapter.java:47)\n\tat com.google.devtools.build.lib.bazel.bzlmod.Tag_GsonTypeAdapter.write(Tag_GsonTypeAdapter.java:57)\n\tat com.google.devtools.build.lib.bazel.bzlmod.Tag_GsonTypeAdapter.write(Tag_GsonTypeAdapter.java:12)\n\tat com.google.gson.internal.bind.TypeAdapterRuntimeTypeWrapper.write(TypeAdapterRuntimeTypeWrapper.java:73)\n\tat com.google.gson.internal.bind.CollectionTypeAdapterFactory$Adapter.write(CollectionTypeAdapterFactory.java:99)\n\tat com.google.gson.internal.bind.CollectionTypeAdapterFactory$Adapter.write(CollectionTypeAdapterFactory.java:59)\n\tat com.google.devtools.build.lib.bazel.bzlmod.DelegateTypeAdapterFactory$1.write(DelegateTypeAdapterFactory.java:139)\n\tat com.google.devtools.build.lib.bazel.bzlmod.ModuleExtensionUsage_GsonTypeAdapter.write(ModuleExtensionUsage_GsonTypeAdapter.java:92)\n\tat com.google.devtools.build.lib.bazel.bzlmod.ModuleExtensionUsage_GsonTypeAdapter.write(ModuleExtensionUsage_GsonTypeAdapter.java:15)\n\tat com.google.gson.internal.bind.TypeAdapterRuntimeTypeWrapper.write(TypeAdapterRuntimeTypeWrapper.java:73)\n\tat com.google.gson.internal.bind.MapTypeAdapterFactory$Adapter.write(MapTypeAdapterFactory.java:253)\n\tat com.google.gson.internal.bind.MapTypeAdapterFactory$Adapter.write(MapTypeAdapterFactory.java:154)\n\tat com.google.devtools.build.lib.bazel.bzlmod.DelegateTypeAdapterFactory$1.write(DelegateTypeAdapterFactory.java:139)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionUsagesValue_GsonTypeAdapter.write(SingleExtensionUsagesValue_GsonTypeAdapter.java:53)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionUsagesValue_GsonTypeAdapter.write(SingleExtensionUsagesValue_GsonTypeAdapter.java:16)\n\tat com.google.gson.Gson.toJson(Gson.java:944)\n\tat com.google.gson.Gson.toJson(Gson.java:899)\n\tat com.google.gson.Gson.toJson(Gson.java:848)\n\tat com.google.gson.Gson.toJson(Gson.java:825)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionUsagesValue.hashForEvaluation(SingleExtensionUsagesValue.java:80)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionEvalFunction.tryGettingValueFromLockFile(SingleExtensionEvalFunction.java:340)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionEvalFunction.compute(SingleExtensionEvalFunction.java:185)\n\tat com.google.devtools.build.skyframe.AbstractParallelEvaluator$Evaluate.run(AbstractParallelEvaluator.java:471)\n\t... 8 more",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: df2723d8-8c30-4d88-8ab7-99299e72c483\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/df2723d8-8c30-4d88-8ab7-99299e72c483\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:tag_float_update (3 packages loaded, 2 targets configured)\nAnalyzing: target //:tag_float_update (3 packages loaded, 2 targets configured)\n\nFATAL: bazel crashed due to an internal error. Printing stack trace:\njava.lang.RuntimeException: Unrecoverable error while evaluating node 'SINGLE_EXTENSION_EVAL:@@subject+//:ext.bzl%string_ext' (requested by nodes 'SINGLE_EXTENSION:@@subject+//:ext.bzl%string_ext')\n\tat com.google.devtools.build.skyframe.AbstractParallelEvaluator$Evaluate.run(AbstractParallelEvaluator.java:552)\n\tat com.google.devtools.build.lib.concurrent.AbstractQueueVisitor$WrappedRunnable.run(AbstractQueueVisitor.java:435)\n\tat java.base/java.util.concurrent.ForkJoinTask$RunnableExecuteAction.compute(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinTask$RunnableExecuteAction.compute(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinTask$InterruptibleTask.exec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinTask.doExec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinPool.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinWorkerThread.run(Unknown Source)\nCaused by: java.lang.IllegalArgumentException: Unsupported type: class net.starlark.java.eval.StarlarkFloat\n\tat com.google.devtools.build.lib.bazel.bzlmod.AttributeValuesAdapter.serializeObject(AttributeValuesAdapter.java:105)\n\tat com.google.devtools.build.lib.bazel.bzlmod.AttributeValuesAdapter.write(AttributeValuesAdapter.java:56)\n\tat com.google.devtools.build.lib.bazel.bzlmod.AttributeValuesAdapter.write(AttributeValuesAdapter.java:47)\n\tat com.google.devtools.build.lib.bazel.bzlmod.Tag_GsonTypeAdapter.write(Tag_GsonTypeAdapter.java:57)\n\tat com.google.devtools.build.lib.bazel.bzlmod.Tag_GsonTypeAdapter.write(Tag_GsonTypeAdapter.java:12)\n\tat com.google.gson.internal.bind.TypeAdapterRuntimeTypeWrapper.write(TypeAdapterRuntimeTypeWrapper.java:73)\n\tat com.google.gson.internal.bind.CollectionTypeAdapterFactory$Adapter.write(CollectionTypeAdapterFactory.java:99)\n\tat com.google.gson.internal.bind.CollectionTypeAdapterFactory$Adapter.write(CollectionTypeAdapterFactory.java:59)\n\tat com.google.devtools.build.lib.bazel.bzlmod.DelegateTypeAdapterFactory$1.write(DelegateTypeAdapterFactory.java:139)\n\tat com.google.devtools.build.lib.bazel.bzlmod.ModuleExtensionUsage_GsonTypeAdapter.write(ModuleExtensionUsage_GsonTypeAdapter.java:92)\n\tat com.google.devtools.build.lib.bazel.bzlmod.ModuleExtensionUsage_GsonTypeAdapter.write(ModuleExtensionUsage_GsonTypeAdapter.java:15)\n\tat com.google.gson.internal.bind.TypeAdapterRuntimeTypeWrapper.write(TypeAdapterRuntimeTypeWrapper.java:73)\n\tat com.google.gson.internal.bind.MapTypeAdapterFactory$Adapter.write(MapTypeAdapterFactory.java:253)\n\tat com.google.gson.internal.bind.MapTypeAdapterFactory$Adapter.write(MapTypeAdapterFactory.java:154)\n\tat com.google.devtools.build.lib.bazel.bzlmod.DelegateTypeAdapterFactory$1.write(DelegateTypeAdapterFactory.java:139)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionUsagesValue_GsonTypeAdapter.write(SingleExtensionUsagesValue_GsonTypeAdapter.java:53)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionUsagesValue_GsonTypeAdapter.write(SingleExtensionUsagesValue_GsonTypeAdapter.java:16)\n\tat com.google.gson.Gson.toJson(Gson.java:944)\n\tat com.google.gson.Gson.toJson(Gson.java:899)\n\tat com.google.gson.Gson.toJson(Gson.java:848)\n\tat com.google.gson.Gson.toJson(Gson.java:825)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionUsagesValue.hashForEvaluation(SingleExtensionUsagesValue.java:80)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionEvalFunction.tryGettingValueFromLockFile(SingleExtensionEvalFunction.java:340)\n\tat com.google.devtools.build.lib.bazel.bzlmod.SingleExtensionEvalFunction.compute(SingleExtensionEvalFunction.java:185)\n\tat com.google.devtools.build.skyframe.AbstractParallelEvaluator$Evaluate.run(AbstractParallelEvaluator.java:471)\n\t... 8 more\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "nonroot-raw-attributes",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

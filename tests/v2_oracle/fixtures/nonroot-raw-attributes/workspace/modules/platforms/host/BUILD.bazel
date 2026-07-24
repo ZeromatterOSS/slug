@@ -1,0 +1,6 @@
+exports_files(["constraints.bzl"])
+
+platform(
+    name = "host",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,7 @@
+module(name = "nonroot_raw_attributes", version = "0.1.0")
+
+bazel_dep(name = "platforms", version = "1.0.0")
+local_path_override(module_name = "platforms", path = "modules/platforms")
+
+bazel_dep(name = "subject", version = "1.0.0")
+local_path_override(module_name = "subject", path = "modules/subject")

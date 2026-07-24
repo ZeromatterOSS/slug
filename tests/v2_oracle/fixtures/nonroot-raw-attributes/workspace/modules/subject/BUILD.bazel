@@ -1,0 +1,20 @@
+load(":defs.bzl", "subject_consumer")
+
+subject_consumer(
+    name = "valid_tag",
+    marker = "@valid_tag_repo//:marker.txt",
+)
+subject_consumer(name = "valid_innate", marker = "@valid_innate_repo//:marker.txt")
+subject_consumer(name = "tag_alias", marker = "@tag_alias_repo//:marker.txt")
+subject_consumer(name = "tag_float", marker = "@tag_float_repo//:marker.txt")
+subject_consumer(name = "tag_print", marker = "@tag_print_repo//:marker.txt")
+subject_consumer(name = "tag_proxy", marker = "@tag_proxy_repo//:marker.txt")
+subject_consumer(name = "tag_nested_list", marker = "@tag_nested_list_repo//:marker.txt")
+subject_consumer(name = "tag_nested_dict", marker = "@tag_nested_dict_repo//:marker.txt")
+subject_consumer(name = "tag_cycle", marker = "@tag_cycle_repo//:marker.txt")
+subject_consumer(name = "innate_float", marker = "@innate_float_repo//:marker.txt")
+subject_consumer(name = "innate_print", marker = "@innate_print_repo//:marker.txt")
+subject_consumer(name = "innate_nested", marker = "@innate_nested_repo//:marker.txt")
+subject_consumer(name = "tag_float_update", marker = "@tag_float_update_repo//:marker.txt")
+
+package(default_visibility = ["//visibility:public"])

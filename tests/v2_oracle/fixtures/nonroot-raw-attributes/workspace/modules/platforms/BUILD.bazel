@@ -1,0 +1,7 @@
+constraint_setting(name = "incompatible_setting")
+
+constraint_value(
+    name = "incompatible",
+    constraint_setting = ":incompatible_setting",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,80 @@
+module(name = "subject", version = "1.0.0")
+
+valid_tag = use_extension("//:ext.bzl", "valid_ext")
+valid_tag.valid_structural(
+    name = "valid_tag_repo",
+    value = "valid",
+    integer = 7,
+    enabled = True,
+    items = ("one", "two"),
+    mapping = {"one": "first", "two": "second"},
+)
+use_repo(valid_tag, "valid_tag_repo")
+
+valid_innate = use_repo_rule("//:ext.bzl", "valid_repo")
+valid_innate(
+    name = "valid_innate_repo",
+    value = "valid",
+    integer = 7,
+    enabled = True,
+    items = ("one", "two"),
+    mapping = {"one": "first", "two": "second"},
+)
+
+shared_list = ["before"]
+shared_dict = {"phase": "before"}
+tag_alias = use_extension("//:ext.bzl", "alias_ext")
+tag_alias.alias_observation(name = "tag_alias_repo", items = shared_list, mapping = shared_dict)
+shared_list.append("between")
+shared_dict["phase"] = "between"
+tag_alias.alias_observation(name = "ignored_alias_repo", items = shared_list, mapping = shared_dict)
+shared_list.append("after")
+shared_dict["phase"] = "after"
+use_repo(tag_alias, "tag_alias_repo")
+
+tag_float_value = "TAG_FLOAT_SENTINEL"
+tag_float = use_extension("//:ext.bzl", "string_ext")
+tag_float.float_value(name = "tag_float_repo", value = tag_float_value)
+use_repo(tag_float, "tag_float_repo")
+
+tag_print_value = "TAG_PRINT_SENTINEL"
+tag_print = use_extension("//:ext.bzl", "string_ext")
+tag_print.builtin_callable(name = "tag_print_repo", value = tag_print_value)
+use_repo(tag_print, "tag_print_repo")
+
+tag_proxy_value = "TAG_PROXY_SENTINEL"
+tag_proxy = use_extension("//:ext.bzl", "string_ext")
+tag_proxy.extension_proxy(name = "tag_proxy_repo", value = tag_proxy_value)
+use_repo(tag_proxy, "tag_proxy_repo")
+
+tag_nested_list_value = ["ok"]
+tag_nested_list = use_extension("//:ext.bzl", "list_ext")
+tag_nested_list.nested_list(name = "tag_nested_list_repo", value = tag_nested_list_value)
+use_repo(tag_nested_list, "tag_nested_list_repo")
+
+tag_nested_dict_value = {"ok": "value"}
+tag_nested_dict = use_extension("//:ext.bzl", "dict_ext")
+tag_nested_dict.nested_dict(name = "tag_nested_dict_repo", value = tag_nested_dict_value)
+use_repo(tag_nested_dict, "tag_nested_dict_repo")
+
+cycle_value = ["valid"]
+tag_cycle = use_extension("//:ext.bzl", "list_ext")
+tag_cycle.self_cycle(name = "tag_cycle_repo", value = cycle_value)
+use_repo(tag_cycle, "tag_cycle_repo")
+
+innate_float_value = "INNATE_FLOAT_SENTINEL"
+innate_float = use_repo_rule("//:ext.bzl", "string_repo")
+innate_float(name = "innate_float_repo", value = innate_float_value)
+
+innate_print_value = "INNATE_PRINT_SENTINEL"
+innate_print = use_repo_rule("//:ext.bzl", "string_repo")
+innate_print(name = "innate_print_repo", value = innate_print_value)
+
+innate_nested_value = ["ok"]
+innate_nested = use_repo_rule("//:ext.bzl", "list_repo")
+innate_nested(name = "innate_nested_repo", value = innate_nested_value)
+
+tag_float_update_value = "TAG_FLOAT_UPDATE_SENTINEL"
+tag_float_update = use_extension("//:ext.bzl", "string_ext")
+tag_float_update.update_value(name = "tag_float_update_repo", value = tag_float_update_value)
+use_repo(tag_float_update, "tag_float_update_repo")

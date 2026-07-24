@@ -1,0 +1,267 @@
+[fixture]
+name = "nonroot-raw-attributes"
+description = "Bazel 9.2 raw nonroot extension-tag and innate repository-rule attribute boundaries."
+comparison = "semantic"
+daemon = true
+oracle_notes = "Local-path-only fixture. Successful root and subject consumers copy generated marker bytes with ctx.actions.expand_template into unique bazel-bin outputs; invalid rows have unique outputs that have never succeeded. The valid row primes string_ext and manifests its visible-lockfile entry. The invalid update row pins Bazel 9.2's AttributeValuesAdapter failure before tag schema validation."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/AttributeValues.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/AttributeValuesAdapter.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Tag.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/TypeCheckedTag.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/InnateRunnableExtension.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionUsagesValue.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java",
+]
+translation_notes = "TagCallable and innate repository-rule proxies retain raw Starlark kwargs during MODULE evaluation. Later tag/repository-rule schema conversion and visible-lockfile serialization are separate boundaries."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-raw-attributes --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-raw-attributes --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "valid_structural_values_reach_tag_and_innate_consumers"
+argv = ["build", "//:valid_tag", "//:valid_innate", "//:valid_update_prime", "--lockfile_mode=update"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+manifest_roots = ["bazel-bin/valid_tag.txt", "bazel-bin/valid_innate.txt", "bazel-bin/valid_update_prime.txt", "MODULE.bazel.lock"]
+
+[[commands]]
+name = "ordinary_tag_values_retain_post_call_list_and_dict_aliasing"
+argv = ["build", "//:tag_alias", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+manifest_roots = ["bazel-bin/tag_alias.txt"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.0\""
+  replace = "version = \"0.1.1\""
+
+[[commands]]
+name = "ordinary_tag_float_is_deferred_until_schema_validation"
+argv = ["build", "//:tag_float", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["in 'float_value' tag", "expected value of type 'string'", "got 3.14 (float)"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter)(?!.*disk quota).*got 3[.]14 \\(float\\).*"]
+manifest_roots = ["bazel-bin/tag_float.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_float_value = \"TAG_FLOAT_SENTINEL\""
+  replace = "tag_float_value = 3.14"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.1\""
+  replace = "version = \"0.1.2\""
+
+[[commands]]
+name = "ordinary_tag_builtin_callable_is_deferred_until_schema_validation"
+argv = ["build", "//:tag_print", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["in 'builtin_callable' tag", "expected value of type 'string'", "<built-in function print>", "builtin_function_or_method"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter)(?!.*@[0-9a-fA-F]{4,}).*<built-in function print>.*builtin_function_or_method.*"]
+manifest_roots = ["bazel-bin/tag_print.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_float_value = 3.14"
+  replace = "tag_float_value = \"TAG_FLOAT_SENTINEL\""
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_print_value = \"TAG_PRINT_SENTINEL\""
+  replace = "tag_print_value = print"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.2\""
+  replace = "version = \"0.1.3\""
+
+[[commands]]
+name = "ordinary_tag_extension_proxy_is_deferred_until_schema_validation"
+argv = ["build", "//:tag_proxy", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["in 'extension_proxy' tag", "expected value of type 'string'"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter)(?!.*@[0-9a-fA-F]{4,}).*module_extension_proxy.*"]
+manifest_roots = ["bazel-bin/tag_proxy.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_print_value = print"
+  replace = "tag_print_value = \"TAG_PRINT_SENTINEL\""
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_proxy_value = \"TAG_PROXY_SENTINEL\""
+  replace = "tag_proxy_value = valid_tag"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.3\""
+  replace = "version = \"0.1.4\""
+
+[[commands]]
+name = "ordinary_tag_nested_list_invalid_value_is_deferred"
+argv = ["build", "//:tag_nested_list", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["in 'nested_list' tag", "expected value of type 'string'", "got 3.14 (float)"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter).*in 'nested_list' tag.*3[.]14 \\(float\\).*"]
+manifest_roots = ["bazel-bin/tag_nested_list.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_proxy_value = valid_tag"
+  replace = "tag_proxy_value = \"TAG_PROXY_SENTINEL\""
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_nested_list_value = [\"ok\"]"
+  replace = "tag_nested_list_value = [\"ok\", 3.14]"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.4\""
+  replace = "version = \"0.1.5\""
+
+[[commands]]
+name = "ordinary_tag_nested_dict_key_invalid_value_is_deferred"
+argv = ["build", "//:tag_nested_dict", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["in 'nested_dict' tag", "expected value of type 'string'"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter).*in 'nested_dict' tag.*3[.]14.*"]
+manifest_roots = ["bazel-bin/tag_nested_dict.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_nested_list_value = [\"ok\", 3.14]"
+  replace = "tag_nested_list_value = [\"ok\"]"
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_nested_dict_value = {\"ok\": \"value\"}"
+  replace = "tag_nested_dict_value = {3.14: \"value\"}"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.5\""
+  replace = "version = \"0.1.6\""
+
+[[commands]]
+name = "ordinary_tag_self_cycle_reaches_bounded_later_validation"
+argv = ["build", "//:tag_cycle", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["in 'self_cycle' tag", "expected value of type 'string'"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter).*in 'self_cycle' tag.*"]
+manifest_roots = ["bazel-bin/tag_cycle.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_nested_dict_value = {3.14: \"value\"}"
+  replace = "tag_nested_dict_value = {\"ok\": \"value\"}"
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "cycle_value = [\"valid\"]"
+  replace = "cycle_value = []\ncycle_value.append(cycle_value)"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.6\""
+  replace = "version = \"0.1.7\""
+
+[[commands]]
+name = "innate_float_is_deferred_until_repository_rule_validation"
+argv = ["build", "//:innate_float", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["expected value of type 'string'", "got 3.14 (float)"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter)(?!.*disk quota).*got 3[.]14 \\(float\\).*"]
+manifest_roots = ["bazel-bin/innate_float.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "cycle_value = []\ncycle_value.append(cycle_value)"
+  replace = "cycle_value = [\"valid\"]"
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "innate_float_value = \"INNATE_FLOAT_SENTINEL\""
+  replace = "innate_float_value = 3.14"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.7\""
+  replace = "version = \"0.1.8\""
+
+[[commands]]
+name = "innate_builtin_callable_is_deferred_until_repository_rule_validation"
+argv = ["build", "//:innate_print", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["expected value of type 'string'", "<built-in function print>", "builtin_function_or_method"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter)(?!.*@[0-9a-fA-F]{4,}).*<built-in function print>.*builtin_function_or_method.*"]
+manifest_roots = ["bazel-bin/innate_print.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "innate_float_value = 3.14"
+  replace = "innate_float_value = \"INNATE_FLOAT_SENTINEL\""
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "innate_print_value = \"INNATE_PRINT_SENTINEL\""
+  replace = "innate_print_value = print"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.8\""
+  replace = "version = \"0.1.9\""
+
+[[commands]]
+name = "innate_nested_invalid_value_is_deferred"
+argv = ["build", "//:innate_nested", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["expected value of type 'string'", "got 3.14 (float)"]
+stderr_patterns = ["(?s)\\A(?!.*error executing MODULE[.]bazel)(?!.*AttributeValuesAdapter).*innate_nested.*3[.]14 \\(float\\).*"]
+manifest_roots = ["bazel-bin/innate_nested.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "innate_print_value = print"
+  replace = "innate_print_value = \"INNATE_PRINT_SENTINEL\""
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "innate_nested_value = [\"ok\"]"
+  replace = "innate_nested_value = [\"ok\", 3.14]"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.9\""
+  replace = "version = \"0.1.10\""
+
+[[commands]]
+name = "tag_invalid_update_pins_adapter_schema_and_lockfile_order"
+argv = ["build", "//:tag_float_update", "--lockfile_mode=update"]
+expected_exit = 37
+stderr_contains = ["bazel crashed due to an internal error", "Unsupported type: class net.starlark.java.eval.StarlarkFloat", "AttributeValuesAdapter.serializeObject", "SingleExtensionUsagesValue.hashForEvaluation"]
+stderr_patterns = ["(?s)\\A(?!.*in 'update_value' tag)(?!.*disk quota).*AttributeValuesAdapter[.]serializeObject.*SingleExtensionUsagesValue[.]hashForEvaluation.*"]
+manifest_roots = ["bazel-bin/tag_float_update.txt", "MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "innate_nested_value = [\"ok\", 3.14]"
+  replace = "innate_nested_value = [\"ok\"]"
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "tag_float_update_value = \"TAG_FLOAT_UPDATE_SENTINEL\""
+  replace = "tag_float_update_value = 3.14"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.10\""
+  replace = "version = \"0.1.11\""
