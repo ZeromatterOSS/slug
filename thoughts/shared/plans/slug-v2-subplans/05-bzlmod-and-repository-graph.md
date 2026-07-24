@@ -148,6 +148,21 @@ file equality/compute behavior. The current packet is the read-only
 shape into one exact, cycle-free implementation allowlist and acceptance
 matrix before editing Stage 5 or command/runtime code.
 
+Final design result: `REPLAN` the six-fixture bridge into serial packets.
+Independent review accepts `WP-5-m1-root-module-dice-core` first: a
+bzlmod-owned starlark-rust root/include evaluator, fail-closed injected request
+values, real file/root graph keys, and an immutable mapping exposed as
+`Arc<RootModuleGraph>` on `WorkspaceBuildEvaluation`. It does not yet alter
+`PackageLoadKey`; that avoids forcing unmodeled defaults into every standalone
+loading transaction while keeping the first packet observable end to end.
+
+Follow serially with `WP-5-m1-root-module-command-daemon-handoff` for request
+transport and the loading mapping dependency, then
+`WP-5-m1-visible-lockfile-v28`, registry/yanked resolution, and finally
+MVS/extension repo mapping. The six accepted fixtures remain the terminal
+matrix; no current packet may claim rows whose required owner is still
+deferred.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
