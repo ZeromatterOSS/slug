@@ -76,6 +76,36 @@ record, parser result, or isolated policy helper is not completion until the
 analysis/query path computes through it. Refresh any fixture used for current
 acceptance from historical Bazel 9.1.1 to the Stage 1 Bazel 9.2.0 baseline.
 
+### Current prerequisite — `WP-5-m1-bzlmod-runtime-input-oracle` (2026-07-23)
+
+The M1 exit-gate audit returned `REPLAN`: `BzlmodDiceInputs` and
+`ResolvedBzlmodGraphDiceKey` are value/identity records, not real DICE
+dependencies in `WorkspaceRuntime`, and current Stage 5 fixtures cannot
+authorize the bridge because they retain Bazel 9.1.1 evidence.
+
+Refresh only `module-include-change-invalidation`,
+`module-root-dev-dependency-visibility`, `lockfile-mode-update-refresh`,
+`lockfile-version-error`, `yanked-version-command-env-union`, and
+`repo-mapping-canonical-names` at Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Strengthen the include fixture
+through edit/delete-error/recreate and the command-policy fixture through
+default/ignore/default in one output base. Pin visible lockfile
+absence/presence/version/modes, command/environment yanked-policy union, and
+root repo-mapping identity with exact diagnostics, manifests, immutable
+provenance, and source anchors.
+
+Hidden lockfile ownership is deferred: it belongs to output-base and
+module-extension replay and cannot be inferred from visible lockfile rows.
+The exact allowlist is those six fixture directories plus compact plan/routing
+evidence after acceptance. No Rust, Cargo, dependency, registry networking,
+module extension, materialization, repository fetching, cquery/aquery, or
+command activation is authorized. Stop on an unpinned source, nonlocal network
+dependency, hidden-lockfile claim, or need to broaden semantics. After
+independent oracle acceptance, review the exact raw-content/digest input
+owners, real DICE keys/equality, Starlark module evaluator boundary, policy
+source, minimal resolution value, and same-runtime activation expectations
+before implementing a bridge.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation

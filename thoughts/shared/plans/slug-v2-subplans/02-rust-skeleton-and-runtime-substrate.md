@@ -338,6 +338,23 @@ independently reviewable implementation packet, its exact file allowlist,
 oracle/source anchors, lifecycle evidence, exclusions, and stop conditions.
 This audit authorizes no Rust, fixture, dependency, DICE-key, or lock change.
 
+Audit result: `REPLAN`. One retained `WorkspaceRuntime` exists per daemon and
+implemented root/loading/configured-analysis/query paths share its committed
+transaction. File/directory values preserve present, absent, and read-error
+states, and no blocking application lock crosses DICE or Starlark work.
+However only the two coarse workspace snapshots are injected; bzlmod,
+environment, command policy, lockfile, repository mapping, materialization,
+cquery, and aquery are absent from the semantic spine. The recursive observer
+still scans the full workspace for every production request, deletion is map
+omission rather than a named per-path change, and daemon reuse evidence is
+partly the adapter's compatibility counter rather than key activation.
+
+The proposed direct Rust bridge was rejected because Stage 5's input bundles
+are value-only records, not real DICE keys, and their owning fixtures still
+encode Bazel 9.1.1 behavior. The next packet is the pinned Bazel 9.2
+`WP-5-m1-bzlmod-runtime-input-oracle` prerequisite recorded in Stage 5 and the
+canonical plan. M1 remains partial.
+
 ### 2.6 First-Real-Build Promotion
 
 Before Stage 5-8 work can advance beyond scaffold status:
