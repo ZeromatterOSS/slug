@@ -19,6 +19,7 @@ from .normalize import normalize_text, path_replacements
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HTTP_REGISTRY_STARTUP_TIMEOUT_SECONDS = 5.0
+WORKSPACE_URI_TOKEN = "{{workspace_uri}}"
 
 
 @dataclass(frozen=True)
@@ -45,7 +46,39 @@ def _copy_workspace(fixture: Fixture, run_dir: Path) -> Path:
     if workspace.exists():
         raise FileExistsError(f"refusing to reuse run workspace: {workspace}")
     shutil.copytree(fixture.workspace, workspace, symlinks=True)
+    _expand_workspace_uri_templates(workspace)
     return workspace
+
+
+def _workspace_uri(workspace: Path) -> str:
+    return workspace.resolve().as_uri()
+
+
+def _expand_workspace_uri(value: str | None, workspace_uri: str) -> str | None:
+    if value is None:
+        return None
+    return value.replace(WORKSPACE_URI_TOKEN, workspace_uri)
+
+
+def _expand_workspace_uri_templates(workspace: Path) -> None:
+    workspace_uri = _workspace_uri(workspace)
+    for directory, dirnames, filenames in os.walk(workspace, followlinks=False):
+        directory_path = Path(directory)
+        dirnames[:] = [
+            name for name in dirnames if not (directory_path / name).is_symlink()
+        ]
+        for name in filenames:
+            path = directory_path / name
+            if path.is_symlink() or not path.is_file():
+                continue
+            try:
+                content = path.read_bytes().decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+            if WORKSPACE_URI_TOKEN in content:
+                path.write_bytes(
+                    content.replace(WORKSPACE_URI_TOKEN, workspace_uri).encode("utf-8")
+                )
 
 
 def _start_fixture_http_registry(
@@ -156,14 +189,19 @@ def _collect_manifest(
 
 def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str, str | None]]:
     applied: list[dict[str, str | None]] = []
+    workspace_uri = _workspace_uri(workspace)
     for mutation in command.mutations:
         path = _workspace_mutation_path(workspace, mutation.path)
         if mutation.op == "create":
             if path.exists() or path.is_symlink():
                 raise FileExistsError(f"mutation create destination exists: {mutation.path}")
             _require_existing_real_parent(path, mutation.path)
-            path.write_text(mutation.content or "", encoding="utf-8", newline="")
-            applied.append({"op": "create", "path": mutation.path})
+            content = _expand_workspace_uri(mutation.content, workspace_uri) or ""
+            path.write_text(content, encoding="utf-8", newline="")
+            record: dict[str, str | None] = {"op": "create", "path": mutation.path}
+            if mutation.content is not None and WORKSPACE_URI_TOKEN in mutation.content:
+                record["content"] = mutation.content
+            applied.append(record)
             continue
         if mutation.op == "delete":
             if not path.is_file():
@@ -186,15 +224,29 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
             raise FileNotFoundError(f"mutation target does not exist: {mutation.path}")
         if mutation.content is not None:
             old = path.read_text(encoding="utf-8")
-            path.write_text(mutation.content, encoding="utf-8", newline="")
-            applied.append({"path": mutation.path, "find": None, "replace": None, "old_digest_hint": str(len(old))})
+            content = _expand_workspace_uri(mutation.content, workspace_uri)
+            assert content is not None
+            path.write_text(content, encoding="utf-8", newline="")
+            record = {
+                "path": mutation.path,
+                "find": None,
+                "replace": None,
+                "old_digest_hint": str(len(old)),
+            }
+            if WORKSPACE_URI_TOKEN in mutation.content:
+                record["content"] = mutation.content
+            applied.append(record)
             continue
         old = path.read_text(encoding="utf-8")
         assert mutation.find is not None
         assert mutation.replace is not None
-        if mutation.find not in old:
+        find = _expand_workspace_uri(mutation.find, workspace_uri)
+        replace = _expand_workspace_uri(mutation.replace, workspace_uri)
+        assert find is not None
+        assert replace is not None
+        if find not in old:
             raise ValueError(f"mutation text not found in {mutation.path}: {mutation.find!r}")
-        path.write_text(old.replace(mutation.find, mutation.replace), encoding="utf-8", newline="")
+        path.write_text(old.replace(find, replace), encoding="utf-8", newline="")
         applied.append({"path": mutation.path, "find": mutation.find, "replace": mutation.replace, "old_digest_hint": str(len(old))})
     return applied
 

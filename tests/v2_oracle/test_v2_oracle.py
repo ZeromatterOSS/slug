@@ -30,6 +30,7 @@ from tools.v2_oracle_lib.normalize import normalize_text, path_replacements
 from tools.v2_oracle_lib.runner import (
     RunOptions,
     ToolConfig,
+    _argv,
     _apply_mutations,
     _extract_reapi_evidence,
     run_fixture,
@@ -287,6 +288,118 @@ path = "renamed.txt"
         )
 
 
+def test_runner_expands_workspace_uri_only_in_copied_utf8_regular_files() -> None:
+    root = scratch_dir("workspace-uri-initial")
+    fixture_root = root / "fixture"
+    source_workspace = fixture_root / "workspace"
+    expected = fixture_root / "expected"
+    source_workspace.mkdir(parents=True)
+    expected.mkdir()
+    source_text = (
+        b"first {{workspace_uri}}\r\n"
+        b"second {{workspace_uri}} {{unknown_token}} {{http_registry}}\r\n"
+    )
+    (source_workspace / "text.txt").write_bytes(source_text)
+    binary = b"\xff{{workspace_uri}}\x00"
+    (source_workspace / "binary.dat").write_bytes(binary)
+    outside = root / "outside.txt"
+    outside.write_text("{{workspace_uri}}\n", encoding="utf-8")
+    (source_workspace / "linked.txt").symlink_to(outside)
+    (fixture_root / "fixture.toml").write_text(
+        """
+[fixture]
+name = "workspace-uri-initial"
+
+[[commands]]
+argv = ["-c", "pass"]
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = run_fixture(
+        load_fixture(fixture_root),
+        ToolConfig(name="slug", executable=Path(sys.executable)),
+        RunOptions(run_root=root / "runs", timeout_seconds=30),
+    )
+    copied_workspace = Path(result["commands"][0]["cwd"])
+    workspace_uri = copied_workspace.resolve().as_uri()
+    assert (copied_workspace / "text.txt").read_bytes() == (
+        f"first {workspace_uri}\r\n"
+        f"second {workspace_uri} {{{{unknown_token}}}} {{{{http_registry}}}}\r\n"
+    ).encode("utf-8")
+    assert (source_workspace / "text.txt").read_bytes() == source_text
+    assert (copied_workspace / "binary.dat").read_bytes() == binary
+    assert (copied_workspace / "linked.txt").is_symlink()
+    assert outside.read_text(encoding="utf-8") == "{{workspace_uri}}\n"
+
+
+def test_mutations_expand_workspace_uri_operands_but_record_raw_templates() -> None:
+    workspace = scratch_dir("workspace-uri-mutations") / "workspace"
+    workspace.mkdir()
+    workspace_uri = workspace.resolve().as_uri()
+    (workspace / "message.txt").write_text(f"before {workspace_uri}\n", encoding="utf-8")
+    (workspace / "content.txt").write_text("old\n", encoding="utf-8")
+    raw_find = "before {{workspace_uri}}"
+    raw_replace = "after {{workspace_uri}}"
+    raw_content = "created {{workspace_uri}} {{unknown_token}}\n"
+    raw_path = "literal-{{workspace_uri}}.txt"
+    raw_destination = "renamed-{{workspace_uri}}.txt"
+    command = FixtureCommand(
+        name="workspace-uri-mutations",
+        argv=("-c", "pass"),
+        compare="semantic",
+        mutations=(
+            Mutation(path="message.txt", find=raw_find, replace=raw_replace),
+            Mutation(path=raw_path, op="create", content=raw_content),
+            Mutation(path=raw_path, op="rename", destination=raw_destination),
+            Mutation(path="content.txt", content="replacement {{workspace_uri}}\n"),
+        ),
+    )
+
+    applied = _apply_mutations(workspace, command)
+    assert (workspace / "message.txt").read_text(encoding="utf-8") == f"after {workspace_uri}\n"
+    assert (workspace / raw_destination).read_text(encoding="utf-8") == (
+        f"created {workspace_uri} {{{{unknown_token}}}}\n"
+    )
+    assert not (workspace / raw_path).exists()
+    assert (workspace / "content.txt").read_text(encoding="utf-8") == (
+        f"replacement {workspace_uri}\n"
+    )
+    assert applied == [
+        {
+            "path": "message.txt",
+            "find": raw_find,
+            "replace": raw_replace,
+            "old_digest_hint": str(len(f"before {workspace_uri}\n")),
+        },
+        {"op": "create", "path": raw_path, "content": raw_content},
+        {"op": "rename", "path": raw_path, "destination": raw_destination},
+        {
+            "path": "content.txt",
+            "find": None,
+            "replace": None,
+            "content": "replacement {{workspace_uri}}\n",
+            "old_digest_hint": str(len("old\n")),
+        },
+    ]
+
+
+def test_runner_preserves_registry_argv_and_conditional_http_registry_substitution() -> None:
+    tool = ToolConfig(name="slug", executable=Path(sys.executable))
+    command = FixtureCommand(
+        name="transport-tokens",
+        argv=("-c", "pass", "--registry=file://%workspace%/registry", "{{http_registry}}"),
+        compare="semantic",
+    )
+    assert _argv(tool, command, Path("/tmp/output-base")) == [
+        str(Path(sys.executable)),
+        "-c",
+        "pass",
+        "--registry=file://%workspace%/registry",
+        "{{http_registry}}",
+    ]
+
+
 def test_normalize_text_strips_host_specific_noise() -> None:
     workspace = scratch_dir("normalize") / "workspace"
     workspace.mkdir()
@@ -296,6 +409,15 @@ def test_normalize_text_strips_host_specific_noise() -> None:
     assert "<workspace>/pkg/x" in normalized
     assert "<duration>" in normalized
     assert "<uuid>" in normalized
+
+
+def test_normalize_text_replaces_percent_encoded_workspace_uri() -> None:
+    workspace = scratch_dir("normalize-uri") / "space café"
+    workspace.mkdir()
+    workspace_uri = workspace.resolve().as_uri()
+    assert "%20" in workspace_uri
+    assert "%C3%A9" in workspace_uri
+    assert normalize_text(workspace_uri, path_replacements(workspace=workspace)) == "file://<workspace>"
 
 
 def test_normalize_text_strips_prior_run_workspace_paths() -> None:

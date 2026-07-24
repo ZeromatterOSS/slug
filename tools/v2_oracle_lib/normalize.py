@@ -35,4 +35,6 @@ def path_replacements(**paths: Path | str | None) -> dict[str, str]:
         path = str(value)
         replacements[path] = f"<{name}>"
         replacements[path.replace("\\", "/")] = f"<{name}>"
+        if isinstance(value, Path):
+            replacements[value.resolve().as_uri()] = f"file://<{name}>"
     return replacements
