@@ -532,6 +532,20 @@ The current packet is the read-only
 accept or replan the frozen five-file key/provenance/evaluator design before
 any discovery Rust.
 
+That rereview returned `REPLAN`. The live `ModuleFileEvaluation` is not a
+Bazel-shaped `InterimModule`: it omits compatibility fields, max-compatibility
+and distinct nodep/original deps, registrations, extension usages, flag
+aliases, built-in collision behavior, and nonroot dev-dependency suppression.
+The eleven-row oracle pins evaluation ordering but not those values.
+Preparation also drops ordered exhaustion attempts and flattens fatal registry
+causes to strings.
+
+The current packet is the read-only
+`WP-5-m1-nonroot-interim-module-oracle-design`. It must design complete
+observable Bazel 9.2 evidence and the serial evaluator/schema → typed
+preparation provenance → discovery split. No dependency-only discovery subset
+is authorized.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
