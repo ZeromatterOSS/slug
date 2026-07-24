@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; discovery design audit and first local executable probe complete | the first local probe disproved exact-file invalidation after a successful registry read: Bazel retries transient absence, then replays successful local module content across edit/delete/recreate under unchanged root and registry inputs; the accepted local `RegistryFileKey` owner and discovery design require correction before Rust | correct only the local registry replay/invalidation oracle |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry replay oracle is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry replay oracle is current |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c` | the accepted local `RegistryFileKey` exact-workspace dependency does not match Bazel's transient-failure/sticky-success lifecycle; its IO and invalidation ownership must be redesigned before discovery | design only the local registry replay correction |
+| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 registry replay design is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 registry replay design is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,49 +33,49 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-registry-module-discovery-replay-oracle-correction`.
+Run only `WP-5-m1-registry-local-replay-design-correction`.
 
-The first executable `registry-module-discovery-recovery` probe reached Bazel
-9.2 only after source-controlled local-path shims isolated the embedded
-`bazel_tools` closure from BCR. In one retained server/output base, Bazel
-reported both local registries absent, retried that transient failure after
-the first file was created, and selected `firstdep`. It then replayed that
-successful module value unchanged after the file became malformed, was
-repaired, was deleted, and was recreated. This is consistent with
-`ModuleFileValue.Key(ModuleKey)`, direct `IndexRegistry` reads that publish no
-local file Skyframe dependency, and transient `ModuleFileFunctionException`
-failures. It disproves the prior requirement that every successful local
-registry edit invalidates under otherwise unchanged semantic inputs.
+Oracle `0211982c` is accepted against Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Its six retained-daemon rows prove
+ordered transient absence and retry after creation; successful local module
+content replay after a malformed mutation under equal semantic inputs;
+root-version invalidation exposing fatal malformed content without fallback;
+repair recovery; and delete fallback to the second registry. Generation,
+worker replay, root replay, fixture/TOML/source-anchor checks, diff checks, and
+fresh independent evidence review passed. Embedded-tools local-path shims are
+deterministic scaffolding, not extension or repository evidence.
 
-Correct only the same fixture and expected output. Preserve the two local
-registries, local embedded-closure shims, one Bazel server/output base,
-`--lockfile_mode=off`, and distinct `firstdep`, `repaireddep`, and `seconddep`
-bodies. Use six commands:
+Before Rust, trace pinned Bazel `ModuleFileFunction`, `RegistryFunction`,
+`IndexRegistry`, and exception transience against the live
+`RegistryFileKey`, `RegistryPolicyKey`, root file/graph keys, request
+generation, global IO capability, and core adapter. Freeze a correction that:
 
-1. both absent: ordered first/second not-found failure;
-2. create first: transient failure retries and selects `firstdep`;
-3. make first malformed and create valid second, with the root and registry
-   inputs unchanged: cached `firstdep` replays without evaluation;
-4. change only the root module version: the non-root module key is invalidated,
-   malformed first is fatal, and valid second is not consulted;
-5. repair first and change the root version again: `repaireddep` is observed;
-6. delete first and change the root version again: first is absent and
-   `seconddep` is selected.
+1. preserves one stable exact-resource key identity without request generation
+   or content in the key;
+2. reads local registry files through a non-semantic IO capability, not
+   `WorkspaceFileKey`, so a successful value remains cached while relevant
+   root/registry/mode inputs are equal;
+3. depends on request generation only for local absence and local read
+   failures, so the next request retries a transient failure;
+4. rereads after every Bazel-equivalent semantic invalidator, including root
+   module value and ordered registry changes, without applying remote lockfile
+   checksum policy to local files;
+5. still emits the SHA-or-absence observation for every local module-file
+   attempt even though local fetch policy ignores visible-lockfile hashes;
+6. leaves HTTP(S) checksum, recorded-absence, refresh, and conditional
+   generation behavior unchanged; and
+7. names the exact DICE equality boundary, nonblocking filesystem adapter,
+   lifecycle tests, downstream compile/tests, and implementation allowlist.
 
-Each root-version mutation must be unique and must leave the requested
-`aaa@1.0.0` key and registry list unchanged. Graph output and diagnostics must
-separately prove sticky success, fatal evaluation, repair, and delete fallback.
-Record the local embedded-module shims as deterministic scaffolding only; no
-extension or repository behavior is evidence. Generate with Bazel 9.2, replay
-independently, and obtain independent evidence review.
-
-The allowlist remains only
-`tests/v2_oracle/fixtures/registry-module-discovery-recovery/**`. Do not edit
-the harness, Rust, Cargo, existing fixtures, plans beyond compact evidence, or
-lockfiles. After acceptance, redesign the local `RegistryFileKey` branch
-before discovery implementation: the current exact `WorkspaceFileKey`
-dependency is not Bazel-parity for cached successes. No earlier discovery
-implementation allowlist is active.
+Audit whether `RootModuleFilesKey`, `RootModuleGraphKey`, or a smaller replay
+epoch should own the invalidator without creating a policy/file cycle or
+retaining a lock across DICE compute. Explicitly cover root A→B→C, registry
+A→B→A, absent→created, successful→malformed sticky replay, invalidated
+malformed failure, repaired success, and invalidated delete fallback. This is
+a read-only design packet: do not edit Rust, Cargo, fixtures, expected output,
+tests, or lockfiles. The prior discovery implementation allowlist remains
+inactive; MVS, selected-yanked/RepoSpec aggregation, writing, loading,
+extensions, and materialization remain deferred.
 
 ### Accepted transport evidence
 

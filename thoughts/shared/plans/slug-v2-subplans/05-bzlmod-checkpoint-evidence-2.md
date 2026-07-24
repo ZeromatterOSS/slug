@@ -525,3 +525,14 @@ Expected evidence artifact: the preserved six-row run reports ordered absence, t
 Design summary: Bazel retries the initial transient module-not-found failure, but a successful local registry module read has no local file Skyframe dependency and remains cached under its `ModuleKey` while root and registry inputs stay equal. This contradicts the accepted Slug substrate's unconditional local `WorkspaceFileKey` dependency and invalidates the discovery design's exact-file replay premise.
 Validation: Bazel 9.2 run `20260723-224004-1531558-bazel`; exact normalized outputs inspected for all six commands; no Rust, Cargo, harness, existing-fixture, or lockfile edit
 Residual risk: The fixture's original transition assertions are intentionally not accepted. Correct it to pin transient retry, sticky success, root-input-triggered malformed failure, repair, and delete fallback; then redesign the local registry IO/DICE branch before any discovery Rust.
+
+### Stage 5 local registry module replay oracle correction
+
+Status: Accepted
+V2 commit: `0211982c test: pin local registry module replay`
+Bazel source inspected: Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `ModuleFileValue.Key`, `ModuleFileFunction`, `RegistryFunction`, `IndexRegistry`, `RegistryFactoryImpl`, and installed `embedded_tools/MODULE.bazel`
+Bazel oracle: `registry-module-discovery-recovery` with two local file registries, lockfile off, one retained server/output base, and source-controlled local-path shims for the unrelated embedded-tools closure
+Expected evidence artifact: ordered absent failure; transient retry after first creation; cached first-registry success after malformed mutation under equal root/registry inputs; unique root-version invalidation exposing fatal malformed content; repair recovery; and invalidated delete fallback to the second registry
+Implementation summary: Added only the six-row fixture and expected evidence. Minimal local module declarations, local-path repo specs, and exact rules_java/buildozer/rules_cc redirect stubs prevent BCR or network closure content from becoming evidence; their behavior is not asserted.
+Validation: Bazel 9.2 generation, worker replay, and independent root replay passed; fixture listing, six-row TOML/no-BCR checks, all pinned source anchors, normalized/raw record inspection, diff checks, and fresh independent evidence review returned `ACCEPT`
+Residual risk: Slug's accepted local `RegistryFileKey` still depends on exact `WorkspaceFileKey` state and therefore invalidates successful reads more eagerly than Bazel. Design the non-semantic local IO, transient-failure generation, and root/registry replay epoch correction before discovery implementation.
