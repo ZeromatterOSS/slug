@@ -1028,6 +1028,9 @@ Detailed checkpoint evidence for this stage lives in these companion files:
   records checkpoints through `c65dedee Stage 5 preserve registry module
   digests`.
 - [05-bzlmod-checkpoint-evidence-2.md](./05-bzlmod-checkpoint-evidence-2.md)
+  records checkpoints through the accepted repository materialization
+  request/result design.
+- [05-bzlmod-checkpoint-evidence-3.md](./05-bzlmod-checkpoint-evidence-3.md)
   is the active destination for new Stage 5 checkpoint entries.
 
 Keep new entries in the active evidence file so this owner plan and every

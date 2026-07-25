@@ -3,10 +3,11 @@
 This companion file continues detailed landed evidence for
 [05-bzlmod-and-repository-graph.md](./05-bzlmod-and-repository-graph.md).
 
-Use this file for new Stage 5 checkpoint entries after
-`c65dedee Stage 5 preserve registry module digests`. The first evidence shard
-is [05-bzlmod-checkpoint-evidence.md](./05-bzlmod-checkpoint-evidence.md).
-Keep each evidence shard below 1000 lines.
+This file records Stage 5 checkpoints after
+`c65dedee Stage 5 preserve registry module digests` through the accepted
+repository materialization request/result design. Earlier evidence is in
+[Part 1](./05-bzlmod-checkpoint-evidence.md); new entries go to
+[Part 3](./05-bzlmod-checkpoint-evidence-3.md).
 
 ## Checkpoint Evidence
 
