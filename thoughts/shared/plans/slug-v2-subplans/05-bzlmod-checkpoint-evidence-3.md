@@ -619,3 +619,66 @@ archive stage precedence, and normalized/relativized exact-prefix extraction.
 Preserve the three-file private implementation boundary and every already
 accepted owner, dirtiness, lifetime, Local, epoch, capture, and exclusion
 decision.
+
+### Stage 5 retained materializer session/archive-order design correction
+
+Status: Accepted before Rust
+
+The corrected owner permits exactly one active nonzero session token per
+`WorkspaceRuntime`. Busy begin and stale epoch/accept/discard operations are
+typed no-mutation errors. Accepted state stores each full request beside its
+ID, repo-keyed terminal validation, and append-only published roots. The
+owner's short mutex covers only synchronous snapshot, token/instance
+allocation, root registration, and terminal promotion; no guard crosses path
+observation, archive/Git work, await, or DICE.
+
+Fresh immutable roots remain provisional across cumulative retry epochs and
+receive a unique instance before first DICE exposure; abandoned IDs are never
+reused. Provisional TempDirs are physically quarantined under the active owner
+token, so dropping a session handle cannot release a DICE-addressable path.
+Only explicit matching-token accept or discard, after the future caller has
+restored accepted injection and ended every transaction that can reference
+unselected roots, may move selected roots to append-only accepted retention or
+release the rest. Local success remains logical Host-only and allocation-free.
+
+At session start, accepted validation demands are reobserved outside DICE with
+the retained-root authority. Stable Missing is clean and any observation error
+is dirty. Existence/kind changes dirty the owning repository. Exact FileBytes
+takes precedence over lstat proxies; otherwise regular/special lstat compares
+size, node, and mtime while ignoring ctime and permissions. ReadLink targets
+and directory entries compare exactly. Only a clean full-request match reuses
+the same immutable root/instance offline. Each session epoch is one sorted
+cumulative complete replacement; only a future terminal caller may promote
+closure-selected results and validation.
+
+The supported archive sequence is structural strip/URL validation and saved
+checksum parsing; unpublished output root and private capture creation; one
+caller-source capture/hash; saved malformed-checksum or checksum result;
+inspection and exact prefix selection; then extraction. Source/capture failure
+wins over a saved malformed checksum; malformed checksum after successful
+capture is persistent Spec, valid mismatch is current-generation Transport,
+and later tar/filter/extract failures are current-generation Materialization.
+Checksum, source identity, every inspection, and extraction use only the
+private artifact.
+
+Archive member and prefix bytes use Bazel's normalize-then-absolute-to-relative
+component semantics before exact prefix selection and destination containment.
+Outside-prefix entries are skipped and an absent prefix fails. Evidence must
+cover overlapping sessions and stale tokens, zero/MAX allocation, implicit
+handle drop retention, exact dirtiness/reuse, cancellation, complete epoch
+order, mutable-source capture, dual-stage failures, absolute and
+`foo/../bar` members, same-depth sibling prefixes, absent prefixes, normalized
+collisions, and old-root readability. Symlink/hardlink and broader raw-tar
+support remain explicit Bazel parity gaps after this regular/directory subset.
+Independent pinned-source and architecture terminal reviews returned
+`ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-materializer-session-archive-implementation` in
+`app/slug_core_v2/src/runtime/repository_io.rs`,
+`app/slug_core_v2/src/runtime/path_observation.rs`, and
+`app/slug_core_v2/src/runtime/dice.rs`. The path file may add only one private
+native-observer/root-authority entrypoint, and the DICE file only one private
+owner field plus construction. Do not add a dependency, public API, DICE key,
+source-preparation change, sidecar, producer, retry/publication, command
+activation, fixture, or discovery behavior.
