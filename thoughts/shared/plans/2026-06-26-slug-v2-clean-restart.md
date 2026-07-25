@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a`; nonroot registration/flag-alias consumer oracle accepted in `eeea40a6`; complete compact evaluator/schema design accepted; compact nonroot schema and MODULE syntax inspector accepted in `c663fe46`; bounded raw-attribute oracle design accepted; 12-row raw-attribute oracle accepted in `cffc39b0`; post-file bounded snapshot design accepted; compact deferred-attribute snapshot and ordered adapter projection accepted in `d4fb5d65`; GC-rooted private single-file directive-evaluator design accepted; private one-file directive evaluator accepted in `b738547d`; bounded nonroot include-composition oracle design accepted; six-row nonroot include-composition oracle accepted in `203cdaac`; prepared-program include-composition redesign accepted; `extra` and borrowed-slice dispatcher attempts stopped cleanly on distinct lifetime boundaries; evaluator-owned `Rc`-slice opaque-index dispatcher accepted; private supplied-file include composition accepted in `72e132a1`; compact typed preparation-provenance design accepted; typed preparation provenance accepted in `0494db65`; discovery rereview preserved the stable composition contract but replanned on three unowned Bazel boundaries; discovery-boundary oracle design corrected after executable nonreplay evidence; eight-row package/print/default discovery-boundary oracle accepted in `12bb70a1`; package-lookup design retained identity/priority/order but replanned on directory and policy ownership; neutral workspace-directory owner lift accepted in `e440e707`; focused nonroot package-policy oracle design accepted and corrected after isolated HEAD exposed seven stale manifest modes; 15-row package-policy oracle accepted in `60c24045`; package-lookup rereview froze a four-owner sequence and replanned on unresolved repository path state; repository path-state design proved the eager one-commit snapshot cannot boundedly cover Bazel-compatible ancestor symlink escapes and replanned to exact retained-daemon evidence before a request-boundary redesign; focused 16-row repository path-state oracle design and oracle accepted; five-packet fixture-growth checkpoint accepted with no pruning or replay; demand-boundary design preserved a typed sparse owner/runtime restart architecture but replanned before Rust; filesystem-authority feasibility accepted Bazel's command-boundary invalidation plus live lazy reads and removed the invented request-atomic premise; command-scoped final-root effect sidecar design accepted; corrected typed observation/retry/event/immutable-instance architecture accepted; activation-substrate first attempt stopped cleanly and its version-lifecycle/API scope correction was accepted; exact-version DICE activation closure accepted in `d775986d`; split neutral event/path substrate contract accepted; structural path/sparse owner accepted in `c26d14c6`; neutral evaluation event batches accepted in `19366fbe` | structural propagation, local/immutable read migration, runtime retry ownership, and terminal publication remain; resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | design the first leaf-up structural propagation/read-migration packet |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a`; nonroot registration/flag-alias consumer oracle accepted in `eeea40a6`; complete compact evaluator/schema design accepted; compact nonroot schema and MODULE syntax inspector accepted in `c663fe46`; bounded raw-attribute oracle design accepted; 12-row raw-attribute oracle accepted in `cffc39b0`; post-file bounded snapshot design accepted; compact deferred-attribute snapshot and ordered adapter projection accepted in `d4fb5d65`; GC-rooted private single-file directive-evaluator design accepted; private one-file directive evaluator accepted in `b738547d`; bounded nonroot include-composition oracle design accepted; six-row nonroot include-composition oracle accepted in `203cdaac`; prepared-program include-composition redesign accepted; `extra` and borrowed-slice dispatcher attempts stopped cleanly on distinct lifetime boundaries; evaluator-owned `Rc`-slice opaque-index dispatcher accepted; private supplied-file include composition accepted in `72e132a1`; compact typed preparation-provenance design accepted; typed preparation provenance accepted in `0494db65`; discovery rereview preserved the stable composition contract but replanned on three unowned Bazel boundaries; discovery-boundary oracle design corrected after executable nonreplay evidence; eight-row package/print/default discovery-boundary oracle accepted in `12bb70a1`; package-lookup design retained identity/priority/order but replanned on directory and policy ownership; neutral workspace-directory owner lift accepted in `e440e707`; focused nonroot package-policy oracle design accepted and corrected after isolated HEAD exposed seven stale manifest modes; 15-row package-policy oracle accepted in `60c24045`; package-lookup rereview froze a four-owner sequence and replanned on unresolved repository path state; repository path-state design proved the eager one-commit snapshot cannot boundedly cover Bazel-compatible ancestor symlink escapes and replanned to exact retained-daemon evidence before a request-boundary redesign; focused 16-row repository path-state oracle design and oracle accepted; five-packet fixture-growth checkpoint accepted with no pruning or replay; demand-boundary design preserved a typed sparse owner/runtime restart architecture but replanned before Rust; filesystem-authority feasibility accepted Bazel's command-boundary invalidation plus live lazy reads and removed the invented request-atomic premise; command-scoped final-root effect sidecar design accepted; corrected typed observation/retry/event/immutable-instance architecture accepted; activation-substrate first attempt stopped cleanly and its version-lifecycle/API scope correction was accepted; exact-version DICE activation closure accepted in `d775986d`; split neutral event/path substrate contract accepted; structural path/sparse owner accepted in `c26d14c6`; neutral evaluation event batches accepted in `19366fbe`; operational path-resolution/byte-projection design accepted | the operational resolver, structural propagation, local/immutable read migration, runtime retry ownership, and terminal publication remain; resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | implement only the operational resolver and semantic byte projection |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,39 +33,63 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-structural-propagation-read-migration-design`.
+Run only `WP-5-m1-operational-path-resolution-byte-projection`.
 
-Perform a read-only live dependency and ownership audit before more Rust.
-Trace the legacy workspace text/raw/directory projections and the new sparse
-path owner through bzlmod module evaluation, registry and source preparation;
-loading Bzl/package/glob keys; analysis configured-target evaluation; query
-graph/loading consumers; and the retained core runtime. Name every direct
-filesystem read, error stringification, lossy path/name projection, and DICE
-value boundary that would erase `Need`.
+In `app/slug_workspace_v2`, add new `src/path_resolution.rs` and reexport its
+public surface from `src/lib.rs`. Add no dependency and do not edit the
+accepted `path_observation.rs`. Implement `ResolvedPathKey(namespace,
+logical_path) -> PathResult<ResolvedPath, PathResolutionError>` as an
+observation-only component resolver. Its complete-only equality must retain
+the operational namespace/instance, requested and real OS-native paths, final
+present-lstat or missing state, ordered logical route, every traversed
+physical symlink plus raw target, and the first optional nonterminal
+ancestor-expansion path/chain. Typed observation, cycle, and infinite
+expansion failures remain inside `Complete(Err(_))`; `Need` stays invalid and
+unequal.
 
-Against pinned Bazel 9.2 `FileFunction`, `FileStateFunction`,
-`FileStateValue`, symlink-resolution, package lookup, and repository source
-authorities at `8220c6198837d5c13d53fea211cf3282aa12408a`, freeze the first
-serial implementation packet. It must define component-wise no-follow
-resolution from typed observations, relative and absolute symlink handling,
-filesystem-root escape, dangling/wrong-kind/inconsistent-state behavior,
-exact cycle and unbounded-descendant detection, and semantic projection
-equality that erases operational instance/root/generation while retaining
-content, observed absence, or typed terminal error.
+Mirror pinned Bazel 9.2 `FileFunction` at
+`8220c6198837d5c13d53fea211cf3282aa12408a` with an explicit iterative
+parent-frame stack. Resolve each parent in its own frame, replay that parent's
+logical-chain entries with the child basename into the current frame, and
+only then lstat the derived real child. Ordinary `/a/b/c` therefore has
+current chain `[/a/b/c]`, never the list of all filesystem ancestors.
+Symlink-target parents use the same separate-frame rule. A missing or
+non-directory parent produces descendant Missing without a child lstat.
+No-follow lstat precedes raw ReadLink; relative targets start at the physical
+link parent, absolute targets at the filesystem root, and lexical normalization
+may escape repository roots while clamping only at the filesystem root.
+Check component-aware proposed paths before admission: exact repeat is a
+cycle, a strict descendant of a prior path is terminal infinite expansion,
+and a strict ancestor records the first nonterminal marker. Use no traversal
+or retry cap.
 
-The design must order structural `Need` propagation leaf-up and identify the
-first bounded consumer/read migration without adding the command retry loop.
-It must give exact files, APIs, dependencies, focused create/edit/delete,
-symlink, A→B→A, equality/invalidation tests, downstream compile gates, and
-stop conditions. Preserve the accepted path and event substrates unchanged;
-do not add producers, publication, retry/runtime ownership, a second
-filesystem authority, direct IO inside DICE, or a combined cross-graph
-implementation packet.
+Add `PathFileBytesKey(namespace, logical_path) ->
+PathResult<PathFileBytes, PathResolutionError>`. It depends on the exact
+resolver, demands FileBytes only for a final regular file, distinguishes
+observed Missing from typed wrong-kind/IO/inconsistent failures, and treats
+ReadLink or FileBytes Missing after a matching lstat as inconsistent state.
+Its complete-only equality retains only Present shared bytes, semantic
+Missing, or the complete typed terminal error and erases route, root,
+instance, and generation.
 
-This is a design packet only. Update the owner plan, canonical current packet,
-and routing rollup once at terminal `ACCEPT` or `REPLAN`; make no Rust, Cargo,
-fixture, oracle, runtime, server, CLI, repository-transport, REAPI, or
-materialization edit.
+Use OS-native normalized paths, ordered and sorted vectors, existing compact
+small collections where useful, shared slices, `Dupe` handles, and
+`Allocative` retained values. Inline focused tests must discriminate
+cumulative Need and component order; parent suppression; regular bytes;
+relative/absolute/ancestor/leaf/transitive links; filesystem-root
+escape/clamp; dangling versus races; typed errors; exact self and A→B→A
+cycles; descendant terminal versus ancestor nonterminal expansion; ordinary
+chain shape; operational-unequal/semantic-equal retarget and materialization
+instances; and bytes A→B→Missing→A restoration.
+
+Run focused/full `slug_workspace_v2` tests and doctests, format, diff check,
+the exact two-file allowlist, and archive guards. Stop on any Cargo/dependency,
+accepted observation/event, direct-IO, string/lossy path, global-interner,
+consumer, runtime, retry, publication, directory/package/glob, repository,
+materialization, fixture, or oracle edit, or if the exact FileFunction chain
+shape cannot be reproduced. The separate first consumer remains the
+Host-scoped root-patch read in `ModuleSourcePreparationKey`; design it only
+after this owner packet is accepted.
 
 ### Accepted transport evidence
 
