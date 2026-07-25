@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a`; nonroot registration/flag-alias consumer oracle accepted in `eeea40a6`; complete compact evaluator/schema design accepted; compact nonroot schema and MODULE syntax inspector accepted in `c663fe46`; bounded raw-attribute oracle design accepted; 12-row raw-attribute oracle accepted in `cffc39b0`; post-file bounded snapshot design accepted; compact deferred-attribute snapshot and ordered adapter projection accepted in `d4fb5d65`; GC-rooted private single-file directive-evaluator design accepted; private one-file directive evaluator accepted in `b738547d`; bounded nonroot include-composition oracle design accepted; six-row nonroot include-composition oracle accepted in `203cdaac`; prepared-program include-composition redesign accepted; `extra` and borrowed-slice dispatcher attempts stopped cleanly on distinct lifetime boundaries; evaluator-owned `Rc`-slice opaque-index dispatcher accepted; private supplied-file include composition accepted in `72e132a1`; compact typed preparation-provenance design accepted; typed preparation provenance accepted in `0494db65`; discovery rereview preserved the stable composition contract but replanned on three unowned Bazel boundaries; discovery-boundary oracle design corrected after executable nonreplay evidence; eight-row package/print/default discovery-boundary oracle accepted in `12bb70a1`; package-lookup design retained identity/priority/order but replanned on directory and policy ownership; neutral workspace-directory owner lift accepted in `e440e707`; focused nonroot package-policy oracle design accepted and corrected after isolated HEAD exposed seven stale manifest modes; 15-row package-policy oracle accepted in `60c24045`; package-lookup rereview froze a four-owner sequence and replanned on unresolved repository path state; repository path-state design proved the eager one-commit snapshot cannot boundedly cover Bazel-compatible ancestor symlink escapes and replanned to exact retained-daemon evidence before a request-boundary redesign; focused 16-row repository path-state oracle design and oracle accepted; five-packet fixture-growth checkpoint accepted with no pruning or replay; demand-boundary design preserved a typed sparse owner/runtime restart architecture but replanned before Rust; filesystem-authority feasibility accepted Bazel's command-boundary invalidation plus live lazy reads and removed the invented request-atomic premise; command-scoped final-root effect sidecar design accepted; corrected typed observation/retry/event/immutable-instance architecture accepted | the accepted architecture remains unimplemented; resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | implement the exact-version DICE activation-closure substrate |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a`; nonroot registration/flag-alias consumer oracle accepted in `eeea40a6`; complete compact evaluator/schema design accepted; compact nonroot schema and MODULE syntax inspector accepted in `c663fe46`; bounded raw-attribute oracle design accepted; 12-row raw-attribute oracle accepted in `cffc39b0`; post-file bounded snapshot design accepted; compact deferred-attribute snapshot and ordered adapter projection accepted in `d4fb5d65`; GC-rooted private single-file directive-evaluator design accepted; private one-file directive evaluator accepted in `b738547d`; bounded nonroot include-composition oracle design accepted; six-row nonroot include-composition oracle accepted in `203cdaac`; prepared-program include-composition redesign accepted; `extra` and borrowed-slice dispatcher attempts stopped cleanly on distinct lifetime boundaries; evaluator-owned `Rc`-slice opaque-index dispatcher accepted; private supplied-file include composition accepted in `72e132a1`; compact typed preparation-provenance design accepted; typed preparation provenance accepted in `0494db65`; discovery rereview preserved the stable composition contract but replanned on three unowned Bazel boundaries; discovery-boundary oracle design corrected after executable nonreplay evidence; eight-row package/print/default discovery-boundary oracle accepted in `12bb70a1`; package-lookup design retained identity/priority/order but replanned on directory and policy ownership; neutral workspace-directory owner lift accepted in `e440e707`; focused nonroot package-policy oracle design accepted and corrected after isolated HEAD exposed seven stale manifest modes; 15-row package-policy oracle accepted in `60c24045`; package-lookup rereview froze a four-owner sequence and replanned on unresolved repository path state; repository path-state design proved the eager one-commit snapshot cannot boundedly cover Bazel-compatible ancestor symlink escapes and replanned to exact retained-daemon evidence before a request-boundary redesign; focused 16-row repository path-state oracle design and oracle accepted; five-packet fixture-growth checkpoint accepted with no pruning or replay; demand-boundary design preserved a typed sparse owner/runtime restart architecture but replanned before Rust; filesystem-authority feasibility accepted Bazel's command-boundary invalidation plus live lazy reads and removed the invented request-atomic premise; command-scoped final-root effect sidecar design accepted; corrected typed observation/retry/event/immutable-instance architecture accepted; activation-substrate first attempt stopped cleanly and its version-lifecycle/API scope correction was accepted | the accepted architecture remains unimplemented; resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | implement the scope-corrected exact-version DICE activation-closure substrate |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -37,20 +37,47 @@ Run only `WP-5-m1-command-effect-activation-substrate`.
 
 Implement the DICE-owned provenance primitive required by the accepted command
 effect sidecar. Add an opaque copyable/hashable `DiceNodeId` whose identity
-includes its originating engine, activation callbacks that expose the node ID,
-`Evaluated`/`Reused` kind, optional evaluation data, and ordered direct
-dependency IDs, plus ordered notifications for parentless transaction
-requests. Existing tracker implementations must keep compiling through a
-temporary default compatibility bridge; do not edit downstream Slug crates in
-this packet.
+includes its originating engine. Add a separate rich activation callback with
+the node ID, exact public DICE `VersionNumber`, `Evaluated`/`Reused` kind,
+borrowed optional evaluation data, and ordered direct dependency IDs, plus a
+parentless-root callback carrying node ID, exact version, and a monotonically
+ordered request ordinal shared by clones of one transaction. Keep the existing
+required legacy `key_activated` callback and its frequency byte-for-byte:
+existing completion paths invoke rich then legacy, while newly covered exact
+graph-match and same-live-version cache hits invoke rich only. Both new
+callbacks default to no-op, and a default-false capability method may avoid
+exact-dependency queries for legacy-only trackers. Root notification occurs
+once immediately after top-level key or projection indexing and before cache
+lookup, including success, error, cancellation, and cached roots; nested
+requests never notify. Do not edit downstream Slug crates in this packet.
 
 Add an async transaction API that accepts ordered root IDs and asks the core
 state thread for a read-only closure at that transaction's exact version. It
 must traverse stored `SeriesParallelDeps`, include untouched cached
-intermediates, preserve root and dependency order, deduplicate shared nodes,
-and reject foreign IDs or nodes that are absent, dirty, checking dependencies,
-rejected, or not verified at the transaction version. It must never compute a
-key or consult the latest-version introspection snapshot.
+intermediates, preserve duplicate caller roots, emit dependency-before-parent
+nodes in root/direct-dependency order, deduplicate shared nodes at first
+encounter, and reject foreign IDs or nodes that are absent, dirty, checking
+dependencies, rejected, cyclic, or not verified at the transaction version.
+Return a typed `ActivationClosure` containing its exact version, ordered roots,
+and each node's ordered direct dependencies; errors distinguish foreign engine,
+unavailable root/node, and not-verified state without strings. Empty roots
+succeed. The transaction stays borrowed until the response arrives. The query
+must never compute a key or consult the latest-version introspection snapshot.
+
+`VersionedGraph` owns a provenance-only per-node transition history separate
+from semantic values: version-sorted `Verified(Arc<SeriesParallelDeps>)` and
+`Dirty` entries. Record verified transitions for successful compute,
+dependency-check reuse, exact graph Match, changed injected values with empty
+dependencies, and older computations that finish out of order. Record dirty
+transitions for changed explicit and transitive invalidations and vacant/force
+dirty state; tentative no-op updates leave no entry, and graph clear clears
+history. Exact closure selects the latest transition at or before its version
+and fails closed unless it is verified. `VersionTracker` remains the sole
+active-version lifecycle owner and exposes only private `is_active` and
+`oldest_live_or_current` helpers. After the last guard for a version drops,
+prune each history to the newest transition at or before the oldest live/current
+floor plus all later transitions. Do not mirror active-version refcounts in
+`CoreState`.
 
 The exact implementation allowlist is
 `dice/dice/src/api/activation_tracker.rs`,
@@ -63,22 +90,30 @@ The exact implementation allowlist is
 `dice/dice/src/impls/core/processor.rs`,
 `dice/dice/src/impls/core/internals.rs`,
 `dice/dice/src/impls/core/graph/storage.rs`,
+`dice/dice/src/impls/core/versions.rs`,
 `dice/dice/src/transaction.rs`, and
 `dice/dice/src/impls/tests/activation_tracker.rs`.
 Touch fewer files when possible. Stop and `REPLAN` if exact-version
 verification needs a semantic recomputation, latest-state introspection,
 string key identity, a process-global interner, dependency-order loss, a
-foreign-engine collision, or changes outside this allowlist.
+foreign-engine collision, a second version-lifecycle owner, changed legacy
+callback frequency, missing activation versions, consumed evaluation data, or
+changes outside this allowlist.
 
 Focused tests must prove evaluated and reused callback IDs and direct-dependency
-order, parentless cached-root notification, an untouched cached child in the
-final closure, abandoned old-branch exclusion after parent recomputation,
-terminal-version stability after a newer engine version exists, foreign and
-unavailable ID failure, ordered roots, and shared-node deduplication. Run only
-the focused DICE activation tests, the DICE crate test suite if the focused
-target passes, formatting, `git diff --check`, and the archive guard. Do not
-add event batches, path observations, command owners, Slug runtime changes,
-Cargo dependencies, fixtures, or oracle artifacts in this packet.
+order and exact version; unchanged legacy callback counts across evaluated,
+dependency-check reuse, exact graph Match, and same-version cache hits;
+parentless key/projection root ordinals including cached and failed requests;
+an untouched cached child in the final closure; abandoned old-branch exclusion
+after parent recomputation; terminal-version stability after a newer engine
+version changes dependencies; out-of-order old completion; pruning only after
+the final old guard drops; foreign, unavailable, dirty, and unverified ID
+failure; empty and duplicate ordered roots; dependency-before-parent order; and
+shared-node deduplication. Run the focused DICE activation tests, then the DICE
+crate suite, the four existing downstream tracker suites in loading, analysis,
+and query, formatting, `git diff --check`, and the archive guard. Do not add
+event batches, path observations, command owners, Slug runtime changes, Cargo
+dependencies, fixtures, or oracle artifacts in this packet.
 
 ### Accepted transport evidence
 
