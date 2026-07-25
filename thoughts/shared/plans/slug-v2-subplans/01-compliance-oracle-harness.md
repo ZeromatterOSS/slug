@@ -945,3 +945,35 @@ No unused or nondiscriminating module, registry, mutation, manifest field,
 expected field, or negative assertion was established, so the pruning
 allowlist and affected replay set are empty. The next checkpoint starts from
 this baseline and counts accepted oracle packets after `eeea40a6`.
+
+### Fixture-growth hygiene checkpoint (2026-07-25)
+
+The second bounded review compared tracked archives at baseline `3afc1c5a`
+and accepted tree `42e38bc3`. The fixture tree grew from 1,231 regular files,
+zero symlinks, and 27,626 newline-counted regular-file lines to 1,272 regular
+files, ten symlinks, and 31,208 lines: 41 regular files plus ten symlinks, or
+51 entries, and 3,582 lines.
+
+The five accepted packets were raw attributes `cffc39b0` (+15 regular files,
++1,183 lines), include composition `203cdaac` (+12, +438), discovery
+boundaries `12bb70a1` (+1, +419), package policy `60c24045` (+1 regular file,
++1 symlink, +750 lines), and repository path state `42e38bc3` (+12 regular
+files, +9 symlinks, +792 lines). The earlier 3,583-line rollup counted the
+package-policy symlink blob as a text line; regular-file newline accounting
+corrects it to 3,582.
+
+All 57 reviewed rows remain discriminating: 12 raw-attribute, six include,
+eight discovery, 15 package-policy, and 16 path-state rows. Every retained
+asset, symlink, mutation, manifest field, expected record, and negative
+assertion contributes to a distinct boundary. The only exact repeated
+substantive subtree is the raw-attribute fixture's six-file/50-line
+`platforms` module copied from `nonroot-module-consumers`; it remains reserved
+for fixture-local override closure, hermetic replay, and immutable provenance.
+No post-baseline registry subtree was copied, and the remaining apparent
+scaffolding overlap is fixture-specific package topology or label/action
+identity.
+
+Two independent inventories, root tracked-archive synthesis, and a fresh
+terminal review returned `ACCEPT`. The pruning allowlist and affected replay
+set are both `none`. The next fixture-growth checkpoint starts from accepted
+tree `42e38bc3` and counts later accepted oracle packets only.
