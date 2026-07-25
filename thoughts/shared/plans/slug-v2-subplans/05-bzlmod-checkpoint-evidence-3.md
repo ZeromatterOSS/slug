@@ -682,3 +682,27 @@ native-observer/root-authority entrypoint, and the DICE file only one private
 owner field plus construction. Do not add a dependency, public API, DICE key,
 source-preparation change, sidecar, producer, retry/publication, command
 activation, fixture, or discovery behavior.
+
+### Stage 5 retained materializer/session/archive implementation
+
+Status: Replanned before Rust
+
+No source edit was retained. The implementation contract remained sound, but
+the pinned acceptance checklist proved that the declared regular/directory tar
+subset itself requires a byte-oriented USTAR parser: raw non-UTF-8 name plus
+prefix assembly, octal size and padded payload bounds, typeflag/name-suffix
+directory classification, archive-order normalized collisions, exact
+normalize/relativize/prefix/containment behavior, Bazel's accepted
+checksum-only corruption and physical-EOF cases, and explicit PAX/GNU/link/
+special rejection. That independently reviewable parser and mutation/error
+matrix could not be combined honestly with the single-lease retained-session,
+dirtiness, epoch, lifetime, cancellation, and native-owner bridge matrices.
+
+Next evidence: Design only
+`WP-5-m1-runtime-materializer-implementation-checkpoint-split`. Preserve the
+accepted three-file union but freeze serial checkpoints for (1) the one-file
+captured USTAR regular/directory subset, (2) the one-file pure retained-session
+and dirtiness kernel with scripted materialization/observation, and (3) the
+native observer plus `WorkspaceRuntime` owner bridge. Do not edit Rust or
+weaken any accepted archive, session, lifetime, equality, error, or exclusion
+gate.
