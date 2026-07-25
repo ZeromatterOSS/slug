@@ -440,3 +440,35 @@ Next evidence: Implement only
 `app/slug_core_v2/src/runtime/path_observation.rs`, `runtime/mod.rs`,
 `app/slug_core_v2/Cargo.toml`, and `Cargo.lock`, adding only target-Unix
 workspace `nix`.
+
+### Stage 5 native path-observation producer final implementation
+
+Status: Replanned; draft removed
+
+A bounded four-file writer produced a 1,167-line private draft. Linux validation
+passed four focused tests, 18 unit tests, 13 integration tests, and doctests;
+Windows `cargo check` also passed. Root provisioned
+`x86_64-pc-windows-gnu` plus MinGW and independently proved the required real
+`cargo test -p slug_core_v2 --target x86_64-pc-windows-gnu --no-run` link,
+including both test executables and kernel32.
+
+The single permitted correction fixed unterminated Windows find names, shared
+race refinement, Unix close errno capture and interior-NUL handling, and pure
+Windows kind/permission/time/path helpers. Six focused, 20 unit, 13 integration,
+and zero doctests then passed with formatting, diff, and allowlist checks.
+
+Reason for `REPLAN`: The correction still lacked the generic Windows Find
+backend/owner and its raw-error/close/partial-result matrix, scripted Unix
+open/read/close ownership evidence, sorted-execution and zero-operation
+preflight evidence, the complete primary/auxiliary operation table, the
+reparse/ABI/time/path parser matrix, and the full directory/symlink/escaped-root
+real lifecycle matrix. The worker correctly stopped rather than treating broad
+crate tests or a linked Windows artifact as substitutes for those
+discriminating regressions. The complete unaccepted draft and manifest/module
+edits were removed; the worktree returned clean.
+
+Next evidence: Design only
+`WP-5-m1-runtime-path-observation-native-producer-checkpoint-split`. Preserve
+the accepted terminal contract while freezing serial platform-neutral, Unix,
+Windows, and any necessary final lifecycle-test owners that can each land
+complete private behavior without temporary activated-platform wrongness.
