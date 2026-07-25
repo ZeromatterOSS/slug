@@ -585,8 +585,37 @@ kernel32 imports. Formatting, diff, archive, and exact one-file scope passed.
 Independent pinned-Bazel/windows-sys and architecture/unsafe-owner reviews
 both returned `ACCEPT`.
 
+### Stage 5 retained runtime materializer and captured-archive design
+
+Status: Replanned before Rust
+
+The read-only audits retained a bounded three-file outside-DICE owner:
+one `RepositoryMaterializer` per `WorkspaceRuntime`, command-scoped provisional
+sessions, full-request accepted reuse, append-only accepted roots, exact
+per-repository validation dirtiness, logical Host-only Local success, and a
+single private archive capture. A short owner mutex can snapshot, allocate
+monotonic instance IDs, and terminally promote without crossing path I/O,
+archive/Git work, awaits, or DICE. Provisional roots remain session-owned
+across retries; once exposed in an epoch their IDs are burned even if the
+session is abandoned. Complete epochs are cumulative replacements, and only a
+future terminal-accept caller may promote closure-reachable results and
+validation.
+
+The focused correction fixed ID lifetime, terminal-only promotion, full
+request equality, exact FileBytes/ReadLink/directory and ctime-ignoring lstat
+dirtiness, captured-byte checksum/identity/inspection/extraction, and exact
+prefix filtering. Terminal pinned-source rereview then found a second material
+gap: overlapping sessions still lacked a single-lease/stale-token rule, and
+archive extraction still lacked the exact Bazel create/capture/checksum/
+extraction precedence plus normalize-and-relativize-before-prefix semantics.
+Per the packet review limit, no Rust was started. Existing symlink/hardlink tar
+support also remains an explicitly deferred Bazel parity gap rather than an
+accepted property of the regular-file/directory subset.
+
 Next evidence: Design only
-`WP-5-m1-runtime-materializer-captured-archive-design`. Freeze the corrected
-retained outside-DICE materializer, including single-capture archive ownership,
-before any attempt/effect sidecar, producer, retry/publication, DICE, or
-ordinary command activation change.
+`WP-5-m1-runtime-materializer-session-archive-order-design-correction`.
+Correct only the single active-session lease and stale-token behavior, exact
+archive stage precedence, and normalized/relativized exact-prefix extraction.
+Preserve the three-file private implementation boundary and every already
+accepted owner, dirtiness, lifetime, Local, epoch, capture, and exclusion
+decision.
