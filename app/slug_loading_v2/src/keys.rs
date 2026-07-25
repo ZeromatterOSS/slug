@@ -10,121 +10,19 @@
 
 use std::fmt;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use allocative::Allocative;
-use compact_str::CompactString;
-use dice::InjectedKey;
-use dupe::Dupe;
 use slug_identity_v2::ApparentLabel;
+pub use slug_workspace_v2::WorkspaceDirectoryEntry;
+pub use slug_workspace_v2::WorkspaceDirectoryEntryKind;
+pub use slug_workspace_v2::WorkspaceDirectoryKey;
+pub use slug_workspace_v2::WorkspaceDirectorySnapshot;
+pub use slug_workspace_v2::WorkspaceDirectorySnapshotKey;
+pub use slug_workspace_v2::WorkspaceDirectoryValue;
 pub use slug_workspace_v2::WorkspaceFileKey;
 pub use slug_workspace_v2::WorkspaceFileValue;
 pub use slug_workspace_v2::WorkspaceSnapshot;
 pub use slug_workspace_v2::WorkspaceSnapshotKey;
-use starlark_map::sorted_map::SortedMap;
-
-/// The direct kind of a directory entry observed before a DICE request.
-///
-/// This mirrors only the compact, portable part of Buck2's `FileType`: it
-/// identifies symlinks rather than resolving them, and keeps special files
-/// distinct from regular files and directories.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
-pub enum WorkspaceDirectoryEntryKind {
-    RegularFile,
-    Directory,
-    Symlink,
-    Other,
-}
-
-/// One direct directory entry, sorted by `name` in a present directory value.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
-pub struct WorkspaceDirectoryEntry {
-    pub name: CompactString,
-    pub kind: WorkspaceDirectoryEntryKind,
-}
-
-/// An observed direct directory listing. Read failures are explicit rather
-/// than being collapsed into absence.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-pub enum WorkspaceDirectoryValue {
-    Present(Arc<[WorkspaceDirectoryEntry]>),
-    Absent,
-    ReadError(Arc<String>),
-}
-
-impl WorkspaceDirectoryValue {
-    pub fn present(mut entries: Vec<WorkspaceDirectoryEntry>) -> Self {
-        entries.sort_unstable_by(|left, right| left.name.cmp(&right.name));
-        Self::Present(entries.into())
-    }
-
-    pub fn entries(&self) -> Option<&[WorkspaceDirectoryEntry]> {
-        match self {
-            Self::Present(entries) => Some(entries),
-            Self::Absent | Self::ReadError(_) => None,
-        }
-    }
-}
-
-/// Immutable compact directory observations for one request revision.
-///
-/// The sorted map gives a deterministic snapshot while the `Arc` slices make
-/// unchanged directory values cheap to retain and compare.
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct WorkspaceDirectorySnapshot {
-    pub directories: Arc<SortedMap<PathBuf, WorkspaceDirectoryValue>>,
-}
-
-impl WorkspaceDirectorySnapshot {
-    pub fn empty() -> Self {
-        Self {
-            directories: Arc::new(SortedMap::new()),
-        }
-    }
-
-    pub fn value(&self, directory: &std::path::Path) -> WorkspaceDirectoryValue {
-        self.directories
-            .get(directory)
-            .cloned()
-            .unwrap_or(WorkspaceDirectoryValue::Absent)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-pub struct WorkspaceDirectorySnapshotKey {
-    pub workspace: PathBuf,
-}
-
-impl fmt::Display for WorkspaceDirectorySnapshotKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "workspace-directory-snapshot:{}",
-            self.workspace.display()
-        )
-    }
-}
-
-impl InjectedKey for WorkspaceDirectorySnapshotKey {
-    type Value = Arc<WorkspaceDirectorySnapshot>;
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x == y
-    }
-}
-
-/// The DICE propagation boundary for one normalized absolute directory.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-pub struct WorkspaceDirectoryKey {
-    pub workspace: PathBuf,
-    pub directory: PathBuf,
-}
-
-impl fmt::Display for WorkspaceDirectoryKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "workspace-directory:{}", self.directory.display())
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct BzlParseKey {

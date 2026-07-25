@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use compact_str::CompactString;
 use dice::DiceComputations;
 use dice::InjectedKey;
 use dice::Key;
@@ -43,6 +44,109 @@ pub enum WorkspaceRawFileValue {
     Present(Arc<[u8]>),
     Absent,
     ReadError(Arc<String>),
+}
+
+/// The direct kind of a directory entry observed before a DICE request.
+///
+/// This mirrors only the compact, portable part of Buck2's `FileType`: it
+/// identifies symlinks rather than resolving them, and keeps special files
+/// distinct from regular files and directories.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
+pub enum WorkspaceDirectoryEntryKind {
+    RegularFile,
+    Directory,
+    Symlink,
+    Other,
+}
+
+/// One direct directory entry, sorted by `name` in a present directory value.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
+pub struct WorkspaceDirectoryEntry {
+    pub name: CompactString,
+    pub kind: WorkspaceDirectoryEntryKind,
+}
+
+/// An observed direct directory listing. Read failures are explicit rather
+/// than being collapsed into absence.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum WorkspaceDirectoryValue {
+    Present(Arc<[WorkspaceDirectoryEntry]>),
+    Absent,
+    ReadError(Arc<String>),
+}
+
+impl WorkspaceDirectoryValue {
+    pub fn present(mut entries: Vec<WorkspaceDirectoryEntry>) -> Self {
+        entries.sort_unstable_by(|left, right| left.name.cmp(&right.name));
+        Self::Present(entries.into())
+    }
+
+    pub fn entries(&self) -> Option<&[WorkspaceDirectoryEntry]> {
+        match self {
+            Self::Present(entries) => Some(entries),
+            Self::Absent | Self::ReadError(_) => None,
+        }
+    }
+}
+
+/// Immutable compact directory observations for one request revision.
+///
+/// The sorted map gives a deterministic snapshot while the `Arc` slices make
+/// unchanged directory values cheap to retain and compare.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct WorkspaceDirectorySnapshot {
+    pub directories: Arc<SortedMap<PathBuf, WorkspaceDirectoryValue>>,
+}
+
+impl WorkspaceDirectorySnapshot {
+    pub fn empty() -> Self {
+        Self {
+            directories: Arc::new(SortedMap::new()),
+        }
+    }
+
+    pub fn value(&self, directory: &std::path::Path) -> WorkspaceDirectoryValue {
+        self.directories
+            .get(directory)
+            .cloned()
+            .unwrap_or(WorkspaceDirectoryValue::Absent)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct WorkspaceDirectorySnapshotKey {
+    pub workspace: PathBuf,
+}
+
+impl fmt::Display for WorkspaceDirectorySnapshotKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "workspace-directory-snapshot:{}",
+            self.workspace.display()
+        )
+    }
+}
+
+impl InjectedKey for WorkspaceDirectorySnapshotKey {
+    type Value = Arc<WorkspaceDirectorySnapshot>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+/// The DICE propagation boundary for one normalized absolute directory.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct WorkspaceDirectoryKey {
+    pub workspace: PathBuf,
+    pub directory: PathBuf,
+}
+
+impl fmt::Display for WorkspaceDirectoryKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "workspace-directory:{}", self.directory.display())
+    }
 }
 
 /// Immutable, externally observed workspace state for one DICE revision.
@@ -184,6 +288,38 @@ impl Key for WorkspaceRawFileKey {
     }
 }
 
+#[async_trait]
+impl Key for WorkspaceDirectoryKey {
+    type Value = WorkspaceDirectoryValue;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match ctx
+            .compute(&WorkspaceDirectorySnapshotKey {
+                workspace: self.workspace.clone(),
+            })
+            .await
+        {
+            Ok(snapshot) => snapshot
+                .directories
+                .get(&self.directory)
+                .cloned()
+                .unwrap_or(WorkspaceDirectoryValue::Absent),
+            Err(error) => WorkspaceDirectoryValue::ReadError(Arc::new(format!(
+                "reading workspace directory snapshot for {}: {error}",
+                self.directory.display()
+            ))),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
@@ -195,6 +331,12 @@ mod tests {
     use dice::Key;
     use starlark_map::sorted_map::SortedMap;
 
+    use super::WorkspaceDirectoryEntry;
+    use super::WorkspaceDirectoryEntryKind;
+    use super::WorkspaceDirectoryKey;
+    use super::WorkspaceDirectorySnapshot;
+    use super::WorkspaceDirectorySnapshotKey;
+    use super::WorkspaceDirectoryValue;
     use super::WorkspaceFileKey;
     use super::WorkspaceFileValue;
     use super::WorkspaceRawFileKey;
@@ -288,5 +430,95 @@ mod tests {
                 .unwrap(),
             WorkspaceFileValue::Absent
         );
+    }
+
+    #[test]
+    fn directory_values_sort_entries_and_preserve_structural_states() {
+        let present = WorkspaceDirectoryValue::present(vec![
+            WorkspaceDirectoryEntry {
+                name: "zeta".into(),
+                kind: WorkspaceDirectoryEntryKind::Symlink,
+            },
+            WorkspaceDirectoryEntry {
+                name: "alpha".into(),
+                kind: WorkspaceDirectoryEntryKind::RegularFile,
+            },
+        ]);
+        let entries = present.entries().expect("present directory entries");
+        assert_eq!(entries[0].name.as_str(), "alpha");
+        assert_eq!(entries[1].name.as_str(), "zeta");
+        assert_eq!(WorkspaceDirectoryValue::Absent.entries(), None);
+        assert_eq!(
+            WorkspaceDirectoryValue::ReadError(Arc::new("denied".to_owned())).entries(),
+            None
+        );
+
+        let missing = PathBuf::from("/workspace/missing");
+        assert_eq!(
+            WorkspaceDirectorySnapshot::empty().value(&missing),
+            WorkspaceDirectoryValue::Absent
+        );
+        let snapshot = Arc::new(WorkspaceDirectorySnapshot {
+            directories: Arc::new(SortedMap::from_iter([(
+                missing.clone(),
+                WorkspaceDirectoryValue::Absent,
+            )])),
+        });
+        let same = Arc::new(WorkspaceDirectorySnapshot {
+            directories: Arc::new(SortedMap::from_iter([(
+                missing,
+                WorkspaceDirectoryValue::Absent,
+            )])),
+        });
+        assert!(<WorkspaceDirectorySnapshotKey as InjectedKey>::equality(
+            &snapshot, &same
+        ));
+    }
+
+    #[tokio::test]
+    async fn directory_key_reads_present_absent_and_read_error_from_one_snapshot() {
+        let workspace = PathBuf::from("/workspace");
+        let present = workspace.join("present");
+        let denied = workspace.join("denied");
+        let missing = workspace.join("missing");
+        let present_value = WorkspaceDirectoryValue::present(vec![WorkspaceDirectoryEntry {
+            name: "BUILD.bazel".into(),
+            kind: WorkspaceDirectoryEntryKind::RegularFile,
+        }]);
+        let denied_value = WorkspaceDirectoryValue::ReadError(Arc::new("denied".to_owned()));
+        let snapshot = Arc::new(WorkspaceDirectorySnapshot {
+            directories: Arc::new(SortedMap::from_iter([
+                (present.clone(), present_value.clone()),
+                (denied.clone(), denied_value.clone()),
+            ])),
+        });
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                WorkspaceDirectorySnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                snapshot,
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+
+        for (directory, expected) in [
+            (present, present_value),
+            (denied, denied_value),
+            (missing, WorkspaceDirectoryValue::Absent),
+        ] {
+            assert_eq!(
+                transaction
+                    .compute(&WorkspaceDirectoryKey {
+                        workspace: workspace.clone(),
+                        directory,
+                    })
+                    .await
+                    .unwrap(),
+                expected
+            );
+        }
     }
 }
