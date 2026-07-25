@@ -347,6 +347,203 @@
       "manifest": [],
       "mutations": [
         {
+          "destination": "local-route-a-link",
+          "op": "rename",
+          "path": "local-route"
+        },
+        {
+          "destination": "local-route",
+          "op": "rename",
+          "path": "local-route-b-link"
+        }
+      ],
+      "name": "local_logical_root_retargets_a_to_b",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500rules_license@1.0.0",
+      "stderr": "INFO: Invocation ID: de86a709-1cf9-41de-8892-b34d81be9eb2\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500rules_license@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "local-route"
+        }
+      ],
+      "name": "local_logical_root_missing_is_fatal",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nINFO: Repo route+ defined by rule local_repository in @@bazel_tools//tools/build_defs/repo:local.bzl\nERROR: <output_base>/external/bazel_tools/tools/build_defs/repo/local.bzl:55:13: An error occurred during the fetch of repository 'route+':\n   Traceback (most recent call last):\n\tFile \"<output_base>/external/bazel_tools/tools/build_defs/repo/local.bzl\", line 62, column 25, in _local_repository_impl\n\t\tpath = _get_dir_path(rctx)\n\tFile \"<output_base>/external/bazel_tools/tools/build_defs/repo/local.bzl\", line 55, column 13, in _get_dir_path\n\t\tfail(\nError in fail: The repository's path is \"local-route\" (absolute: \"<workspace>/local-route\") but it does not exist or is not a directory.\nERROR: The repository's path is \"local-route\" (absolute: \"<workspace>/local-route\") but it does not exist or is not a directory.",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 631714c6-59db-4ccc-8d35-4f17fa515561\n no actions running\nINFO: Repo route+ defined by rule local_repository in @@bazel_tools//tools/build_defs/repo:local.bzl\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/ob/module-source-preparation/bazel/external/bazel_tools/tools/build_defs/repo/local.bzl:55:13: An error occurred during the fetch of repository 'route+':\n   Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/ob/module-source-preparation/bazel/external/bazel_tools/tools/build_defs/repo/local.bzl\", line 62, column 25, in _local_repository_impl\n\t\tpath = _get_dir_path(rctx)\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/ob/module-source-preparation/bazel/external/bazel_tools/tools/build_defs/repo/local.bzl\", line 55, column 13, in _get_dir_path\n\t\tfail(\nError in fail: The repository's path is \"local-route\" (absolute: \"/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260725-111852-2382839-bazel/workspace/local-route\") but it does not exist or is not a directory.\nERROR: The repository's path is \"local-route\" (absolute: \"/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260725-111852-2382839-bazel/workspace/local-route\") but it does not exist or is not a directory.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "local-route"
+        }
+      ],
+      "name": "local_logical_root_regular_file_is_fatal",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nWARNING: Repository '@@route+' will be fetched again since the file '' has been modified externally. External modifications can lead to incorrect builds.\n no actions running\nINFO: Repo route+ defined by rule local_repository in @@bazel_tools//tools/build_defs/repo:local.bzl\nERROR: <output_base>/external/bazel_tools/tools/build_defs/repo/local.bzl:55:13: An error occurred during the fetch of repository 'route+':\n   Traceback (most recent call last):\n\tFile \"<output_base>/external/bazel_tools/tools/build_defs/repo/local.bzl\", line 62, column 25, in _local_repository_impl\n\t\tpath = _get_dir_path(rctx)\n\tFile \"<output_base>/external/bazel_tools/tools/build_defs/repo/local.bzl\", line 55, column 13, in _get_dir_path\n\t\tfail(\nError in fail: The repository's path is \"local-route\" (absolute: \"<workspace>/local-route\") but it does not exist or is not a directory.\nERROR: The repository's path is \"local-route\" (absolute: \"<workspace>/local-route\") but it does not exist or is not a directory.",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 6f44ab72-cda7-4765-b113-d01b419280bd\nWARNING: Repository '@@route+' will be fetched again since the file '' has been modified externally. External modifications can lead to incorrect builds.\n no actions running\nINFO: Repo route+ defined by rule local_repository in @@bazel_tools//tools/build_defs/repo:local.bzl\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/ob/module-source-preparation/bazel/external/bazel_tools/tools/build_defs/repo/local.bzl:55:13: An error occurred during the fetch of repository 'route+':\n   Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/ob/module-source-preparation/bazel/external/bazel_tools/tools/build_defs/repo/local.bzl\", line 62, column 25, in _local_repository_impl\n\t\tpath = _get_dir_path(rctx)\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/ob/module-source-preparation/bazel/external/bazel_tools/tools/build_defs/repo/local.bzl\", line 55, column 13, in _get_dir_path\n\t\tfail(\nError in fail: The repository's path is \"local-route\" (absolute: \"/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260725-111852-2382839-bazel/workspace/local-route\") but it does not exist or is not a directory.\nERROR: The repository's path is \"local-route\" (absolute: \"/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260725-111852-2382839-bazel/workspace/local-route\") but it does not exist or is not a directory.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "local-route"
+        },
+        {
+          "destination": "local-route",
+          "op": "rename",
+          "path": "local-route-boundaryless-link"
+        }
+      ],
+      "name": "local_logical_root_boundaryless_directory_is_fatal",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nWARNING: Repository '@@route+' will be fetched again since the file '' has been modified externally. External modifications can lead to incorrect builds.\n no actions running\nERROR: fetching route+: java.io.IOException: No MODULE.bazel, REPO.bazel, or WORKSPACE file found in <output_base>/external/route+\nERROR: No MODULE.bazel, REPO.bazel, or WORKSPACE file found in <output_base>/external/route+",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: c2d2b05f-5f78-45ac-8ade-c79029cb821b\nWARNING: Repository '@@route+' will be fetched again since the file '' has been modified externally. External modifications can lead to incorrect builds.\n no actions running\nERROR: fetching route+: java.io.IOException: No MODULE.bazel, REPO.bazel, or WORKSPACE file found in /run/media/system/Colossus/dev/slug/target/v2o/ob/module-source-preparation/bazel/external/route+\nERROR: No MODULE.bazel, REPO.bazel, or WORKSPACE file found in /run/media/system/Colossus/dev/slug/target/v2o/ob/module-source-preparation/bazel/external/route+\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "local-route-boundaryless-link",
+          "op": "rename",
+          "path": "local-route"
+        },
+        {
+          "destination": "local-route",
+          "op": "rename",
+          "path": "local-route-a-link"
+        }
+      ],
+      "name": "local_logical_root_a_recovery_restores_mutated_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_b@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0",
+      "stderr": "INFO: Invocation ID: 8fa546fb-02c5-43d5-8302-25b47def36a9\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_b@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/malformed",
+        "--registry=file://%workspace%/registry/absent"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
           "find": "local_path_override(module_name = \"route\", path = \"local-route\")",
           "old_digest_hint": "174",
           "path": "MODULE.bazel",
