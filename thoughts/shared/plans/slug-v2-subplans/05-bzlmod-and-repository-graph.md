@@ -846,6 +846,25 @@ Slug regressions first; no Cargo, public consumer, DICE, preparation,
 discovery, command, server, fixture, expected-artifact, or lockfile edit is
 authorized.
 
+The implementation packet returned `REPLAN` with no Rust retained. A compiling
+module-bound `PreparedModule<'v>` prototype proved preparation and reusable
+execution, but the private native `include()` could not safely recover a
+context containing that program through `Evaluator.extra`: its independent
+`AnyLifetime<'e>` cannot prove the invariant evaluator value lifetime `'v`.
+The downstream check reported the explicit-lifetime, invariance, and context
+drop-order failures. Unsafe lifetime erasure, self-referential context storage,
+and a speculative upstream-only API were rejected; all three implementation
+files were restored to `HEAD`.
+
+The current packet is read-only
+`WP-5-m1-nonroot-include-dispatcher-design`. Design the smallest
+evaluator-owned, lifetime-coupled prepared-program registry/dispatcher so a
+native callback passes only an exact raw key or opaque index and never
+downcasts a prepared program from `extra`. Freeze the required runtime
+allowlist and exact upstream/downstream tests while retaining the accepted
+compile-first, common-stack, scoped-GC, restoration, diagnostic, repeated-key,
+and cycle-horizon contracts. No Rust or other production edit is authorized.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
