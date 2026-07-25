@@ -22,6 +22,7 @@ use dupe::Dupe;
 use starlark_map::sorted_map::SortedMap;
 
 mod path_observation;
+mod path_resolution;
 
 pub use path_observation::DuplicatePathDirectoryName;
 pub use path_observation::EmptyPathObservationNeed;
@@ -47,6 +48,12 @@ pub use path_observation::PathObservationResult;
 pub use path_observation::PathOperationResult;
 pub use path_observation::PathOutcome;
 pub use path_observation::PathResult;
+pub use path_resolution::PathResolutionChain;
+pub use path_resolution::PathResolutionError;
+pub use path_resolution::ResolvedPath;
+pub use path_resolution::ResolvedPathKey;
+pub use path_resolution::ResolvedPathState;
+pub use path_resolution::ResolvedSymlink;
 
 /// An observation supplied to the workspace DICE graph before loading begins.
 ///
