@@ -804,6 +804,24 @@ process-group timeout, and record the non-normative result only in the handoff.
 No existing fixture, harness, Rust, Cargo, DICE, preparation, discovery,
 command, server, lockfile, or Slug replay is authorized.
 
+Commit `203cdaac` accepts that oracle. Six retained-daemon rows pin the exact
+A/B marker digests, same-daemon A→B→A direct fragment invalidation, the
+root→outer→nested runtime traceback and call sites, later-fragment scope
+compilation before an earlier invalid directive, and final recovery. The
+fixture adds 12 files and 438 lines, below the growth-review threshold. A
+separate confined Bazel probe timed out after 10 seconds without an include
+cycle diagnostic; it is source/behavior characterization only.
+
+The current packet is read-only
+`WP-5-m1-nonroot-include-composition-design-rereview`. It must replace the
+rejected nested-evaluator seam with an exact common-call-stack,
+compile-complete-closure-before-execution design over supplied files. Preserve
+per-file bindings, shared semantic state, exact raw-label-keyed stored
+Program/Module reuse, file spans, multi-heap rooting/reread, and registry
+ordering. Inspect supported starlark-rust APIs or a bounded upstream seam and
+return `REPLAN` if exact behavior is infeasible; no diagnostic divergence or
+invented cycle rejection is acceptable.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
