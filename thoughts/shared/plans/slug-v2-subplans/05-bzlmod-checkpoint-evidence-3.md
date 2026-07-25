@@ -329,3 +329,52 @@ minimal public NotALink discriminator and every direct consumer/equality test,
 plus an exact safe Unix native directory owner and dependency/file boundary.
 Preserve the accepted Windows parser and all other producer contracts; do not
 edit Rust or activate the runtime.
+
+### Stage 5 native observation schema and Unix directory design
+
+Status: Accepted before Rust
+
+Schema contract: Add one fieldless `PathObservationError::NotALink`. Bazel
+collapses native Windows raw 4390, raw 1, and ProjFS into one not-a-link result
+even though no-follow lstat classifies every reparse point as Symlink. The
+variant carries no path, tag, raw code, or message because the demand and
+enclosing errors already own operational context. It remains structurally
+distinct from `Io`, truthful `WrongKind`, and evidence-backed
+`InconsistentState`; existing resolver, semantic byte, and repository-source
+errors preserve it unchanged, with no reexport or production-consumer edit.
+
+Land this prerequisite first in exactly
+`path_observation.rs`, `path_resolution.rs`, and
+`source_preparation_dice.rs`. Evidence must cover direct equality and every
+existing error-class distinction, Symlink then ReadLink NotALink demand
+propagation, semantic byte pruning plus transitions to and from I/O, and exact
+complete repository-source projection. Do not restore the producer in this
+packet.
+
+Native producer contract: After schema acceptance, use a target-Unix workspace
+`nix` dependency only for its `libc` ABI and `Errno::{clear,last_raw}` in the
+private producer. One safe owner wraps `NonNull<DIR>` and contains all unsafe
+calls. Retry only `opendir` EINTR; retain one handle and accumulated raw names
+across `readdir` EINTR/EIO; clear errno before each read; distinguish EOF from
+error; skip only byte-exact dot entries; and copy transient `d_name` bytes
+immediately. An iterator error wins over the one ignored close result. After
+EOF, call close once, accept close EINTR without retry, and report every other
+close error. Consuming close disarms the Drop fallback even on failure.
+
+Pure scripted backend tests must prove handle identity, retained partial names,
+stale-errno clearing, open/read/close error rules, error precedence, and
+exactly-one-close; one real Unix test preserves a non-UTF-8 filename. Do not
+use `std::fs::ReadDir`, `nix::dir::Dir`, vendored layouts, another dependency,
+or public unsafe. The later producer allowlist is exactly
+`app/slug_core_v2/Cargo.toml`, `Cargo.lock`,
+`app/slug_core_v2/src/runtime/path_observation.rs`, and
+`app/slug_core_v2/src/runtime/mod.rs`; it also preserves every previously
+accepted Windows parser/lstat and compact producer contract without
+runtime/DICE/materializer wiring.
+
+Independent pinned-source, Rust/ABI feasibility, and architecture reviews all
+returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-path-observation-not-a-link-schema`, then obtain independent
+acceptance before scheduling the native producer.
