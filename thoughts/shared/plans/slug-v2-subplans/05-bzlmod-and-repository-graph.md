@@ -822,6 +822,30 @@ ordering. Inspect supported starlark-rust APIs or a bounded upstream seam and
 return `REPLAN` if exact behavior is infeasible; no diagnostic divergence or
 invented cycle rejection is acceptable.
 
+That rereview is accepted. The implementation packet is only
+`WP-5-m1-nonroot-include-composition`, with the three-file allowlist
+`starlark-rust/starlark/src/eval.rs`,
+`starlark-rust/starlark/src/eval/compiler/module.rs`, and
+`app/slug_bzlmod_v2/src/module_eval.rs`.
+
+The upstream seam owns an opaque module-bound prepared program: exact
+`ModuleScopes` resolution, reusable load-free top-level bytecode, root
+execution, and same-evaluator nested execution in a different Module without a
+second sentinel. Module environment, `DefInfo`, current frame, scoped GC
+suspension, and current-file state restore before success or error crosses the
+native include frame. Cross-heap automatic GC is suspended only while a foreign
+Module is active; after evaluation each Module is collected and reread
+independently from its hidden slots.
+
+Slug owns only supplied-file horizon composition, exact raw-label-keyed
+prepared Module reuse, per-file bindings and spans, one compact Value-free
+semantic state, file-indexed roots, repeated inline execution, and a typed
+include-site/leaf diagnostic adapter. Cycles retain Bazel's nonterminating
+horizon behavior and gain no visited set or diagnostic. Add exact upstream and
+Slug regressions first; no Cargo, public consumer, DICE, preparation,
+discovery, command, server, fixture, expected-artifact, or lockfile edit is
+authorized.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
