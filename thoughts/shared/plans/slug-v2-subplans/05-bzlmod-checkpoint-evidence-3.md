@@ -50,3 +50,79 @@ captured archive bytes through extraction, or publish effects only for the
 terminal attempt. Design only
 `WP-5-m1-runtime-materialization-preflight-retry-design` next; do not activate
 source preparation or edit Rust during that packet.
+
+### Stage 5 runtime materialization preflight/retry design
+
+Status: Replanned before Rust
+
+Frozen command contract: One external command allocates fixed workspace,
+registry, and failure-only materialization generations plus one effect owner.
+Every retry uses a fresh updater, committed transaction, and exact-version
+activation closure. Result and path epochs are complete replacements, never
+deltas. Materialization Needs are satisfied outside DICE before path Needs;
+each retry must add one exact request result or new path demand, otherwise it
+fails with typed internal non-progress rather than an arbitrary retry cap.
+Transient failures terminalize only their current generation and are retried
+on the next command.
+
+Retention and dirtiness: Runtime state retains each exact request, immutable
+success/root/instance, and only its accepted closure's validation demands.
+Command start reobserves previous terminal demands, groups materialization
+demands by repository, and compares each previously observed operation/path.
+Existence or kind changes always dirty only the owning repository. Exact
+`FileBytes`, or a digest derived from those exact bytes, takes precedence over
+node/mtime proxies; otherwise regular/special lstat compares size plus node and
+mtime while ignoring ctime and permissions. `ReadLink` compares exact targets,
+and directory observations compare exact entries. Clean immutable repositories
+remain offline-reusable; changed `RepoSpec` values cannot reuse them. Local
+results retain the logical Host root, validate existence/directory/boundary
+before source observation, and reobserve it every command. Obsolete-instance
+and abandoned-attempt demands never enter retained state.
+
+Terminal policy: While the accepted transaction remains live, compute the
+ordered-root activation closure and select only closure-reachable semantic
+event batches and materialization/path demands. Success and final Starlark
+failures may publish their selected semantic events; preflight, path, package,
+I/O, internal, and closure failures publish none. Immediate transport
+progress/debug output is excluded from this semantic-effect claim. REAPI
+execution and output materialization occur only after terminal acceptance.
+Abandoned retries, cancellation, and incomplete attempts contribute no new
+retained state or effects. Terminal Starlark failures follow the accepted
+final-closure event and retention policy. Preflight, path, package, I/O,
+internal, and closure failures preserve previously accepted retained state and
+commit or publish nothing new.
+
+Pinned Bazel correction: Bazel records and rechecks only materialized paths
+observed by the retained graph, not an unconditional whole-tree digest.
+`DirtinessCheckerUtils`, `FileStateValue`, `FileContentsProxy`, and
+`ExternalFilesHelper` establish exact per-repository dirtiness and ctime-only
+non-dirtiness. `RepositoryFetchFunction`, `DigestWriter`, and
+`RepoRecordedInput` establish exact-spec/recorded-input reuse and final-only
+success. `local.bzl`, `FileFunction`, and `FileFunctionTest` establish logical
+Local path and symlink-retarget freshness. Archive materialization must capture
+the source once and use that same private artifact for checksum, identity, tar
+inspection, and extraction; the current core implementation hashes bytes and
+then reopens a mutable caller path.
+
+Reason for `REPLAN`: Live Slug has the pure request/result projection and exact
+activation closure, but no production path-observation producer, no retained
+outside-DICE materializer, no event/demand attempt sidecar or evaluation-event
+producers, and no production source-preparation caller. One runtime patch could
+not honestly prove complete terminal replacement or publication. The frozen
+serial sequence is: Local lifecycle oracle; outside-DICE path producer;
+corrected retained runtime materializer including captured archives;
+attempt/effect sidecar; event and demand producers; then one shared one-shot
+and daemon retry/publication driver. Ordinary build/query activation remains
+deferred to the discovery owner.
+
+Next evidence: Run only
+`WP-5-m1-local-repository-lifecycle-oracle`. Extend the existing
+`module-source-preparation` retained-daemon fixture without runner changes.
+Keep one logical Local request while proving valid A, symlink retarget A→B,
+missing, regular-file wrong kind, existing boundaryless directory, and exact A
+recovery. Failure rows must distinguish directory preflight from repository
+boundary validation and exclude downstream MODULE/graph markers. Move the
+existing A payload rather than copy it; add only one B `MODULE.bazel`, one
+boundaryless `BUILD.bazel`, and three relative symlinks. Do not add an
+unused-invalid override: neither a demanded dependency nor an override of an
+absent module proves unused-repository laziness.
