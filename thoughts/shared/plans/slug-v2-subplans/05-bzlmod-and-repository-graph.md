@@ -784,6 +784,26 @@ and successful inline order, plus a separate hard-timeout Bazel cycle probe.
 No fixture, Rust, public API, provenance, discovery, or DICE edit is authorized
 before fresh review.
 
+That design is accepted. The next packet is only
+`WP-5-m1-nonroot-include-composition-oracle`, with the allowlist
+`tests/v2_oracle/fixtures/nonroot-include-composition/**`. A self-contained
+local-path subject module must produce one extension-generated marker proving
+`outer-before|nested-a|outer-after|repeat-a|repeat-a`, then retain one Bazel
+daemon across direct nested-fragment A→B→A edits, a nested runtime failure, a
+later-fragment scope failure that precedes an earlier invalid directive, and a
+final recovery. The runtime row must retain Bazel's observable include-parent
+stack/location; stop if that frame is not stable enough for a narrow shape.
+Identical raw-label execution is black-box evidence, while reuse of one stored
+`CompiledModuleFile` and predeclared `Module` remains a pinned-source invariant
+because the restricted MODULE language cannot distinguish it from a fresh
+module.
+
+The cycle probe remains outside `v2_oracle`: run Bazel 9.2 in `--batch` mode
+against a temporary root→A→B→A workspace, with a fresh output root and a hard
+process-group timeout, and record the non-normative result only in the handoff.
+No existing fixture, harness, Rust, Cargo, DICE, preparation, discovery,
+command, server, lockfile, or Slug replay is authorized.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
