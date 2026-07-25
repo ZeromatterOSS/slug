@@ -26,10 +26,27 @@ use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryIo;
 use slug_bzlmod_v2::RepositoryIoOutcome;
+use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
+use slug_bzlmod_v2::RepositoryMaterializationGeneration;
+use slug_bzlmod_v2::RepositoryMaterializationKind;
+use slug_bzlmod_v2::RepositoryMaterializationRequest;
+use slug_bzlmod_v2::RepositoryMaterializationRequestId;
+use slug_bzlmod_v2::RepositoryMaterializationResult;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+use slug_bzlmod_v2::RepositoryMaterializationSuccess;
 use slug_bzlmod_v2::RepositoryTransportError;
 use slug_bzlmod_v2::install_repository_io;
 use slug_bzlmod_v2::source_identity;
+use slug_identity_v2::CanonicalRepoName;
+use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathLstat;
+use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationInstanceId;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathObservationOperation;
+use slug_workspace_v2::PathObservationResult;
+use slug_workspace_v2::PathOperationResult;
 
 struct LocalRepositoryIo {
     immutable_roots: Mutex<RetainedImmutableRoots>,
@@ -82,6 +99,689 @@ fn allocate_observation_instance(
 fn observation_instance_exhausted() -> RepositoryTransportError {
     RepositoryTransportError {
         message: "repository materialization observation instance is invalid or exhausted".into(),
+    }
+}
+
+#[allow(dead_code)] // Activated by the next retained-native-owner bridge packet.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct RepositorySessionToken(u64);
+
+#[allow(dead_code)]
+#[derive(Debug, Eq, PartialEq)]
+enum RepositorySessionError {
+    Busy,
+    StaleToken {
+        active: Option<RepositorySessionToken>,
+        supplied: RepositorySessionToken,
+    },
+    TokenExhausted,
+    InstanceExhausted,
+    WrongWorkspace,
+    KindMismatch,
+    NonSuccessSelection(CanonicalRepoName),
+    UnknownSelection(CanonicalRepoName),
+    DuplicateSelection(CanonicalRepoName),
+    InvalidValidation(CanonicalRepoName),
+    ValidationAlreadyStarted,
+    ValidationIncomplete,
+}
+
+#[allow(dead_code)]
+#[derive(Clone)]
+struct RepositoryValidation {
+    request_id: RepositoryMaterializationRequestId,
+    observations: Vec<(PathObservationDemand, PathObservationResult)>,
+}
+
+#[allow(dead_code)]
+#[derive(Clone)]
+struct AcceptedRepository {
+    request: Arc<RepositoryMaterializationRequest>,
+    success: RepositoryMaterializationSuccess,
+    validation: Vec<(PathObservationDemand, PathObservationResult)>,
+}
+
+#[allow(dead_code)]
+struct RetainedRepositoryRoot {
+    observation_instance: PathObservationInstanceId,
+    root: tempfile::TempDir,
+}
+
+#[allow(dead_code)]
+struct ActiveRepositorySession {
+    token: RepositorySessionToken,
+    validation: RepositorySessionValidation,
+    reusable: Vec<AcceptedRepository>,
+    entries: Vec<RepositoryMaterializationEpochEntry>,
+    provisional_roots: Vec<RetainedRepositoryRoot>,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RepositorySessionValidation {
+    Pending,
+    InProgress,
+    Complete,
+}
+
+#[allow(dead_code)]
+struct RepositoryMaterializerState {
+    next_token: u64,
+    next_instance: u64,
+    active: Option<ActiveRepositorySession>,
+    accepted: Vec<AcceptedRepository>,
+    accepted_roots: Vec<RetainedRepositoryRoot>,
+}
+
+#[allow(dead_code)]
+struct RepositoryMaterializer {
+    workspace: NormalizedAbsolutePath,
+    state: Mutex<RepositoryMaterializerState>,
+}
+
+#[allow(dead_code)]
+enum RepositoryMaterializationAttempt {
+    Local,
+    Immutable {
+        bytes: Vec<u8>,
+        root: tempfile::TempDir,
+    },
+    SpecError(String),
+    TransportError(String),
+    MaterializationError(String),
+}
+
+#[allow(dead_code)]
+impl RepositoryMaterializer {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self {
+            workspace,
+            state: Mutex::new(RepositoryMaterializerState {
+                next_token: 1,
+                next_instance: 1,
+                active: None,
+                accepted: Vec::new(),
+                accepted_roots: Vec::new(),
+            }),
+        }
+    }
+
+    fn begin(&self) -> Result<RepositorySessionToken, RepositorySessionError> {
+        let mut state = self
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        if state.active.is_some() {
+            return Err(RepositorySessionError::Busy);
+        }
+        let token = allocate_session_token(&mut state.next_token)?;
+        state.active = Some(ActiveRepositorySession {
+            token,
+            validation: RepositorySessionValidation::Pending,
+            reusable: Vec::new(),
+            entries: Vec::new(),
+            provisional_roots: Vec::new(),
+        });
+        Ok(token)
+    }
+
+    fn validate(
+        &self,
+        token: RepositorySessionToken,
+        observe: &mut impl FnMut(&PathObservationDemand, Option<&Path>) -> PathObservationResult,
+    ) -> Result<(), RepositorySessionError> {
+        let (accepted, roots) = {
+            let mut state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            let active = matching_active_mut(&mut state, token)?;
+            if active.validation != RepositorySessionValidation::Pending {
+                return Err(RepositorySessionError::ValidationAlreadyStarted);
+            }
+            active.validation = RepositorySessionValidation::InProgress;
+            let accepted = state.accepted.clone();
+            let roots = state
+                .accepted_roots
+                .iter()
+                .map(|root| (root.observation_instance, root.root.path().to_path_buf()))
+                .collect::<Vec<_>>();
+            (accepted, roots)
+        };
+        let reusable = accepted
+            .into_iter()
+            .filter(|accepted| {
+                !validation_is_dirty(&accepted.validation, &roots, |demand, root| {
+                    observe(demand, root)
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let mut state = self
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        let active = matching_active_mut(&mut state, token)?;
+        for accepted in &reusable {
+            upsert_epoch_entry(
+                &mut active.entries,
+                RepositoryMaterializationEpochEntry {
+                    request: accepted.request.clone(),
+                    result: RepositoryMaterializationResult::Success(accepted.success.clone()),
+                },
+            );
+        }
+        active.reusable = reusable;
+        active.validation = RepositorySessionValidation::Complete;
+        Ok(())
+    }
+
+    fn materialize_with(
+        &self,
+        token: RepositorySessionToken,
+        request: Arc<RepositoryMaterializationRequest>,
+        generation: RepositoryMaterializationGeneration,
+        materialize: impl FnOnce() -> RepositoryMaterializationAttempt,
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        if request.id.workspace != self.workspace {
+            return Err(RepositorySessionError::WrongWorkspace);
+        }
+        {
+            let mut state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            let active = matching_validated_active_mut(&mut state, token)?;
+            if let Some(accepted) = active
+                .reusable
+                .iter()
+                .find(|accepted| *accepted.request == *request)
+            {
+                let entry = RepositoryMaterializationEpochEntry {
+                    request,
+                    result: RepositoryMaterializationResult::Success(accepted.success.clone()),
+                };
+                upsert_epoch_entry(&mut active.entries, entry);
+                return complete_epoch(&self.workspace, &active.entries);
+            }
+        }
+
+        let attempt = materialize();
+        let prepared = match attempt {
+            RepositoryMaterializationAttempt::Immutable { bytes, root } => {
+                let identity = source_identity(&bytes);
+                PreparedMaterializationAttempt::Immutable {
+                    source_identity: identity,
+                    root,
+                }
+            }
+            RepositoryMaterializationAttempt::Local => PreparedMaterializationAttempt::Local,
+            RepositoryMaterializationAttempt::SpecError(message) => {
+                PreparedMaterializationAttempt::Result(RepositoryMaterializationResult::SpecError(
+                    message.into(),
+                ))
+            }
+            RepositoryMaterializationAttempt::TransportError(message) => {
+                PreparedMaterializationAttempt::Result(
+                    RepositoryMaterializationResult::TransportError {
+                        generation,
+                        message: message.into(),
+                    },
+                )
+            }
+            RepositoryMaterializationAttempt::MaterializationError(message) => {
+                PreparedMaterializationAttempt::Result(
+                    RepositoryMaterializationResult::MaterializationError {
+                        generation,
+                        message: message.into(),
+                    },
+                )
+            }
+        };
+
+        let kind_matches = matches!(
+            (&request.kind, &prepared),
+            (
+                RepositoryMaterializationKind::Local { .. },
+                PreparedMaterializationAttempt::Local
+            ) | (
+                RepositoryMaterializationKind::Immutable,
+                PreparedMaterializationAttempt::Immutable { .. }
+            ) | (_, PreparedMaterializationAttempt::Result(_))
+        );
+        if !kind_matches {
+            return Err(RepositorySessionError::KindMismatch);
+        }
+
+        let mut state = self
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        matching_validated_active(&state, token)?;
+        let result = match (request.kind.clone(), prepared) {
+            (
+                RepositoryMaterializationKind::Local { .. },
+                PreparedMaterializationAttempt::Local,
+            ) => RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local),
+            (
+                RepositoryMaterializationKind::Immutable,
+                PreparedMaterializationAttempt::Immutable {
+                    source_identity,
+                    root,
+                },
+            ) => {
+                let mut candidate = state.next_instance;
+                let observation_instance = match allocate_observation_instance(&mut candidate) {
+                    Ok(observation_instance) => observation_instance,
+                    Err(_) => {
+                        drop(state);
+                        drop(root);
+                        return Err(RepositorySessionError::InstanceExhausted);
+                    }
+                };
+                state.next_instance = candidate;
+                let generation_root = root.path().to_path_buf();
+                matching_validated_active_mut(&mut state, token)?
+                    .provisional_roots
+                    .push(RetainedRepositoryRoot {
+                        observation_instance,
+                        root,
+                    });
+                RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Immutable {
+                        source_identity,
+                        generation_root,
+                        observation_instance,
+                    },
+                )
+            }
+            (_, PreparedMaterializationAttempt::Result(result)) => result,
+            _ => unreachable!("materialization kind was validated before locking"),
+        };
+        let entry = RepositoryMaterializationEpochEntry { request, result };
+        let active = matching_validated_active_mut(&mut state, token)?;
+        upsert_epoch_entry(&mut active.entries, entry);
+        complete_epoch(&self.workspace, &active.entries)
+    }
+
+    fn epoch(
+        &self,
+        token: RepositorySessionToken,
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        let state = self
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        let active = matching_validated_active(&state, token)?;
+        complete_epoch(&self.workspace, &active.entries)
+    }
+
+    fn accept(
+        &self,
+        token: RepositorySessionToken,
+        selected: &[RepositoryMaterializationRequestId],
+        validation: Vec<RepositoryValidation>,
+    ) -> Result<(), RepositorySessionError> {
+        let released = {
+            let mut state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            let active = matching_validated_active(&state, token)?;
+            let accepted = selected_acceptance(active, selected, validation)?;
+            let selected_instances = accepted
+                .iter()
+                .filter_map(|accepted| match &accepted.success {
+                    RepositoryMaterializationSuccess::Local => None,
+                    RepositoryMaterializationSuccess::Immutable {
+                        observation_instance,
+                        ..
+                    } => Some(*observation_instance),
+                })
+                .collect::<Vec<_>>();
+            let mut active = state.active.take().expect("matching active session exists");
+            let mut retained = Vec::new();
+            let mut released = Vec::new();
+            for root in active.provisional_roots.drain(..) {
+                if selected_instances.contains(&root.observation_instance) {
+                    retained.push(root);
+                } else {
+                    released.push(root);
+                }
+            }
+            state.accepted_roots.extend(retained);
+            state.accepted = accepted;
+            released
+        };
+        drop(released);
+        Ok(())
+    }
+
+    fn discard(&self, token: RepositorySessionToken) -> Result<(), RepositorySessionError> {
+        let released = {
+            let mut state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            matching_active(&state, token)?;
+            state
+                .active
+                .take()
+                .expect("matching active session exists")
+                .provisional_roots
+        };
+        drop(released);
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+enum PreparedMaterializationAttempt {
+    Local,
+    Immutable {
+        source_identity: Arc<str>,
+        root: tempfile::TempDir,
+    },
+    Result(RepositoryMaterializationResult),
+}
+
+#[allow(dead_code)]
+fn allocate_session_token(
+    next_token: &mut u64,
+) -> Result<RepositorySessionToken, RepositorySessionError> {
+    let current = *next_token;
+    if current == 0 {
+        return Err(RepositorySessionError::TokenExhausted);
+    }
+    let successor = current
+        .checked_add(1)
+        .ok_or(RepositorySessionError::TokenExhausted)?;
+    *next_token = successor;
+    Ok(RepositorySessionToken(current))
+}
+
+#[allow(dead_code)]
+fn matching_active(
+    state: &RepositoryMaterializerState,
+    token: RepositorySessionToken,
+) -> Result<&ActiveRepositorySession, RepositorySessionError> {
+    match state.active.as_ref() {
+        Some(active) if active.token == token => Ok(active),
+        active => Err(RepositorySessionError::StaleToken {
+            active: active.map(|active| active.token),
+            supplied: token,
+        }),
+    }
+}
+
+#[allow(dead_code)]
+fn matching_active_mut(
+    state: &mut RepositoryMaterializerState,
+    token: RepositorySessionToken,
+) -> Result<&mut ActiveRepositorySession, RepositorySessionError> {
+    match state.active.as_mut() {
+        Some(active) if active.token == token => Ok(active),
+        active => Err(RepositorySessionError::StaleToken {
+            active: active.as_deref().map(|active| active.token),
+            supplied: token,
+        }),
+    }
+}
+
+#[allow(dead_code)]
+fn matching_validated_active(
+    state: &RepositoryMaterializerState,
+    token: RepositorySessionToken,
+) -> Result<&ActiveRepositorySession, RepositorySessionError> {
+    let active = matching_active(state, token)?;
+    if active.validation != RepositorySessionValidation::Complete {
+        return Err(RepositorySessionError::ValidationIncomplete);
+    }
+    Ok(active)
+}
+
+#[allow(dead_code)]
+fn matching_validated_active_mut(
+    state: &mut RepositoryMaterializerState,
+    token: RepositorySessionToken,
+) -> Result<&mut ActiveRepositorySession, RepositorySessionError> {
+    let active = matching_active_mut(state, token)?;
+    if active.validation != RepositorySessionValidation::Complete {
+        return Err(RepositorySessionError::ValidationIncomplete);
+    }
+    Ok(active)
+}
+
+#[allow(dead_code)]
+fn upsert_epoch_entry(
+    entries: &mut Vec<RepositoryMaterializationEpochEntry>,
+    entry: RepositoryMaterializationEpochEntry,
+) {
+    let repo = &entry.request.id.canonical_repo;
+    match entries.binary_search_by(|candidate| candidate.request.id.canonical_repo.cmp(repo)) {
+        Ok(index) => entries[index] = entry,
+        Err(index) => entries.insert(index, entry),
+    }
+}
+
+#[allow(dead_code)]
+fn complete_epoch(
+    workspace: &NormalizedAbsolutePath,
+    entries: &[RepositoryMaterializationEpochEntry],
+) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+    RepositoryMaterializationResultEpoch::new(workspace.clone(), entries.iter().cloned())
+        .map_err(|_| RepositorySessionError::WrongWorkspace)
+}
+
+#[allow(dead_code)]
+fn selected_acceptance(
+    active: &ActiveRepositorySession,
+    selected: &[RepositoryMaterializationRequestId],
+    validation: Vec<RepositoryValidation>,
+) -> Result<Vec<AcceptedRepository>, RepositorySessionError> {
+    let mut selected = selected.to_vec();
+    selected.sort_by(|left, right| left.canonical_repo.cmp(&right.canonical_repo));
+    if let Some(duplicate) = selected
+        .windows(2)
+        .find(|pair| pair[0] == pair[1])
+        .map(|pair| pair[0].canonical_repo.clone())
+    {
+        return Err(RepositorySessionError::DuplicateSelection(duplicate));
+    }
+    let mut validation = validation;
+    validation.sort_by(|left, right| {
+        left.request_id
+            .canonical_repo
+            .cmp(&right.request_id.canonical_repo)
+    });
+    if let Some(duplicate) = validation
+        .windows(2)
+        .find(|pair| pair[0].request_id == pair[1].request_id)
+        .map(|pair| pair[0].request_id.canonical_repo.clone())
+    {
+        return Err(RepositorySessionError::InvalidValidation(duplicate));
+    }
+    let mut accepted = Vec::new();
+    for request_id in selected {
+        let Some(entry) = active
+            .entries
+            .iter()
+            .find(|entry| entry.request.id == request_id)
+        else {
+            return Err(RepositorySessionError::UnknownSelection(
+                request_id.canonical_repo,
+            ));
+        };
+        let RepositoryMaterializationResult::Success(success) = &entry.result else {
+            return Err(RepositorySessionError::NonSuccessSelection(
+                request_id.canonical_repo,
+            ));
+        };
+        let observations = validation
+            .iter()
+            .find(|candidate| candidate.request_id == request_id)
+            .map(|candidate| candidate.observations.clone())
+            .unwrap_or_default();
+        if !valid_validation(success, &observations) {
+            return Err(RepositorySessionError::InvalidValidation(
+                request_id.canonical_repo,
+            ));
+        }
+        accepted.push(AcceptedRepository {
+            request: entry.request.clone(),
+            success: success.clone(),
+            validation: observations,
+        });
+    }
+    if let Some(unselected) = validation.iter().find(|candidate| {
+        !accepted
+            .iter()
+            .any(|entry| entry.request.id == candidate.request_id)
+    }) {
+        return Err(RepositorySessionError::InvalidValidation(
+            unselected.request_id.canonical_repo.clone(),
+        ));
+    }
+    Ok(accepted)
+}
+
+#[allow(dead_code)]
+fn valid_validation(
+    success: &RepositoryMaterializationSuccess,
+    observations: &[(PathObservationDemand, PathObservationResult)],
+) -> bool {
+    observations.iter().all(|(demand, result)| {
+        demand.operation() == result.operation()
+            && match success {
+                RepositoryMaterializationSuccess::Local => {
+                    demand.namespace() == PathObservationNamespace::Host
+                }
+                RepositoryMaterializationSuccess::Immutable {
+                    observation_instance,
+                    ..
+                } => {
+                    demand.namespace()
+                        == PathObservationNamespace::Materialization(*observation_instance)
+                }
+            }
+    })
+}
+
+#[allow(dead_code)]
+fn validation_is_dirty(
+    previous: &[(PathObservationDemand, PathObservationResult)],
+    roots: &[(PathObservationInstanceId, PathBuf)],
+    mut observe: impl FnMut(&PathObservationDemand, Option<&Path>) -> PathObservationResult,
+) -> bool {
+    let mut observed = Vec::with_capacity(previous.len());
+    for (demand, _) in previous {
+        let root = match demand.namespace() {
+            PathObservationNamespace::Host => None,
+            PathObservationNamespace::Materialization(instance) => {
+                let Some((_, root)) = roots.iter().find(|(candidate, _)| *candidate == instance)
+                else {
+                    return true;
+                };
+                Some(root.as_path())
+            }
+        };
+        observed.push(observe(demand, root));
+    }
+    previous
+        .iter()
+        .zip(&observed)
+        .any(|((demand, prior_result), observed)| {
+            observation_is_dirty(
+                demand,
+                prior_result,
+                observed,
+                previous_has_file_bytes(previous, demand),
+            )
+        })
+}
+
+#[allow(dead_code)]
+fn previous_has_file_bytes(
+    previous: &[(PathObservationDemand, PathObservationResult)],
+    demand: &PathObservationDemand,
+) -> bool {
+    previous.iter().any(|(candidate, _)| {
+        candidate.namespace() == demand.namespace()
+            && candidate.path() == demand.path()
+            && candidate.operation() == PathObservationOperation::FileBytes
+    })
+}
+
+#[allow(dead_code)]
+fn observation_is_dirty(
+    demand: &PathObservationDemand,
+    previous: &PathObservationResult,
+    observed: &PathObservationResult,
+    has_file_bytes: bool,
+) -> bool {
+    if observed.operation() != demand.operation() || observation_has_error(observed) {
+        return true;
+    }
+    match (previous, observed) {
+        (PathObservationResult::Lstat(previous), PathObservationResult::Lstat(observed)) => {
+            lstat_is_dirty(previous, observed, has_file_bytes)
+        }
+        (
+            PathObservationResult::FileBytes(previous),
+            PathObservationResult::FileBytes(observed),
+        ) => previous != observed,
+        (PathObservationResult::ReadLink(previous), PathObservationResult::ReadLink(observed)) => {
+            previous != observed
+        }
+        (
+            PathObservationResult::DirectoryEntries(previous),
+            PathObservationResult::DirectoryEntries(observed),
+        ) => previous != observed,
+        _ => true,
+    }
+}
+
+#[allow(dead_code)]
+fn observation_has_error(result: &PathObservationResult) -> bool {
+    match result {
+        PathObservationResult::Lstat(result) => {
+            matches!(result, PathOperationResult::Error(_))
+        }
+        PathObservationResult::ReadLink(result) => {
+            matches!(result, PathOperationResult::Error(_))
+        }
+        PathObservationResult::FileBytes(result) => {
+            matches!(result, PathOperationResult::Error(_))
+        }
+        PathObservationResult::DirectoryEntries(result) => {
+            matches!(result, PathOperationResult::Error(_))
+        }
+    }
+}
+
+#[allow(dead_code)]
+fn lstat_is_dirty(
+    previous: &PathOperationResult<PathLstat>,
+    observed: &PathOperationResult<PathLstat>,
+    has_file_bytes: bool,
+) -> bool {
+    match (previous, observed) {
+        (PathOperationResult::Missing, PathOperationResult::Missing) => false,
+        (PathOperationResult::Present(previous), PathOperationResult::Present(observed)) => {
+            if previous.kind() != observed.kind() {
+                return true;
+            }
+            match previous.kind() {
+                PathNodeKind::RegularFile | PathNodeKind::SpecialFile => {
+                    previous.size() != observed.size()
+                        || (!has_file_bytes
+                            && (previous.node_id() != observed.node_id()
+                                || previous.mtime_millis() != observed.mtime_millis()))
+                }
+                PathNodeKind::Directory | PathNodeKind::Symlink => false,
+            }
+        }
+        _ => true,
     }
 }
 
@@ -2142,6 +2842,1037 @@ mod tests {
             std::fs::read(root.path().join("file")).unwrap(),
             b"deleted source"
         );
+    }
+
+    fn materialization_request(
+        workspace: &NormalizedAbsolutePath,
+        repo: &str,
+        salt: &str,
+        kind: RepositoryMaterializationKind,
+    ) -> Arc<RepositoryMaterializationRequest> {
+        Arc::new(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: workspace.clone(),
+                canonical_repo: CanonicalRepoName::new(repo).unwrap(),
+            },
+            repo_spec: git_spec(format!("file:///{salt}"), salt.into()),
+            kind,
+        })
+    }
+
+    fn begin_empty(materializer: &RepositoryMaterializer) -> RepositorySessionToken {
+        begin_validated(materializer, |_, _| {
+            panic!("empty accepted state must not observe")
+        })
+    }
+
+    fn begin_validated(
+        materializer: &RepositoryMaterializer,
+        mut observe: impl FnMut(&PathObservationDemand, Option<&Path>) -> PathObservationResult,
+    ) -> RepositorySessionToken {
+        let token = materializer.begin().unwrap();
+        materializer.validate(token, &mut observe).unwrap();
+        token
+    }
+
+    fn immutable_result(
+        materializer: &RepositoryMaterializer,
+        repo: &str,
+    ) -> (PathBuf, PathObservationInstanceId) {
+        let state = materializer
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        let entry = state
+            .active
+            .as_ref()
+            .unwrap()
+            .entries
+            .iter()
+            .find(|entry| entry.request.id.canonical_repo.as_str() == repo)
+            .unwrap();
+        let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            generation_root,
+            observation_instance,
+            ..
+        }) = &entry.result
+        else {
+            panic!("expected immutable success");
+        };
+        (generation_root.clone(), *observation_instance)
+    }
+
+    #[test]
+    fn retained_session_lease_allocators_cancellation_and_lock_scope_are_exact() {
+        for invalid in [0, u64::MAX] {
+            let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+            let materializer = RepositoryMaterializer::new(workspace);
+            materializer.state.lock().unwrap().next_token = invalid;
+            let error = materializer.begin().unwrap_err();
+            assert_eq!(error, RepositorySessionError::TokenExhausted);
+            let state = materializer.state.lock().unwrap();
+            assert_eq!(state.next_token, invalid);
+            assert!(state.active.is_none());
+        }
+
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let materializer = RepositoryMaterializer::new(workspace.clone());
+        let pending = materializer.begin().unwrap();
+        assert_eq!(
+            materializer.epoch(pending).unwrap_err(),
+            RepositorySessionError::ValidationIncomplete
+        );
+        assert_eq!(
+            materializer.accept(pending, &[], Vec::new()).unwrap_err(),
+            RepositorySessionError::ValidationIncomplete
+        );
+        let pending_request = materialization_request(
+            &workspace,
+            "pending",
+            "pending",
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/logical/pending").unwrap(),
+            },
+        );
+        let mut pending_materializations = 0;
+        assert_eq!(
+            materializer
+                .materialize_with(
+                    pending,
+                    pending_request,
+                    RepositoryMaterializationGeneration(1),
+                    || {
+                        pending_materializations += 1;
+                        RepositoryMaterializationAttempt::Local
+                    },
+                )
+                .unwrap_err(),
+            RepositorySessionError::ValidationIncomplete
+        );
+        assert_eq!(pending_materializations, 0);
+        materializer.discard(pending).unwrap();
+
+        let token = begin_empty(&materializer);
+        assert_eq!(token, RepositorySessionToken(2));
+        assert_eq!(
+            materializer
+                .validate(token, &mut |_, _| unreachable!())
+                .unwrap_err(),
+            RepositorySessionError::ValidationAlreadyStarted
+        );
+        assert_eq!(
+            materializer.begin().unwrap_err(),
+            RepositorySessionError::Busy
+        );
+        assert_eq!(materializer.state.lock().unwrap().next_token, 3);
+
+        let stale = RepositorySessionToken(0);
+        assert!(matches!(
+            materializer.epoch(stale),
+            Err(RepositorySessionError::StaleToken { .. })
+        ));
+        assert!(matches!(
+            materializer.accept(stale, &[], Vec::new()),
+            Err(RepositorySessionError::StaleToken { .. })
+        ));
+        assert!(matches!(
+            materializer.discard(stale),
+            Err(RepositorySessionError::StaleToken { .. })
+        ));
+        assert_eq!(materializer.state.lock().unwrap().next_token, 3);
+
+        let request = materialization_request(
+            &workspace,
+            "repo",
+            "one",
+            RepositoryMaterializationKind::Immutable,
+        );
+        let mut provisional_path = None;
+        materializer
+            .materialize_with(
+                token,
+                request,
+                RepositoryMaterializationGeneration(1),
+                || {
+                    assert_eq!(
+                        materializer.begin().unwrap_err(),
+                        RepositorySessionError::Busy
+                    );
+                    let root = tempfile::tempdir().unwrap();
+                    std::fs::write(root.path().join("value"), b"one").unwrap();
+                    provisional_path = Some(root.path().to_path_buf());
+                    RepositoryMaterializationAttempt::Immutable {
+                        bytes: b"one".to_vec(),
+                        root,
+                    }
+                },
+            )
+            .unwrap();
+        let provisional_path = provisional_path.unwrap();
+        assert!(provisional_path.exists());
+        let copied_token = token;
+        let _ = copied_token;
+        assert_eq!(
+            materializer.begin().unwrap_err(),
+            RepositorySessionError::Busy
+        );
+        assert!(provisional_path.exists());
+
+        materializer.discard(token).unwrap();
+        assert!(!provisional_path.exists());
+        assert_eq!(
+            materializer.epoch(token).unwrap_err(),
+            RepositorySessionError::StaleToken {
+                active: None,
+                supplied: token,
+            }
+        );
+        let next = begin_empty(&materializer);
+        assert_eq!(next, RepositorySessionToken(3));
+        assert_eq!(materializer.state.lock().unwrap().next_instance, 2);
+        assert_eq!(
+            materializer.discard(token).unwrap_err(),
+            RepositorySessionError::StaleToken {
+                active: Some(next),
+                supplied: token,
+            }
+        );
+        let request = materialization_request(
+            &workspace,
+            "repo",
+            "two",
+            RepositoryMaterializationKind::Immutable,
+        );
+        materializer
+            .materialize_with(
+                next,
+                request,
+                RepositoryMaterializationGeneration(2),
+                || RepositoryMaterializationAttempt::Immutable {
+                    bytes: b"two".to_vec(),
+                    root: tempfile::tempdir().unwrap(),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            immutable_result(&materializer, "repo").1,
+            PathObservationInstanceId::new(2)
+        );
+        materializer.discard(next).unwrap();
+
+        for invalid in [0, u64::MAX] {
+            let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+            let materializer = RepositoryMaterializer::new(workspace.clone());
+            materializer.state.lock().unwrap().next_instance = invalid;
+            let token = begin_empty(&materializer);
+            let request = materialization_request(
+                &workspace,
+                "repo",
+                "invalid",
+                RepositoryMaterializationKind::Immutable,
+            );
+            let mut root_path = None;
+            let error = materializer
+                .materialize_with(
+                    token,
+                    request,
+                    RepositoryMaterializationGeneration(1),
+                    || {
+                        let root = tempfile::tempdir().unwrap();
+                        root_path = Some(root.path().to_path_buf());
+                        RepositoryMaterializationAttempt::Immutable {
+                            bytes: Vec::new(),
+                            root,
+                        }
+                    },
+                )
+                .unwrap_err();
+            assert_eq!(error, RepositorySessionError::InstanceExhausted);
+            assert!(!root_path.unwrap().exists());
+            let state = materializer.state.lock().unwrap();
+            assert_eq!(state.next_instance, invalid);
+            assert!(state.active.as_ref().unwrap().entries.is_empty());
+            assert!(state.active.as_ref().unwrap().provisional_roots.is_empty());
+            drop(state);
+            materializer.discard(token).unwrap();
+        }
+    }
+
+    #[test]
+    fn retained_session_epochs_acceptance_reuse_and_old_roots_are_exact() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let materializer = RepositoryMaterializer::new(workspace.clone());
+        let token = begin_empty(&materializer);
+        let request_b = materialization_request(
+            &workspace,
+            "b",
+            "b",
+            RepositoryMaterializationKind::Immutable,
+        );
+        let request_a = materialization_request(
+            &workspace,
+            "a",
+            "a",
+            RepositoryMaterializationKind::Immutable,
+        );
+        let request_local = materialization_request(
+            &workspace,
+            "local",
+            "local",
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/logical/local").unwrap(),
+            },
+        );
+        let mut paths = Vec::new();
+        for (request, value) in [(&request_b, b"b".as_slice()), (&request_a, b"a".as_slice())] {
+            materializer
+                .materialize_with(
+                    token,
+                    request.clone(),
+                    RepositoryMaterializationGeneration(1),
+                    || {
+                        let root = tempfile::tempdir().unwrap();
+                        std::fs::write(root.path().join("value"), value).unwrap();
+                        paths.push(root.path().to_path_buf());
+                        RepositoryMaterializationAttempt::Immutable {
+                            bytes: value.to_vec(),
+                            root,
+                        }
+                    },
+                )
+                .unwrap();
+        }
+        let instance_after_immutable = materializer.state.lock().unwrap().next_instance;
+        materializer
+            .materialize_with(
+                token,
+                request_local.clone(),
+                RepositoryMaterializationGeneration(1),
+                || RepositoryMaterializationAttempt::Local,
+            )
+            .unwrap();
+        {
+            let state = materializer.state.lock().unwrap();
+            assert_eq!(state.next_instance, instance_after_immutable);
+            let active = state.active.as_ref().unwrap();
+            assert_eq!(
+                active
+                    .entries
+                    .iter()
+                    .map(|entry| entry.request.id.canonical_repo.as_str())
+                    .collect::<Vec<_>>(),
+                ["a", "b", "local"]
+            );
+        }
+        let (path_a, instance_a) = immutable_result(&materializer, "a");
+        let (path_b, _) = immutable_result(&materializer, "b");
+        let validation_a = RepositoryValidation {
+            request_id: request_a.id.clone(),
+            observations: vec![(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Materialization(instance_a),
+                    NormalizedAbsolutePath::new("/MODULE.bazel").unwrap(),
+                    PathObservationOperation::FileBytes,
+                ),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                    &b"a"[..],
+                ))),
+            )],
+        };
+        let validation_local = RepositoryValidation {
+            request_id: request_local.id.clone(),
+            observations: vec![(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new("/logical/local").unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            )],
+        };
+        materializer
+            .accept(
+                token,
+                &[request_a.id.clone(), request_local.id.clone()],
+                vec![validation_a.clone(), validation_local],
+            )
+            .unwrap();
+        assert!(path_a.exists());
+        assert!(!path_b.exists());
+        {
+            let state = materializer.state.lock().unwrap();
+            assert_eq!(state.accepted_roots.len(), 1);
+            assert_eq!(
+                state
+                    .accepted
+                    .iter()
+                    .map(|entry| entry.request.id.canonical_repo.as_str())
+                    .collect::<Vec<_>>(),
+                ["a", "local"]
+            );
+        }
+
+        let token = begin_validated(&materializer, |demand, root| match demand.namespace() {
+            PathObservationNamespace::Materialization(_) => {
+                assert_eq!(root, Some(path_a.as_path()));
+                validation_a.observations[0].1.clone()
+            }
+            PathObservationNamespace::Host => {
+                assert!(root.is_none());
+                PathObservationResult::Lstat(PathOperationResult::Missing)
+            }
+        });
+        let epoch = materializer
+            .materialize_with(
+                token,
+                request_a.clone(),
+                RepositoryMaterializationGeneration(2),
+                || panic!("clean exact request must reuse offline"),
+            )
+            .unwrap();
+        assert_eq!(epoch, materializer.epoch(token).unwrap());
+        let (reused_path, reused_instance) = immutable_result(&materializer, "a");
+        assert_eq!(reused_path, path_a);
+        assert_eq!(reused_instance, instance_a);
+
+        let changed_request = materialization_request(
+            &workspace,
+            "a",
+            "changed",
+            RepositoryMaterializationKind::Immutable,
+        );
+        let mut replacement_path = None;
+        materializer
+            .materialize_with(
+                token,
+                changed_request.clone(),
+                RepositoryMaterializationGeneration(2),
+                || {
+                    let root = tempfile::tempdir().unwrap();
+                    std::fs::write(root.path().join("value"), b"changed").unwrap();
+                    replacement_path = Some(root.path().to_path_buf());
+                    RepositoryMaterializationAttempt::Immutable {
+                        bytes: b"changed".to_vec(),
+                        root,
+                    }
+                },
+            )
+            .unwrap();
+        let changed_local = materialization_request(
+            &workspace,
+            "local",
+            "local",
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/logical/other").unwrap(),
+            },
+        );
+        let mut local_materializations = 0;
+        materializer
+            .materialize_with(
+                token,
+                changed_local,
+                RepositoryMaterializationGeneration(2),
+                || {
+                    local_materializations += 1;
+                    RepositoryMaterializationAttempt::Local
+                },
+            )
+            .unwrap();
+        assert_eq!(local_materializations, 1);
+        let replacement_path = replacement_path.unwrap();
+        materializer
+            .accept(token, &[changed_request.id.clone()], Vec::new())
+            .unwrap();
+        assert!(path_a.exists());
+        assert!(replacement_path.exists());
+        let state = materializer.state.lock().unwrap();
+        assert_eq!(state.accepted_roots.len(), 2);
+        assert_eq!(state.accepted.len(), 1);
+        assert_eq!(*state.accepted[0].request, *changed_request);
+    }
+
+    #[test]
+    fn retained_session_dirtiness_is_repo_local_and_discard_preserves_cache() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let materializer = RepositoryMaterializer::new(workspace.clone());
+        let token = begin_empty(&materializer);
+        let request_a = materialization_request(
+            &workspace,
+            "a",
+            "a",
+            RepositoryMaterializationKind::Immutable,
+        );
+        let request_b = materialization_request(
+            &workspace,
+            "b",
+            "b",
+            RepositoryMaterializationKind::Immutable,
+        );
+        for request in [&request_a, &request_b] {
+            materializer
+                .materialize_with(
+                    token,
+                    request.clone(),
+                    RepositoryMaterializationGeneration(1),
+                    || {
+                        let root = tempfile::tempdir().unwrap();
+                        RepositoryMaterializationAttempt::Immutable {
+                            bytes: request.id.canonical_repo.as_str().as_bytes().to_vec(),
+                            root,
+                        }
+                    },
+                )
+                .unwrap();
+        }
+        let (accepted_path_a, instance_a) = immutable_result(&materializer, "a");
+        let (_, instance_b) = immutable_result(&materializer, "b");
+        let validation = [(&request_a, instance_a), (&request_b, instance_b)]
+            .into_iter()
+            .map(|(request, instance)| RepositoryValidation {
+                request_id: request.id.clone(),
+                observations: vec![(
+                    PathObservationDemand::new(
+                        PathObservationNamespace::Materialization(instance),
+                        NormalizedAbsolutePath::new("/MODULE.bazel").unwrap(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    PathObservationResult::Lstat(PathOperationResult::Missing),
+                )],
+            })
+            .collect::<Vec<_>>();
+        materializer
+            .accept(
+                token,
+                &[request_a.id.clone(), request_b.id.clone()],
+                validation,
+            )
+            .unwrap();
+
+        let cancelled = materializer.begin().unwrap();
+        let mut discarded = false;
+        let error = materializer
+            .validate(cancelled, &mut |_, _| {
+                if !discarded {
+                    discarded = true;
+                    materializer.discard(cancelled).unwrap();
+                }
+                PathObservationResult::Lstat(PathOperationResult::Missing)
+            })
+            .unwrap_err();
+        assert_eq!(
+            error,
+            RepositorySessionError::StaleToken {
+                active: None,
+                supplied: cancelled,
+            }
+        );
+        assert!(discarded);
+        assert_eq!(materializer.state.lock().unwrap().accepted.len(), 2);
+
+        let token = begin_validated(&materializer, |demand, _| match demand.namespace() {
+            PathObservationNamespace::Materialization(instance) if instance == instance_a => {
+                PathObservationResult::Lstat(PathOperationResult::Missing)
+            }
+            PathObservationNamespace::Materialization(instance) if instance == instance_b => {
+                lstat(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644)
+            }
+            _ => unreachable!(),
+        });
+        assert_eq!(
+            materializer
+                .state
+                .lock()
+                .unwrap()
+                .active
+                .as_ref()
+                .unwrap()
+                .entries
+                .iter()
+                .map(|entry| entry.request.id.canonical_repo.as_str())
+                .collect::<Vec<_>>(),
+            ["a"]
+        );
+        materializer
+            .materialize_with(
+                token,
+                request_a.clone(),
+                RepositoryMaterializationGeneration(2),
+                || panic!("clean repository A must reuse"),
+            )
+            .unwrap();
+        let mut dirty_materializations = 0;
+        let mut dirty_path = None;
+        materializer
+            .materialize_with(
+                token,
+                request_b.clone(),
+                RepositoryMaterializationGeneration(2),
+                || {
+                    dirty_materializations += 1;
+                    let root = tempfile::tempdir().unwrap();
+                    dirty_path = Some(root.path().to_path_buf());
+                    RepositoryMaterializationAttempt::Immutable {
+                        bytes: b"new-b".to_vec(),
+                        root,
+                    }
+                },
+            )
+            .unwrap();
+        assert_eq!(dirty_materializations, 1);
+        let dirty_path = dirty_path.take().unwrap();
+        let (_, replacement_instance_b) = immutable_result(&materializer, "b");
+        let expected = RepositoryMaterializationResultEpoch::new(
+            workspace.clone(),
+            [
+                RepositoryMaterializationEpochEntry {
+                    request: request_b.clone(),
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Immutable {
+                            source_identity: source_identity(b"new-b"),
+                            generation_root: dirty_path.clone(),
+                            observation_instance: replacement_instance_b,
+                        },
+                    ),
+                },
+                RepositoryMaterializationEpochEntry {
+                    request: request_a.clone(),
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Immutable {
+                            source_identity: source_identity(b"a"),
+                            generation_root: accepted_path_a,
+                            observation_instance: instance_a,
+                        },
+                    ),
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(materializer.epoch(token).unwrap(), expected);
+
+        let local_a = materialization_request(
+            &workspace,
+            "a",
+            "a",
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/different-logical-root").unwrap(),
+            },
+        );
+        materializer
+            .materialize_with(
+                token,
+                local_a,
+                RepositoryMaterializationGeneration(2),
+                || {
+                    dirty_materializations += 1;
+                    RepositoryMaterializationAttempt::Local
+                },
+            )
+            .unwrap();
+        assert_eq!(dirty_materializations, 2);
+        assert!(dirty_path.exists());
+        materializer.discard(token).unwrap();
+        assert!(!dirty_path.exists());
+        assert_eq!(materializer.state.lock().unwrap().accepted.len(), 2);
+
+        let token = begin_validated(&materializer, |_, _| {
+            PathObservationResult::Lstat(PathOperationResult::Missing)
+        });
+        materializer
+            .materialize_with(
+                token,
+                request_a,
+                RepositoryMaterializationGeneration(3),
+                || panic!("discard must preserve the prior accepted cache"),
+            )
+            .unwrap();
+        materializer.discard(token).unwrap();
+    }
+
+    #[test]
+    fn retained_session_errors_and_full_request_misses_are_cumulative() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let materializer = RepositoryMaterializer::new(workspace.clone());
+        let token = begin_empty(&materializer);
+        let seed = materialization_request(
+            &workspace,
+            "seed",
+            "seed",
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/logical/seed").unwrap(),
+            },
+        );
+        materializer
+            .materialize_with(
+                token,
+                seed.clone(),
+                RepositoryMaterializationGeneration(1),
+                || RepositoryMaterializationAttempt::Local,
+            )
+            .unwrap();
+        materializer
+            .accept(token, &[seed.id.clone()], Vec::new())
+            .unwrap();
+
+        let token = begin_empty(&materializer);
+        let request_a = materialization_request(
+            &workspace,
+            "a",
+            "a",
+            RepositoryMaterializationKind::Immutable,
+        );
+        let request_b = materialization_request(
+            &workspace,
+            "b",
+            "b",
+            RepositoryMaterializationKind::Immutable,
+        );
+        materializer
+            .materialize_with(
+                token,
+                request_b.clone(),
+                RepositoryMaterializationGeneration(1),
+                || RepositoryMaterializationAttempt::TransportError("offline".into()),
+            )
+            .unwrap();
+        materializer
+            .materialize_with(
+                token,
+                request_a.clone(),
+                RepositoryMaterializationGeneration(1),
+                || RepositoryMaterializationAttempt::SpecError("bad spec".into()),
+            )
+            .unwrap();
+        {
+            let state = materializer.state.lock().unwrap();
+            assert_eq!(
+                state
+                    .active
+                    .as_ref()
+                    .unwrap()
+                    .entries
+                    .iter()
+                    .map(|entry| entry.request.id.canonical_repo.as_str())
+                    .collect::<Vec<_>>(),
+                ["a", "b", "seed"]
+            );
+        }
+        materializer
+            .materialize_with(
+                token,
+                request_b.clone(),
+                RepositoryMaterializationGeneration(2),
+                || RepositoryMaterializationAttempt::MaterializationError("bad tar".into()),
+            )
+            .unwrap();
+        let expected = RepositoryMaterializationResultEpoch::new(
+            workspace.clone(),
+            [
+                RepositoryMaterializationEpochEntry {
+                    request: seed.clone(),
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Local,
+                    ),
+                },
+                RepositoryMaterializationEpochEntry {
+                    request: request_b.clone(),
+                    result: RepositoryMaterializationResult::MaterializationError {
+                        generation: RepositoryMaterializationGeneration(2),
+                        message: "bad tar".into(),
+                    },
+                },
+                RepositoryMaterializationEpochEntry {
+                    request: request_a.clone(),
+                    result: RepositoryMaterializationResult::SpecError("bad spec".into()),
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(materializer.epoch(token).unwrap(), expected);
+        assert_eq!(
+            materializer
+                .accept(
+                    token,
+                    &[request_a.id.clone(), request_b.id.clone()],
+                    Vec::new(),
+                )
+                .unwrap_err(),
+            RepositorySessionError::NonSuccessSelection(request_a.id.canonical_repo.clone())
+        );
+        {
+            let state = materializer.state.lock().unwrap();
+            assert_eq!(state.accepted.len(), 1);
+            assert_eq!(*state.accepted[0].request, *seed);
+            assert!(state.active.is_some());
+        }
+        materializer.discard(token).unwrap();
+
+        let token = begin_empty(&materializer);
+        let local_a = materialization_request(
+            &workspace,
+            "a",
+            "a",
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/logical/a").unwrap(),
+            },
+        );
+        let mut calls = 0;
+        materializer
+            .materialize_with(
+                token,
+                local_a,
+                RepositoryMaterializationGeneration(3),
+                || {
+                    calls += 1;
+                    RepositoryMaterializationAttempt::Local
+                },
+            )
+            .unwrap();
+        assert_eq!(calls, 1);
+        materializer
+            .materialize_with(
+                token,
+                materialization_request(
+                    &workspace,
+                    "a",
+                    "a",
+                    RepositoryMaterializationKind::Local {
+                        logical_root: NormalizedAbsolutePath::new("/logical/other").unwrap(),
+                    },
+                ),
+                RepositoryMaterializationGeneration(3),
+                || {
+                    calls += 1;
+                    RepositoryMaterializationAttempt::Local
+                },
+            )
+            .unwrap();
+        assert_eq!(calls, 2);
+        let wrong_workspace = materialization_request(
+            &NormalizedAbsolutePath::new("/other-workspace").unwrap(),
+            "a",
+            "a",
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/logical/a").unwrap(),
+            },
+        );
+        assert_eq!(
+            materializer
+                .materialize_with(
+                    token,
+                    wrong_workspace,
+                    RepositoryMaterializationGeneration(3),
+                    || panic!("wrong workspace must fail before materialization")
+                )
+                .unwrap_err(),
+            RepositorySessionError::WrongWorkspace
+        );
+        materializer.discard(token).unwrap();
+    }
+
+    fn lstat(
+        kind: PathNodeKind,
+        size: i64,
+        mtime: i64,
+        ctime: i64,
+        node: i64,
+        permissions: i32,
+    ) -> PathObservationResult {
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            kind,
+            size,
+            mtime,
+            ctime,
+            node,
+            permissions,
+        )))
+    }
+
+    fn validation_demand(operation: PathObservationOperation) -> PathObservationDemand {
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/observed").unwrap(),
+            operation,
+        )
+    }
+
+    #[test]
+    fn retained_session_validation_dirtiness_matrix_is_exact() {
+        use slug_workspace_v2::PathDirectoryEntries;
+        use slug_workspace_v2::PathDirectoryName;
+        use slug_workspace_v2::PathIoErrorKind;
+        use slug_workspace_v2::PathObservationError;
+
+        let lstat_demand = validation_demand(PathObservationOperation::Lstat);
+        let missing = vec![(
+            lstat_demand.clone(),
+            PathObservationResult::Lstat(PathOperationResult::Missing),
+        )];
+        assert!(!validation_is_dirty(&missing, &[], |_, _| missing[0]
+            .1
+            .clone()));
+        assert!(validation_is_dirty(&missing, &[], |_, _| {
+            lstat(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644)
+        }));
+        let io_error =
+            PathObservationResult::Lstat(PathOperationResult::Error(PathObservationError::Io {
+                kind: PathIoErrorKind::PermissionDenied,
+                raw_os_error: Some(13),
+            }));
+        assert!(validation_is_dirty(
+            &[(lstat_demand.clone(), io_error.clone())],
+            &[],
+            |_, _| io_error.clone()
+        ));
+
+        let regular = lstat(PathNodeKind::RegularFile, 4, 10, 20, 30, 0o644);
+        let file_demand = validation_demand(PathObservationOperation::FileBytes);
+        let bytes =
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(&b"same"[..])));
+        let with_bytes = vec![
+            (lstat_demand.clone(), regular.clone()),
+            (file_demand, bytes.clone()),
+        ];
+        assert!(!validation_is_dirty(&with_bytes, &[], |demand, _| {
+            match demand.operation() {
+                PathObservationOperation::Lstat => {
+                    lstat(PathNodeKind::RegularFile, 4, 999, 999, 999, 0)
+                }
+                PathObservationOperation::FileBytes => bytes.clone(),
+                _ => unreachable!(),
+            }
+        }));
+        assert!(validation_is_dirty(&with_bytes, &[], |demand, _| {
+            match demand.operation() {
+                PathObservationOperation::Lstat => {
+                    lstat(PathNodeKind::RegularFile, 5, 10, 20, 30, 0o644)
+                }
+                PathObservationOperation::FileBytes => bytes.clone(),
+                _ => unreachable!(),
+            }
+        }));
+        let special_with_bytes = vec![
+            (
+                lstat_demand.clone(),
+                lstat(PathNodeKind::SpecialFile, 4, 10, 20, 30, 0o644),
+            ),
+            (
+                validation_demand(PathObservationOperation::FileBytes),
+                bytes.clone(),
+            ),
+        ];
+        assert!(!validation_is_dirty(
+            &special_with_bytes,
+            &[],
+            |demand, _| match demand.operation() {
+                PathObservationOperation::Lstat => {
+                    lstat(PathNodeKind::SpecialFile, 4, 999, 999, 999, 0)
+                }
+                PathObservationOperation::FileBytes => bytes.clone(),
+                _ => unreachable!(),
+            }
+        ));
+        assert!(validation_is_dirty(
+            &special_with_bytes,
+            &[],
+            |demand, _| match demand.operation() {
+                PathObservationOperation::Lstat => {
+                    lstat(PathNodeKind::SpecialFile, 5, 10, 20, 30, 0o644)
+                }
+                PathObservationOperation::FileBytes => bytes.clone(),
+                _ => unreachable!(),
+            }
+        ));
+        assert!(validation_is_dirty(&with_bytes, &[], |demand, _| {
+            match demand.operation() {
+                PathObservationOperation::Lstat => {
+                    lstat(PathNodeKind::Directory, 4, 10, 20, 30, 0o644)
+                }
+                PathObservationOperation::FileBytes => bytes.clone(),
+                _ => unreachable!(),
+            }
+        }));
+        assert!(validation_is_dirty(&with_bytes, &[], |demand, _| {
+            match demand.operation() {
+                PathObservationOperation::Lstat => regular.clone(),
+                PathObservationOperation::FileBytes => PathObservationResult::FileBytes(
+                    PathOperationResult::Present(Arc::from(&b"changed"[..])),
+                ),
+                _ => unreachable!(),
+            }
+        }));
+
+        let only_lstat = vec![(lstat_demand.clone(), regular.clone())];
+        for changed in [
+            lstat(PathNodeKind::RegularFile, 5, 10, 20, 30, 0o644),
+            lstat(PathNodeKind::RegularFile, 4, 11, 20, 30, 0o644),
+            lstat(PathNodeKind::RegularFile, 4, 10, 20, 31, 0o644),
+        ] {
+            assert!(validation_is_dirty(&only_lstat, &[], |_, _| changed.clone()));
+        }
+        for clean in [
+            lstat(PathNodeKind::RegularFile, 4, 10, 999, 30, 0o644),
+            lstat(PathNodeKind::RegularFile, 4, 10, 20, 30, 0o600),
+            lstat(PathNodeKind::Directory, 999, 999, 999, 999, 0),
+            lstat(PathNodeKind::Symlink, 999, 999, 999, 999, 0),
+        ] {
+            let prior = match &clean {
+                PathObservationResult::Lstat(PathOperationResult::Present(value))
+                    if matches!(
+                        value.kind(),
+                        PathNodeKind::Directory | PathNodeKind::Symlink
+                    ) =>
+                {
+                    vec![(lstat_demand.clone(), lstat(value.kind(), 1, 1, 1, 1, 0o644))]
+                }
+                _ => only_lstat.clone(),
+            };
+            assert!(!validation_is_dirty(&prior, &[], |_, _| clean.clone()));
+        }
+        let special = vec![(
+            lstat_demand.clone(),
+            lstat(PathNodeKind::SpecialFile, 4, 10, 20, 30, 0o644),
+        )];
+        assert!(validation_is_dirty(&special, &[], |_, _| {
+            lstat(PathNodeKind::SpecialFile, 5, 10, 20, 30, 0o644)
+        }));
+
+        let readlink_demand = validation_demand(PathObservationOperation::ReadLink);
+        let target = PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(
+            PathBuf::from("../target"),
+        )));
+        assert!(!validation_is_dirty(
+            &[(readlink_demand.clone(), target.clone())],
+            &[],
+            |_, _| target.clone()
+        ));
+        assert!(validation_is_dirty(
+            &[(readlink_demand, target)],
+            &[],
+            |_, _| PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(
+                PathBuf::from("../other"),
+            )))
+        ));
+
+        let entries_demand = validation_demand(PathObservationOperation::DirectoryEntries);
+        let entries = PathDirectoryEntries::new([
+            PathDirectoryName::new("a").unwrap(),
+            PathDirectoryName::new("b").unwrap(),
+        ])
+        .unwrap();
+        let entries_result =
+            PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries.clone()));
+        assert!(!validation_is_dirty(
+            &[(entries_demand.clone(), entries_result.clone())],
+            &[],
+            |_, _| entries_result.clone()
+        ));
+        assert!(validation_is_dirty(
+            &[(entries_demand, entries_result)],
+            &[],
+            |_, _| PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+                PathDirectoryEntries::new([PathDirectoryName::new("a").unwrap()]).unwrap()
+            ))
+        ));
     }
 
     #[test]

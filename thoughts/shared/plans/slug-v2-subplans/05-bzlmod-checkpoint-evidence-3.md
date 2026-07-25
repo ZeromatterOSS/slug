@@ -906,3 +906,44 @@ Next evidence: Implement only
 `app/slug_core_v2/src/runtime/repository_io.rs`. Add no native observation,
 runtime field, public API, dependency, DICE key, sidecar, producer, retry, or
 publication behavior.
+
+### Stage 5 pure retained-session kernel
+
+Status: Accepted
+
+The callerless one-file kernel owns one checked nonzero session lease, explicit
+Pending/InProgress/Complete validation, owner-quarantined provisional roots,
+append-only accepted roots, burned instance IDs, exact full-request reuse,
+logical rootless Local successes, sorted cumulative complete epochs, and
+token-checked accept/discard. Only explicit terminal operations release
+unselected provisionals after unlocking; dropping or losing the token cannot
+release a DICE-addressable root.
+
+Accepted validation is repo-local and reobserved outside the mutex. Stable
+Missing is clean, observation errors and existence/kind/size changes are
+dirty, exact FileBytes suppresses only node/mtime proxies, ctime and permissions
+are ignored, and ReadLink targets and directory entries compare exactly.
+Terminal accept replaces the logical cache with selected successes and
+validation while physical accepted roots remain readable; selected failures,
+discard, cancellation, Busy, stale, incomplete-validation, and allocator
+errors preserve accepted state.
+
+Scripted evidence covers cancellation after token exposure, Busy/stale and
+zero/MAX no-mutation behavior, nonreuse of burned IDs, explicit cleanup after
+unlock, clean-base plus dirty-replacement epoch equality, transport-to-
+materialization replacement, exact request/spec/kind/logical-root matching,
+repo-local dirtiness, Local allocation freedom, failure preservation, and old
+root readability. The pinned Bazel source was checkout `b1acdef69e`.
+
+Validation passed 17 focused repository tests, 60 full unit tests, 13
+integration tests, and zero doctests. Both GNU-Windows test executables linked.
+Formatting, diff, archive, one-file scope, and exact HTTP/Git function
+byte-identity checks passed. Three terminal corrected-diff rereviews returned
+`ACCEPT`; only pre-existing workspace warnings remained.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-retained-native-owner-bridge`. Add the private native
+retained-root observer entrypoint, the minimum repository materializer call
+bridge, and one private runtime owner field plus initialization. Add no DICE
+key, injection, retry, sidecar, command activation, public API, dependency,
+fixture, or discovery behavior.
