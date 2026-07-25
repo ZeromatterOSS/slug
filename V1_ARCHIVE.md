@@ -103,7 +103,7 @@ Validation for the metadata cleanup:
 - `CARGO_TARGET_DIR=.codex-cargo-target cargo test -p slug_cli_v2 -p slug_core_v2 -p slug_commands_v2 -p slug_identity_v2 -p slug_query_v2 -p slug_build_api_v2 -p slug_analysis_v2 -p slug_loading_v2 -p slug_bzlmod_v2 -p slug_reapi_v2 -p slug_bep_v2 -p slug_server_v2`
 - `python3 -B -m tools.v2_oracle list`
 - `scripts/v2_archive_status.sh`
-- `git ls-files -- app ':!app/slug_analysis_v2/**' ':!app/slug_bep_v2/**' ':!app/slug_build_api_v2/**' ':!app/slug_bzlmod_v2/**' ':!app/slug_cli_v2/**' ':!app/slug_commands_v2/**' ':!app/slug_core_v2/**' ':!app/slug_identity_v2/**' ':!app/slug_loading_v2/**' ':!app/slug_query_v2/**' ':!app/slug_reapi_v2/**' ':!app/slug_server_v2/**'`
+- `git ls-files -- app ':!app/slug_analysis_v2/**' ':!app/slug_bep_v2/**' ':!app/slug_build_api_v2/**' ':!app/slug_bzlmod_v2/**' ':!app/slug_cli_v2/**' ':!app/slug_commands_v2/**' ':!app/slug_core_v2/**' ':!app/slug_events_v2/**' ':!app/slug_identity_v2/**' ':!app/slug_loading_v2/**' ':!app/slug_query_v2/**' ':!app/slug_reapi_v2/**' ':!app/slug_server_v2/**' ':!app/slug_workspace_v2/**'`
 - `git ls-files -- tests ':!tests/v2_oracle/**'`
 - `git diff --check -- AGENTS.md README.md V1_ARCHIVE.md scripts/v2_archive_status.sh thoughts/shared/plans`
 

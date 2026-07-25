@@ -118,6 +118,7 @@ app_v1_paths=$(git ls-files -- app \
   ':!app/slug_cli_v2/**' \
   ':!app/slug_commands_v2/**' \
   ':!app/slug_core_v2/**' \
+  ':!app/slug_events_v2/**' \
   ':!app/slug_identity_v2/**' \
   ':!app/slug_loading_v2/**' \
   ':!app/slug_query_v2/**' \
