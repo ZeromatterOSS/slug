@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceComputations;
+use dice::InjectedKey;
 use dice::Key;
 use dice::UserComputationData;
 use dice_futures::cancellation::CancellationContext;
@@ -32,12 +33,15 @@ use slug_bzlmod_v2::RegistryIoOutcome;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryTransportError;
 use slug_bzlmod_v2::RegistryUrls;
+use slug_bzlmod_v2::RepoRuleId;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryIo;
 use slug_bzlmod_v2::RepositoryIoOutcome;
+use slug_bzlmod_v2::RepositoryMaterialization;
 use slug_bzlmod_v2::RepositoryMaterializationError;
 use slug_bzlmod_v2::RepositoryMaterializationGeneration;
 use slug_bzlmod_v2::RepositoryMaterializationGenerationKey;
+use slug_bzlmod_v2::RepositoryMaterializationKey;
 use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::RepositorySourceFileKey;
 use slug_bzlmod_v2::RepositorySourceFileValue;
@@ -54,6 +58,7 @@ use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationEpochKey;
 use slug_workspace_v2::PathObservationError;
+use slug_workspace_v2::PathObservationInstanceId;
 use slug_workspace_v2::PathObservationKey;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
@@ -85,6 +90,73 @@ struct FlakyIo {
 struct ImmutableIo {
     calls: AtomicUsize,
     root: tempfile::TempDir,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+struct SemanticMaterializationInputKey;
+
+impl fmt::Display for SemanticMaterializationInputKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("semantic-materialization-input")
+    }
+}
+
+impl InjectedKey for SemanticMaterializationInputKey {
+    type Value = Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        <RepositoryMaterializationKey as Key>::equality(x, y)
+    }
+}
+
+#[derive(Debug, Clone, Allocative, Dupe)]
+struct MaterializationCounterKey {
+    #[allocative(skip)]
+    counter: Arc<AtomicUsize>,
+}
+
+impl PartialEq for MaterializationCounterKey {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.counter, &other.counter)
+    }
+}
+
+impl Eq for MaterializationCounterKey {}
+
+impl Hash for MaterializationCounterKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.counter).hash(state);
+    }
+}
+
+impl fmt::Display for MaterializationCounterKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "semantic-materialization-counter:{:p}",
+            Arc::as_ptr(&self.counter)
+        )
+    }
+}
+
+#[async_trait]
+impl Key for MaterializationCounterKey {
+    type Value = usize;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.compute(&SemanticMaterializationInputKey)
+            .await
+            .expect("injected semantic materialization must compute");
+        self.counter.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
 }
 
 #[derive(Debug, Clone, Allocative, Dupe)]
@@ -292,6 +364,7 @@ impl RepositoryIo for ImmutableIo {
         Ok(RepositoryIoOutcome::Immutable {
             source_identity: Arc::from("retained-immutable-source"),
             generation_root: self.root.path().to_owned(),
+            observation_instance: PathObservationInstanceId::new(1),
         })
     }
 }
@@ -705,6 +778,74 @@ fn local_source_observations(
             terminal,
         ),
     ]
+}
+
+fn semantic_materialization(
+    root: &str,
+    instance: u64,
+    source_identity: &str,
+    canonical_repo: &str,
+    rule_name: &str,
+) -> Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>> {
+    Arc::new(Ok(RepositoryMaterialization::Immutable {
+        canonical_repo: slug_identity_v2::CanonicalRepoName::new(canonical_repo).unwrap(),
+        repo_spec: RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                    "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                )
+                .unwrap(),
+                rule_name: rule_name.into(),
+            },
+            attributes: Arc::default(),
+        },
+        source_identity: Arc::from(source_identity),
+        generation_root: PathBuf::from(root),
+        observation_instance: PathObservationInstanceId::new(instance),
+    }))
+}
+
+#[tokio::test]
+async fn immutable_materialization_equality_prunes_only_operational_root_and_instance() {
+    let a1 = semantic_materialization("/generation/a", 1, "A", "dep+", "http_archive");
+    let root_only = semantic_materialization("/generation/b", 1, "A", "dep+", "http_archive");
+    let instance_only = semantic_materialization("/generation/a", 2, "A", "dep+", "http_archive");
+    let a2 = semantic_materialization("/generation/b", 2, "A", "dep+", "http_archive");
+    let identity_b = semantic_materialization("/generation/b", 2, "B", "dep+", "http_archive");
+    let other_repo = semantic_materialization("/generation/a", 1, "A", "other+", "http_archive");
+    let other_spec = semantic_materialization("/generation/a", 1, "A", "dep+", "git_repository");
+
+    for operationally_distinct in [&root_only, &instance_only, &a2] {
+        assert_ne!(&a1, operationally_distinct);
+        assert!(<RepositoryMaterializationKey as Key>::equality(
+            &a1,
+            operationally_distinct,
+        ));
+    }
+    for semantically_distinct in [&identity_b, &other_repo, &other_spec] {
+        assert!(!<RepositoryMaterializationKey as Key>::equality(
+            &a1,
+            semantically_distinct,
+        ));
+    }
+
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_key = MaterializationCounterKey {
+        counter: counter.dupe(),
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    for (value, expected_count) in [(a1.dupe(), 1), (a2, 1), (identity_b, 2), (a1, 3)] {
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(SemanticMaterializationInputKey, value)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        assert_eq!(
+            transaction.compute(&counter_key).await.unwrap(),
+            expected_count
+        );
+        assert_eq!(counter.load(Ordering::SeqCst), expected_count);
+    }
 }
 
 #[test]

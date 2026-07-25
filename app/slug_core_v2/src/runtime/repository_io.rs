@@ -25,25 +25,59 @@ use slug_bzlmod_v2::RepositoryIoOutcome;
 use slug_bzlmod_v2::RepositoryTransportError;
 use slug_bzlmod_v2::install_repository_io;
 use slug_bzlmod_v2::source_identity;
+use slug_workspace_v2::PathObservationInstanceId;
 
 struct LocalRepositoryIo {
-    immutable_roots: Mutex<Vec<tempfile::TempDir>>,
+    immutable_roots: Mutex<RetainedImmutableRoots>,
+}
+
+struct RetainedImmutableRoots {
+    next_instance: u64,
+    roots: Vec<(PathObservationInstanceId, tempfile::TempDir)>,
 }
 
 impl LocalRepositoryIo {
     fn new() -> Self {
         Self {
-            immutable_roots: Mutex::new(Vec::new()),
+            immutable_roots: Mutex::new(RetainedImmutableRoots {
+                next_instance: 1,
+                roots: Vec::new(),
+            }),
         }
     }
 
-    fn retain(&self, root: tempfile::TempDir) -> PathBuf {
-        let path = root.path().to_path_buf();
-        self.immutable_roots
+    fn retain(
+        &self,
+        root: tempfile::TempDir,
+    ) -> Result<(PathBuf, PathObservationInstanceId), RepositoryTransportError> {
+        let mut retained = self
+            .immutable_roots
             .lock()
-            .expect("immutable repository root mutex poisoned")
-            .push(root);
-        path
+            .expect("immutable repository root mutex poisoned");
+        let instance = allocate_observation_instance(&mut retained.next_instance)?;
+        let path = root.path().to_path_buf();
+        retained.roots.push((instance, root));
+        Ok((path, instance))
+    }
+}
+
+fn allocate_observation_instance(
+    next_instance: &mut u64,
+) -> Result<PathObservationInstanceId, RepositoryTransportError> {
+    let current = *next_instance;
+    if current == 0 {
+        return Err(observation_instance_exhausted());
+    }
+    let successor = current
+        .checked_add(1)
+        .ok_or_else(observation_instance_exhausted)?;
+    *next_instance = successor;
+    Ok(PathObservationInstanceId::new(current))
+}
+
+fn observation_instance_exhausted() -> RepositoryTransportError {
+    RepositoryTransportError {
+        message: "repository materialization observation instance is invalid or exhausted".into(),
     }
 }
 
@@ -65,10 +99,11 @@ impl RepositoryIo for LocalRepositoryIo {
             Materialized::Local { source_root } => Ok(RepositoryIoOutcome::Local { source_root }),
             Materialized::Immutable { bytes, root } => {
                 let source_identity = source_identity(&bytes);
-                let generation_root = self.retain(root);
+                let (generation_root, observation_instance) = self.retain(root)?;
                 Ok(RepositoryIoOutcome::Immutable {
                     source_identity,
                     generation_root,
+                    observation_instance,
                 })
             }
         }
@@ -425,6 +460,84 @@ mod tests {
         }
     }
 
+    fn immutable_archive_fixture() -> (tempfile::TempDir, RepoSpec) {
+        let source = tempfile::tempdir().unwrap();
+        let content = source.path().join("content");
+        std::fs::create_dir(&content).unwrap();
+        std::fs::write(content.join("MODULE.bazel"), b"module(name = 'archive')").unwrap();
+        let archive = source.path().join("source.tar");
+        assert!(
+            Command::new("tar")
+                .args(["-cf"])
+                .arg(&archive)
+                .args(["-C"])
+                .arg(source.path())
+                .arg("content")
+                .status()
+                .unwrap()
+                .success()
+        );
+        let bytes = std::fs::read(&archive).unwrap();
+        let spec = archive_spec(
+            url::Url::from_file_path(&archive).unwrap().to_string(),
+            format!("{:x}", Sha256::digest(&bytes)),
+        );
+        (source, spec)
+    }
+
+    #[test]
+    fn observation_instance_allocator_is_checked_and_preserves_invalid_state() {
+        let mut next_instance = 1;
+        assert_eq!(
+            allocate_observation_instance(&mut next_instance).unwrap(),
+            PathObservationInstanceId::new(1)
+        );
+        assert_eq!(next_instance, 2);
+        assert_eq!(
+            allocate_observation_instance(&mut next_instance).unwrap(),
+            PathObservationInstanceId::new(2)
+        );
+        assert_eq!(next_instance, 3);
+
+        for invalid in [0, u64::MAX] {
+            let mut next_instance = invalid;
+            let error = allocate_observation_instance(&mut next_instance).unwrap_err();
+            assert_eq!(
+                error.message,
+                "repository materialization observation instance is invalid or exhausted"
+            );
+            assert_eq!(next_instance, invalid);
+        }
+    }
+
+    #[test]
+    fn failed_observation_instance_allocation_drops_unretained_root() {
+        for invalid in [0, u64::MAX] {
+            let io = LocalRepositoryIo {
+                immutable_roots: Mutex::new(RetainedImmutableRoots {
+                    next_instance: invalid,
+                    roots: Vec::new(),
+                }),
+            };
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().to_owned();
+
+            let error = io.retain(root).unwrap_err();
+
+            assert_eq!(
+                error.message,
+                "repository materialization observation instance is invalid or exhausted"
+            );
+            assert!(!path.exists());
+            let retained = io
+                .immutable_roots
+                .lock()
+                .expect("immutable repository root mutex poisoned");
+            assert_eq!(retained.next_instance, invalid);
+            assert!(retained.roots.is_empty());
+        }
+    }
+
     #[test]
     fn archive_requires_the_fixed_tar_shape_and_decodes_file_uris() {
         let source = tempfile::tempdir().unwrap();
@@ -459,31 +572,12 @@ mod tests {
 
     #[tokio::test]
     async fn immutable_materializations_retain_prior_equal_generations() {
-        let source = tempfile::tempdir().unwrap();
-        let content = source.path().join("content");
-        std::fs::create_dir(&content).unwrap();
-        std::fs::write(content.join("MODULE.bazel"), b"module(name = 'archive')").unwrap();
-        let archive = source.path().join("source.tar");
-        assert!(
-            Command::new("tar")
-                .args(["-cf"])
-                .arg(&archive)
-                .args(["-C"])
-                .arg(source.path())
-                .arg("content")
-                .status()
-                .unwrap()
-                .success()
-        );
-        let bytes = std::fs::read(&archive).unwrap();
-        let spec = archive_spec(
-            url::Url::from_file_path(&archive).unwrap().to_string(),
-            format!("{:x}", Sha256::digest(&bytes)),
-        );
+        let (source, spec) = immutable_archive_fixture();
         let io = LocalRepositoryIo::new();
         let RepositoryIoOutcome::Immutable {
             source_identity: first_identity,
             generation_root: first_root,
+            observation_instance: first_instance,
         } = io.materialize(source.path(), &spec).await.unwrap()
         else {
             panic!("archive source must materialize immutably");
@@ -491,12 +585,16 @@ mod tests {
         let RepositoryIoOutcome::Immutable {
             source_identity: second_identity,
             generation_root: second_root,
+            observation_instance: second_instance,
         } = io.materialize(source.path(), &spec).await.unwrap()
         else {
             panic!("archive source must materialize immutably");
         };
 
         assert_eq!(first_identity, second_identity);
+        assert_ne!(first_instance.value(), 0);
+        assert_ne!(second_instance.value(), 0);
+        assert_ne!(first_instance, second_instance);
         assert_ne!(first_root, second_root);
         assert_eq!(
             std::fs::read(first_root.join("content/MODULE.bazel")).unwrap(),
@@ -506,6 +604,72 @@ mod tests {
             std::fs::read(second_root.join("content/MODULE.bazel")).unwrap(),
             b"module(name = 'archive')"
         );
+        let retained = io
+            .immutable_roots
+            .lock()
+            .expect("immutable repository root mutex poisoned");
+        assert_eq!(retained.roots.len(), 2);
+        assert_eq!(retained.roots[0].0, first_instance);
+        assert_eq!(retained.roots[0].1.path(), first_root);
+        assert_eq!(retained.roots[1].0, second_instance);
+        assert_eq!(retained.roots[1].1.path(), second_root);
+    }
+
+    #[tokio::test]
+    async fn concurrent_immutable_materializations_get_unique_retained_instances() {
+        let (source, spec) = immutable_archive_fixture();
+        let io = LocalRepositoryIo::new();
+
+        let (first, second) = tokio::join!(
+            io.materialize(source.path(), &spec),
+            io.materialize(source.path(), &spec)
+        );
+        let RepositoryIoOutcome::Immutable {
+            source_identity: first_identity,
+            generation_root: first_root,
+            observation_instance: first_instance,
+        } = first.unwrap()
+        else {
+            panic!("archive source must materialize immutably");
+        };
+        let RepositoryIoOutcome::Immutable {
+            source_identity: second_identity,
+            generation_root: second_root,
+            observation_instance: second_instance,
+        } = second.unwrap()
+        else {
+            panic!("archive source must materialize immutably");
+        };
+
+        assert_eq!(first_identity, second_identity);
+        assert_ne!(first_instance.value(), 0);
+        assert_ne!(second_instance.value(), 0);
+        assert_ne!(first_instance, second_instance);
+        assert_ne!(first_root, second_root);
+        assert_eq!(
+            std::fs::read(first_root.join("content/MODULE.bazel")).unwrap(),
+            b"module(name = 'archive')"
+        );
+        assert_eq!(
+            std::fs::read(second_root.join("content/MODULE.bazel")).unwrap(),
+            b"module(name = 'archive')"
+        );
+        let retained = io
+            .immutable_roots
+            .lock()
+            .expect("immutable repository root mutex poisoned");
+        assert_eq!(retained.roots.len(), 2);
+        for (instance, root) in [
+            (first_instance, first_root.as_path()),
+            (second_instance, second_root.as_path()),
+        ] {
+            assert!(
+                retained
+                    .roots
+                    .iter()
+                    .any(|retained| retained.0 == instance && retained.1.path() == root)
+            );
+        }
     }
 
     #[test]

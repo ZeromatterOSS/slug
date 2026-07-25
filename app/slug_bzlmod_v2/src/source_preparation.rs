@@ -31,6 +31,7 @@ use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationError;
+use slug_workspace_v2::PathObservationInstanceId;
 use slug_workspace_v2::PathObservationKey;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
@@ -209,6 +210,7 @@ pub enum RepositoryIoOutcome {
     Immutable {
         source_identity: Arc<str>,
         generation_root: PathBuf,
+        observation_instance: PathObservationInstanceId,
     },
 }
 
@@ -244,6 +246,7 @@ pub enum RepositoryMaterialization {
         repo_spec: RepoSpec,
         source_identity: Arc<str>,
         generation_root: PathBuf,
+        observation_instance: PathObservationInstanceId,
     },
 }
 
@@ -426,11 +429,13 @@ impl Key for RepositoryMaterializationKey {
             Ok(RepositoryIoOutcome::Immutable {
                 source_identity,
                 generation_root,
+                observation_instance,
             }) => Ok(RepositoryMaterialization::Immutable {
                 canonical_repo,
                 repo_spec,
                 source_identity,
                 generation_root,
+                observation_instance,
             }),
             Err(error) => Err(RepositoryMaterializationError::Transport(error.message)),
         };
@@ -1051,7 +1056,7 @@ pub fn source_identity(bytes: &[u8]) -> Arc<str> {
 mod tests {
     use super::*;
 
-    fn immutable(root: &str) -> RepositoryMaterialization {
+    fn immutable(root: &str, instance: u64) -> RepositoryMaterialization {
         RepositoryMaterialization::Immutable {
             canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
             repo_spec: RepoSpec {
@@ -1066,13 +1071,14 @@ mod tests {
             },
             source_identity: Arc::from("fixed-content"),
             generation_root: PathBuf::from(root),
+            observation_instance: PathObservationInstanceId::new(instance),
         }
     }
 
     #[test]
-    fn immutable_materialization_equality_excludes_generation_root() {
-        let left = Arc::new(Ok(immutable("/tmp/generation-a")));
-        let right = Arc::new(Ok(immutable("/tmp/generation-b")));
+    fn immutable_materialization_equality_excludes_generation_root_and_instance() {
+        let left = Arc::new(Ok(immutable("/tmp/generation-a", 1)));
+        let right = Arc::new(Ok(immutable("/tmp/generation-b", 2)));
 
         assert_ne!(left, right);
         assert!(RepositoryMaterializationKey::equality(&left, &right));
