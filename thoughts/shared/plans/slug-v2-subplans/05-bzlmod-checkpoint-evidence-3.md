@@ -563,6 +563,30 @@ two-file scope, and forbidden-reference scans. Existing diagnostics are
 unrelated. Independent pinned-Bazel and architecture/unsafe-owner reviews both
 returned `ACCEPT`.
 
-Next evidence: Implement only
-`WP-5-m1-runtime-path-observation-windows-adapter` in the existing private
-module. Do not edit Cargo or any caller.
+### Stage 5 Windows native path-observation adapter
+
+Status: Accepted
+
+The one-file checkpoint adds a safe host-pure Windows helper/script layer and
+a cfg-Windows copied-ABI native adapter. It preserves exact staged lstat
+classification and formulas, no-follow ReadLink with checked NTFS/LX/mount
+reparse parsing, raw WTF-16 paths and names, and one-owner Find enumeration
+with terminal partial-result discard. Unsafe remains confined to the copied
+kernel32 ABI and native RAII boundary; there is no dependency, public, caller,
+DICE, materializer, publication, fixture, or non-Windows change.
+
+Ten focused Windows tests exhaust the eight attribute combinations, permission
+and FILETIME boundaries, long-path forms, parser tags/ranges/capacity,
+open/query/close precedence, Find initial/iterator/EOF/error/partial/Drop
+behavior, and exact error refinement. Root validation passed 49 unit, 13
+integration, and zero doctests. The real GNU-Windows no-run build produced
+both unit and integration executables, and object inspection confirmed their
+kernel32 imports. Formatting, diff, archive, and exact one-file scope passed.
+Independent pinned-Bazel/windows-sys and architecture/unsafe-owner reviews
+both returned `ACCEPT`.
+
+Next evidence: Design only
+`WP-5-m1-runtime-materializer-captured-archive-design`. Freeze the corrected
+retained outside-DICE materializer, including single-capture archive ownership,
+before any attempt/effect sidecar, producer, retry/publication, DICE, or
+ordinary command activation change.
