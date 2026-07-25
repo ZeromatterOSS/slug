@@ -33,26 +33,23 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-nonroot-include-composition-design`.
+Run only `WP-5-m1-nonroot-include-composition-oracle-design`.
 
-This is a read-only packet. Rereview the landed restricted-syntax inspector
-and private one-file evaluator against pinned Bazel 9.2
-`CompiledModuleFile`, `ModuleFileFunction`, `ModuleThreadContext`, and
-`include()` execution. Freeze the smallest supplied-file composition seam:
-compile the complete include closure before any directive executes; preserve
-the accepted registry-include rejection ordering; execute nonregistry includes
-at their call sites with isolated file bindings and one shared semantic
-context; preserve exact repeated-include/cycle behavior, directive order,
-logical source spans, and first-export names; and root/reread raw kwargs plus
-every source-visible extension proxy across all participating `Module` heaps
-before the final compact snapshot.
+This is a read-only packet. Design one bounded local nonregistry-override
+characterization that distinguishes: nested included-file runtime failure and
+its exact include-parent stack/location shape; a later included-file
+compile/scope failure before any earlier root directive has a semantic effect;
+repeated exact raw-label execution with Bazel's stored compiled-module binding
+isolation/persistence; and successful nested inline directive order. Keep the
+already accepted registry-include ordering evidence unchanged.
 
-The design must name exact file/API ownership, focused tests, stop conditions,
-and whether the existing private evaluator can remain private until discovery.
-Do not edit Rust, Cargo, DICE, source preparation, discovery, commands, server,
-fixtures, or lockfiles. Do not retain Starlark heaps in semantic state, perform
-IO inside evaluation, change the accepted deferred-value domain, or combine
-typed preparation provenance or discovery composition into this packet.
+Design the include-cycle observation as a separate confined Bazel subprocess
+probe with a hard timeout. It is source/behavior characterization only, not an
+oracle row and not permission to invent a Slug cycle diagnostic. Name the exact
+future fixture allowlist, deterministic observables, retained-daemon mutations,
+source anchors, growth estimate, focused replay, and stop conditions. Do not
+edit fixtures, expected artifacts, harness code, Rust, Cargo, DICE, source
+preparation, discovery, commands, server, or lockfiles.
 
 ### Accepted transport evidence
 

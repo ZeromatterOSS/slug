@@ -796,3 +796,11 @@ Bazel oracle: accepted complete-nonroot and raw-attribute fixtures from `908c7c6
 Implementation summary: Added one private supplied-file starlark-rust evaluator with exact nonroot globals, direct syntax-inaccessible `Module` roots for source-visible proxies and raw kwargs, forced-GC reread with fresh identities, final bounded snapshots, compact ordered output, dev suppression, global apparent-name collisions, normalized labels/versions, ignored redirections/overrides, isolated usages, and aggregated innate repo-rule usages.
 Validation: focused evaluator 9/9; full `slug_bzlmod_v2` 204/204; exact spans, first-export aliases, build-metadata normalization, post-call mutation, deferred boundaries, built-in collisions, fmt, diff, archive; independent final rereview `ACCEPT`
 Residual risk: Include closure composition, typed preparation provenance, and stable discovery composition remain. Design only `WP-5-m1-nonroot-include-composition-design`; do not edit Rust or combine later owners.
+
+### Stage 5 nonroot include-composition design
+
+Status: Replan before Rust for execution-order and diagnostic evidence
+Bazel source inspected: pinned Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, especially `CompiledModuleFile`, `ModuleFileFunction`, `ModuleThreadContext`, and upstream include tests
+Design summary: Separate per-file starlark-rust `Module` heaps, cloneable supplied ASTs, one compact semantic context, file-indexed hidden roots, and final cross-heap reread are feasible. Exact repeated raw labels must reuse their stored file module. However, nested evaluators do not preserve Bazel's common include-parent call stack, and the public Rust evaluator combines scope compilation with execution instead of compiling the complete closure first.
+Validation: two independent pinned-source/live-API audits, root source/API adjudication, and fresh independent review `REPLAN`; no Rust, fixture, Cargo, DICE, or public API edit
+Residual risk: Bazel's BFS exposes no include-cycle termination/diagnostic. Design only `WP-5-m1-nonroot-include-composition-oracle-design` for bounded runtime-stack, compile-order, repeated-label, inline-order, and hard-timeout cycle characterization.

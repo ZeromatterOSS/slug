@@ -767,6 +767,23 @@ and the registry-include ordering boundary. Typed preparation provenance,
 discovery composition, DICE, IO, public activation, and Rust edits remain
 deferred.
 
+That design returned `REPLAN` before Rust. Pinned Bazel executes every compiled
+fragment on one `StarlarkThread`, while the feasible private starlark-rust seam
+would use nested `Evaluator`s with distinct call stacks. Starlark-rust also
+performs scope compilation inside `eval_module`, so parsing the supplied
+closure alone does not prove Bazel's compile-all-before-execution ordering.
+Exact repeated raw labels reuse one stored file `Module`; multi-heap rooting
+and final reread remain viable. Bazel's BFS has no explicit include-cycle
+termination or diagnostic, so Slug may not invent one.
+
+The current packet is the read-only
+`WP-5-m1-nonroot-include-composition-oracle-design`. It must freeze a bounded
+nonregistry characterization for nested runtime diagnostics, later-fragment
+compile-before-execute ordering, repeated-label binding/execution behavior,
+and successful inline order, plus a separate hard-timeout Bazel cycle probe.
+No fixture, Rust, public API, provenance, discovery, or DICE edit is authorized
+before fresh review.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
