@@ -1,9 +1,9 @@
 [fixture]
 name = "nonroot-include-composition"
-description = "Retained-daemon oracle for non-root MODULE.bazel include execution order, package lookup, print lifecycle, diagnostics, invalidation, and recovery."
+description = "Retained-daemon oracle for non-root MODULE.bazel include execution order and package policy: BUILD filename priority and fallback, source-order discovery, symlink markers, deleted-package identity, repository ignores, diagnostics, invalidation, and recovery."
 comparison = "semantic"
 daemon = true
-oracle_notes = "The baseline marker is exactly outer-before|nested-a|outer-after|repeat-a|repeat-a\\n, proving nested inline execution order and the two raw-label executions of repeat.MODULE.bazel. The original final row recovers on the same daemon after a nested runtime failure and a later-fragment compile failure. Five appended rows prove package lookup precedes included-fragment execution, both BUILD filenames are accepted, a source-attributed nonregistry print occurs only when evaluation executes and is not replayed on an unchanged warm request, package deletion fails before execution, and BUILD.bazel recreation recovers."
+oracle_notes = "The baseline marker is exactly outer-before|nested-a|outer-after|repeat-a|repeat-a\\n, proving nested inline execution order and the two raw-label executions of repeat.MODULE.bazel. The original final row recovers on the same daemon after a nested runtime failure and a later-fragment compile failure. The first five appended rows prove package lookup precedes included-fragment execution, both BUILD filenames are accepted, a source-attributed nonregistry print occurs only when evaluation executes and is not replayed on an unchanged warm request, package deletion fails before execution, and BUILD.bazel recreation recovers. The final fifteen rows prove BUILD.bazel priority and BUILD fallback transitions, line-4 then line-5 source-order discovery and execution, an unchanged output digest, symlink-to-file marker acceptance and removal, canonical rather than apparent --deleted_packages identity, external .bazelignore rejection and clearing, and REPO.bazel ignore_directories rejection and mutation recovery."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -11,13 +11,19 @@ bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/CompiledModuleFile.java: parseAndCompile, checkModuleFileSyntax, runOnThread",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java: compute, advanceHorizon, execModuleFile",
-  "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupFunction.java: compute, checkPackageExists",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupFunction.java: compute, computeExternalPackageLookupValue, explainNoBuildFileValue",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupValue.java: DELETED_PACKAGE_VALUE",
+  "src/main/java/com/google/devtools/build/lib/skyframe/IgnoredSubdirectoriesFunction.java: computeIgnoredPrefixes, compute",
+  "src/main/java/com/google/devtools/build/lib/packages/RepoFileGlobals.java: ignoreDirectories",
+  "src/main/java/com/google/devtools/build/lib/pkgcache/PackageOptions.java: CommaSeparatedPackageNameListConverter.convert, getDeletedPackagesOrEmptySet",
+  "src/main/java/com/google/devtools/build/lib/skyframe/BazelSkyframeExecutorConstants.java: BUILD_FILES_BY_PRIORITY",
+  "src/main/java/com/google/devtools/build/lib/actions/FileValue.java: isFile",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleThreadContext.java: include",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java: include",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionUsage.java",
   "src/main/java/net/starlark/java/eval/Starlark.java: execFileProgram",
 ]
-translation_notes = "The marker proves shared inline directive order and two executions of one exact raw include label. Reuse of one raw-label-keyed CompiledModuleFile, Program, and predeclared Module is source-derived only: restricted MODULE.bazel code has no valid binding-persistence discriminator. The appended boundary fragment remains present while its package marker changes, so both failures isolate package lookup rather than missing-file behavior. Its print and extension tag prove execution only after package success; the unchanged marker plus absent print proves cached values do not replay evaluation-time debug events. Registry print behavior remains in registry-module-discovery-recovery."
+translation_notes = "The marker proves shared inline directive order and two executions of one exact raw include label. Reuse of one raw-label-keyed CompiledModuleFile, Program, and predeclared Module is source-derived only: restricted MODULE.bazel code has no valid binding-persistence discriminator. The boundary fragments remain present while package policy changes, so failures isolate lookup rather than missing-fragment behavior. Their prints and extension tags prove line-4 then line-5 discovery and execution only after both packages succeed; unchanged-marker rows prove cached values do not replay evaluation-time debug events. BUILD.bazel precedes BUILD, while FileValue.isFile accepts a symlink to a regular file. Deleted-package matching uses parsed PackageIdentifier identity, and external .bazelignore plus REPO.bazel ignore_directories feed the deleted-package lookup result. Registry print behavior remains in registry-module-discovery-recovery."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-include-composition --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-include-composition --tool bazel --bazel /usr/bin/bazel"
 
@@ -161,3 +167,192 @@ manifest_roots = ["bazel-bin/include_order.txt"]
   op = "create"
   path = "modules/subject/pkg/BUILD.bazel"
   content = ""
+
+[[commands]]
+name = "lower_build_does_not_displace_primary_or_replay"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL).*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/pkg/BUILD"
+  content = ""
+
+[[commands]]
+name = "deleting_primary_selects_fallback_and_reexecutes"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "modules/subject/pkg/BUILD.bazel"
+
+[[commands]]
+name = "recreating_primary_displaces_fallback_and_reexecutes"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/pkg/BUILD.bazel"
+  content = ""
+
+[[commands]]
+name = "source_order_reports_pkg_before_pkg2_before_execution"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1", "BUILD file not found in directory 'pkg' of external repository @@subject+", "in module dependency chain <root> -> subject@_"]
+stderr_patterns = ["(?s)\\A(?!.*pkg2)(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).*\\Z"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "include(\"//pkg:boundary.MODULE.bazel\")"
+  replace = "include(\"//pkg:boundary.MODULE.bazel\")\ninclude(\"//pkg2:order.MODULE.bazel\")"
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "modules/subject/pkg/BUILD.bazel"
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "modules/subject/pkg/BUILD"
+
+[[commands]]
+name = "recovering_first_package_reports_second_before_execution"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg2:order.MODULE.bazel' included at @@subject+//:MODULE.bazel:5:1", "BUILD file not found in directory 'pkg2' of external repository @@subject+", "in module dependency chain <root> -> subject@_"]
+stderr_patterns = ["(?s)\\A(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/pkg/BUILD.bazel"
+  content = ""
+
+[[commands]]
+name = "recovering_second_package_executes_both_in_source_order"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL", "order.MODULE.bazel:1:6: NONROOT_PACKAGE_POLICY_ORDER_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/pkg2/BUILD.bazel"
+  content = ""
+
+[[commands]]
+name = "symlink_marker_preserves_primary_selection_without_replay"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "modules/subject/pkg/BUILD.bazel"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/pkg/BUILD.link"
+  destination = "modules/subject/pkg/BUILD.bazel"
+
+[[commands]]
+name = "parking_symlink_removes_package_before_execution"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1", "BUILD file not found in directory 'pkg' of external repository @@subject+", "in module dependency chain <root> -> subject@_"]
+stderr_patterns = ["(?s)\\A(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/pkg/BUILD.bazel"
+  destination = "modules/subject/pkg/BUILD.link"
+
+[[commands]]
+name = "fallback_build_recovers_after_symlink_removal"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL", "order.MODULE.bazel:1:6: NONROOT_PACKAGE_POLICY_ORDER_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/pkg/BUILD"
+  content = ""
+
+[[commands]]
+name = "canonical_deleted_packages_rejects_external_package"
+argv = ["build", "//:include_order", "--lockfile_mode=off", "--deleted_packages=@@subject+//pkg"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1", "Package is considered deleted due to --deleted_packages", "in module dependency chain <root> -> subject@_"]
+stderr_patterns = ["(?s)\\A(?!.*BUILD file not found)(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).*\\Z"]
+
+[[commands]]
+name = "apparent_deleted_packages_does_not_match_canonical_package"
+argv = ["build", "//:include_order", "--lockfile_mode=off", "--deleted_packages=@subject//pkg"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL", "order.MODULE.bazel:1:6: NONROOT_PACKAGE_POLICY_ORDER_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+[[commands]]
+name = "external_bazelignore_rejects_package_before_execution"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1", "Package is considered deleted due to --deleted_packages", "in module dependency chain <root> -> subject@_"]
+stderr_patterns = ["(?s)\\A(?!.*BUILD file not found)(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/.bazelignore"
+  content = "pkg\n"
+
+[[commands]]
+name = "clearing_external_bazelignore_recovers_both_fragments"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL", "order.MODULE.bazel:1:6: NONROOT_PACKAGE_POLICY_ORDER_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/.bazelignore"
+  content = ""
+
+[[commands]]
+name = "repo_bazel_ignore_directories_rejects_package_before_execution"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1", "Package is considered deleted due to --deleted_packages", "in module dependency chain <root> -> subject@_"]
+stderr_patterns = ["(?s)\\A(?!.*BUILD file not found)(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/REPO.bazel"
+  content = "ignore_directories([\"pkg\"])\n"
+
+[[commands]]
+name = "repo_bazel_not_pkg_mutation_recovers_both_fragments"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL", "order.MODULE.bazel:1:6: NONROOT_PACKAGE_POLICY_ORDER_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*NONROOT_PACKAGE_POLICY_ORDER_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL|NONROOT_PACKAGE_POLICY_ORDER_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  path = "modules/subject/REPO.bazel"
+  find = "ignore_directories([\"pkg\"])"
+  replace = "ignore_directories([\"not_pkg\"])"
