@@ -761,13 +761,15 @@ suite, and a real GNU-Windows no-run build passed before terminal review.
 
 The permitted Windows destination-containment correction was applied locally,
 but two independent terminal reviews then found further pinned mismatches:
-inspection and extraction were interleaved, a partial next header was accepted,
-nonempty initial short records were rejected contrary to Commons Compress
-1.26.1, `strip_prefix` used UTF-8 instead of Latin-1/raw-like bytes, leading-NUL
-octal fields disagreed with `TarUtils.parseOctal`, Windows drive-absolute
-members were not relativized, and capture write/flush failures were classified
-as Materialization rather than Transport and could not be injected. The draft
-was removed in full; no Rust or tests were retained.
+inspection and extraction were interleaved, nonempty initial short records were
+rejected contrary to Commons Compress 1.26.1, `strip_prefix` used UTF-8 instead
+of Latin-1/raw-like bytes, leading-NUL octal fields disagreed with
+`TarUtils.parseOctal`, Windows drive-absolute members were not relativized, and
+capture write/flush failures were classified as Materialization rather than
+Transport and could not be injected. The draft was removed in full; no Rust or
+tests were retained. A subsequent direct source check corrected one review
+claim: Commons accepts a short next-header read as EOF after a complete padded
+entry too, so that behavior in the removed draft was not a mismatch.
 
 Next evidence: Design only
 `WP-5-m1-runtime-http-archive-captured-ustar-design-correction`. Preserve the
@@ -775,3 +777,101 @@ accepted one-file/Git/private-capture boundary, but freeze parse-before-write,
 short-record and numeric semantics, Latin-1 prefix encoding, Windows
 normalization/containment, capture-writer injection/stage classification, and
 their exact discriminating rows before another implementation attempt.
+
+### Stage 5 HTTP captured-USTAR design correction
+
+Status: Accepted before Rust
+
+The retry remains private to `runtime/repository_io.rs`. It may add only
+`ArchiveFailureStage`, `ArchiveMaterializationError`, `SavedChecksum`,
+`CapturedArchive`, raw-path and planned-entry types, an `ArchiveIo` test seam,
+a private `ArchiveDestination` execution seam, and private
+capture/inspect/plan/extract helpers. `ArchiveIo` owns separately injectable
+root, artifact, source-read, artifact-write, and artifact-flush operations;
+`ArchiveDestination` counts or performs parent, directory, and regular-file
+writes only after planning. `materialize_git` through its existing
+`extract_tar` call remains byte-identical; no dependency, public API, session,
+runtime, path-observation, DICE, source-preparation, sidecar, producer, retry,
+publication, command, fixture, or discovery behavior enters this packet.
+
+The exact order is structural URL/type/prefix validation plus saved checksum
+parsing; unpublished output-root creation; private capture-artifact creation;
+one caller-source open/read; artifact `write_all` and flush; saved malformed
+checksum; valid checksum mismatch; exhaustive archive inspection and immutable
+extraction planning; then archive-order extraction from the privately owned
+captured bytes. Output-root and capture-artifact creation are Materialization;
+source open/read and artifact write/flush are Transport; the delayed malformed
+checksum is Spec; mismatch is Transport; inspection, filtering, planning, and
+extraction are Materialization. Each operation is separately injectable, all
+capture operations precede a saved checksum error, and every failure drops the
+unpublished root and artifact.
+
+Inspection performs no archive-entry or destination mutation. It reads a
+complete 512-byte header or treats every shorter header-position read as
+physical EOF, both initially and after complete padded entries. A complete
+header with insufficient declared payload or record padding still fails.
+Octal size follows Commons Compress 1.26.1: a leading NUL returns zero
+immediately, leading spaces and trailing NUL/spaces are permitted, and invalid
+digits fail. Base-256 remains an explicit regular/directory-subset rejection,
+including outside the selected prefix because size is required to locate the
+next header. Tar-header checksum corruption remains tolerated.
+
+Name is the raw 100-byte field through its first NUL, joined after the raw
+prefix field when present. Legacy/no-magic regular headers and arbitrary POSIX
+version bytes remain accepted and still combine that prefix. GNU-magic and
+XSTAR layouts are archive-wide subset rejections before their non-USTAR bytes
+can be interpreted as a prefix; selected PAX/GNU metadata, links, and special
+types remain rejected. Outside-prefix entries skip before ordinary type and
+containment rejection, but not before format classification or the numeric and
+payload bounds needed to continue inspection. NUL/`0` are regular files; type
+`5` and trailing-slash names are directories.
+
+`strip_prefix` uses Java `String.getBytes(ISO_8859_1)` semantics:
+U+0000..U+00FF map byte-for-byte and each unmappable scalar becomes `?`.
+Member and prefix paths then share one host-pure flavor normalizer. Unix uses
+only `/` as a separator and preserves raw backslash bytes. Windows uses both
+separators, makes leading-root and `C:/` or `C:\` drive-absolute paths
+relative, normalizes dot/parent components, and leaves drive-relative `C:foo`
+distinct. Exact component prefix selection precedes safe native-component
+construction; residual prefix/root/parent/invalid components fail, and the
+final destination must start with the unpublished root.
+
+The immutable plan owns entry kind, normalized destination components, and
+payload ranges into captured bytes. It rejects namespace collisions that could
+only fail after partial extraction, permits repeated directories and repeated
+regular-file destinations, and replays all valid entries in archive order so a
+later regular file at the same normalized path wins. Explicit and implicit
+directories remain compatible; file/directory and ancestor-file conflicts
+fail before extraction. An absent prefix and any later malformed or selected
+unsupported entry therefore produce zero destination-writer calls.
+
+Focused evidence must cover empty, 1-byte, and 511-byte initial EOF; a complete
+valid entry followed immediately by physical EOF; both short trailing sizes
+after one complete padded entry; checksum-only header corruption acceptance;
+truncated payload and padding; leading-NUL, ordinary, invalid, overflow, and
+selected/outside base-256 size fields; no-magic prefix combination, arbitrary
+POSIX version, archive-wide GNU-magic/XSTAR (including a discriminating
+prefix-layout tail), and selected PAX/GNU-metadata/link/special rejection;
+regular NUL/`0`, type `5` with and without a trailing slash, and
+trailing-slash implicit-directory classification; the same ordinary
+unsupported type skipped outside the prefix and rejected when selected; raw
+non-UTF-8 name and prefix fields; U+00FF and U+0100 Starlark prefixes; Unix
+backslash preservation; Windows `C:/`, `C:\`, rooted, UNC-like,
+embedded-backslash, drive-relative, parent, and containment rows; prefix-root,
+sibling, absent, and unsafe-outside-prefix order; repeated file order and every
+namespace collision; zero destination writes after a late inspection failure;
+one caller read plus post-capture mutation/deletion; every stage-precedence
+pair; failure cleanup; exact Git diff; focused/full core, GNU-Windows no-run,
+format, diff, archive, scope, and forbidden-reference gates.
+
+Independent pinned-source, one-file implementation-feasibility, and
+architecture terminal rereviews returned `ACCEPT` after the focused correction
+made all short records EOF, replaced blanket Windows rejection with exact
+flavor normalization, preserved artifact-creation staging, classified
+GNU/XSTAR before USTAR prefix interpretation, and restored the complete
+checksum/EOF/type/skip evidence rows.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-http-archive-captured-ustar-subset-retry` in
+`app/slug_core_v2/src/runtime/repository_io.rs`. Do not change Git code or add
+retained session/runtime/native-observer behavior.
