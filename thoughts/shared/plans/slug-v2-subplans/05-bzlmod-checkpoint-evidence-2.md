@@ -965,3 +965,18 @@ Design summary: Append 15 rows to `nonroot-include-composition`. The matrix firs
 Implementation boundary: Edit exactly the fixture TOML and expected JSON plus new print-only `pkg2/order.MODULE.bazel` and symlink `pkg/BUILD.link -> ../BUILD.bazel`. Preserve all 11 records byte-for-byte, add exactly two files and fewer than 800 lines, generate with pinned Bazel 9.2, and replay twice. No harness, network, Rust, Cargo, command, server, lockfile, or registry scaffold edit is authorized.
 Validation: two independent read-only pinned-source and harness/fixture audits; an executable retained-server canonical-versus-apparent deleted-package probe; root exact row/error/order/growth synthesis; fresh independent review `ACCEPT`
 Residual risk: Implement only `WP-5-m1-nonroot-package-policy-oracle`. Stop on old-row drift, unstable print/source order, a marker-digest change, symlink mutation infeasibility, network input, harness expansion, or scope expansion.
+
+### Stage 5 nonroot package-policy oracle first run
+
+Status: `REPLAN` on executable stop evidence
+Evidence: The generated 15-row package-policy suffix passed every expected exit, diagnostic, print-order, symlink, policy, recovery, and marker-digest assertion. The required replay failed seven successful pre-existing records solely because their output manifest modes were `0o544` while fresh Bazel produced `0o555`.
+Baseline isolation: A temporary `git archive HEAD tools tests/v2_oracle` replay of the untouched accepted fixture reproduced exactly the same seven scalar mode differences and no other comparison failure, proving the drift predates the new rows. A fresh output base and attempted server-umask reproduction still produced `0o555`.
+Source adjudication: Pinned Bazel 9.2 `OutputPermissions.READONLY` is exactly `0555`; remote-execution source comments likewise state output permissions are changed to `0555`.
+Residual risk: Do not weaken arbitrary old-row equality. Correct only the seven stale `0o544` manifest scalars, preserve every other prior field exactly, then rerun the same bounded oracle packet.
+
+### Stage 5 nonroot package-policy manifest correction
+
+Status: Accepted before corrected rerun
+Design summary: In the first 11 expected records, change only the seven successful output-manifest mode scalars from `0o544` to Bazel-canonical `0o555`; preserve all other fields byte-for-byte. Retain the accepted 15-row suffix, four-file allowlist, two new assets, exact assertions, and sub-800-line growth cap unchanged.
+Validation: isolated untouched-HEAD replay; clean-output-base pinned Bazel generation; pinned `OutputPermissions` source; root exact-diff synthesis; fresh independent review `ACCEPT`
+Residual risk: Rerun only corrected `WP-5-m1-nonroot-package-policy-oracle`, including two independent pinned replays and an exact check that the seven modes are the sole old-record changes.
