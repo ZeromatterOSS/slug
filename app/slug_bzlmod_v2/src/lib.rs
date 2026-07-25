@@ -203,6 +203,7 @@ pub use resolution::resolve_local_module_graph_with_includes_and_dev_dependency_
 pub use source_preparation::ModuleSourcePreparation;
 pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;
+pub use source_preparation::RegistryModuleFileAttempt;
 pub use source_preparation::RepositoryIo;
 pub use source_preparation::RepositoryIoOutcome;
 pub use source_preparation::RepositoryMaterialization;

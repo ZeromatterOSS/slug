@@ -30,6 +30,8 @@ use slug_workspace_v2::WorkspaceRawFileKey;
 use slug_workspace_v2::WorkspaceRawFileValue;
 
 use crate::ModuleKey;
+use crate::RegistryBaseUrl;
+use crate::RegistryFileError;
 use crate::RegistryFileKey;
 use crate::RegistryFileUrl;
 use crate::RegistryFileValue;
@@ -68,18 +70,43 @@ impl fmt::Display for ModuleSourcePreparationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum ModuleSourcePreparation {
-    Found(Arc<[u8]>),
+    NonRegistry {
+        bytes: Arc<[u8]>,
+    },
+    Registry {
+        bytes: Arc<[u8]>,
+        selected_registry: RegistryBaseUrl,
+        module_file_attempts: Arc<[RegistryModuleFileAttempt]>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RegistryModuleFileAttempt {
+    pub url: RegistryFileUrl,
+    pub sha256: Option<[u8; 32]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum ModuleSourcePreparationError {
     RootModuleFiles(CompactString),
-    RegistryPolicy(CompactString),
-    Registry(CompactString),
+    RegistryPolicy(RegistryFileError),
+    RegistryFileCompute {
+        url: RegistryFileUrl,
+        prior_not_found_attempts: Arc<[RegistryModuleFileAttempt]>,
+        message: CompactString,
+    },
+    RegistryFile {
+        url: RegistryFileUrl,
+        prior_not_found_attempts: Arc<[RegistryModuleFileAttempt]>,
+        error: RegistryFileError,
+    },
+    RegistryPolicyCompute(CompactString),
     Source(Arc<str>),
     Patch(CompactString),
     MissingVersion,
-    ModuleNotFound,
+    ModuleNotFound {
+        module_file_attempts: Arc<[RegistryModuleFileAttempt]>,
+    },
 }
 
 impl fmt::Display for RepositoryMaterializationKey {
@@ -441,10 +468,12 @@ impl Key for ModuleSourcePreparationKey {
                 .await
             {
                 Ok(RepositorySourceFileValue::Present(bytes)) => {
-                    Ok(ModuleSourcePreparation::Found(bytes))
+                    Ok(ModuleSourcePreparation::NonRegistry { bytes })
                 }
                 Ok(RepositorySourceFileValue::Absent) => {
-                    Err(ModuleSourcePreparationError::ModuleNotFound)
+                    Err(ModuleSourcePreparationError::ModuleNotFound {
+                        module_file_attempts: Arc::from([]),
+                    })
                 }
                 Ok(RepositorySourceFileValue::ReadError(error)) => {
                     Err(ModuleSourcePreparationError::Source(error))
@@ -466,7 +495,7 @@ impl Key for ModuleSourcePreparationKey {
         {
             Ok(value) => value,
             Err(error) => {
-                return Arc::new(Err(ModuleSourcePreparationError::RegistryPolicy(
+                return Arc::new(Err(ModuleSourcePreparationError::RegistryPolicyCompute(
                     error.to_string().into(),
                 )));
             }
@@ -475,7 +504,7 @@ impl Key for ModuleSourcePreparationKey {
             Ok(value) => value,
             Err(error) => {
                 return Arc::new(Err(ModuleSourcePreparationError::RegistryPolicy(
-                    format!("{error:?}").into(),
+                    error.clone(),
                 )));
             }
         };
@@ -490,20 +519,36 @@ impl Key for ModuleSourcePreparationKey {
         };
         let module = ModuleKey::new(self.module_name.as_str(), self.version.as_str());
         if let Some(registry) = override_registry {
+            let mut attempts = Vec::new();
             return Arc::new(
                 match self
-                    .prepare_from_registry(ctx, override_.as_ref(), registry, &module)
+                    .prepare_from_registry(
+                        ctx,
+                        override_.as_ref(),
+                        registry,
+                        &module,
+                        &mut attempts,
+                    )
                     .await
                 {
                     Ok(Some(value)) => Ok(value),
-                    Ok(None) => Err(ModuleSourcePreparationError::ModuleNotFound),
+                    Ok(None) => Err(ModuleSourcePreparationError::ModuleNotFound {
+                        module_file_attempts: Arc::from(attempts),
+                    }),
                     Err(error) => Err(error),
                 },
             );
         }
+        let mut attempts = Vec::new();
         for registry in policy.urls().as_slice() {
             match self
-                .prepare_from_registry(ctx, override_.as_ref(), registry.as_str(), &module)
+                .prepare_from_registry(
+                    ctx,
+                    override_.as_ref(),
+                    registry.as_str(),
+                    &module,
+                    &mut attempts,
+                )
                 .await
             {
                 Ok(Some(value)) => return Arc::new(Ok(value)),
@@ -511,7 +556,9 @@ impl Key for ModuleSourcePreparationKey {
                 Err(error) => return Arc::new(Err(error)),
             }
         }
-        Arc::new(Err(ModuleSourcePreparationError::ModuleNotFound))
+        Arc::new(Err(ModuleSourcePreparationError::ModuleNotFound {
+            module_file_attempts: Arc::from(attempts),
+        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -526,24 +573,45 @@ impl ModuleSourcePreparationKey {
         override_: Option<&RootModuleOverride>,
         registry: &str,
         module: &ModuleKey,
+        attempts: &mut Vec<RegistryModuleFileAttempt>,
     ) -> Result<Option<ModuleSourcePreparation>, ModuleSourcePreparationError> {
         let url = RegistryFileUrl::new(registry_module_file_url(registry, module));
         let file = ctx
             .compute(&RegistryFileKey {
                 workspace: self.workspace.clone(),
-                url,
+                url: url.clone(),
             })
             .await
-            .map_err(|error| ModuleSourcePreparationError::Registry(error.to_string().into()))?;
+            .map_err(|error| ModuleSourcePreparationError::RegistryFileCompute {
+                url: url.clone(),
+                prior_not_found_attempts: Arc::from(attempts.as_slice()),
+                message: error.to_string().into(),
+            })?;
         match file.as_ref() {
-            Ok(RegistryFileValue::NotFound { .. }) => Ok(None),
-            Ok(RegistryFileValue::Found { bytes, .. }) => Ok(Some(ModuleSourcePreparation::Found(
-                self.apply_root_patches(ctx, override_, bytes.clone())
-                    .await?,
-            ))),
-            Err(error) => Err(ModuleSourcePreparationError::Registry(
-                format!("{error:?}").into(),
-            )),
+            Ok(RegistryFileValue::NotFound { .. }) => {
+                attempts.push(RegistryModuleFileAttempt { url, sha256: None });
+                Ok(None)
+            }
+            Ok(RegistryFileValue::Found { bytes, sha256, .. }) => {
+                let selected_registry = RegistryBaseUrl::new(registry);
+                let bytes = self
+                    .apply_root_patches(ctx, override_, bytes.clone())
+                    .await?;
+                attempts.push(RegistryModuleFileAttempt {
+                    url,
+                    sha256: Some(*sha256),
+                });
+                Ok(Some(ModuleSourcePreparation::Registry {
+                    bytes,
+                    selected_registry,
+                    module_file_attempts: Arc::from(attempts.as_slice()),
+                }))
+            }
+            Err(error) => Err(ModuleSourcePreparationError::RegistryFile {
+                url,
+                prior_not_found_attempts: Arc::from(attempts.as_slice()),
+                error: error.clone(),
+            }),
         }
     }
 

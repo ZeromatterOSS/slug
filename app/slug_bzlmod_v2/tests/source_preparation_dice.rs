@@ -9,12 +9,15 @@ use async_trait::async_trait;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::UserComputationData;
+use sha2::Digest;
+use sha2::Sha256;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleSourcePreparation;
 use slug_bzlmod_v2::ModuleSourcePreparationError;
 use slug_bzlmod_v2::ModuleSourcePreparationKey;
+use slug_bzlmod_v2::RegistryFileError;
 use slug_bzlmod_v2::RegistryFileUrl;
 use slug_bzlmod_v2::RegistryIo;
 use slug_bzlmod_v2::RegistryIoOutcome;
@@ -460,16 +463,32 @@ async fn registry_preparation_falls_through_only_not_found_and_preserves_raw_byt
     )
     .await
     .expect("source preparation must not introduce a DICE cycle");
-    assert!(matches!(
-        prepared.as_ref(),
-        Ok(ModuleSourcePreparation::Found(bytes)) if bytes == &raw_module
-    ));
+    let Ok(ModuleSourcePreparation::Registry {
+        bytes,
+        selected_registry,
+        module_file_attempts,
+    }) = prepared.as_ref()
+    else {
+        panic!("expected registry preparation")
+    };
+    assert_eq!(bytes.as_ref(), raw_module.as_ref());
+    assert_eq!(selected_registry.as_str(), "https://second.invalid");
+    assert_eq!(module_file_attempts.len(), 2);
+    assert_eq!(module_file_attempts[0].url.as_str(), first);
+    assert_eq!(module_file_attempts[0].sha256, None);
+    assert_eq!(module_file_attempts[1].url.as_str(), second);
+    assert_eq!(
+        module_file_attempts[1].sha256,
+        Some(Sha256::digest(raw_module.as_ref()).into())
+    );
     assert_eq!(io.calls(), [first, second]);
 
+    let third = "https://third.invalid/modules/dep/1.0.0/MODULE.bazel";
     let io = Arc::new(FakeRegistryIo::new([
-        (first, FakeRegistryResponse::Error("fatal transport")),
+        (first, FakeRegistryResponse::NotFound),
+        (second, FakeRegistryResponse::Error("fatal transport")),
         (
-            second,
+            third,
             FakeRegistryResponse::Found(Arc::from(&b"must not be read"[..])),
         ),
     ]));
@@ -480,25 +499,114 @@ async fn registry_preparation_falls_through_only_not_found_and_preserves_raw_byt
         &dice,
         "module(name = 'root')\nbazel_dep(name = 'dep', version = '1.0.0')\n",
         raw_workspace_snapshot([]),
-        &["https://first.invalid", "https://second.invalid"],
+        &[
+            "https://first.invalid",
+            "https://second.invalid",
+            "https://third.invalid",
+        ],
         1,
         "1.0.0",
     )
     .await;
+    let Err(ModuleSourcePreparationError::RegistryFile {
+        url,
+        prior_not_found_attempts,
+        error,
+    }) = prepared.as_ref()
+    else {
+        panic!("expected typed fatal registry error: {prepared:?}");
+    };
+    assert_eq!(url.as_str(), second);
+    assert_eq!(prior_not_found_attempts.len(), 1);
+    assert_eq!(prior_not_found_attempts[0].url.as_str(), first);
+    assert_eq!(prior_not_found_attempts[0].sha256, None);
     assert!(matches!(
-        prepared.as_ref(),
-        Err(ModuleSourcePreparationError::Registry(message))
-            if message.as_str().contains("fatal transport")
+        error,
+        RegistryFileError::Transport { url, message }
+            if url.as_str() == second && message.as_str() == "fatal transport"
     ));
-    assert_eq!(io.calls(), [first]);
+    assert_eq!(io.calls(), [first, second]);
+}
+
+#[tokio::test]
+async fn selected_registry_provenance_replays_a_b_a_structurally() {
+    let first = "https://first.invalid/modules/dep/1.0.0/MODULE.bazel";
+    let second = "https://second.invalid/modules/dep/1.0.0/MODULE.bazel";
+    let module_bytes: Arc<[u8]> = Arc::from(&b"identical module bytes"[..]);
+    let io = Arc::new(FakeRegistryIo::new([
+        (first, FakeRegistryResponse::Found(module_bytes.clone())),
+        (second, FakeRegistryResponse::Found(module_bytes.clone())),
+    ]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let root = "module(name = 'root')\nbazel_dep(name = 'dep', version = '1.0.0')\n";
+
+    let first_a = prepare(
+        &dice,
+        root,
+        raw_workspace_snapshot([]),
+        &["https://first.invalid"],
+        1,
+        "1.0.0",
+    )
+    .await;
+    let selected_b = prepare(
+        &dice,
+        root,
+        raw_workspace_snapshot([]),
+        &["https://second.invalid"],
+        2,
+        "1.0.0",
+    )
+    .await;
+    let second_a = prepare(
+        &dice,
+        root,
+        raw_workspace_snapshot([]),
+        &["https://first.invalid"],
+        3,
+        "1.0.0",
+    )
+    .await;
+
+    assert_eq!(first_a, second_a);
+    assert_ne!(first_a, selected_b);
+    assert!(matches!(
+        first_a.as_ref(),
+        Ok(ModuleSourcePreparation::Registry {
+            bytes,
+            selected_registry,
+            module_file_attempts,
+        }) if bytes == &module_bytes
+            && selected_registry.as_str() == "https://first.invalid"
+            && module_file_attempts.len() == 1
+            && module_file_attempts[0].url.as_str() == first
+            && module_file_attempts[0].sha256
+                == Some(Sha256::digest(module_bytes.as_ref()).into())
+    ));
+    assert!(matches!(
+        selected_b.as_ref(),
+        Ok(ModuleSourcePreparation::Registry {
+            bytes,
+            selected_registry,
+            module_file_attempts,
+        }) if bytes == &module_bytes
+            && selected_registry.as_str() == "https://second.invalid"
+            && module_file_attempts.len() == 1
+            && module_file_attempts[0].url.as_str() == second
+            && module_file_attempts[0].sha256
+                == Some(Sha256::digest(module_bytes.as_ref()).into())
+    ));
 }
 
 #[tokio::test]
 async fn override_registry_uses_the_effective_version_and_bypasses_defaults() {
     let expected = "https://override.invalid/modules/dep/9.0.0/MODULE.bazel";
+    let override_bytes: Arc<[u8]> = Arc::from(&b"effective override"[..]);
     let io = Arc::new(FakeRegistryIo::new([(
         expected,
-        FakeRegistryResponse::Found(Arc::from(&b"effective override"[..])),
+        FakeRegistryResponse::Found(override_bytes.clone()),
     )]));
     let mut builder = Dice::builder();
     install_registry_io(&mut builder, io.clone());
@@ -515,10 +623,51 @@ async fn override_registry_uses_the_effective_version_and_bypasses_defaults() {
     )
     .await;
 
-    assert!(matches!(
-        prepared.as_ref(),
-        Ok(ModuleSourcePreparation::Found(bytes)) if bytes.as_ref() == b"effective override"
-    ));
+    let Ok(ModuleSourcePreparation::Registry {
+        bytes,
+        selected_registry,
+        module_file_attempts,
+    }) = prepared.as_ref()
+    else {
+        panic!("expected override registry preparation: {prepared:?}");
+    };
+    assert_eq!(bytes.as_ref(), override_bytes.as_ref());
+    assert_eq!(selected_registry.as_str(), "https://override.invalid");
+    assert_eq!(module_file_attempts.len(), 1);
+    assert_eq!(module_file_attempts[0].url.as_str(), expected);
+    assert_eq!(
+        module_file_attempts[0].sha256,
+        Some(Sha256::digest(override_bytes.as_ref()).into())
+    );
+    assert_eq!(io.calls(), [expected]);
+
+    let io = Arc::new(FakeRegistryIo::new([(
+        expected,
+        FakeRegistryResponse::NotFound,
+    )]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let missing = prepare(
+        &dice,
+        "module(name = 'root')\n\
+         bazel_dep(name = 'dep', version = '1.0.0')\n\
+         single_version_override(module_name = 'dep', version = '9.0.0', registry = 'https://override.invalid/')\n",
+        raw_workspace_snapshot([]),
+        &["https://default.invalid"],
+        1,
+        "9.0.0",
+    )
+    .await;
+    let Err(ModuleSourcePreparationError::ModuleNotFound {
+        module_file_attempts,
+    }) = missing.as_ref()
+    else {
+        panic!("expected typed override registry miss: {missing:?}");
+    };
+    assert_eq!(module_file_attempts.len(), 1);
+    assert_eq!(module_file_attempts[0].url.as_str(), expected);
+    assert_eq!(module_file_attempts[0].sha256, None);
     assert_eq!(io.calls(), [expected]);
 }
 
@@ -552,7 +701,7 @@ async fn nonregistry_preparation_bypasses_registry_io() {
 
     assert!(matches!(
         prepared.as_ref(),
-        Ok(ModuleSourcePreparation::Found(bytes)) if bytes.as_ref() == b"local module"
+        Ok(ModuleSourcePreparation::NonRegistry { bytes }) if bytes.as_ref() == b"local module"
     ));
     assert!(registry_io.calls().is_empty());
     assert_eq!(repository_io.calls.load(Ordering::SeqCst), 1);
@@ -612,14 +761,22 @@ bazel_dep(name = 'base', version = '1.0.0')\n";
         )
         .await;
         match expected {
-            Some(leaf) => assert!(
-                matches!(
-                    prepared.as_ref(),
-                    Ok(ModuleSourcePreparation::Found(bytes))
-                        if String::from_utf8_lossy(bytes).contains(leaf)
-                ),
-                "{prepared:?}"
-            ),
+            Some(leaf) => {
+                let Ok(ModuleSourcePreparation::Registry {
+                    bytes,
+                    module_file_attempts,
+                    ..
+                }) = prepared.as_ref()
+                else {
+                    panic!("expected patched registry preparation: {prepared:?}");
+                };
+                assert!(String::from_utf8_lossy(bytes).contains(leaf));
+                assert_eq!(module_file_attempts.len(), 1);
+                assert_eq!(
+                    module_file_attempts[0].sha256,
+                    Some(Sha256::digest(original).into())
+                );
+            }
             None => assert!(matches!(
                 prepared.as_ref(),
                 Err(ModuleSourcePreparationError::Patch(_))
@@ -632,9 +789,10 @@ bazel_dep(name = 'base', version = '1.0.0')\n";
 #[tokio::test]
 async fn ordered_patches_apply_strip_while_nonmain_and_commands_stay_inactive() {
     let module_url = "https://registry.invalid/modules/dep/1.0.0/MODULE.bazel";
+    let original: Arc<[u8]> = Arc::from(&b"value = 'base'\n"[..]);
     let io = Arc::new(FakeRegistryIo::new([(
         module_url,
-        FakeRegistryResponse::Found(Arc::from(&b"value = 'base'\n"[..])),
+        FakeRegistryResponse::Found(original.clone()),
     )]));
     let mut builder = Dice::builder();
     install_registry_io(&mut builder, io);
@@ -665,12 +823,20 @@ async fn ordered_patches_apply_strip_while_nonmain_and_commands_stay_inactive() 
     )
     .await;
 
-    assert!(
-        matches!(
-            prepared.as_ref(),
-            Ok(ModuleSourcePreparation::Found(bytes)) if bytes.as_ref() == b"value = 'final'\n"
-        ),
-        "{prepared:?}"
+    let Ok(ModuleSourcePreparation::Registry {
+        bytes,
+        module_file_attempts,
+        ..
+    }) = prepared.as_ref()
+    else {
+        panic!("expected patched registry preparation: {prepared:?}");
+    };
+    assert_eq!(bytes.as_ref(), b"value = 'final'\n");
+    assert_eq!(module_file_attempts.len(), 1);
+    assert_eq!(module_file_attempts[0].url.as_str(), module_url);
+    assert_eq!(
+        module_file_attempts[0].sha256,
+        Some(Sha256::digest(original.as_ref()).into())
     );
 }
 
@@ -711,10 +877,17 @@ async fn empty_version_and_registry_exhaustion_are_typed_failures() {
         "1.0.0",
     )
     .await;
-    assert!(matches!(
-        exhausted.as_ref(),
-        Err(ModuleSourcePreparationError::ModuleNotFound)
-    ));
+    let Err(ModuleSourcePreparationError::ModuleNotFound {
+        module_file_attempts,
+    }) = exhausted.as_ref()
+    else {
+        panic!("expected ordered registry exhaustion: {exhausted:?}");
+    };
+    assert_eq!(module_file_attempts.len(), 2);
+    assert_eq!(module_file_attempts[0].url.as_str(), first);
+    assert_eq!(module_file_attempts[0].sha256, None);
+    assert_eq!(module_file_attempts[1].url.as_str(), second);
+    assert_eq!(module_file_attempts[1].sha256, None);
     assert_eq!(io.calls(), [first, second]);
 }
 
