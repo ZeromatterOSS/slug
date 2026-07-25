@@ -1,3 +1,6 @@
+use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -5,11 +8,14 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
+use allocative::Allocative;
 use async_trait::async_trait;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::DiceComputations;
 use dice::Key;
 use dice::UserComputationData;
+use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
@@ -29,8 +35,10 @@ use slug_bzlmod_v2::RegistryUrls;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryIo;
 use slug_bzlmod_v2::RepositoryIoOutcome;
+use slug_bzlmod_v2::RepositoryMaterializationError;
 use slug_bzlmod_v2::RepositoryMaterializationGeneration;
 use slug_bzlmod_v2::RepositoryMaterializationGenerationKey;
+use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::RepositorySourceFileKey;
 use slug_bzlmod_v2::RepositorySourceFileValue;
 use slug_bzlmod_v2::RepositoryTransportError;
@@ -46,12 +54,14 @@ use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationEpochKey;
 use slug_workspace_v2::PathObservationError;
+use slug_workspace_v2::PathObservationKey;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::PathResolutionError;
+use slug_workspace_v2::PathResult;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
@@ -70,6 +80,126 @@ struct LocalIo {
 
 struct FlakyIo {
     calls: AtomicUsize,
+}
+
+struct ImmutableIo {
+    calls: AtomicUsize,
+    root: tempfile::TempDir,
+}
+
+#[derive(Debug, Clone, Allocative, Dupe)]
+struct PreparationCounterKey {
+    #[allocative(skip)]
+    counter: Arc<AtomicUsize>,
+}
+
+impl PartialEq for PreparationCounterKey {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.counter, &other.counter)
+    }
+}
+
+impl Eq for PreparationCounterKey {}
+
+impl Hash for PreparationCounterKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.counter).hash(state);
+    }
+}
+
+impl fmt::Display for PreparationCounterKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "module-source-preparation-counter:{:p}",
+            Arc::as_ptr(&self.counter)
+        )
+    }
+}
+
+#[async_trait]
+impl Key for PreparationCounterKey {
+    type Value = PathOutcome<usize>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.compute(&ModuleSourcePreparationKey {
+            workspace: workspace(),
+            module_name: "dep".into(),
+            version: "1.0.0".into(),
+        })
+        .await
+        .expect("fixed module-source preparation must compute")
+        .map(|_| self.counter.fetch_add(1, Ordering::SeqCst) + 1)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, Allocative, Dupe)]
+struct RootObservationCounterKey {
+    #[allocative(skip)]
+    counter: Arc<AtomicUsize>,
+}
+
+impl PartialEq for RootObservationCounterKey {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.counter, &other.counter)
+    }
+}
+
+impl Eq for RootObservationCounterKey {}
+
+impl Hash for RootObservationCounterKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.counter).hash(state);
+    }
+}
+
+impl fmt::Display for RootObservationCounterKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "root-observation-counter:{:p}",
+            Arc::as_ptr(&self.counter)
+        )
+    }
+}
+
+#[async_trait]
+impl Key for RootObservationCounterKey {
+    type Value = PathOutcome<usize>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.compute(&PathObservationKey::new(demand(
+            "/",
+            PathObservationOperation::Lstat,
+        )))
+        .await
+        .expect("fixed root observation must compute")
+        .map(|_| self.counter.fetch_add(1, Ordering::SeqCst) + 1)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
 }
 
 #[derive(Clone)]
@@ -151,6 +281,21 @@ impl RepositoryIo for LocalIo {
     }
 }
 
+#[async_trait]
+impl RepositoryIo for ImmutableIo {
+    async fn materialize(
+        &self,
+        _: &Path,
+        _: &RepoSpec,
+    ) -> Result<RepositoryIoOutcome, RepositoryTransportError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(RepositoryIoOutcome::Immutable {
+            source_identity: Arc::from("retained-immutable-source"),
+            generation_root: self.root.path().to_owned(),
+        })
+    }
+}
+
 fn text_snapshot() -> Arc<WorkspaceSnapshot> {
     let workspace = workspace();
     Arc::new(WorkspaceSnapshot {
@@ -200,12 +345,13 @@ fn raw_snapshot(
     })
 }
 
-async fn source(
+async fn source_with_epoch(
     dice: &Arc<Dice>,
     raw: Arc<WorkspaceRawSnapshot>,
+    epoch: PathObservationEpoch,
     generation: u64,
     repo_relative_path: &str,
-) -> RepositorySourceFileValue {
+) -> PathResult<RepositorySourceFileValue, RepositorySourceFileError> {
     let workspace = workspace();
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
@@ -224,6 +370,9 @@ async fn source(
             raw,
         )])
         .unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
     inject_root_module_request_inputs(
         &mut updater,
         &workspace,
@@ -241,14 +390,29 @@ async fn source(
         )])
         .unwrap();
     let mut transaction = updater.commit().await;
-    transaction
+    let outcome = transaction
         .compute(&RepositorySourceFileKey {
             workspace,
             module_name: "dep".into(),
             repo_relative_path: PathBuf::from(repo_relative_path),
         })
         .await
-        .unwrap()
+        .unwrap();
+    outcome
+}
+
+async fn source(
+    dice: &Arc<Dice>,
+    raw: Arc<WorkspaceRawSnapshot>,
+    generation: u64,
+    repo_relative_path: &str,
+) -> Result<RepositorySourceFileValue, RepositorySourceFileError> {
+    let epoch = complete_epoch_for_raw(&raw);
+    let outcome = source_with_epoch(dice, raw, epoch, generation, repo_relative_path).await;
+    let PathOutcome::Complete(value) = outcome else {
+        panic!("complete raw snapshot unexpectedly needs path observations");
+    };
+    value
 }
 
 async fn prepare(
@@ -339,6 +503,73 @@ async fn prepare_with_epoch(
         .unwrap()
 }
 
+async fn count_preparation_with_epoch(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+    generation: u64,
+    counter_key: &PreparationCounterKey,
+) -> PathOutcome<usize> {
+    let workspace = workspace();
+    let mut updater = dice.updater_with_data(UserComputationData::default());
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            text_snapshot(),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            raw_snapshot([]),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        &workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    inject_registry_request_inputs(
+        &mut updater,
+        &workspace,
+        RegistryUrls::new(std::iter::empty::<&str>()),
+        RegistryRequestGeneration(generation),
+    )
+    .unwrap();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationGenerationKey {
+                workspace: workspace.clone(),
+            },
+            RepositoryMaterializationGeneration(generation),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    transaction.compute(counter_key).await.unwrap()
+}
+
+async fn count_root_observation_with_epoch(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+    counter_key: &RootObservationCounterKey,
+) -> PathOutcome<usize> {
+    let mut updater = dice.updater_with_data(UserComputationData::default());
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    transaction.compute(counter_key).await.unwrap()
+}
+
 fn path(value: &str) -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new(value).unwrap()
 }
@@ -351,23 +582,34 @@ fn lstat(kind: PathNodeKind) -> PathLstat {
     PathLstat::new(kind, 1, 2, 3, 4, 0o644)
 }
 
+fn lstat_variant(kind: PathNodeKind, value: i64) -> PathLstat {
+    PathLstat::new(kind, value, value + 1, value + 2, value + 3, 0o600)
+}
+
 fn complete_epoch_for_raw(raw: &WorkspaceRawSnapshot) -> PathObservationEpoch {
     let workspace = workspace();
-    let mut observations = vec![
-        (
-            demand("/", PathObservationOperation::Lstat),
-            PathObservationResult::Lstat(PathOperationResult::Present(lstat(
-                PathNodeKind::Directory,
-            ))),
-        ),
-        (
-            demand(workspace.to_str().unwrap(), PathObservationOperation::Lstat),
-            PathObservationResult::Lstat(PathOperationResult::Present(lstat(
-                PathNodeKind::Directory,
-            ))),
-        ),
-    ];
+    let mut observations = std::collections::BTreeMap::new();
+    let directory =
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Directory)));
+    observations.insert(
+        demand("/", PathObservationOperation::Lstat),
+        directory.clone(),
+    );
+    observations.insert(
+        demand(workspace.to_str().unwrap(), PathObservationOperation::Lstat),
+        directory.clone(),
+    );
     for (file, value) in raw.files.iter() {
+        let mut ancestor = file.parent();
+        while let Some(path) = ancestor {
+            observations
+                .entry(demand(
+                    path.to_str().unwrap(),
+                    PathObservationOperation::Lstat,
+                ))
+                .or_insert_with(|| directory.clone());
+            ancestor = path.parent();
+        }
         let file = file.to_str().unwrap();
         let lstat_result = match value {
             WorkspaceRawFileValue::Present(_) => {
@@ -381,15 +623,15 @@ fn complete_epoch_for_raw(raw: &WorkspaceRawSnapshot) -> PathObservationEpoch {
                 })
             }
         };
-        observations.push((
+        observations.insert(
             demand(file, PathObservationOperation::Lstat),
             PathObservationResult::Lstat(lstat_result),
-        ));
+        );
         if let WorkspaceRawFileValue::Present(bytes) = value {
-            observations.push((
+            observations.insert(
                 demand(file, PathObservationOperation::FileBytes),
                 PathObservationResult::FileBytes(PathOperationResult::Present(bytes.dupe())),
-            ));
+            );
         }
     }
     PathObservationEpoch::new(observations).unwrap()
@@ -433,6 +675,1033 @@ fn root_patch_source(patches: &str) -> String {
     )
 }
 
+fn local_source_observations(
+    terminal: PathObservationResult,
+) -> Vec<(PathObservationDemand, PathObservationResult)> {
+    let workspace = workspace();
+    let root = workspace.join("vendor/dep");
+    vec![
+        lstat_observation(
+            "/",
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        lstat_observation(
+            workspace.to_str().unwrap(),
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        lstat_observation(
+            workspace.join("vendor").to_str().unwrap(),
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        lstat_observation(
+            root.to_str().unwrap(),
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        (
+            demand(
+                root.join("MODULE.bazel").to_str().unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+            terminal,
+        ),
+    ]
+}
+
+#[test]
+fn repository_source_error_schema_compares_every_shared_semantic_field() {
+    let path = Arc::new(PathBuf::from("MODULE.bazel"));
+    let other_path = Arc::new(PathBuf::from("parts/dep.MODULE.bazel"));
+    let message: Arc<str> = Arc::from("compute failed");
+    let other_message: Arc<str> = Arc::from("different failure");
+    let materialization = Arc::new(RepositoryMaterializationError::Transport("offline".into()));
+    let other_materialization =
+        Arc::new(RepositoryMaterializationError::Transport("online".into()));
+    let io_error = PathObservationError::Io {
+        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    let other_io_error = PathObservationError::Io {
+        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(14),
+    };
+    let invalid_relative =
+        |requested_path| RepositorySourceFileError::InvalidRepoRelativePath { requested_path };
+    let materialization_compute =
+        |repo_relative_path, message| RepositorySourceFileError::MaterializationCompute {
+            repo_relative_path,
+            message,
+        };
+    let materialization_error =
+        |repo_relative_path, error| RepositorySourceFileError::Materialization {
+            repo_relative_path,
+            error,
+        };
+    let generation_compute =
+        |repo_relative_path, message| RepositorySourceFileError::MaterializationGenerationCompute {
+            repo_relative_path,
+            message,
+        };
+    let invalid_materialized = |repo_relative_path| {
+        RepositorySourceFileError::InvalidMaterializedPath { repo_relative_path }
+    };
+    let observation =
+        |repo_relative_path, operation, error| RepositorySourceFileError::Observation {
+            repo_relative_path,
+            operation,
+            error,
+        };
+    let inconsistent = |repo_relative_path, operation, before, after| {
+        RepositorySourceFileError::InconsistentState {
+            repo_relative_path,
+            operation,
+            before,
+            after,
+        }
+    };
+    let wrong_kind = |repo_relative_path, actual| RepositorySourceFileError::WrongKind {
+        repo_relative_path,
+        actual,
+    };
+    let cycle = |repo_relative_path| RepositorySourceFileError::Cycle { repo_relative_path };
+    let expansion =
+        |repo_relative_path| RepositorySourceFileError::InfiniteExpansion { repo_relative_path };
+    let resolution_compute =
+        |repo_relative_path, message| RepositorySourceFileError::ResolutionCompute {
+            repo_relative_path,
+            message,
+        };
+    let file_compute = |repo_relative_path, message| RepositorySourceFileError::FileCompute {
+        repo_relative_path,
+        message,
+    };
+    let immutable_read = |repo_relative_path, message| RepositorySourceFileError::ImmutableRead {
+        repo_relative_path,
+        message,
+    };
+    macro_rules! unequal {
+        ($left:expr, $right:expr) => {{
+            let left = $left;
+            assert_eq!(left, left.dupe());
+            assert_ne!(left, $right);
+        }};
+    }
+
+    unequal!(
+        invalid_relative(path.dupe()),
+        invalid_relative(other_path.dupe())
+    );
+    unequal!(
+        materialization_compute(path.dupe(), message.dupe()),
+        materialization_compute(other_path.dupe(), message.dupe())
+    );
+    unequal!(
+        materialization_compute(path.dupe(), message.dupe()),
+        materialization_compute(path.dupe(), other_message.dupe())
+    );
+    unequal!(
+        materialization_error(path.dupe(), materialization.dupe()),
+        materialization_error(other_path.dupe(), materialization.dupe())
+    );
+    unequal!(
+        materialization_error(path.dupe(), materialization.dupe()),
+        materialization_error(path.dupe(), other_materialization)
+    );
+    unequal!(
+        generation_compute(path.dupe(), message.dupe()),
+        generation_compute(other_path.dupe(), message.dupe())
+    );
+    unequal!(
+        generation_compute(path.dupe(), message.dupe()),
+        generation_compute(path.dupe(), other_message.dupe())
+    );
+    unequal!(
+        invalid_materialized(path.dupe()),
+        invalid_materialized(other_path.dupe())
+    );
+    unequal!(
+        observation(path.dupe(), PathObservationOperation::Lstat, io_error),
+        observation(other_path.dupe(), PathObservationOperation::Lstat, io_error)
+    );
+    unequal!(
+        observation(path.dupe(), PathObservationOperation::Lstat, io_error),
+        observation(path.dupe(), PathObservationOperation::ReadLink, io_error)
+    );
+    unequal!(
+        observation(path.dupe(), PathObservationOperation::Lstat, io_error),
+        observation(path.dupe(), PathObservationOperation::Lstat, other_io_error)
+    );
+    let before = Some(lstat(PathNodeKind::Symlink));
+    unequal!(
+        inconsistent(
+            path.dupe(),
+            PathObservationOperation::ReadLink,
+            before,
+            None
+        ),
+        inconsistent(
+            other_path.dupe(),
+            PathObservationOperation::ReadLink,
+            before,
+            None
+        )
+    );
+    unequal!(
+        inconsistent(
+            path.dupe(),
+            PathObservationOperation::ReadLink,
+            before,
+            None
+        ),
+        inconsistent(
+            path.dupe(),
+            PathObservationOperation::FileBytes,
+            before,
+            None
+        )
+    );
+    unequal!(
+        inconsistent(
+            path.dupe(),
+            PathObservationOperation::ReadLink,
+            before,
+            None
+        ),
+        inconsistent(
+            path.dupe(),
+            PathObservationOperation::ReadLink,
+            Some(lstat(PathNodeKind::RegularFile)),
+            None
+        )
+    );
+    unequal!(
+        inconsistent(
+            path.dupe(),
+            PathObservationOperation::ReadLink,
+            before,
+            None
+        ),
+        inconsistent(
+            path.dupe(),
+            PathObservationOperation::ReadLink,
+            before,
+            Some(lstat(PathNodeKind::RegularFile))
+        )
+    );
+    unequal!(
+        wrong_kind(path.dupe(), PathNodeKind::Directory),
+        wrong_kind(other_path.dupe(), PathNodeKind::Directory)
+    );
+    unequal!(
+        wrong_kind(path.dupe(), PathNodeKind::Directory),
+        wrong_kind(path.dupe(), PathNodeKind::SpecialFile)
+    );
+    unequal!(cycle(path.dupe()), cycle(other_path.dupe()));
+    unequal!(expansion(path.dupe()), expansion(other_path.dupe()));
+    unequal!(
+        resolution_compute(path.dupe(), message.dupe()),
+        resolution_compute(other_path.dupe(), message.dupe())
+    );
+    unequal!(
+        resolution_compute(path.dupe(), message.dupe()),
+        resolution_compute(path.dupe(), other_message.dupe())
+    );
+    unequal!(
+        file_compute(path.dupe(), message.dupe()),
+        file_compute(other_path.dupe(), message.dupe())
+    );
+    unequal!(
+        file_compute(path.dupe(), message.dupe()),
+        file_compute(path.dupe(), other_message.dupe())
+    );
+    unequal!(
+        immutable_read(path.dupe(), message.dupe()),
+        immutable_read(other_path.dupe(), message.dupe())
+    );
+    unequal!(
+        immutable_read(path.dupe(), message.dupe()),
+        immutable_read(path.dupe(), other_message)
+    );
+
+    let source_error = cycle(path);
+    assert_ne!(
+        ModuleSourcePreparationError::Source(source_error.dupe()),
+        ModuleSourcePreparationError::SourceCompute(Arc::from("source key failed"))
+    );
+    assert!(matches!(
+        ModuleSourcePreparationError::Source(source_error),
+        ModuleSourcePreparationError::Source(RepositorySourceFileError::Cycle { .. })
+    ));
+    assert!(matches!(
+        ModuleSourcePreparationError::SourceCompute(Arc::from("source key failed")),
+        ModuleSourcePreparationError::SourceCompute(message)
+            if message.as_ref() == "source key failed"
+    ));
+}
+
+async fn assert_cumulative_source_and_preparation_needs(
+    dice: &Arc<Dice>,
+    observations: &[(PathObservationDemand, PathObservationResult)],
+    generation_base: u64,
+    expected_bytes: &[u8],
+) {
+    for index in 0..observations.len() {
+        let outcome = source_with_epoch(
+            dice,
+            raw_snapshot([]),
+            PathObservationEpoch::new(observations[..index].to_vec()).unwrap(),
+            generation_base + index as u64,
+            "MODULE.bazel",
+        )
+        .await;
+        let PathOutcome::Need(need) = outcome else {
+            panic!("prefix {index} unexpectedly completed");
+        };
+        assert_eq!(need.demands(), &[observations[index].0.dupe()]);
+        let need_outcome = PathOutcome::Need(need.dupe());
+        assert!(!<RepositorySourceFileKey as Key>::validity(&need_outcome));
+        assert!(!<RepositorySourceFileKey as Key>::equality(
+            &need_outcome,
+            &PathOutcome::Need(need),
+        ));
+
+        let preparation = prepare_with_epoch(
+            dice,
+            "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = 'vendor/dep')\n",
+            raw_snapshot([]),
+            PathObservationEpoch::new(observations[..index].to_vec()).unwrap(),
+            &[],
+            generation_base + index as u64,
+            "1.0.0",
+        )
+        .await;
+        let PathOutcome::Need(preparation_need) = preparation else {
+            panic!("preparation prefix {index} unexpectedly completed");
+        };
+        assert_eq!(preparation_need.demands(), &[observations[index].0.dupe()]);
+        let preparation_need = PathOutcome::Need(preparation_need);
+        assert!(!<ModuleSourcePreparationKey as Key>::validity(
+            &preparation_need
+        ));
+        assert!(!<ModuleSourcePreparationKey as Key>::equality(
+            &preparation_need,
+            &preparation_need
+        ));
+    }
+
+    let complete_epoch = PathObservationEpoch::new(observations.to_vec()).unwrap();
+    let source_complete = source_with_epoch(
+        dice,
+        raw_snapshot([]),
+        complete_epoch.clone(),
+        generation_base + observations.len() as u64,
+        "MODULE.bazel",
+    )
+    .await;
+    let PathOutcome::Complete(value) = &source_complete else {
+        panic!("complete epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        &Ok(RepositorySourceFileValue::Present(Arc::from(
+            expected_bytes
+        )))
+    );
+    assert!(<RepositorySourceFileKey as Key>::validity(&source_complete));
+    assert!(<RepositorySourceFileKey as Key>::equality(
+        &source_complete,
+        &source_complete
+    ));
+
+    let preparation_complete = prepare_with_epoch(
+        dice,
+        "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = 'vendor/dep')\n",
+        raw_snapshot([]),
+        complete_epoch,
+        &[],
+        generation_base + observations.len() as u64,
+        "1.0.0",
+    )
+    .await;
+    let PathOutcome::Complete(prepared) = &preparation_complete else {
+        panic!("complete preparation epoch needs observations");
+    };
+    assert!(matches!(
+        prepared.as_ref(),
+        Ok(ModuleSourcePreparation::NonRegistry { bytes })
+            if bytes.as_ref() == expected_bytes
+    ));
+    assert!(<ModuleSourcePreparationKey as Key>::validity(
+        &preparation_complete
+    ));
+    assert!(<ModuleSourcePreparationKey as Key>::equality(
+        &preparation_complete,
+        &preparation_complete
+    ));
+}
+
+#[tokio::test]
+async fn local_source_demands_cumulatively_and_propagates_need_to_preparation() {
+    let io = Arc::new(LocalIo {
+        calls: AtomicUsize::new(0),
+    });
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let module_path = workspace().join("vendor/dep/MODULE.bazel");
+
+    let mut direct = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    direct.push(file_bytes_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::from(&b"direct"[..])),
+    ));
+    assert_cumulative_source_and_preparation_needs(&dice, &direct, 1, b"direct").await;
+
+    let mut relative = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    relative.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("target"))),
+    ));
+    let relative_target = workspace().join("vendor/dep/target");
+    relative.push(lstat_observation(
+        relative_target.to_str().unwrap(),
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    relative.push(file_bytes_observation(
+        relative_target.to_str().unwrap(),
+        PathOperationResult::Present(Arc::from(&b"relative"[..])),
+    ));
+    assert_cumulative_source_and_preparation_needs(&dice, &relative, 20, b"relative").await;
+
+    let mut escaping = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    escaping.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("/outside"))),
+    ));
+    escaping.push(lstat_observation(
+        "/outside",
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    escaping.push(file_bytes_observation(
+        "/outside",
+        PathOperationResult::Present(Arc::from(&b"escaping"[..])),
+    ));
+    assert_cumulative_source_and_preparation_needs(&dice, &escaping, 40, b"escaping").await;
+
+    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn local_source_accepts_special_and_projects_resolver_and_file_terminals() {
+    let io = Arc::new(LocalIo {
+        calls: AtomicUsize::new(0),
+    });
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let relative = Arc::new(PathBuf::from("MODULE.bazel"));
+    let module_path = workspace().join("vendor/dep/MODULE.bazel");
+
+    let mut special = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::SpecialFile)),
+    ));
+    special.push(file_bytes_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::from(&b""[..])),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(special).unwrap(),
+        1,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("special-file epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Ok(RepositorySourceFileValue::Present(Arc::from(&b""[..])))
+    );
+
+    let mut relative_link = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    relative_link.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("target"))),
+    ));
+    let target = workspace().join("vendor/dep/target");
+    relative_link.push(lstat_observation(
+        target.to_str().unwrap(),
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    relative_link.push(file_bytes_observation(
+        target.to_str().unwrap(),
+        PathOperationResult::Present(Arc::from(&b"linked"[..])),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(relative_link).unwrap(),
+        2,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("relative symlink epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Ok(RepositorySourceFileValue::Present(Arc::from(
+            &b"linked"[..]
+        )))
+    );
+
+    let directory = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(directory).unwrap(),
+        3,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("directory epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::WrongKind {
+            repo_relative_path: relative.dupe(),
+            actual: PathNodeKind::Directory,
+        })
+    );
+
+    let mut denied = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    denied.push(file_bytes_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Error(PathObservationError::Io {
+            kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        }),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(denied).unwrap(),
+        4,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("denied epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::Observation {
+            repo_relative_path: relative,
+            operation: PathObservationOperation::FileBytes,
+            error: PathObservationError::Io {
+                kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                raw_os_error: Some(13),
+            },
+        })
+    );
+
+    let missing =
+        local_source_observations(PathObservationResult::Lstat(PathOperationResult::Missing));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(missing).unwrap(),
+        5,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("missing epoch needs observations")
+    };
+    assert_eq!(value, Ok(RepositorySourceFileValue::Absent));
+
+    let mut readlink_io = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    readlink_io.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Error(PathObservationError::Io {
+            kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        }),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(readlink_io).unwrap(),
+        10,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("readlink-io epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::Observation {
+            repo_relative_path: Arc::new(PathBuf::from("MODULE.bazel")),
+            operation: PathObservationOperation::ReadLink,
+            error: PathObservationError::Io {
+                kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                raw_os_error: Some(13)
+            },
+        })
+    );
+
+    let mut escape = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    escape.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("/escape"))),
+    ));
+    escape.push(lstat_observation(
+        "/escape",
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    escape.push(file_bytes_observation(
+        "/escape",
+        PathOperationResult::Present(Arc::from(&b"escape"[..])),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(escape).unwrap(),
+        11,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("escaping epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Ok(RepositorySourceFileValue::Present(Arc::from(
+            &b"escape"[..]
+        )))
+    );
+
+    let mut cycle = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    cycle.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("MODULE.bazel"))),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(cycle).unwrap(),
+        12,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("cycle epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::Cycle {
+            repo_relative_path: Arc::new(PathBuf::from("MODULE.bazel")),
+        })
+    );
+
+    let mut expansion = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    expansion.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("MODULE.bazel/child"))),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(expansion).unwrap(),
+        13,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("descendant-expansion epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::InfiniteExpansion {
+            repo_relative_path: Arc::new(PathBuf::from("MODULE.bazel")),
+        })
+    );
+
+    let denied_lstat = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Error(PathObservationError::Io {
+            kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        }),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(denied_lstat).unwrap(),
+        6,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("lstat-error epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::Observation {
+            repo_relative_path: Arc::new(PathBuf::from("MODULE.bazel")),
+            operation: PathObservationOperation::Lstat,
+            error: PathObservationError::Io {
+                kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                raw_os_error: Some(13),
+            },
+        })
+    );
+
+    let mut bytes_missing = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    bytes_missing.push(file_bytes_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Missing,
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(bytes_missing).unwrap(),
+        7,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("file-missing epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::InconsistentState {
+            repo_relative_path: Arc::new(PathBuf::from("MODULE.bazel")),
+            operation: PathObservationOperation::FileBytes,
+            before: Some(lstat(PathNodeKind::RegularFile)),
+            after: None,
+        })
+    );
+
+    let mut readlink_missing = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    readlink_missing.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Missing,
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(readlink_missing).unwrap(),
+        8,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("readlink-missing epoch needs observations")
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::InconsistentState {
+            repo_relative_path: Arc::new(PathBuf::from("MODULE.bazel")),
+            operation: PathObservationOperation::ReadLink,
+            before: Some(lstat(PathNodeKind::Symlink)),
+            after: None,
+        })
+    );
+
+    let mut dangling = local_source_observations(PathObservationResult::Lstat(
+        PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+    ));
+    dangling.push(read_link_observation(
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("gone"))),
+    ));
+    dangling.push(lstat_observation(
+        workspace().join("vendor/dep/gone").to_str().unwrap(),
+        PathOperationResult::Missing,
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new(dangling).unwrap(),
+        9,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("dangling epoch needs observations")
+    };
+    assert_eq!(value, Ok(RepositorySourceFileValue::Absent));
+}
+
+#[tokio::test]
+async fn local_source_semantics_prune_preparation_and_restore_on_one_retained_engine() {
+    let io = Arc::new(LocalIo {
+        calls: AtomicUsize::new(0),
+    });
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_key = PreparationCounterKey {
+        counter: counter.dupe(),
+    };
+    let root_counter = Arc::new(AtomicUsize::new(0));
+    let root_counter_key = RootObservationCounterKey {
+        counter: root_counter.dupe(),
+    };
+    let module_path = workspace().join("vendor/dep/MODULE.bazel");
+
+    let direct_bytes = |bytes: &'static [u8], metadata, root_metadata| {
+        let mut observations = local_source_observations(PathObservationResult::Lstat(
+            PathOperationResult::Present(lstat_variant(PathNodeKind::RegularFile, metadata)),
+        ));
+        observations[0] = lstat_observation(
+            "/",
+            PathOperationResult::Present(lstat_variant(PathNodeKind::Directory, root_metadata)),
+        );
+        observations.push(file_bytes_observation(
+            module_path.to_str().unwrap(),
+            PathOperationResult::Present(Arc::from(bytes)),
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    };
+    let routed_bytes = |target_name: &'static str, bytes: &'static [u8], metadata| {
+        let mut observations = local_source_observations(PathObservationResult::Lstat(
+            PathOperationResult::Present(lstat_variant(PathNodeKind::Symlink, metadata)),
+        ));
+        observations.push(read_link_observation(
+            module_path.to_str().unwrap(),
+            PathOperationResult::Present(Arc::new(PathBuf::from(target_name))),
+        ));
+        let target = workspace().join("vendor/dep").join(target_name);
+        observations.push(lstat_observation(
+            target.to_str().unwrap(),
+            PathOperationResult::Present(lstat_variant(PathNodeKind::RegularFile, metadata + 10)),
+        ));
+        observations.push(file_bytes_observation(
+            target.to_str().unwrap(),
+            PathOperationResult::Present(Arc::from(bytes)),
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    };
+    let direct_missing = PathObservationEpoch::new(local_source_observations(
+        PathObservationResult::Lstat(PathOperationResult::Missing),
+    ))
+    .unwrap();
+    let dangling_missing = {
+        let mut observations = local_source_observations(PathObservationResult::Lstat(
+            PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+        ));
+        observations.push(read_link_observation(
+            module_path.to_str().unwrap(),
+            PathOperationResult::Present(Arc::new(PathBuf::from("missing-target"))),
+        ));
+        observations.push(lstat_observation(
+            workspace()
+                .join("vendor/dep/missing-target")
+                .to_str()
+                .unwrap(),
+            PathOperationResult::Missing,
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    };
+    let permission_denied = PathObservationError::Io {
+        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    let direct_error = PathObservationEpoch::new(local_source_observations(
+        PathObservationResult::Lstat(PathOperationResult::Error(permission_denied)),
+    ))
+    .unwrap();
+    let routed_error = {
+        let mut observations = local_source_observations(PathObservationResult::Lstat(
+            PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+        ));
+        observations.push(read_link_observation(
+            module_path.to_str().unwrap(),
+            PathOperationResult::Present(Arc::new(PathBuf::from("error-target"))),
+        ));
+        observations.push(lstat_observation(
+            workspace()
+                .join("vendor/dep/error-target")
+                .to_str()
+                .unwrap(),
+            PathOperationResult::Error(permission_denied),
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    };
+
+    enum Expected {
+        Bytes(&'static [u8]),
+        Missing,
+        Error,
+    }
+    let steps = [
+        (direct_bytes(b"A", 1, 1), 1, Expected::Bytes(b"A")),
+        (direct_bytes(b"A", 1, 1_000), 1, Expected::Bytes(b"A")),
+        (direct_bytes(b"A", 100, 1_000), 1, Expected::Bytes(b"A")),
+        (routed_bytes("route-a", b"A", 200), 1, Expected::Bytes(b"A")),
+        (routed_bytes("route-b", b"A", 300), 1, Expected::Bytes(b"A")),
+        (direct_bytes(b"B", 400, 1), 2, Expected::Bytes(b"B")),
+        (direct_missing, 3, Expected::Missing),
+        (dangling_missing, 3, Expected::Missing),
+        (direct_error, 4, Expected::Error),
+        (routed_error, 4, Expected::Error),
+        (direct_bytes(b"A", 500, 1), 5, Expected::Bytes(b"A")),
+    ];
+    let mut first_a = None;
+    for (index, (epoch, expected_count, expected)) in steps.into_iter().enumerate() {
+        let counted =
+            count_preparation_with_epoch(&dice, epoch.clone(), index as u64 + 1, &counter_key)
+                .await;
+        assert!(matches!(
+            counted,
+            PathOutcome::Complete(actual) if actual == expected_count
+        ));
+        assert_eq!(counter.load(Ordering::SeqCst), expected_count);
+        if index < 2 {
+            let root_counted =
+                count_root_observation_with_epoch(&dice, epoch.clone(), &root_counter_key).await;
+            assert!(matches!(
+                root_counted,
+                PathOutcome::Complete(actual) if actual == index + 1
+            ));
+            assert_eq!(root_counter.load(Ordering::SeqCst), index + 1);
+        }
+
+        let prepared = prepare_with_epoch(
+            &dice,
+            "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = 'vendor/dep')\n",
+            raw_snapshot([]),
+            epoch,
+            &[],
+            index as u64 + 1,
+            "1.0.0",
+        )
+        .await;
+        let PathOutcome::Complete(prepared) = prepared else {
+            panic!("lifecycle step {index} needs observations");
+        };
+        match expected {
+            Expected::Bytes(expected) => assert!(matches!(
+                prepared.as_ref(),
+                Ok(ModuleSourcePreparation::NonRegistry { bytes })
+                    if bytes.as_ref() == expected
+            )),
+            Expected::Missing => assert!(matches!(
+                prepared.as_ref(),
+                Err(ModuleSourcePreparationError::ModuleNotFound {
+                    module_file_attempts
+                }) if module_file_attempts.is_empty()
+            )),
+            Expected::Error => assert!(matches!(
+                prepared.as_ref(),
+                Err(ModuleSourcePreparationError::Source(
+                    RepositorySourceFileError::Observation {
+                        repo_relative_path,
+                        operation: PathObservationOperation::Lstat,
+                        error,
+                    }
+                )) if repo_relative_path.as_path() == Path::new("MODULE.bazel")
+                    && *error == permission_denied
+            )),
+        }
+        if index == 0 {
+            first_a = Some(prepared);
+        } else if index == 10 {
+            assert_eq!(Some(prepared), first_a);
+        }
+    }
+    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(root_counter.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn immutable_source_read_retains_direct_present_absent_and_error_without_path_need() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("present.MODULE.bazel"), b"immutable bytes").unwrap();
+    std::fs::create_dir(root.path().join("directory.MODULE.bazel")).unwrap();
+    let io = Arc::new(ImmutableIo {
+        calls: AtomicUsize::new(0),
+        root,
+    });
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+
+    let present = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new([]).unwrap(),
+        1,
+        "present.MODULE.bazel",
+    )
+    .await;
+    assert!(matches!(
+        present,
+        PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes)))
+            if bytes.as_ref() == b"immutable bytes"
+    ));
+
+    let absent = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new([]).unwrap(),
+        2,
+        "absent.MODULE.bazel",
+    )
+    .await;
+    assert!(matches!(
+        absent,
+        PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent))
+    ));
+
+    let error = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        PathObservationEpoch::new([]).unwrap(),
+        3,
+        "directory.MODULE.bazel",
+    )
+    .await;
+    assert!(matches!(
+        error,
+        PathOutcome::Complete(Err(RepositorySourceFileError::ImmutableRead {
+            repo_relative_path,
+            message,
+        })) if repo_relative_path.as_path() == Path::new("directory.MODULE.bazel")
+            && !message.is_empty()
+    ));
+    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+}
+
 #[tokio::test]
 async fn local_root_and_include_replay_independently_without_a_dice_cycle() {
     let io = Arc::new(LocalIo {
@@ -462,9 +1731,9 @@ async fn local_root_and_include_replay_independently_without_a_dice_cycle() {
             ),
         )
         .await,
-        Ok(RepositorySourceFileValue::Present(Arc::from(
+        Ok(Ok(RepositorySourceFileValue::Present(Arc::from(
             &b"module(name = 'first')"[..]
-        )))
+        ))))
     );
     assert_eq!(
         source(
@@ -483,7 +1752,9 @@ async fn local_root_and_include_replay_independently_without_a_dice_cycle() {
             "parts/dep.MODULE.bazel",
         )
         .await,
-        RepositorySourceFileValue::Present(Arc::from(&b"bazel_dep(name = 'b')"[..]))
+        Ok(RepositorySourceFileValue::Present(Arc::from(
+            &b"bazel_dep(name = 'b')"[..]
+        )))
     );
     assert_eq!(
         source(
@@ -502,7 +1773,9 @@ async fn local_root_and_include_replay_independently_without_a_dice_cycle() {
             "MODULE.bazel",
         )
         .await,
-        RepositorySourceFileValue::Present(Arc::from(&b"module(name = 'second')"[..]))
+        Ok(RepositorySourceFileValue::Present(Arc::from(
+            &b"module(name = 'second')"[..]
+        )))
     );
     assert_eq!(
         source(
@@ -521,7 +1794,9 @@ async fn local_root_and_include_replay_independently_without_a_dice_cycle() {
             "MODULE.bazel",
         )
         .await,
-        RepositorySourceFileValue::Present(Arc::from(&b"module(name = 'first')"[..]))
+        Ok(RepositorySourceFileValue::Present(Arc::from(
+            &b"module(name = 'first')"[..]
+        )))
     );
     assert_eq!(io.calls.load(Ordering::SeqCst), 1);
 
@@ -533,7 +1808,7 @@ async fn local_root_and_include_replay_independently_without_a_dice_cycle() {
             "MODULE.bazel",
         )
         .await,
-        RepositorySourceFileValue::Absent
+        Ok(RepositorySourceFileValue::Absent)
     );
     assert!(matches!(
         source(
@@ -546,7 +1821,14 @@ async fn local_root_and_include_replay_independently_without_a_dice_cycle() {
             "MODULE.bazel",
         )
         .await,
-        RepositorySourceFileValue::ReadError(message) if message.as_ref() == "denied"
+        Err(RepositorySourceFileError::Observation {
+            operation: PathObservationOperation::Lstat,
+            error: PathObservationError::Io {
+                kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                raw_os_error: Some(13)
+            },
+            ..
+        })
     ));
 }
 
@@ -565,11 +1847,13 @@ async fn materialization_failure_retries_when_the_generation_changes() {
 
     assert!(matches!(
         source(&dice, raw.clone(), 1, "MODULE.bazel").await,
-        RepositorySourceFileValue::ReadError(message) if message.as_ref().contains("Transport")
+        Err(RepositorySourceFileError::Materialization { .. })
     ));
     assert_eq!(
         source(&dice, raw, 2, "MODULE.bazel").await,
-        RepositorySourceFileValue::Present(Arc::from(&b"module(name = 'recovered')"[..]))
+        Ok(RepositorySourceFileValue::Present(Arc::from(
+            &b"module(name = 'recovered')"[..]
+        )))
     );
     assert_eq!(io.calls.load(Ordering::SeqCst), 2);
 }

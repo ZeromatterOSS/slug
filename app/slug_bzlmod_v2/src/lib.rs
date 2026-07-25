@@ -211,6 +211,7 @@ pub use source_preparation::RepositoryMaterializationError;
 pub use source_preparation::RepositoryMaterializationGeneration;
 pub use source_preparation::RepositoryMaterializationGenerationKey;
 pub use source_preparation::RepositoryMaterializationKey;
+pub use source_preparation::RepositorySourceFileError;
 pub use source_preparation::RepositorySourceFileKey;
 pub use source_preparation::RepositorySourceFileValue;
 pub use source_preparation::RepositoryTransportError;

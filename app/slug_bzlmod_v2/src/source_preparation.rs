@@ -38,10 +38,9 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::PathResolutionError;
+use slug_workspace_v2::PathResult;
 use slug_workspace_v2::ResolvedPathKey;
 use slug_workspace_v2::ResolvedPathState;
-use slug_workspace_v2::WorkspaceRawFileKey;
-use slug_workspace_v2::WorkspaceRawFileValue;
 
 use crate::ModuleKey;
 use crate::RegistryBaseUrl;
@@ -115,7 +114,8 @@ pub enum ModuleSourcePreparationError {
         error: RegistryFileError,
     },
     RegistryPolicyCompute(CompactString),
-    Source(Arc<str>),
+    Source(RepositorySourceFileError),
+    SourceCompute(Arc<str>),
     InvalidPatchPath {
         path: PathBuf,
     },
@@ -300,7 +300,64 @@ pub enum RepositoryMaterializationError {
 pub enum RepositorySourceFileValue {
     Present(Arc<[u8]>),
     Absent,
-    ReadError(Arc<str>),
+}
+
+/// Semantic failure from reading a repository source file. Operational resolver
+/// paths, namespaces, and symlink provenance deliberately remain below this
+/// DICE boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum RepositorySourceFileError {
+    InvalidRepoRelativePath {
+        requested_path: Arc<PathBuf>,
+    },
+    MaterializationCompute {
+        repo_relative_path: Arc<PathBuf>,
+        message: Arc<str>,
+    },
+    Materialization {
+        repo_relative_path: Arc<PathBuf>,
+        error: Arc<RepositoryMaterializationError>,
+    },
+    MaterializationGenerationCompute {
+        repo_relative_path: Arc<PathBuf>,
+        message: Arc<str>,
+    },
+    InvalidMaterializedPath {
+        repo_relative_path: Arc<PathBuf>,
+    },
+    Observation {
+        repo_relative_path: Arc<PathBuf>,
+        operation: PathObservationOperation,
+        error: PathObservationError,
+    },
+    InconsistentState {
+        repo_relative_path: Arc<PathBuf>,
+        operation: PathObservationOperation,
+        before: Option<PathLstat>,
+        after: Option<PathLstat>,
+    },
+    WrongKind {
+        repo_relative_path: Arc<PathBuf>,
+        actual: PathNodeKind,
+    },
+    Cycle {
+        repo_relative_path: Arc<PathBuf>,
+    },
+    InfiniteExpansion {
+        repo_relative_path: Arc<PathBuf>,
+    },
+    ResolutionCompute {
+        repo_relative_path: Arc<PathBuf>,
+        message: Arc<str>,
+    },
+    FileCompute {
+        repo_relative_path: Arc<PathBuf>,
+        message: Arc<str>,
+    },
+    ImmutableRead {
+        repo_relative_path: Arc<PathBuf>,
+        message: Arc<str>,
+    },
 }
 
 #[async_trait]
@@ -401,15 +458,54 @@ impl Key for RepositoryMaterializationKey {
     }
 }
 
+fn project_resolution_error(
+    repo_relative_path: Arc<PathBuf>,
+    error: PathResolutionError,
+) -> RepositorySourceFileError {
+    match error {
+        PathResolutionError::Observation { demand, error, .. } => {
+            RepositorySourceFileError::Observation {
+                repo_relative_path,
+                operation: demand.operation(),
+                error,
+            }
+        }
+        PathResolutionError::InconsistentState {
+            demand,
+            before,
+            after,
+            ..
+        } => RepositorySourceFileError::InconsistentState {
+            repo_relative_path,
+            operation: demand.operation(),
+            before,
+            after,
+        },
+        PathResolutionError::Cycle { .. } => {
+            RepositorySourceFileError::Cycle { repo_relative_path }
+        }
+        PathResolutionError::InfiniteExpansion { .. } => {
+            RepositorySourceFileError::InfiniteExpansion { repo_relative_path }
+        }
+    }
+}
+
 #[async_trait]
 impl Key for RepositorySourceFileKey {
-    type Value = RepositorySourceFileValue;
+    type Value = PathResult<RepositorySourceFileValue, RepositorySourceFileError>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let relative = match checked_relative_path(&self.repo_relative_path) {
             Ok(relative) => relative,
-            Err(error) => return RepositorySourceFileValue::ReadError(error.into()),
+            Err(_) => {
+                return PathOutcome::Complete(Err(
+                    RepositorySourceFileError::InvalidRepoRelativePath {
+                        requested_path: Arc::new(self.repo_relative_path.clone()),
+                    },
+                ));
+            }
         };
+        let repo_relative_path = Arc::new(relative.to_owned());
         let materialization = match ctx
             .compute(&RepositoryMaterializationKey {
                 workspace: self.workspace.clone(),
@@ -418,58 +514,160 @@ impl Key for RepositorySourceFileKey {
             .await
         {
             Ok(value) => value,
-            Err(error) => return RepositorySourceFileValue::ReadError(error.to_string().into()),
+            Err(error) => {
+                return PathOutcome::Complete(Err(
+                    RepositorySourceFileError::MaterializationCompute {
+                        repo_relative_path,
+                        message: Arc::from(error.to_string()),
+                    },
+                ));
+            }
         };
         let materialization = match materialization.as_ref() {
             Ok(value) => value,
             Err(error) => {
-                let error = error.clone();
                 if let Err(generation_error) = ctx
                     .compute(&RepositoryMaterializationGenerationKey {
                         workspace: self.workspace.clone(),
                     })
                     .await
                 {
-                    return RepositorySourceFileValue::ReadError(
-                        generation_error.to_string().into(),
-                    );
+                    return PathOutcome::Complete(Err(
+                        RepositorySourceFileError::MaterializationGenerationCompute {
+                            repo_relative_path,
+                            message: Arc::from(generation_error.to_string()),
+                        },
+                    ));
                 }
-                return RepositorySourceFileValue::ReadError(format!("{error:?}").into());
+                return PathOutcome::Complete(Err(RepositorySourceFileError::Materialization {
+                    repo_relative_path,
+                    error: Arc::new(error.clone()),
+                }));
             }
         };
         match materialization {
-            RepositoryMaterialization::Local { source_root, .. } => match ctx
-                .compute(&WorkspaceRawFileKey {
-                    workspace: self.workspace.clone(),
-                    path: source_root.join(relative),
-                })
-                .await
-            {
-                Ok(value) => match value {
-                    WorkspaceRawFileValue::Present(bytes) => {
-                        RepositorySourceFileValue::Present(bytes)
+            RepositoryMaterialization::Local { source_root, .. } => {
+                let logical_path = match NormalizedAbsolutePath::new(source_root.join(relative)) {
+                    Ok(path) => path,
+                    Err(_) => {
+                        return PathOutcome::Complete(Err(
+                            RepositorySourceFileError::InvalidMaterializedPath {
+                                repo_relative_path,
+                            },
+                        ));
                     }
-                    WorkspaceRawFileValue::Absent => RepositorySourceFileValue::Absent,
-                    WorkspaceRawFileValue::ReadError(error) => {
-                        RepositorySourceFileValue::ReadError(error.to_string().into())
+                };
+                let resolved = match ctx
+                    .compute(&ResolvedPathKey::new(
+                        PathObservationNamespace::Host,
+                        logical_path,
+                    ))
+                    .await
+                {
+                    Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
+                    Ok(PathOutcome::Complete(Err(error))) => {
+                        return PathOutcome::Complete(Err(project_resolution_error(
+                            repo_relative_path,
+                            error,
+                        )));
                     }
-                },
-                Err(error) => RepositorySourceFileValue::ReadError(error.to_string().into()),
-            },
+                    Ok(PathOutcome::Complete(Ok(resolved))) => resolved,
+                    Err(error) => {
+                        return PathOutcome::Complete(Err(
+                            RepositorySourceFileError::ResolutionCompute {
+                                repo_relative_path,
+                                message: Arc::from(error.to_string()),
+                            },
+                        ));
+                    }
+                };
+                let lstat = match resolved.state() {
+                    ResolvedPathState::Missing => {
+                        return PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent));
+                    }
+                    ResolvedPathState::Present(lstat)
+                        if matches!(
+                            lstat.kind(),
+                            PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                        ) =>
+                    {
+                        lstat
+                    }
+                    ResolvedPathState::Present(lstat) => {
+                        return PathOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
+                            repo_relative_path,
+                            actual: lstat.kind(),
+                        }));
+                    }
+                };
+                let demand = PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    resolved.real_path().dupe(),
+                    PathObservationOperation::FileBytes,
+                );
+                let observed = match ctx.compute(&PathObservationKey::new(demand)).await {
+                    Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
+                    Ok(PathOutcome::Complete(result)) => result,
+                    Err(error) => {
+                        return PathOutcome::Complete(Err(
+                            RepositorySourceFileError::FileCompute {
+                                repo_relative_path,
+                                message: Arc::from(error.to_string()),
+                            },
+                        ));
+                    }
+                };
+                match observed.as_ref() {
+                    PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
+                        PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes.dupe())))
+                    }
+                    PathObservationResult::FileBytes(PathOperationResult::Missing) => {
+                        PathOutcome::Complete(Err(RepositorySourceFileError::InconsistentState {
+                            repo_relative_path,
+                            operation: PathObservationOperation::FileBytes,
+                            before: Some(lstat),
+                            after: None,
+                        }))
+                    }
+                    PathObservationResult::FileBytes(PathOperationResult::Error(error)) => {
+                        PathOutcome::Complete(Err(RepositorySourceFileError::Observation {
+                            repo_relative_path,
+                            operation: PathObservationOperation::FileBytes,
+                            error: *error,
+                        }))
+                    }
+                    PathObservationResult::Lstat(_)
+                    | PathObservationResult::ReadLink(_)
+                    | PathObservationResult::DirectoryEntries(_) => {
+                        unreachable!("FileBytes demand must return a FileBytes observation")
+                    }
+                }
+            }
             RepositoryMaterialization::Immutable {
                 generation_root, ..
             } => match std::fs::read(generation_root.join(relative)) {
-                Ok(bytes) => RepositorySourceFileValue::Present(Arc::from(bytes)),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    RepositorySourceFileValue::Absent
+                Ok(bytes) => {
+                    PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(Arc::from(bytes))))
                 }
-                Err(error) => RepositorySourceFileValue::ReadError(error.to_string().into()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent))
+                }
+                Err(error) => {
+                    PathOutcome::Complete(Err(RepositorySourceFileError::ImmutableRead {
+                        repo_relative_path,
+                        message: Arc::from(error.to_string()),
+                    }))
+                }
             },
         }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x == y
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
     }
 }
 
@@ -509,20 +707,21 @@ impl Key for ModuleSourcePreparationKey {
                 })
                 .await
             {
-                Ok(RepositorySourceFileValue::Present(bytes)) => {
+                Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
+                Ok(PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes)))) => {
                     Ok(ModuleSourcePreparation::NonRegistry { bytes })
                 }
-                Ok(RepositorySourceFileValue::Absent) => {
+                Ok(PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent))) => {
                     Err(ModuleSourcePreparationError::ModuleNotFound {
                         module_file_attempts: Arc::from([]),
                     })
                 }
-                Ok(RepositorySourceFileValue::ReadError(error)) => {
+                Ok(PathOutcome::Complete(Err(error))) => {
                     Err(ModuleSourcePreparationError::Source(error))
                 }
-                Err(error) => Err(ModuleSourcePreparationError::Source(
-                    error.to_string().into(),
-                )),
+                Err(error) => Err(ModuleSourcePreparationError::SourceCompute(Arc::from(
+                    error.to_string(),
+                ))),
             };
             return PathOutcome::Complete(Arc::new(value));
         }
