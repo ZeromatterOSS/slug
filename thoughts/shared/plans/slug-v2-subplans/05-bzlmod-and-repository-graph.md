@@ -750,6 +750,23 @@ order, errors, and the complete compact result. Do not edit any other file,
 compose includes, validate later schemas, hash/write lockfiles, or add
 DICE/public/preparation/discovery ownership.
 
+Commit `b738547d` accepts that implementation. The private one-file evaluator
+uses syntax-inaccessible `Module` roots, forced-GC rereads and fresh
+identities, the exact compact directive surface and ordering, normalized
+versions/labels, nonroot dev and collision behavior, isolated and innate
+usages, exact logical spans, and post-file bounded snapshots. Focused 9/9 and
+all 204 `slug_bzlmod_v2` tests passed with formatting, diff, archive, and fresh
+independent final review `ACCEPT`.
+
+The current packet is the read-only
+`WP-5-m1-nonroot-include-composition-design`. It must freeze only supplied-file
+closure compilation and inline include execution over the landed inspector and
+private evaluator, including isolated bindings, shared semantic state,
+multi-Module rooting/reread, repeated/cyclic include behavior, source spans,
+and the registry-include ordering boundary. Typed preparation provenance,
+discovery composition, DICE, IO, public activation, and Rust edits remain
+deferred.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
