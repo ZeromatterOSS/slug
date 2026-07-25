@@ -8,7 +8,9 @@ use std::sync::atomic::Ordering;
 use async_trait::async_trait;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::Key;
 use dice::UserComputationData;
+use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -37,6 +39,19 @@ use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::install_registry_io;
 use slug_bzlmod_v2::install_repository_io;
+use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathLstat;
+use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationDemand;
+use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationEpochKey;
+use slug_workspace_v2::PathObservationError;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathObservationOperation;
+use slug_workspace_v2::PathObservationResult;
+use slug_workspace_v2::PathOperationResult;
+use slug_workspace_v2::PathOutcome;
+use slug_workspace_v2::PathResolutionError;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
@@ -244,6 +259,31 @@ async fn prepare(
     generation: u64,
     version: &str,
 ) -> Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>> {
+    let outcome = prepare_with_epoch(
+        dice,
+        root_source,
+        raw.clone(),
+        complete_epoch_for_raw(&raw),
+        registries,
+        generation,
+        version,
+    )
+    .await;
+    let PathOutcome::Complete(value) = outcome else {
+        panic!("complete raw snapshot unexpectedly needs path observations");
+    };
+    value
+}
+
+async fn prepare_with_epoch(
+    dice: &Arc<Dice>,
+    root_source: &str,
+    raw: Arc<WorkspaceRawSnapshot>,
+    epoch: PathObservationEpoch,
+    registries: &[&str],
+    generation: u64,
+    version: &str,
+) -> PathOutcome<Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>>> {
     let workspace = workspace();
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
@@ -261,6 +301,9 @@ async fn prepare(
             },
             raw,
         )])
+        .unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
     inject_root_module_request_inputs(
         &mut updater,
@@ -294,6 +337,100 @@ async fn prepare(
         })
         .await
         .unwrap()
+}
+
+fn path(value: &str) -> NormalizedAbsolutePath {
+    NormalizedAbsolutePath::new(value).unwrap()
+}
+
+fn demand(value: &str, operation: PathObservationOperation) -> PathObservationDemand {
+    PathObservationDemand::new(PathObservationNamespace::Host, path(value), operation)
+}
+
+fn lstat(kind: PathNodeKind) -> PathLstat {
+    PathLstat::new(kind, 1, 2, 3, 4, 0o644)
+}
+
+fn complete_epoch_for_raw(raw: &WorkspaceRawSnapshot) -> PathObservationEpoch {
+    let workspace = workspace();
+    let mut observations = vec![
+        (
+            demand("/", PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+                PathNodeKind::Directory,
+            ))),
+        ),
+        (
+            demand(workspace.to_str().unwrap(), PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+                PathNodeKind::Directory,
+            ))),
+        ),
+    ];
+    for (file, value) in raw.files.iter() {
+        let file = file.to_str().unwrap();
+        let lstat_result = match value {
+            WorkspaceRawFileValue::Present(_) => {
+                PathOperationResult::Present(lstat(PathNodeKind::RegularFile))
+            }
+            WorkspaceRawFileValue::Absent => PathOperationResult::Missing,
+            WorkspaceRawFileValue::ReadError(_) => {
+                PathOperationResult::Error(PathObservationError::Io {
+                    kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                    raw_os_error: Some(13),
+                })
+            }
+        };
+        observations.push((
+            demand(file, PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(lstat_result),
+        ));
+        if let WorkspaceRawFileValue::Present(bytes) = value {
+            observations.push((
+                demand(file, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(bytes.dupe())),
+            ));
+        }
+    }
+    PathObservationEpoch::new(observations).unwrap()
+}
+
+fn lstat_observation(
+    path: &str,
+    result: PathOperationResult<PathLstat>,
+) -> (PathObservationDemand, PathObservationResult) {
+    (
+        demand(path, PathObservationOperation::Lstat),
+        PathObservationResult::Lstat(result),
+    )
+}
+
+fn file_bytes_observation(
+    path: &str,
+    result: PathOperationResult<Arc<[u8]>>,
+) -> (PathObservationDemand, PathObservationResult) {
+    (
+        demand(path, PathObservationOperation::FileBytes),
+        PathObservationResult::FileBytes(result),
+    )
+}
+
+fn read_link_observation(
+    path: &str,
+    result: PathOperationResult<Arc<PathBuf>>,
+) -> (PathObservationDemand, PathObservationResult) {
+    (
+        demand(path, PathObservationOperation::ReadLink),
+        PathObservationResult::ReadLink(result),
+    )
+}
+
+fn root_patch_source(patches: &str) -> String {
+    format!(
+        "module(name = 'root')\n\
+         bazel_dep(name = 'dep', version = '1.0.0')\n\
+         single_version_override(module_name = 'dep', patches = [{patches}], patch_strip = 1)\n"
+    )
 }
 
 #[tokio::test]
@@ -713,7 +850,7 @@ async fn selected_patch_replays_a_b_errors_recovery_and_a_without_refetch() {
     let original = b"module(name = 'dep', version = '1.0.0')\n\
 bazel_dep(name = 'base', version = '1.0.0')\n";
     let patch = |leaf: &'static str| {
-        WorkspaceRawFileValue::Present(Arc::from(
+        Arc::from(
             format!(
                 concat!(
                     "--- a/MODULE.bazel\n",
@@ -726,7 +863,7 @@ bazel_dep(name = 'base', version = '1.0.0')\n";
                 leaf
             )
             .into_bytes(),
-        ))
+        )
     };
     let io = Arc::new(FakeRegistryIo::new([(
         module_url,
@@ -739,27 +876,91 @@ bazel_dep(name = 'base', version = '1.0.0')\n";
                 bazel_dep(name = 'dep', version = '1.0.0')\n\
                 single_version_override(module_name = 'dep', patches = ['//:route.patch'], patch_strip = 1)\n";
 
-    for (generation, value, expected) in [
-        (1, patch("leaf_a"), Some("leaf_a")),
-        (2, patch("leaf_b"), Some("leaf_b")),
-        (3, WorkspaceRawFileValue::Absent, None),
-        (
-            4,
-            WorkspaceRawFileValue::Present(Arc::from(&b"not a patch"[..])),
-            None,
+    let workspace = workspace();
+    let route = workspace.join("route.patch");
+    let route = route.to_str().unwrap();
+    let base = [
+        lstat_observation(
+            "/",
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
         ),
-        (5, patch("leaf_b"), Some("leaf_b")),
-        (6, patch("leaf_a"), Some("leaf_a")),
+        lstat_observation(
+            workspace.to_str().unwrap(),
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+    ];
+    enum PatchStep {
+        Bytes(Arc<[u8]>, Option<&'static str>),
+        Missing,
+        FileError,
+        Malformed,
+    }
+    let mut first_a = None;
+    for (generation, step) in [
+        (1, PatchStep::Bytes(patch("leaf_a"), Some("leaf_a"))),
+        (2, PatchStep::Bytes(patch("leaf_b"), Some("leaf_b"))),
+        (3, PatchStep::Missing),
+        (4, PatchStep::FileError),
+        (5, PatchStep::Malformed),
+        (6, PatchStep::Bytes(patch("leaf_b"), Some("leaf_b"))),
+        (7, PatchStep::Bytes(patch("leaf_a"), Some("leaf_a"))),
     ] {
-        let prepared = prepare(
+        let mut observations = base.to_vec();
+        let expected = match step {
+            PatchStep::Bytes(bytes, leaf) => {
+                observations.push(lstat_observation(
+                    route,
+                    PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+                ));
+                observations.push(file_bytes_observation(
+                    route,
+                    PathOperationResult::Present(bytes),
+                ));
+                leaf
+            }
+            PatchStep::Missing => {
+                observations.push(lstat_observation(route, PathOperationResult::Missing));
+                None
+            }
+            PatchStep::FileError => {
+                observations.push(lstat_observation(
+                    route,
+                    PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+                ));
+                observations.push(file_bytes_observation(
+                    route,
+                    PathOperationResult::Error(PathObservationError::Io {
+                        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                        raw_os_error: Some(13),
+                    }),
+                ));
+                None
+            }
+            PatchStep::Malformed => {
+                observations.push(lstat_observation(
+                    route,
+                    PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+                ));
+                observations.push(file_bytes_observation(
+                    route,
+                    PathOperationResult::Present(Arc::from(&b"not a patch"[..])),
+                ));
+                None
+            }
+        };
+        let outcome = prepare_with_epoch(
             &dice,
             root,
-            raw_workspace_snapshot([("route.patch", value)]),
+            raw_workspace_snapshot([]),
+            PathObservationEpoch::new(observations).unwrap(),
             &["file:///registry"],
             generation,
             "1.0.0",
         )
         .await;
+        let PathOutcome::Complete(prepared) = outcome else {
+            panic!("complete lifecycle epoch unexpectedly needs observations");
+        };
         match expected {
             Some(leaf) => {
                 let Ok(ModuleSourcePreparation::Registry {
@@ -776,7 +977,27 @@ bazel_dep(name = 'base', version = '1.0.0')\n";
                     module_file_attempts[0].sha256,
                     Some(Sha256::digest(original).into())
                 );
+                if generation == 1 {
+                    first_a = Some(prepared.clone());
+                }
+                if generation == 7 {
+                    assert_eq!(Some(prepared.clone()), first_a);
+                }
             }
+            None if generation == 3 => assert!(matches!(
+                prepared.as_ref(),
+                Err(ModuleSourcePreparationError::PatchMissing { logical_path })
+                    if logical_path.as_path() == Path::new(route)
+            )),
+            None if generation == 4 => assert!(matches!(
+                prepared.as_ref(),
+                Err(ModuleSourcePreparationError::PatchFileObservation { demand: actual_demand, error })
+                    if actual_demand == &demand(route, PathObservationOperation::FileBytes)
+                        && *error == PathObservationError::Io {
+                            kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                            raw_os_error: Some(13),
+                        }
+            )),
             None => assert!(matches!(
                 prepared.as_ref(),
                 Err(ModuleSourcePreparationError::Patch(_))
@@ -784,6 +1005,489 @@ bazel_dep(name = 'base', version = '1.0.0')\n";
         }
     }
     assert_eq!(io.calls(), [module_url]);
+}
+
+#[tokio::test]
+async fn root_patches_validate_all_paths_before_reading_or_applying() {
+    let module_url = "file:///registry/modules/dep/1.0.0/MODULE.bazel";
+    let original: Arc<[u8]> = Arc::from(&b"value = 'base'\n"[..]);
+    let io = Arc::new(FakeRegistryIo::new([(
+        module_url,
+        FakeRegistryResponse::Found(original.clone()),
+    )]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let root = root_patch_source("'//:first.patch', '//:second.patch'");
+    let workspace = workspace();
+    let first = workspace.join("first.patch");
+    let second = workspace.join("second.patch");
+    let first = first.to_str().unwrap();
+    let second = second.to_str().unwrap();
+    let first_patch: Arc<[u8]> = Arc::from(
+        &b"--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1 +1 @@\n-value = 'base'\n+value = 'first'\n"[..],
+    );
+    let second_patch: Arc<[u8]> = Arc::from(
+        &b"--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1 +1 @@\n-value = 'first'\n+value = 'final'\n"[..],
+    );
+    let observations = vec![
+        lstat_observation(
+            "/",
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        lstat_observation(
+            workspace.to_str().unwrap(),
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        lstat_observation(
+            first,
+            PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+        ),
+        lstat_observation(
+            second,
+            PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+        ),
+        file_bytes_observation(first, PathOperationResult::Present(first_patch)),
+        file_bytes_observation(second, PathOperationResult::Present(second_patch)),
+    ];
+    for prefix_len in 0..=observations.len() {
+        let epoch = PathObservationEpoch::new(observations[..prefix_len].iter().cloned()).unwrap();
+        let outcome = prepare_with_epoch(
+            &dice,
+            &root,
+            raw_workspace_snapshot([]),
+            epoch,
+            &["file:///registry"],
+            prefix_len as u64 + 1,
+            "1.0.0",
+        )
+        .await;
+        if prefix_len < observations.len() {
+            let PathOutcome::Need(need) = outcome else {
+                panic!("prefix {prefix_len} unexpectedly completed: {outcome:?}");
+            };
+            assert_eq!(need.demands(), &[observations[prefix_len].0.clone()]);
+            let need = PathOutcome::Need(need);
+            assert!(!ModuleSourcePreparationKey::validity(&need));
+            assert!(!ModuleSourcePreparationKey::equality(&need, &need));
+        } else {
+            let PathOutcome::Complete(prepared) = outcome else {
+                panic!("complete epoch unexpectedly needs observations");
+            };
+            let complete = PathOutcome::Complete(prepared.clone());
+            assert!(ModuleSourcePreparationKey::validity(&complete));
+            assert!(ModuleSourcePreparationKey::equality(&complete, &complete));
+            let Ok(ModuleSourcePreparation::Registry { bytes, .. }) = prepared.as_ref() else {
+                panic!("expected patched registry bytes: {prepared:?}");
+            };
+            assert_eq!(bytes.as_ref(), b"value = 'final'\n");
+        }
+    }
+
+    let missing_second = PathObservationEpoch::new([
+        lstat_observation(
+            "/",
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        lstat_observation(
+            workspace.to_str().unwrap(),
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        lstat_observation(
+            first,
+            PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+        ),
+        lstat_observation(second, PathOperationResult::Missing),
+    ])
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        missing_second,
+        &["file:///registry"],
+        20,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchMissing { logical_path }) if logical_path.as_path() == Path::new(second))
+    ));
+
+    let malformed_first_then_missing_second =
+        root_patch_source("'//:malformed.patch', '//:missing.patch'");
+    let malformed = workspace.join("malformed.patch");
+    let missing = workspace.join("missing.patch");
+    let malformed = malformed.to_str().unwrap();
+    let missing = missing.to_str().unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &malformed_first_then_missing_second,
+        raw_workspace_snapshot([]),
+        PathObservationEpoch::new([
+            lstat_observation(
+                "/",
+                PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+            ),
+            lstat_observation(
+                workspace.to_str().unwrap(),
+                PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+            ),
+            lstat_observation(
+                malformed,
+                PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+            ),
+            lstat_observation(missing, PathOperationResult::Missing),
+        ])
+        .unwrap(),
+        &["file:///registry"],
+        21,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchMissing { logical_path }) if logical_path.as_path() == Path::new(missing))
+    ));
+    assert_eq!(io.calls(), [module_url, module_url]);
+}
+
+#[tokio::test]
+async fn root_patch_special_files_and_filebytes_failures_are_typed() {
+    let module_url = "file:///registry/modules/dep/1.0.0/MODULE.bazel";
+    let original: Arc<[u8]> = Arc::from(&b"value = 'base'\n"[..]);
+    let io = Arc::new(FakeRegistryIo::new([(
+        module_url,
+        FakeRegistryResponse::Found(original.clone()),
+    )]));
+    let mut builder = Dice::builder();
+    install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let root = root_patch_source("'//:special.patch'");
+    let workspace = workspace();
+    let special = workspace.join("special.patch");
+    let special = special.to_str().unwrap();
+    let base = [
+        lstat_observation(
+            "/",
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+        lstat_observation(
+            workspace.to_str().unwrap(),
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ),
+    ];
+    let special_epoch = PathObservationEpoch::new(base.iter().cloned().chain([
+        lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::SpecialFile)),
+        ),
+        file_bytes_observation(special, PathOperationResult::Present(Arc::from(&b""[..]))),
+    ]))
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        special_epoch,
+        &["file:///registry"],
+        1,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Ok(ModuleSourcePreparation::Registry { bytes, .. }) if bytes.as_ref() == original.as_ref())
+    ));
+
+    let relative_target = workspace.join("relative-special.patch");
+    let relative_target = relative_target.to_str().unwrap();
+    let relative_epoch = PathObservationEpoch::new(base.iter().cloned().chain([
+        lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+        ),
+        read_link_observation(
+            special,
+            PathOperationResult::Present(Arc::new(PathBuf::from("relative-special.patch"))),
+        ),
+        lstat_observation(
+            relative_target,
+            PathOperationResult::Present(lstat(PathNodeKind::SpecialFile)),
+        ),
+        file_bytes_observation(
+            relative_target,
+            PathOperationResult::Present(Arc::from(&b""[..])),
+        ),
+    ]))
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        relative_epoch,
+        &["file:///registry"],
+        2,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Ok(ModuleSourcePreparation::Registry { bytes, .. }) if bytes.as_ref() == original.as_ref())
+    ));
+
+    let escaped_special = "/outside-special.patch";
+    let escaped_epoch = PathObservationEpoch::new(base.iter().cloned().chain([
+        lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+        ),
+        read_link_observation(
+            special,
+            PathOperationResult::Present(Arc::new(PathBuf::from(escaped_special))),
+        ),
+        lstat_observation(
+            escaped_special,
+            PathOperationResult::Present(lstat(PathNodeKind::SpecialFile)),
+        ),
+        file_bytes_observation(
+            escaped_special,
+            PathOperationResult::Present(Arc::from(&b""[..])),
+        ),
+    ]))
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        escaped_epoch,
+        &["file:///registry"],
+        3,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Ok(ModuleSourcePreparation::Registry { bytes, .. }) if bytes.as_ref() == original.as_ref())
+    ));
+
+    let directory_epoch =
+        PathObservationEpoch::new(base.iter().cloned().chain([lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        )]))
+        .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        directory_epoch,
+        &["file:///registry"],
+        4,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchWrongKind {
+                logical_path,
+                actual: PathNodeKind::Directory,
+            }) if logical_path.as_path() == Path::new(special))
+    ));
+
+    let missing_target = workspace.join("missing-target.patch");
+    let missing_target = missing_target.to_str().unwrap();
+    let dangling_epoch = PathObservationEpoch::new(base.iter().cloned().chain([
+        lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+        ),
+        read_link_observation(
+            special,
+            PathOperationResult::Present(Arc::new(PathBuf::from("missing-target.patch"))),
+        ),
+        lstat_observation(missing_target, PathOperationResult::Missing),
+    ]))
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        dangling_epoch,
+        &["file:///registry"],
+        5,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchMissing { logical_path })
+                if logical_path.as_path() == Path::new(special))
+    ));
+
+    let readlink_missing_race = PathObservationEpoch::new(base.iter().cloned().chain([
+        lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+        ),
+        read_link_observation(special, PathOperationResult::Missing),
+    ]))
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        readlink_missing_race,
+        &["file:///registry"],
+        6,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchResolution(
+                PathResolutionError::InconsistentState {
+                    namespace,
+                    requested_path,
+                    demand: actual_demand,
+                    before: Some(before),
+                    after: None,
+                }
+            )) if *namespace == PathObservationNamespace::Host
+                && requested_path.as_path() == Path::new(special)
+                && actual_demand == &demand(special, PathObservationOperation::ReadLink)
+                && *before == lstat(PathNodeKind::Symlink))
+    ));
+
+    let lstat_error = PathObservationError::Io {
+        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    let lstat_error_epoch =
+        PathObservationEpoch::new(base.iter().cloned().chain([lstat_observation(
+            special,
+            PathOperationResult::Error(lstat_error),
+        )]))
+        .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        lstat_error_epoch,
+        &["file:///registry"],
+        7,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchResolution(
+                PathResolutionError::Observation { namespace, requested_path, demand: actual_demand, error }
+            )) if *namespace == PathObservationNamespace::Host
+                && requested_path.as_path() == Path::new(special)
+                && actual_demand == &demand(special, PathObservationOperation::Lstat)
+                && *error == lstat_error)
+    ));
+
+    let readlink_error = PathObservationError::Io {
+        kind: slug_workspace_v2::PathIoErrorKind::InvalidData,
+        raw_os_error: Some(22),
+    };
+    let readlink_error_epoch = PathObservationEpoch::new(base.iter().cloned().chain([
+        lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+        ),
+        read_link_observation(special, PathOperationResult::Error(readlink_error)),
+    ]))
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        readlink_error_epoch,
+        &["file:///registry"],
+        8,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchResolution(
+                PathResolutionError::Observation { namespace, requested_path, demand: actual_demand, error }
+            )) if *namespace == PathObservationNamespace::Host
+                && requested_path.as_path() == Path::new(special)
+                && actual_demand == &demand(special, PathObservationOperation::ReadLink)
+                && *error == readlink_error)
+    ));
+
+    let error = PathObservationError::Io {
+        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    let regular_epoch = PathObservationEpoch::new(base.iter().cloned().chain([
+        lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+        ),
+        file_bytes_observation(special, PathOperationResult::Error(error)),
+    ]))
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        regular_epoch,
+        &["file:///registry"],
+        9,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchFileObservation { error: actual, .. }) if *actual == error)
+    ));
+
+    let missing_after_lstat = PathObservationEpoch::new(base.iter().cloned().chain([
+        lstat_observation(
+            special,
+            PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+        ),
+        file_bytes_observation(special, PathOperationResult::Missing),
+    ]))
+    .unwrap();
+    let outcome = prepare_with_epoch(
+        &dice,
+        &root,
+        raw_workspace_snapshot([]),
+        missing_after_lstat,
+        &["file:///registry"],
+        10,
+        "1.0.0",
+    )
+    .await;
+    assert!(matches!(
+        outcome,
+        PathOutcome::Complete(prepared)
+            if matches!(prepared.as_ref(), Err(ModuleSourcePreparationError::PatchFileInconsistentState {
+                demand: actual_demand,
+                before: Some(before),
+                after: None,
+            }) if actual_demand == &demand(special, PathObservationOperation::FileBytes)
+                && *before == lstat(PathNodeKind::RegularFile))
+    ));
 }
 
 #[tokio::test]
