@@ -404,3 +404,39 @@ Next evidence: Implement only
 `WP-5-m1-runtime-path-observation-native-producer` in the four frozen files.
 Do not wire the private producer into DICE, runtime materialization, retry, or
 publication.
+
+### Stage 5 native path-observation producer implementation retry
+
+Status: Replanned before retained Rust
+
+Draft evidence: The private four-file attempt compiled and reached ten focused
+path-observation tests plus all 36 core tests. It established a compact batch
+owner, a direct raw Unix `DIR` owner with contained unsafe and partial-name
+retention, and a checked host-pure Windows reparse parser that preserved lone
+surrogates. No DICE, materializer, retry, publication, or public API was wired.
+
+Reason for `REPLAN`: Both terminal reviews rejected material behavior and
+evidence. The draft ran auxiliary lstat before ReadLink, FileBytes, and
+DirectoryEntries rather than using it only after specified primary-operation
+failures, changing race and error precedence. It observed a prevalidated batch
+in caller order rather than deterministic sorted order, used unvalidated raw
+roots without the frozen retained allocation contract, and kept several
+Unix-only paths in supposedly portable tests.
+
+Windows review found writable permissions `0777` instead of `0755`, collapsed
+the distinct OpenJDK mtime and native ctime formulas, used the wrong long-path
+slash/prefix rules, omitted explicit kernel32 linkage, and trusted
+`DeviceIoControl`'s returned length before constructing a slice. Host-pure
+tests did not discriminate LX and mount layouts, substitute offsets,
+print-name/flags, both target-prefix normalizations, relative targets, malformed
+offsets/ranges, oversized returned lengths, timestamp overflow, or long-path
+rules. Unix evidence omitted opener EINTR/EIO, EOF close failure, direct
+disarmed-Drop proof, and full directory/symlink/materialization lifecycle
+transitions. The unaccepted draft and manifest/module edits were removed; the
+worktree returned clean without rerunning Cargo after removal.
+
+Next evidence: Design only
+`WP-5-m1-runtime-path-observation-native-producer-final-design-correction`.
+Freeze the exact operation-first state tables, deterministic/authority owner,
+Windows source formulas/safety/linkage, portable test matrix, and missing Unix
+evidence before any further Rust.
