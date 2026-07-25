@@ -10,6 +10,7 @@
 
 pub mod dice;
 pub mod events;
+mod path_observation;
 pub mod reapi;
 mod registry_io;
 mod repository_io;

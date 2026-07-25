@@ -507,3 +507,31 @@ previously accepted operation tables remain unchanged.
 Next evidence: Implement only
 `WP-5-m1-runtime-path-observation-neutral-kernel` in the new private module and
 `runtime/mod.rs`. Do not add Cargo, native, public, or caller changes.
+
+### Stage 5 platform-neutral path-observation kernel
+
+Status: Accepted
+
+The two-file dependency-free checkpoint adds one unconditional private dormant
+module with the lifetime-bound `Allocative` sorted `Arc` root authority,
+complete sorted duplicate/instance/Lstat-support preflight, exact demanded-path
+execution, adapter-owned primary operations, and neutral auxiliary-lstat
+refinement. Primary failures can only be Refine or Final, so adapters cannot
+bypass the accepted Missing race tables. The module has no native
+implementation, public export, caller, or activation.
+
+Fifteen focused scripted tests prove exact structural errors and zero operation
+calls, compact root ordering and shared roots, Host/materialization identity,
+no rewriting, complete sorted execution with error continuation, direct Lstat
+Present/Missing/I/O, every primary/refinement/no-auxiliary row across node
+kinds, typed NotALink and generic-I/O preservation, special-file-compatible
+bytes, and matching epoch variants. Root validation passed 29 unit, 13
+integration, and zero doctests, host and GNU-Windows all-target checks,
+formatting, diff, archive status, exact two-file scope, and forbidden-reference
+scans. Existing perf-event, serde-import, and core dead-code warnings are
+unrelated. Independent pinned-contract and architecture/performance reviews
+both returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-path-observation-unix-adapter` in the private module,
+`app/slug_core_v2/Cargo.toml`, and `Cargo.lock` only if resolution changes.
