@@ -126,3 +126,39 @@ existing A payload rather than copy it; add only one B `MODULE.bazel`, one
 boundaryless `BUILD.bazel`, and three relative symlinks. Do not add an
 unused-invalid override: neither a demanded dependency nor an override of an
 absent module proves unused-repository laziness.
+
+### Stage 5 Local repository lifecycle oracle
+
+Status: Accepted in `dcc19327`
+
+Oracle: The retained-daemon `module-source-preparation` fixture now keeps one
+exact `local_path_override(... path = "local-route")` request across five new
+rows. A relative logical-root symlink retargets from the already-mutated A
+payload to a B-only `rules_license` graph, becomes missing, becomes a regular
+file, points to an existing directory with no repository boundary, and then
+restores the exact mutated A graph. Missing and regular-file states both pin
+Bazel's path missing/not-directory error before boundary validation; the
+boundaryless state pins the distinct missing `MODULE.bazel`, `REPO.bazel`, or
+`WORKSPACE` error. Negative assertions exclude the alternate preflight class
+and downstream A/B graph markers.
+
+Fixture hygiene: All eleven prior normalized command records remain
+byte-identical. The existing A payload moved without copying; B reuses the
+fixture's registry scaffold, and no runner/schema or registry topology changed.
+Net growth is two regular files, three relative symlinks, five entries, and 282
+regular-file lines: 82 TOML, 197 expected JSON, and three asset lines. This is
+the second accepted oracle packet after fixture-growth checkpoint `42e38bc3`
+(`9fa4fbde`, `dcc19327`), so another hygiene checkpoint is not due.
+
+Validation: Pinned Bazel 9.2 generation and two fresh normalized replays
+passed. Direct harness assertions loaded all 16 commands, proved the exact
+five-row suffix, all eleven old records by name, and all three relative
+symlinks; JSON and `git diff --check` passed. The environment had no `pytest`
+module, so the unchanged harness's pytest suite was unavailable and is not
+acceptance-blocking. Independent pinned-source and fixture-maintainability
+reviews returned `ACCEPT`.
+
+Residual risk: Runtime still cannot produce structural Host or
+Materialization observations. Design only
+`WP-5-m1-runtime-path-observation-producer-design` next; do not combine the
+producer with retained materializer correction, epoch injection, or retries.
