@@ -875,3 +875,34 @@ Next evidence: Implement only
 `WP-5-m1-runtime-http-archive-captured-ustar-subset-retry` in
 `app/slug_core_v2/src/runtime/repository_io.rs`. Do not change Git code or add
 retained session/runtime/native-observer behavior.
+
+### Stage 5 HTTP captured-USTAR implementation retry
+
+Status: Accepted
+
+The one-file implementation now captures the caller source once into private
+owned bytes plus a retained artifact, preserves the exact Spec/Transport/
+Materialization precedence, exhaustively inspects and plans before destination
+writes, and extracts only the accepted raw regular/directory USTAR subset.
+It pins Commons short-record, checksum-syntax, leading-NUL octal, padding,
+default/POSIX/GNU/XSTAR, ISO-8859-1, Unix/Windows path-flavor, exact-prefix,
+containment, collision, mutation, cleanup, and archive-order behavior while
+leaving Git's existing external-tar path byte-identical.
+
+The focused correction added structural safe-prefix validation, selected-type
+classification before suffix/prefix-root handling, checksum-field syntax,
+full XUSTAR evidence, an end-to-end parent/directory/file destination seam,
+dual-failure ordering, unsafe-outside-prefix rows, and the complete namespace
+matrix. All three terminal rereviews returned `ACCEPT`.
+
+Validation passed 12 focused repository tests, 55 full unit tests, 13
+integration tests, and zero doctests. The GNU-Windows no-run gate produced
+both unit and integration executables. Formatting, diff, archive, exact
+one-file scope, forbidden-boundary, cleanup, and Git byte-identity checks
+passed; only pre-existing workspace warnings remained.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-retained-session-kernel` in
+`app/slug_core_v2/src/runtime/repository_io.rs`. Add no native observation,
+runtime field, public API, dependency, DICE key, sidecar, producer, retry, or
+publication behavior.
