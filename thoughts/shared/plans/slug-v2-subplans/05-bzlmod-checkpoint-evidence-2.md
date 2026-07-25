@@ -980,3 +980,14 @@ Status: Accepted before corrected rerun
 Design summary: In the first 11 expected records, change only the seven successful output-manifest mode scalars from `0o544` to Bazel-canonical `0o555`; preserve all other fields byte-for-byte. Retain the accepted 15-row suffix, four-file allowlist, two new assets, exact assertions, and sub-800-line growth cap unchanged.
 Validation: isolated untouched-HEAD replay; clean-output-base pinned Bazel generation; pinned `OutputPermissions` source; root exact-diff synthesis; fresh independent review `ACCEPT`
 Residual risk: Rerun only corrected `WP-5-m1-nonroot-package-policy-oracle`, including two independent pinned replays and an exact check that the seven modes are the sole old-record changes.
+
+### Stage 5 nonroot package-policy oracle
+
+Status: Accepted
+V2 commit: `60c24045 test: pin nonroot package policy`
+Bazel oracle: pinned Bazel 9.2 generation `20260724-230704-2057039-bazel`; corrected independent replays `20260724-231058-2065032-bazel` and `20260724-231141-2070171-bazel`
+Evidence: Fifteen appended retained-daemon rows prove `BUILD.bazel` priority and fallback, horizon-wide line-4-before-line-5 package preflight before execution, exact boundary-then-order evaluation, valid BUILD symlink acceptance with unchanged selected-name nonreplay, canonical versus apparent external deleted-package identity, repository `.bazelignore`, `REPO.bazel` `ignore_directories()`, exact no-BUILD/deleted diagnostics, and recovery. Every successful two-fragment row retains marker digest `f052c5616758f335713070ac968b140a71a32a2ea5a9be46871f720323eba3a8`.
+Baseline correction: The first 11 records retain every field except the seven independently reviewed `0o544 -> 0o555` manifest scalars required by pinned `OutputPermissions.READONLY`; isolated untouched-HEAD replay proved no other baseline drift.
+Validation: two corrected independent Bazel replays; oracle harness 38/38; exact 26-row, prior-field, print/source-order, digest, source, manifest, provenance, symlink-mode/target, local-only, credential, scope, diff, and archive checks; fresh independent terminal review `ACCEPT`
+Growth: exactly two new files and 751 net newline-counted lines. Cumulative accepted growth since baseline is 30 files and 2,791 lines, below the roughly 100-file or 10,000-line review threshold; this is the fourth accepted oracle packet after the baseline.
+Residual risk: Package-aware lookup implementation ownership remains. Rereview only read-only `WP-5-m1-nonroot-repository-package-lookup-design-rereview` against the accepted directory owner and policy oracle before Rust.
