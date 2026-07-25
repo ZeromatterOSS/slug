@@ -719,17 +719,312 @@ impl Key for ResolvedPathKey {
     }
 }
 
+/// Semantic file contents after operational path resolution.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum PathFileBytes {
+    Present(Arc<[u8]>),
+    Missing,
+}
+
+/// A byte-projection failure containing only semantic identity.
+#[derive(Debug, Clone, Allocative, Dupe)]
+pub enum PathFileBytesError {
+    Observation {
+        logical_path: NormalizedAbsolutePath,
+        operation: PathObservationOperation,
+        error: PathObservationError,
+    },
+    InconsistentState {
+        logical_path: NormalizedAbsolutePath,
+        operation: PathObservationOperation,
+        before: Option<PathLstat>,
+        after: Option<PathLstat>,
+    },
+    WrongKind {
+        logical_path: NormalizedAbsolutePath,
+        expected: PathNodeKind,
+        actual: PathNodeKind,
+    },
+    Cycle {
+        logical_path: NormalizedAbsolutePath,
+    },
+    InfiniteExpansion {
+        logical_path: NormalizedAbsolutePath,
+    },
+}
+
+impl PathFileBytesError {
+    pub fn logical_path(&self) -> &NormalizedAbsolutePath {
+        match self {
+            Self::Observation { logical_path, .. }
+            | Self::InconsistentState { logical_path, .. }
+            | Self::WrongKind { logical_path, .. }
+            | Self::Cycle { logical_path }
+            | Self::InfiniteExpansion { logical_path } => logical_path,
+        }
+    }
+
+    pub fn semantic_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Observation {
+                    logical_path: left_path,
+                    operation: left_operation,
+                    error: left_error,
+                },
+                Self::Observation {
+                    logical_path: right_path,
+                    operation: right_operation,
+                    error: right_error,
+                },
+            ) => {
+                left_path == right_path
+                    && left_operation == right_operation
+                    && left_error == right_error
+            }
+            (
+                Self::InconsistentState {
+                    logical_path: left_path,
+                    operation: left_operation,
+                    before: left_before,
+                    after: left_after,
+                },
+                Self::InconsistentState {
+                    logical_path: right_path,
+                    operation: right_operation,
+                    before: right_before,
+                    after: right_after,
+                },
+            ) => {
+                left_path == right_path
+                    && left_operation == right_operation
+                    && left_before == right_before
+                    && left_after == right_after
+            }
+            (
+                Self::WrongKind {
+                    logical_path: left_path,
+                    expected: left_expected,
+                    actual: left_actual,
+                },
+                Self::WrongKind {
+                    logical_path: right_path,
+                    expected: right_expected,
+                    actual: right_actual,
+                },
+            ) => {
+                left_path == right_path
+                    && left_expected == right_expected
+                    && left_actual == right_actual
+            }
+            (
+                Self::Cycle {
+                    logical_path: left_path,
+                },
+                Self::Cycle {
+                    logical_path: right_path,
+                },
+            )
+            | (
+                Self::InfiniteExpansion {
+                    logical_path: left_path,
+                },
+                Self::InfiniteExpansion {
+                    logical_path: right_path,
+                },
+            ) => left_path == right_path,
+            (
+                Self::Observation { .. }
+                | Self::InconsistentState { .. }
+                | Self::WrongKind { .. }
+                | Self::Cycle { .. }
+                | Self::InfiniteExpansion { .. },
+                _,
+            ) => false,
+        }
+    }
+
+    fn from_resolution(logical_path: NormalizedAbsolutePath, error: PathResolutionError) -> Self {
+        match error {
+            PathResolutionError::Observation { demand, error, .. } => Self::Observation {
+                logical_path,
+                operation: demand.operation(),
+                error,
+            },
+            PathResolutionError::InconsistentState {
+                demand,
+                before,
+                after,
+                ..
+            } => Self::InconsistentState {
+                logical_path,
+                operation: demand.operation(),
+                before,
+                after,
+            },
+            PathResolutionError::Cycle { .. } => Self::Cycle { logical_path },
+            PathResolutionError::InfiniteExpansion { .. } => {
+                Self::InfiniteExpansion { logical_path }
+            }
+        }
+    }
+}
+
+impl PartialEq for PathFileBytesError {
+    fn eq(&self, other: &Self) -> bool {
+        self.semantic_eq(other)
+    }
+}
+
+impl Eq for PathFileBytesError {}
+
+/// Resolves and reads one exact logical regular file.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct PathFileBytesKey {
+    namespace: PathObservationNamespace,
+    logical_path: NormalizedAbsolutePath,
+}
+
+impl PathFileBytesKey {
+    pub fn new(namespace: PathObservationNamespace, logical_path: NormalizedAbsolutePath) -> Self {
+        Self {
+            namespace,
+            logical_path,
+        }
+    }
+
+    pub const fn namespace(&self) -> PathObservationNamespace {
+        self.namespace
+    }
+
+    pub fn logical_path(&self) -> &NormalizedAbsolutePath {
+        &self.logical_path
+    }
+}
+
+impl fmt::Display for PathFileBytesKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "path-file-bytes:{:?}:{:?}",
+            self.namespace,
+            self.logical_path.as_path()
+        )
+    }
+}
+
+#[async_trait]
+impl Key for PathFileBytesKey {
+    type Value = PathResult<PathFileBytes, PathFileBytesError>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let resolved = dice_invariant(
+            ctx.compute(&ResolvedPathKey::new(
+                self.namespace,
+                self.logical_path.dupe(),
+            ))
+            .await,
+        );
+        let resolved = match resolved {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => {
+                return PathOutcome::Complete(Err(PathFileBytesError::from_resolution(
+                    self.logical_path.dupe(),
+                    error,
+                )));
+            }
+            PathOutcome::Complete(Ok(resolved)) => resolved,
+        };
+        let lstat = match resolved.state() {
+            ResolvedPathState::Missing => {
+                return PathOutcome::Complete(Ok(PathFileBytes::Missing));
+            }
+            ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::RegularFile => lstat,
+            ResolvedPathState::Present(lstat) => {
+                return PathOutcome::Complete(Err(PathFileBytesError::WrongKind {
+                    logical_path: self.logical_path.dupe(),
+                    expected: PathNodeKind::RegularFile,
+                    actual: lstat.kind(),
+                }));
+            }
+        };
+
+        let demand = PathObservationDemand::new(
+            self.namespace,
+            resolved.real_path().dupe(),
+            PathObservationOperation::FileBytes,
+        );
+        let observed = dice_invariant(ctx.compute(&PathObservationKey::new(demand.dupe())).await);
+        match observed {
+            PathOutcome::Need(need) => PathOutcome::Need(need),
+            PathOutcome::Complete(result) => match result.as_ref() {
+                PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
+                    PathOutcome::Complete(Ok(PathFileBytes::Present(bytes.dupe())))
+                }
+                PathObservationResult::FileBytes(PathOperationResult::Missing) => {
+                    PathOutcome::Complete(Err(PathFileBytesError::InconsistentState {
+                        logical_path: self.logical_path.dupe(),
+                        operation: demand.operation(),
+                        before: Some(lstat),
+                        after: None,
+                    }))
+                }
+                PathObservationResult::FileBytes(PathOperationResult::Error(error)) => {
+                    PathOutcome::Complete(Err(PathFileBytesError::Observation {
+                        logical_path: self.logical_path.dupe(),
+                        operation: demand.operation(),
+                        error: *error,
+                    }))
+                }
+                PathObservationResult::Lstat(_)
+                | PathObservationResult::ReadLink(_)
+                | PathObservationResult::DirectoryEntries(_) => {
+                    unreachable!("FileBytes demand must return a FileBytes observation")
+                }
+            },
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::fmt;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::path::Path;
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
 
+    use allocative::Allocative;
+    use async_trait::async_trait;
     use dice::DetectCycles;
     use dice::Dice;
+    use dice::DiceComputations;
+    use dice::DiceProjectionComputations;
+    use dice::DiceTransaction;
+    use dice::InjectedKey;
     use dice::Key;
+    use dice::ProjectionKey;
+    use dice_futures::cancellation::CancellationContext;
     use dupe::Dupe;
 
+    use super::PathFileBytes;
+    use super::PathFileBytesError;
+    use super::PathFileBytesKey;
     use super::PathResolutionChain;
     use super::PathResolutionError;
     use super::ResolvedPath;
@@ -750,8 +1045,207 @@ mod tests {
     use crate::PathObservationResult;
     use crate::PathOperationResult;
     use crate::PathOutcome;
+    use crate::PathResult;
 
     type ScriptEntry = (PathObservationDemand, PathObservationResult);
+
+    #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+    struct TestSelector {
+        namespace: PathObservationNamespace,
+        logical_path: NormalizedAbsolutePath,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+    struct TestSelectorKey;
+
+    impl fmt::Display for TestSelectorKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("path-resolution-test-selector")
+        }
+    }
+
+    impl InjectedKey for TestSelectorKey {
+        type Value = TestSelector;
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            x == y
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+    struct OperationalProjectionKey;
+
+    impl fmt::Display for OperationalProjectionKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("path-resolution-operational-projection")
+        }
+    }
+
+    #[async_trait]
+    impl Key for OperationalProjectionKey {
+        type Value = PathResult<ResolvedPath, PathResolutionError>;
+
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _cancellations: &CancellationContext,
+        ) -> Self::Value {
+            let selector = super::dice_invariant(ctx.compute(&TestSelectorKey).await);
+            super::dice_invariant(
+                ctx.compute(&ResolvedPathKey::new(
+                    selector.namespace,
+                    selector.logical_path.dupe(),
+                ))
+                .await,
+            )
+        }
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            ResolvedPathKey::equality(x, y)
+        }
+
+        fn validity(value: &Self::Value) -> bool {
+            ResolvedPathKey::validity(value)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+    struct SemanticProjectionKey;
+
+    impl fmt::Display for SemanticProjectionKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("path-resolution-semantic-projection")
+        }
+    }
+
+    #[async_trait]
+    impl Key for SemanticProjectionKey {
+        type Value = PathResult<PathFileBytes, PathFileBytesError>;
+
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _cancellations: &CancellationContext,
+        ) -> Self::Value {
+            let selector = super::dice_invariant(ctx.compute(&TestSelectorKey).await);
+            super::dice_invariant(
+                ctx.compute(&PathFileBytesKey::new(
+                    selector.namespace,
+                    selector.logical_path.dupe(),
+                ))
+                .await,
+            )
+        }
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            PathFileBytesKey::equality(x, y)
+        }
+
+        fn validity(value: &Self::Value) -> bool {
+            PathFileBytesKey::validity(value)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+    struct SemanticValueProjectionKey;
+
+    impl fmt::Display for SemanticValueProjectionKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("path-resolution-semantic-value-projection")
+        }
+    }
+
+    impl ProjectionKey for SemanticValueProjectionKey {
+        type DeriveFromKey = SemanticProjectionKey;
+        type Value = PathResult<PathFileBytes, PathFileBytesError>;
+
+        fn compute(
+            &self,
+            derive_from: &<Self::DeriveFromKey as Key>::Value,
+            _ctx: &DiceProjectionComputations,
+        ) -> Self::Value {
+            derive_from.dupe()
+        }
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            PathFileBytesKey::equality(x, y)
+        }
+
+        fn validity(value: &Self::Value) -> bool {
+            PathFileBytesKey::validity(value)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+    enum CounterKind {
+        Operational,
+        Semantic,
+    }
+
+    #[derive(Debug, Clone, Allocative, Dupe)]
+    struct CounterKey {
+        kind: CounterKind,
+        #[allocative(skip)]
+        counter: Arc<AtomicUsize>,
+    }
+
+    impl PartialEq for CounterKey {
+        fn eq(&self, other: &Self) -> bool {
+            self.kind == other.kind && Arc::ptr_eq(&self.counter, &other.counter)
+        }
+    }
+
+    impl Eq for CounterKey {}
+
+    impl Hash for CounterKey {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.kind.hash(state);
+            Arc::as_ptr(&self.counter).hash(state);
+        }
+    }
+
+    impl fmt::Display for CounterKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(
+                f,
+                "path-resolution-{:?}-counter:{:p}",
+                self.kind,
+                Arc::as_ptr(&self.counter)
+            )
+        }
+    }
+
+    #[async_trait]
+    impl Key for CounterKey {
+        type Value = PathOutcome<usize>;
+
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _cancellations: &CancellationContext,
+        ) -> Self::Value {
+            let projection = match self.kind {
+                CounterKind::Operational => {
+                    super::dice_invariant(ctx.compute(&OperationalProjectionKey).await).map(|_| ())
+                }
+                CounterKind::Semantic => {
+                    let semantic =
+                        super::dice_invariant(ctx.compute_opaque(&SemanticProjectionKey).await);
+                    super::dice_invariant(ctx.projection(&semantic, &SemanticValueProjectionKey))
+                        .map(|_| ())
+                }
+            };
+            projection.map(|()| self.counter.fetch_add(1, Ordering::SeqCst) + 1)
+        }
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            x.complete_eq(y)
+        }
+
+        fn validity(value: &Self::Value) -> bool {
+            value.is_complete()
+        }
+    }
 
     fn path(value: &str) -> NormalizedAbsolutePath {
         NormalizedAbsolutePath::new(value).unwrap()
@@ -822,6 +1316,59 @@ mod tests {
         )
     }
 
+    fn file_bytes_result(
+        namespace: PathObservationNamespace,
+        value: &str,
+        result: PathOperationResult<Arc<[u8]>>,
+    ) -> ScriptEntry {
+        (
+            demand(namespace, value, PathObservationOperation::FileBytes),
+            PathObservationResult::FileBytes(result),
+        )
+    }
+
+    fn file_bytes(
+        namespace: PathObservationNamespace,
+        value: &str,
+        bytes: &'static [u8],
+    ) -> ScriptEntry {
+        file_bytes_result(
+            namespace,
+            value,
+            PathOperationResult::Present(Arc::from(bytes)),
+        )
+    }
+
+    fn linked_file_script(
+        namespace: PathObservationNamespace,
+        target: &str,
+        metadata: PathLstat,
+        bytes: PathOperationResult<Arc<[u8]>>,
+    ) -> Vec<ScriptEntry> {
+        vec![
+            present(namespace, "/", PathNodeKind::Directory),
+            present(namespace, "/entry", PathNodeKind::Symlink),
+            read_link(namespace, "/entry", target),
+            observed_lstat(namespace, target, PathOperationResult::Present(metadata)),
+            file_bytes_result(namespace, target, bytes),
+        ]
+    }
+
+    fn direct_file_script(
+        namespace: PathObservationNamespace,
+        metadata: PathOperationResult<PathLstat>,
+        bytes: Option<PathOperationResult<Arc<[u8]>>>,
+    ) -> Vec<ScriptEntry> {
+        let mut script = vec![
+            present(namespace, "/", PathNodeKind::Directory),
+            observed_lstat(namespace, "/file", metadata),
+        ];
+        if let Some(bytes) = bytes {
+            script.push(file_bytes_result(namespace, "/file", bytes));
+        }
+        script
+    }
+
     async fn resolve_script(
         namespace: PathObservationNamespace,
         logical_path: &str,
@@ -874,6 +1421,134 @@ mod tests {
             }
         }
         unreachable!("inclusive prefix loop always reaches the full script")
+    }
+
+    async fn resolve_bytes_script(
+        namespace: PathObservationNamespace,
+        logical_path: &str,
+        script: &[ScriptEntry],
+    ) -> Result<PathFileBytes, PathFileBytesError> {
+        let key = PathFileBytesKey::new(namespace, path(logical_path));
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = dice.updater().commit().await;
+
+        for prefix_len in 0..=script.len() {
+            let epoch = PathObservationEpoch::new(
+                script[..prefix_len]
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            )
+            .unwrap();
+            let mut updater = transaction.into_updater();
+            updater
+                .changed_to(vec![(PathObservationEpochKey, epoch)])
+                .unwrap();
+            transaction = updater.commit().await;
+
+            let outcome = transaction.compute(&key).await.unwrap();
+            if prefix_len < script.len() {
+                let PathOutcome::Need(need) = &outcome else {
+                    panic!(
+                        "byte script for {logical_path:?} completed after {prefix_len} of {} observations",
+                        script.len()
+                    );
+                };
+                assert_eq!(
+                    need.demands(),
+                    &[script[prefix_len].0.dupe()],
+                    "unexpected byte demand after prefix {prefix_len} for {logical_path:?}"
+                );
+                assert!(!PathFileBytesKey::validity(&outcome));
+                assert!(!PathFileBytesKey::equality(&outcome, &outcome));
+            } else {
+                let PathOutcome::Complete(result) = outcome else {
+                    panic!("full byte script for {logical_path:?} did not complete");
+                };
+                assert!(PathFileBytesKey::validity(&PathOutcome::Complete(
+                    result.dupe()
+                )));
+                assert!(PathFileBytesKey::equality(
+                    &PathOutcome::Complete(result.dupe()),
+                    &PathOutcome::Complete(result.dupe())
+                ));
+                return result;
+            }
+        }
+        unreachable!("inclusive prefix loop always reaches the full byte script")
+    }
+
+    async fn update_projection_state(
+        transaction: DiceTransaction,
+        namespace: PathObservationNamespace,
+        logical_path: &str,
+        script: &[ScriptEntry],
+    ) -> DiceTransaction {
+        let epoch = PathObservationEpoch::new(
+            script
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap();
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                TestSelectorKey,
+                TestSelector {
+                    namespace,
+                    logical_path: path(logical_path),
+                },
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        updater.commit().await
+    }
+
+    async fn run_projection_counters(
+        transaction: &mut DiceTransaction,
+        operational: &CounterKey,
+        semantic: &CounterKey,
+    ) -> (usize, usize) {
+        let operational_projection = transaction
+            .compute(&OperationalProjectionKey)
+            .await
+            .unwrap();
+        let semantic_projection = transaction.compute(&SemanticProjectionKey).await.unwrap();
+        assert!(matches!(operational_projection, PathOutcome::Complete(_)));
+        assert!(matches!(semantic_projection, PathOutcome::Complete(_)));
+        let operational_value = transaction.compute(operational).await.unwrap();
+        let semantic_value = transaction.compute(semantic).await.unwrap();
+        assert!(matches!(operational_value, PathOutcome::Complete(_)));
+        assert!(matches!(semantic_value, PathOutcome::Complete(_)));
+        (
+            operational.counter.load(Ordering::SeqCst),
+            semantic.counter.load(Ordering::SeqCst),
+        )
+    }
+
+    async fn operational_projection(
+        transaction: &mut DiceTransaction,
+    ) -> Result<ResolvedPath, PathResolutionError> {
+        let PathOutcome::Complete(result) = transaction
+            .compute(&OperationalProjectionKey)
+            .await
+            .unwrap()
+        else {
+            panic!("complete retained epoch must resolve operationally");
+        };
+        result
+    }
+
+    async fn semantic_projection(
+        transaction: &mut DiceTransaction,
+    ) -> Result<PathFileBytes, PathFileBytesError> {
+        let PathOutcome::Complete(result) =
+            transaction.compute(&SemanticProjectionKey).await.unwrap()
+        else {
+            panic!("complete retained epoch must resolve semantically");
+        };
+        result
     }
 
     fn assert_paths(actual: &[NormalizedAbsolutePath], expected: &[&str]) {
@@ -1846,6 +2521,642 @@ mod tests {
             raw_absolute.as_path().as_os_str().as_bytes(),
             resolved.real_path().as_path().as_os_str().as_bytes()
         );
+    }
+
+    #[test]
+    fn path_file_bytes_semantic_equality_is_field_complete_and_physical_identity_free() {
+        let host = PathObservationNamespace::Host;
+        let materialized =
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(41));
+        let key = PathFileBytesKey::new(host, path("/logical"));
+        assert_eq!(key.namespace(), host);
+        assert_eq!(key.logical_path().as_path(), Path::new("/logical"));
+        assert!(key.to_string().contains("path-file-bytes"));
+
+        let io = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let left_operational = PathResolutionError::Observation {
+            namespace: host,
+            requested_path: path("/outer-a"),
+            demand: demand(host, "/physical-a", PathObservationOperation::FileBytes),
+            error: io,
+        };
+        let right_operational = PathResolutionError::Observation {
+            namespace: materialized,
+            requested_path: path("/outer-b"),
+            demand: demand(
+                materialized,
+                "/different-root/physical-b",
+                PathObservationOperation::FileBytes,
+            ),
+            error: io,
+        };
+        let left = PathFileBytesError::from_resolution(path("/logical"), left_operational);
+        let right = PathFileBytesError::from_resolution(path("/logical"), right_operational);
+        assert!(left.semantic_eq(&right));
+        assert_eq!(left, right);
+        assert_eq!(left.logical_path().as_path(), Path::new("/logical"));
+
+        let cycle_a = PathFileBytesError::from_resolution(
+            path("/logical"),
+            PathResolutionError::Cycle {
+                namespace: host,
+                requested_path: path("/outer-a"),
+                chain: PathResolutionChain {
+                    path_to: Arc::from([path("/prefix")]),
+                    chain: Arc::from([path("/a"), path("/b")]),
+                },
+            },
+        );
+        let cycle_b = PathFileBytesError::from_resolution(
+            path("/logical"),
+            PathResolutionError::Cycle {
+                namespace: materialized,
+                requested_path: path("/outer-b"),
+                chain: PathResolutionChain {
+                    path_to: Arc::from([]),
+                    chain: Arc::from([path("/other"), path("/order")]),
+                },
+            },
+        );
+        assert_eq!(cycle_a, cycle_b);
+
+        let observation = PathFileBytesError::Observation {
+            logical_path: path("/logical"),
+            operation: PathObservationOperation::FileBytes,
+            error: io,
+        };
+        for unequal in [
+            PathFileBytesError::Observation {
+                logical_path: path("/other"),
+                operation: PathObservationOperation::FileBytes,
+                error: io,
+            },
+            PathFileBytesError::Observation {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::ReadLink,
+                error: io,
+            },
+            PathFileBytesError::Observation {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::FileBytes,
+                error: PathObservationError::Io {
+                    kind: PathIoErrorKind::TimedOut,
+                    raw_os_error: Some(13),
+                },
+            },
+            PathFileBytesError::Observation {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::FileBytes,
+                error: PathObservationError::Io {
+                    kind: PathIoErrorKind::PermissionDenied,
+                    raw_os_error: Some(5),
+                },
+            },
+        ] {
+            assert!(!observation.semantic_eq(&unequal));
+            assert_ne!(observation, unequal);
+        }
+
+        let inconsistent = PathFileBytesError::InconsistentState {
+            logical_path: path("/logical"),
+            operation: PathObservationOperation::FileBytes,
+            before: Some(lstat(PathNodeKind::RegularFile)),
+            after: None,
+        };
+        assert_ne!(
+            inconsistent,
+            PathFileBytesError::InconsistentState {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::FileBytes,
+                before: Some(lstat(PathNodeKind::Directory)),
+                after: None,
+            }
+        );
+        assert_ne!(
+            inconsistent,
+            PathFileBytesError::InconsistentState {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::FileBytes,
+                before: Some(lstat(PathNodeKind::RegularFile)),
+                after: Some(lstat(PathNodeKind::RegularFile)),
+            }
+        );
+
+        let theoretical_symlink_wrong_kind = PathFileBytesError::WrongKind {
+            logical_path: path("/logical"),
+            expected: PathNodeKind::RegularFile,
+            actual: PathNodeKind::Symlink,
+        };
+        assert_ne!(
+            theoretical_symlink_wrong_kind,
+            PathFileBytesError::WrongKind {
+                logical_path: path("/logical"),
+                expected: PathNodeKind::Directory,
+                actual: PathNodeKind::Symlink,
+            }
+        );
+        assert_ne!(
+            theoretical_symlink_wrong_kind,
+            PathFileBytesError::WrongKind {
+                logical_path: path("/logical"),
+                expected: PathNodeKind::RegularFile,
+                actual: PathNodeKind::Directory,
+            }
+        );
+        assert_ne!(
+            cycle_a,
+            PathFileBytesError::InfiniteExpansion {
+                logical_path: path("/logical"),
+            }
+        );
+
+        let present = PathOutcome::Complete(Ok::<_, PathFileBytesError>(PathFileBytes::Present(
+            Arc::from(&b"same"[..]),
+        )));
+        assert!(PathFileBytesKey::equality(&present, &present));
+        assert!(!PathFileBytesKey::equality(
+            &present,
+            &PathOutcome::Complete(Ok(PathFileBytes::Missing))
+        ));
+        assert!(!PathFileBytesKey::equality(
+            &present,
+            &PathOutcome::Complete(Err(observation))
+        ));
+        let need = PathOutcome::<Result<PathFileBytes, PathFileBytesError>>::Need(
+            NeedPathObservations::singleton(demand(
+                host,
+                "/physical",
+                PathObservationOperation::FileBytes,
+            )),
+        );
+        assert!(!PathFileBytesKey::validity(&need));
+        assert!(!PathFileBytesKey::equality(&need, &need));
+    }
+
+    #[tokio::test]
+    async fn path_file_bytes_cumulative_projection_is_total_and_exact() {
+        let ns = PathObservationNamespace::Host;
+        let regular = resolve_bytes_script(
+            ns,
+            "/file",
+            &[
+                present(ns, "/", PathNodeKind::Directory),
+                present(ns, "/file", PathNodeKind::RegularFile),
+                file_bytes(ns, "/file", b"bytes"),
+            ],
+        )
+        .await
+        .unwrap();
+        assert_eq!(regular, PathFileBytes::Present(Arc::from(&b"bytes"[..])));
+
+        assert_eq!(
+            resolve_bytes_script(ns, "/file", &[missing(ns, "/")])
+                .await
+                .unwrap(),
+            PathFileBytes::Missing
+        );
+
+        for (logical, kind) in [
+            ("/directory", PathNodeKind::Directory),
+            ("/special", PathNodeKind::SpecialFile),
+        ] {
+            let error = resolve_bytes_script(
+                ns,
+                logical,
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    present(ns, logical, kind),
+                ],
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                error,
+                PathFileBytesError::WrongKind {
+                    logical_path: path(logical),
+                    expected: PathNodeKind::RegularFile,
+                    actual: kind,
+                }
+            );
+        }
+
+        let io = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let lstat_error = resolve_bytes_script(
+            ns,
+            "/file",
+            &[
+                present(ns, "/", PathNodeKind::Directory),
+                lstat_error(ns, "/file", io),
+            ],
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            lstat_error,
+            PathFileBytesError::Observation {
+                logical_path: path("/file"),
+                operation: PathObservationOperation::Lstat,
+                error: io,
+            }
+        );
+
+        let file_error = resolve_bytes_script(
+            ns,
+            "/file",
+            &[
+                present(ns, "/", PathNodeKind::Directory),
+                present(ns, "/file", PathNodeKind::RegularFile),
+                file_bytes_result(ns, "/file", PathOperationResult::Error(io)),
+            ],
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            file_error,
+            PathFileBytesError::Observation {
+                logical_path: path("/file"),
+                operation: PathObservationOperation::FileBytes,
+                error: io,
+            }
+        );
+
+        let file_missing = resolve_bytes_script(
+            ns,
+            "/file",
+            &[
+                present(ns, "/", PathNodeKind::Directory),
+                present(ns, "/file", PathNodeKind::RegularFile),
+                file_bytes_result(ns, "/file", PathOperationResult::Missing),
+            ],
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            file_missing,
+            PathFileBytesError::InconsistentState {
+                logical_path: path("/file"),
+                operation: PathObservationOperation::FileBytes,
+                before: Some(lstat(PathNodeKind::RegularFile)),
+                after: None,
+            }
+        );
+
+        let readlink_missing = resolve_bytes_script(
+            ns,
+            "/link",
+            &[
+                present(ns, "/", PathNodeKind::Directory),
+                present(ns, "/link", PathNodeKind::Symlink),
+                read_link_result(ns, "/link", PathOperationResult::Missing),
+            ],
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            readlink_missing,
+            PathFileBytesError::InconsistentState {
+                logical_path: path("/link"),
+                operation: PathObservationOperation::ReadLink,
+                before: Some(lstat(PathNodeKind::Symlink)),
+                after: None,
+            }
+        );
+
+        assert_eq!(
+            resolve_bytes_script(
+                ns,
+                "/self",
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    present(ns, "/self", PathNodeKind::Symlink),
+                    read_link(ns, "/self", "self"),
+                ],
+            )
+            .await
+            .unwrap_err(),
+            PathFileBytesError::Cycle {
+                logical_path: path("/self"),
+            }
+        );
+        assert_eq!(
+            resolve_bytes_script(
+                ns,
+                "/prefix",
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    present(ns, "/prefix", PathNodeKind::Symlink),
+                    read_link(ns, "/prefix", "a"),
+                    present(ns, "/a", PathNodeKind::Symlink),
+                    read_link(ns, "/a", "a/child"),
+                ],
+            )
+            .await
+            .unwrap_err(),
+            PathFileBytesError::InfiniteExpansion {
+                logical_path: path("/prefix"),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn path_file_bytes_prunes_metadata_route_instance_and_restores_operational_value() {
+        let host = PathObservationNamespace::Host;
+        let materialized =
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(7));
+        let metadata_one = PathLstat::new(PathNodeKind::RegularFile, 1, 2, 3, 4, 0o644);
+        let metadata_two = PathLstat::new(PathNodeKind::RegularFile, 2, 5, 6, 7, 0o600);
+        let operational_count = Arc::new(AtomicUsize::new(0));
+        let semantic_count = Arc::new(AtomicUsize::new(0));
+        let operational_counter = CounterKey {
+            kind: CounterKind::Operational,
+            counter: operational_count,
+        };
+        let semantic_counter = CounterKey {
+            kind: CounterKind::Semantic,
+            counter: semantic_count,
+        };
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let transaction = dice.updater().commit().await;
+
+        let script = linked_file_script(
+            host,
+            "/a",
+            metadata_one,
+            PathOperationResult::Present(Arc::from(&b"same"[..])),
+        );
+        let mut transaction = update_projection_state(transaction, host, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (1, 1)
+        );
+        let first_operational = operational_projection(&mut transaction).await.unwrap();
+        let first_semantic = semantic_projection(&mut transaction).await.unwrap();
+        assert_eq!(
+            first_semantic,
+            PathFileBytes::Present(Arc::from(&b"same"[..]))
+        );
+
+        let script = linked_file_script(
+            host,
+            "/a",
+            metadata_two,
+            PathOperationResult::Present(Arc::from(&b"same"[..])),
+        );
+        transaction = update_projection_state(transaction, host, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (2, 1)
+        );
+
+        let script = linked_file_script(
+            host,
+            "/b",
+            metadata_two,
+            PathOperationResult::Present(Arc::from(&b"same"[..])),
+        );
+        transaction = update_projection_state(transaction, host, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (3, 1)
+        );
+        let retargeted = operational_projection(&mut transaction).await.unwrap();
+        assert_eq!(retargeted.real_path().as_path(), Path::new("/b"));
+        assert_paths(retargeted.route(), &["/entry", "/b"]);
+        assert_symlinks(&retargeted, &[("/entry", "/b")]);
+
+        let script = linked_file_script(
+            materialized,
+            "/b",
+            metadata_two,
+            PathOperationResult::Present(Arc::from(&b"same"[..])),
+        );
+        transaction = update_projection_state(transaction, materialized, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (4, 1)
+        );
+
+        let script = linked_file_script(
+            host,
+            "/a",
+            metadata_one,
+            PathOperationResult::Present(Arc::from(&b"same"[..])),
+        );
+        transaction = update_projection_state(transaction, host, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (5, 1)
+        );
+        let restored_operational = operational_projection(&mut transaction).await.unwrap();
+        let restored_semantic = semantic_projection(&mut transaction).await.unwrap();
+        assert_eq!(restored_operational, first_operational);
+        assert_eq!(restored_semantic, first_semantic);
+    }
+
+    #[tokio::test]
+    async fn path_file_bytes_prunes_equal_typed_errors_but_retains_io_fields() {
+        let host = PathObservationNamespace::Host;
+        let materialized =
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(8));
+        let metadata = lstat(PathNodeKind::RegularFile);
+        let operational_counter = CounterKey {
+            kind: CounterKind::Operational,
+            counter: Arc::new(AtomicUsize::new(0)),
+        };
+        let semantic_counter = CounterKey {
+            kind: CounterKind::Semantic,
+            counter: Arc::new(AtomicUsize::new(0)),
+        };
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let transaction = dice.updater().commit().await;
+        let denied = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+
+        let script = linked_file_script(host, "/a", metadata, PathOperationResult::Error(denied));
+        let mut transaction = update_projection_state(transaction, host, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (1, 1)
+        );
+        let first_error = semantic_projection(&mut transaction).await.unwrap_err();
+
+        let script = linked_file_script(host, "/b", metadata, PathOperationResult::Error(denied));
+        transaction = update_projection_state(transaction, host, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (2, 1)
+        );
+        assert_eq!(
+            semantic_projection(&mut transaction).await.unwrap_err(),
+            first_error
+        );
+
+        let script = linked_file_script(
+            materialized,
+            "/b",
+            metadata,
+            PathOperationResult::Error(denied),
+        );
+        transaction = update_projection_state(transaction, materialized, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (3, 1)
+        );
+
+        let timed_out = PathObservationError::Io {
+            kind: PathIoErrorKind::TimedOut,
+            raw_os_error: Some(13),
+        };
+        let script = linked_file_script(
+            materialized,
+            "/b",
+            metadata,
+            PathOperationResult::Error(timed_out),
+        );
+        transaction = update_projection_state(transaction, materialized, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (3, 2)
+        );
+
+        let different_raw = PathObservationError::Io {
+            kind: PathIoErrorKind::TimedOut,
+            raw_os_error: Some(110),
+        };
+        let script = linked_file_script(
+            materialized,
+            "/b",
+            metadata,
+            PathOperationResult::Error(different_raw),
+        );
+        transaction = update_projection_state(transaction, materialized, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (3, 3)
+        );
+        assert_eq!(
+            semantic_projection(&mut transaction).await.unwrap_err(),
+            PathFileBytesError::Observation {
+                logical_path: path("/entry"),
+                operation: PathObservationOperation::FileBytes,
+                error: different_raw,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn path_file_bytes_lifecycle_has_exact_operational_and_semantic_counts() {
+        let ns = PathObservationNamespace::Host;
+        let metadata = lstat(PathNodeKind::RegularFile);
+        let operational_counter = CounterKey {
+            kind: CounterKind::Operational,
+            counter: Arc::new(AtomicUsize::new(0)),
+        };
+        let semantic_counter = CounterKey {
+            kind: CounterKind::Semantic,
+            counter: Arc::new(AtomicUsize::new(0)),
+        };
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let transaction = dice.updater().commit().await;
+
+        let script = direct_file_script(
+            ns,
+            PathOperationResult::Present(metadata),
+            Some(PathOperationResult::Present(Arc::from(&b"A"[..]))),
+        );
+        let mut transaction = update_projection_state(transaction, ns, "/file", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (1, 1)
+        );
+        let first = semantic_projection(&mut transaction).await;
+        assert_eq!(first, Ok(PathFileBytes::Present(Arc::from(&b"A"[..]))));
+
+        let script = direct_file_script(
+            ns,
+            PathOperationResult::Present(metadata),
+            Some(PathOperationResult::Present(Arc::from(&b"B"[..]))),
+        );
+        transaction = update_projection_state(transaction, ns, "/file", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (1, 2)
+        );
+        let second = semantic_projection(&mut transaction).await;
+        assert_eq!(second, Ok(PathFileBytes::Present(Arc::from(&b"B"[..]))));
+        assert_ne!(first, second);
+
+        let script = direct_file_script(ns, PathOperationResult::Missing, None);
+        transaction = update_projection_state(transaction, ns, "/file", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (2, 3)
+        );
+        let third = semantic_projection(&mut transaction).await;
+        assert_eq!(third, Ok(PathFileBytes::Missing));
+        assert_ne!(second, third);
+
+        let io = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let script = direct_file_script(
+            ns,
+            PathOperationResult::Present(metadata),
+            Some(PathOperationResult::Error(io)),
+        );
+        transaction = update_projection_state(transaction, ns, "/file", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (3, 4)
+        );
+        let fourth = semantic_projection(&mut transaction).await;
+        assert_eq!(
+            fourth,
+            Err(PathFileBytesError::Observation {
+                logical_path: path("/file"),
+                operation: PathObservationOperation::FileBytes,
+                error: io,
+            })
+        );
+        assert_ne!(third, fourth);
+
+        let script = direct_file_script(
+            ns,
+            PathOperationResult::Present(metadata),
+            Some(PathOperationResult::Present(Arc::from(&b"A"[..]))),
+        );
+        transaction = update_projection_state(transaction, ns, "/file", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (3, 5)
+        );
+        let restored = semantic_projection(&mut transaction).await;
+        assert_eq!(restored, first);
+        assert_ne!(fourth, restored);
     }
 
     #[test]
