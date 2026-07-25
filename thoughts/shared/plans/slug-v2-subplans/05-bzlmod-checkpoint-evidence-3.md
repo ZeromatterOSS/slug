@@ -472,3 +472,38 @@ Next evidence: Design only
 the accepted terminal contract while freezing serial platform-neutral, Unix,
 Windows, and any necessary final lifecycle-test owners that can each land
 complete private behavior without temporary activated-platform wrongness.
+
+### Stage 5 native path-observation implementation checkpoint split
+
+Status: Accepted
+
+Independent neutral-kernel, Unix-owner, Windows-source, and terminal
+architecture reviews accepted three serial checkpoints with no fourth
+lifecycle packet. The split preserves the final four-file union and introduces
+no observable partial platform behavior because the module and every native
+entrypoint remain private and callerless.
+
+Owner A lands only the unconditional private, dependency-free neutral module:
+normalized retained-root authority, sorted complete preflight, exact demanded
+paths, primary-versus-refinement state, auxiliary lstat tables, complete epoch
+construction, and exhaustive scripted order/race evidence. Only unsupported
+Lstat is an outer zero-operation preflight failure; unsupported non-Lstat
+operations remain final adapter results. No native implementation exists in
+this checkpoint.
+
+Owner B then adds only target-Unix workspace `nix`, a complete cfg-Unix adapter
+and raw same-handle directory owner, exhaustive open/read/errno/close/Drop
+scripts, and all real temp-derived file, directory, symlink,
+Host/materialization, inside-root, and escaped-path lifecycle evidence. Windows
+still has no entrypoint or stub.
+
+Owner C edits only the private module to add host-pure Windows helpers and
+scripts plus cfg-Windows ABI/FFI adapters for staged lstat, ReadLink, checked
+reparse parsing, and raw Find enumeration. It must pass the real provisioned
+GNU-Windows `cargo test --no-run` kernel32 link gate. The exact Bazel 9.2
+formulas, UTF-16 behavior, ownership/error ordering, terminal exclusions, and
+previously accepted operation tables remain unchanged.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-path-observation-neutral-kernel` in the new private module and
+`runtime/mod.rs`. Do not add Cargo, native, public, or caller changes.
