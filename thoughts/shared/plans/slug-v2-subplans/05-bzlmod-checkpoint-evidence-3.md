@@ -295,3 +295,37 @@ Freeze exact native Windows ReadLink ABI/parsing/output/error semantics and
 the ProjFS schema boundary, plus iterator-only Unix EIO retry and portable
 tests. Do not edit Rust or combine the producer with materialization, retry,
 injection, or publication.
+
+### Stage 5 native Windows ReadLink design correction
+
+Status: Replanned before Rust
+
+Preserved native contract: The exact Windows ReadLink seam is feasible in the
+private producer file with no new dependency. It shares raw UTF-16 long-path
+conversion, no-follow handle opening, RAII, and immediate error capture with
+the ctime query. A checked four-byte-or-better-aligned 16 KiB buffer and pure
+byte parser validate the common header, declared payload, tag-specific fixed
+prefix, even substitute offset/length, and exact returned range before
+decoding UTF-16. NTFS and LX symlinks use the symbolic-link layout, mount
+points their layout, ProjFS is not-a-link, and unknown tags are unsupported
+I/O. Output removes one `\\?\` or `\??\` prefix and converts every backslash
+to slash without resolution, PrintName selection, or relative-flag branching.
+
+Reason for `REPLAN`: Pinned source rejected two assumptions outside the
+reviewed scope. Bazel lstat classifies every reparse point as Symlink while
+ReadLink reports ProjFS as the distinct `NotASymlinkException`; existing
+WrongKind cannot truthfully encode that, generic I/O loses the discriminator,
+and Bazel does not fabricate inconsistency. The public workspace observation
+schema therefore needs a reviewed NotALink-like result. Separately, Bazel
+retains the same directory handle and already-collected names across
+`readdir` EINTR/EIO, while pinned Rust `ReadDir` marks end-of-stream after any
+iterator error. Exact behavior needs a raw Unix directory seam or approved
+dependency, not whole-pass discard/restart. Opener EIO remains immediate, and
+only `closedir` EINTR is ignored.
+
+Next evidence: Design only
+`WP-5-m1-path-observation-native-schema-and-unix-directory-design`. Freeze the
+minimal public NotALink discriminator and every direct consumer/equality test,
+plus an exact safe Unix native directory owner and dependency/file boundary.
+Preserve the accepted Windows parser and all other producer contracts; do not
+edit Rust or activate the runtime.
