@@ -706,3 +706,44 @@ and dirtiness kernel with scripted materialization/observation, and (3) the
 native observer plus `WorkspaceRuntime` owner bridge. Do not edit Rust or
 weaken any accepted archive, session, lifetime, equality, error, or exclusion
 gate.
+
+### Stage 5 retained materializer implementation checkpoint split
+
+Status: Accepted before Rust
+
+The accepted union is split into three serial terminal checkpoints:
+
+1. `WP-5-m1-runtime-http-archive-captured-ustar-subset` edits only
+   `runtime/repository_io.rs`. It replaces only `http_archive` caller-path
+   reuse with the accepted private capture and byte-oriented USTAR
+   regular/directory parser/extractor. It owns stage/error precedence, raw
+   names and USTAR prefix, numeric/padding bounds, type/name directory rules,
+   physical EOF/checksum quirks, streamed normalization/prefix/containment and
+   collision behavior, and explicit PAX/GNU/link/special rejection.
+   `materialize_git` and its existing private stdout/NamedTempFile/external-tar
+   path remain byte-identical because real `git archive` emits PAX metadata.
+2. `WP-5-m1-runtime-retained-session-kernel` then edits only
+   `runtime/repository_io.rs`. It adds the callerless single-lease owner,
+   owner-held provisional and append-only roots, burned IDs, full-request
+   accepted cache, exact validation dirtiness, Local result, cumulative
+   complete epochs, explicit token-checked accept/discard, and scripted
+   materialization/observation evidence. It adds no native observation or
+   runtime field.
+3. `WP-5-m1-runtime-retained-native-owner-bridge` finally adds only the
+   `pub(super)` retained-root/native-observer entrypoint in
+   `runtime/path_observation.rs`, the minimum call bridge in
+   `runtime/repository_io.rs`, and one private `Arc<RepositoryMaterializer>`
+   field plus initialization in `runtime/dice.rs`. It adds no DICE key,
+   injection, retry, sidecar, command activation, or public API.
+
+The focused correction kept Git off the HTTP USTAR parser after pinned review
+proved even an empty real Git archive begins with a global PAX header.
+Independent pinned-source, implementation-feasibility, and architecture
+terminal reviews returned `ACCEPT`; no requirement leaks backward across the
+three packets. Git PAX/GNU/external-tar parity and HTTP PAX/GNU/link/special
+breadth remain explicit residuals.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-http-archive-captured-ustar-subset` in
+`app/slug_core_v2/src/runtime/repository_io.rs`. Do not change Git code or add
+retained session/runtime/native-observer behavior.
