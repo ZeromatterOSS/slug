@@ -26,6 +26,7 @@ use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleSourcePreparation;
 use slug_bzlmod_v2::ModuleSourcePreparationError;
 use slug_bzlmod_v2::ModuleSourcePreparationKey;
+use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RegistryFileError;
 use slug_bzlmod_v2::RegistryFileUrl;
 use slug_bzlmod_v2::RegistryIo;
@@ -38,19 +39,32 @@ use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::RepositoryIo;
 use slug_bzlmod_v2::RepositoryIoOutcome;
 use slug_bzlmod_v2::RepositoryMaterialization;
+use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
 use slug_bzlmod_v2::RepositoryMaterializationError;
 use slug_bzlmod_v2::RepositoryMaterializationGeneration;
 use slug_bzlmod_v2::RepositoryMaterializationGenerationKey;
 use slug_bzlmod_v2::RepositoryMaterializationKey;
+use slug_bzlmod_v2::RepositoryMaterializationKind;
+use slug_bzlmod_v2::RepositoryMaterializationRequest;
+use slug_bzlmod_v2::RepositoryMaterializationRequestId;
+use slug_bzlmod_v2::RepositoryMaterializationResult;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpochError;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+use slug_bzlmod_v2::RepositoryMaterializationSuccess;
 use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::RepositorySourceFileKey;
 use slug_bzlmod_v2::RepositorySourceFileValue;
 use slug_bzlmod_v2::RepositoryTransportError;
+use slug_bzlmod_v2::SourcePreparationNeeds;
+use slug_bzlmod_v2::SourcePreparationNeedsError;
+use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_bzlmod_v2::apply_unified_patch;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::install_registry_io;
 use slug_bzlmod_v2::install_repository_io;
+use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
@@ -102,7 +116,9 @@ impl fmt::Display for SemanticMaterializationInputKey {
 }
 
 impl InjectedKey for SemanticMaterializationInputKey {
-    type Value = Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>;
+    type Value = SourcePreparationOutcome<
+        Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>,
+    >;
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         <RepositoryMaterializationKey as Key>::equality(x, y)
@@ -113,6 +129,64 @@ impl InjectedKey for SemanticMaterializationInputKey {
 struct MaterializationCounterKey {
     #[allocative(skip)]
     counter: Arc<AtomicUsize>,
+}
+
+#[derive(Debug, Clone, Allocative, Dupe)]
+struct RepositoryMaterializationCounterKey {
+    #[allocative(skip)]
+    counter: Arc<AtomicUsize>,
+}
+
+impl PartialEq for RepositoryMaterializationCounterKey {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.counter, &other.counter)
+    }
+}
+
+impl Eq for RepositoryMaterializationCounterKey {}
+
+impl Hash for RepositoryMaterializationCounterKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.counter).hash(state);
+    }
+}
+
+impl fmt::Display for RepositoryMaterializationCounterKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "repository-materialization-counter:{:p}",
+            Arc::as_ptr(&self.counter)
+        )
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryMaterializationCounterKey {
+    type Value = usize;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let outcome = ctx
+            .compute(&RepositoryMaterializationKey {
+                workspace: workspace(),
+                module_name: "dep".into(),
+            })
+            .await
+            .expect("fixed repository materialization must compute");
+        assert!(matches!(
+            outcome,
+            SourcePreparationOutcome::Complete(value) if value.as_ref().is_ok()
+        ));
+        self.counter.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
 }
 
 impl PartialEq for MaterializationCounterKey {
@@ -198,14 +272,16 @@ impl Key for PreparationCounterKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        ctx.compute(&ModuleSourcePreparationKey {
-            workspace: workspace(),
-            module_name: "dep".into(),
-            version: "1.0.0".into(),
-        })
-        .await
-        .expect("fixed module-source preparation must compute")
-        .map(|_| self.counter.fetch_add(1, Ordering::SeqCst) + 1)
+        source_outcome_to_path(
+            ctx.compute(&ModuleSourcePreparationKey {
+                workspace: workspace(),
+                module_name: "dep".into(),
+                version: "1.0.0".into(),
+            })
+            .await
+            .expect("fixed module-source preparation must compute")
+            .map(|_| self.counter.fetch_add(1, Ordering::SeqCst) + 1),
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -430,13 +506,68 @@ async fn source_with_epoch(
     repo_relative_path: &str,
 ) -> PathResult<RepositorySourceFileValue, RepositorySourceFileError> {
     let workspace = workspace();
+    let immutable = epoch
+        .observations()
+        .keys()
+        .find_map(|demand| match demand.namespace() {
+            PathObservationNamespace::Materialization(instance)
+                if demand.path().as_path().file_name().is_some_and(|name| {
+                    name == "MODULE.bazel" || name == ".materialization-root"
+                }) =>
+            {
+                Some((
+                    demand
+                        .path()
+                        .as_path()
+                        .parent()
+                        .unwrap_or(Path::new("/"))
+                        .to_owned(),
+                    instance,
+                ))
+            }
+            PathObservationNamespace::Materialization(_) => None,
+            PathObservationNamespace::Host => None,
+        });
+    let text = immutable
+        .as_ref()
+        .map(|_| immutable_text_snapshot())
+        .unwrap_or_else(text_snapshot);
+    let materialization_epoch = match immutable {
+        Some((root, instance)) => immutable_materialization_epoch_input(&workspace, root, instance),
+        None => local_materialization_epoch_input(&workspace),
+    };
+    source_with_result_epoch(
+        dice,
+        text,
+        raw,
+        epoch,
+        materialization_epoch,
+        generation,
+        repo_relative_path,
+    )
+    .await
+}
+
+async fn source_with_result_epoch(
+    dice: &Arc<Dice>,
+    text: Arc<WorkspaceSnapshot>,
+    raw: Arc<WorkspaceRawSnapshot>,
+    epoch: PathObservationEpoch,
+    materialization_epoch: (
+        RepositoryMaterializationResultEpochKey,
+        RepositoryMaterializationResultEpoch,
+    ),
+    generation: u64,
+    repo_relative_path: &str,
+) -> PathResult<RepositorySourceFileValue, RepositorySourceFileError> {
+    let workspace = workspace();
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
         .changed_to(vec![(
             (WorkspaceSnapshotKey {
                 workspace: workspace.clone(),
             }),
-            text_snapshot(),
+            text,
         )])
         .unwrap();
     updater
@@ -450,6 +581,7 @@ async fn source_with_epoch(
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
+    updater.changed_to(vec![materialization_epoch]).unwrap();
     inject_root_module_request_inputs(
         &mut updater,
         &workspace,
@@ -475,7 +607,264 @@ async fn source_with_epoch(
         })
         .await
         .unwrap();
-    outcome
+    source_outcome_to_path(outcome)
+}
+
+fn immutable_text_snapshot() -> Arc<WorkspaceSnapshot> {
+    let workspace = workspace();
+    Arc::new(WorkspaceSnapshot {
+        files: Arc::new(SortedMap::from_iter([(
+            workspace.join("MODULE.bazel"),
+            WorkspaceFileValue::Present(Arc::new(
+                "module(name = 'root')\narchive_override(module_name = 'dep')\n".to_owned(),
+            )),
+        )])),
+    })
+}
+
+fn immutable_materialization_epoch_input(
+    workspace: &Path,
+    root: PathBuf,
+    instance: PathObservationInstanceId,
+) -> (
+    RepositoryMaterializationResultEpochKey,
+    RepositoryMaterializationResultEpoch,
+) {
+    let workspace = NormalizedAbsolutePath::new(workspace).unwrap();
+    let request = Arc::new(RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: workspace.dupe(),
+            canonical_repo: slug_identity_v2::CanonicalRepoName::new("dep+").unwrap(),
+        },
+        repo_spec: RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                    "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                )
+                .unwrap(),
+                rule_name: "http_archive".into(),
+            },
+            attributes: Arc::default(),
+        },
+        kind: RepositoryMaterializationKind::Immutable,
+    });
+    (
+        RepositoryMaterializationResultEpochKey {
+            workspace: workspace.dupe(),
+        },
+        RepositoryMaterializationResultEpoch::new(
+            workspace,
+            [RepositoryMaterializationEpochEntry {
+                request,
+                result: RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Immutable {
+                        source_identity: Arc::from("immutable-test-source"),
+                        generation_root: root,
+                        observation_instance: instance,
+                    },
+                ),
+            }],
+        )
+        .unwrap(),
+    )
+}
+
+fn source_outcome_to_path<T>(outcome: SourcePreparationOutcome<T>) -> PathOutcome<T> {
+    match outcome {
+        SourcePreparationOutcome::Complete(value) => PathOutcome::Complete(value),
+        SourcePreparationOutcome::Need(need) => {
+            assert!(need.repository_materializations().is_empty());
+            PathOutcome::Need(
+                need.path_observations()
+                    .expect("path-only test need")
+                    .dupe(),
+            )
+        }
+    }
+}
+
+fn local_materialization_epoch_input(
+    workspace: &Path,
+) -> (
+    RepositoryMaterializationResultEpochKey,
+    RepositoryMaterializationResultEpoch,
+) {
+    let workspace = NormalizedAbsolutePath::new(workspace).unwrap();
+    let request = Arc::new(RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: workspace.dupe(),
+            canonical_repo: slug_identity_v2::CanonicalRepoName::new("dep+").unwrap(),
+        },
+        repo_spec: RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                    "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                )
+                .unwrap(),
+                rule_name: "local_repository".into(),
+            },
+            attributes: Arc::new(starlark_map::small_map::SmallMap::from_iter([(
+                compact_str::CompactString::new("path"),
+                OverrideAttributeValue::String("vendor/dep".into()),
+            )])),
+        },
+        kind: RepositoryMaterializationKind::Local {
+            logical_root: NormalizedAbsolutePath::new(workspace.as_path().join("vendor/dep"))
+                .unwrap(),
+        },
+    });
+    (
+        RepositoryMaterializationResultEpochKey {
+            workspace: workspace.dupe(),
+        },
+        RepositoryMaterializationResultEpoch::new(
+            workspace,
+            [RepositoryMaterializationEpochEntry {
+                request,
+                result: RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Local,
+                ),
+            }],
+        )
+        .unwrap(),
+    )
+}
+
+fn local_request_for(
+    workspace: &Path,
+    module_name: &str,
+    relative_path: &str,
+) -> Arc<RepositoryMaterializationRequest> {
+    let workspace = NormalizedAbsolutePath::new(workspace).unwrap();
+    Arc::new(RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: workspace.dupe(),
+            canonical_repo: slug_identity_v2::CanonicalRepoName::new(format!("{module_name}+"))
+                .unwrap(),
+        },
+        repo_spec: RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                    "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                )
+                .unwrap(),
+                rule_name: "local_repository".into(),
+            },
+            attributes: Arc::new(starlark_map::small_map::SmallMap::from_iter([(
+                compact_str::CompactString::new("path"),
+                OverrideAttributeValue::String(relative_path.into()),
+            )])),
+        },
+        kind: RepositoryMaterializationKind::Local {
+            logical_root: NormalizedAbsolutePath::new(workspace.as_path().join(relative_path))
+                .unwrap(),
+        },
+    })
+}
+
+fn materialization_epoch_input(
+    workspace: &Path,
+    entries: impl IntoIterator<Item = RepositoryMaterializationEpochEntry>,
+) -> (
+    RepositoryMaterializationResultEpochKey,
+    RepositoryMaterializationResultEpoch,
+) {
+    let workspace = NormalizedAbsolutePath::new(workspace).unwrap();
+    (
+        RepositoryMaterializationResultEpochKey {
+            workspace: workspace.dupe(),
+        },
+        RepositoryMaterializationResultEpoch::new(workspace, entries).unwrap(),
+    )
+}
+
+async fn materialization_with_epoch(
+    dice: &Arc<Dice>,
+    root_source: &str,
+    epoch: (
+        RepositoryMaterializationResultEpochKey,
+        RepositoryMaterializationResultEpoch,
+    ),
+    generation: u64,
+    module_name: &str,
+) -> SourcePreparationOutcome<Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>>
+{
+    let workspace = workspace();
+    let mut updater = dice.updater_with_data(UserComputationData::default());
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            text_snapshot_with(root_source),
+        )])
+        .unwrap();
+    updater.changed_to(vec![epoch]).unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        &workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationGenerationKey {
+                workspace: workspace.clone(),
+            },
+            RepositoryMaterializationGeneration(generation),
+        )])
+        .unwrap();
+    updater
+        .commit()
+        .await
+        .compute(&RepositoryMaterializationKey {
+            workspace,
+            module_name: module_name.into(),
+        })
+        .await
+        .unwrap()
+}
+
+async fn count_repository_materialization_with_epoch(
+    dice: &Arc<Dice>,
+    root_source: &str,
+    epoch: (
+        RepositoryMaterializationResultEpochKey,
+        RepositoryMaterializationResultEpoch,
+    ),
+    generation: u64,
+    counter_key: &RepositoryMaterializationCounterKey,
+) -> usize {
+    let workspace = workspace();
+    let mut updater = dice.updater_with_data(UserComputationData::default());
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            text_snapshot_with(root_source),
+        )])
+        .unwrap();
+    updater.changed_to(vec![epoch]).unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        &workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationGenerationKey {
+                workspace: workspace.clone(),
+            },
+            RepositoryMaterializationGeneration(generation),
+        )])
+        .unwrap();
+    updater.commit().await.compute(counter_key).await.unwrap()
 }
 
 async fn source(
@@ -526,13 +915,37 @@ async fn prepare_with_epoch(
     version: &str,
 ) -> PathOutcome<Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>>> {
     let workspace = workspace();
+    let immutable = epoch
+        .observations()
+        .keys()
+        .find_map(|demand| match demand.namespace() {
+            PathObservationNamespace::Materialization(instance)
+                if demand.path().as_path().file_name().is_some_and(|name| {
+                    name == "MODULE.bazel" || name == ".materialization-root"
+                }) =>
+            {
+                Some((
+                    demand
+                        .path()
+                        .as_path()
+                        .parent()
+                        .unwrap_or(Path::new("/"))
+                        .to_owned(),
+                    instance,
+                ))
+            }
+            PathObservationNamespace::Materialization(_) | PathObservationNamespace::Host => None,
+        });
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
                 workspace: workspace.clone(),
             },
-            text_snapshot_with(root_source),
+            immutable
+                .as_ref()
+                .map(|_| immutable_text_snapshot())
+                .unwrap_or_else(|| text_snapshot_with(root_source)),
         )])
         .unwrap();
     updater
@@ -545,6 +958,14 @@ async fn prepare_with_epoch(
         .unwrap();
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    updater
+        .changed_to(vec![match immutable {
+            Some((root, instance)) => {
+                immutable_materialization_epoch_input(&workspace, root, instance)
+            }
+            None => local_materialization_epoch_input(&workspace),
+        }])
         .unwrap();
     inject_root_module_request_inputs(
         &mut updater,
@@ -570,14 +991,16 @@ async fn prepare_with_epoch(
         )])
         .unwrap();
     let mut transaction = updater.commit().await;
-    transaction
-        .compute(&ModuleSourcePreparationKey {
-            workspace,
-            module_name: "dep".into(),
-            version: version.into(),
-        })
-        .await
-        .unwrap()
+    source_outcome_to_path(
+        transaction
+            .compute(&ModuleSourcePreparationKey {
+                workspace,
+                module_name: "dep".into(),
+                version: version.into(),
+            })
+            .await
+            .unwrap(),
+    )
 }
 
 async fn count_preparation_with_epoch(
@@ -587,13 +1010,34 @@ async fn count_preparation_with_epoch(
     counter_key: &PreparationCounterKey,
 ) -> PathOutcome<usize> {
     let workspace = workspace();
+    let immutable = epoch
+        .observations()
+        .keys()
+        .find_map(|demand| match demand.namespace() {
+            PathObservationNamespace::Materialization(instance)
+                if demand
+                    .path()
+                    .as_path()
+                    .file_name()
+                    .is_some_and(|name| name == "MODULE.bazel") =>
+            {
+                Some((
+                    demand.path().as_path().parent().unwrap().to_owned(),
+                    instance,
+                ))
+            }
+            _ => None,
+        });
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
                 workspace: workspace.clone(),
             },
-            text_snapshot(),
+            immutable
+                .as_ref()
+                .map(|_| immutable_text_snapshot())
+                .unwrap_or_else(text_snapshot),
         )])
         .unwrap();
     updater
@@ -606,6 +1050,14 @@ async fn count_preparation_with_epoch(
         .unwrap();
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    updater
+        .changed_to(vec![match immutable {
+            Some((root, instance)) => {
+                immutable_materialization_epoch_input(&workspace, root, instance)
+            }
+            None => local_materialization_epoch_input(&workspace),
+        }])
         .unwrap();
     inject_root_module_request_inputs(
         &mut updater,
@@ -848,8 +1300,9 @@ fn semantic_materialization(
     source_identity: &str,
     canonical_repo: &str,
     rule_name: &str,
-) -> Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>> {
-    Arc::new(Ok(RepositoryMaterialization::Immutable {
+) -> SourcePreparationOutcome<Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>>
+{
+    SourcePreparationOutcome::Complete(Arc::new(Ok(RepositoryMaterialization::Immutable {
         canonical_repo: slug_identity_v2::CanonicalRepoName::new(canonical_repo).unwrap(),
         repo_spec: RepoSpec {
             rule_id: RepoRuleId {
@@ -864,7 +1317,526 @@ fn semantic_materialization(
         source_identity: Arc::from(source_identity),
         generation_root: PathBuf::from(root),
         observation_instance: PathObservationInstanceId::new(instance),
-    }))
+    })))
+}
+
+fn materialization_request(
+    workspace: &str,
+    canonical_repo: &str,
+    rule_name: &str,
+    kind: RepositoryMaterializationKind,
+) -> RepositoryMaterializationRequest {
+    RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: NormalizedAbsolutePath::new(workspace).unwrap(),
+            canonical_repo: slug_identity_v2::CanonicalRepoName::new(canonical_repo).unwrap(),
+        },
+        repo_spec: RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                    "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                )
+                .unwrap(),
+                rule_name: rule_name.into(),
+            },
+            attributes: Arc::default(),
+        },
+        kind,
+    }
+}
+
+#[test]
+fn source_needs_union_deduplicates_and_rejects_conflicts_while_need_is_transient() {
+    let dep = materialization_request(
+        "/workspace",
+        "dep+",
+        "http_archive",
+        RepositoryMaterializationKind::Immutable,
+    );
+    let other = materialization_request(
+        "/workspace",
+        "other+",
+        "http_archive",
+        RepositoryMaterializationKind::Immutable,
+    );
+    let conflicting_dep = materialization_request(
+        "/workspace",
+        "dep+",
+        "git_repository",
+        RepositoryMaterializationKind::Immutable,
+    );
+    let path_demand = demand(
+        "/workspace/MODULE.bazel",
+        PathObservationOperation::FileBytes,
+    );
+    let path = SourcePreparationNeeds::path(NeedPathObservations::singleton(path_demand.dupe()));
+    let dep_need = SourcePreparationNeeds::repository(dep.clone());
+    let combined = path
+        .try_union(&path)
+        .unwrap()
+        .try_union(&dep_need)
+        .unwrap()
+        .try_union(&dep_need)
+        .unwrap()
+        .try_union(&SourcePreparationNeeds::repository(other))
+        .unwrap();
+
+    assert_eq!(
+        combined
+            .path_observations()
+            .expect("path demand must be retained")
+            .demands(),
+        &[path_demand]
+    );
+    assert_eq!(combined.repository_materializations().len(), 2);
+    assert!(matches!(
+        combined.try_union(&SourcePreparationNeeds::repository(conflicting_dep)),
+        Err(SourcePreparationNeedsError::ConflictingRepositoryRequest {
+            canonical_repo
+        }) if canonical_repo.as_str() == "dep+"
+    ));
+
+    let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(dep));
+    assert!(!<RepositoryMaterializationKey as Key>::equality(
+        &need, &need
+    ));
+    assert!(!<RepositoryMaterializationKey as Key>::validity(&need));
+}
+
+#[test]
+fn result_epoch_rejects_wrong_workspace_duplicates_conflicts_and_success_kind_mismatch() {
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let immutable = Arc::new(materialization_request(
+        "/workspace",
+        "dep+",
+        "http_archive",
+        RepositoryMaterializationKind::Immutable,
+    ));
+    let other_workspace = Arc::new(materialization_request(
+        "/other-workspace",
+        "dep+",
+        "http_archive",
+        RepositoryMaterializationKind::Immutable,
+    ));
+    let conflicting = Arc::new(materialization_request(
+        "/workspace",
+        "dep+",
+        "git_repository",
+        RepositoryMaterializationKind::Immutable,
+    ));
+    let local = Arc::new(materialization_request(
+        "/workspace",
+        "local+",
+        "local_repository",
+        RepositoryMaterializationKind::Local {
+            logical_root: NormalizedAbsolutePath::new("/workspace/vendor/local").unwrap(),
+        },
+    ));
+    let immutable_success = || {
+        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("source"),
+            generation_root: PathBuf::from("/immutable"),
+            observation_instance: PathObservationInstanceId::new(1),
+        })
+    };
+    let entry =
+        |request: Arc<RepositoryMaterializationRequest>| RepositoryMaterializationEpochEntry {
+            request,
+            result: immutable_success(),
+        };
+
+    assert!(matches!(
+        RepositoryMaterializationResultEpoch::new(
+            workspace.dupe(),
+            [entry(other_workspace)]
+        ),
+        Err(RepositoryMaterializationResultEpochError::WrongWorkspace {
+            canonical_repo
+        }) if canonical_repo.as_str() == "dep+"
+    ));
+    assert!(matches!(
+        RepositoryMaterializationResultEpoch::new(
+            workspace.dupe(),
+            [entry(immutable.dupe()), entry(immutable.dupe())]
+        ),
+        Err(RepositoryMaterializationResultEpochError::DuplicateRepository {
+            canonical_repo
+        }) if canonical_repo.as_str() == "dep+"
+    ));
+    assert!(matches!(
+        RepositoryMaterializationResultEpoch::new(
+            workspace.dupe(),
+            [entry(immutable), entry(conflicting)]
+        ),
+        Err(
+            RepositoryMaterializationResultEpochError::ConflictingRepositoryRequest {
+                canonical_repo
+            }
+        ) if canonical_repo.as_str() == "dep+"
+    ));
+    assert!(matches!(
+        RepositoryMaterializationResultEpoch::new(workspace, [entry(local)]),
+        Err(
+            RepositoryMaterializationResultEpochError::SuccessKindMismatch {
+                canonical_repo
+            }
+        ) if canonical_repo.as_str() == "local+"
+    ));
+}
+
+#[tokio::test]
+async fn materialization_result_key_collision_and_projection_handle_errors_retries_and_omissions() {
+    let io = Arc::new(LocalIo {
+        calls: AtomicUsize::new(0),
+    });
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let workspace = workspace();
+    let source = |path: &str| {
+        format!(
+            "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = '{path}')\n"
+        )
+    };
+    let empty_epoch = || materialization_epoch_input(&workspace, []);
+    let old = local_request_for(&workspace, "dep", "vendor/old");
+    let current = local_request_for(&workspace, "dep", "vendor/current");
+    let entry = |request, result| RepositoryMaterializationEpochEntry { request, result };
+
+    let SourcePreparationOutcome::Need(empty_need) =
+        materialization_with_epoch(&dice, &source("vendor/old"), empty_epoch(), 1, "dep").await
+    else {
+        panic!("an empty result epoch must demand materialization");
+    };
+    assert_eq!(
+        empty_need
+            .repository_materializations()
+            .values()
+            .map(|request| request.as_ref())
+            .collect::<Vec<_>>(),
+        [old.as_ref()]
+    );
+
+    let old_success = materialization_epoch_input(
+        &workspace,
+        [entry(
+            old.dupe(),
+            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local),
+        )],
+    );
+    assert!(matches!(
+        materialization_with_epoch(&dice, &source("vendor/old"), old_success, 1, "dep").await,
+        SourcePreparationOutcome::Complete(value)
+            if matches!(
+                value.as_ref(),
+                Ok(RepositoryMaterialization::Local { source_root, .. })
+                    if source_root == &workspace.join("vendor/old")
+            )
+    ));
+
+    let old_success = materialization_epoch_input(
+        &workspace,
+        [entry(
+            old,
+            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local),
+        )],
+    );
+    let SourcePreparationOutcome::Need(changed_spec_need) =
+        materialization_with_epoch(&dice, &source("vendor/current"), old_success, 1, "dep").await
+    else {
+        panic!(
+            "same workspace/repository with a distinct RepoSpec must not hit the old result key"
+        );
+    };
+    assert_eq!(
+        changed_spec_need
+            .repository_materializations()
+            .values()
+            .map(|request| request.as_ref())
+            .collect::<Vec<_>>(),
+        [current.as_ref()]
+    );
+
+    let persistent = materialization_epoch_input(
+        &workspace,
+        [entry(
+            current.dupe(),
+            RepositoryMaterializationResult::SpecError("bad spec".into()),
+        )],
+    );
+    assert!(matches!(
+        materialization_with_epoch(&dice, &source("vendor/current"), persistent, 1, "dep").await,
+        SourcePreparationOutcome::Complete(value)
+            if matches!(
+                value.as_ref(),
+                Err(RepositoryMaterializationError::Spec(message))
+                    if message.as_str() == "bad spec"
+            )
+    ));
+
+    for result in [
+        RepositoryMaterializationResult::TransportError {
+            generation: RepositoryMaterializationGeneration(7),
+            message: "offline".into(),
+        },
+        RepositoryMaterializationResult::MaterializationError {
+            generation: RepositoryMaterializationGeneration(7),
+            message: "unpack failed".into(),
+        },
+    ] {
+        let matching =
+            materialization_epoch_input(&workspace, [entry(current.dupe(), result.clone())]);
+        assert!(matches!(
+            materialization_with_epoch(&dice, &source("vendor/current"), matching, 7, "dep").await,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    (result, value.as_ref()),
+                    (
+                        RepositoryMaterializationResult::TransportError { .. },
+                        Err(RepositoryMaterializationError::Transport(_))
+                    ) | (
+                        RepositoryMaterializationResult::MaterializationError { .. },
+                        Err(RepositoryMaterializationError::Materialization(_))
+                    )
+                )
+        ));
+    }
+
+    for stale_result in [
+        RepositoryMaterializationResult::TransportError {
+            generation: RepositoryMaterializationGeneration(6),
+            message: "stale transport".into(),
+        },
+        RepositoryMaterializationResult::MaterializationError {
+            generation: RepositoryMaterializationGeneration(6),
+            message: "stale materialization".into(),
+        },
+    ] {
+        let stale = materialization_epoch_input(&workspace, [entry(current.dupe(), stale_result)]);
+        assert!(matches!(
+            materialization_with_epoch(&dice, &source("vendor/current"), stale, 7, "dep").await,
+            SourcePreparationOutcome::Need(_)
+        ));
+    }
+
+    let spare = local_request_for(&workspace, "spare", "vendor/spare");
+    let two_overrides = "module(name = 'root')\n\
+        local_path_override(module_name = 'dep', path = 'vendor/current')\n\
+        local_path_override(module_name = 'spare', path = 'vendor/spare')\n";
+    let only_dep = || {
+        materialization_epoch_input(
+            &workspace,
+            [entry(
+                current.dupe(),
+                RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local),
+            )],
+        )
+    };
+    assert!(matches!(
+        materialization_with_epoch(&dice, two_overrides, only_dep(), 7, "dep").await,
+        SourcePreparationOutcome::Complete(value) if value.as_ref().is_ok()
+    ));
+    let SourcePreparationOutcome::Need(spare_need) =
+        materialization_with_epoch(&dice, two_overrides, only_dep(), 7, "spare").await
+    else {
+        panic!("an omitted second repository must demand only its own result");
+    };
+    assert_eq!(
+        spare_need
+            .repository_materializations()
+            .values()
+            .map(|request| request.as_ref())
+            .collect::<Vec<_>>(),
+        [spare.as_ref()]
+    );
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn result_projection_prunes_unrelated_repositories_but_tracks_exact_immutable_selection() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_key = RepositoryMaterializationCounterKey {
+        counter: counter.dupe(),
+    };
+    let workspace = workspace();
+    let root_source = "module(name = 'root')\narchive_override(module_name = 'dep')\n";
+    let dep = Arc::new(materialization_request(
+        workspace.to_str().unwrap(),
+        "dep+",
+        "http_archive",
+        RepositoryMaterializationKind::Immutable,
+    ));
+    let spare = Arc::new(materialization_request(
+        workspace.to_str().unwrap(),
+        "spare+",
+        "http_archive",
+        RepositoryMaterializationKind::Immutable,
+    ));
+    let immutable = |request: Arc<RepositoryMaterializationRequest>, root: &str, instance| {
+        RepositoryMaterializationEpochEntry {
+            request,
+            result: RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Immutable {
+                    source_identity: Arc::from("source"),
+                    generation_root: PathBuf::from(root),
+                    observation_instance: PathObservationInstanceId::new(instance),
+                },
+            ),
+        }
+    };
+    let epoch = |entries| materialization_epoch_input(&workspace, entries);
+
+    assert_eq!(
+        count_repository_materialization_with_epoch(
+            &dice,
+            root_source,
+            epoch(vec![immutable(dep.dupe(), "/generation/a", 1)]),
+            1,
+            &counter_key,
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count_repository_materialization_with_epoch(
+            &dice,
+            root_source,
+            epoch(vec![
+                immutable(dep.dupe(), "/generation/a", 1),
+                immutable(spare.dupe(), "/generation/spare-a", 1),
+            ]),
+            1,
+            &counter_key,
+        )
+        .await,
+        1,
+        "adding an unrelated result must not invalidate dep's projection"
+    );
+    assert_eq!(
+        count_repository_materialization_with_epoch(
+            &dice,
+            root_source,
+            epoch(vec![
+                immutable(dep.dupe(), "/generation/a", 1),
+                immutable(spare, "/generation/spare-b", 2),
+            ]),
+            1,
+            &counter_key,
+        )
+        .await,
+        1,
+        "changing an unrelated result must not invalidate dep's projection"
+    );
+    assert_eq!(
+        count_repository_materialization_with_epoch(
+            &dice,
+            root_source,
+            epoch(vec![immutable(dep.dupe(), "/generation/b", 1)]),
+            1,
+            &counter_key,
+        )
+        .await,
+        2,
+        "changing dep's exact immutable root must invalidate its projection"
+    );
+    assert_eq!(
+        count_repository_materialization_with_epoch(
+            &dice,
+            root_source,
+            epoch(vec![immutable(dep, "/generation/b", 2)]),
+            1,
+            &counter_key,
+        )
+        .await,
+        3,
+        "changing dep's observation instance must invalidate its projection"
+    );
+    assert_eq!(counter.load(Ordering::SeqCst), 3);
+}
+
+#[tokio::test]
+async fn materialization_need_and_pure_spec_error_precede_path_observation() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let workspace = workspace();
+    let compute = |root_source: &str| {
+        let dice = dice.dupe();
+        let workspace = workspace.clone();
+        let root_source = root_source.to_owned();
+        async move {
+            let mut updater = dice.updater_with_data(UserComputationData::default());
+            updater
+                .changed_to(vec![(
+                    WorkspaceSnapshotKey {
+                        workspace: workspace.clone(),
+                    },
+                    text_snapshot_with(&root_source),
+                )])
+                .unwrap();
+            updater
+                .changed_to(vec![(
+                    PathObservationEpochKey,
+                    PathObservationEpoch::empty(),
+                )])
+                .unwrap();
+            updater
+                .changed_to(vec![materialization_epoch_input(&workspace, [])])
+                .unwrap();
+            inject_root_module_request_inputs(
+                &mut updater,
+                &workspace,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+            )
+            .unwrap();
+            updater
+                .changed_to(vec![(
+                    RepositoryMaterializationGenerationKey {
+                        workspace: workspace.clone(),
+                    },
+                    RepositoryMaterializationGeneration(1),
+                )])
+                .unwrap();
+            updater
+                .commit()
+                .await
+                .compute(&RepositorySourceFileKey {
+                    workspace,
+                    module_name: "dep".into(),
+                    repo_relative_path: PathBuf::from("MODULE.bazel"),
+                })
+                .await
+                .unwrap()
+        }
+    };
+
+    let SourcePreparationOutcome::Need(need) = compute(
+        "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = 'vendor/dep')\n",
+    )
+    .await
+    else {
+        panic!("an absent materialization result must demand materialization");
+    };
+    assert!(need.path_observations().is_none());
+    assert_eq!(need.repository_materializations().len(), 1);
+
+    let invalid = compute(
+        "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = '/absolute')\n",
+    )
+    .await;
+    assert!(matches!(
+        invalid,
+        SourcePreparationOutcome::Complete(Err(RepositorySourceFileError::Materialization {
+            error,
+            ..
+        })) if matches!(
+            error.as_ref(),
+            RepositoryMaterializationError::Spec(message)
+                if message.as_str()
+                    == "local_repository path must be normalized and workspace-relative"
+        )
+    ));
 }
 
 #[tokio::test]
@@ -878,8 +1850,7 @@ async fn immutable_materialization_equality_prunes_only_operational_root_and_ins
     let other_spec = semantic_materialization("/generation/a", 1, "A", "dep+", "git_repository");
 
     for operationally_distinct in [&root_only, &instance_only, &a2] {
-        assert_ne!(&a1, operationally_distinct);
-        assert!(<RepositoryMaterializationKey as Key>::equality(
+        assert!(!<RepositoryMaterializationKey as Key>::equality(
             &a1,
             operationally_distinct,
         ));
@@ -896,7 +1867,7 @@ async fn immutable_materialization_equality_prunes_only_operational_root_and_ins
         counter: counter.dupe(),
     };
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    for (value, expected_count) in [(a1.dupe(), 1), (a2, 1), (identity_b, 2), (a1, 3)] {
+    for (value, expected_count) in [(a1.dupe(), 1), (a2, 2), (identity_b, 3), (a1, 4)] {
         let mut updater = dice.updater();
         updater
             .changed_to(vec![(SemanticMaterializationInputKey, value)])
@@ -938,11 +1909,6 @@ fn repository_source_error_schema_compares_every_shared_semantic_field() {
         |repo_relative_path, error| RepositorySourceFileError::Materialization {
             repo_relative_path,
             error,
-        };
-    let generation_compute =
-        |repo_relative_path, message| RepositorySourceFileError::MaterializationGenerationCompute {
-            repo_relative_path,
-            message,
         };
     let invalid_materialized = |repo_relative_path| {
         RepositorySourceFileError::InvalidMaterializedPath { repo_relative_path }
@@ -1004,14 +1970,6 @@ fn repository_source_error_schema_compares_every_shared_semantic_field() {
     unequal!(
         materialization_error(path.dupe(), materialization.dupe()),
         materialization_error(path.dupe(), other_materialization)
-    );
-    unequal!(
-        generation_compute(path.dupe(), message.dupe()),
-        generation_compute(other_path.dupe(), message.dupe())
-    );
-    unequal!(
-        generation_compute(path.dupe(), message.dupe()),
-        generation_compute(path.dupe(), other_message.dupe())
     );
     unequal!(
         invalid_materialized(path.dupe()),
@@ -1135,11 +2093,39 @@ async fn assert_cumulative_source_and_preparation_needs(
     generation_base: u64,
     expected_bytes: &[u8],
 ) {
+    let immutable_context = observations
+        .iter()
+        .find_map(|(demand, _)| match demand.namespace() {
+            PathObservationNamespace::Materialization(instance)
+                if demand
+                    .path()
+                    .as_path()
+                    .file_name()
+                    .is_some_and(|name| name == "MODULE.bazel") =>
+            {
+                Some((
+                    demand.path().as_path().parent().unwrap().to_owned(),
+                    instance,
+                ))
+            }
+            _ => None,
+        });
     for index in 0..observations.len() {
+        let mut prefix = observations[..index].to_vec();
+        if let Some((root, instance)) = &immutable_context {
+            prefix.push((
+                demand_in(
+                    PathObservationNamespace::Materialization(*instance),
+                    root.join(".materialization-root").to_str().unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            ));
+        }
         let outcome = source_with_epoch(
             dice,
             raw_snapshot([]),
-            PathObservationEpoch::new(observations[..index].to_vec()).unwrap(),
+            PathObservationEpoch::new(prefix.clone()).unwrap(),
             generation_base + index as u64,
             "MODULE.bazel",
         )
@@ -1148,18 +2134,19 @@ async fn assert_cumulative_source_and_preparation_needs(
             panic!("prefix {index} unexpectedly completed");
         };
         assert_eq!(need.demands(), &[observations[index].0.dupe()]);
-        let need_outcome = PathOutcome::Need(need.dupe());
+        let need_outcome =
+            SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need.dupe()));
         assert!(!<RepositorySourceFileKey as Key>::validity(&need_outcome));
         assert!(!<RepositorySourceFileKey as Key>::equality(
             &need_outcome,
-            &PathOutcome::Need(need),
+            &SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need)),
         ));
 
         let preparation = prepare_with_epoch(
             dice,
             "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = 'vendor/dep')\n",
             raw_snapshot([]),
-            PathObservationEpoch::new(observations[..index].to_vec()).unwrap(),
+            PathObservationEpoch::new(prefix).unwrap(),
             &[],
             generation_base + index as u64,
             "1.0.0",
@@ -1169,7 +2156,8 @@ async fn assert_cumulative_source_and_preparation_needs(
             panic!("preparation prefix {index} unexpectedly completed");
         };
         assert_eq!(preparation_need.demands(), &[observations[index].0.dupe()]);
-        let preparation_need = PathOutcome::Need(preparation_need);
+        let preparation_need =
+            SourcePreparationOutcome::Need(SourcePreparationNeeds::path(preparation_need));
         assert!(!<ModuleSourcePreparationKey as Key>::validity(
             &preparation_need
         ));
@@ -1188,15 +2176,16 @@ async fn assert_cumulative_source_and_preparation_needs(
         "MODULE.bazel",
     )
     .await;
-    let PathOutcome::Complete(value) = &source_complete else {
+    let PathOutcome::Complete(value) = source_complete else {
         panic!("complete epoch needs observations");
     };
     assert_eq!(
-        value,
+        &value,
         &Ok(RepositorySourceFileValue::Present(Arc::from(
             expected_bytes
         )))
     );
+    let source_complete = SourcePreparationOutcome::Complete(value);
     assert!(<RepositorySourceFileKey as Key>::validity(&source_complete));
     assert!(<RepositorySourceFileKey as Key>::equality(
         &source_complete,
@@ -1213,7 +2202,7 @@ async fn assert_cumulative_source_and_preparation_needs(
         "1.0.0",
     )
     .await;
-    let PathOutcome::Complete(prepared) = &preparation_complete else {
+    let PathOutcome::Complete(prepared) = preparation_complete else {
         panic!("complete preparation epoch needs observations");
     };
     assert!(matches!(
@@ -1221,6 +2210,7 @@ async fn assert_cumulative_source_and_preparation_needs(
         Ok(ModuleSourcePreparation::NonRegistry { bytes })
             if bytes.as_ref() == expected_bytes
     ));
+    let preparation_complete = SourcePreparationOutcome::Complete(prepared);
     assert!(<ModuleSourcePreparationKey as Key>::validity(
         &preparation_complete
     ));
@@ -1284,7 +2274,7 @@ async fn local_source_demands_cumulatively_and_propagates_need_to_preparation() 
     ));
     assert_cumulative_source_and_preparation_needs(&dice, &escaping, 40, b"escaping").await;
 
-    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
@@ -1831,8 +2821,135 @@ async fn local_source_semantics_prune_preparation_and_restore_on_one_retained_en
             assert_eq!(Some(prepared), first_a);
         }
     }
-    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
     assert_eq!(root_counter.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn logical_local_root_and_immutable_instance_moves_select_new_paths_but_prune_equal_bytes() {
+    let io = Arc::new(LocalIo {
+        calls: AtomicUsize::new(0),
+    });
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, io.clone());
+    let local_dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let local_counter = Arc::new(AtomicUsize::new(0));
+    let local_counter_key = PreparationCounterKey {
+        counter: local_counter.dupe(),
+    };
+    let workspace = workspace();
+    let logical_root = workspace.join("vendor/dep");
+    let local_route = |target_name: &str| {
+        let target = workspace.join("vendor").join(target_name);
+        PathObservationEpoch::new([
+            lstat_observation(
+                "/",
+                PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+            ),
+            lstat_observation(
+                workspace.to_str().unwrap(),
+                PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+            ),
+            lstat_observation(
+                workspace.join("vendor").to_str().unwrap(),
+                PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+            ),
+            lstat_observation(
+                logical_root.to_str().unwrap(),
+                PathOperationResult::Present(lstat(PathNodeKind::Symlink)),
+            ),
+            read_link_observation(
+                logical_root.to_str().unwrap(),
+                PathOperationResult::Present(Arc::new(PathBuf::from(target_name))),
+            ),
+            lstat_observation(
+                target.to_str().unwrap(),
+                PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+            ),
+            lstat_observation(
+                target.join("MODULE.bazel").to_str().unwrap(),
+                PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+            ),
+            file_bytes_observation(
+                target.join("MODULE.bazel").to_str().unwrap(),
+                PathOperationResult::Present(Arc::from(&b"same"[..])),
+            ),
+        ])
+        .unwrap()
+    };
+    for route in ["dep-a", "dep-b"] {
+        assert!(matches!(
+            count_preparation_with_epoch(&local_dice, local_route(route), 1, &local_counter_key)
+                .await,
+            PathOutcome::Complete(1)
+        ));
+    }
+    assert_eq!(local_counter.load(Ordering::SeqCst), 1);
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
+
+    let immutable_io = Arc::new(ImmutableIo {
+        calls: AtomicUsize::new(0),
+        root: tempfile::tempdir().unwrap(),
+    });
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, immutable_io.clone());
+    let immutable_dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let immutable_counter = Arc::new(AtomicUsize::new(0));
+    let immutable_counter_key = PreparationCounterKey {
+        counter: immutable_counter.dupe(),
+    };
+    let immutable_epoch =
+        |root: &Path, instance: PathObservationInstanceId, bytes: &'static [u8]| {
+            let namespace = PathObservationNamespace::Materialization(instance);
+            let mut observations = immutable_source_observations(
+                root,
+                instance,
+                PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+                    PathNodeKind::RegularFile,
+                ))),
+            );
+            observations.push(file_bytes_observation_in(
+                namespace,
+                root.join("MODULE.bazel").to_str().unwrap(),
+                PathOperationResult::Present(Arc::from(bytes)),
+            ));
+            PathObservationEpoch::new(observations).unwrap()
+        };
+    let root_a = PathBuf::from("/immutable/a");
+    let root_b = PathBuf::from("/immutable/b");
+    let instance_1 = PathObservationInstanceId::new(11);
+    let instance_2 = PathObservationInstanceId::new(12);
+    let steps = [
+        (immutable_epoch(&root_a, instance_1, b"A"), 1),
+        (immutable_epoch(&root_b, instance_2, b"A"), 1),
+        (immutable_epoch(&root_b, instance_2, b"B"), 2),
+        (immutable_epoch(&root_a, instance_1, b"A"), 3),
+    ];
+    for (index, (epoch, expected_count)) in steps.into_iter().enumerate() {
+        let expected_namespace = if index == 0 || index == 3 {
+            PathObservationNamespace::Materialization(instance_1)
+        } else {
+            PathObservationNamespace::Materialization(instance_2)
+        };
+        assert!(
+            epoch
+                .observations()
+                .keys()
+                .all(|demand| demand.namespace() == expected_namespace)
+        );
+        assert!(matches!(
+            count_preparation_with_epoch(
+                &immutable_dice,
+                epoch,
+                index as u64 + 1,
+                &immutable_counter_key
+            )
+            .await,
+            PathOutcome::Complete(actual) if actual == expected_count
+        ));
+    }
+    assert_eq!(immutable_counter.load(Ordering::SeqCst), 3);
+    assert_eq!(immutable_io.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
@@ -1936,10 +3053,12 @@ async fn immutable_source_demands_exact_instance_cumulatively_through_preparatio
         module_path.to_str().unwrap(),
         PathOperationResult::Present(Arc::from(&b"wrong-instance"[..])),
     ));
-    let PathOutcome::Need(need) = source_with_epoch(
+    let PathOutcome::Need(need) = source_with_result_epoch(
         &dice,
+        immutable_text_snapshot(),
         raw_snapshot([]),
         PathObservationEpoch::new(wrong).unwrap(),
+        immutable_materialization_epoch_input(&workspace(), root.clone(), instance),
         60,
         "MODULE.bazel",
     )
@@ -1956,7 +3075,7 @@ async fn immutable_source_demands_exact_instance_cumulatively_through_preparatio
             .iter()
             .all(|demand| demand.namespace() != PathObservationNamespace::Host)
     );
-    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
@@ -2296,7 +3415,7 @@ async fn immutable_source_accepts_special_and_projects_all_observed_terminals() 
             repo_relative_path: relative,
         })
     );
-    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
@@ -2516,7 +3635,7 @@ async fn immutable_source_prunes_operational_changes_and_restores_on_fixed_insta
     }
     assert_eq!(counter.load(Ordering::SeqCst), 5);
     assert_eq!(root_counter.load(Ordering::SeqCst), 2);
-    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
@@ -2615,7 +3734,7 @@ async fn local_root_and_include_replay_independently_without_a_dice_cycle() {
             &b"module(name = 'first')"[..]
         )))
     );
-    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
 
     assert_eq!(
         source(
@@ -2662,17 +3781,19 @@ async fn materialization_failure_retries_when_the_generation_changes() {
         WorkspaceRawFileValue::Present(Arc::from(&b"module(name = 'recovered')"[..])),
     )]);
 
-    assert!(matches!(
+    assert_eq!(
         source(&dice, raw.clone(), 1, "MODULE.bazel").await,
-        Err(RepositorySourceFileError::Materialization { .. })
-    ));
+        Ok(RepositorySourceFileValue::Present(Arc::from(
+            &b"module(name = 'recovered')"[..]
+        )))
+    );
     assert_eq!(
         source(&dice, raw, 2, "MODULE.bazel").await,
         Ok(RepositorySourceFileValue::Present(Arc::from(
             &b"module(name = 'recovered')"[..]
         )))
     );
-    assert_eq!(io.calls.load(Ordering::SeqCst), 2);
+    assert_eq!(io.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
@@ -2942,7 +4063,7 @@ async fn nonregistry_preparation_bypasses_registry_io() {
         Ok(ModuleSourcePreparation::NonRegistry { bytes }) if bytes.as_ref() == b"local module"
     ));
     assert!(registry_io.calls().is_empty());
-    assert_eq!(repository_io.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(repository_io.calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
@@ -3168,14 +4289,14 @@ async fn root_patches_validate_all_paths_before_reading_or_applying() {
                 panic!("prefix {prefix_len} unexpectedly completed: {outcome:?}");
             };
             assert_eq!(need.demands(), &[observations[prefix_len].0.clone()]);
-            let need = PathOutcome::Need(need);
+            let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
             assert!(!ModuleSourcePreparationKey::validity(&need));
             assert!(!ModuleSourcePreparationKey::equality(&need, &need));
         } else {
             let PathOutcome::Complete(prepared) = outcome else {
                 panic!("complete epoch unexpectedly needs observations");
             };
-            let complete = PathOutcome::Complete(prepared.clone());
+            let complete = SourcePreparationOutcome::Complete(prepared.clone());
             assert!(ModuleSourcePreparationKey::validity(&complete));
             assert!(ModuleSourcePreparationKey::equality(&complete, &complete));
             let Ok(ModuleSourcePreparation::Registry { bytes, .. }) = prepared.as_ref() else {

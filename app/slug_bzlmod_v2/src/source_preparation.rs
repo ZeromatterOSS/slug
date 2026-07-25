@@ -8,6 +8,8 @@
  */
 
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -26,6 +28,7 @@ use sha2::Digest;
 use sha2::Sha256;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
@@ -42,8 +45,10 @@ use slug_workspace_v2::PathResolutionError;
 use slug_workspace_v2::PathResult;
 use slug_workspace_v2::ResolvedPathKey;
 use slug_workspace_v2::ResolvedPathState;
+use starlark_map::small_map::SmallMap;
 
 use crate::ModuleKey;
+use crate::OverrideAttributeValue;
 use crate::RegistryBaseUrl;
 use crate::RegistryFileError;
 use crate::RegistryFileKey;
@@ -60,6 +65,281 @@ use crate::registry_module_file_url;
 pub struct RepositoryMaterializationKey {
     pub workspace: PathBuf,
     pub module_name: CompactString,
+}
+
+/// A bzlmod computation either completed or needs outside-DICE observations
+/// and/or repository materialization. Needs are deliberately transient: they
+/// are neither valid nor equal at DICE boundaries.
+#[derive(Debug, Clone, Allocative, Dupe)]
+pub enum SourcePreparationOutcome<T> {
+    Complete(T),
+    Need(SourcePreparationNeeds),
+}
+
+pub type SourcePreparationResult<T, E> = SourcePreparationOutcome<Result<T, E>>;
+
+impl<T> SourcePreparationOutcome<T> {
+    fn path_need(need: NeedPathObservations) -> Self {
+        Self::Need(SourcePreparationNeeds::path(need))
+    }
+
+    pub fn is_complete(&self) -> bool {
+        matches!(self, Self::Complete(_))
+    }
+
+    pub fn complete_eq(&self, other: &Self) -> bool
+    where
+        T: PartialEq,
+    {
+        matches!((self, other), (Self::Complete(left), Self::Complete(right)) if left == right)
+    }
+
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> SourcePreparationOutcome<U> {
+        match self {
+            Self::Complete(value) => SourcePreparationOutcome::Complete(f(value)),
+            Self::Need(need) => SourcePreparationOutcome::Need(need),
+        }
+    }
+}
+
+fn source_outcome_from_path<T>(outcome: PathOutcome<T>) -> SourcePreparationOutcome<T> {
+    match outcome {
+        PathOutcome::Complete(value) => SourcePreparationOutcome::Complete(value),
+        PathOutcome::Need(need) => SourcePreparationOutcome::path_need(need),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct SourcePreparationNeeds {
+    path_observations: Option<NeedPathObservations>,
+    repository_materializations:
+        Arc<SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum SourcePreparationNeedsError {
+    ConflictingRepositoryRequest { canonical_repo: CanonicalRepoName },
+}
+
+impl SourcePreparationNeeds {
+    pub fn path(need: NeedPathObservations) -> Self {
+        Self {
+            path_observations: Some(need),
+            repository_materializations: Arc::new(SmallMap::new()),
+        }
+    }
+
+    pub fn repository(request: RepositoryMaterializationRequest) -> Self {
+        let mut repository_materializations = SmallMap::new();
+        repository_materializations.insert(request.id.clone(), Arc::new(request));
+        Self {
+            path_observations: None,
+            repository_materializations: Arc::new(repository_materializations),
+        }
+    }
+
+    pub fn path_observations(&self) -> Option<&NeedPathObservations> {
+        self.path_observations.as_ref()
+    }
+
+    pub fn repository_materializations(
+        &self,
+    ) -> &SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>> {
+        &self.repository_materializations
+    }
+
+    pub fn try_union(&self, other: &Self) -> Result<Self, SourcePreparationNeedsError> {
+        let path_observations = match (&self.path_observations, &other.path_observations) {
+            (Some(left), Some(right)) => Some(left.union(right)),
+            (Some(need), None) | (None, Some(need)) => Some(need.dupe()),
+            (None, None) => None,
+        };
+        let mut requests = (*self.repository_materializations).clone();
+        for (request_id, request) in other.repository_materializations.iter() {
+            match requests.get(request_id) {
+                Some(existing) if existing == request => {}
+                Some(_) => {
+                    return Err(SourcePreparationNeedsError::ConflictingRepositoryRequest {
+                        canonical_repo: request_id.canonical_repo.clone(),
+                    });
+                }
+                None => {
+                    requests.insert(request_id.clone(), request.dupe());
+                }
+            }
+        }
+        debug_assert!(path_observations.is_some() || !requests.is_empty());
+        Ok(Self {
+            path_observations,
+            repository_materializations: Arc::new(requests),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RepositoryMaterializationRequestId {
+    pub workspace: NormalizedAbsolutePath,
+    pub canonical_repo: CanonicalRepoName,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum RepositoryMaterializationKind {
+    Local {
+        logical_root: NormalizedAbsolutePath,
+    },
+    Immutable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepositoryMaterializationRequest {
+    pub id: RepositoryMaterializationRequestId,
+    pub repo_spec: RepoSpec,
+    pub kind: RepositoryMaterializationKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum RepositoryMaterializationSuccess {
+    Local,
+    Immutable {
+        source_identity: Arc<str>,
+        generation_root: PathBuf,
+        observation_instance: PathObservationInstanceId,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum RepositoryMaterializationResult {
+    Success(RepositoryMaterializationSuccess),
+    SpecError(CompactString),
+    TransportError {
+        generation: RepositoryMaterializationGeneration,
+        message: CompactString,
+    },
+    MaterializationError {
+        generation: RepositoryMaterializationGeneration,
+        message: CompactString,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepositoryMaterializationEpochEntry {
+    pub request: Arc<RepositoryMaterializationRequest>,
+    pub result: RepositoryMaterializationResult,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct RepositoryMaterializationResultEpoch {
+    workspace: NormalizedAbsolutePath,
+    entries: Arc<SmallMap<CanonicalRepoName, RepositoryMaterializationEpochEntry>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum RepositoryMaterializationResultEpochError {
+    WrongWorkspace { canonical_repo: CanonicalRepoName },
+    DuplicateRepository { canonical_repo: CanonicalRepoName },
+    ConflictingRepositoryRequest { canonical_repo: CanonicalRepoName },
+    SuccessKindMismatch { canonical_repo: CanonicalRepoName },
+}
+
+impl RepositoryMaterializationResultEpoch {
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        entries: impl IntoIterator<Item = RepositoryMaterializationEpochEntry>,
+    ) -> Result<Self, RepositoryMaterializationResultEpochError> {
+        let mut entries = entries.into_iter().collect::<Vec<_>>();
+        entries.sort_by(|left, right| {
+            left.request
+                .id
+                .canonical_repo
+                .cmp(&right.request.id.canonical_repo)
+        });
+        let mut result: SmallMap<CanonicalRepoName, RepositoryMaterializationEpochEntry> =
+            SmallMap::with_capacity(entries.len());
+        for entry in entries {
+            let canonical_repo = entry.request.id.canonical_repo.clone();
+            if entry.request.id.workspace != workspace {
+                return Err(RepositoryMaterializationResultEpochError::WrongWorkspace {
+                    canonical_repo,
+                });
+            }
+            if !result_kind_matches(&entry.request.kind, &entry.result) {
+                return Err(
+                    RepositoryMaterializationResultEpochError::SuccessKindMismatch {
+                        canonical_repo,
+                    },
+                );
+            }
+            if let Some(existing) = result.get(&canonical_repo) {
+                return Err(if existing.request == entry.request {
+                    RepositoryMaterializationResultEpochError::DuplicateRepository {
+                        canonical_repo,
+                    }
+                } else {
+                    RepositoryMaterializationResultEpochError::ConflictingRepositoryRequest {
+                        canonical_repo,
+                    }
+                });
+            }
+            result.insert(canonical_repo, entry);
+        }
+        Ok(Self {
+            workspace,
+            entries: Arc::new(result),
+        })
+    }
+
+    fn get(
+        &self,
+        request: &RepositoryMaterializationRequest,
+    ) -> Option<&RepositoryMaterializationEpochEntry> {
+        (self.workspace == request.id.workspace)
+            .then(|| self.entries.get(&request.id.canonical_repo))
+            .flatten()
+    }
+}
+
+fn result_kind_matches(
+    kind: &RepositoryMaterializationKind,
+    result: &RepositoryMaterializationResult,
+) -> bool {
+    matches!(
+        (kind, result),
+        (_, RepositoryMaterializationResult::SpecError(_))
+            | (_, RepositoryMaterializationResult::TransportError { .. })
+            | (
+                _,
+                RepositoryMaterializationResult::MaterializationError { .. }
+            )
+            | (
+                RepositoryMaterializationKind::Local { .. },
+                RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local)
+            )
+            | (
+                RepositoryMaterializationKind::Immutable,
+                RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Immutable { .. }
+                )
+            )
+    )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RepositoryMaterializationResultEpochKey {
+    pub workspace: NormalizedAbsolutePath,
+}
+
+impl fmt::Display for RepositoryMaterializationResultEpochKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "repository-materialization-results:{}", self.workspace)
+    }
+}
+
+impl InjectedKey for RepositoryMaterializationResultEpochKey {
+    type Value = RepositoryMaterializationResultEpoch;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
 }
 
 /// Prepares one module's raw MODULE.bazel bytes. `version` is already the
@@ -228,10 +508,9 @@ pub trait RepositoryIo: Send + Sync + 'static {
     ) -> Result<RepositoryIoOutcome, RepositoryTransportError>;
 }
 
-struct RepositoryIoHandle(Arc<dyn RepositoryIo>);
-
-pub fn install_repository_io(builder: &mut DiceDataBuilder, io: Arc<dyn RepositoryIo>) {
-    builder.set(RepositoryIoHandle(io));
+pub fn install_repository_io(_: &mut DiceDataBuilder, _: Arc<dyn RepositoryIo>) {
+    // Kept for the core runtime's compile-time integration boundary. The
+    // request/result graph intentionally never reads this capability in DICE.
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -250,53 +529,18 @@ pub enum RepositoryMaterialization {
     },
 }
 
-impl RepositoryMaterialization {
-    fn equivalent_to(&self, other: &Self) -> bool {
-        match (self, other) {
-            (
-                Self::Local {
-                    canonical_repo: left_repo,
-                    repo_spec: left_spec,
-                    source_root: left_root,
-                },
-                Self::Local {
-                    canonical_repo: right_repo,
-                    repo_spec: right_spec,
-                    source_root: right_root,
-                },
-            ) => left_repo == right_repo && left_spec == right_spec && left_root == right_root,
-            (
-                Self::Immutable {
-                    canonical_repo: left_repo,
-                    repo_spec: left_spec,
-                    source_identity: left_identity,
-                    ..
-                },
-                Self::Immutable {
-                    canonical_repo: right_repo,
-                    repo_spec: right_spec,
-                    source_identity: right_identity,
-                    ..
-                },
-            ) => {
-                left_repo == right_repo
-                    && left_spec == right_spec
-                    && left_identity == right_identity
-            }
-            _ => false,
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum RepositoryMaterializationError {
     RootModuleFiles(CompactString),
     MissingOverride(CompactString),
     UnsupportedOverride(CompactString),
     InvalidCanonicalRepository(CompactString),
-    MissingIoCapability,
+    InvalidWorkspace(CompactString),
+    ResultCompute(CompactString),
     MissingGeneration(CompactString),
+    Spec(CompactString),
     Transport(CompactString),
+    Materialization(CompactString),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -320,10 +564,6 @@ pub enum RepositorySourceFileError {
     Materialization {
         repo_relative_path: Arc<PathBuf>,
         error: Arc<RepositoryMaterializationError>,
-    },
-    MaterializationGenerationCompute {
-        repo_relative_path: Arc<PathBuf>,
-        message: Arc<str>,
     },
     InvalidMaterializedPath {
         repo_relative_path: Arc<PathBuf>,
@@ -359,9 +599,21 @@ pub enum RepositorySourceFileError {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct RepositoryMaterializationRequestKey {
+    workspace: PathBuf,
+    module_name: CompactString,
+}
+
+impl fmt::Display for RepositoryMaterializationRequestKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "repository-materialization-request:{}", self.module_name)
+    }
+}
+
 #[async_trait]
-impl Key for RepositoryMaterializationKey {
-    type Value = Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>;
+impl Key for RepositoryMaterializationRequestKey {
+    type Value = Arc<Result<RepositoryMaterializationRequest, RepositoryMaterializationError>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let root_files = match ctx
@@ -410,52 +662,272 @@ impl Key for RepositoryMaterializationKey {
                 ));
             }
         };
-        let io = match ctx.global_data().get::<RepositoryIoHandle>() {
-            Ok(handle) => handle.0.clone(),
-            Err(_) => return Arc::new(Err(RepositoryMaterializationError::MissingIoCapability)),
-        };
-        let result = match io.materialize(&self.workspace, &repo_spec).await {
-            Ok(RepositoryIoOutcome::Local { source_root }) => {
-                Ok(RepositoryMaterialization::Local {
-                    canonical_repo,
-                    repo_spec,
-                    source_root,
-                })
-            }
-            Ok(RepositoryIoOutcome::Immutable {
-                source_identity,
-                generation_root,
-                observation_instance,
-            }) => Ok(RepositoryMaterialization::Immutable {
-                canonical_repo,
-                repo_spec,
-                source_identity,
-                generation_root,
-                observation_instance,
-            }),
-            Err(error) => Err(RepositoryMaterializationError::Transport(error.message)),
-        };
-        if result.is_err() {
-            if let Err(error) = ctx
-                .compute(&RepositoryMaterializationGenerationKey {
-                    workspace: self.workspace.clone(),
-                })
-                .await
-            {
-                return Arc::new(Err(RepositoryMaterializationError::MissingGeneration(
+        let workspace = match NormalizedAbsolutePath::new(self.workspace.clone()) {
+            Ok(workspace) => workspace,
+            Err(error) => {
+                return Arc::new(Err(RepositoryMaterializationError::InvalidWorkspace(
                     error.to_string().into(),
                 )));
             }
-        }
-        Arc::new(result)
+        };
+        let kind = match request_kind(&workspace, &repo_spec) {
+            Ok(kind) => kind,
+            Err(error) => return Arc::new(Err(error)),
+        };
+        Arc::new(Ok(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace,
+                canonical_repo,
+            },
+            repo_spec,
+            kind,
+        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        match (x.as_ref(), y.as_ref()) {
-            (Ok(left), Ok(right)) => left.equivalent_to(right),
-            (Err(left), Err(right)) => left == right,
-            _ => false,
+        x == y
+    }
+}
+
+fn request_kind(
+    workspace: &NormalizedAbsolutePath,
+    repo_spec: &RepoSpec,
+) -> Result<RepositoryMaterializationKind, RepositoryMaterializationError> {
+    let local_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
+        .expect("pinned local repository label is canonical");
+    if repo_spec.rule_id.bzl_file == local_bzl && repo_spec.rule_id.rule_name == "local_repository"
+    {
+        if repo_spec.attributes.len() != 1 {
+            return Err(RepositoryMaterializationError::Spec(
+                "local_repository has unsupported attributes".into(),
+            ));
         }
+        let Some(OverrideAttributeValue::String(path)) = repo_spec.attributes.get("path") else {
+            return Err(RepositoryMaterializationError::Spec(
+                "local_repository requires a string path".into(),
+            ));
+        };
+        let relative = Path::new(path.as_str());
+        if relative.as_os_str().is_empty()
+            || relative.is_absolute()
+            || relative
+                .components()
+                .any(|component| !matches!(component, Component::Normal(_)))
+        {
+            return Err(RepositoryMaterializationError::Spec(
+                "local_repository path must be normalized and workspace-relative".into(),
+            ));
+        }
+        let root = NormalizedAbsolutePath::new(workspace.as_path().join(relative))
+            .map_err(|error| RepositoryMaterializationError::Spec(error.to_string().into()))?;
+        return Ok(RepositoryMaterializationKind::Local { logical_root: root });
+    }
+    let http_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:http.bzl")
+        .expect("pinned http repository label is canonical");
+    let git_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:git.bzl")
+        .expect("pinned git repository label is canonical");
+    if (repo_spec.rule_id.bzl_file == http_bzl && repo_spec.rule_id.rule_name == "http_archive")
+        || (repo_spec.rule_id.bzl_file == git_bzl
+            && repo_spec.rule_id.rule_name == "git_repository")
+    {
+        return Ok(RepositoryMaterializationKind::Immutable);
+    }
+    Err(RepositoryMaterializationError::Spec(
+        "unsupported repository override rule".into(),
+    ))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct RepositoryMaterializationResultKey {
+    request: Arc<RepositoryMaterializationRequest>,
+}
+
+impl Hash for RepositoryMaterializationResultKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.request.id.workspace.hash(state);
+        self.request.id.canonical_repo.hash(state);
+    }
+}
+
+impl fmt::Display for RepositoryMaterializationResultKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "repository-materialization-result:{}",
+            self.request.id.canonical_repo
+        )
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryMaterializationResultKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let epoch = match ctx
+            .compute(&RepositoryMaterializationResultEpochKey {
+                workspace: self.request.id.workspace.dupe(),
+            })
+            .await
+        {
+            Ok(epoch) => epoch,
+            Err(_) => {
+                return SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
+                    (*self.request).clone(),
+                ));
+            }
+        };
+        let Some(entry) = epoch.get(&self.request) else {
+            return SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
+                (*self.request).clone(),
+            ));
+        };
+        if entry.request != self.request {
+            return SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
+                (*self.request).clone(),
+            ));
+        }
+        let result = match &entry.result {
+            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local) => {
+                let RepositoryMaterializationKind::Local { logical_root } = &self.request.kind
+                else {
+                    unreachable!("validated epoch success kind must match request kind");
+                };
+                Ok(RepositoryMaterialization::Local {
+                    canonical_repo: self.request.id.canonical_repo.clone(),
+                    repo_spec: self.request.repo_spec.clone(),
+                    source_root: logical_root.as_path().to_owned(),
+                })
+            }
+            RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Immutable {
+                    source_identity,
+                    generation_root,
+                    observation_instance,
+                },
+            ) => Ok(RepositoryMaterialization::Immutable {
+                canonical_repo: self.request.id.canonical_repo.clone(),
+                repo_spec: self.request.repo_spec.clone(),
+                source_identity: source_identity.clone(),
+                generation_root: generation_root.clone(),
+                observation_instance: *observation_instance,
+            }),
+            RepositoryMaterializationResult::SpecError(message) => {
+                Err(RepositoryMaterializationError::Spec(message.clone()))
+            }
+            RepositoryMaterializationResult::TransportError {
+                generation,
+                message,
+            } => {
+                let current = match ctx
+                    .compute(&RepositoryMaterializationGenerationKey {
+                        workspace: self.request.id.workspace.as_path().to_owned(),
+                    })
+                    .await
+                {
+                    Ok(current) => current,
+                    Err(error) => {
+                        return SourcePreparationOutcome::Complete(Arc::new(Err(
+                            RepositoryMaterializationError::MissingGeneration(
+                                error.to_string().into(),
+                            ),
+                        )));
+                    }
+                };
+                if current != *generation {
+                    return SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
+                        (*self.request).clone(),
+                    ));
+                }
+                Err(RepositoryMaterializationError::Transport(message.clone()))
+            }
+            RepositoryMaterializationResult::MaterializationError {
+                generation,
+                message,
+            } => {
+                let current = match ctx
+                    .compute(&RepositoryMaterializationGenerationKey {
+                        workspace: self.request.id.workspace.as_path().to_owned(),
+                    })
+                    .await
+                {
+                    Ok(current) => current,
+                    Err(error) => {
+                        return SourcePreparationOutcome::Complete(Arc::new(Err(
+                            RepositoryMaterializationError::MissingGeneration(
+                                error.to_string().into(),
+                            ),
+                        )));
+                    }
+                };
+                if current != *generation {
+                    return SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
+                        (*self.request).clone(),
+                    ));
+                }
+                Err(RepositoryMaterializationError::Materialization(
+                    message.clone(),
+                ))
+            }
+        };
+        SourcePreparationOutcome::Complete(Arc::new(result))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryMaterializationKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let request = match ctx
+            .compute(&RepositoryMaterializationRequestKey {
+                workspace: self.workspace.clone(),
+                module_name: self.module_name.clone(),
+            })
+            .await
+        {
+            Ok(request) => request,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    RepositoryMaterializationError::RootModuleFiles(error.to_string().into()),
+                )));
+            }
+        };
+        let request = match request.as_ref() {
+            Ok(request) => request.clone(),
+            Err(error) => return SourcePreparationOutcome::Complete(Arc::new(Err(error.clone()))),
+        };
+        match ctx
+            .compute(&RepositoryMaterializationResultKey {
+                request: Arc::new(request),
+            })
+            .await
+        {
+            Ok(value) => value,
+            Err(error) => SourcePreparationOutcome::Complete(Arc::new(Err(
+                RepositoryMaterializationError::ResultCompute(error.to_string().into()),
+            ))),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
     }
 }
 
@@ -585,13 +1057,13 @@ async fn observed_repository_source_file(
 
 #[async_trait]
 impl Key for RepositorySourceFileKey {
-    type Value = PathResult<RepositorySourceFileValue, RepositorySourceFileError>;
+    type Value = SourcePreparationResult<RepositorySourceFileValue, RepositorySourceFileError>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let relative = match checked_relative_path(&self.repo_relative_path) {
             Ok(relative) => relative,
             Err(_) => {
-                return PathOutcome::Complete(Err(
+                return SourcePreparationOutcome::Complete(Err(
                     RepositorySourceFileError::InvalidRepoRelativePath {
                         requested_path: Arc::new(self.repo_relative_path.clone()),
                     },
@@ -608,7 +1080,7 @@ impl Key for RepositorySourceFileKey {
         {
             Ok(value) => value,
             Err(error) => {
-                return PathOutcome::Complete(Err(
+                return SourcePreparationOutcome::Complete(Err(
                     RepositorySourceFileError::MaterializationCompute {
                         repo_relative_path,
                         message: Arc::from(error.to_string()),
@@ -616,53 +1088,46 @@ impl Key for RepositorySourceFileKey {
                 ));
             }
         };
+        let materialization = match materialization {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(value) => value,
+        };
         let materialization = match materialization.as_ref() {
             Ok(value) => value,
             Err(error) => {
-                if let Err(generation_error) = ctx
-                    .compute(&RepositoryMaterializationGenerationKey {
-                        workspace: self.workspace.clone(),
-                    })
-                    .await
-                {
-                    return PathOutcome::Complete(Err(
-                        RepositorySourceFileError::MaterializationGenerationCompute {
-                            repo_relative_path,
-                            message: Arc::from(generation_error.to_string()),
-                        },
-                    ));
-                }
-                return PathOutcome::Complete(Err(RepositorySourceFileError::Materialization {
-                    repo_relative_path,
-                    error: Arc::new(error.clone()),
-                }));
+                return SourcePreparationOutcome::Complete(Err(
+                    RepositorySourceFileError::Materialization {
+                        repo_relative_path,
+                        error: Arc::new(error.clone()),
+                    },
+                ));
             }
         };
         match materialization {
-            RepositoryMaterialization::Local { source_root, .. } => {
+            RepositoryMaterialization::Local { source_root, .. } => source_outcome_from_path(
                 observed_repository_source_file(
                     ctx,
                     PathObservationNamespace::Host,
-                    source_root,
+                    &source_root,
                     relative,
                     repo_relative_path,
                 )
-                .await
-            }
+                .await,
+            ),
             RepositoryMaterialization::Immutable {
                 generation_root,
                 observation_instance,
                 ..
-            } => {
+            } => source_outcome_from_path(
                 observed_repository_source_file(
                     ctx,
                     PathObservationNamespace::Materialization(*observation_instance),
-                    generation_root,
+                    &generation_root,
                     relative,
                     repo_relative_path,
                 )
-                .await
-            }
+                .await,
+            ),
         }
     }
 
@@ -677,7 +1142,9 @@ impl Key for RepositorySourceFileKey {
 
 #[async_trait]
 impl Key for ModuleSourcePreparationKey {
-    type Value = PathOutcome<Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>>>;
+    type Value = SourcePreparationOutcome<
+        Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>>,
+    >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let root = match ctx
@@ -688,7 +1155,7 @@ impl Key for ModuleSourcePreparationKey {
         {
             Ok(value) => value,
             Err(error) => {
-                return PathOutcome::Complete(Arc::new(Err(
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
                     ModuleSourcePreparationError::RootModuleFiles(error.to_string().into()),
                 )));
             }
@@ -696,7 +1163,7 @@ impl Key for ModuleSourcePreparationKey {
         let root = match root.as_ref() {
             Ok(value) => value,
             Err(error) => {
-                return PathOutcome::Complete(Arc::new(Err(
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
                     ModuleSourcePreparationError::RootModuleFiles(error.clone()),
                 )));
             }
@@ -711,26 +1178,28 @@ impl Key for ModuleSourcePreparationKey {
                 })
                 .await
             {
-                Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
-                Ok(PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes)))) => {
-                    Ok(ModuleSourcePreparation::NonRegistry { bytes })
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
                 }
-                Ok(PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent))) => {
+                Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(
+                    bytes,
+                )))) => Ok(ModuleSourcePreparation::NonRegistry { bytes }),
+                Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))) => {
                     Err(ModuleSourcePreparationError::ModuleNotFound {
                         module_file_attempts: Arc::from([]),
                     })
                 }
-                Ok(PathOutcome::Complete(Err(error))) => {
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => {
                     Err(ModuleSourcePreparationError::Source(error))
                 }
                 Err(error) => Err(ModuleSourcePreparationError::SourceCompute(Arc::from(
                     error.to_string(),
                 ))),
             };
-            return PathOutcome::Complete(Arc::new(value));
+            return SourcePreparationOutcome::Complete(Arc::new(value));
         }
         if self.version.is_empty() {
-            return PathOutcome::Complete(Arc::new(Err(
+            return SourcePreparationOutcome::Complete(Arc::new(Err(
                 ModuleSourcePreparationError::MissingVersion,
             )));
         }
@@ -742,7 +1211,7 @@ impl Key for ModuleSourcePreparationKey {
         {
             Ok(value) => value,
             Err(error) => {
-                return PathOutcome::Complete(Arc::new(Err(
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
                     ModuleSourcePreparationError::RegistryPolicyCompute(error.to_string().into()),
                 )));
             }
@@ -750,7 +1219,7 @@ impl Key for ModuleSourcePreparationKey {
         let policy = match policy.as_ref() {
             Ok(value) => value,
             Err(error) => {
-                return PathOutcome::Complete(Arc::new(Err(
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
                     ModuleSourcePreparationError::RegistryPolicy(error.clone()),
                 )));
             }
@@ -771,14 +1240,16 @@ impl Key for ModuleSourcePreparationKey {
                 .prepare_from_registry(ctx, override_.as_ref(), registry, &module, &mut attempts)
                 .await
             {
-                PathOutcome::Need(need) => PathOutcome::Need(need),
-                PathOutcome::Complete(result) => PathOutcome::Complete(Arc::new(match result {
-                    Ok(Some(value)) => Ok(value),
-                    Ok(None) => Err(ModuleSourcePreparationError::ModuleNotFound {
-                        module_file_attempts: Arc::from(attempts),
-                    }),
-                    Err(error) => Err(error),
-                })),
+                PathOutcome::Need(need) => SourcePreparationOutcome::path_need(need),
+                PathOutcome::Complete(result) => {
+                    SourcePreparationOutcome::Complete(Arc::new(match result {
+                        Ok(Some(value)) => Ok(value),
+                        Ok(None) => Err(ModuleSourcePreparationError::ModuleNotFound {
+                            module_file_attempts: Arc::from(attempts),
+                        }),
+                        Err(error) => Err(error),
+                    }))
+                }
             };
         }
         let mut attempts = Vec::new();
@@ -793,17 +1264,17 @@ impl Key for ModuleSourcePreparationKey {
                 )
                 .await
             {
-                PathOutcome::Need(need) => return PathOutcome::Need(need),
+                PathOutcome::Need(need) => return SourcePreparationOutcome::path_need(need),
                 PathOutcome::Complete(Ok(Some(value))) => {
-                    return PathOutcome::Complete(Arc::new(Ok(value)));
+                    return SourcePreparationOutcome::Complete(Arc::new(Ok(value)));
                 }
                 PathOutcome::Complete(Ok(None)) => {}
                 PathOutcome::Complete(Err(error)) => {
-                    return PathOutcome::Complete(Arc::new(Err(error)));
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(error)));
                 }
             }
         }
-        PathOutcome::Complete(Arc::new(Err(
+        SourcePreparationOutcome::Complete(Arc::new(Err(
             ModuleSourcePreparationError::ModuleNotFound {
                 module_file_attempts: Arc::from(attempts),
             },
@@ -1053,6 +1524,8 @@ pub fn source_identity(bytes: &[u8]) -> Arc<str> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::hash_map::DefaultHasher;
+
     use super::*;
 
     fn immutable(root: &str, instance: u64) -> RepositoryMaterialization {
@@ -1075,11 +1548,57 @@ mod tests {
     }
 
     #[test]
-    fn immutable_materialization_equality_excludes_generation_root_and_instance() {
+    fn immutable_materialization_equality_is_operationally_exact() {
         let left = Arc::new(Ok(immutable("/tmp/generation-a", 1)));
         let right = Arc::new(Ok(immutable("/tmp/generation-b", 2)));
 
         assert_ne!(left, right);
-        assert!(RepositoryMaterializationKey::equality(&left, &right));
+        assert!(!RepositoryMaterializationKey::equality(
+            &SourcePreparationOutcome::Complete(left),
+            &SourcePreparationOutcome::Complete(right),
+        ));
+    }
+
+    #[test]
+    fn result_key_equality_is_exact_while_hash_intentionally_collides_across_repo_specs() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let request = RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace,
+                canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: RepoSpec {
+                rule_id: crate::RepoRuleId {
+                    bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "http_archive".into(),
+                },
+                attributes: Arc::default(),
+            },
+            kind: RepositoryMaterializationKind::Immutable,
+        };
+        let equal = RepositoryMaterializationResultKey {
+            request: Arc::new(request.clone()),
+        };
+        let mut distinct_request = request.clone();
+        distinct_request.repo_spec.rule_id.rule_name = "git_repository".into();
+        let distinct = RepositoryMaterializationResultKey {
+            request: Arc::new(distinct_request),
+        };
+        let key = RepositoryMaterializationResultKey {
+            request: Arc::new(request),
+        };
+        let hash = |key: &RepositoryMaterializationResultKey| {
+            let mut state = DefaultHasher::new();
+            key.hash(&mut state);
+            state.finish()
+        };
+
+        assert_eq!(key, equal);
+        assert_eq!(hash(&key), hash(&equal));
+        assert_ne!(key, distinct);
+        assert_eq!(hash(&key), hash(&distinct));
     }
 }
