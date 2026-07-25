@@ -162,3 +162,52 @@ Residual risk: Runtime still cannot produce structural Host or
 Materialization observations. Design only
 `WP-5-m1-runtime-path-observation-producer-design` next; do not combine the
 producer with retained materializer correction, epoch injection, or retries.
+
+### Stage 5 runtime path-observation producer design
+
+Status: Replanned before Rust
+
+Preserved contract: The smallest producer remains a private synchronous
+runtime kernel in one new `path_observation.rs` plus one private module
+declaration. A compact sorted shared slice maps nonzero materialization
+instances to retained roots for authorization only; the producer prevalidates
+all instances and duplicate demands before deterministic filesystem work.
+Host and Materialization demands retain distinct identities while observing
+their exact normalized absolute physical paths, including materialization
+symlink escapes. The future caller must retain the materialization owner for
+the whole synchronous call and may not store the snapshot independently.
+
+Operation contract: Exact `Lstat`, raw `ReadLink`, exact `FileBytes`, and
+sorted raw-OS-native `DirectoryEntries` results form one complete epoch or a
+typed structural/runtime error. Every syscall retries `Interrupted`.
+`Lstat` maps missing paths and non-directory ancestors to Missing. ReadLink
+and DirectoryEntries use an auxiliary no-follow stat only to distinguish a
+present wrong kind from a missing target or ancestor; FileBytes similarly
+distinguishes a present directory from a missing ancestor. Directory
+collection discards partial results and restarts without a cap for
+`Interrupted` or Unix `EIO`. The producer never fabricates
+`InconsistentState`, performs containment or canonicalization, touches DICE,
+or filters ctime/permissions from exact epoch equality.
+
+Pinned metadata contract: Unix lstat retains no-follow kind, signed size/node,
+millisecond mtime/ctime using wrapping Bazel arithmetic, and `mode & 0777`.
+Windows must retain node `-1`, Bazel permission bits, name-surrogate reparse
+links/junctions, and Device or other reparse nodes as special. Mtime uses the
+OpenJDK two-stage signed FILETIME formula while ctime uses Bazel's direct
+signed formula.
+
+Reason for `REPLAN`: Rust's unstable `MetadataExt::change_time()` returns
+`None` on ordinary desktop Windows and cannot provide Bazel's native ctime.
+A private raw Win32 query is ABI-feasible without Cargo or crate features, but
+the first correction still omitted Bazel's `WindowsPathOperations.asLongPath`
+transformation and misclassified path/query failures as outer producer errors.
+Pinned Bazel and feasibility reviews require raw UTF-16 verbatim-path
+transformation before no-follow `CreateFileW`, immediate error capture,
+`FILE_BASIC_INFO`, and operation-level Missing/InvalidInput/PermissionDenied/
+exact-I/O projection.
+
+Next evidence: Run only
+`WP-5-m1-runtime-path-observation-producer-design-correction`. Correct and
+rereview the Windows path/query and operation-result contract while preserving
+the private two-file boundary; do not edit Rust or combine the producer with
+runtime materialization, epoch injection, retry, or publication.
