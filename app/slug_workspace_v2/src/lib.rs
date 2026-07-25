@@ -21,6 +21,33 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use starlark_map::sorted_map::SortedMap;
 
+mod path_observation;
+
+pub use path_observation::DuplicatePathDirectoryName;
+pub use path_observation::EmptyPathObservationNeed;
+pub use path_observation::InvalidPathDirectoryName;
+pub use path_observation::NeedPathObservations;
+pub use path_observation::NormalizedAbsolutePath;
+pub use path_observation::PathDirectoryEntries;
+pub use path_observation::PathDirectoryName;
+pub use path_observation::PathIoErrorKind;
+pub use path_observation::PathLstat;
+pub use path_observation::PathNodeKind;
+pub use path_observation::PathNormalizationError;
+pub use path_observation::PathObservationDemand;
+pub use path_observation::PathObservationEpoch;
+pub use path_observation::PathObservationEpochError;
+pub use path_observation::PathObservationEpochKey;
+pub use path_observation::PathObservationError;
+pub use path_observation::PathObservationInstanceId;
+pub use path_observation::PathObservationKey;
+pub use path_observation::PathObservationNamespace;
+pub use path_observation::PathObservationOperation;
+pub use path_observation::PathObservationResult;
+pub use path_observation::PathOperationResult;
+pub use path_observation::PathOutcome;
+pub use path_observation::PathResult;
+
 /// An observation supplied to the workspace DICE graph before loading begins.
 ///
 /// The value deliberately distinguishes a file that does not exist from a
