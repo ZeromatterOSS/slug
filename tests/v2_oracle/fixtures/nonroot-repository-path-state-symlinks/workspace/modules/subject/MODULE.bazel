@@ -1,0 +1,4 @@
+module(name = "subject", version = "1.0.0")
+
+include("//logical:payload.MODULE.bazel")
+include("//escape:escape.MODULE.bazel")

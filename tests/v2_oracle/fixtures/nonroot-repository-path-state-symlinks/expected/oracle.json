@@ -1,0 +1,534 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "baseline_two_hop_ancestor_orders_payload_then_escape",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a2a9842a-cfa0-4c74-8d29-de9d59a191f3\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a2a9842a-cfa0-4c74-8d29-de9d59a191f3\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 4.645s, Critical Path: 0.01s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a2a9842a-cfa0-4c74-8d29-de9d59a191f3\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "unchanged_warm_request_does_not_replay",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e5869238-1a83-4435-8167-30206a0ce4db\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e5869238-1a83-4435-8167-30206a0ce4db\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.038s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e5869238-1a83-4435-8167-30206a0ce4db\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "NONROOT_PATH_STATE_PAYLOAD_A",
+          "old_digest_hint": "38",
+          "path": "modules/subject/backing/a/payload.real.MODULE.bazel",
+          "replace": "NONROOT_PATH_STATE_PAYLOAD_EDIT"
+        }
+      ],
+      "name": "real_payload_bytes_a_to_edit",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_EDIT\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 59b979da-6b3c-432d-b983-e4bc36c2ff86\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/59b979da-6b3c-432d-b983-e4bc36c2ff86\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_EDIT\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.039s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/59b979da-6b3c-432d-b983-e4bc36c2ff86\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "NONROOT_PATH_STATE_PAYLOAD_EDIT",
+          "old_digest_hint": "41",
+          "path": "modules/subject/backing/a/payload.real.MODULE.bazel",
+          "replace": "NONROOT_PATH_STATE_PAYLOAD_A"
+        }
+      ],
+      "name": "real_payload_bytes_edit_to_a",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: d7e90388-b642-4d55-a7dc-62afa00d4826\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d7e90388-b642-4d55-a7dc-62afa00d4826\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.034s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d7e90388-b642-4d55-a7dc-62afa00d4826\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "modules/subject/logical.a",
+          "op": "rename",
+          "path": "modules/subject/logical"
+        },
+        {
+          "destination": "modules/subject/logical",
+          "op": "rename",
+          "path": "modules/subject/logical.b"
+        }
+      ],
+      "name": "logical_directory_retargets_a_to_b",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_B\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 633917f3-aad1-4bea-95ba-1022191961d4\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/633917f3-aad1-4bea-95ba-1022191961d4\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_B\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.031s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/633917f3-aad1-4bea-95ba-1022191961d4\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "modules/subject/logical.b",
+          "op": "rename",
+          "path": "modules/subject/logical"
+        },
+        {
+          "destination": "modules/subject/logical",
+          "op": "rename",
+          "path": "modules/subject/logical.a"
+        }
+      ],
+      "name": "logical_directory_retargets_b_to_a",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: d992afc5-900b-466c-9118-e02f932169b5\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d992afc5-900b-466c-9118-e02f932169b5\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.028s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d992afc5-900b-466c-9118-e02f932169b5\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "modules/subject/backing/a/payload.real.MODULE.bazel"
+        }
+      ],
+      "name": "symlinked_payload_target_delete_fails",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: error reading '//logical:payload.MODULE.bazel' included at @@subject+//:MODULE.bazel:3:1: not a regular file\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 93c8a4db-a64d-4d98-b6bc-1be8473c2132\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/93c8a4db-a64d-4d98-b6bc-1be8473c2132\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: error reading '//logical:payload.MODULE.bazel' included at @@subject+//:MODULE.bazel:3:1: not a regular file\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/93c8a4db-a64d-4d98-b6bc-1be8473c2132\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "modules/subject/backing/a/payload.real.MODULE.bazel"
+        }
+      ],
+      "name": "symlinked_payload_target_recreate_recovers",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ef12ac83-1e5b-49b9-8071-31cfcda59e8b\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ef12ac83-1e5b-49b9-8071-31cfcda59e8b\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.059s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ef12ac83-1e5b-49b9-8071-31cfcda59e8b\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "modules/subject/logical.a",
+          "op": "rename",
+          "path": "modules/subject/logical"
+        },
+        {
+          "destination": "modules/subject/logical",
+          "op": "rename",
+          "path": "modules/subject/dangling"
+        }
+      ],
+      "name": "dangling_directory_ancestor_fails_before_execution",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: unable to load package for '//logical:payload.MODULE.bazel' included at @@subject+//:MODULE.bazel:3:1: BUILD file not found in directory 'logical' of external repository @@subject+. Add a BUILD file to a directory to mark it as a package.\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 9ba31a30-9dff-4522-88c9-4e288941b7bc\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/9ba31a30-9dff-4522-88c9-4e288941b7bc\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: unable to load package for '//logical:payload.MODULE.bazel' included at @@subject+//:MODULE.bazel:3:1: BUILD file not found in directory 'logical' of external repository @@subject+. Add a BUILD file to a directory to mark it as a package.\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/9ba31a30-9dff-4522-88c9-4e288941b7bc\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "modules/subject/dangling",
+          "op": "rename",
+          "path": "modules/subject/logical"
+        },
+        {
+          "destination": "modules/subject/logical",
+          "op": "rename",
+          "path": "modules/subject/logical.a"
+        }
+      ],
+      "name": "dangling_directory_ancestor_recovers",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 5e197b87-1349-4f64-afd0-40d101478a7b\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/5e197b87-1349-4f64-afd0-40d101478a7b\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.051s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/5e197b87-1349-4f64-afd0-40d101478a7b\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "modules/subject/backing/a/BUILD.bazel"
+        }
+      ],
+      "name": "primary_build_delete_selects_fallback",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 3863e3f6-e410-490b-ac00-d2b344dfbf1a\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3863e3f6-e410-490b-ac00-d2b344dfbf1a\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.027s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3863e3f6-e410-490b-ac00-d2b344dfbf1a\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "modules/subject/backing/a/BUILD.bazel"
+        }
+      ],
+      "name": "primary_build_recreate_restores_priority",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: b4ef0924-d465-4fe7-898d-98785b74a4b7\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b4ef0924-d465-4fe7-898d-98785b74a4b7\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.027s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b4ef0924-d465-4fe7-898d-98785b74a4b7\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "modules/subject/logical.a",
+          "op": "rename",
+          "path": "modules/subject/logical"
+        },
+        {
+          "destination": "modules/subject/logical",
+          "op": "rename",
+          "path": "modules/subject/logical.cycle"
+        }
+      ],
+      "name": "self_cycle_fails_with_uniqueness_block",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: circular symlinks detected\n[start of symlink cycle]\n<workspace>/modules/subject/logical\n[end of symlink cycle]\nERROR: Error computing the main repository mapping: Symlink cycle detected while trying to find BUILD.bazel file <output_base>/external/subject+/logical/BUILD.bazel\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 6f56c1eb-1893-4497-8668-7d7356358292\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/6f56c1eb-1893-4497-8668-7d7356358292\nComputing main repo mapping: \nERROR: circular symlinks detected\n[start of symlink cycle]\n/run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/runs/nonroot-repository-path-state-symlinks/20260725-000236-2103303-bazel/workspace/modules/subject/logical\n[end of symlink cycle]\nERROR: Error computing the main repository mapping: Symlink cycle detected while trying to find BUILD.bazel file /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/BUILD.bazel\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/6f56c1eb-1893-4497-8668-7d7356358292\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "modules/subject/logical.cycle",
+          "op": "rename",
+          "path": "modules/subject/logical"
+        },
+        {
+          "destination": "modules/subject/logical",
+          "op": "rename",
+          "path": "modules/subject/logical.a"
+        }
+      ],
+      "name": "self_cycle_recovery",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: db6f80eb-c575-44fc-8fec-8232e420e5cb\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/db6f80eb-c575-44fc-8fec-8232e420e5cb\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.043s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/db6f80eb-c575-44fc-8fec-8232e420e5cb\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 1,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "modules/subject/logical.a",
+          "op": "rename",
+          "path": "modules/subject/logical"
+        },
+        {
+          "destination": "modules/subject/logical",
+          "op": "rename",
+          "path": "modules/subject/logical.expand"
+        }
+      ],
+      "name": "descendant_expansion_fails_with_uniqueness_block",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: infinite symlink expansion detected\n[start of symlink chain]\n<workspace>/modules/subject/logical\n<workspace>/modules/subject/logical/sub\n[end of symlink chain]\nERROR: Error computing the main repository mapping: Infinite symlink expansion detected while trying to find BUILD.bazel file <output_base>/external/subject+/logical/BUILD.bazel\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 2bb4e805-f3f3-48a5-b16c-ba5edf8e8779\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2bb4e805-f3f3-48a5-b16c-ba5edf8e8779\nComputing main repo mapping: \nERROR: infinite symlink expansion detected\n[start of symlink chain]\n/run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/runs/nonroot-repository-path-state-symlinks/20260725-000236-2103303-bazel/workspace/modules/subject/logical\n/run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/runs/nonroot-repository-path-state-symlinks/20260725-000236-2103303-bazel/workspace/modules/subject/logical/sub\n[end of symlink chain]\nERROR: Error computing the main repository mapping: Infinite symlink expansion detected while trying to find BUILD.bazel file /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/BUILD.bazel\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2bb4e805-f3f3-48a5-b16c-ba5edf8e8779\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "modules/subject/logical.expand",
+          "op": "rename",
+          "path": "modules/subject/logical"
+        },
+        {
+          "destination": "modules/subject/logical",
+          "op": "rename",
+          "path": "modules/subject/logical.a"
+        }
+      ],
+      "name": "descendant_expansion_recovery",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: <output_base>/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 2336cf2d-bca9-4704-863a-f973e793e801\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2336cf2d-bca9-4704-863a-f973e793e801\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/logical/payload.MODULE.bazel:1:6: NONROOT_PATH_STATE_PAYLOAD_A\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o-path-state-correction-generation/ob/nonroot-repository-path-state-symlinks/bazel/external/subject+/escape/escape.MODULE.bazel:1:6: NONROOT_PATH_STATE_ESCAPE\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.046s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2336cf2d-bca9-4704-863a-f973e793e801\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "nonroot-repository-path-state-symlinks",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

@@ -1,0 +1,242 @@
+[fixture]
+name = "nonroot-repository-path-state-symlinks"
+description = "Retained-daemon oracle for non-root repository path state through symlinked ancestors, escaped roots, leaf bytes, lifecycle transitions, cycles, and descendant expansion."
+comparison = "semantic"
+daemon = true
+oracle_notes = "The subject module evaluates its logical payload before the fixture-local escaped payload. One stable logical package starts through a two-hop directory alias, retargets A to B to A, becomes dangling, self-cyclic, or descendant-expanding, and recovers. Both payload leaves are symlinks to regular fragment bytes. BUILD.bazel priority and BUILD fallback are exercised only in backing A. Parked checked links pin the two distinct Bazel symlink errors without requiring the harness to create links."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/skyframe/FileFunction.java: compute, resolveFromAncestors, getSymlinkTargetRootedPath, checkAndNotePathSeenDuringPartialResolution",
+  "src/main/java/com/google/devtools/build/lib/actions/FileValue.java",
+  "src/main/java/com/google/devtools/build/lib/actions/FileStateValue.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/ExternalFilesHelper.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupFunction.java: getFileValue, computeExternalPackageLookupValue",
+  "src/test/java/com/google/devtools/build/lib/skyframe/FileFunctionTest.java: testExternalRelativeSymlink, testSymlinkAsAncestor, testTwoSymlinksInAncestors, testSymlinkTargetChange, symlink cycle and infinite expansion tests",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java: advanceHorizon, execModuleFile",
+]
+translation_notes = "All checked links are relative and remain within the copied workspace. The escape link leaves only the overridden subject repository and resolves to workspace/modules/outside. Absolute host links, special files, ordinary permission failures, and Windows reparse behavior remain source-derived. Ordered exact-once prints prove horizon preflight, current bytes, target routing, recovery, and warm nonreplay."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-repository-path-state-symlinks --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-repository-path-state-symlinks --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "baseline_two_hop_ancestor_orders_payload_then_escape"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+[[commands]]
+name = "unchanged_warm_request_does_not_replay"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*NONROOT_PATH_STATE_PAYLOAD_A)(?!.*NONROOT_PATH_STATE_PAYLOAD_EDIT)(?!.*NONROOT_PATH_STATE_PAYLOAD_B)(?!.*NONROOT_PATH_STATE_ESCAPE).*\\Z"]
+
+[[commands]]
+name = "real_payload_bytes_a_to_edit"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_EDIT(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "modules/subject/backing/a/payload.real.MODULE.bazel"
+  find = "NONROOT_PATH_STATE_PAYLOAD_A"
+  replace = "NONROOT_PATH_STATE_PAYLOAD_EDIT"
+
+[[commands]]
+name = "real_payload_bytes_edit_to_a"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "modules/subject/backing/a/payload.real.MODULE.bazel"
+  find = "NONROOT_PATH_STATE_PAYLOAD_EDIT"
+  replace = "NONROOT_PATH_STATE_PAYLOAD_A"
+
+[[commands]]
+name = "logical_directory_retargets_a_to_b"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_B(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical"
+  destination = "modules/subject/logical.a"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical.b"
+  destination = "modules/subject/logical"
+
+[[commands]]
+name = "logical_directory_retargets_b_to_a"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical"
+  destination = "modules/subject/logical.b"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical.a"
+  destination = "modules/subject/logical"
+
+[[commands]]
+name = "symlinked_payload_target_delete_fails"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["in module dependency chain <root> -> subject@_: error reading '//logical:payload.MODULE.bazel' included at @@subject+//:MODULE.bazel:3:1: not a regular file"]
+stderr_patterns = ["(?s)\\A(?!.*NONROOT_PATH_STATE_PAYLOAD_A)(?!.*NONROOT_PATH_STATE_PAYLOAD_EDIT)(?!.*NONROOT_PATH_STATE_PAYLOAD_B)(?!.*NONROOT_PATH_STATE_ESCAPE).*\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "modules/subject/backing/a/payload.real.MODULE.bazel"
+
+[[commands]]
+name = "symlinked_payload_target_recreate_recovers"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/backing/a/payload.real.MODULE.bazel"
+  content = "print(\"NONROOT_PATH_STATE_PAYLOAD_A\")\n"
+
+[[commands]]
+name = "dangling_directory_ancestor_fails_before_execution"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//logical:payload.MODULE.bazel' included at @@subject+//:MODULE.bazel:3:1", "BUILD file not found in directory 'logical' of external repository @@subject+"]
+stderr_patterns = ["(?s)\\A(?!.*NONROOT_PATH_STATE_PAYLOAD_A)(?!.*NONROOT_PATH_STATE_PAYLOAD_EDIT)(?!.*NONROOT_PATH_STATE_PAYLOAD_B)(?!.*NONROOT_PATH_STATE_ESCAPE).*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical"
+  destination = "modules/subject/logical.a"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/dangling"
+  destination = "modules/subject/logical"
+
+[[commands]]
+name = "dangling_directory_ancestor_recovers"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical"
+  destination = "modules/subject/dangling"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical.a"
+  destination = "modules/subject/logical"
+
+[[commands]]
+name = "primary_build_delete_selects_fallback"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "modules/subject/backing/a/BUILD.bazel"
+
+[[commands]]
+name = "primary_build_recreate_restores_priority"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/backing/a/BUILD.bazel"
+  content = ""
+
+[[commands]]
+name = "self_cycle_fails_with_uniqueness_block"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["ERROR: circular symlinks detected\n[start of symlink cycle]\n<workspace>/modules/subject/logical\n[end of symlink cycle]", "ERROR: Error computing the main repository mapping: Symlink cycle detected while trying to find BUILD.bazel file <output_base>/external/subject+/logical/BUILD.bazel"]
+stderr_patterns = ["(?s)\\A(?!.*NONROOT_PATH_STATE_PAYLOAD_A)(?!.*NONROOT_PATH_STATE_PAYLOAD_EDIT)(?!.*NONROOT_PATH_STATE_PAYLOAD_B)(?!.*NONROOT_PATH_STATE_ESCAPE).*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical"
+  destination = "modules/subject/logical.a"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical.cycle"
+  destination = "modules/subject/logical"
+
+[[commands]]
+name = "self_cycle_recovery"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical"
+  destination = "modules/subject/logical.cycle"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical.a"
+  destination = "modules/subject/logical"
+
+[[commands]]
+name = "descendant_expansion_fails_with_uniqueness_block"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 1
+stderr_contains = ["ERROR: infinite symlink expansion detected\n[start of symlink chain]\n<workspace>/modules/subject/logical\n<workspace>/modules/subject/logical/sub\n[end of symlink chain]", "ERROR: Error computing the main repository mapping: Infinite symlink expansion detected while trying to find BUILD.bazel file <output_base>/external/subject+/logical/BUILD.bazel"]
+stderr_patterns = ["(?s)\\A(?!.*NONROOT_PATH_STATE_PAYLOAD_A)(?!.*NONROOT_PATH_STATE_PAYLOAD_EDIT)(?!.*NONROOT_PATH_STATE_PAYLOAD_B)(?!.*NONROOT_PATH_STATE_ESCAPE).*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical"
+  destination = "modules/subject/logical.a"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical.expand"
+  destination = "modules/subject/logical"
+
+[[commands]]
+name = "descendant_expansion_recovery"
+argv = ["build", "//:probe", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_PAYLOAD_A(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*NONROOT_PATH_STATE_ESCAPE(?:(?!NONROOT_PATH_STATE_PAYLOAD_A|NONROOT_PATH_STATE_PAYLOAD_EDIT|NONROOT_PATH_STATE_PAYLOAD_B|NONROOT_PATH_STATE_ESCAPE).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical"
+  destination = "modules/subject/logical.expand"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "modules/subject/logical.a"
+  destination = "modules/subject/logical"

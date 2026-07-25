@@ -278,14 +278,63 @@ path = "renamed.txt"
                 Mutation(path="source.txt", op="rename", destination="missing/renamed.txt")
             ),
         )
+
+    target_dir = workspace / "target-dir"
+    target_dir.mkdir()
+    (workspace / "directory-link").symlink_to(target_dir, target_is_directory=True)
+    _apply_mutations(
+        workspace,
+        mutation_command(Mutation(path="directory-link", op="rename", destination="renamed-directory-link")),
+    )
+    assert (workspace / "renamed-directory-link").is_symlink()
+
+    (workspace / "dangling-link").symlink_to("missing-target")
+    (workspace / "cycle-link").symlink_to("cycle-link")
+    _apply_mutations(
+        workspace,
+        mutation_command(Mutation(path="dangling-link", op="rename", destination="parked-dangling-link")),
+    )
+    assert (workspace / "parked-dangling-link").is_symlink()
+    (workspace / "deletable-dangling-link").symlink_to("missing-delete-target")
+    _apply_mutations(
+        workspace,
+        mutation_command(Mutation(path="deletable-dangling-link", op="delete")),
+    )
+    assert not (workspace / "deletable-dangling-link").is_symlink()
+    _apply_mutations(
+        workspace,
+        mutation_command(Mutation(path="cycle-link", op="rename", destination="parked-cycle-link")),
+    )
+    _apply_mutations(
+        workspace,
+        mutation_command(Mutation(path="parked-cycle-link", op="rename", destination="cycle-link")),
+    )
+    assert (workspace / "cycle-link").is_symlink()
+
+    (workspace / "dangling-destination").symlink_to("missing-destination")
+    with pytest.raises(FileExistsError, match="rename destination exists"):
+        _apply_mutations(
+            workspace,
+            mutation_command(Mutation(path="source.txt", op="rename", destination="dangling-destination")),
+        )
+    assert (workspace / "source.txt").is_file()
+    assert (workspace / "dangling-destination").is_symlink()
+
     outside = root / "outside"
     outside.mkdir()
+    (outside / "victim.txt").write_text("outside\n", encoding="utf-8")
     (workspace / "escape").symlink_to(outside, target_is_directory=True)
     with pytest.raises(ValueError, match="escapes workspace"):
         _apply_mutations(
             workspace,
             mutation_command(Mutation(path="escape/x.txt", op="create", content="nope\n")),
         )
+    with pytest.raises(ValueError, match="escapes workspace"):
+        _apply_mutations(
+            workspace,
+            mutation_command(Mutation(path="escape/victim.txt", op="delete")),
+        )
+    assert (outside / "victim.txt").is_file()
 
 
 def test_runner_expands_workspace_uri_only_in_copied_utf8_regular_files() -> None:

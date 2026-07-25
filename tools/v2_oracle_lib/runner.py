@@ -5,6 +5,7 @@ import json
 import os
 import select
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -191,7 +192,11 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
     applied: list[dict[str, str | None]] = []
     workspace_uri = _workspace_uri(workspace)
     for mutation in command.mutations:
-        path = _workspace_mutation_path(workspace, mutation.path)
+        path = (
+            _workspace_mutation_entry_path(workspace, mutation.path)
+            if mutation.op in {"delete", "rename"}
+            else _workspace_mutation_path(workspace, mutation.path)
+        )
         if mutation.op == "create":
             if path.exists() or path.is_symlink():
                 raise FileExistsError(f"mutation create destination exists: {mutation.path}")
@@ -204,17 +209,15 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
             applied.append(record)
             continue
         if mutation.op == "delete":
-            if not path.is_file():
-                raise FileNotFoundError(f"mutation source does not exist: {mutation.path}")
+            _require_regular_or_symlink_source(path, mutation.path)
             path.unlink()
             applied.append({"op": "delete", "path": mutation.path})
             continue
         if mutation.op == "rename":
             assert mutation.destination is not None
-            destination = _workspace_mutation_path(workspace, mutation.destination)
-            if not path.is_file():
-                raise FileNotFoundError(f"mutation source does not exist: {mutation.path}")
-            if destination.exists() or destination.is_symlink():
+            destination = _workspace_mutation_entry_path(workspace, mutation.destination)
+            _require_regular_or_symlink_source(path, mutation.path)
+            if os.path.lexists(destination):
                 raise FileExistsError(f"mutation rename destination exists: {mutation.destination}")
             _require_existing_real_parent(destination, mutation.destination)
             path.rename(destination)
@@ -258,6 +261,25 @@ def _workspace_mutation_path(workspace: Path, path: str) -> Path:
     if not resolved.is_relative_to(workspace_root):
         raise ValueError(f"mutation path escapes workspace: {path}")
     return candidate
+
+
+def _workspace_mutation_entry_path(workspace: Path, path: str) -> Path:
+    workspace_root = workspace.resolve()
+    candidate = workspace / path
+    resolved_parent = candidate.parent.resolve(strict=False)
+    if not resolved_parent.is_relative_to(workspace_root):
+        raise ValueError(f"mutation path escapes workspace: {path}")
+    return candidate
+
+
+def _require_regular_or_symlink_source(path: Path, display_path: str) -> None:
+    if not os.path.lexists(path):
+        raise FileNotFoundError(f"mutation source does not exist: {display_path}")
+    mode = path.lstat().st_mode
+    if not (stat.S_ISREG(mode) or stat.S_ISLNK(mode)):
+        raise ValueError(
+            f"mutation source must be a regular file or symlink: {display_path}"
+        )
 
 
 def _require_existing_real_parent(path: Path, display_path: str) -> None:
