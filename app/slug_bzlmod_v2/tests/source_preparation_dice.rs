@@ -221,11 +221,12 @@ impl Key for PreparationCounterKey {
 struct RootObservationCounterKey {
     #[allocative(skip)]
     counter: Arc<AtomicUsize>,
+    namespace: PathObservationNamespace,
 }
 
 impl PartialEq for RootObservationCounterKey {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.counter, &other.counter)
+        Arc::ptr_eq(&self.counter, &other.counter) && self.namespace == other.namespace
     }
 }
 
@@ -234,6 +235,7 @@ impl Eq for RootObservationCounterKey {}
 impl Hash for RootObservationCounterKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Arc::as_ptr(&self.counter).hash(state);
+        self.namespace.hash(state);
     }
 }
 
@@ -241,8 +243,9 @@ impl fmt::Display for RootObservationCounterKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "root-observation-counter:{:p}",
-            Arc::as_ptr(&self.counter)
+            "root-observation-counter:{:?}:{:p}",
+            self.namespace,
+            Arc::as_ptr(&self.counter),
         )
     }
 }
@@ -256,7 +259,8 @@ impl Key for RootObservationCounterKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        ctx.compute(&PathObservationKey::new(demand(
+        ctx.compute(&PathObservationKey::new(demand_in(
+            self.namespace,
             "/",
             PathObservationOperation::Lstat,
         )))
@@ -647,8 +651,16 @@ fn path(value: &str) -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new(value).unwrap()
 }
 
+fn demand_in(
+    namespace: PathObservationNamespace,
+    value: &str,
+    operation: PathObservationOperation,
+) -> PathObservationDemand {
+    PathObservationDemand::new(namespace, path(value), operation)
+}
+
 fn demand(value: &str, operation: PathObservationOperation) -> PathObservationDemand {
-    PathObservationDemand::new(PathObservationNamespace::Host, path(value), operation)
+    demand_in(PathObservationNamespace::Host, value, operation)
 }
 
 fn lstat(kind: PathNodeKind) -> PathLstat {
@@ -714,8 +726,16 @@ fn lstat_observation(
     path: &str,
     result: PathOperationResult<PathLstat>,
 ) -> (PathObservationDemand, PathObservationResult) {
+    lstat_observation_in(PathObservationNamespace::Host, path, result)
+}
+
+fn lstat_observation_in(
+    namespace: PathObservationNamespace,
+    path: &str,
+    result: PathOperationResult<PathLstat>,
+) -> (PathObservationDemand, PathObservationResult) {
     (
-        demand(path, PathObservationOperation::Lstat),
+        demand_in(namespace, path, PathObservationOperation::Lstat),
         PathObservationResult::Lstat(result),
     )
 }
@@ -724,8 +744,16 @@ fn file_bytes_observation(
     path: &str,
     result: PathOperationResult<Arc<[u8]>>,
 ) -> (PathObservationDemand, PathObservationResult) {
+    file_bytes_observation_in(PathObservationNamespace::Host, path, result)
+}
+
+fn file_bytes_observation_in(
+    namespace: PathObservationNamespace,
+    path: &str,
+    result: PathOperationResult<Arc<[u8]>>,
+) -> (PathObservationDemand, PathObservationResult) {
     (
-        demand(path, PathObservationOperation::FileBytes),
+        demand_in(namespace, path, PathObservationOperation::FileBytes),
         PathObservationResult::FileBytes(result),
     )
 }
@@ -734,8 +762,16 @@ fn read_link_observation(
     path: &str,
     result: PathOperationResult<Arc<PathBuf>>,
 ) -> (PathObservationDemand, PathObservationResult) {
+    read_link_observation_in(PathObservationNamespace::Host, path, result)
+}
+
+fn read_link_observation_in(
+    namespace: PathObservationNamespace,
+    path: &str,
+    result: PathOperationResult<Arc<PathBuf>>,
+) -> (PathObservationDemand, PathObservationResult) {
     (
-        demand(path, PathObservationOperation::ReadLink),
+        demand_in(namespace, path, PathObservationOperation::ReadLink),
         PathObservationResult::ReadLink(result),
     )
 }
@@ -778,6 +814,32 @@ fn local_source_observations(
             terminal,
         ),
     ]
+}
+
+fn immutable_source_observations(
+    root: &Path,
+    instance: PathObservationInstanceId,
+    terminal: PathObservationResult,
+) -> Vec<(PathObservationDemand, PathObservationResult)> {
+    let namespace = PathObservationNamespace::Materialization(instance);
+    let directory = PathOperationResult::Present(lstat(PathNodeKind::Directory));
+    let mut ancestors = root.ancestors().collect::<Vec<_>>();
+    ancestors.reverse();
+    let mut observations = ancestors
+        .into_iter()
+        .map(|ancestor| {
+            lstat_observation_in(namespace, ancestor.to_str().unwrap(), directory.clone())
+        })
+        .collect::<Vec<_>>();
+    observations.push((
+        demand_in(
+            namespace,
+            root.join("MODULE.bazel").to_str().unwrap(),
+            PathObservationOperation::Lstat,
+        ),
+        terminal,
+    ));
+    observations
 }
 
 fn semantic_materialization(
@@ -915,10 +977,6 @@ fn repository_source_error_schema_compares_every_shared_semantic_field() {
         repo_relative_path,
         message,
     };
-    let immutable_read = |repo_relative_path, message| RepositorySourceFileError::ImmutableRead {
-        repo_relative_path,
-        message,
-    };
     macro_rules! unequal {
         ($left:expr, $right:expr) => {{
             let left = $left;
@@ -1053,14 +1111,6 @@ fn repository_source_error_schema_compares_every_shared_semantic_field() {
     unequal!(
         file_compute(path.dupe(), message.dupe()),
         file_compute(path.dupe(), other_message.dupe())
-    );
-    unequal!(
-        immutable_read(path.dupe(), message.dupe()),
-        immutable_read(other_path.dupe(), message.dupe())
-    );
-    unequal!(
-        immutable_read(path.dupe(), message.dupe()),
-        immutable_read(path.dupe(), other_message)
     );
 
     let source_error = cycle(path);
@@ -1616,6 +1666,7 @@ async fn local_source_semantics_prune_preparation_and_restore_on_one_retained_en
     let root_counter = Arc::new(AtomicUsize::new(0));
     let root_counter_key = RootObservationCounterKey {
         counter: root_counter.dupe(),
+        namespace: PathObservationNamespace::Host,
     };
     let module_path = workspace().join("vendor/dep/MODULE.bazel");
 
@@ -1785,61 +1836,686 @@ async fn local_source_semantics_prune_preparation_and_restore_on_one_retained_en
 }
 
 #[tokio::test]
-async fn immutable_source_read_retains_direct_present_absent_and_error_without_path_need() {
-    let root = tempfile::tempdir().unwrap();
-    std::fs::write(root.path().join("present.MODULE.bazel"), b"immutable bytes").unwrap();
-    std::fs::create_dir(root.path().join("directory.MODULE.bazel")).unwrap();
+async fn immutable_source_demands_exact_instance_cumulatively_through_preparation() {
     let io = Arc::new(ImmutableIo {
         calls: AtomicUsize::new(0),
-        root,
+        root: tempfile::tempdir().unwrap(),
     });
+    let root = io.root.path().to_owned();
+    let instance = PathObservationInstanceId::new(1);
+    let namespace = PathObservationNamespace::Materialization(instance);
     let mut builder = Dice::builder();
     install_repository_io(&mut builder, io.clone());
     let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let module_path = root.join("MODULE.bazel");
 
-    let present = source_with_epoch(
+    let mut direct = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+            PathNodeKind::RegularFile,
+        ))),
+    );
+    direct.push(file_bytes_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::from(&b"direct"[..])),
+    ));
+    assert!(
+        direct
+            .iter()
+            .all(|(demand, _)| demand.namespace() == namespace)
+    );
+    assert_cumulative_source_and_preparation_needs(&dice, &direct, 1, b"direct").await;
+
+    let mut relative = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Symlink))),
+    );
+    relative.push(read_link_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("target"))),
+    ));
+    relative.push(lstat_observation_in(
+        namespace,
+        root.join("target").to_str().unwrap(),
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    relative.push(file_bytes_observation_in(
+        namespace,
+        root.join("target").to_str().unwrap(),
+        PathOperationResult::Present(Arc::from(&b"relative"[..])),
+    ));
+    assert!(
+        relative
+            .iter()
+            .all(|(demand, _)| demand.namespace() == namespace)
+    );
+    assert_cumulative_source_and_preparation_needs(&dice, &relative, 20, b"relative").await;
+
+    let mut escaping = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Symlink))),
+    );
+    escaping.push(read_link_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("/immutable-outside"))),
+    ));
+    escaping.push(lstat_observation_in(
+        namespace,
+        "/immutable-outside",
+        PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+    ));
+    escaping.push(file_bytes_observation_in(
+        namespace,
+        "/immutable-outside",
+        PathOperationResult::Present(Arc::from(&b"escaping"[..])),
+    ));
+    assert!(
+        escaping
+            .iter()
+            .all(|(demand, _)| demand.namespace() == namespace)
+    );
+    assert_cumulative_source_and_preparation_needs(&dice, &escaping, 40, b"escaping").await;
+
+    let wrong_instance = PathObservationInstanceId::new(2);
+    let wrong_namespace = PathObservationNamespace::Materialization(wrong_instance);
+    let mut wrong = immutable_source_observations(
+        &root,
+        wrong_instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+            PathNodeKind::RegularFile,
+        ))),
+    );
+    wrong.push(file_bytes_observation_in(
+        wrong_namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::from(&b"wrong-instance"[..])),
+    ));
+    let PathOutcome::Need(need) = source_with_epoch(
         &dice,
         raw_snapshot([]),
-        PathObservationEpoch::new([]).unwrap(),
+        PathObservationEpoch::new(wrong).unwrap(),
+        60,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("wrong materialization instance unexpectedly satisfied the source read");
+    };
+    assert_eq!(
+        need.demands(),
+        &[demand_in(namespace, "/", PathObservationOperation::Lstat)]
+    );
+    assert!(
+        need.demands()
+            .iter()
+            .all(|demand| demand.namespace() != PathObservationNamespace::Host)
+    );
+    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn immutable_source_accepts_special_and_projects_all_observed_terminals() {
+    let io = Arc::new(ImmutableIo {
+        calls: AtomicUsize::new(0),
+        root: tempfile::tempdir().unwrap(),
+    });
+    let root = io.root.path().to_owned();
+    let instance = PathObservationInstanceId::new(1);
+    let namespace = PathObservationNamespace::Materialization(instance);
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let module_path = root.join("MODULE.bazel");
+    let relative = Arc::new(PathBuf::from("MODULE.bazel"));
+    let permission_denied = PathObservationError::Io {
+        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+
+    let complete = |observations| PathObservationEpoch::new(observations).unwrap();
+
+    let mut special = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+            PathNodeKind::SpecialFile,
+        ))),
+    );
+    special.push(file_bytes_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::from(&b""[..])),
+    ));
+    let special_epoch = complete(special);
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        special_epoch.clone(),
         1,
-        "present.MODULE.bazel",
+        "MODULE.bazel",
     )
-    .await;
+    .await
+    else {
+        panic!("special-file epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        Ok(RepositorySourceFileValue::Present(Arc::from(&b""[..])))
+    );
+    let PathOutcome::Complete(prepared) = prepare_with_epoch(
+        &dice,
+        "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = 'vendor/dep')\n",
+        raw_snapshot([]),
+        special_epoch,
+        &[],
+        1,
+        "1.0.0",
+    )
+    .await
+    else {
+        panic!("special-file preparation needs observations");
+    };
     assert!(matches!(
-        present,
-        PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes)))
-            if bytes.as_ref() == b"immutable bytes"
+        prepared.as_ref(),
+        Ok(ModuleSourcePreparation::NonRegistry { bytes }) if bytes.is_empty()
     ));
 
-    let absent = source_with_epoch(
+    let directory = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Directory))),
+    );
+    let PathOutcome::Complete(value) = source_with_epoch(
         &dice,
         raw_snapshot([]),
-        PathObservationEpoch::new([]).unwrap(),
+        complete(directory),
         2,
-        "absent.MODULE.bazel",
+        "MODULE.bazel",
     )
-    .await;
-    assert!(matches!(
-        absent,
-        PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent))
-    ));
+    .await
+    else {
+        panic!("directory epoch requested FileBytes");
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::WrongKind {
+            repo_relative_path: relative.dupe(),
+            actual: PathNodeKind::Directory,
+        })
+    );
 
-    let error = source_with_epoch(
+    let missing = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Missing),
+    );
+    let PathOutcome::Complete(value) = source_with_epoch(
         &dice,
         raw_snapshot([]),
-        PathObservationEpoch::new([]).unwrap(),
+        complete(missing),
         3,
-        "directory.MODULE.bazel",
+        "MODULE.bazel",
     )
-    .await;
-    assert!(matches!(
-        error,
-        PathOutcome::Complete(Err(RepositorySourceFileError::ImmutableRead {
-            repo_relative_path,
-            message,
-        })) if repo_relative_path.as_path() == Path::new("directory.MODULE.bazel")
-            && !message.is_empty()
+    .await
+    else {
+        panic!("missing epoch needs observations");
+    };
+    assert_eq!(value, Ok(RepositorySourceFileValue::Absent));
+
+    let denied_lstat = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Error(permission_denied)),
+    );
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        complete(denied_lstat),
+        4,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("lstat-error epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::Observation {
+            repo_relative_path: relative.dupe(),
+            operation: PathObservationOperation::Lstat,
+            error: permission_denied,
+        })
+    );
+
+    let mut denied_readlink = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Symlink))),
+    );
+    denied_readlink.push(read_link_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Error(permission_denied),
     ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        complete(denied_readlink),
+        5,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("readlink-error epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::Observation {
+            repo_relative_path: relative.dupe(),
+            operation: PathObservationOperation::ReadLink,
+            error: permission_denied,
+        })
+    );
+
+    let mut denied_bytes = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+            PathNodeKind::RegularFile,
+        ))),
+    );
+    denied_bytes.push(file_bytes_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Error(permission_denied),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        complete(denied_bytes),
+        6,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("file-error epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::Observation {
+            repo_relative_path: relative.dupe(),
+            operation: PathObservationOperation::FileBytes,
+            error: permission_denied,
+        })
+    );
+
+    let mut missing_readlink = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Symlink))),
+    );
+    missing_readlink.push(read_link_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Missing,
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        complete(missing_readlink),
+        7,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("readlink-missing epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::InconsistentState {
+            repo_relative_path: relative.dupe(),
+            operation: PathObservationOperation::ReadLink,
+            before: Some(lstat(PathNodeKind::Symlink)),
+            after: None,
+        })
+    );
+
+    let mut missing_bytes = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+            PathNodeKind::RegularFile,
+        ))),
+    );
+    missing_bytes.push(file_bytes_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Missing,
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        complete(missing_bytes),
+        8,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("file-missing epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::InconsistentState {
+            repo_relative_path: relative.dupe(),
+            operation: PathObservationOperation::FileBytes,
+            before: Some(lstat(PathNodeKind::RegularFile)),
+            after: None,
+        })
+    );
+
+    let mut dangling = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Symlink))),
+    );
+    dangling.push(read_link_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("gone"))),
+    ));
+    dangling.push(lstat_observation_in(
+        namespace,
+        root.join("gone").to_str().unwrap(),
+        PathOperationResult::Missing,
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        complete(dangling),
+        9,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("dangling epoch needs observations");
+    };
+    assert_eq!(value, Ok(RepositorySourceFileValue::Absent));
+
+    let mut cycle = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Symlink))),
+    );
+    cycle.push(read_link_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("MODULE.bazel"))),
+    ));
+    let PathOutcome::Complete(value) =
+        source_with_epoch(&dice, raw_snapshot([]), complete(cycle), 10, "MODULE.bazel").await
+    else {
+        panic!("cycle epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::Cycle {
+            repo_relative_path: relative.dupe(),
+        })
+    );
+
+    let mut expansion = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Symlink))),
+    );
+    expansion.push(read_link_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Present(Arc::new(PathBuf::from("MODULE.bazel/child"))),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        complete(expansion),
+        11,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("expansion epoch needs observations");
+    };
+    assert_eq!(
+        value,
+        Err(RepositorySourceFileError::InfiniteExpansion {
+            repo_relative_path: relative,
+        })
+    );
+    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn immutable_source_prunes_operational_changes_and_restores_on_fixed_instance() {
+    let io = Arc::new(ImmutableIo {
+        calls: AtomicUsize::new(0),
+        root: tempfile::tempdir().unwrap(),
+    });
+    let root = io.root.path().to_owned();
+    let instance = PathObservationInstanceId::new(1);
+    let namespace = PathObservationNamespace::Materialization(instance);
+    let mut builder = Dice::builder();
+    install_repository_io(&mut builder, io.clone());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter_key = PreparationCounterKey {
+        counter: counter.dupe(),
+    };
+    let root_counter = Arc::new(AtomicUsize::new(0));
+    let root_counter_key = RootObservationCounterKey {
+        counter: root_counter.dupe(),
+        namespace,
+    };
+    let module_path = root.join("MODULE.bazel");
+
+    let direct_bytes = |bytes: &'static [u8], metadata, root_metadata| {
+        let mut observations = immutable_source_observations(
+            &root,
+            instance,
+            PathObservationResult::Lstat(PathOperationResult::Present(lstat_variant(
+                PathNodeKind::RegularFile,
+                metadata,
+            ))),
+        );
+        observations[0] = lstat_observation_in(
+            namespace,
+            "/",
+            PathOperationResult::Present(lstat_variant(PathNodeKind::Directory, root_metadata)),
+        );
+        observations.push(file_bytes_observation_in(
+            namespace,
+            module_path.to_str().unwrap(),
+            PathOperationResult::Present(Arc::from(bytes)),
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    };
+    let routed_bytes = |target_name: &'static str, bytes: &'static [u8], metadata| {
+        let mut observations = immutable_source_observations(
+            &root,
+            instance,
+            PathObservationResult::Lstat(PathOperationResult::Present(lstat_variant(
+                PathNodeKind::Symlink,
+                metadata,
+            ))),
+        );
+        observations.push(read_link_observation_in(
+            namespace,
+            module_path.to_str().unwrap(),
+            PathOperationResult::Present(Arc::new(PathBuf::from(target_name))),
+        ));
+        let target = root.join(target_name);
+        observations.push(lstat_observation_in(
+            namespace,
+            target.to_str().unwrap(),
+            PathOperationResult::Present(lstat_variant(PathNodeKind::RegularFile, metadata + 10)),
+        ));
+        observations.push(file_bytes_observation_in(
+            namespace,
+            target.to_str().unwrap(),
+            PathOperationResult::Present(Arc::from(bytes)),
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    };
+    let direct_missing = PathObservationEpoch::new(immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Missing),
+    ))
+    .unwrap();
+    let dangling_missing = {
+        let mut observations = immutable_source_observations(
+            &root,
+            instance,
+            PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+                PathNodeKind::Symlink,
+            ))),
+        );
+        observations.push(read_link_observation_in(
+            namespace,
+            module_path.to_str().unwrap(),
+            PathOperationResult::Present(Arc::new(PathBuf::from("missing-target"))),
+        ));
+        observations.push(lstat_observation_in(
+            namespace,
+            root.join("missing-target").to_str().unwrap(),
+            PathOperationResult::Missing,
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    };
+    let permission_denied = PathObservationError::Io {
+        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    let direct_error = PathObservationEpoch::new(immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Error(permission_denied)),
+    ))
+    .unwrap();
+    let routed_error = {
+        let mut observations = immutable_source_observations(
+            &root,
+            instance,
+            PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+                PathNodeKind::Symlink,
+            ))),
+        );
+        observations.push(read_link_observation_in(
+            namespace,
+            module_path.to_str().unwrap(),
+            PathOperationResult::Present(Arc::new(PathBuf::from("error-target"))),
+        ));
+        observations.push(lstat_observation_in(
+            namespace,
+            root.join("error-target").to_str().unwrap(),
+            PathOperationResult::Error(permission_denied),
+        ));
+        PathObservationEpoch::new(observations).unwrap()
+    };
+
+    enum Expected {
+        Bytes(&'static [u8]),
+        Missing,
+        Error,
+    }
+    let steps = [
+        (direct_bytes(b"A", 1, 1), 1, Expected::Bytes(b"A")),
+        (direct_bytes(b"A", 1, 1_000), 1, Expected::Bytes(b"A")),
+        (direct_bytes(b"A", 100, 1_000), 1, Expected::Bytes(b"A")),
+        (routed_bytes("route-a", b"A", 200), 1, Expected::Bytes(b"A")),
+        (routed_bytes("route-b", b"A", 300), 1, Expected::Bytes(b"A")),
+        (direct_bytes(b"B", 400, 1), 2, Expected::Bytes(b"B")),
+        (direct_missing, 3, Expected::Missing),
+        (dangling_missing, 3, Expected::Missing),
+        (direct_error, 4, Expected::Error),
+        (routed_error, 4, Expected::Error),
+        (direct_bytes(b"A", 500, 1), 5, Expected::Bytes(b"A")),
+    ];
+    let mut first_a = None;
+    for (index, (epoch, expected_count, expected)) in steps.into_iter().enumerate() {
+        assert!(
+            epoch
+                .observations()
+                .keys()
+                .all(|demand| demand.namespace() == namespace)
+        );
+        let counted =
+            count_preparation_with_epoch(&dice, epoch.clone(), index as u64 + 1, &counter_key)
+                .await;
+        assert!(matches!(
+            counted,
+            PathOutcome::Complete(actual) if actual == expected_count
+        ));
+        assert_eq!(counter.load(Ordering::SeqCst), expected_count);
+        if index < 2 {
+            let root_counted =
+                count_root_observation_with_epoch(&dice, epoch.clone(), &root_counter_key).await;
+            assert!(matches!(
+                root_counted,
+                PathOutcome::Complete(actual) if actual == index + 1
+            ));
+            assert_eq!(root_counter.load(Ordering::SeqCst), index + 1);
+        }
+
+        let prepared = prepare_with_epoch(
+            &dice,
+            "module(name = 'root')\nlocal_path_override(module_name = 'dep', path = 'vendor/dep')\n",
+            raw_snapshot([]),
+            epoch,
+            &[],
+            index as u64 + 1,
+            "1.0.0",
+        )
+        .await;
+        let PathOutcome::Complete(prepared) = prepared else {
+            panic!("immutable lifecycle step {index} needs observations");
+        };
+        match expected {
+            Expected::Bytes(expected) => assert!(matches!(
+                prepared.as_ref(),
+                Ok(ModuleSourcePreparation::NonRegistry { bytes })
+                    if bytes.as_ref() == expected
+            )),
+            Expected::Missing => assert!(matches!(
+                prepared.as_ref(),
+                Err(ModuleSourcePreparationError::ModuleNotFound {
+                    module_file_attempts
+                }) if module_file_attempts.is_empty()
+            )),
+            Expected::Error => assert!(matches!(
+                prepared.as_ref(),
+                Err(ModuleSourcePreparationError::Source(
+                    RepositorySourceFileError::Observation {
+                        repo_relative_path,
+                        operation: PathObservationOperation::Lstat,
+                        error,
+                    }
+                )) if repo_relative_path.as_path() == Path::new("MODULE.bazel")
+                    && *error == permission_denied
+            )),
+        }
+        if index == 0 {
+            first_a = Some(prepared);
+        } else if index == 10 {
+            assert_eq!(Some(prepared), first_a);
+        }
+    }
+    assert_eq!(counter.load(Ordering::SeqCst), 5);
+    assert_eq!(root_counter.load(Ordering::SeqCst), 2);
     assert_eq!(io.calls.load(Ordering::SeqCst), 1);
 }
 

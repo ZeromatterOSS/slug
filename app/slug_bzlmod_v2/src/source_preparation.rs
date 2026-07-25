@@ -357,10 +357,6 @@ pub enum RepositorySourceFileError {
         repo_relative_path: Arc<PathBuf>,
         message: Arc<str>,
     },
-    ImmutableRead {
-        repo_relative_path: Arc<PathBuf>,
-        message: Arc<str>,
-    },
 }
 
 #[async_trait]
@@ -495,6 +491,98 @@ fn project_resolution_error(
     }
 }
 
+async fn observed_repository_source_file(
+    ctx: &mut DiceComputations<'_>,
+    namespace: PathObservationNamespace,
+    materialized_root: &Path,
+    relative: &Path,
+    repo_relative_path: Arc<PathBuf>,
+) -> PathResult<RepositorySourceFileValue, RepositorySourceFileError> {
+    let logical_path = match NormalizedAbsolutePath::new(materialized_root.join(relative)) {
+        Ok(path) => path,
+        Err(_) => {
+            return PathOutcome::Complete(Err(
+                RepositorySourceFileError::InvalidMaterializedPath { repo_relative_path },
+            ));
+        }
+    };
+    let resolved = match ctx
+        .compute(&ResolvedPathKey::new(namespace, logical_path))
+        .await
+    {
+        Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
+        Ok(PathOutcome::Complete(Err(error))) => {
+            return PathOutcome::Complete(Err(project_resolution_error(repo_relative_path, error)));
+        }
+        Ok(PathOutcome::Complete(Ok(resolved))) => resolved,
+        Err(error) => {
+            return PathOutcome::Complete(Err(RepositorySourceFileError::ResolutionCompute {
+                repo_relative_path,
+                message: Arc::from(error.to_string()),
+            }));
+        }
+    };
+    let lstat = match resolved.state() {
+        ResolvedPathState::Missing => {
+            return PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent));
+        }
+        ResolvedPathState::Present(lstat)
+            if matches!(
+                lstat.kind(),
+                PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+            ) =>
+        {
+            lstat
+        }
+        ResolvedPathState::Present(lstat) => {
+            return PathOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
+                repo_relative_path,
+                actual: lstat.kind(),
+            }));
+        }
+    };
+    let demand = PathObservationDemand::new(
+        namespace,
+        resolved.real_path().dupe(),
+        PathObservationOperation::FileBytes,
+    );
+    let observed = match ctx.compute(&PathObservationKey::new(demand)).await {
+        Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
+        Ok(PathOutcome::Complete(result)) => result,
+        Err(error) => {
+            return PathOutcome::Complete(Err(RepositorySourceFileError::FileCompute {
+                repo_relative_path,
+                message: Arc::from(error.to_string()),
+            }));
+        }
+    };
+    match observed.as_ref() {
+        PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
+            PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes.dupe())))
+        }
+        PathObservationResult::FileBytes(PathOperationResult::Missing) => {
+            PathOutcome::Complete(Err(RepositorySourceFileError::InconsistentState {
+                repo_relative_path,
+                operation: PathObservationOperation::FileBytes,
+                before: Some(lstat),
+                after: None,
+            }))
+        }
+        PathObservationResult::FileBytes(PathOperationResult::Error(error)) => {
+            PathOutcome::Complete(Err(RepositorySourceFileError::Observation {
+                repo_relative_path,
+                operation: PathObservationOperation::FileBytes,
+                error: *error,
+            }))
+        }
+        PathObservationResult::Lstat(_)
+        | PathObservationResult::ReadLink(_)
+        | PathObservationResult::DirectoryEntries(_) => {
+            unreachable!("FileBytes demand must return a FileBytes observation")
+        }
+    }
+}
+
 #[async_trait]
 impl Key for RepositorySourceFileKey {
     type Value = PathResult<RepositorySourceFileValue, RepositorySourceFileError>;
@@ -552,118 +640,29 @@ impl Key for RepositorySourceFileKey {
         };
         match materialization {
             RepositoryMaterialization::Local { source_root, .. } => {
-                let logical_path = match NormalizedAbsolutePath::new(source_root.join(relative)) {
-                    Ok(path) => path,
-                    Err(_) => {
-                        return PathOutcome::Complete(Err(
-                            RepositorySourceFileError::InvalidMaterializedPath {
-                                repo_relative_path,
-                            },
-                        ));
-                    }
-                };
-                let resolved = match ctx
-                    .compute(&ResolvedPathKey::new(
-                        PathObservationNamespace::Host,
-                        logical_path,
-                    ))
-                    .await
-                {
-                    Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
-                    Ok(PathOutcome::Complete(Err(error))) => {
-                        return PathOutcome::Complete(Err(project_resolution_error(
-                            repo_relative_path,
-                            error,
-                        )));
-                    }
-                    Ok(PathOutcome::Complete(Ok(resolved))) => resolved,
-                    Err(error) => {
-                        return PathOutcome::Complete(Err(
-                            RepositorySourceFileError::ResolutionCompute {
-                                repo_relative_path,
-                                message: Arc::from(error.to_string()),
-                            },
-                        ));
-                    }
-                };
-                let lstat = match resolved.state() {
-                    ResolvedPathState::Missing => {
-                        return PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent));
-                    }
-                    ResolvedPathState::Present(lstat)
-                        if matches!(
-                            lstat.kind(),
-                            PathNodeKind::RegularFile | PathNodeKind::SpecialFile
-                        ) =>
-                    {
-                        lstat
-                    }
-                    ResolvedPathState::Present(lstat) => {
-                        return PathOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
-                            repo_relative_path,
-                            actual: lstat.kind(),
-                        }));
-                    }
-                };
-                let demand = PathObservationDemand::new(
+                observed_repository_source_file(
+                    ctx,
                     PathObservationNamespace::Host,
-                    resolved.real_path().dupe(),
-                    PathObservationOperation::FileBytes,
-                );
-                let observed = match ctx.compute(&PathObservationKey::new(demand)).await {
-                    Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
-                    Ok(PathOutcome::Complete(result)) => result,
-                    Err(error) => {
-                        return PathOutcome::Complete(Err(
-                            RepositorySourceFileError::FileCompute {
-                                repo_relative_path,
-                                message: Arc::from(error.to_string()),
-                            },
-                        ));
-                    }
-                };
-                match observed.as_ref() {
-                    PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
-                        PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes.dupe())))
-                    }
-                    PathObservationResult::FileBytes(PathOperationResult::Missing) => {
-                        PathOutcome::Complete(Err(RepositorySourceFileError::InconsistentState {
-                            repo_relative_path,
-                            operation: PathObservationOperation::FileBytes,
-                            before: Some(lstat),
-                            after: None,
-                        }))
-                    }
-                    PathObservationResult::FileBytes(PathOperationResult::Error(error)) => {
-                        PathOutcome::Complete(Err(RepositorySourceFileError::Observation {
-                            repo_relative_path,
-                            operation: PathObservationOperation::FileBytes,
-                            error: *error,
-                        }))
-                    }
-                    PathObservationResult::Lstat(_)
-                    | PathObservationResult::ReadLink(_)
-                    | PathObservationResult::DirectoryEntries(_) => {
-                        unreachable!("FileBytes demand must return a FileBytes observation")
-                    }
-                }
+                    source_root,
+                    relative,
+                    repo_relative_path,
+                )
+                .await
             }
             RepositoryMaterialization::Immutable {
-                generation_root, ..
-            } => match std::fs::read(generation_root.join(relative)) {
-                Ok(bytes) => {
-                    PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(Arc::from(bytes))))
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent))
-                }
-                Err(error) => {
-                    PathOutcome::Complete(Err(RepositorySourceFileError::ImmutableRead {
-                        repo_relative_path,
-                        message: Arc::from(error.to_string()),
-                    }))
-                }
-            },
+                generation_root,
+                observation_instance,
+                ..
+            } => {
+                observed_repository_source_file(
+                    ctx,
+                    PathObservationNamespace::Materialization(*observation_instance),
+                    generation_root,
+                    relative,
+                    repo_relative_path,
+                )
+                .await
+            }
         }
     }
 
