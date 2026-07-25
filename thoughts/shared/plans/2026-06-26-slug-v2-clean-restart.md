@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a`; nonroot registration/flag-alias consumer oracle accepted in `eeea40a6`; complete compact evaluator/schema design accepted; compact nonroot schema and MODULE syntax inspector accepted in `c663fe46`; bounded raw-attribute oracle design accepted; 12-row raw-attribute oracle accepted in `cffc39b0`; post-file bounded snapshot design accepted; compact deferred-attribute snapshot and ordered adapter projection accepted in `d4fb5d65`; GC-rooted private single-file directive-evaluator design accepted; private one-file directive evaluator accepted in `b738547d`; bounded nonroot include-composition oracle design accepted; six-row nonroot include-composition oracle accepted in `203cdaac`; prepared-program include-composition redesign accepted; `extra` and borrowed-slice dispatcher attempts stopped cleanly on distinct lifetime boundaries; evaluator-owned `Rc`-slice opaque-index dispatcher accepted; private supplied-file include composition accepted in `72e132a1`; compact typed preparation-provenance design accepted; typed preparation provenance accepted in `0494db65`; discovery rereview preserved the stable composition contract but replanned on three unowned Bazel boundaries; discovery-boundary oracle design corrected after executable nonreplay evidence; eight-row package/print/default discovery-boundary oracle accepted in `12bb70a1`; package-lookup design retained identity/priority/order but replanned on directory and policy ownership; neutral workspace-directory owner lift accepted in `e440e707`; focused nonroot package-policy oracle design accepted and corrected after isolated HEAD exposed seven stale manifest modes; 15-row package-policy oracle accepted in `60c24045`; package-lookup rereview froze a four-owner sequence and replanned on unresolved repository path state; repository path-state design proved the eager one-commit snapshot cannot boundedly cover Bazel-compatible ancestor symlink escapes and replanned to exact retained-daemon evidence before a request-boundary redesign | path-state oracle evidence and a request-atomic demand boundary precede resolved repository path state; deleted-package request ownership, repository-ignore ownership, package lookup, evaluation-only print delivery, omitted-`module()` defaults, and discovery composition remain | design only the repository path-state oracle |
+| M1: one semantic spine | partial | retained `WorkspaceRuntime`, injected file/directory observations, DICE-prepared loading/glob transitions; serialized validation wrapper `0618a007`; six-fixture Bazel 9.2 bzlmod runtime-input oracle accepted in `911f16f2`; neutral workspace-file owner `00422fdc`; root-module evaluator/DICE core `58e9faa4`; request-local command/daemon transport and loading mapping dependency `3f84e34d`; semantic visible-lockfile v28 DICE read `6d354e10`; registry/yanked owner audit accepted as an oracle-first replan; deterministic remote update/refresh/error oracle `2e9a3a56`; registry policy/IO substrate accepted in `f71ef02d`; Bazel 9.2 registry-command transport oracle `3bc88fd9`; command/daemon registry transport accepted in `2777b6f8`; local registry replay oracle accepted in `0211982c`; Bazel-shaped local replay ownership accepted in `6491a55a`; root override routing oracle accepted in `256c02e2`; compact root override owner accepted in `a5f13bf9`; portable workspace-URI harness accepted in `de58ba16`; nine-row patch/local/archive/Git source-preparation oracle accepted in `183970d9`; raw/local/immutable source-input materialization accepted in `9c2a6814`; registry/non-registry MODULE-byte preparation and ordered root patches accepted in `0445cafd`; eleven-row local replay and nonroot evaluation-ordering oracle accepted in `51bfc915`; three-fixture complete nonroot semantic evidence design accepted; nonroot graph/repo-mapping oracle accepted in `908c7c62`; nonroot extension-semantics oracle accepted in `8824135a`; nonroot registration/flag-alias consumer oracle accepted in `eeea40a6`; complete compact evaluator/schema design accepted; compact nonroot schema and MODULE syntax inspector accepted in `c663fe46`; bounded raw-attribute oracle design accepted; 12-row raw-attribute oracle accepted in `cffc39b0`; post-file bounded snapshot design accepted; compact deferred-attribute snapshot and ordered adapter projection accepted in `d4fb5d65`; GC-rooted private single-file directive-evaluator design accepted; private one-file directive evaluator accepted in `b738547d`; bounded nonroot include-composition oracle design accepted; six-row nonroot include-composition oracle accepted in `203cdaac`; prepared-program include-composition redesign accepted; `extra` and borrowed-slice dispatcher attempts stopped cleanly on distinct lifetime boundaries; evaluator-owned `Rc`-slice opaque-index dispatcher accepted; private supplied-file include composition accepted in `72e132a1`; compact typed preparation-provenance design accepted; typed preparation provenance accepted in `0494db65`; discovery rereview preserved the stable composition contract but replanned on three unowned Bazel boundaries; discovery-boundary oracle design corrected after executable nonreplay evidence; eight-row package/print/default discovery-boundary oracle accepted in `12bb70a1`; package-lookup design retained identity/priority/order but replanned on directory and policy ownership; neutral workspace-directory owner lift accepted in `e440e707`; focused nonroot package-policy oracle design accepted and corrected after isolated HEAD exposed seven stale manifest modes; 15-row package-policy oracle accepted in `60c24045`; package-lookup rereview froze a four-owner sequence and replanned on unresolved repository path state; repository path-state design proved the eager one-commit snapshot cannot boundedly cover Bazel-compatible ancestor symlink escapes and replanned to exact retained-daemon evidence before a request-boundary redesign; focused 16-row repository path-state oracle design accepted | path-state oracle evidence and a request-atomic demand boundary precede resolved repository path state; deleted-package request ownership, repository-ignore ownership, package lookup, evaluation-only print delivery, omitted-`module()` defaults, and discovery composition remain | implement only the repository path-state oracle |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -33,33 +33,48 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Run only `WP-5-m1-repository-path-state-oracle-design`.
+Run only `WP-5-m1-repository-path-state-oracle`.
 
-This is a read-only design packet. Inspect the accepted nonroot package-policy
-fixture, the retained-daemon oracle harness and growth checkpoint, and pinned
-Bazel 9.2 `FileFunction`, `FileValue`, `FileStateValue`,
-`ExternalFilesHelper`, `PackageLookupFunction`, and their symlink tests.
+Add the dedicated retained-daemon fixture
+`nonroot-repository-path-state-symlinks`. Its subject module includes
+`//logical:payload.MODULE.bazel` before a fixture-local escaped package.
+Use checked relative links so `logical` begins as a two-hop directory alias,
+can retarget to an equivalent-kind second tree, become a dangling ancestor,
+self-cycle, or descendant expansion, while both backing payload leaves are
+symlinks to regular fragment bytes. Keep `BUILD.bazel` plus `BUILD` only in the
+first backing package.
 
-Design the smallest hermetic retained-daemon oracle that distinguishes
-repository path state through directory-symlink ancestors before Slug changes
-its request boundary. Cover internal and fixture-local relative escapes,
-multi-hop resolution, included-file bytes and A→B→A restoration, retargeting
-between same-kind paths, target create/delete/recreate, dangling ancestors,
-cycles or infinite expansion with exact command-facing errors and recovery,
-BUILD-name priority, evaluation ordering, and unchanged warm-request
-nonreplay. Decide whether to extend an existing fixture or add one isolated
-fixture, with exact reused/copied scaffolding, mutations, assertions, allowlist,
-growth, replay, and platform-source justification. Absolute host escapes,
-special files, ordinary read failures, and Windows reparse behavior may remain
-source-derived only when a checked hermetic fixture cannot express them safely.
+Generate exactly 16 Bazel 9.2 rows: baseline and warm nonreplay; real payload
+bytes A→edit→A; logical directory A→B→A; payload target delete/recreate;
+dangling directory fail/recover; primary BUILD deletion fallback and
+recreation priority; self-cycle fail/recover; and descendant expansion
+fail/recover. Every success must emit exactly one current payload sentinel
+before exactly one escape sentinel and exclude stale sentinels. File/package
+failures use exit 48 and exact source-attributed causes; cycle/expansion use
+exit 1 with the pinned uniqueness block and package-lookup wrapper. Every
+failure excludes all evaluation sentinels.
 
-This would be the fifth accepted oracle packet after the current growth
-baseline; record that count and require the focused fixture-growth review
-before any later oracle breadth. Stop on a host-absolute dependency, network
-input, credential exposure, unstable cycle diagnostic, unsafe special-file
-asset, harness-wide feature without a proven need, nondiscriminating copied
-scaffold, or scope expansion. Do not edit fixtures, expected artifacts, Rust,
-Cargo, commands, server, or lockfile.
+The only harness change is no-follow rename/delete support for symlink leaves:
+resolve and validate the real parent inside the copied workspace, use
+`lstat`/`lexists` for source type and destination collision, accept only regular
+files or symlinks, and never follow the final link. Keep create/content
+confinement and the real destination-parent rule. Add focused directory,
+dangling, cycle, dangling-destination, and ancestor-escape mutation tests.
+
+The exact allowlist is `tools/v2_oracle_lib/runner.py`,
+`tests/v2_oracle/test_v2_oracle.py`, and 21 new fixture entries: fixture TOML,
+expected JSON, ten regular workspace files, and nine symlinks. Fixture growth
+must remain below 1,200 newline-counted lines and harness growth below 80 net
+lines; preserve every existing fixture byte-for-byte. Generate once and replay
+twice from fresh run roots with one retained output base per 16-row run, then
+run the full oracle harness and exact provenance/link/network/credential/growth
+checks. This is the fifth accepted packet after the current baseline, so
+schedule fixture-growth review before a sixth oracle-breadth packet.
+
+Stop on a target outside the copied workspace, overwrite of a dangling
+destination, unstable error/order, a new mutation schema, network or
+credentials, existing-fixture drift, a growth-cap breach, or any Rust, Cargo,
+command, server, lockfile, special-file, absolute-host, or Windows-fixture edit.
 
 ### Accepted transport evidence
 
