@@ -239,3 +239,28 @@ Next evidence: Run only
 Freeze the exact order ReparsePoint→Symlink, Device→SpecialFile,
 Directory→Directory, otherwise RegularFile; preserve every other accepted
 producer, operation, platform, test, and two-file constraint.
+
+### Stage 5 runtime path-observation producer Windows lstat correction
+
+Status: Accepted before Rust
+
+Corrected contract: Exact Bazel 9.2 Windows lstat validates interior NUL, then
+retries the first no-follow metadata read on `Interrupted` and maps every other
+initial failure to Missing. That first read alone owns size, OpenJDK-formula
+mtime, attributes/permissions, and kind. Kind classification tests the
+reparse-point attribute first and maps every such node to Symlink, then maps
+Device to SpecialFile, then Directory, otherwise RegularFile. This deliberately
+does not use Rust's narrower name-surrogate-only link decision.
+
+The subsequent private raw Win32 query applies Bazel's UTF-16 long-path
+transformation and exact no-follow open flags, contributes only native ctime,
+captures the last error before RAII close, and maps missing, access denied, and
+other raw failures into the Lstat operation result. Pinned Bazel and
+architecture reviews returned `ACCEPT`, including overlapping reparse/device/
+directory classification evidence and the unchanged std-only two-file scope.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-path-observation-producer` in one new private runtime module
+plus its private declaration. Preserve every accepted compact authority,
+preflight, operation, platform, test, lifetime, and exclusion boundary; do not
+wire DICE, retained materialization, retries, or publication.
