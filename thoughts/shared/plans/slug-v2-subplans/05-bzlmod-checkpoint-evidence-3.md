@@ -747,3 +747,31 @@ Next evidence: Implement only
 `WP-5-m1-runtime-http-archive-captured-ustar-subset` in
 `app/slug_core_v2/src/runtime/repository_io.rs`. Do not change Git code or add
 retained session/runtime/native-observer behavior.
+
+### Stage 5 HTTP captured-USTAR implementation
+
+Status: Replanned before Rust
+
+The one-file draft preserved one caller-source read, private captured bytes,
+checksum precedence, raw USTAR names and prefix fields, normalized prefix
+selection, archive-order collisions, selected type rejection, outside-prefix
+skip precedence, payload/padding bounds, checksum tolerance, complete-entry
+physical EOF, and byte-identical Git extraction. Focused tests, the full core
+suite, and a real GNU-Windows no-run build passed before terminal review.
+
+The permitted Windows destination-containment correction was applied locally,
+but two independent terminal reviews then found further pinned mismatches:
+inspection and extraction were interleaved, a partial next header was accepted,
+nonempty initial short records were rejected contrary to Commons Compress
+1.26.1, `strip_prefix` used UTF-8 instead of Latin-1/raw-like bytes, leading-NUL
+octal fields disagreed with `TarUtils.parseOctal`, Windows drive-absolute
+members were not relativized, and capture write/flush failures were classified
+as Materialization rather than Transport and could not be injected. The draft
+was removed in full; no Rust or tests were retained.
+
+Next evidence: Design only
+`WP-5-m1-runtime-http-archive-captured-ustar-design-correction`. Preserve the
+accepted one-file/Git/private-capture boundary, but freeze parse-before-write,
+short-record and numeric semantics, Latin-1 prefix encoding, Windows
+normalization/containment, capture-writer injection/stage classification, and
+their exact discriminating rows before another implementation attempt.
