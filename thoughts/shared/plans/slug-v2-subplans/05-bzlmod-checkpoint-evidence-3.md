@@ -407,36 +407,36 @@ publication.
 
 ### Stage 5 native path-observation producer implementation retry
 
-Status: Replanned before retained Rust
+Status: Final corrected design accepted; implementation current
 
-Draft evidence: The private four-file attempt compiled and reached ten focused
-path-observation tests plus all 36 core tests. It established a compact batch
-owner, a direct raw Unix `DIR` owner with contained unsafe and partial-name
-retention, and a checked host-pure Windows reparse parser that preserved lone
-surrogates. No DICE, materializer, retry, publication, or public API was wired.
+The rejected draft was removed before this correction. Three independent
+terminal rereviews accepted a private four-file implementation with no public
+schema, DICE, materializer, retry, publication, fixture, or consumer change.
+The producer owns a lifetime-bound `Allocative` sorted `Arc` slice of normalized
+materialization roots, completely preflights sorted demands, then executes that
+same order. Roots authorize instance identity only; exact demanded paths are
+never rewritten or containment-checked.
 
-Reason for `REPLAN`: Both terminal reviews rejected material behavior and
-evidence. The draft ran auxiliary lstat before ReadLink, FileBytes, and
-DirectoryEntries rather than using it only after specified primary-operation
-failures, changing race and error precedence. It observed a prevalidated batch
-in caller order rather than deterministic sorted order, used unvalidated raw
-roots without the frozen retained allocation contract, and kept several
-Unix-only paths in supposedly portable tests.
+ReadLink, FileBytes, and DirectoryEntries are primary operations. Auxiliary
+no-follow lstat runs only after their frozen candidate failures and resolves
+races to Missing or truthful WrongKind while otherwise preserving the original
+operation error. Unix directory enumeration uses one raw handle with exact
+open/read/close EINTR, iterator EIO, partial-name, errno, and disarmed-owner
+precedence. Windows uses a copied pinned `windows-sys 0.61.2` kernel32 ABI for
+raw Find enumeration, exact Bazel `0555`/`0755`, mtime/ctime and long-path
+rules, checked reparse parsing, and a returned-length bounds check before every
+slice.
 
-Windows review found writable permissions `0777` instead of `0755`, collapsed
-the distinct OpenJDK mtime and native ctime formulas, used the wrong long-path
-slash/prefix rules, omitted explicit kernel32 linkage, and trusted
-`DeviceIoControl`'s returned length before constructing a slice. Host-pure
-tests did not discriminate LX and mount layouts, substitute offsets,
-print-name/flags, both target-prefix normalizations, relative targets, malformed
-offsets/ranges, oversized returned lengths, timestamp overflow, or long-path
-rules. Unix evidence omitted opener EINTR/EIO, EOF close failure, direct
-disarmed-Drop proof, and full directory/symlink/materialization lifecycle
-transitions. The unaccepted draft and manifest/module edits were removed; the
-worktree returned clean without rerunning Cargo after removal.
+Required evidence covers every pure failure/race cell, sorted preflight and
+execution, retained-root allocation/authority, scripted Unix and Windows handle
+lifecycle, Windows ABI/layout/path/time/parser/name behavior, portable
+create/edit/delete/recreate, directory and symlink transitions, and distinct
+Host/materialization paths. Terminal acceptance additionally requires a native
+or correctly provisioned Windows `cargo test -p slug_core_v2 --no-run` that
+links the test binary against kernel32; cross-target checking is not enough.
 
-Next evidence: Design only
-`WP-5-m1-runtime-path-observation-native-producer-final-design-correction`.
-Freeze the exact operation-first state tables, deterministic/authority owner,
-Windows source formulas/safety/linkage, portable test matrix, and missing Unix
-evidence before any further Rust.
+Next evidence: Implement only
+`WP-5-m1-runtime-path-observation-native-producer-final` in
+`app/slug_core_v2/src/runtime/path_observation.rs`, `runtime/mod.rs`,
+`app/slug_core_v2/Cargo.toml`, and `Cargo.lock`, adding only target-Unix
+workspace `nix`.
