@@ -1,0 +1,3 @@
+module(name = "subject", version = "1.0.0")
+
+include("//:outer.MODULE.bazel")

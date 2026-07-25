@@ -1,0 +1,16 @@
+load("@subject//:defs.bzl", "copy_marker")
+
+copy_marker(
+    name = "include_order",
+    marker = "@subject//:include_marker",
+)
+
+copy_marker(
+    name = "nested_runtime_failure",
+    marker = "@subject//:include_marker",
+)
+
+copy_marker(
+    name = "scope_failure",
+    marker = "@subject//:include_marker",
+)

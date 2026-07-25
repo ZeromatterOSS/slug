@@ -1,0 +1,255 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "b435004b812954f62dbaf4d42943d51d0a9761020d8df778c90b2742cdbdbb75",
+          "mode": "0o544",
+          "path": "include_order.txt",
+          "root": "bazel-bin/include_order.txt",
+          "size": 52,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "baseline_nested_order",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-include-composition/20260724-202944-1945909-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-include-composition/20260724-203343-1948186-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a9b11001-3304-406c-887e-3d5ac861abe4\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a9b11001-3304-406c-887e-3d5ac861abe4\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: 4.875s, Critical Path: 0.01s\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a9b11001-3304-406c-887e-3d5ac861abe4\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "cfa1dfce663d725bca45fe925a1b6781b9cb7e52c88c21d64d219272a07e7fa7",
+          "mode": "0o544",
+          "path": "include_order.txt",
+          "root": "bazel-bin/include_order.txt",
+          "size": 52,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "nested-a",
+          "old_digest_hint": "79",
+          "path": "modules/subject/nested.MODULE.bazel",
+          "replace": "nested-b"
+        }
+      ],
+      "name": "nested_a_to_b",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (2 packages loaded, 2 targets configured)\nAnalyzing: target //:include_order (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:include_order (3 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 3 processes: 3 internal.\nINFO: Build completed successfully, 3 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 23e2342e-d532-4d71-aeb3-ba7232fc718f\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/23e2342e-d532-4d71-aeb3-ba7232fc718f\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (2 packages loaded, 2 targets configured)\nAnalyzing: target //:include_order (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:include_order (3 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: 0.070s, Critical Path: 0.00s\nINFO: 3 processes: 3 internal.\nINFO: Build completed successfully, 3 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/23e2342e-d532-4d71-aeb3-ba7232fc718f\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "b435004b812954f62dbaf4d42943d51d0a9761020d8df778c90b2742cdbdbb75",
+          "mode": "0o544",
+          "path": "include_order.txt",
+          "root": "bazel-bin/include_order.txt",
+          "size": 52,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "nested-b",
+          "old_digest_hint": "79",
+          "path": "modules/subject/nested.MODULE.bazel",
+          "replace": "nested-a"
+        }
+      ],
+      "name": "nested_b_to_a",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (2 packages loaded, 2 targets configured)\nAnalyzing: target //:include_order (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:include_order (3 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 3 processes: 3 internal.\nINFO: Build completed successfully, 3 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1df70b9a-c8f6-45dc-a7ee-e4526ab492f5\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1df70b9a-c8f6-45dc-a7ee-e4526ab492f5\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (2 packages loaded, 2 targets configured)\nAnalyzing: target //:include_order (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:include_order (3 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: 0.052s, Critical Path: 0.00s\nINFO: 3 processes: 3 internal.\nINFO: Build completed successfully, 3 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1df70b9a-c8f6-45dc-a7ee-e4526ab492f5\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:nested_runtime_failure",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:nested_runtime_failure",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "nested.tag(value = \"nested-a\")",
+          "old_digest_hint": "79",
+          "path": "modules/subject/nested.MODULE.bazel",
+          "replace": "fail(\"nested include runtime sentinel\")"
+        }
+      ],
+      "name": "nested_runtime_failure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: <output_base>/external/subject+/nested.MODULE.bazel:2:5: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 3, column 8, in <toplevel>\n\tFile \"<builtin>\", in include\n\tFile \"<output_base>/external/subject+/outer.MODULE.bazel\", line 3, column 8, in <toplevel>\n\t\tinclude(\"//:nested.MODULE.bazel\")\n\tFile \"<builtin>\", in include\n\tFile \"<output_base>/external/subject+/nested.MODULE.bazel\", line 2, column 5, in <toplevel>\n\t\tfail(\"nested include runtime sentinel\")\nError in fail: nested include runtime sentinel\nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: error executing MODULE.bazel file for subject@_\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 3a5bb4b0-3a46-4f31-939e-466eba7b69d9\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3a5bb4b0-3a46-4f31-939e-466eba7b69d9\nComputing main repo mapping: \nERROR: /run/media/system/Colossus/dev/slug/target/v2o/ob/nonroot-include-composition/bazel/external/subject+/nested.MODULE.bazel:2:5: Traceback (most recent call last):\n\tFile \"@@subject+//:MODULE.bazel\", line 3, column 8, in <toplevel>\n\tFile \"<builtin>\", in include\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/ob/nonroot-include-composition/bazel/external/subject+/outer.MODULE.bazel\", line 3, column 8, in <toplevel>\n\t\tinclude(\"//:nested.MODULE.bazel\")\n\tFile \"<builtin>\", in include\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/ob/nonroot-include-composition/bazel/external/subject+/nested.MODULE.bazel\", line 2, column 5, in <toplevel>\n\t\tfail(\"nested include runtime sentinel\")\nError in fail: nested include runtime sentinel\nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: error executing MODULE.bazel file for subject@_\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3a5bb4b0-3a46-4f31-939e-466eba7b69d9\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:scope_failure",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:scope_failure",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "fail(\"nested include runtime sentinel\")",
+          "old_digest_hint": "88",
+          "path": "modules/subject/nested.MODULE.bazel",
+          "replace": "nested.tag(value = \"nested-a\")"
+        },
+        {
+          "find": "include(\"//:outer.MODULE.bazel\")",
+          "old_digest_hint": "78",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "bazel_dep(name = \"bad!runtime-name\", version = \"1.0.0\")\ninclude(\"//:outer.MODULE.bazel\")"
+        },
+        {
+          "find": "late_value = \"late-ok\"",
+          "old_digest_hint": "23",
+          "path": "modules/subject/late.MODULE.bazel",
+          "replace": "late_scope_error = undefined_late_symbol"
+        }
+      ],
+      "name": "later_fragment_scope_failure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: <output_base>/external/subject+/late.MODULE.bazel:1:20: name 'undefined_late_symbol' is not defined\nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: syntax error in MODULE.bazel file for <root>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: f3adc91f-ac1f-40b6-b8eb-c139057473b0\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f3adc91f-ac1f-40b6-b8eb-c139057473b0\nComputing main repo mapping: \nERROR: /run/media/system/Colossus/dev/slug/target/v2o/ob/nonroot-include-composition/bazel/external/subject+/late.MODULE.bazel:1:20: name 'undefined_late_symbol' is not defined\nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: syntax error in MODULE.bazel file for <root>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f3adc91f-ac1f-40b6-b8eb-c139057473b0\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "b435004b812954f62dbaf4d42943d51d0a9761020d8df778c90b2742cdbdbb75",
+          "mode": "0o544",
+          "path": "include_order.txt",
+          "root": "bazel-bin/include_order.txt",
+          "size": 52,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "bazel_dep(name = \"bad!runtime-name\", version = \"1.0.0\")\ninclude(\"//:outer.MODULE.bazel\")",
+          "old_digest_hint": "134",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "include(\"//:outer.MODULE.bazel\")"
+        },
+        {
+          "find": "late_scope_error = undefined_late_symbol",
+          "old_digest_hint": "41",
+          "path": "modules/subject/late.MODULE.bazel",
+          "replace": "late_value = \"late-ok\""
+        }
+      ],
+      "name": "final_same_daemon_recovery",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 138e17e2-262c-4410-8a1a-0499d79ed9f7\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/138e17e2-262c-4410-8a1a-0499d79ed9f7\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: 0.061s, Critical Path: 0.00s\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/138e17e2-262c-4410-8a1a-0499d79ed9f7\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "nonroot-include-composition",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

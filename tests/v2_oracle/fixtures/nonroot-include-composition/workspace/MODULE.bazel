@@ -1,0 +1,4 @@
+module(name = "nonroot_include_composition", version = "0.1.0")
+
+bazel_dep(name = "subject", version = "1.0.0")
+local_path_override(module_name = "subject", path = "modules/subject")

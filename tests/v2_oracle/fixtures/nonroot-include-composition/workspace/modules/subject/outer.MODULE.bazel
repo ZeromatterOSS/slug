@@ -1,0 +1,8 @@
+outer = use_extension("//:ext.bzl", "markers")
+outer.tag(value = "outer-before")
+include("//:nested.MODULE.bazel")
+outer.tag(value = "outer-after")
+include("//:late.MODULE.bazel")
+include("//:repeat.MODULE.bazel")
+include("//:repeat.MODULE.bazel")
+use_repo(outer, "include_marker")

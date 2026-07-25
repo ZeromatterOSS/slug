@@ -1,0 +1,7 @@
+load(":defs.bzl", "copy_marker")
+
+copy_marker(
+    name = "include_marker",
+    marker = "@include_marker//:marker.txt",
+    visibility = ["//visibility:public"],
+)

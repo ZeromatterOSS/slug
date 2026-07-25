@@ -1,0 +1,2 @@
+repeat = use_extension("//:ext.bzl", "markers")
+repeat.tag(value = "repeat-a")
