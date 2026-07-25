@@ -865,6 +865,23 @@ allowlist and exact upstream/downstream tests while retaining the accepted
 compile-first, common-stack, scoped-GC, restoration, diagnostic, repeated-key,
 and cycle-horizon contracts. No Rust or other production edit is authorized.
 
+That replacement design is accepted. The implementation packet is only
+`WP-5-m1-nonroot-include-dispatcher`, with the four-file allowlist
+`starlark-rust/starlark/src/eval.rs`,
+`starlark-rust/starlark/src/eval/compiler/module.rs`,
+`starlark-rust/starlark/src/eval/runtime/evaluator.rs`, and
+`app/slug_bzlmod_v2/src/module_eval.rs`.
+
+The evaluator borrows a one-shot `&'a [PreparedModule<'v>]` registry. The app
+keeps only exact raw-label-to-opaque-index and logical-file metadata in its
+Value-free `extra` context. The dispatcher copies the external slice reference
+before mutable execution, while modules, prepared storage, and the execution
+evaluator are declared in safe drop order. A separate preparation evaluator
+must finish exact closure-wide scope resolution/bytecode compilation before
+the one execution evaluator runs root or included effects. Preserve every
+previous common-stack, scoped-GC, restoration, per-file root, diagnostic,
+repeated-key, finalization, and cycle-horizon constraint.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
