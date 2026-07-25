@@ -849,3 +849,17 @@ Live API inspected: `Evaluator<'v, 'a, 'e>`, the higher-ranked `#[starlark_modul
 Design summary: Add one evaluator field borrowing `&'a [PreparedModule<'v>]`, a one-shot setter, and opaque-index execution. All file Modules are allocated before a temporary preparation evaluator scope-checks and compiles the entire supplied closure. Prepared storage then outlives the one execution evaluator. Native include retains only exact raw label, logical file, and opaque index in Value-free `extra`, copies that context reference and releases `RefCell` borrows before dispatch, and restores logical-file state afterward. The upstream execution helper retains same-stack Module/DefInfo/frame restoration and scoped foreign-heap GC suspension.
 Validation: two independent read-only runtime/native-ABI audits, root borrowed-registry/opaque-index synthesis, and fresh independent review `ACCEPT`; no Rust, Cargo, fixture, expected artifact, DICE, preparation, discovery, command, server, or lockfile edit
 Residual risk: Implement only `WP-5-m1-nonroot-include-dispatcher` in `starlark-rust/starlark/src/eval.rs`, `starlark-rust/starlark/src/eval/compiler/module.rs`, `starlark-rust/starlark/src/eval/runtime/evaluator.rs`, and `app/slug_bzlmod_v2/src/module_eval.rs`. Stop on a self borrow derived from the evaluator registry, module-vector growth after preparation, incomplete restoration, cross-heap roots, frame divergence, lifetime erasure, or any required edit outside the allowlist.
+
+### Stage 5 borrowed include-dispatcher implementation attempt
+
+Status: `REPLAN`; no Rust retained
+Compiler evidence: `Option<&'a [PreparedModule<'v>]>` requires `'v: 'a`. The live `Evaluator` deliberately has no such relation, and `TMPDIR=$PWD/target/codex-tmp cargo check -p starlark` failed through mutable lifetime invariance in existing `eval/compiler/call.rs` generic optimizer code.
+Cleanup: The partial three-file upstream changes were reverted; no app, test, Cargo, fixture, expected-artifact, DICE, preparation, discovery, command, server, or lockfile change was retained.
+Residual risk: Do not add a broad evaluator lifetime bound or optimizer edits. Replace the borrowed registry with evaluator-owned reference-counted prepared storage.
+
+### Stage 5 owned include-dispatcher design
+
+Status: Accepted before Rust
+Design summary: The one-shot setter consumes `Vec<PreparedModule<'v>>` into one evaluator-owned `Rc<[PreparedModule<'v>]>`. Dispatch dupes the registry `Rc`, bounds-checks the opaque index, borrows the entry from that external clone, and only then mutably executes it. No prepared program crosses `AnyLifetime<'e>`, no borrowed registry introduces `'v: 'a`, and no program is self-referential or lifetime-erased. Fixed external Modules still outlive `Evaluator<'v>`; app `extra` remains exact raw-label-to-index/logical-file metadata plus Value-free semantic state.
+Validation: root compiler-boundary audit, the earlier independent owned-registry/native-ABI audit, and fresh independent review `ACCEPT`; no Rust or other production edit retained
+Residual risk: Implement only `WP-5-m1-nonroot-owned-include-dispatcher` in the same four-file allowlist. Stop on any new lifetime bound, per-program reference-count allocation, incomplete restoration, cross-heap root, frame divergence, or scope expansion.

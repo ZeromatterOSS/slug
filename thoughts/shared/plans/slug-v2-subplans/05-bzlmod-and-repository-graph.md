@@ -882,6 +882,22 @@ the one execution evaluator runs root or included effects. Preserve every
 previous common-stack, scoped-GC, restoration, per-file root, diagnostic,
 repeated-key, finalization, and cycle-horizon constraint.
 
+That implementation attempt also returned `REPLAN` with no Rust retained.
+`Option<&'a [PreparedModule<'v>]>` necessarily implies `'v: 'a`; the current
+evaluator deliberately has no such relation, and the focused starlark check
+failed in existing optimizer code through mutable lifetime invariance. Adding
+that bound or editing the optimizer would exceed the reviewed allowlist.
+
+The corrected owned-dispatcher design is accepted. The current implementation
+packet is `WP-5-m1-nonroot-owned-include-dispatcher` under the same four-file
+allowlist. `Evaluator<'v>` owns one `Rc<[PreparedModule<'v>]>`, installed by a
+one-shot setter that consumes the prepared vector. Opaque-index dispatch dupes
+that single `Rc`, ending the field borrow before mutable execution. This
+introduces neither the hidden `'v: 'a` bound nor per-program allocation, and
+each program remains safely bound to fixed external Modules for `'v`. All
+other preparation, stack, GC, restoration, app-state, diagnostic, finalization,
+and cycle-horizon constraints remain unchanged.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
