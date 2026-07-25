@@ -906,3 +906,18 @@ Bazel source inspected: pinned Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3
 Design summary: Append five rows to the existing nonregistry include fixture for missing package, fallback `BUILD`, unchanged warm print replay, deletion, and primary `BUILD.bazel` recovery. One new fragment emits an exactly-once source-attributed print and adds a deterministic `package-boundary` marker. Append three rows to the existing registry discovery fixture for silent print, omitted `module()` retaining print and yielding the empty-name-before-version error, and silent recovery. No new fixture or registry scaffold is needed.
 Validation: two read-only pinned-source/fixture-harness audits; root row/mutation/assertion/growth synthesis; fresh independent review verified the marker digest and returned `ACCEPT`; no fixture, expected-artifact, harness, Rust, Cargo, command, server, or lockfile edit
 Residual risk: Implement only `WP-5-m1-nonroot-discovery-boundaries-oracle` under the exact five-file allowlist. Stop on old-row drift, unstable print attribution/count/replay, missing-file masking, execution before package failure, omitted-declaration ordering drift, network or harness expansion, or any edit outside that allowlist.
+
+### Stage 5 nonroot discovery-boundary oracle first run
+
+Status: `REPLAN` on executable stop evidence
+Bazel oracle: pinned Bazel 9.2 run `20260724-221706-1996631-bazel`
+Evidence: Missing-package and delete rows failed before fragment execution; fallback `BUILD` creation and primary `BUILD.bazel` recovery each emitted one source-attributed print and produced the exact `package-boundary` marker. The identical warm request reused the successful marker but emitted no print, contradicting the accepted replay claim.
+Validation: exact normalized records and manifest inspected; pinned `ModuleFileFunction.execModuleFile` sends nonregistry print directly to the environment listener during evaluation, while `NonRootModuleFileValue` retains no event state; fresh independent review accepted the stop
+Residual risk: Do not weaken the stopped row in place. Correct the design so nonregistry print is evaluation-only, cached values do not replay it, and discovery semantic equality excludes print events.
+
+### Stage 5 nonroot discovery-boundary oracle design correction
+
+Status: Accepted before corrected rerun
+Design summary: Preserve the five-file allowlist and all eight rows, but rename the unchanged warm row and require successful unchanged marker output with the nonregistry print sentinel absent. Package creation and recovery still require one exact source-attributed print; registry print remains a no-op. Future discovery values/equality exclude print events, and nonregistry delivery occurs only when evaluation actually executes.
+Validation: executable Bazel evidence, pinned event/value source adjudication, and fresh independent review `ACCEPT`; no additional fixture, harness, Rust, Cargo, command, server, or lockfile edit authorized
+Residual risk: Rerun only the corrected `WP-5-m1-nonroot-discovery-boundaries-oracle`; stop on print replay, missing package causality drift, old-row changes, registry print visibility, omitted-declaration ordering drift, or scope expansion.
