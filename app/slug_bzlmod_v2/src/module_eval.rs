@@ -1701,11 +1701,14 @@ fn snapshot_deferred_attribute_key<'v>(value: Value<'v>) -> anyhow::Result<Nonro
 #[derive(ProvidesStaticType)]
 struct NonrootEvalContext {
     state: RefCell<NonrootEvalState>,
+    include_indices: SmallMap<CompactString, usize>,
+    file_ids: Vec<LogicalModuleFileId>,
 }
 
 #[allow(dead_code)]
 struct NonrootEvalState {
     logical_id: LogicalModuleFileId,
+    current_file: usize,
     module_called: bool,
     non_module_called: bool,
     builder: NonrootModuleBuilder,
@@ -1749,6 +1752,7 @@ enum NonrootRootKind {
 
 #[allow(dead_code)]
 struct NonrootRoot {
+    file: usize,
     name: CompactString,
     kind: NonrootRootKind,
 }
@@ -1927,7 +1931,9 @@ impl<'v> StarlarkValue<'v> for TagInvoker {
             location: span,
             attributes: None,
         });
+        let file = state.current_file;
         state.roots.push(NonrootRoot {
+            file,
             name: root,
             kind: NonrootRootKind::Tag {
                 usage: self.usage,
@@ -2015,7 +2021,9 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
             location: span,
             attributes: None,
         });
+        let file = state.current_file;
         state.roots.push(NonrootRoot {
+            file,
             name: root,
             kind: NonrootRootKind::Tag {
                 usage: self.usage,
@@ -2066,8 +2074,79 @@ fn register_import(
     Ok(())
 }
 
+#[derive(Debug)]
+enum NonrootIncludeError {
+    BadLabel(CompactString),
+    MissingSuppliedFile {
+        label: CompactString,
+        location: Option<LogicalSpan>,
+    },
+    DuplicateSuppliedFile(CompactString),
+    UnreachableSuppliedFile(CompactString),
+}
+
+impl fmt::Display for NonrootIncludeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::BadLabel(message) => f.write_str(message),
+            Self::MissingSuppliedFile { label, location } => {
+                if let Some(location) = location {
+                    write!(
+                        f,
+                        "{}:{}:{}: include() has no supplied non-registry file for `{label}`",
+                        location.file.0, location.start_line, location.start_column
+                    )
+                } else {
+                    write!(
+                        f,
+                        "include() has no supplied non-registry file for `{label}`"
+                    )
+                }
+            }
+            Self::DuplicateSuppliedFile(label) => {
+                write!(f, "duplicate supplied include label `{label}`")
+            }
+            Self::UnreachableSuppliedFile(label) => {
+                write!(f, "supplied include label `{label}` is not reachable")
+            }
+        }
+    }
+}
+
+impl std::error::Error for NonrootIncludeError {}
+
 #[starlark_module]
 fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
+    fn include(label: &str, eval: &mut Evaluator) -> starlark::Result<NoneType> {
+        include_path(Path::new("."), label)
+            .map_err(NonrootIncludeError::BadLabel)
+            .map_err(starlark::Error::new_other)?;
+        let extra = eval.extra;
+        let context = extra
+            .and_then(|extra| extra.downcast_ref::<NonrootEvalContext>())
+            .context("non-root include invoked without evaluator context")
+            .map_err(starlark::Error::new_other)?;
+        let index = *context.include_indices.get(label).ok_or_else(|| {
+            starlark::Error::new_other(NonrootIncludeError::MissingSuppliedFile {
+                label: label.into(),
+                location: None,
+            })
+        })?;
+        let previous = {
+            let mut state = context.state.borrow_mut();
+            let previous = (state.logical_id.clone(), state.current_file);
+            state.logical_id = context.file_ids[index].clone();
+            state.current_file = index;
+            previous
+        };
+        let result = eval.eval_prepared_module_index(index);
+        let mut state = context.state.borrow_mut();
+        state.logical_id = previous.0;
+        state.current_file = previous.1;
+        result?;
+        Ok(NoneType)
+    }
+
     fn module(
         #[starlark(require = named, default = "")] name: &str,
         #[starlark(require = named, default = "")] version: &str,
@@ -2273,7 +2352,9 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
             location,
             imports: SmallMap::new(),
         });
+        let file = state.current_file;
         state.roots.push(NonrootRoot {
+            file,
             name: root.clone(),
             kind: NonrootRootKind::Proxy,
         });
@@ -2469,13 +2550,101 @@ fn evaluate_nonroot_module_file(
     source: &[u8],
     force_gc_after_eval: bool,
 ) -> anyhow::Result<EvaluatedNonrootModule> {
+    evaluate_nonroot_module_file_with_includes(
+        expected_key,
+        logical_id,
+        source,
+        &[],
+        force_gc_after_eval,
+    )
+}
+
+#[allow(dead_code)]
+struct SuppliedNonrootModuleFile<'a> {
+    raw_label: &'a str,
+    logical_id: LogicalModuleFileId,
+    source: &'a [u8],
+}
+
+#[allow(dead_code)]
+fn evaluate_nonroot_module_file_with_includes(
+    expected_key: NonrootModuleKey,
+    logical_id: LogicalModuleFileId,
+    source: &[u8],
+    supplied: &[SuppliedNonrootModuleFile<'_>],
+    force_gc_after_eval: bool,
+) -> anyhow::Result<EvaluatedNonrootModule> {
+    let mut include_indices = SmallMap::with_capacity(supplied.len());
+    let mut file_ids = Vec::with_capacity(supplied.len() + 1);
+    file_ids.push(logical_id.clone());
+    for (index, file) in supplied.iter().enumerate() {
+        include_path(Path::new("."), file.raw_label).map_err(NonrootIncludeError::BadLabel)?;
+        if include_indices
+            .insert(CompactString::from(file.raw_label), index + 1)
+            .is_some()
+        {
+            return Err(NonrootIncludeError::DuplicateSuppliedFile(file.raw_label.into()).into());
+        }
+        file_ids.push(file.logical_id.clone());
+    }
+    let inspections = std::iter::once((logical_id.clone(), source))
+        .chain(
+            supplied
+                .iter()
+                .map(|file| (file.logical_id.clone(), file.source)),
+        )
+        .map(|(logical_id, source)| inspect_nonroot_module_file(logical_id, source))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let mut reachable = vec![false; supplied.len() + 1];
+    let mut horizon = VecDeque::from([0]);
+    reachable[0] = true;
+    while let Some(file_index) = horizon.pop_front() {
+        for request in inspections[file_index].includes.iter() {
+            include_path(Path::new("."), request.path.as_str())
+                .map_err(NonrootIncludeError::BadLabel)?;
+            let included_index = *include_indices.get(request.path.as_str()).ok_or_else(|| {
+                NonrootIncludeError::MissingSuppliedFile {
+                    label: request.path.clone(),
+                    location: Some(request.location.clone()),
+                }
+            })?;
+            if !reachable[included_index] {
+                reachable[included_index] = true;
+                horizon.push_back(included_index);
+            }
+        }
+    }
+    if let Some((index, _)) = reachable
+        .iter()
+        .enumerate()
+        .skip(1)
+        .find(|(_, reachable)| !**reachable)
+    {
+        return Err(NonrootIncludeError::UnreachableSuppliedFile(
+            supplied[index - 1].raw_label.into(),
+        )
+        .into());
+    }
     let source = std::str::from_utf8(source).context("MODULE file is not valid UTF-8")?;
-    let ast = AstModule::parse(
+    let root_ast = AstModule::parse(
         logical_id.0.as_str(),
         source.to_owned(),
         &nonroot_module_dialect(),
     )
-    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+    .map_err(starlark::Error::into_anyhow)?;
+    let supplied_asts = supplied
+        .iter()
+        .map(|file| {
+            let source = std::str::from_utf8(file.source)
+                .context("included MODULE file is not valid UTF-8")?;
+            AstModule::parse(
+                file.logical_id.0.as_str(),
+                source.to_owned(),
+                &nonroot_module_dialect(),
+            )
+            .map_err(starlark::Error::into_anyhow)
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
     let builder = NonrootModuleBuilder::new(
         expected_key.clone(),
         expected_key.name.clone(),
@@ -2484,7 +2653,8 @@ fn evaluate_nonroot_module_file(
     );
     let context = NonrootEvalContext {
         state: RefCell::new(NonrootEvalState {
-            logical_id,
+            logical_id: logical_id.clone(),
+            current_file: 0,
             module_called: false,
             non_module_called: false,
             builder,
@@ -2492,57 +2662,86 @@ fn evaluate_nonroot_module_file(
             roots: Vec::new(),
             repo_names: SmallSet::new(),
         }),
+        include_indices,
+        file_ids,
     };
     let globals = GlobalsBuilder::extended_by(&[LibraryExtension::Print])
         .with(nonroot_module_globals)
         .build();
     let reject_print = RejectPrint;
     let module = Module::new();
+    let included_modules: Vec<_> = supplied.iter().map(|_| Box::new(Module::new())).collect();
+    let programs = {
+        let mut evaluator = Evaluator::new(&module);
+        let mut programs = Vec::with_capacity(supplied.len() + 1);
+        programs.push(
+            evaluator
+                .prepare_module(root_ast, &globals)
+                .map_err(starlark::Error::into_anyhow)?,
+        );
+        for (index, ast) in supplied_asts.into_iter().enumerate() {
+            programs.push(
+                evaluator
+                    .prepare_module_in(included_modules[index].as_ref(), ast, &globals)
+                    .map_err(starlark::Error::into_anyhow)?,
+            );
+        }
+        programs
+    };
     {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&context);
         evaluator.set_print_handler(&reject_print);
         evaluator
-            .eval_module(ast, &globals)
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+            .set_prepared_modules(programs)
+            .map_err(starlark::Error::into_anyhow)?;
+        evaluator
+            .eval_prepared_module_index(0)
+            .map_err(starlark::Error::into_anyhow)?;
     }
+    let modules: Vec<&Module> = std::iter::once(&module)
+        .chain(included_modules.iter().map(Box::as_ref))
+        .collect();
     if force_gc_after_eval {
         // `Evaluator::garbage_collect` is not usable on the cleared frame
         // left by `eval_module` (it asserts in starlark-rust). Allocate
         // unreachable evaluator-heap data, then use a fresh evaluator on the
         // same Module: its first statement performs the normal safe possible
         // GC while every hidden module slot is a root.
-        for _ in 0..2048 {
-            let _ = module.heap().alloc_str(
-                "nonroot-gc-probe-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        for (index, module) in modules.iter().enumerate() {
+            for _ in 0..2048 {
+                let _ = module.heap().alloc_str(
+                    "nonroot-gc-probe-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                );
+            }
+            let before = module.heap().allocated_bytes();
+            let probe_name = format!("nonroot-gc-probe-{index}.MODULE.bazel");
+            let probe = AstModule::parse(
+                &probe_name,
+                "gc_probe = 1".to_owned(),
+                &nonroot_module_dialect(),
+            )
+            .map_err(starlark::Error::into_anyhow)?;
+            let mut evaluator = Evaluator::new(module);
+            evaluator
+                .eval_module(probe, &globals)
+                .map_err(starlark::Error::into_anyhow)?;
+            anyhow::ensure!(
+                module.heap().allocated_bytes() < before / 2,
+                "non-root GC probe did not collect unreachable evaluator data for file {index}"
             );
         }
-        let before = module.heap().allocated_bytes();
-        let probe = AstModule::parse(
-            "nonroot-gc-probe.MODULE.bazel",
-            "gc_probe = 1".to_owned(),
-            &nonroot_module_dialect(),
-        )
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        let mut evaluator = Evaluator::new(&module);
-        evaluator
-            .eval_module(probe, &globals)
-            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-        anyhow::ensure!(
-            module.heap().allocated_bytes() < before / 2,
-            "non-root GC probe did not collect unreachable evaluator data"
-        );
     }
     let builtin_print = globals
         .iter()
         .find_map(|(name, value)| (name == "print").then_some(value.to_value().identity()))
         .context("print global is absent")?;
-    let mut state = context.state.borrow_mut();
+    let mut state = context.state.into_inner();
     let mut proxy_ids = SmallSet::new();
     for root in &state.roots {
         if matches!(root.kind, NonrootRootKind::Proxy) {
             proxy_ids.insert(
-                module
+                modules[root.file]
                     .get(root.name.as_str())
                     .context("missing hidden proxy root")?
                     .identity(),
@@ -2554,17 +2753,21 @@ fn evaluate_nonroot_module_file(
         .roots
         .iter()
         .filter_map(|root| match root.kind {
-            NonrootRootKind::Tag { usage, tag } => Some((root.name.clone(), usage, tag)),
+            NonrootRootKind::Tag { usage, tag } => Some((root.file, root.name.clone(), usage, tag)),
             _ => None,
         })
         .collect();
-    for (name, usage, tag) in roots {
-        let attrs = DictRef::from_value(module.get(name.as_str()).unwrap()).unwrap();
+    for (file, name, usage, tag) in roots {
+        let attrs = DictRef::from_value(
+            modules[file]
+                .get(name.as_str())
+                .context("missing hidden tag root")?,
+        )
+        .context("hidden tag root is not a dict")?;
         let values = snapshot_deferred_attribute_values(attrs, &identities)?;
         state.usages[usage].tags[tag].attributes = Some(values);
     }
-    drop(state);
-    finalize_nonroot_state(context.state.into_inner())
+    finalize_nonroot_state(state)
 }
 
 #[allow(dead_code)]
@@ -2604,7 +2807,7 @@ fn finalize_nonroot_state(mut state: NonrootEvalState) -> anyhow::Result<Evaluat
             .map(|proxy| {
                 Ok(NonrootExtensionProxy {
                     proxy_name: proxy.name.clone(),
-                    containing_file: state.logical_id.clone(),
+                    containing_file: proxy.location.file.clone(),
                     dev_dependency: proxy.dev_dependency,
                     location: proxy.location.clone(),
                     imports: NonrootRepoImports::from_local_to_exported(proxy.imports.clone())
@@ -2645,6 +2848,19 @@ mod nonroot_directive_evaluator_tests {
             NonrootModuleKey::new("subject", "1.0"),
             LogicalModuleFileId::new("@@subject+//:MODULE.bazel"),
             source.as_bytes(),
+            true,
+        )
+    }
+
+    fn evaluate_with_includes(
+        source: &str,
+        supplied: &[SuppliedNonrootModuleFile<'_>],
+    ) -> anyhow::Result<EvaluatedNonrootModule> {
+        evaluate_nonroot_module_file_with_includes(
+            NonrootModuleKey::new("subject", "1.0"),
+            LogicalModuleFileId::new("@@subject+//:MODULE.bazel"),
+            source.as_bytes(),
+            supplied,
             true,
         )
     }
@@ -2988,6 +3204,216 @@ repo_rule(name = "ignored_innate", dev_dependency = True, value = len)
         assert_eq!(
             evaluated.extension_usages[1].tags[0].location,
             expected(5, 1, 25)
+        );
+    }
+
+    #[test]
+    fn composes_nested_and_repeated_includes_with_per_file_gc_roots() {
+        let supplied = [
+            SuppliedNonrootModuleFile {
+                raw_label: "//:outer.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:outer.MODULE.bazel"),
+                source: br#"
+proxy = use_extension("//:extension.bzl", "extension")
+proxy.marker(marker = "outer-before")
+include("//:nested.MODULE.bazel")
+proxy.marker(marker = "outer-after")
+"#,
+            },
+            SuppliedNonrootModuleFile {
+                raw_label: "//:nested.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:nested.MODULE.bazel"),
+                source: br#"
+proxy = use_extension("//:extension.bzl", "extension")
+proxy.marker(marker = "nested-a")
+"#,
+            },
+            SuppliedNonrootModuleFile {
+                raw_label: "//:repeat.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:repeat.MODULE.bazel"),
+                source: br#"
+proxy = use_extension("//:extension.bzl", "extension")
+proxy.marker(marker = "repeat-a")
+"#,
+            },
+        ];
+        let evaluated = evaluate_with_includes(
+            r#"
+module(name = "subject", version = "1.0")
+include("//:outer.MODULE.bazel")
+include("//:repeat.MODULE.bazel")
+include("//:repeat.MODULE.bazel")
+"#,
+            &supplied,
+        )
+        .unwrap();
+
+        let usage = evaluated
+            .extension_usages
+            .iter()
+            .find(|usage| usage.extension_name == "extension")
+            .unwrap();
+        let markers: Vec<_> = usage
+            .tags
+            .iter()
+            .map(|tag| match tag.attributes.get("marker") {
+                Some(NonrootAttributeValue::String(marker)) => marker.as_str(),
+                marker => panic!("unexpected marker: {marker:?}"),
+            })
+            .collect();
+        assert_eq!(
+            markers,
+            [
+                "outer-before",
+                "nested-a",
+                "outer-after",
+                "repeat-a",
+                "repeat-a"
+            ]
+        );
+        assert_eq!(
+            usage.tags[0].location.file.0,
+            "@@subject+//:outer.MODULE.bazel"
+        );
+        assert_eq!(
+            usage.tags[1].location.file.0,
+            "@@subject+//:nested.MODULE.bazel"
+        );
+        assert_eq!(
+            usage.tags[3].location.file.0,
+            "@@subject+//:repeat.MODULE.bazel"
+        );
+    }
+
+    #[test]
+    fn compiles_the_supplied_closure_before_root_effects() {
+        let supplied = [SuppliedNonrootModuleFile {
+            raw_label: "//:late.MODULE.bazel",
+            logical_id: LogicalModuleFileId::new("@@subject+//:late.MODULE.bazel"),
+            source: b"value = undefined_late_symbol",
+        }];
+        let error = evaluate_with_includes(
+            r#"
+module(name = "subject", version = "1.0")
+bazel_dep(name = "dep", version = "not a version")
+include("//:late.MODULE.bazel")
+"#,
+            &supplied,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("undefined_late_symbol"), "{error}");
+        assert!(!error.contains("not a version"), "{error}");
+    }
+
+    #[test]
+    fn rejects_a_missing_nested_file_before_any_directive_effects() {
+        let supplied = [SuppliedNonrootModuleFile {
+            raw_label: "//:outer.MODULE.bazel",
+            logical_id: LogicalModuleFileId::new("@@subject+//:outer.MODULE.bazel"),
+            source: b"bazel_dep(name='dep', version='not a version')\ninclude('//:missing.MODULE.bazel')",
+        }];
+        let error = evaluate_with_includes(
+            "module(name='subject', version='1.0')\nbazel_dep(name='earlier', version='also not a version')\ninclude('//:outer.MODULE.bazel')",
+            &supplied,
+        )
+        .unwrap_err()
+        .to_string();
+
+        assert!(
+            error.contains(
+                "@@subject+//:outer.MODULE.bazel:2:1: include() has no supplied non-registry file"
+            ),
+            "{error}"
+        );
+        assert!(error.contains("//:missing.MODULE.bazel"), "{error}");
+        assert!(!error.contains("also not a version"), "{error}");
+        assert!(!error.contains("not a version"), "{error}");
+    }
+
+    #[test]
+    fn reports_nested_include_sites_and_typed_label_failures() {
+        let supplied = [
+            SuppliedNonrootModuleFile {
+                raw_label: "//:outer.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:outer.MODULE.bazel"),
+                source: b"include(\"//:nested.MODULE.bazel\")",
+            },
+            SuppliedNonrootModuleFile {
+                raw_label: "//:nested.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:nested.MODULE.bazel"),
+                source: b"fail(\"nested sentinel\")",
+            },
+        ];
+        let nested = evaluate_with_includes(
+            "module(name='subject', version='1.0')\ninclude('//:outer.MODULE.bazel')",
+            &supplied,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(nested.contains("nested sentinel"), "{nested}");
+        let root_frame = nested
+            .find("@@subject+//:MODULE.bazel:2")
+            .unwrap_or_else(|| panic!("{nested}"));
+        let outer_frame = nested
+            .find("@@subject+//:outer.MODULE.bazel:1")
+            .unwrap_or_else(|| panic!("{nested}"));
+        let nested_frame = nested
+            .find("@@subject+//:nested.MODULE.bazel:1")
+            .unwrap_or_else(|| panic!("{nested}"));
+        assert!(root_frame < outer_frame, "{nested}");
+        assert!(outer_frame < nested_frame, "{nested}");
+        assert_eq!(nested.matches("in <module>").count(), 1, "{nested}");
+        assert_eq!(nested.matches("in include").count(), 2, "{nested}");
+
+        let bad =
+            evaluate("module(name='subject', version='1.0')\ninclude('relative.MODULE.bazel')")
+                .unwrap_err()
+                .to_string();
+        assert!(bad.contains("bad include label"), "{bad}");
+
+        let missing =
+            evaluate("module(name='subject', version='1.0')\ninclude('//:missing.MODULE.bazel')")
+                .unwrap_err()
+                .to_string();
+        assert!(
+            missing.contains("no supplied non-registry file"),
+            "{missing}"
+        );
+
+        let duplicate = [
+            SuppliedNonrootModuleFile {
+                raw_label: "//:same.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:first.MODULE.bazel"),
+                source: b"value = 1",
+            },
+            SuppliedNonrootModuleFile {
+                raw_label: "//:same.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:second.MODULE.bazel"),
+                source: b"value = 2",
+            },
+        ];
+        let duplicate = evaluate_with_includes("module(name='subject', version='1.0')", &duplicate)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            duplicate.contains("duplicate supplied include label"),
+            "{duplicate}"
+        );
+
+        let unreachable = [SuppliedNonrootModuleFile {
+            raw_label: "//:unused.MODULE.bazel",
+            logical_id: LogicalModuleFileId::new("@@subject+//:unused.MODULE.bazel"),
+            source: b"value = 1",
+        }];
+        let unreachable =
+            evaluate_with_includes("module(name='subject', version='1.0')", &unreachable)
+                .unwrap_err()
+                .to_string();
+        assert!(
+            unreachable
+                .contains("supplied include label `//:unused.MODULE.bazel` is not reachable"),
+            "{unreachable}"
         );
     }
 }

@@ -24,6 +24,7 @@ use starlark_syntax::syntax::top_level_stmts::top_level_stmts_mut;
 
 use crate::codemap::Spanned;
 use crate::const_frozen_string;
+use crate::eval::bc::bytecode::Bc;
 use crate::eval::bc::frame::alloca_frame;
 use crate::eval::compiler::Compiler;
 use crate::eval::compiler::add_span_to_expr_error;
@@ -44,6 +45,29 @@ use crate::typing::typecheck::solve_bindings;
 use crate::values::FrozenRef;
 use crate::values::FrozenStringValue;
 use crate::values::Value;
+
+pub(crate) struct PreparedModuleBytecode {
+    pub(crate) local_names: FrozenRef<'static, [FrozenStringValue]>,
+    pub(crate) bytecode: Vec<Bc>,
+}
+
+pub(crate) fn eval_prepared_module<'v>(
+    eval: &mut crate::eval::Evaluator<'v, '_, '_>,
+    prepared: &PreparedModuleBytecode,
+) -> Result<Value<'v>, EvalException> {
+    let mut last = Value::new_none();
+    let local_count = prepared.local_names.len().try_into().unwrap();
+    for bc in &prepared.bytecode {
+        last = alloca_frame(
+            eval,
+            local_count,
+            bc.max_stack_size,
+            bc.max_loop_depth,
+            |eval| eval.eval_bc(const_frozen_string!("module").to_value(), bc),
+        )?;
+    }
+    Ok(last)
+}
 
 #[derive(Debug, thiserror::Error)]
 enum ModuleError {
@@ -128,6 +152,29 @@ impl<'v> Compiler<'v, '_, '_, '_> {
             bc.max_loop_depth,
             |eval| eval.eval_bc(const_frozen_string!("module").to_value(), &bc),
         )
+    }
+
+    fn prepare_regular_top_level_stmt(
+        &mut self,
+        stmt: &mut CstStmt,
+        local_names: FrozenRef<'static, [FrozenStringValue]>,
+    ) -> Result<Bc, EvalException> {
+        if matches!(stmt.node, StmtP::Statements(_) | StmtP::Load(_)) {
+            return Err(EvalException::new_anyhow(
+                ModuleError::UnexpectedStatement.into(),
+                stmt.span,
+                &self.codemap,
+            ));
+        }
+        let stmt = self
+            .module_top_level_stmt(stmt)
+            .map_err(|e| e.into_eval_exception())?;
+        Ok(stmt.as_bc(
+            &self.compile_context(false),
+            local_names,
+            0,
+            self.eval.module_env.frozen_heap(),
+        ))
     }
 
     #[allow(clippy::mut_mut)] // Another false positive.
@@ -221,5 +268,35 @@ impl<'v> Compiler<'v, '_, '_, '_> {
         self.exit_scope();
         assert!(self.locals.is_empty());
         Ok(value)
+    }
+
+    pub(crate) fn prepare_module(
+        &mut self,
+        mut stmt: CstStmt,
+        local_names: FrozenRef<'static, [FrozenStringValue]>,
+    ) -> Result<PreparedModuleBytecode, EvalException> {
+        self.enter_scope(ScopeId::module());
+        let result = (|| {
+            let mut stmts = top_level_stmts_mut(&mut stmt);
+            if stmts.len() != self.top_level_stmt_count {
+                return Err(EvalException::new_anyhow(
+                    ModuleError::TopLevelStmtCountMismatch.into(),
+                    stmt.span,
+                    &self.codemap,
+                ));
+            }
+            let mut bytecode = Vec::with_capacity(stmts.len());
+            for stmt in stmts.iter_mut() {
+                self.populate_types_in_stmt(stmt)?;
+                bytecode.push(self.prepare_regular_top_level_stmt(stmt, local_names)?);
+            }
+            Ok(PreparedModuleBytecode {
+                local_names,
+                bytecode,
+            })
+        })();
+        self.exit_scope();
+        assert!(self.locals.is_empty());
+        result
     }
 }

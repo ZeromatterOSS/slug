@@ -159,6 +159,9 @@ pub struct Evaluator<'v, 'a, 'e> {
     pub extra: Option<&'a dyn AnyLifetime<'e>>,
     /// Like `extra`, but mutable
     pub extra_mut: Option<&'a mut dyn AnyLifetime<'e>>,
+    /// One owned registry allocation for module-bound programs dispatched by
+    /// opaque index from embedder native functions.
+    pub(crate) prepared_modules: Option<std::rc::Rc<[crate::eval::PreparedModule<'v>]>>,
     /// Called to perform console IO each time `breakpoint` function is called.
     pub(crate) breakpoint_handler:
         Option<Box<dyn Fn() -> anyhow::Result<Box<dyn BreakpointConsole>>>>,
@@ -267,6 +270,7 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             loader: None,
             extra: None,
             extra_mut: None,
+            prepared_modules: None,
             next_gc_level: GC_THRESHOLD,
             disable_gc: false,
             alloca: Alloca::new(),
