@@ -28,6 +28,7 @@ use itertools::Either;
 use tracing::Instrument;
 
 use crate::api::activation_tracker::ActivationData;
+use crate::api::activation_tracker::ActivationKind;
 use crate::arc::Arc;
 use crate::impls::core::graph::types::VersionedGraphKey;
 use crate::impls::core::graph::types::VersionedGraphResult;
@@ -153,9 +154,15 @@ impl DiceTaskWorker {
     ) -> CancellableResult<DiceWorkerStateFinishedAndCached> {
         let v = self.eval.per_live_version_ctx.get_version();
         let log_started = dice_log::now_if_enabled();
+        let tracks_rich_activations = self
+            .eval
+            .user_data
+            .activation_tracker
+            .as_ref()
+            .is_some_and(|tracker| tracker.tracks_rich_activations());
 
-        let state_result = state_handle
-            .lookup_key(VersionedGraphKey::new(v, self.k))
+        let (state_result, activation_dependencies) = state_handle
+            .lookup_key(VersionedGraphKey::new(v, self.k), tracks_rich_activations)
             .await;
 
         // handle cancelled/cache hits before sending started events
@@ -170,7 +177,19 @@ impl DiceTaskWorker {
                 if log_started.is_some() {
                     dice_log::record(self.eval.dice.key_index.get(self.k), "hit", log_started);
                 }
-                return task_state.lookup_matches(handle, entry);
+                let result = task_state.lookup_matches(handle, entry);
+                if result.is_ok() && tracks_rich_activations {
+                    if let Some(dependencies) = activation_dependencies {
+                        if let Some(activation_info) = self.rich_activation_info(
+                            &state_handle,
+                            dependencies.iter_keys(),
+                            ActivationKind::Reused,
+                        ) {
+                            activation_info.notify_rich_only();
+                        }
+                    }
+                }
+                return result;
             }
             VersionedGraphResult::CheckDeps(mismatch2) => Some(mismatch2),
             VersionedGraphResult::Compute => None,
@@ -217,6 +236,7 @@ impl DiceTaskWorker {
                         let task_state = task_state.deps_match(handle)?;
 
                         let activation_info = self.activation_info(
+                            &state_handle,
                             mismatch.deps_to_validate.iter_keys(),
                             ActivationData::Reused,
                         );
@@ -270,7 +290,8 @@ impl DiceTaskWorker {
         // the compute would.
         drop(deps_check_continuables);
 
-        let activation_info = self.activation_info(result.deps.iter_keys(), activation_data);
+        let activation_info =
+            self.activation_info(&state_handle, result.deps.iter_keys(), activation_data);
 
         let res = {
             match result.value.into_valid_value() {
@@ -327,15 +348,35 @@ impl DiceTaskWorker {
 
     fn activation_info<'a>(
         &self,
+        state: &CoreStateHandle,
         deps: impl Iterator<Item = DiceKey> + 'a,
         data: ActivationData,
     ) -> Option<ActivationInfo> {
         ActivationInfo::new(
             &self.eval.dice.key_index,
+            state,
             &self.eval.user_data.activation_tracker,
+            self.eval.per_live_version_ctx.get_version(),
             self.k,
             deps,
             data,
+        )
+    }
+
+    fn rich_activation_info<'a>(
+        &self,
+        state: &CoreStateHandle,
+        deps: impl Iterator<Item = DiceKey> + 'a,
+        kind: ActivationKind,
+    ) -> Option<ActivationInfo> {
+        ActivationInfo::new_rich(
+            &self.eval.dice.key_index,
+            state,
+            &self.eval.user_data.activation_tracker,
+            self.eval.per_live_version_ctx.get_version(),
+            self.k,
+            deps,
+            kind,
         )
     }
 }

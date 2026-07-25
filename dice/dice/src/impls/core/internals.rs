@@ -15,11 +15,17 @@ use dice_error::result::CancellationReason;
 use gazebo::prelude::SliceExt;
 
 use super::graph::types::RejectedReason;
+use crate::ActivationClosure;
+use crate::ActivationClosureError;
+use crate::ActivationClosureNode;
+use crate::DiceNodeId;
+use crate::HashSet;
 use crate::api::key::InvalidationSourcePriority;
 use crate::api::storage_type::StorageType;
 use crate::arc::Arc;
 use crate::impls::cache::SharedCache;
 use crate::impls::core::graph::introspection::VersionedGraphIntrospectable;
+use crate::impls::core::graph::storage::ActivationTransition;
 use crate::impls::core::graph::storage::InvalidateKind;
 use crate::impls::core::graph::storage::ValueReusable;
 use crate::impls::core::graph::storage::VersionedGraph;
@@ -97,15 +103,155 @@ impl CoreState {
                 .retain(|task| task.is_pending());
             self.pending_termination_tasks
                 .extend(evicted_cache.cancel_pending_tasks());
+            self.graph
+                .prune_activation_history(self.version_tracker.oldest_live_or_current());
         }
     }
 
-    pub(super) fn lookup_key(&mut self, key: VersionedGraphKey) -> VersionedGraphResult {
+    pub(super) fn lookup_key(
+        &mut self,
+        key: VersionedGraphKey,
+        include_activation_dependencies: bool,
+    ) -> (VersionedGraphResult, Option<Arc<SeriesParallelDeps>>) {
         if self.version_tracker.should_reject(key.v) {
-            VersionedGraphResult::Rejected(RejectedReason::RejectedDueToGraphClear)
+            (
+                VersionedGraphResult::Rejected(RejectedReason::RejectedDueToGraphClear),
+                None,
+            )
         } else {
-            self.graph.get(key)
+            let (result, dependencies) = self.graph.lookup(key);
+            (
+                result,
+                include_activation_dependencies
+                    .then_some(dependencies)
+                    .flatten(),
+            )
         }
+    }
+
+    pub(super) fn activation_dependencies(
+        &self,
+        version: VersionNumber,
+        key: DiceKey,
+    ) -> Option<Arc<SeriesParallelDeps>> {
+        if self.version_tracker.should_reject(version)
+            || !self.version_tracker.is_active(version)
+            || !self.graph.nodes.contains_key(&key)
+        {
+            return None;
+        }
+        match self
+            .graph
+            .activation_transition_at(VersionedGraphKey::new(version, key))
+        {
+            Some(ActivationTransition::Verified(dependencies)) => Some(Arc::clone(dependencies)),
+            Some(ActivationTransition::Dirty) | None => None,
+        }
+    }
+
+    pub(super) fn activation_closure(
+        &self,
+        engine: u64,
+        version: VersionNumber,
+        roots: Vec<DiceNodeId>,
+    ) -> Result<ActivationClosure, ActivationClosureError> {
+        for root in &roots {
+            if root.engine() != engine {
+                return Err(ActivationClosureError::ForeignEngine { node: *root });
+            }
+        }
+        if roots.is_empty() {
+            return Ok(ActivationClosure::new(version, roots, Vec::new()));
+        }
+        if self.version_tracker.should_reject(version) || !self.version_tracker.is_active(version) {
+            return Err(ActivationClosureError::NotVerified {
+                node: roots[0],
+                version,
+            });
+        }
+
+        let mut visiting = HashSet::default();
+        let mut visited = HashSet::default();
+        let mut nodes = Vec::new();
+        let mut stack = roots
+            .iter()
+            .rev()
+            .map(|root| ActivationTraversalFrame::Enter {
+                key: DiceKey { index: root.node() },
+                is_root: true,
+            })
+            .collect::<Vec<_>>();
+        while let Some(frame) = stack.pop() {
+            match frame {
+                ActivationTraversalFrame::Enter { key, is_root } => {
+                    if visited.contains(&key) {
+                        continue;
+                    }
+                    let node = DiceNodeId::new(engine, key.index);
+                    if !self.graph.nodes.contains_key(&key) {
+                        return Err(if is_root {
+                            ActivationClosureError::UnavailableRoot { root: node }
+                        } else {
+                            ActivationClosureError::UnavailableNode { node }
+                        });
+                    }
+                    if !visiting.insert(key) {
+                        return Err(ActivationClosureError::Cycle { node });
+                    }
+
+                    let dependencies = match self
+                        .graph
+                        .activation_transition_at(VersionedGraphKey::new(version, key))
+                    {
+                        Some(ActivationTransition::Verified(dependencies)) => {
+                            dependencies.iter_keys().collect::<Vec<_>>()
+                        }
+                        Some(ActivationTransition::Dirty) => {
+                            return Err(ActivationClosureError::Dirty { node, version });
+                        }
+                        None => {
+                            return Err(ActivationClosureError::NotVerified { node, version });
+                        }
+                    };
+                    let dependency_ids = dependencies
+                        .iter()
+                        .map(|dependency| DiceNodeId::new(engine, dependency.index))
+                        .collect();
+                    stack.push(ActivationTraversalFrame::Exit {
+                        key,
+                        node,
+                        dependency_ids,
+                    });
+                    stack.extend(dependencies.into_iter().rev().map(|key| {
+                        ActivationTraversalFrame::Enter {
+                            key,
+                            is_root: false,
+                        }
+                    }));
+                }
+                ActivationTraversalFrame::Exit {
+                    key,
+                    node,
+                    dependency_ids,
+                } => {
+                    visiting.remove(&key);
+                    if visited.insert(key) {
+                        nodes.push(ActivationClosureNode::new(node, dependency_ids));
+                    }
+                }
+            }
+        }
+        Ok(ActivationClosure::new(version, roots, nodes))
+    }
+
+    #[cfg(test)]
+    pub(super) fn activation_history_len(&self, key: DiceKey) -> usize {
+        self.graph.activation_history_len(key)
+    }
+
+    #[cfg(test)]
+    pub(super) fn remove_activation_history(&mut self, key: DiceKey) {
+        self.graph.remove_activation_history(key);
     }
 
     pub(super) fn update_computed(
@@ -148,6 +294,7 @@ impl CoreState {
         // Do the actual drop on a different thread because we may have to drop a lot of stuff
         // here.
         let map = std::mem::take(&mut self.graph.nodes);
+        self.graph.clear_activation_history();
         thread::Builder::new()
             .name("dice-drop-everything".to_owned())
             .spawn(move || drop(map))
@@ -177,6 +324,18 @@ impl CoreState {
 
         (graph, version_data)
     }
+}
+
+enum ActivationTraversalFrame {
+    Enter {
+        key: DiceKey,
+        is_root: bool,
+    },
+    Exit {
+        key: DiceKey,
+        node: DiceNodeId,
+        dependency_ids: Vec<DiceNodeId>,
+    },
 }
 
 #[cfg(test)]

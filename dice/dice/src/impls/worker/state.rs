@@ -20,8 +20,13 @@ use dupe::Dupe;
 use itertools::Either;
 
 use crate::ActivationData;
+use crate::ActivationKind;
 use crate::ActivationTracker;
+use crate::DiceNodeId;
 use crate::DynKey;
+use crate::RichActivation;
+use crate::VersionNumber;
+use crate::impls::core::state::CoreStateHandle;
 use crate::impls::evaluator::AsyncEvaluator;
 use crate::impls::evaluator::KeyEvaluationResult;
 use crate::impls::key::DiceKey;
@@ -288,11 +293,7 @@ impl DiceWorkerStateFinished {
         debug!(msg = "Update caches complete");
 
         if let Some(activation_info) = activation_info {
-            activation_info.activation_tracker.key_activated(
-                DynKey::ref_cast(&activation_info.key),
-                &mut activation_info.deps.iter().map(DynKey::ref_cast),
-                activation_info.activation_data,
-            )
+            activation_info.notify_with_legacy();
         }
 
         DiceWorkerStateFinishedAndCached {
@@ -304,31 +305,105 @@ impl DiceWorkerStateFinished {
 
 pub(crate) struct ActivationInfo {
     activation_tracker: Arc<dyn ActivationTracker>,
+    node: DiceNodeId,
+    version: VersionNumber,
     key: DiceKeyErased,
     deps: Vec<DiceKeyErased>,
+    dependency_ids: Vec<DiceNodeId>,
     activation_data: ActivationData,
 }
 
 impl ActivationInfo {
     pub(crate) fn new<'a>(
         key_index: &DiceKeyIndex,
+        state: &CoreStateHandle,
         activation_tracker: &Option<Arc<dyn ActivationTracker>>,
+        version: VersionNumber,
         key: DiceKey,
         deps: impl Iterator<Item = DiceKey> + 'a,
         activation_data: ActivationData,
     ) -> Option<ActivationInfo> {
         if let Some(activation_tracker) = activation_tracker {
+            let node = state.node_id(key);
             let key = key_index.get(key).dupe();
-            let deps = deps.map(|dep| key_index.get(dep).dupe()).collect();
+            let tracks_rich_activations = activation_tracker.tracks_rich_activations();
+            let mut dependency_ids = Vec::new();
+            let deps = deps
+                .map(|dep| {
+                    if tracks_rich_activations {
+                        dependency_ids.push(state.node_id(dep));
+                    }
+                    key_index.get(dep).dupe()
+                })
+                .collect();
 
             Some(ActivationInfo {
                 activation_tracker: activation_tracker.dupe(),
+                node,
+                version,
                 key,
                 deps,
+                dependency_ids,
                 activation_data,
             })
         } else {
             None
+        }
+    }
+
+    pub(crate) fn new_rich<'a>(
+        key_index: &DiceKeyIndex,
+        state: &CoreStateHandle,
+        activation_tracker: &Option<Arc<dyn ActivationTracker>>,
+        version: VersionNumber,
+        key: DiceKey,
+        deps: impl Iterator<Item = DiceKey> + 'a,
+        kind: ActivationKind,
+    ) -> Option<Self> {
+        let activation_tracker = activation_tracker
+            .as_ref()
+            .filter(|tracker| tracker.tracks_rich_activations())?;
+        let key_erased = key_index.get(key).dupe();
+        let dependency_ids = deps.map(|dep| state.node_id(dep)).collect();
+        Some(Self {
+            activation_tracker: activation_tracker.dupe(),
+            node: state.node_id(key),
+            version,
+            key: key_erased,
+            deps: Vec::new(),
+            dependency_ids,
+            activation_data: match kind {
+                ActivationKind::Evaluated => ActivationData::Evaluated(None),
+                ActivationKind::Reused => ActivationData::Reused,
+            },
+        })
+    }
+
+    pub(crate) fn notify_rich_only(self) {
+        self.notify_rich();
+    }
+
+    fn notify_with_legacy(self) {
+        self.notify_rich();
+        self.activation_tracker.key_activated(
+            DynKey::ref_cast(&self.key),
+            &mut self.deps.iter().map(DynKey::ref_cast),
+            self.activation_data,
+        );
+    }
+
+    fn notify_rich(&self) {
+        if self.activation_tracker.tracks_rich_activations() {
+            self.activation_tracker.key_activated_rich(
+                DynKey::ref_cast(&self.key),
+                RichActivation::new(
+                    self.node,
+                    self.version,
+                    self.activation_data.kind(),
+                    self.activation_data.evaluation_data(),
+                    &self.dependency_ids,
+                ),
+            );
         }
     }
 }

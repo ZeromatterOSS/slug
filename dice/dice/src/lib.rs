@@ -196,8 +196,15 @@ pub use dice_futures::spawn::WeakFutureError; // expose future errors as api
 pub(crate) type HashMap<K, V> = std::collections::HashMap<K, V, fxhash::FxBuildHasher>;
 pub(crate) type HashSet<K> = std::collections::HashSet<K, fxhash::FxBuildHasher>;
 
+pub use crate::api::activation_tracker::ActivationClosure;
+pub use crate::api::activation_tracker::ActivationClosureError;
+pub use crate::api::activation_tracker::ActivationClosureNode;
 pub use crate::api::activation_tracker::ActivationData;
+pub use crate::api::activation_tracker::ActivationKind;
 pub use crate::api::activation_tracker::ActivationTracker;
+pub use crate::api::activation_tracker::DiceNodeId;
+pub use crate::api::activation_tracker::RichActivation;
+pub use crate::api::activation_tracker::RootActivation;
 pub use crate::api::computations::DiceComputations;
 pub use crate::api::computations::LinearRecomputeDiceComputations;
 pub use crate::api::cycles::DetectCycles;
@@ -228,6 +235,7 @@ pub use crate::introspection::serialize_dense_graph;
 pub use crate::introspection::serialize_graph;
 pub use crate::stats::GlobalStats;
 use crate::transaction_update::DiceTransactionUpdaterImpl;
+pub use crate::versions::VersionNumber;
 
 pub mod testing {
     pub use crate::api::dice::testing::DiceBuilder;

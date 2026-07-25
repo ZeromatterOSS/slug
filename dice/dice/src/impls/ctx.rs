@@ -13,6 +13,8 @@ use std::future::Future;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use derivative::Derivative;
@@ -29,8 +31,14 @@ use itertools::Either;
 use parking_lot::Mutex;
 use typed_arena::Arena;
 
+use crate::ActivationClosure;
+use crate::ActivationClosureError;
+use crate::ActivationKind;
+use crate::DiceNodeId;
 use crate::DiceTransactionUpdater;
+use crate::DynKey;
 use crate::LinearRecomputeDiceComputations;
+use crate::RootActivation;
 use crate::UserCycleDetectorGuard;
 use crate::api::activation_tracker::ActivationData;
 use crate::api::computations::DiceComputations;
@@ -66,6 +74,7 @@ use crate::impls::value::DiceComputedValue;
 use crate::impls::value::TrackedInvalidationPaths;
 use crate::impls::worker::DiceTaskWorker;
 use crate::impls::worker::project_for_key;
+use crate::impls::worker::state::ActivationInfo;
 use crate::transaction_update::DiceTransactionUpdaterImpl;
 use crate::versions::VersionNumber;
 
@@ -93,8 +102,9 @@ impl BaseComputeCtx {
         dice: Arc<Dice>,
         live_version_guard: ActiveTransactionGuard,
     ) -> Self {
+        let root_request_ordinal = Arc::new(AtomicU64::new(0));
         Self {
-            data: DiceComputations(DiceComputationsImpl(ModernComputeCtx::new(
+            data: DiceComputations(DiceComputationsImpl(ModernComputeCtx::new_root(
                 ParentKey::None,
                 KeyComputingUserCycleDetectorData::Untracked,
                 AsyncEvaluator {
@@ -102,6 +112,7 @@ impl BaseComputeCtx {
                     user_data,
                     dice,
                 },
+                root_request_ordinal,
             ))),
             live_version_guard,
         }
@@ -112,10 +123,16 @@ impl BaseComputeCtx {
         live_version_guard: ActiveTransactionGuard,
     ) -> BaseComputeCtx {
         Self {
-            data: DiceComputations(DiceComputationsImpl(ModernComputeCtx::new(
+            data: DiceComputations(DiceComputationsImpl(ModernComputeCtx::new_root(
                 ParentKey::None,
                 KeyComputingUserCycleDetectorData::Untracked,
                 modern.ctx_data().async_evaluator.clone(),
+                modern
+                    .ctx_data()
+                    .root_request_ordinal
+                    .as_ref()
+                    .expect("base context has a root ordinal")
+                    .clone(),
             ))),
             live_version_guard,
         }
@@ -135,6 +152,50 @@ impl BaseComputeCtx {
 
     pub(crate) fn as_computations_mut(&mut self) -> &mut DiceComputations<'static> {
         &mut self.data
+    }
+
+    pub(crate) fn activation_closure(
+        &self,
+        roots: Vec<DiceNodeId>,
+    ) -> impl Future<Output = Result<ActivationClosure, ActivationClosureError>> + use<> {
+        self.data
+            .0
+            .0
+            .ctx_data()
+            .async_evaluator
+            .dice
+            .state_handle
+            .activation_closure(self.get_version(), roots)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn activation_history_len(
+        &self,
+        node: DiceNodeId,
+    ) -> impl Future<Output = usize> + use<> {
+        self.data
+            .0
+            .0
+            .ctx_data()
+            .async_evaluator
+            .dice
+            .state_handle
+            .activation_history_len(node)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn remove_activation_history(
+        &self,
+        node: DiceNodeId,
+    ) -> impl Future<Output = ()> + use<> {
+        self.data
+            .0
+            .0
+            .ctx_data()
+            .async_evaluator
+            .dice
+            .state_handle
+            .remove_activation_history(node)
     }
 }
 
@@ -440,6 +501,8 @@ pub(crate) struct CoreCtx {
     // data for the entire compute of a Key, including parallel computes
     #[allocative(skip)]
     evaluation_data: Mutex<EvaluationData>,
+    #[allocative(skip)]
+    root_request_ordinal: Option<Arc<AtomicU64>>,
 }
 
 impl ModernComputeCtx<'static> {
@@ -485,6 +548,29 @@ impl ModernComputeCtx<'_> {
         cycles: KeyComputingUserCycleDetectorData,
         async_evaluator: AsyncEvaluator,
     ) -> ModernComputeCtx<'static> {
+        Self::new_with_root_ordinal(parent_key, cycles, async_evaluator, None)
+    }
+
+    fn new_root(
+        parent_key: ParentKey,
+        cycles: KeyComputingUserCycleDetectorData,
+        async_evaluator: AsyncEvaluator,
+        root_request_ordinal: Arc<AtomicU64>,
+    ) -> ModernComputeCtx<'static> {
+        Self::new_with_root_ordinal(
+            parent_key,
+            cycles,
+            async_evaluator,
+            Some(root_request_ordinal),
+        )
+    }
+
+    fn new_with_root_ordinal(
+        parent_key: ParentKey,
+        cycles: KeyComputingUserCycleDetectorData,
+        async_evaluator: AsyncEvaluator,
+        root_request_ordinal: Option<Arc<AtomicU64>>,
+    ) -> ModernComputeCtx<'static> {
         ModernComputeCtx::Owned {
             dep_trackers: RecordingDepsTracker::new(TrackedInvalidationPaths::clean()),
             ctx_data: CoreCtx {
@@ -492,6 +578,7 @@ impl ModernComputeCtx<'_> {
                 parent_key,
                 cycles,
                 evaluation_data: Mutex::new(EvaluationData::none()),
+                root_request_ordinal,
             },
         }
     }
@@ -620,6 +707,7 @@ impl CoreCtx {
             .dice
             .key_index
             .index(CowDiceKeyHashed::key_ref(key));
+        self.notify_root(dice_key);
 
         self.async_evaluator
             .per_live_version_ctx
@@ -645,8 +733,9 @@ impl CoreCtx {
             .dice
             .key_index
             .index(CowDiceKeyHashed::proj_ref(base.derive_from_key, key));
+        self.notify_root(dice_key);
 
-        let r = self
+        let (r, cache_hit) = self
             .async_evaluator
             .per_live_version_ctx
             .compute_projection(
@@ -663,12 +752,29 @@ impl CoreCtx {
                     self.async_evaluator.user_data.tracker.dupe(),
                     self.async_evaluator.dice.dupe(),
                 ),
-            );
+            )
+            .map_err(DiceError::cancelled)?;
 
-        let r = match r {
-            Ok(r) => r,
-            Err(reason) => return Err(DiceError::cancelled(reason)),
-        };
+        if cache_hit
+            && self
+                .async_evaluator
+                .user_data
+                .activation_tracker
+                .as_ref()
+                .is_some_and(|tracker| tracker.tracks_rich_activations())
+        {
+            if let Some(activation_info) = ActivationInfo::new_rich(
+                &self.async_evaluator.dice.key_index,
+                &self.async_evaluator.dice.state_handle,
+                &self.async_evaluator.user_data.activation_tracker,
+                self.get_version(),
+                dice_key,
+                std::iter::once(base.derive_from_key),
+                ActivationKind::Reused,
+            ) {
+                activation_info.notify_rich_only();
+            }
+        }
 
         dep_trackers.lock().record(
             dice_key,
@@ -722,6 +828,28 @@ impl CoreCtx {
     pub(crate) fn cycle_guard<T: UserCycleDetectorGuard>(&self) -> DiceResult<Option<Arc<T>>> {
         self.cycles.cycle_guard()
     }
+
+    fn notify_root(&self, key: DiceKey) {
+        let Some(root_request_ordinal) = &self.root_request_ordinal else {
+            return;
+        };
+        let Some(activation_tracker) = &self.async_evaluator.user_data.activation_tracker else {
+            return;
+        };
+        let ordinal = root_request_ordinal
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+                next.checked_add(1)
+            })
+            .expect("transaction root request ordinal exhausted");
+        activation_tracker.root_activated(
+            DynKey::ref_cast(self.async_evaluator.dice.key_index.get(key)),
+            RootActivation::new(
+                self.async_evaluator.dice.state_handle.node_id(key),
+                self.get_version(),
+                ordinal,
+            ),
+        );
+    }
 }
 
 /// Context that is shared for all current live computations of the same version.
@@ -755,8 +883,12 @@ impl SharedLiveTransactionCtx {
         eval: &AsyncEvaluator,
         cycles: UserCycleDetectorData,
     ) -> impl Future<Output = CancellableResult<DiceComputedValue>> + use<> {
+        let mut cache_hit = false;
         let res: CancellableResult<DicePromise> = match self.cache.get(key) {
-            DiceTaskRef::Computed(result) => Ok(DicePromise::ready(result)),
+            DiceTaskRef::Computed(result) => {
+                cache_hit = true;
+                Ok(DicePromise::ready(result))
+            }
             DiceTaskRef::Occupied(mut occupied) => {
                 match occupied.get().depended_on_by(parent_key) {
                     Ok(promise) => {
@@ -808,7 +940,7 @@ impl SharedLiveTransactionCtx {
             DiceTaskRef::TransactionCancelled => Err(CancellationReason::TransactionCancelled),
         };
 
-        match res {
+        let future = match res {
             Ok(v) => v.left_future(),
             Err(reason) => {
                 let v = self.version;
@@ -820,6 +952,41 @@ impl SharedLiveTransactionCtx {
                 }
                     .right_future()
             }
+        };
+        let tracks_rich_activations = cache_hit
+            && eval
+                .user_data
+                .activation_tracker
+                .as_ref()
+                .is_some_and(|tracker| tracker.tracks_rich_activations());
+        if tracks_rich_activations {
+            let version = self.version;
+            let dice = eval.dice.dupe();
+            let state = eval.dice.state_handle.dupe();
+            let activation_tracker = eval.user_data.activation_tracker.dupe();
+            async move {
+                let result = future.await;
+                if result.is_ok() {
+                    if let Some(dependencies) = state.activation_dependencies(version, key).await {
+                        if let Some(activation_info) = ActivationInfo::new_rich(
+                            &dice.key_index,
+                            &state,
+                            &activation_tracker,
+                            version,
+                            key,
+                            dependencies.iter_keys(),
+                            ActivationKind::Reused,
+                        ) {
+                            activation_info.notify_rich_only();
+                        }
+                    }
+                }
+                result
+            }
+            .boxed()
+            .right_future()
+        } else {
+            future.left_future()
         }
     }
 
@@ -831,9 +998,13 @@ impl SharedLiveTransactionCtx {
         state: CoreStateHandle,
         eval: SyncEvaluator,
         events: DiceEventDispatcher,
-    ) -> CancellableResult<DiceComputedValue> {
+    ) -> CancellableResult<(DiceComputedValue, bool)> {
+        let mut cache_hit = false;
         let result = match self.cache.get(key) {
-            DiceTaskRef::Computed(value) => DicePromise::ready(value),
+            DiceTaskRef::Computed(value) => {
+                cache_hit = true;
+                DicePromise::ready(value)
+            }
             DiceTaskRef::Occupied(mut occupied) => {
                 match occupied.get().depended_on_by(parent_key) {
                     Ok(promise) => promise,
@@ -878,6 +1049,7 @@ impl SharedLiveTransactionCtx {
             eval,
             events,
         )
+        .map(|value| (value, cache_hit))
     }
 
     pub(crate) fn get_version(&self) -> VersionNumber {

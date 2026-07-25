@@ -118,6 +118,18 @@ impl VersionTracker {
             .is_some_and(|active| active.version_epoch == epoch)
     }
 
+    pub(crate) fn is_active(&self, v: VersionNumber) -> bool {
+        self.active_versions.contains_key(&v)
+    }
+
+    pub(crate) fn oldest_live_or_current(&self) -> VersionNumber {
+        self.active_versions
+            .keys()
+            .copied()
+            .min()
+            .unwrap_or(self.current)
+    }
+
     pub(crate) fn should_reject(&self, v: VersionNumber) -> bool {
         v < self.invalid_before
     }

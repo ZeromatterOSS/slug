@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+
 #[allow(unused_imports)]
 use gazebo::variants::VariantName;
 
@@ -17,7 +20,10 @@ use crate::impls::core::state::CoreStateHandle;
 use crate::impls::core::state::StateRequest;
 use crate::impls::ctx::SharedLiveTransactionCtx;
 
+static NEXT_DICE_ENGINE_ID: AtomicU64 = AtomicU64::new(1);
+
 pub(super) struct StateProcessor {
+    engine: u64,
     state: CoreState,
     rx: tokio::sync::mpsc::UnboundedReceiver<StateRequest>,
 }
@@ -25,14 +31,19 @@ pub(super) struct StateProcessor {
 impl StateProcessor {
     pub(super) fn spawn() -> CoreStateHandle {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let engine = NEXT_DICE_ENGINE_ID
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+                next.checked_add(1)
+            })
+            .expect("DICE engine identity space exhausted");
         let state = CoreState::new();
 
         std::thread::Builder::new()
             .name("slug-dice".to_owned())
-            .spawn(move || StateProcessor { state, rx }.event_loop())
+            .spawn(move || StateProcessor { engine, state, rx }.event_loop())
             .unwrap();
 
-        CoreStateHandle::new(tx)
+        CoreStateHandle::new(tx, engine)
     }
 
     fn event_loop(mut self) {
@@ -72,7 +83,30 @@ impl StateProcessor {
                 // ignore error if the requester dropped it.
                 let _ = resp.send(self.state.current_version());
             }
-            StateRequest::LookupKey { key, resp } => drop(resp.send(self.state.lookup_key(key))),
+            StateRequest::LookupKey {
+                key,
+                include_activation_dependencies,
+                resp,
+            } => drop(resp.send(self.state.lookup_key(key, include_activation_dependencies))),
+            StateRequest::ActivationDependencies { version, key, resp } => {
+                drop(resp.send(self.state.activation_dependencies(version, key)));
+            }
+            StateRequest::ActivationClosure {
+                version,
+                roots,
+                resp,
+            } => {
+                drop(resp.send(self.state.activation_closure(self.engine, version, roots)));
+            }
+            #[cfg(test)]
+            StateRequest::ActivationHistoryLen { key, resp } => {
+                let _ignored = resp.send(self.state.activation_history_len(key));
+            }
+            #[cfg(test)]
+            StateRequest::RemoveActivationHistory { key, resp } => {
+                self.state.remove_activation_history(key);
+                let _ignored = resp.send(());
+            }
             StateRequest::UpdateComputed {
                 key,
                 epoch,

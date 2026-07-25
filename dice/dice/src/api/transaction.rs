@@ -16,6 +16,9 @@ use allocative::Allocative;
 use dice_error::DiceResult;
 use dupe::Dupe;
 
+use crate::ActivationClosure;
+use crate::ActivationClosureError;
+use crate::DiceNodeId;
 use crate::api::computations::DiceComputations;
 use crate::api::key::Key;
 use crate::api::user_data::UserComputationData;
@@ -101,6 +104,31 @@ impl DiceTransaction {
 
     pub fn equality_token(&self) -> DiceEquality {
         DiceEquality(self.0.get_version())
+    }
+
+    pub fn version(&self) -> VersionNumber {
+        self.0.get_version()
+    }
+
+    /// Reads the dependency-first activation closure for ordered roots at this transaction's
+    /// exact version. This never computes keys.
+    pub async fn activation_closure(
+        &self,
+        roots: impl IntoIterator<Item = DiceNodeId>,
+    ) -> Result<ActivationClosure, ActivationClosureError> {
+        let response = self.0.activation_closure(roots.into_iter().collect()).await;
+        let _keep_transaction_guard_live = &self.0;
+        response
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn activation_history_len(&self, node: DiceNodeId) -> usize {
+        self.0.activation_history_len(node).await
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn remove_activation_history(&self, node: DiceNodeId) {
+        self.0.remove_activation_history(node).await
     }
 
     /// Creates an Updater to record changes to DICE that upon committing, creates a new transaction

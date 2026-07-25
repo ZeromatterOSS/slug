@@ -19,6 +19,9 @@ use tokio::sync::oneshot::Receiver;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::oneshot::{self};
 
+use crate::ActivationClosure;
+use crate::ActivationClosureError;
+use crate::DiceNodeId;
 use crate::api::key::InvalidationSourcePriority;
 use crate::api::storage_type::StorageType;
 use crate::arc::Arc;
@@ -46,12 +49,17 @@ use crate::versions::VersionNumber;
 #[derive(Clone)]
 pub(crate) struct CoreStateHandle {
     tx: UnboundedSender<StateRequest>,
+    engine: u64,
     // should this handle hold onto the thread and terminate it when all of Dice is dropped?
 }
 
 impl CoreStateHandle {
-    pub(super) fn new(tx: UnboundedSender<StateRequest>) -> Self {
-        Self { tx }
+    pub(super) fn new(tx: UnboundedSender<StateRequest>, engine: u64) -> Self {
+        Self { tx, engine }
+    }
+
+    pub(crate) fn node_id(&self, key: DiceKey) -> DiceNodeId {
+        DiceNodeId::new(self.engine, key.index)
     }
 
     fn request(&self, message: StateRequest) {
@@ -108,9 +116,77 @@ impl CoreStateHandle {
     pub(crate) fn lookup_key(
         &self,
         key: VersionedGraphKey,
-    ) -> impl Future<Output = VersionedGraphResult> + use<> {
+        include_activation_dependencies: bool,
+    ) -> impl Future<Output = (VersionedGraphResult, Option<Arc<SeriesParallelDeps>>)> + use<> {
         let (resp, recv) = oneshot::channel();
-        self.call(StateRequest::LookupKey { key, resp }, recv)
+        self.call(
+            StateRequest::LookupKey {
+                key,
+                include_activation_dependencies,
+                resp,
+            },
+            recv,
+        )
+    }
+
+    pub(crate) fn activation_dependencies(
+        &self,
+        version: VersionNumber,
+        key: DiceKey,
+    ) -> impl Future<Output = Option<Arc<SeriesParallelDeps>>> + use<> {
+        let (resp, recv) = oneshot::channel();
+        self.call(
+            StateRequest::ActivationDependencies { version, key, resp },
+            recv,
+        )
+    }
+
+    pub(crate) fn activation_closure(
+        &self,
+        version: VersionNumber,
+        roots: Vec<DiceNodeId>,
+    ) -> impl Future<Output = Result<ActivationClosure, ActivationClosureError>> + use<> {
+        let (resp, recv) = oneshot::channel();
+        self.call(
+            StateRequest::ActivationClosure {
+                version,
+                roots,
+                resp,
+            },
+            recv,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn activation_history_len(
+        &self,
+        node: DiceNodeId,
+    ) -> impl Future<Output = usize> + use<> {
+        assert_eq!(node.engine(), self.engine);
+        let (resp, recv) = oneshot::channel();
+        self.call(
+            StateRequest::ActivationHistoryLen {
+                key: DiceKey { index: node.node() },
+                resp,
+            },
+            recv,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn remove_activation_history(
+        &self,
+        node: DiceNodeId,
+    ) -> impl Future<Output = ()> + use<> {
+        assert_eq!(node.engine(), self.engine);
+        let (resp, recv) = oneshot::channel();
+        self.call(
+            StateRequest::RemoveActivationHistory {
+                key: DiceKey { index: node.node() },
+                resp,
+            },
+            recv,
+        )
     }
 
     /// Report that a value has been computed
@@ -244,8 +320,23 @@ pub(super) enum StateRequest {
     /// Lookup the state of a key
     LookupKey {
         key: VersionedGraphKey,
-        resp: Sender<VersionedGraphResult>,
+        include_activation_dependencies: bool,
+        resp: Sender<(VersionedGraphResult, Option<Arc<SeriesParallelDeps>>)>,
     },
+    ActivationDependencies {
+        version: VersionNumber,
+        key: DiceKey,
+        resp: Sender<Option<Arc<SeriesParallelDeps>>>,
+    },
+    ActivationClosure {
+        version: VersionNumber,
+        roots: Vec<DiceNodeId>,
+        resp: Sender<Result<ActivationClosure, ActivationClosureError>>,
+    },
+    #[cfg(test)]
+    ActivationHistoryLen { key: DiceKey, resp: Sender<usize> },
+    #[cfg(test)]
+    RemoveActivationHistory { key: DiceKey, resp: Sender<()> },
     /// Report that a value has been computed
     UpdateComputed {
         key: VersionedGraphKey,

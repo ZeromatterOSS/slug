@@ -11,7 +11,10 @@
 use allocative::Allocative;
 use dupe::Dupe;
 
+use crate::ActivationClosure;
+use crate::ActivationClosureError;
 use crate::DiceComputations;
+use crate::DiceNodeId;
 use crate::DiceTransactionUpdater;
 use crate::impls::ctx::BaseComputeCtx;
 use crate::versions::VersionNumber;
@@ -34,6 +37,30 @@ impl DiceTransactionImpl {
 
     pub(crate) fn into_updater(self) -> DiceTransactionUpdater {
         self.0.into_updater()
+    }
+
+    pub(crate) fn activation_closure(
+        &self,
+        roots: Vec<DiceNodeId>,
+    ) -> impl std::future::Future<Output = Result<ActivationClosure, ActivationClosureError>> + use<>
+    {
+        self.0.activation_closure(roots)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn activation_history_len(
+        &self,
+        node: DiceNodeId,
+    ) -> impl std::future::Future<Output = usize> + use<> {
+        self.0.activation_history_len(node)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn remove_activation_history(
+        &self,
+        node: DiceNodeId,
+    ) -> impl std::future::Future<Output = ()> + use<> {
+        self.0.remove_activation_history(node)
     }
 
     pub(crate) fn as_computations(&self) -> &DiceComputations<'static> {

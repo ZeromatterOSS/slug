@@ -168,6 +168,7 @@
 //! value-based dep checks.
 
 use allocative::Allocative;
+use dupe::Dupe;
 
 use crate::HashMap;
 use crate::HashSet;
@@ -202,12 +203,26 @@ pub(crate) struct VersionedGraph {
     /// VacantGraphEntries can only be present when no other entries are present for the key at
     /// any version.
     pub(crate) nodes: HashMap<DiceKey, VersionedGraphNode>,
+    activation_history: HashMap<DiceKey, Vec<ActivationTransitionEntry>>,
+}
+
+#[derive(Allocative)]
+struct ActivationTransitionEntry {
+    version: VersionNumber,
+    transition: ActivationTransition,
+}
+
+#[derive(Allocative, Clone)]
+pub(crate) enum ActivationTransition {
+    Verified(Arc<SeriesParallelDeps>),
+    Dirty,
 }
 
 impl VersionedGraph {
     pub(crate) fn new() -> Self {
         Self {
             nodes: Default::default(),
+            activation_history: Default::default(),
         }
     }
 
@@ -218,6 +233,29 @@ impl VersionedGraph {
         } else {
             VersionedGraphResult::Compute
         }
+    }
+
+    /// Looks up a semantic graph entry and records exact-version provenance for a graph match.
+    pub(crate) fn lookup(
+        &mut self,
+        key: VersionedGraphKey,
+    ) -> (VersionedGraphResult, Option<Arc<SeriesParallelDeps>>) {
+        let result = self.get(key);
+        let dependencies = if matches!(result, VersionedGraphResult::Match(..)) {
+            match self.activation_transition_at(key) {
+                Some(ActivationTransition::Verified(dependencies)) => Some(dependencies.dupe()),
+                Some(ActivationTransition::Dirty) | None => None,
+            }
+        } else {
+            None
+        };
+        if let Some(dependencies) = &dependencies {
+            self.record_activation_transition(
+                key,
+                ActivationTransition::Verified(dependencies.dupe()),
+            );
+        }
+        (result, dependencies)
     }
 
     /// updates the cached value based on the given key and versions. The value
@@ -239,6 +277,7 @@ impl VersionedGraph {
             );
         };
 
+        let activation_dependencies = deps.dupe();
         let mut valid_deps_versions = VersionRange::begins_with(VersionNumber::ZERO).into_ranges();
 
         // Add rdeps.
@@ -251,7 +290,7 @@ impl VersionedGraph {
         let invalidation_paths = invalidation_paths.for_dependent(key.k);
 
         // Update entry.
-        match self.nodes.get_mut(&key.k) {
+        let result = match self.nodes.get_mut(&key.k) {
             Some(entry) => entry.on_computed(
                 key,
                 value,
@@ -272,7 +311,12 @@ impl VersionedGraph {
                 ),
                 true,
             ),
-        }
+        };
+        self.record_activation_transition(
+            key,
+            ActivationTransition::Verified(activation_dependencies),
+        );
+        result
     }
 
     /// Invalidates an entry and its transitive rdeps. Returning true if this caused any type of
@@ -283,6 +327,7 @@ impl VersionedGraph {
         invalidate: InvalidateKind,
         invalidation_priority: InvalidationSourcePriority,
     ) -> bool {
+        let verified_update = matches!(&invalidate, InvalidateKind::Update(..));
         let entry = match self.nodes.get_mut(&key.k) {
             Some(entry) => entry,
             _ => {
@@ -314,6 +359,14 @@ impl VersionedGraph {
                 };
 
                 self.nodes.insert(key.k, new_entry);
+                self.record_activation_transition(
+                    key,
+                    if verified_update {
+                        ActivationTransition::Verified(Arc::new(SeriesParallelDeps::None))
+                    } else {
+                        ActivationTransition::Dirty
+                    },
+                );
                 return true;
             }
         };
@@ -336,8 +389,50 @@ impl VersionedGraph {
             }
         };
 
+        self.record_activation_transition(
+            key,
+            if verified_update {
+                ActivationTransition::Verified(Arc::new(SeriesParallelDeps::None))
+            } else {
+                ActivationTransition::Dirty
+            },
+        );
         self.invalidate_rdeps(key.v, queue);
         true
+    }
+
+    pub(crate) fn activation_transition_at(
+        &self,
+        key: VersionedGraphKey,
+    ) -> Option<&ActivationTransition> {
+        let history = self.activation_history.get(&key.k)?;
+        let index = history.partition_point(|entry| entry.version <= key.v);
+        index.checked_sub(1).map(|index| &history[index].transition)
+    }
+
+    pub(crate) fn prune_activation_history(&mut self, floor: VersionNumber) {
+        self.activation_history.retain(|_, history| {
+            let first_after_floor = history.partition_point(|entry| entry.version <= floor);
+            let remove = first_after_floor.saturating_sub(1);
+            if remove != 0 {
+                history.drain(..remove);
+            }
+            !history.is_empty()
+        });
+    }
+
+    pub(crate) fn clear_activation_history(&mut self) {
+        self.activation_history.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn activation_history_len(&self, key: DiceKey) -> usize {
+        self.activation_history.get(&key).map_or(0, Vec::len)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn remove_activation_history(&mut self, key: DiceKey) {
+        self.activation_history.remove(&key);
     }
 
     // -----------------------------------------------------------------------------
@@ -374,16 +469,43 @@ impl VersionedGraph {
         let mut queue: Vec<_> = queued.iter().copied().collect();
 
         while let Some(rdep) = queue.pop() {
-            if let Some(node) = self.nodes.get_mut(&rdep) {
-                if let InvalidateResult::Changed(Some(rdeps)) = node.mark_invalidated(version, None)
-                {
-                    for dep in rdeps.into_iter() {
-                        if queued.insert(dep) {
-                            queue.push(dep);
-                        }
+            let invalidated = self.nodes.get_mut(&rdep).and_then(|node| {
+                match node.mark_invalidated(version, None) {
+                    InvalidateResult::Changed(rdeps) => {
+                        Some(rdeps.map(|rdeps| rdeps.collect::<Vec<_>>()))
+                    }
+                    InvalidateResult::NoChange => None,
+                }
+            });
+            if let Some(rdeps) = invalidated {
+                self.record_activation_transition(
+                    VersionedGraphKey::new(version, rdep),
+                    ActivationTransition::Dirty,
+                );
+                for dep in rdeps.into_iter().flatten() {
+                    if queued.insert(dep) {
+                        queue.push(dep);
                     }
                 }
             }
+        }
+    }
+
+    fn record_activation_transition(
+        &mut self,
+        key: VersionedGraphKey,
+        transition: ActivationTransition,
+    ) {
+        let history = self.activation_history.entry(key.k).or_default();
+        match history.binary_search_by_key(&key.v, |entry| entry.version) {
+            Ok(index) => history[index].transition = transition,
+            Err(index) => history.insert(
+                index,
+                ActivationTransitionEntry {
+                    version: key.v,
+                    transition,
+                },
+            ),
         }
     }
 }
