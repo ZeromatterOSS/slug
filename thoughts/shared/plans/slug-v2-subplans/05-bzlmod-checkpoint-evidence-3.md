@@ -264,3 +264,34 @@ Next evidence: Implement only
 plus its private declaration. Preserve every accepted compact authority,
 preflight, operation, platform, test, lifetime, and exclusion boundary; do not
 wire DICE, retained materialization, retries, or publication.
+
+### Stage 5 runtime path-observation producer implementation
+
+Status: Replanned before retained Rust
+
+Draft evidence: A private two-file implementation reached 15 focused passing
+tests for compact sorted authority, complete preflight, exact Unix operations,
+metadata, retries, lifecycle freshness, and pure Windows lstat helpers. Root
+review corrected portable ReadLink candidates, retained allocation accounting,
+inside/escaped authority, explicit deletion, retry-discard, raw-error,
+directory-validation, time, and link-retarget evidence. The draft never wired
+DICE, runtime materialization, or public APIs.
+
+Reason for `REPLAN`: Final pinned-source review proved Rust
+`std::fs::read_link` is not Bazel-compatible on Windows. Rust handles NTFS
+symlink and mount-point tags, while Bazel's native
+`ReadSymlinkOrJunction` also decodes `IO_REPARSE_TAG_LX_SYMLINK`, treats
+`ERROR_NOT_A_REPARSE_POINT` and `ERROR_INVALID_FUNCTION` as not-a-link, treats
+ProjFS as not-a-link, and owns distinct open/query/output normalization.
+The accepted design had reviewed native Win32 ctime only, not a reparse-buffer
+ReadLink parser. Review also found that Bazel retries Unix `EIO` only during
+`readdir`, not `opendir`, and two supposedly portable tests used a Unix root
+and Unix raw access-denied code. The unaccepted draft was removed, focused
+Cargo was not rerun after removal, and the worktree returned clean.
+
+Next evidence: Design only
+`WP-5-m1-runtime-path-observation-windows-readlink-design-correction`.
+Freeze exact native Windows ReadLink ABI/parsing/output/error semantics and
+the ProjFS schema boundary, plus iterator-only Unix EIO retry and portable
+tests. Do not edit Rust or combine the producer with materialization, retry,
+injection, or publication.
