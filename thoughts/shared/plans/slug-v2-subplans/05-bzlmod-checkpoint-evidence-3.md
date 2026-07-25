@@ -535,3 +535,34 @@ both returned `ACCEPT`.
 Next evidence: Implement only
 `WP-5-m1-runtime-path-observation-unix-adapter` in the private module,
 `app/slug_core_v2/Cargo.toml`, and `Cargo.lock` only if resolution changes.
+
+### Stage 5 Unix native path-observation adapter
+
+Status: Accepted
+
+The cfg-Unix private adapter implements the neutral trait with exact native
+lstat, primary-first ReadLink/FileBytes classification, and a raw same-handle
+directory API/owner. Only target-Unix workspace `nix` was added; the lockfile
+did not change. Four documented unsafe libc operations are confined to the
+native API. Explicit close disarms before calling, Drop closes only a remaining
+handle, and iterator/validation errors retain precedence over ignored cleanup.
+
+Ten focused Unix tests prove Interrupted retry, opener EINTR/EIO/other errors,
+one handle and partial names across iterator EINTR/EIO, clear-before-read and
+EOF errno behavior, raw non-UTF-8 names, iterator and close candidate/error
+precedence, EOF close success/EINTR/error, invalid/duplicate data, explicit
+disarming, Drop fallback, and exactly-once close. Real temp-derived tests cover
+all lstat kinds and metadata, relative ReadLink, followed file bytes,
+create/edit/delete/recreate, observed directory mutation/delete/recreate,
+symlink retarget/delete/recreate, wrong kinds, non-UTF-8 entries, distinct
+Host/materialization identity, and authorized inside and escaped exact paths.
+
+Root validation passed 39 unit, 13 integration, and zero doctests, GNU-Windows
+neutral-boundary all-target compilation, formatting, diff, archive, exact
+two-file scope, and forbidden-reference scans. Existing diagnostics are
+unrelated. Independent pinned-Bazel and architecture/unsafe-owner reviews both
+returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-path-observation-windows-adapter` in the existing private
+module. Do not edit Cargo or any caller.
