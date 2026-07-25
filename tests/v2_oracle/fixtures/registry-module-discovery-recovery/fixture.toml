@@ -1,8 +1,8 @@
 [fixture]
 name = "registry-module-discovery-recovery"
-description = "Bazel 9.2 local registry discovery, recovery, and nonroot evaluation ordering."
+description = "Bazel 9.2 local registry discovery, recovery, print silence, declaration defaults, and nonroot evaluation ordering."
 comparison = "message_shape"
-oracle_notes = "One retained local file-registry workspace first isolates discovery cache replay: absence, first creation, cached success after a malformed-first mutation, root-version invalidation, repair, and deletion fallback. Five later rows isolate a validation module and prove registry include rejection before execution, execution before declaration validation, name before version, and corrected success. All rows disable lockfile replay. Minimal Bazel 9.2 embedded-tools direct-module declarations and extension stubs are deterministic scaffolding only, not asserted registry evidence."
+oracle_notes = "One retained local file-registry workspace first isolates discovery cache replay: absence, first creation, cached success after a malformed-first mutation, root-version invalidation, repair, and deletion fallback. Five later rows isolate a validation module and prove registry include rejection before execution, execution before declaration validation, name before version, and corrected success. Three appended rows prove registry print is silent, omitted module() retains Bazel's empty declared name and fails name before version after execution, and restoration recovers silently. All rows disable lockfile replay. Minimal Bazel 9.2 embedded-tools direct-module declarations and extension stubs are deterministic scaffolding only, not asserted registry evidence."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -10,11 +10,15 @@ bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
   "src/main/java/com/google/devtools/build/lib/bazel/BazelRepositoryModule.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/CompiledModuleFile.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleThreadContext.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/InterimModule.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFunction.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFactoryImpl.java",
 ]
-translation_notes = "The malformed mutation leaves the root module version unchanged, proving same-key cache replay. Subsequent distinct root versions force re-evaluation: malformed first data is fatal without second fallback, repair selects repaireddep, and deletion selects seconddep. The validation rows replace aaa and advance the root version on every mutation so each diagnostic is attributable to the isolated validation module and a fresh local-registry module evaluation."
+translation_notes = "The malformed mutation leaves the root module version unchanged, proving same-key cache replay. Subsequent distinct root versions force re-evaluation: malformed first data is fatal without second fallback, repair selects repaireddep, and deletion selects seconddep. The validation rows replace aaa and advance the root version on every mutation so each diagnostic is attributable to the isolated validation module and a fresh local-registry module evaluation. The appended rows retain print while removing only module(), so silent execution is followed by the empty declared-name check; conditional version validation remains pinned-source-backed."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture registry-module-discovery-recovery --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture registry-module-discovery-recovery --tool bazel --bazel /usr/bin/bazel"
 
@@ -215,3 +219,54 @@ stdout_patterns = ["(?s)\\A(?!.*wrong_validation@)(?!.*validation@2\\.0\\.0).*va
   path = "MODULE.bazel"
   find = "version = \"0.1.7\""
   replace = "version = \"0.1.8\""
+
+[[commands]]
+name = "registry_print_succeeds_silently"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["validation@1.0.0"]
+stderr_patterns = ["(?s)\\A(?!.*REGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*print\\(\\) is not permitted).*\\Z"]
+
+  [[commands.mutations]]
+  path = "registry/first/modules/validation/1.0.0/MODULE.bazel"
+  find = "module(name = \"validation\", version = \"1.0.0\")"
+  replace = "module(name = \"validation\", version = \"1.0.0\")\nprint(\"REGISTRY_DISCOVERY_PRINT_SENTINEL\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.8\""
+  replace = "version = \"0.1.9\""
+
+[[commands]]
+name = "omitted_module_defaults_to_empty_name_before_version"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 37
+stderr_contains = ["the MODULE.bazel file of validation@1.0.0 declares a different name ()"]
+stderr_patterns = ["(?s)\\A(?!.*declares a different version)(?!.*REGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*print\\(\\) is not permitted).*declares a different name \\(\\).*\\Z"]
+
+  [[commands.mutations]]
+  path = "registry/first/modules/validation/1.0.0/MODULE.bazel"
+  find = "module(name = \"validation\", version = \"1.0.0\")\n"
+  replace = ""
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.9\""
+  replace = "version = \"0.1.10\""
+
+[[commands]]
+name = "restored_module_recovers_with_registry_print_silent"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/first", "--registry=file://%workspace%/registry/second"]
+expected_exit = 0
+stdout_contains = ["validation@1.0.0"]
+stderr_patterns = ["(?s)\\A(?!.*REGISTRY_DISCOVERY_PRINT_SENTINEL)(?!.*print\\(\\) is not permitted).*\\Z"]
+
+  [[commands.mutations]]
+  path = "registry/first/modules/validation/1.0.0/MODULE.bazel"
+  find = "print(\"REGISTRY_DISCOVERY_PRINT_SENTINEL\")"
+  replace = "module(name = \"validation\", version = \"1.0.0\")\nprint(\"REGISTRY_DISCOVERY_PRINT_SENTINEL\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.10\""
+  replace = "version = \"0.1.11\""

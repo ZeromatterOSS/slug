@@ -1,9 +1,9 @@
 [fixture]
 name = "nonroot-include-composition"
-description = "Retained-daemon oracle for non-root MODULE.bazel include execution order, diagnostics, invalidation, and recovery."
+description = "Retained-daemon oracle for non-root MODULE.bazel include execution order, package lookup, print lifecycle, diagnostics, invalidation, and recovery."
 comparison = "semantic"
 daemon = true
-oracle_notes = "The baseline marker is exactly outer-before|nested-a|outer-after|repeat-a|repeat-a\\n, proving nested inline execution order and the two raw-label executions of repeat.MODULE.bazel. The final row recovers on the same daemon after a nested runtime failure and a later-fragment compile failure."
+oracle_notes = "The baseline marker is exactly outer-before|nested-a|outer-after|repeat-a|repeat-a\\n, proving nested inline execution order and the two raw-label executions of repeat.MODULE.bazel. The original final row recovers on the same daemon after a nested runtime failure and a later-fragment compile failure. Five appended rows prove package lookup precedes included-fragment execution, both BUILD filenames are accepted, a source-attributed nonregistry print occurs only when evaluation executes and is not replayed on an unchanged warm request, package deletion fails before execution, and BUILD.bazel recreation recovers."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -11,12 +11,13 @@ bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/CompiledModuleFile.java: parseAndCompile, checkModuleFileSyntax, runOnThread",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java: compute, advanceHorizon, execModuleFile",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupFunction.java: compute, checkPackageExists",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleThreadContext.java: include",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java: include",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionUsage.java",
   "src/main/java/net/starlark/java/eval/Starlark.java: execFileProgram",
 ]
-translation_notes = "The marker proves shared inline directive order and two executions of one exact raw include label. Reuse of one raw-label-keyed CompiledModuleFile, Program, and predeclared Module is source-derived only: restricted MODULE.bazel code has no valid binding-persistence discriminator. The local-path fixture does not claim registry include behavior."
+translation_notes = "The marker proves shared inline directive order and two executions of one exact raw include label. Reuse of one raw-label-keyed CompiledModuleFile, Program, and predeclared Module is source-derived only: restricted MODULE.bazel code has no valid binding-persistence discriminator. The appended boundary fragment remains present while its package marker changes, so both failures isolate package lookup rather than missing-file behavior. Its print and extension tag prove execution only after package success; the unchanged marker plus absent print proves cached values do not replay evaluation-time debug events. Registry print behavior remains in registry-module-discovery-recovery."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-include-composition --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-include-composition --tool bazel --bazel /usr/bin/bazel"
 
@@ -103,3 +104,60 @@ replace = "include(\"//:outer.MODULE.bazel\")"
 path = "modules/subject/late.MODULE.bazel"
 find = "late_scope_error = undefined_late_symbol"
 replace = "late_value = \"late-ok\""
+
+[[commands]]
+name = "included_fragment_without_package_fails_before_execution"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1", "BUILD file not found in directory 'pkg' of external repository @@subject+", "in module dependency chain <root> -> subject@_"]
+stderr_patterns = ["(?s)\\A(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL).*\\Z"]
+
+  [[commands.mutations]]
+  path = "modules/subject/MODULE.bazel"
+  find = "include(\"//:outer.MODULE.bazel\")"
+  replace = "include(\"//:outer.MODULE.bazel\")\ninclude(\"//pkg:boundary.MODULE.bazel\")"
+
+[[commands]]
+name = "fallback_build_enables_included_fragment_and_print"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/pkg/BUILD"
+  content = ""
+
+[[commands]]
+name = "unchanged_warm_request_does_not_replay_print"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL).*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+[[commands]]
+name = "package_delete_fails_before_included_fragment_execution"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1", "BUILD file not found in directory 'pkg' of external repository @@subject+", "in module dependency chain <root> -> subject@_"]
+stderr_patterns = ["(?s)\\A(?!.*NONREGISTRY_DISCOVERY_PRINT_SENTINEL).*\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "modules/subject/pkg/BUILD"
+
+[[commands]]
+name = "primary_build_bazel_recovers_fragment_and_print"
+argv = ["build", "//:include_order", "--lockfile_mode=off"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL"]
+stderr_patterns = ["(?s)\\A(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL).)*NONREGISTRY_DISCOVERY_PRINT_SENTINEL(?:(?!NONREGISTRY_DISCOVERY_PRINT_SENTINEL).)*\\Z"]
+manifest_roots = ["bazel-bin/include_order.txt"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "modules/subject/pkg/BUILD.bazel"
+  content = ""

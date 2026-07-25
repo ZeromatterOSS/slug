@@ -242,6 +242,183 @@
       "normalized_stdout": "",
       "stderr": "INFO: Invocation ID: 138e17e2-262c-4410-8a1a-0499d79ed9f7\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/138e17e2-262c-4410-8a1a-0499d79ed9f7\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: 0.061s, Critical Path: 0.00s\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/138e17e2-262c-4410-8a1a-0499d79ed9f7\n",
       "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "include(\"//:outer.MODULE.bazel\")",
+          "old_digest_hint": "78",
+          "path": "modules/subject/MODULE.bazel",
+          "replace": "include(\"//:outer.MODULE.bazel\")\ninclude(\"//pkg:boundary.MODULE.bazel\")"
+        }
+      ],
+      "name": "included_fragment_without_package_fails_before_execution",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1: BUILD file not found in directory 'pkg' of external repository @@subject+. Add a BUILD file to a directory to mark it as a package.\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ba2e1e46-35b1-4144-a38d-f5215a1b4acb\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ba2e1e46-35b1-4144-a38d-f5215a1b4acb\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1: BUILD file not found in directory 'pkg' of external repository @@subject+. Add a BUILD file to a directory to mark it as a package.\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ba2e1e46-35b1-4144-a38d-f5215a1b4acb\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "f052c5616758f335713070ac968b140a71a32a2ea5a9be46871f720323eba3a8",
+          "mode": "0o544",
+          "path": "include_order.txt",
+          "root": "bazel-bin/include_order.txt",
+          "size": 69,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "modules/subject/pkg/BUILD"
+        }
+      ],
+      "name": "fallback_build_enables_included_fragment_and_print",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/pkg/boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 3 processes: 3 internal.\nINFO: Build completed successfully, 3 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e66fa30c-60d0-4a09-b19c-b62d222e4d01\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e66fa30c-60d0-4a09-b19c-b62d222e4d01\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/ob/nonroot-include-composition/bazel/external/subject+/pkg/boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: 0.060s, Critical Path: 0.00s\nINFO: 3 processes: 3 internal.\nINFO: Build completed successfully, 3 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e66fa30c-60d0-4a09-b19c-b62d222e4d01\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "f052c5616758f335713070ac968b140a71a32a2ea5a9be46871f720323eba3a8",
+          "mode": "0o544",
+          "path": "include_order.txt",
+          "root": "bazel-bin/include_order.txt",
+          "size": 69,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "unchanged_warm_request_does_not_replay_print",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (0 packages loaded, 0 targets configured)\nAnalyzing: target //:include_order (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:include_order (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 4dacea25-1b2a-4efc-89cb-4cda429a2ad1\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/4dacea25-1b2a-4efc-89cb-4cda429a2ad1\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (0 packages loaded, 0 targets configured)\nAnalyzing: target //:include_order (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:include_order (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: 0.027s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/4dacea25-1b2a-4efc-89cb-4cda429a2ad1\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "modules/subject/pkg/BUILD"
+        }
+      ],
+      "name": "package_delete_fails_before_included_fragment_execution",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1: BUILD file not found in directory 'pkg' of external repository @@subject+. Add a BUILD file to a directory to mark it as a package.\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: b9db83e8-f6a0-4d81-a220-6aea077d60d8\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b9db83e8-f6a0-4d81-a220-6aea077d60d8\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: in module dependency chain <root> -> subject@_: unable to load package for '//pkg:boundary.MODULE.bazel' included at @@subject+//:MODULE.bazel:4:1: BUILD file not found in directory 'pkg' of external repository @@subject+. Add a BUILD file to a directory to mark it as a package.\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b9db83e8-f6a0-4d81-a220-6aea077d60d8\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:include_order",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "f052c5616758f335713070ac968b140a71a32a2ea5a9be46871f720323eba3a8",
+          "mode": "0o544",
+          "path": "include_order.txt",
+          "root": "bazel-bin/include_order.txt",
+          "size": 69,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "modules/subject/pkg/BUILD.bazel"
+        }
+      ],
+      "name": "primary_build_bazel_recovers_fragment_and_print",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <output_base>/external/subject+/pkg/boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 000021d1-5a1e-4b3b-91ce-6a7642ab81ad\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/000021d1-5a1e-4b3b-91ce-6a7642ab81ad\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/ob/nonroot-include-composition/bazel/external/subject+/pkg/boundary.MODULE.bazel:1:6: NONREGISTRY_DISCOVERY_PRINT_SENTINEL\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\nAnalyzing: target //:include_order (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:include_order (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:include_order up-to-date:\n  bazel-bin/include_order.txt\nINFO: Elapsed time: 0.053s, Critical Path: 0.00s\nINFO: 1 process: 2 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/000021d1-5a1e-4b3b-91ce-6a7642ab81ad\n",
+      "stdout": ""
     }
   ],
   "fixture": "nonroot-include-composition",

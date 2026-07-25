@@ -462,6 +462,132 @@
       "normalized_stdout": "<root> (registry_module_discovery_recovery@0.1.8)\n\u2514\u2500\u2500\u2500validation@1.0.0",
       "stderr": "INFO: Invocation ID: e3e01734-02c0-49c9-9e95-0f40ee1733fe\n no actions running\n",
       "stdout": "<root> (registry_module_discovery_recovery@0.1.8)\n\u2514\u2500\u2500\u2500validation@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "module(name = \"validation\", version = \"1.0.0\")",
+          "old_digest_hint": "47",
+          "path": "registry/first/modules/validation/1.0.0/MODULE.bazel",
+          "replace": "module(name = \"validation\", version = \"1.0.0\")\nprint(\"REGISTRY_DISCOVERY_PRINT_SENTINEL\")"
+        },
+        {
+          "find": "version = \"0.1.8\"",
+          "old_digest_hint": "153",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.9\""
+        }
+      ],
+      "name": "registry_print_succeeds_silently",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_module_discovery_recovery@0.1.9)\n\u2514\u2500\u2500\u2500validation@1.0.0",
+      "stderr": "INFO: Invocation ID: 8f13523e-30e2-492c-8542-0a86e2dcdc68\n no actions running\n",
+      "stdout": "<root> (registry_module_discovery_recovery@0.1.9)\n\u2514\u2500\u2500\u2500validation@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "module(name = \"validation\", version = \"1.0.0\")\n",
+          "old_digest_hint": "90",
+          "path": "registry/first/modules/validation/1.0.0/MODULE.bazel",
+          "replace": ""
+        },
+        {
+          "find": "version = \"0.1.9\"",
+          "old_digest_hint": "153",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.10\""
+        }
+      ],
+      "name": "omitted_module_defaults_to_empty_name_before_version",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: in module dependency chain <root> -> validation@1.0.0: the MODULE.bazel file of validation@1.0.0 declares a different name ()",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e70c2612-fc0a-4986-8654-8c3b1df8ee8b\n no actions running\nERROR: in module dependency chain <root> -> validation@1.0.0: the MODULE.bazel file of validation@1.0.0 declares a different name ()\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/first",
+        "--registry=file://%workspace%/registry/second"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "print(\"REGISTRY_DISCOVERY_PRINT_SENTINEL\")",
+          "old_digest_hint": "43",
+          "path": "registry/first/modules/validation/1.0.0/MODULE.bazel",
+          "replace": "module(name = \"validation\", version = \"1.0.0\")\nprint(\"REGISTRY_DISCOVERY_PRINT_SENTINEL\")"
+        },
+        {
+          "find": "version = \"0.1.10\"",
+          "old_digest_hint": "154",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.11\""
+        }
+      ],
+      "name": "restored_module_recovers_with_registry_print_silent",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (registry_module_discovery_recovery@0.1.11)\n\u2514\u2500\u2500\u2500validation@1.0.0",
+      "stderr": "INFO: Invocation ID: e8cf78f5-1430-46f4-bf69-ce4a3ab79d62\n no actions running\n",
+      "stdout": "<root> (registry_module_discovery_recovery@0.1.11)\n\u2514\u2500\u2500\u2500validation@1.0.0 \n\n"
     }
   ],
   "fixture": "registry-module-discovery-recovery",

@@ -1,0 +1,3 @@
+print("NONREGISTRY_DISCOVERY_PRINT_SENTINEL")
+boundary = use_extension("//:ext.bzl", "markers")
+boundary.tag(value = "package-boundary")
