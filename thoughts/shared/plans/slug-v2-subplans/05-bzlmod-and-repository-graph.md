@@ -725,6 +725,31 @@ Rust, compose includes, add DICE/public seams, change preparation/discovery,
 or implement lockfile hashing. Stop for a new oracle if any value or cycle
 outside the accepted bounded domain is required.
 
+Fresh pinned-source, live-API, and independent reviews accept the corrected
+design. A private context keeps only compact draft metadata and syntax-
+inaccessible root names. Each source-visible extension proxy and raw kwargs
+dict is stored directly in a dynamically appended
+`"\0slug:nonroot:..."` module slot: `Module::set` does not call `export_as`,
+compiled source slots are fixed before execution, every module slot is traced
+by GC, source cannot spell a NUL/colon identifier, and `Module::get` rereads
+fresh post-GC values. The evaluator therefore needs neither disabled GC,
+unsafe lifetime erasure, a frozen heap, nor a new public owner.
+
+The current packet is only `WP-5-m1-nonroot-directive-evaluator` and may edit
+`module_eval.rs`. Implement the complete single-file nonroot globals, including
+all five module overrides as validation-then-discard, exact dev suppression,
+ordinary/isolated/no-op extension proxy and import behavior, redirection
+no-ops, innate repo-rule calls, source spans, final snapshot, and builder
+finalization. Ordinary tag and repo-rule dynamic callables reject positionals;
+innate `name` is appended after extra kwargs. Register only the exact `print`
+extension, with invocation failing closed through a private handler while its
+identity remains snapshot-able. Fresh identities include every source-visible
+module-extension proxy but exclude the distinct repo-rule proxy. Tests must
+force GC between execution and reread and prove final mutations, identities,
+order, errors, and the complete compact result. Do not edit any other file,
+compose includes, validate later schemas, hash/write lockfiles, or add
+DICE/public/preparation/discovery ownership.
+
 ## Implementation Slices
 
 ### 5.1 MODULE.bazel Evaluation
