@@ -948,3 +948,11 @@ Design summary: Move `WorkspaceDirectoryEntryKind`, `WorkspaceDirectoryEntry`, `
 Implementation boundary: Exact five-file allowlist is `app/slug_workspace_v2/Cargo.toml`, `app/slug_workspace_v2/src/lib.rs`, `app/slug_loading_v2/src/keys.rs`, `app/slug_loading_v2/src/bzl_module.rs`, and `Cargo.lock`. Owner tests remain inside workspace `lib.rs`; no consumer import, core injection, query, analysis, server, bzlmod, fixture, or materialization edit is authorized.
 Validation: two independent read-only dependency/consumer/coherence audits; root Cargo-lock and body-move synthesis; fresh independent review `ACCEPT`; the review required moving both trait implementations with their types and real re-exports rather than aliases
 Residual risk: Implement only `WP-5-m1-workspace-directory-owner-lift`. Stop on public-path or `TypeId` drift, body/equality/order/error changes, another snapshot/cache/generation/filesystem read, reverse dependency, request-order change, root manifest edit, or scope expansion.
+
+### Stage 5 neutral workspace-directory owner lift
+
+Status: Accepted
+V2 commit: `e440e707 refactor: share workspace directory inputs`
+Implementation summary: Moved all six compact directory observation types plus every method, display, injected-key, and DICE-key implementation body-for-body into `slug_workspace_v2`. Real `slug_loading_v2::keys` re-exports preserve existing paths and key `TypeId`; core injection and every consumer remain source-identical. The neutral owner adds only direct `compact_str`; the root-ignored local Cargo lock resolves that dependency.
+Validation: moved definition and key-implementation blocks byte-exact; workspace 4/4; full loading 52/52; affected core 24, server 20, query 61, and analysis 11 passed serially; formatting, diff, archive, and exact four-tracked-file scope clean; fresh independent terminal review `ACCEPT`
+Residual risk: Deleted/ignored/symlink package policy and BUILD-name priority still need focused evidence before package lookup. Design only read-only `WP-5-m1-nonroot-package-policy-oracle-design`.
