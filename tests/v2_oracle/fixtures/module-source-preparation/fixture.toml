@@ -3,7 +3,7 @@ name = "module-source-preparation"
 description = "Bazel 9.2 source preparation before module discovery: root patches and local/archive/Git module sources."
 comparison = "message_shape"
 daemon = true
-oracle_notes = "Nine retained-daemon rows use only checked-in local sources. The valid registry is evidence only for root patch routing and bounded embedded-tools scaffolding; malformed and absent registries follow it for non-registry bypass rows and must not be consulted for route."
+oracle_notes = "Eleven retained-daemon rows use only checked-in local sources. The valid registry is evidence only for root patch routing and bounded embedded-tools scaffolding; malformed and absent registries follow it for non-registry bypass rows and must not be consulted for route."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -59,6 +59,30 @@ stdout_contains = ["route@1.0.0", "patch_leaf_b@1.0.0"]
   content = "--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1,2 +1,2 @@\n module(name = \"route\", version = \"1.0.0\")\n-bazel_dep(name = \"patch_base\", version = \"1.0.0\")\n+bazel_dep(name = \"patch_leaf_b\", version = \"1.0.0\")\n"
 
 [[commands]]
+name = "special_file_patch_is_empty_noop"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/valid"]
+expected_exit = 0
+stdout_contains = ["route@1.0.0", "patch_base@1.0.0"]
+stdout_patterns = ["(?s)\\A(?!.*patch_leaf_a@1\\.0\\.0)(?!.*patch_leaf_b@1\\.0\\.0).*"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:route.patch\"],\n    patch_strip = 1,\n)"
+  replace = "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:special.patch\"],\n    patch_strip = 1,\n)"
+
+[[commands]]
+name = "missing_second_patch_precedes_malformed_first_application"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/valid"]
+expected_exit = 37
+stderr_contains = ["error reading single_version_override patch", "missing.patch"]
+stderr_patterns = ["(?s)\\A(?!.*error applying single_version_override patch)(?!.*malformed\\.patch).*error reading single_version_override patch.*missing\\.patch.*"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:special.patch\"],\n    patch_strip = 1,\n)"
+  replace = "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:malformed.patch\", \"//:missing.patch\"],\n    patch_strip = 1,\n)"
+
+[[commands]]
 name = "local_path_bypasses_malformed_and_absent_registries"
 argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry/scaffold", "--registry=file://%workspace%/registry/malformed", "--registry=file://%workspace%/registry/absent"]
 expected_exit = 0
@@ -67,7 +91,7 @@ stdout_patterns = ["(?s)\\A(?!.*patch_leaf_a@1\\.0\\.0)(?!.*patch_leaf_b@1\\.0\\
 
   [[commands.mutations]]
   path = "MODULE.bazel"
-  find = "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:route.patch\"],\n    patch_strip = 1,\n)"
+  find = "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:malformed.patch\", \"//:missing.patch\"],\n    patch_strip = 1,\n)"
   replace = "local_path_override(module_name = \"route\", path = \"local-route\")"
 
 [[commands]]

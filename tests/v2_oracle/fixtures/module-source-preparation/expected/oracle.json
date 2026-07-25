@@ -26,7 +26,7 @@
       "name": "svo_patch_graph_a",
       "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running",
       "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_a@1.0.0",
-      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260724-004152-1598315-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260724-004340-1600142-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 9a3b83e5-61aa-488c-8b34-fd0fcf212790\n no actions running\n",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260725-074138-2282758-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260725-074241-2284623-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 242f4df6-0897-4ef5-9743-860d9b828160\n no actions running\n",
       "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_a@1.0.0 \n\n"
     },
     {
@@ -62,7 +62,7 @@
       "name": "patch_bytes_only_graph_b",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
       "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_b@1.0.0",
-      "stderr": "INFO: Invocation ID: 69c010d4-6164-4007-bbc0-fb71d8c1b0fa\n no actions running\n",
+      "stderr": "INFO: Invocation ID: 9512c347-5a18-470a-8cdb-8b757c984fb9\n no actions running\n",
       "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_b@1.0.0 \n\n"
     },
     {
@@ -98,7 +98,7 @@
       "name": "patch_delete_is_fatal_without_fallback",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error reading single_version_override patch [<workspace>]/[route.patch]: is a directory or doesn't exist",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: c5db83ce-86bb-4c7d-a76f-8ce2648b1e91\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error reading single_version_override patch [/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260724-004340-1600142-bazel/workspace]/[route.patch]: is a directory or doesn't exist\n",
+      "stderr": "INFO: Invocation ID: 92ebdde0-e181-4c5a-9522-9b701f6033dd\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error reading single_version_override patch [/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260725-074241-2284623-bazel/workspace]/[route.patch]: is a directory or doesn't exist\n",
       "stdout": ""
     },
     {
@@ -132,8 +132,80 @@
       "name": "patch_recreate_recovers_graph_b",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
       "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_b@1.0.0",
-      "stderr": "INFO: Invocation ID: dec70960-5b19-4a55-be44-024a42b7d6ce\n no actions running\n",
+      "stderr": "INFO: Invocation ID: 58008916-9c33-44d0-96d5-a77bfb6aa312\n no actions running\n",
       "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_leaf_b@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:route.patch\"],\n    patch_strip = 1,\n)",
+          "old_digest_hint": "218",
+          "path": "MODULE.bazel",
+          "replace": "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:special.patch\"],\n    patch_strip = 1,\n)"
+        }
+      ],
+      "name": "special_file_patch_is_empty_noop",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_base@1.0.0",
+      "stderr": "INFO: Invocation ID: 1efe4e4d-e723-4860-a0f8-d7e2ea20dce5\n no actions running\n",
+      "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@1.0.0 \n    \u2514\u2500\u2500\u2500patch_base@1.0.0 \n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry/scaffold",
+        "--registry=file://%workspace%/registry/valid"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:special.patch\"],\n    patch_strip = 1,\n)",
+          "old_digest_hint": "220",
+          "path": "MODULE.bazel",
+          "replace": "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:malformed.patch\", \"//:missing.patch\"],\n    patch_strip = 1,\n)"
+        }
+      ],
+      "name": "missing_second_patch_precedes_malformed_first_application",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error reading single_version_override patch [<workspace>]/[missing.patch]: is a directory or doesn't exist",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1dbda619-d97e-4b4b-89d6-6ecc2746b314\n no actions running\nERROR: in module dependency chain <root> -> route@1.0.0: error reading single_version_override patch [/run/media/system/Colossus/dev/slug/target/v2o/runs/module-source-preparation/20260725-074241-2284623-bazel/workspace]/[missing.patch]: is a directory or doesn't exist\n",
+      "stdout": ""
     },
     {
       "argv": [
@@ -161,8 +233,8 @@
       "manifest": [],
       "mutations": [
         {
-          "find": "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:route.patch\"],\n    patch_strip = 1,\n)",
-          "old_digest_hint": "218",
+          "find": "single_version_override(\n    module_name = \"route\",\n    patches = [\"//:malformed.patch\", \"//:missing.patch\"],\n    patch_strip = 1,\n)",
+          "old_digest_hint": "242",
           "path": "MODULE.bazel",
           "replace": "local_path_override(module_name = \"route\", path = \"local-route\")"
         }
@@ -170,7 +242,7 @@
       "name": "local_path_bypasses_malformed_and_absent_registries",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
       "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_a@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_a@1.0.0",
-      "stderr": "INFO: Invocation ID: 232ae734-df7c-4dc0-8e76-d891d60ed32c\n no actions running\n",
+      "stderr": "INFO: Invocation ID: 14f540a8-ae6d-4cc8-bf18-a12b60d0712b\n no actions running\n",
       "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_a@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_a@1.0.0 \n\n"
     },
     {
@@ -208,7 +280,7 @@
       "name": "local_main_module_only_mutation_changes_graph",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
       "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_a@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0",
-      "stderr": "INFO: Invocation ID: 154df932-9c7b-47ee-a5ee-6660c1ec1b53\n no actions running\n",
+      "stderr": "INFO: Invocation ID: 9d02deac-ec02-4609-b526-66c86f09fa09\n no actions running\n",
       "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_a@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0 \n\n"
     },
     {
@@ -246,7 +318,7 @@
       "name": "local_include_module_only_mutation_changes_graph",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
       "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_b@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0",
-      "stderr": "INFO: Invocation ID: 5acedc60-a2c8-4758-8a9a-fe2cbea17c16\n no actions running\n",
+      "stderr": "INFO: Invocation ID: c53c103f-b2c5-4c8e-bbdd-41a5fd9df322\n no actions running\n",
       "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u251c\u2500\u2500\u2500local_include_b@1.0.0 \n    \u2514\u2500\u2500\u2500local_main_b@1.0.0 \n\n"
     },
     {
@@ -284,7 +356,7 @@
       "name": "local_archive_override_evaluates_module_graph",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
       "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500archive_leaf@1.0.0",
-      "stderr": "INFO: Invocation ID: a98a0950-3be7-4296-80db-14eea751c38c\n no actions running\n",
+      "stderr": "INFO: Invocation ID: a5af48b6-5f95-4d2d-8cbd-e639f5bd6a9c\n no actions running\n",
       "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500archive_leaf@1.0.0 \n\n"
     },
     {
@@ -322,7 +394,7 @@
       "name": "local_bare_git_override_fixed_commit_evaluates_module_graph",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
       "normalized_stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500git_leaf@1.0.0",
-      "stderr": "INFO: Invocation ID: 26cb2e02-6143-4240-acf6-ec44e0fe0bfa\n no actions running\n",
+      "stderr": "INFO: Invocation ID: 88ed1e1d-7921-4b3e-b4b1-5c334dc73def\n no actions running\n",
       "stdout": "<root> (module_source_preparation@1.0.0)\n\u2514\u2500\u2500\u2500route@_ \n    \u2514\u2500\u2500\u2500git_leaf@1.0.0 \n\n"
     }
   ],
