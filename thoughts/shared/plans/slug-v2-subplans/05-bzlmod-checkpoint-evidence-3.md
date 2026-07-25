@@ -211,3 +211,31 @@ Next evidence: Run only
 rereview the Windows path/query and operation-result contract while preserving
 the private two-file boundary; do not edit Rust or combine the producer with
 runtime materialization, epoch injection, retry, or publication.
+
+### Stage 5 runtime path-observation producer design correction
+
+Status: Replanned before Rust
+
+Accepted corrections: Exact desktop-Windows ctime is feasible with a private
+std-only raw ABI, Bazel's raw UTF-16 `asLongPath` transformation, no-follow
+`CreateFileW`, `FILE_BASIC_INFO`, immediate error capture, and RAII close.
+Interior NUL and native query failures remain exact Lstat operation results,
+not outer producer failures. The initial `symlink_metadata` read supplies
+size, OpenJDK-formula mtime, attributes/permissions, and kind; after
+`Interrupted` retry, any other initial Windows metadata failure becomes
+Missing. The later native query supplies only Bazel-formula ctime. Architecture
+and Rust-feasibility reviews accepted the private two-file, no-dependency
+boundary.
+
+Reason for `REPLAN`: The focused source correction first repaired metadata
+staging and initial-failure behavior, then terminal rereview found a second
+material mismatch: Bazel 9.2's native `IsSymlinkOrJunction` classifies every
+`FILE_ATTRIBUTE_REPARSE_POINT` as a symlink, while the reviewed draft used
+Rust's name-surrogate-only link classification and treated other reparse
+points as special. The correction budget ended before Rust.
+
+Next evidence: Run only
+`WP-5-m1-runtime-path-observation-producer-windows-lstat-design-correction`.
+Freeze the exact order ReparsePoint→Symlink, Device→SpecialFile,
+Directory→Directory, otherwise RegularFile; preserve every other accepted
+producer, operation, platform, test, and two-file constraint.
