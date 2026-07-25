@@ -455,6 +455,7 @@ pub enum PathObservationError {
         kind: PathIoErrorKind,
         raw_os_error: Option<i32>,
     },
+    NotALink,
     WrongKind {
         expected: PathNodeKind,
         actual: PathNodeKind,
@@ -979,6 +980,7 @@ mod tests {
             kind: PathIoErrorKind::PermissionDenied,
             raw_os_error: Some(13),
         };
+        let not_a_link = PathObservationError::NotALink;
         let wrong_kind = PathObservationError::WrongKind {
             expected: PathNodeKind::Directory,
             actual: PathNodeKind::RegularFile,
@@ -1003,6 +1005,10 @@ mod tests {
             ]
         );
         assert_ne!(io, wrong_kind);
+        assert_eq!(not_a_link, PathObservationError::NotALink);
+        assert_ne!(not_a_link, io);
+        assert_ne!(not_a_link, wrong_kind);
+        assert_ne!(not_a_link, inconsistent);
         assert_ne!(wrong_kind, inconsistent);
         assert_eq!(
             PathIoErrorKind::from(std::io::ErrorKind::ConnectionReset),

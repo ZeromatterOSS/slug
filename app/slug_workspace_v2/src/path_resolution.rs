@@ -2464,6 +2464,37 @@ mod tests {
         assert_eq!(demand.path().as_path(), Path::new("/denied"));
         assert_eq!(demand.operation(), PathObservationOperation::ReadLink);
         assert_eq!(error, io);
+
+        let not_a_link_failure = resolve_script(
+            ns,
+            "/not-a-link",
+            &[
+                present(ns, "/", PathNodeKind::Directory),
+                present(ns, "/not-a-link", PathNodeKind::Symlink),
+                read_link_result(
+                    ns,
+                    "/not-a-link",
+                    PathOperationResult::Error(PathObservationError::NotALink),
+                ),
+            ],
+        )
+        .await
+        .unwrap_err();
+        let PathResolutionError::Observation {
+            namespace,
+            requested_path,
+            demand,
+            error,
+        } = not_a_link_failure
+        else {
+            panic!("expected not-a-link readlink observation error");
+        };
+        assert_eq!(namespace, ns);
+        assert_eq!(requested_path.as_path(), Path::new("/not-a-link"));
+        assert_eq!(demand.namespace(), ns);
+        assert_eq!(demand.path().as_path(), Path::new("/not-a-link"));
+        assert_eq!(demand.operation(), PathObservationOperation::ReadLink);
+        assert_eq!(error, PathObservationError::NotALink);
     }
 
     #[cfg(unix)]
@@ -3059,6 +3090,91 @@ mod tests {
                 operation: PathObservationOperation::FileBytes,
                 error: different_raw,
             }
+        );
+    }
+
+    #[tokio::test]
+    async fn path_file_bytes_prunes_equal_not_a_link_errors_and_invalidates_io_transitions() {
+        let host = PathObservationNamespace::Host;
+        let materialized =
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(42));
+        let operational_counter = CounterKey {
+            kind: CounterKind::Operational,
+            counter: Arc::new(AtomicUsize::new(0)),
+        };
+        let semantic_counter = CounterKey {
+            kind: CounterKind::Semantic,
+            counter: Arc::new(AtomicUsize::new(0)),
+        };
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let transaction = dice.updater().commit().await;
+        let readlink_error_script = |namespace, error| {
+            vec![
+                present(namespace, "/", PathNodeKind::Directory),
+                present(namespace, "/entry", PathNodeKind::Symlink),
+                read_link_result(namespace, "/entry", PathOperationResult::Error(error)),
+            ]
+        };
+
+        let script = readlink_error_script(host, PathObservationError::NotALink);
+        let mut transaction = update_projection_state(transaction, host, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (1, 1)
+        );
+        let first = semantic_projection(&mut transaction).await.unwrap_err();
+        assert_eq!(
+            first,
+            PathFileBytesError::Observation {
+                logical_path: path("/entry"),
+                operation: PathObservationOperation::ReadLink,
+                error: PathObservationError::NotALink,
+            }
+        );
+
+        let script = readlink_error_script(materialized, PathObservationError::NotALink);
+        transaction = update_projection_state(transaction, materialized, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (2, 1)
+        );
+        assert_eq!(
+            semantic_projection(&mut transaction).await.unwrap_err(),
+            first
+        );
+
+        let io = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let script = readlink_error_script(materialized, io);
+        transaction = update_projection_state(transaction, materialized, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (3, 2)
+        );
+        assert_eq!(
+            semantic_projection(&mut transaction).await.unwrap_err(),
+            PathFileBytesError::Observation {
+                logical_path: path("/entry"),
+                operation: PathObservationOperation::ReadLink,
+                error: io,
+            }
+        );
+
+        let script = readlink_error_script(materialized, PathObservationError::NotALink);
+        transaction = update_projection_state(transaction, materialized, "/entry", &script).await;
+        assert_eq!(
+            run_projection_counters(&mut transaction, &operational_counter, &semantic_counter)
+                .await,
+            (4, 3)
+        );
+        assert_eq!(
+            semantic_projection(&mut transaction).await.unwrap_err(),
+            first
         );
     }
 

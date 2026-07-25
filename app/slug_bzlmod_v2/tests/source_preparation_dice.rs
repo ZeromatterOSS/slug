@@ -1898,6 +1898,7 @@ fn repository_source_error_schema_compares_every_shared_semantic_field() {
         kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
         raw_os_error: Some(14),
     };
+    let not_a_link = PathObservationError::NotALink;
     let invalid_relative =
         |requested_path| RepositorySourceFileError::InvalidRepoRelativePath { requested_path };
     let materialization_compute =
@@ -1986,6 +1987,18 @@ fn repository_source_error_schema_compares_every_shared_semantic_field() {
     unequal!(
         observation(path.dupe(), PathObservationOperation::Lstat, io_error),
         observation(path.dupe(), PathObservationOperation::Lstat, other_io_error)
+    );
+    assert_eq!(
+        observation(path.dupe(), PathObservationOperation::ReadLink, not_a_link,),
+        observation(
+            path.dupe(),
+            PathObservationOperation::ReadLink,
+            PathObservationError::NotALink,
+        )
+    );
+    unequal!(
+        observation(path.dupe(), PathObservationOperation::ReadLink, not_a_link,),
+        observation(path.dupe(), PathObservationOperation::ReadLink, io_error)
     );
     let before = Some(lstat(PathNodeKind::Symlink));
     unequal!(
@@ -3241,6 +3254,40 @@ async fn immutable_source_accepts_special_and_projects_all_observed_terminals() 
             error: permission_denied,
         })
     );
+
+    let mut not_a_link_readlink = immutable_source_observations(
+        &root,
+        instance,
+        PathObservationResult::Lstat(PathOperationResult::Present(lstat(PathNodeKind::Symlink))),
+    );
+    not_a_link_readlink.push(read_link_observation_in(
+        namespace,
+        module_path.to_str().unwrap(),
+        PathOperationResult::Error(PathObservationError::NotALink),
+    ));
+    let PathOutcome::Complete(value) = source_with_epoch(
+        &dice,
+        raw_snapshot([]),
+        complete(not_a_link_readlink),
+        5,
+        "MODULE.bazel",
+    )
+    .await
+    else {
+        panic!("not-a-link readlink epoch needs observations");
+    };
+    let expected = Err(RepositorySourceFileError::Observation {
+        repo_relative_path: relative.dupe(),
+        operation: PathObservationOperation::ReadLink,
+        error: PathObservationError::NotALink,
+    });
+    assert_eq!(value, expected);
+    let complete_value = SourcePreparationOutcome::Complete(value.dupe());
+    assert!(<RepositorySourceFileKey as Key>::validity(&complete_value));
+    assert!(<RepositorySourceFileKey as Key>::equality(
+        &complete_value,
+        &SourcePreparationOutcome::Complete(expected),
+    ));
 
     let mut denied_bytes = immutable_source_observations(
         &root,

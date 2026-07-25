@@ -378,3 +378,29 @@ returned `ACCEPT`.
 Next evidence: Implement only
 `WP-5-m1-path-observation-not-a-link-schema`, then obtain independent
 acceptance before scheduling the native producer.
+
+### Stage 5 NotALink observation schema prerequisite
+
+Status: Accepted
+
+Implementation: The public structural observation error now has exactly one
+fieldless `NotALink` variant. Direct evidence distinguishes it from every
+existing observation error class. Scripted Symlink then ReadLink failure
+preserves the exact namespace, requested path, ReadLink demand, and error
+through the operational resolver. Retained DICE evidence proves equal
+semantic byte errors prune across operational namespace changes while
+NotALink-to-I/O and I/O-to-NotALink both invalidate. Immutable repository
+source execution projects the same typed error and proves complete key
+validity and equality.
+
+Validation: `slug_workspace_v2` 29, full `slug_bzlmod_v2` 226, and
+`slug_core_v2` 27 passed serially, including doctests. Formatting, diff,
+three-file allowlist, and forbidden-scope checks passed. Existing unused
+serde-import, perf-event-patch, and one core dead-code warning are unrelated.
+Independent pinned-Bazel/schema and architecture/DICE corrected-diff reviews
+both returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-path-observation-native-producer` in the four frozen files.
+Do not wire the private producer into DICE, runtime materialization, retry, or
+publication.
