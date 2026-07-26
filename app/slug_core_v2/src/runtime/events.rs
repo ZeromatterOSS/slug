@@ -788,6 +788,9 @@ mod tests {
             .flat_map(EventBatch::events)
             .map(|event| match event {
                 EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                EvaluationEvent::Diagnostic { .. } => {
+                    unreachable!("diagnostic events are not produced by this packet")
+                }
             })
             .collect()
     }

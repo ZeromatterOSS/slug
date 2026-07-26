@@ -3826,3 +3826,37 @@ eight-file compile closure. No Cargo or formatting command ran.
 
 Next evidence: Implement only
 `WP-5-m1-neutral-diagnostic-event-contract-correction`.
+
+### Stage 5 neutral diagnostic-event contract
+
+Status: Accepted
+
+The corrected eight-file packet adds public
+`EvaluationDiagnosticLevel::{Warning, Error}` and
+`EvaluationEvent::Diagnostic { level, text: CompactString }` beside the
+existing Starlark-print variant. Event values retain ordinary `Clone`,
+structural equality, and `Allocative` without `Dupe`; only `EventBatch`
+retains cheap `Dupe` over its immutable `Arc<[EvaluationEvent]>`. Tests pin
+same-text level inequality, exact Unicode plus LF/CRLF/trailing-newline text,
+mixed print/diagnostic order and reordered inequality, and shared batch
+storage.
+
+Each of the seven frozen downstream test helpers now has only the exact
+explicit `Diagnostic { .. } =>
+unreachable!("diagnostic events are not produced by this packet")` arm.
+Those compile-closure edits preserve the existing print projection and make
+any accidental producer fail. No wildcard, filtering policy, expected-output
+change, diagnostic construction, or production logic entered those files.
+Repository-wide scans found no diagnostic producer, production exhaustive
+consumer, DICE edge, output/publication mapping, retry, or activation.
+
+Validation passed 7 event tests, 241 bzlmod tests, 54 loading tests, 12
+analysis tests, 98 core unit plus 13 integration tests, and zero doctests.
+Every affected event/bzlmod/loading/analysis/core GNU-Windows test executable
+linked. Formatting, archive, diff, exact eight-file allowlist, dependency,
+trait, storage, reference, and no-activation gates passed. All three terminal
+source/contract, implementation/evidence, and architecture reviews returned
+`ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-repository-ignore-matcher-owner`.

@@ -20,10 +20,23 @@ use dupe::Dupe;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Allocative, Dupe)]
 pub struct CaptureEvaluationEvents;
 
+/// Severity of a neutral evaluation diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+pub enum EvaluationDiagnosticLevel {
+    Warning,
+    Error,
+}
+
 /// One evaluation-local event captured for later command-owned publication.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum EvaluationEvent {
-    StarlarkPrint { text: CompactString },
+    StarlarkPrint {
+        text: CompactString,
+    },
+    Diagnostic {
+        level: EvaluationDiagnosticLevel,
+        text: CompactString,
+    },
 }
 
 /// An immutable ordered batch of evaluation events.
@@ -63,11 +76,19 @@ mod tests {
     use compact_str::CompactString;
     use dupe::Dupe;
 
+    use super::EvaluationDiagnosticLevel;
     use super::EvaluationEvent;
     use super::EventBatch;
 
     fn print(text: &str) -> EvaluationEvent {
         EvaluationEvent::StarlarkPrint {
+            text: CompactString::new(text),
+        }
+    }
+
+    fn diagnostic(level: EvaluationDiagnosticLevel, text: &str) -> EvaluationEvent {
+        EvaluationEvent::Diagnostic {
+            level,
             text: CompactString::new(text),
         }
     }
@@ -104,16 +125,66 @@ mod tests {
     }
 
     #[test]
-    fn event_batch_dupe_shares_storage_and_retains_exact_utf8() {
+    fn diagnostic_levels_are_structurally_unequal() {
+        assert_ne!(
+            diagnostic(EvaluationDiagnosticLevel::Warning, "same"),
+            diagnostic(EvaluationDiagnosticLevel::Error, "same")
+        );
+    }
+
+    #[test]
+    fn diagnostic_retains_exact_utf8_and_newline_text() {
+        let text = "π你好🙂\nfirst\r\nsecond\n";
+        assert_eq!(
+            diagnostic(EvaluationDiagnosticLevel::Warning, text),
+            EvaluationEvent::Diagnostic {
+                level: EvaluationDiagnosticLevel::Warning,
+                text: CompactString::new(text),
+            }
+        );
+    }
+
+    #[test]
+    fn event_batch_preserves_mixed_print_and_diagnostic_order() {
+        let events = [
+            print("before"),
+            diagnostic(EvaluationDiagnosticLevel::Warning, "warning"),
+            print("between"),
+            diagnostic(EvaluationDiagnosticLevel::Error, "error"),
+        ];
+        let batch = EventBatch::from_events(events.clone());
+        assert_eq!(batch.events(), &events);
+        assert_ne!(
+            batch,
+            EventBatch::from_events([
+                diagnostic(EvaluationDiagnosticLevel::Warning, "warning"),
+                print("before"),
+                print("between"),
+                diagnostic(EvaluationDiagnosticLevel::Error, "error"),
+            ])
+        );
+    }
+
+    #[test]
+    fn event_batch_dupe_shares_mixed_storage_and_retains_exact_utf8() {
         let text = "π你好🙂\nexact";
-        let batch = EventBatch::from_events([print(text)]);
+        let batch = EventBatch::from_events([
+            print("before"),
+            diagnostic(EvaluationDiagnosticLevel::Warning, text),
+        ]);
         let cloned = batch.dupe();
         assert!(Arc::ptr_eq(&batch.events, &cloned.events));
         assert_eq!(
             cloned.events(),
-            &[EvaluationEvent::StarlarkPrint {
-                text: CompactString::new(text),
-            }]
+            &[
+                EvaluationEvent::StarlarkPrint {
+                    text: CompactString::new("before"),
+                },
+                EvaluationEvent::Diagnostic {
+                    level: EvaluationDiagnosticLevel::Warning,
+                    text: CompactString::new(text),
+                },
+            ]
         );
     }
 }

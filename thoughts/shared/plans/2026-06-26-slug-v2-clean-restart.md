@@ -42,17 +42,16 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-neutral-diagnostic-event-contract-correction`.
+`WP-5-m1-repository-ignore-matcher-owner`.
 
-Add the neutral warning/error diagnostic event variant beside the accepted
-Starlark-print event in the corrected eight-file compile-closure allowlist.
-The seven added files receive only an exact test-helper `Diagnostic`
-`unreachable!` arm, preserving existing print projections and failing on any
-accidental producer. Preserve ordinary event `Clone`, batch-only `Dupe`,
-structural ordered equality, exact UTF-8/newline text, mixed
-print/diagnostic order, and shared batch storage. Add no producer, DICE key,
-policy, output mapping, retry, REPO evaluator, bootstrap publication, or
-other activation edge.
+Add only the crate-private compact repository-ignore matcher/value in
+`app/slug_bzlmod_v2/src/repository_ignore.rs` plus its private module
+declaration in `lib.rs`. Own sorted/deduplicated literal prefixes, ordered
+original REPO patterns, compact precompiled segments, and exact
+component-aware `matching_entry(&PackagePath)`. Match Bazel 9 `UnixGlob`
+prefix semantics including `**`, segment `*`/`?`, leading-dot rules,
+escaping, and parentheses. Add no IO, DICE key, events, regex/glob
+dependency, loading dependency, or standard retained hash collection.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
