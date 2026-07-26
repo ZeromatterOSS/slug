@@ -42,14 +42,17 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-neutral-diagnostic-event-contract`.
+`WP-5-m1-neutral-diagnostic-event-contract-correction`.
 
-Add only the neutral warning/error diagnostic event variant beside the
-accepted Starlark-print event in `app/slug_events_v2/src/lib.rs`. Preserve
-ordinary event `Clone`, batch-only `Dupe`, structural ordered equality, exact
-UTF-8/newline text, mixed print/diagnostic order, and shared batch storage.
-Add no producer, DICE key, policy, output, retry, REPO evaluator, bootstrap
-publication, or other activation edge.
+Add the neutral warning/error diagnostic event variant beside the accepted
+Starlark-print event in the corrected eight-file compile-closure allowlist.
+The seven added files receive only an exact test-helper `Diagnostic`
+`unreachable!` arm, preserving existing print projections and failing on any
+accidental producer. Preserve ordinary event `Clone`, batch-only `Dupe`,
+structural ordered equality, exact UTF-8/newline text, mixed
+print/diagnostic order, and shared batch storage. Add no producer, DICE key,
+policy, output mapping, retry, REPO evaluator, bootstrap publication, or
+other activation edge.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

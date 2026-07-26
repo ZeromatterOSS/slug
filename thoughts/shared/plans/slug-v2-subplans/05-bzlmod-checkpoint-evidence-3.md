@@ -3784,3 +3784,45 @@ implementation/evidence, and architecture/hot-path reviews returned
 
 Next evidence: Implement only
 `WP-5-m1-neutral-diagnostic-event-contract`.
+
+### Stage 5 neutral diagnostic-event compile-closure correction
+
+Status: Replanned before validation
+
+The frozen one-file packet was not compile-closed. Adding the real public
+`EvaluationEvent::Diagnostic` variant makes seven existing exhaustive matches
+non-exhaustive: one test helper each in bzlmod root-module tests, two loading
+integration tests, one analysis integration test, and three `#[cfg(test)]`
+core runtime modules. There are no production exhaustive consumers,
+diagnostic constructors, wildcard consumers, or diagnostic producers.
+Marking the enum non-exhaustive would still require the same consumer edits.
+
+The corrected allowlist is exactly:
+
+- `app/slug_events_v2/src/lib.rs`;
+- `app/slug_bzlmod_v2/tests/root_module_dice.rs`;
+- `app/slug_loading_v2/tests/bzl_invalidation.rs`;
+- `app/slug_loading_v2/tests/build_file_loading.rs`;
+- `app/slug_analysis_v2/tests/starlark_rule.rs`;
+- `app/slug_core_v2/src/runtime/dice.rs`;
+- `app/slug_core_v2/src/runtime/demands.rs`; and
+- `app/slug_core_v2/src/runtime/events.rs`.
+
+Each of the seven added files receives only the exact explicit arm
+`EvaluationEvent::Diagnostic { .. } =>
+unreachable!("diagnostic events are not produced by this packet")` in its
+existing test helper. This restores compile closure, preserves existing
+print-only projections, establishes no silent diagnostic filtering or output
+policy, and fails if this neutral packet accidentally activates a producer.
+No wildcard arm, expected-output change, diagnostic construction, production
+logic, Cargo dependency, or other consumer edit is authorized.
+
+The event-owner value/test contract remains unchanged: public Warning/Error
+levels, `CompactString` diagnostic text, level inequality, exact UTF-8 and
+newline retention, mixed structural order, ordinary event `Clone`, and
+batch-only `Dupe` sharing one Arc slice. Independent source and architecture
+reviews returned `REPLAN` for the one-file scope and accepted the corrected
+eight-file compile closure. No Cargo or formatting command ran.
+
+Next evidence: Implement only
+`WP-5-m1-neutral-diagnostic-event-contract-correction`.
