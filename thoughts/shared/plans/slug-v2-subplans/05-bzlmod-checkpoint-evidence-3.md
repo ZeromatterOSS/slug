@@ -2613,3 +2613,25 @@ sole revision was already incorporated by explicitly adding `package.rs`.
 
 Next evidence: Implement only the corrected five-file
 `WP-5-m1-loading-event-producer`.
+
+### Stage 5 loading event producer corrected retry
+
+Status: Accepted
+
+The corrected five-file producer builds standard, Print, and loading-specific
+globals in one `package.rs`-owned `Globals` heap; no copied-value or
+process-static overlay remains. `BzlModuleEvalKey` and `PackageLoadKey` store
+one marker-conditional local batch, dependency events remain on child nodes,
+marker absence keeps the default direct handler, explicit empty batches replace
+prior versions, and runtime failures retain only their executed prefix. Key
+values, equality, validity, typed Need, runtime, commands, and publication are
+unchanged.
+
+The focused `.bzl` and BUILD suites passed 23 and 19 tests; all 54 loading tests,
+the serial 13-test core runtime, and all 98 core tests passed. All GNU-Windows
+loading test executables linked. Formatting, diff, archive, static-owner, and
+exact five-file gates passed. Independent lifetime/evidence and architecture
+terminal reviews both returned `ACCEPT`; residual publication integration
+remains owned by later packets.
+
+Next evidence: Implement only `WP-5-m1-analysis-event-producer`.

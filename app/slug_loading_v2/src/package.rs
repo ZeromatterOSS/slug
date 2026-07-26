@@ -21,6 +21,7 @@ use slug_identity_v2::PackageIdentifier;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
+use starlark::environment::LibraryExtension;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
@@ -2031,7 +2032,7 @@ impl AllocFrozenValue for NativeModule {
 }
 
 pub(crate) fn loading_globals() -> Globals {
-    let mut globals = GlobalsBuilder::standard()
+    let mut globals = GlobalsBuilder::extended_by(&[LibraryExtension::Print])
         .with(package_globals)
         .with(select_globals);
     globals.set("native", NativeModule);

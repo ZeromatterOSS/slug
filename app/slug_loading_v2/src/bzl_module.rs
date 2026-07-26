@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::cell::RefCell;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
@@ -24,7 +25,11 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_events_v2::CaptureEvaluationEvents;
+use slug_events_v2::EvaluationEvent;
+use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use starlark::PrintHandler;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
@@ -69,6 +74,26 @@ pub struct EvaluatedBzlModule {
     pub path: PathBuf,
     pub loads: Vec<String>,
     pub manifest: BzlLoadManifest,
+}
+
+#[derive(Default)]
+struct LoadingPrintCapture {
+    events: RefCell<Vec<EvaluationEvent>>,
+}
+
+impl LoadingPrintCapture {
+    fn into_batch(self) -> EventBatch {
+        EventBatch::from_events(self.events.into_inner())
+    }
+}
+
+impl PrintHandler for LoadingPrintCapture {
+    fn println(&self, text: &str) -> starlark::Result<()> {
+        self.events
+            .borrow_mut()
+            .push(EvaluationEvent::StarlarkPrint { text: text.into() });
+        Ok(())
+    }
 }
 
 /// Stable identity for one local `.bzl` module in a workspace.
@@ -729,110 +754,134 @@ impl Key for BzlModuleEvalKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let parsed = match ctx
-            .compute(&BzlParseKey {
-                workspace: self.workspace.clone(),
-                path: self.path.clone(),
-            })
-            .await
-        {
-            Ok(value) => match value.as_ref() {
-                Ok(parsed) => parsed.clone(),
-                Err(error) => return Arc::new(Err(error.clone())),
-            },
-            Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-        };
-
-        let mut loaded_modules = Vec::with_capacity(parsed.loads.len());
-        for load in &parsed.loads {
-            let resolved = match ctx
-                .compute(&LoadLabelResolutionKey {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = async {
+            let parsed = match ctx
+                .compute(&BzlParseKey {
                     workspace: self.workspace.clone(),
-                    requesting_package: self.path.parent().unwrap_or(&self.workspace).to_path_buf(),
-                    load: load.clone(),
+                    path: self.path.clone(),
                 })
                 .await
             {
                 Ok(value) => match value.as_ref() {
-                    Ok(path) => path.clone(),
+                    Ok(parsed) => parsed.clone(),
                     Err(error) => return Arc::new(Err(error.clone())),
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
-            let load_label = match bzl_source_label(&self.workspace, &resolved) {
-                Ok(label) => label,
-                Err(error) => return Arc::new(Err(error)),
-            };
-            let child = BzlModuleEvalKey {
-                workspace: self.workspace.clone(),
-                path: resolved,
-            };
-            let cycle_guard = match ctx.cycle_guard::<BzlLoadCycleGuard>() {
-                Ok(guard) => guard,
-                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-            };
-            let result = match cycle_guard {
-                Some(guard) => match guard.guard_this(ctx.compute(&child)).await {
-                    Ok(result) => result,
-                    Err(cycle) => {
-                        let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
-                        return Arc::new(Err(LoadingError::load_cycle(cycle)));
-                    }
-                },
-                None => ctx.compute(&child).await,
-            };
-            let module = match result {
-                Ok(value) => match value.as_ref() {
-                    Ok(module) => module.clone(),
-                    Err(error) => return Arc::new(Err(load_error(&load_label, error))),
-                },
-                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-            };
-            loaded_modules.push((load.clone(), module));
-        }
 
-        Arc::new((|| {
-            let ast = AstModule::parse(
-                &self.path.display().to_string(),
-                parsed.source.clone(),
-                &Dialect::Standard,
-            )
-            .map_err(|error| LoadingError::new(error.to_string()))?;
-            let module = Module::new();
-            let manifest = BzlLoadManifest::new(
-                bzl_module_identity(&self.workspace, &self.path)?,
-                parsed.source_digest,
-                loaded_modules.iter().map(|(_, module)| module),
-            );
-            let loader = LocalBzlLoader {
-                modules: loaded_modules
-                    .iter()
-                    .map(|(load, module)| (load.as_str(), module.module.dupe()))
-                    .collect(),
-            };
-            let evaluation_context = BzlEvaluationContext::new(
-                bzl_source_label(&self.workspace, &self.path)
-                    .map_err(|error| LoadingError::new(error.to_string()))?,
-            );
-            {
-                let mut evaluator = Evaluator::new(&module);
-                evaluator.extra = Some(&evaluation_context);
-                evaluator.set_loader(&loader);
-                evaluator
-                    .eval_module(ast, &loading_globals())
-                    .map_err(|error| LoadingError::new(error.to_string()))?;
+            let mut loaded_modules = Vec::with_capacity(parsed.loads.len());
+            for load in &parsed.loads {
+                let resolved = match ctx
+                    .compute(&LoadLabelResolutionKey {
+                        workspace: self.workspace.clone(),
+                        requesting_package: self
+                            .path
+                            .parent()
+                            .unwrap_or(&self.workspace)
+                            .to_path_buf(),
+                        load: load.clone(),
+                    })
+                    .await
+                {
+                    Ok(value) => match value.as_ref() {
+                        Ok(path) => path.clone(),
+                        Err(error) => return Arc::new(Err(error.clone())),
+                    },
+                    Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+                };
+                let load_label = match bzl_source_label(&self.workspace, &resolved) {
+                    Ok(label) => label,
+                    Err(error) => return Arc::new(Err(error)),
+                };
+                let child = BzlModuleEvalKey {
+                    workspace: self.workspace.clone(),
+                    path: resolved,
+                };
+                let cycle_guard = match ctx.cycle_guard::<BzlLoadCycleGuard>() {
+                    Ok(guard) => guard,
+                    Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+                };
+                let result = match cycle_guard {
+                    Some(guard) => match guard.guard_this(ctx.compute(&child)).await {
+                        Ok(result) => result,
+                        Err(cycle) => {
+                            let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+                            return Arc::new(Err(LoadingError::load_cycle(cycle)));
+                        }
+                    },
+                    None => ctx.compute(&child).await,
+                };
+                let module = match result {
+                    Ok(value) => match value.as_ref() {
+                        Ok(module) => module.clone(),
+                        Err(error) => return Arc::new(Err(load_error(&load_label, error))),
+                    },
+                    Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+                };
+                loaded_modules.push((load.clone(), module));
             }
-            let module = module
-                .freeze()
-                .map_err(|error| LoadingError::new(format!("{error:?}")))?;
-            Ok(FrozenBzlModule {
-                module,
-                path: self.path.clone(),
-                loads: parsed.loads.clone(),
-                retained_bzl_modules: retained_module_closure(&loaded_modules),
-                manifest,
-            })
-        })())
+
+            Arc::new((|| {
+                let ast = AstModule::parse(
+                    &self.path.display().to_string(),
+                    parsed.source.clone(),
+                    &Dialect::Standard,
+                )
+                .map_err(|error| LoadingError::new(error.to_string()))?;
+                let module = Module::new();
+                let manifest = BzlLoadManifest::new(
+                    bzl_module_identity(&self.workspace, &self.path)?,
+                    parsed.source_digest,
+                    loaded_modules.iter().map(|(_, module)| module),
+                );
+                let loader = LocalBzlLoader {
+                    modules: loaded_modules
+                        .iter()
+                        .map(|(load, module)| (load.as_str(), module.module.dupe()))
+                        .collect(),
+                };
+                let evaluation_context = BzlEvaluationContext::new(
+                    bzl_source_label(&self.workspace, &self.path)
+                        .map_err(|error| LoadingError::new(error.to_string()))?,
+                );
+                let print_capture = capture_events.then(LoadingPrintCapture::default);
+                let globals = loading_globals();
+                {
+                    let mut evaluator = Evaluator::new(&module);
+                    evaluator.extra = Some(&evaluation_context);
+                    evaluator.set_loader(&loader);
+                    if let Some(print_capture) = print_capture.as_ref() {
+                        evaluator.set_print_handler(print_capture);
+                    }
+                    let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
+                    drop(evaluator);
+                    event_batch = print_capture.map(LoadingPrintCapture::into_batch);
+                    evaluation.map_err(|error| LoadingError::new(error.to_string()))?;
+                }
+                let module = module
+                    .freeze()
+                    .map_err(|error| LoadingError::new(format!("{error:?}")))?;
+                Ok(FrozenBzlModule {
+                    module,
+                    path: self.path.clone(),
+                    loads: parsed.loads.clone(),
+                    retained_bzl_modules: retained_module_closure(&loaded_modules),
+                    manifest,
+                })
+            })())
+        }
+        .await;
+        if capture_events {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("BzlModuleEvalKey stores exactly one local event batch");
+        }
+        value
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -853,150 +902,171 @@ impl Key for PackageLoadKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let root_module_graph_value = match ctx
-            .compute(&RootModuleGraphKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-        };
-        let root_module_graph = match root_module_graph_value.as_ref() {
-            Ok(graph) => graph,
-            Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-        };
-        let _repository_mapping = &root_module_graph.repository_mapping;
-        let listing = match ctx
-            .compute(&PackageListingKey {
-                workspace: self.workspace.clone(),
-                package: self.package.clone(),
-            })
-            .await
-        {
-            Ok(value) => match value.as_ref() {
-                Ok(listing) => listing.dupe(),
-                Err(error) => return Arc::new(Err(error.clone())),
-            },
-            Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-        };
-        let primary_build = self.package.join("BUILD.bazel");
-        let fallback_build = self.package.join("BUILD");
-        let (build_file, source) = match observed_file(ctx, &self.workspace, &primary_build).await {
-            Ok(source) => (primary_build, source),
-            Err(error) if error.is_absent() => {
-                match observed_file(ctx, &self.workspace, &fallback_build).await {
-                    Ok(source) => (fallback_build, source),
-                    Err(error) if error.is_absent() => {
-                        return Arc::new(Err(LoadingError::new(format!(
-                            "no BUILD.bazel or BUILD file in package {}",
-                            self.package.display()
-                        ))));
-                    }
-                    Err(error) => return Arc::new(Err(error)),
-                }
-            }
-            Err(error) => return Arc::new(Err(error)),
-        };
-        let ast = match AstModule::parse(
-            &build_file.display().to_string(),
-            source.as_ref().clone(),
-            &Dialect::Standard,
-        ) {
-            Ok(ast) => ast,
-            Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-        };
-
-        let mut loaded_modules = Vec::new();
-        for load in ast.loads() {
-            let load = load.module_id.to_owned();
-            let resolved = match ctx
-                .compute(&LoadLabelResolutionKey {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = async {
+            let root_module_graph_value = match ctx
+                .compute(&RootModuleGraphKey {
                     workspace: self.workspace.clone(),
-                    requesting_package: self.package.clone(),
-                    load: load.clone(),
+                })
+                .await
+            {
+                Ok(value) => value,
+                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+            };
+            let root_module_graph = match root_module_graph_value.as_ref() {
+                Ok(graph) => graph,
+                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+            };
+            let _repository_mapping = &root_module_graph.repository_mapping;
+            let listing = match ctx
+                .compute(&PackageListingKey {
+                    workspace: self.workspace.clone(),
+                    package: self.package.clone(),
                 })
                 .await
             {
                 Ok(value) => match value.as_ref() {
-                    Ok(path) => path.clone(),
+                    Ok(listing) => listing.dupe(),
                     Err(error) => return Arc::new(Err(error.clone())),
                 },
                 Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
-            let load_label = match bzl_source_label(&self.workspace, &resolved) {
-                Ok(label) => label,
-                Err(error) => return Arc::new(Err(error)),
-            };
-            let module = match ctx
-                .compute(&BzlModuleEvalKey {
-                    workspace: self.workspace.clone(),
-                    path: resolved,
-                })
-                .await
-            {
-                Ok(value) => match value.as_ref() {
-                    Ok(module) => module.clone(),
-                    Err(error) => {
-                        return Arc::new(Err(load_error(&load_label, error)
-                            .with_package_cycle_origin(&self.workspace, &self.package)));
+            let primary_build = self.package.join("BUILD.bazel");
+            let fallback_build = self.package.join("BUILD");
+            let (build_file, source) =
+                match observed_file(ctx, &self.workspace, &primary_build).await {
+                    Ok(source) => (primary_build, source),
+                    Err(error) if error.is_absent() => {
+                        match observed_file(ctx, &self.workspace, &fallback_build).await {
+                            Ok(source) => (fallback_build, source),
+                            Err(error) if error.is_absent() => {
+                                return Arc::new(Err(LoadingError::new(format!(
+                                    "no BUILD.bazel or BUILD file in package {}",
+                                    self.package.display()
+                                ))));
+                            }
+                            Err(error) => return Arc::new(Err(error)),
+                        }
                     }
-                },
-                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
-            };
-            loaded_modules.push((load, module));
-        }
-
-        Arc::new((|| {
-            let ast = AstModule::parse(
+                    Err(error) => return Arc::new(Err(error)),
+                };
+            let ast = match AstModule::parse(
                 &build_file.display().to_string(),
                 source.as_ref().clone(),
                 &Dialect::Standard,
-            )
-            .map_err(|error| LoadingError::new(error.to_string()))?;
-            let package_label = self
-                .package
-                .strip_prefix(&self.workspace)
-                .map_err(|_| {
-                    LoadingError::new(format!(
-                        "package is outside workspace: {}",
-                        self.package.display()
-                    ))
-                })?
-                .to_string_lossy()
-                .replace('\\', "/");
-            let recorder = PackageRecorder::new(listing, package_label);
-            let module = Module::new();
-            let loader = LocalBzlLoader {
-                modules: loaded_modules
-                    .iter()
-                    .map(|(load, module)| (load.as_str(), module.module.dupe()))
-                    .collect(),
+            ) {
+                Ok(ast) => ast,
+                Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
             };
-            {
-                let mut evaluator = Evaluator::new(&module);
-                evaluator.extra = Some(&recorder);
-                evaluator.set_loader(&loader);
-                evaluator
-                    .eval_module(ast, &loading_globals())
-                    .map_err(|error| LoadingError::new(error.to_string()))?;
+
+            let mut loaded_modules = Vec::new();
+            for load in ast.loads() {
+                let load = load.module_id.to_owned();
+                let resolved = match ctx
+                    .compute(&LoadLabelResolutionKey {
+                        workspace: self.workspace.clone(),
+                        requesting_package: self.package.clone(),
+                        load: load.clone(),
+                    })
+                    .await
+                {
+                    Ok(value) => match value.as_ref() {
+                        Ok(path) => path.clone(),
+                        Err(error) => return Arc::new(Err(error.clone())),
+                    },
+                    Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+                };
+                let load_label = match bzl_source_label(&self.workspace, &resolved) {
+                    Ok(label) => label,
+                    Err(error) => return Arc::new(Err(error)),
+                };
+                let module = match ctx
+                    .compute(&BzlModuleEvalKey {
+                        workspace: self.workspace.clone(),
+                        path: resolved,
+                    })
+                    .await
+                {
+                    Ok(value) => match value.as_ref() {
+                        Ok(module) => module.clone(),
+                        Err(error) => {
+                            return Arc::new(Err(load_error(&load_label, error)
+                                .with_package_cycle_origin(&self.workspace, &self.package)));
+                        }
+                    },
+                    Err(error) => return Arc::new(Err(LoadingError::new(error.to_string()))),
+                };
+                loaded_modules.push((load, module));
             }
-            let direct_load_roots = first_seen_direct_roots(&loaded_modules);
-            let retained_bzl_modules = flattened_lifetime_closure(&loaded_modules);
-            let reachable_loads = retained_bzl_modules
-                .iter()
-                .map(|entry| entry.identity.clone())
-                .collect::<Vec<_>>();
-            let load_fingerprint = package_load_fingerprint(&loaded_modules);
-            Ok(recorder.finish(
-                self.package.clone(),
-                build_file,
-                direct_load_roots.into(),
-                reachable_loads.into(),
-                load_fingerprint,
-                retained_bzl_modules.into(),
-            ))
-        })())
+
+            Arc::new((|| {
+                let ast = AstModule::parse(
+                    &build_file.display().to_string(),
+                    source.as_ref().clone(),
+                    &Dialect::Standard,
+                )
+                .map_err(|error| LoadingError::new(error.to_string()))?;
+                let package_label = self
+                    .package
+                    .strip_prefix(&self.workspace)
+                    .map_err(|_| {
+                        LoadingError::new(format!(
+                            "package is outside workspace: {}",
+                            self.package.display()
+                        ))
+                    })?
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                let recorder = PackageRecorder::new(listing, package_label);
+                let module = Module::new();
+                let loader = LocalBzlLoader {
+                    modules: loaded_modules
+                        .iter()
+                        .map(|(load, module)| (load.as_str(), module.module.dupe()))
+                        .collect(),
+                };
+                let print_capture = capture_events.then(LoadingPrintCapture::default);
+                let globals = loading_globals();
+                {
+                    let mut evaluator = Evaluator::new(&module);
+                    evaluator.extra = Some(&recorder);
+                    evaluator.set_loader(&loader);
+                    if let Some(print_capture) = print_capture.as_ref() {
+                        evaluator.set_print_handler(print_capture);
+                    }
+                    let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
+                    drop(evaluator);
+                    event_batch = print_capture.map(LoadingPrintCapture::into_batch);
+                    evaluation.map_err(|error| LoadingError::new(error.to_string()))?;
+                }
+                let direct_load_roots = first_seen_direct_roots(&loaded_modules);
+                let retained_bzl_modules = flattened_lifetime_closure(&loaded_modules);
+                let reachable_loads = retained_bzl_modules
+                    .iter()
+                    .map(|entry| entry.identity.clone())
+                    .collect::<Vec<_>>();
+                let load_fingerprint = package_load_fingerprint(&loaded_modules);
+                Ok(recorder.finish(
+                    self.package.clone(),
+                    build_file,
+                    direct_load_roots.into(),
+                    reachable_loads.into(),
+                    load_fingerprint,
+                    retained_bzl_modules.into(),
+                ))
+            })())
+        }
+        .await;
+        if capture_events {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("PackageLoadKey stores exactly one local event batch");
+        }
+        value
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

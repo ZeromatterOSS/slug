@@ -2,14 +2,25 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::SystemTime;
 
+use dice::ActivationData;
+use dice::ActivationKind;
+use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::DynKey;
+use dice::RichActivation;
+use dice::UserComputationData;
+use dupe::Dupe;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_events_v2::CaptureEvaluationEvents;
+use slug_events_v2::EvaluationEvent;
+use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
@@ -28,6 +39,7 @@ use slug_loading_v2::file_discovery::find_build_file;
 use slug_loading_v2::file_discovery::find_workspace_root;
 use slug_loading_v2::file_discovery::is_bazel_build_file;
 use slug_loading_v2::file_discovery::is_bzl_file;
+use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
@@ -93,6 +105,16 @@ fn try_load_package_with_extra_bzl(
     package: &Path,
     extra_bzl: &[PathBuf],
 ) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
+    try_load_package_with_event_capture(workspace, package, extra_bzl, None, false)
+}
+
+fn try_load_package_with_event_capture(
+    workspace: &Path,
+    package: &Path,
+    extra_bzl: &[PathBuf],
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+) -> anyhow::Result<slug_loading_v2::LoadedPackage> {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut paths = vec![
         workspace.join(MODULE_FILE),
@@ -125,7 +147,14 @@ fn try_load_package_with_extra_bzl(
     tokio::runtime::Runtime::new()
         .unwrap()
         .block_on(async move {
-            let mut updater = dice.updater();
+            let mut user_data = UserComputationData {
+                activation_tracker: tracker,
+                ..Default::default()
+            };
+            if capture_events {
+                user_data.data.set(CaptureEvaluationEvents);
+            }
+            let mut updater = dice.updater_with_data(user_data);
             updater
                 .changed_to(vec![(
                     (WorkspaceSnapshotKey {
@@ -155,6 +184,151 @@ fn try_load_package_with_extra_bzl(
             let mut transaction = updater.commit().await;
             evaluator.evaluate_package(&mut transaction, package).await
         })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PackageEventActivation {
+    package: PathBuf,
+    kind: ActivationKind,
+    batch: Option<EventBatch>,
+}
+
+#[derive(Default)]
+struct PackageEventTracker {
+    activations: Mutex<Vec<PackageEventActivation>>,
+}
+
+impl PackageEventTracker {
+    fn take(&self) -> Vec<PackageEventActivation> {
+        std::mem::take(&mut *self.activations.lock().unwrap())
+    }
+}
+
+impl ActivationTracker for PackageEventTracker {
+    fn key_activated(
+        &self,
+        _key: &DynKey,
+        _deps: &mut dyn Iterator<Item = &DynKey>,
+        _activation: ActivationData,
+    ) {
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        true
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        if let Some(key) = key.downcast_ref::<PackageLoadKey>() {
+            self.activations
+                .lock()
+                .unwrap()
+                .push(PackageEventActivation {
+                    package: key.package.clone(),
+                    kind: activation.kind(),
+                    batch: activation
+                        .evaluation_data()
+                        .and_then(|data| data.downcast_ref::<EventBatch>())
+                        .map(Dupe::dupe),
+                });
+        }
+    }
+}
+
+fn package_event_texts<'a>(
+    activations: &'a [PackageEventActivation],
+    package: &Path,
+) -> Option<Vec<&'a str>> {
+    activations
+        .iter()
+        .find(|activation| {
+            activation.kind == ActivationKind::Evaluated && activation.package == package
+        })
+        .and_then(|activation| activation.batch.as_ref())
+        .map(|batch| {
+            batch
+                .events()
+                .iter()
+                .map(|event| match event {
+                    EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                })
+                .collect()
+        })
+}
+
+#[test]
+fn package_event_capture_is_local_and_preserves_empty_and_runtime_prefix_batches() {
+    let workspace = scratch("package-events");
+    let package = workspace.join("pkg");
+    let dependency = package.join("defs.bzl");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        workspace.join(MODULE_FILE),
+        "module(name = \"package_events\")\n",
+    )
+    .unwrap();
+    fs::write(
+        &dependency,
+        "print(\"DEPENDENCY_LOCAL\")\nNAME = \"probe\"\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"NAME\")\nprint(\"BUILD_LOCAL\")\nfilegroup(name = NAME)\n",
+    )
+    .unwrap();
+
+    let direct_tracker = Arc::new(PackageEventTracker::default());
+    try_load_package_with_event_capture(
+        &workspace,
+        &package,
+        &[],
+        Some(direct_tracker.clone()),
+        false,
+    )
+    .unwrap();
+    let direct = direct_tracker.take();
+    assert!(
+        direct
+            .iter()
+            .filter(|activation| activation.kind == ActivationKind::Evaluated)
+            .all(|activation| activation.batch.is_none()),
+        "{direct:?}"
+    );
+
+    let tracker = Arc::new(PackageEventTracker::default());
+    try_load_package_with_event_capture(&workspace, &package, &[], Some(tracker.clone()), true)
+        .unwrap();
+    let captured = tracker.take();
+    assert_eq!(
+        package_event_texts(&captured, &package),
+        Some(vec!["BUILD_LOCAL"])
+    );
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"NAME\")\nfilegroup(name = NAME)\n",
+    )
+    .unwrap();
+    try_load_package_with_event_capture(&workspace, &package, &[], Some(tracker.clone()), true)
+        .unwrap();
+    let empty = tracker.take();
+    assert_eq!(package_event_texts(&empty, &package), Some(Vec::new()));
+
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"NAME\")\nprint(\"BUILD_RUNTIME_PREFIX\")\nfail(\"build runtime\")\nprint(\"BUILD_RUNTIME_AFTER\")\nfilegroup(name = NAME)\n",
+    )
+    .unwrap();
+    let error =
+        try_load_package_with_event_capture(&workspace, &package, &[], Some(tracker.clone()), true)
+            .unwrap_err()
+            .to_string();
+    assert!(error.contains("build runtime"), "{error}");
+    let failed = tracker.take();
+    assert_eq!(
+        package_event_texts(&failed, &package),
+        Some(vec!["BUILD_RUNTIME_PREFIX"])
+    );
 }
 
 #[test]
