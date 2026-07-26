@@ -1229,8 +1229,13 @@ fn json_reader_next_i32(spelling: &str, domain: AdapterDomain) -> Result<i32, Lo
     if let Ok(value) = spelling.parse::<i32>() {
         return Ok(value);
     }
-    let double = java_parse_double(spelling)
-        .map_err(|_| illegal_argument_adapter_error(domain, "invalid signed 32-bit integer"))?;
+    let double = java_parse_double(spelling).map_err(|_| match domain {
+        AdapterDomain::Version => illegal_argument_adapter_error(
+            domain,
+            &format!("java.lang.NumberFormatException: For input string: \"{spelling}\""),
+        ),
+        _ => illegal_argument_adapter_error(domain, "invalid signed 32-bit integer"),
+    })?;
     let narrowed = double as i32;
     if f64::from(narrowed) != double {
         return Err(illegal_argument_adapter_error(
@@ -1239,6 +1244,61 @@ fn json_reader_next_i32(spelling: &str, domain: AdapterDomain) -> Result<i32, Lo
         ));
     }
     Ok(narrowed)
+}
+
+#[cfg(test)]
+mod host_lockfile_json_reader_next_i32_tests {
+    use super::*;
+
+    #[test]
+    fn full_reader_preserves_invalid_version_spelling_in_caught_error() {
+        let error = read_lockfile_v28(
+            br#"{"decoy":{"lockFileVersion":28},"lockFileVersion":"<<<<<<<"}"#,
+            UnsupportedVersionPolicy::ReturnEmpty,
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.surface(),
+            LockfileParseErrorSurface::CaughtIllegalArgument
+        );
+        assert!(matches!(
+            error.kind(),
+            LockfileParseErrorKind::InvalidAdapterValue {
+                domain: AdapterDomain::Version,
+            }
+        ));
+        assert_eq!(error.position(), None);
+        assert_eq!(
+            error.message(),
+            "java.lang.NumberFormatException: For input string: \"<<<<<<<\""
+        );
+        assert_eq!(
+            error.to_string(),
+            "java.lang.NumberFormatException: For input string: \"<<<<<<<\""
+        );
+    }
+
+    #[test]
+    fn full_reader_preserves_generic_non_version_integer_error() {
+        let error = read_lockfile_v28(
+            br#"{"lockFileVersion":28,"factsVersions":{"//:ext.bzl%x":"ordinary"}}"#,
+            UnsupportedVersionPolicy::ReturnEmpty,
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.surface(),
+            LockfileParseErrorSurface::CaughtIllegalArgument
+        );
+        assert!(matches!(
+            error.kind(),
+            LockfileParseErrorKind::InvalidAdapterValue {
+                domain: AdapterDomain::Facts,
+            }
+        ));
+        assert_eq!(error.position(), None);
+        assert_eq!(error.message(), "invalid signed 32-bit integer");
+        assert_eq!(error.to_string(), "invalid signed 32-bit integer");
+    }
 }
 
 fn java_parse_double(spelling: &str) -> Result<f64, ()> {

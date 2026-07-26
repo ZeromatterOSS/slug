@@ -20,6 +20,7 @@ use crate::BzlmodHiddenLockfileDigest;
 use crate::BzlmodVisibleLockfileDigest;
 use crate::ModuleKey;
 use crate::dice::LockfileMode;
+use crate::host_lockfile::HostVisibleLockfileError;
 pub use crate::lockfile_v28::AdapterDomain;
 pub use crate::lockfile_v28::BazelLockfile;
 use crate::lockfile_v28::LOCK_FILE_VERSION_28;
@@ -246,6 +247,48 @@ pub(crate) fn parse_visible_lockfile_bytes_for_mode(
             Err(bad_visible_lockfile_message(error))
         }
         Err(error) => Err(error.to_string()),
+    }
+}
+
+pub(crate) fn parse_visible_lockfile_bytes_for_host(
+    mode: &LockfileMode,
+    existing_content: Option<&[u8]>,
+) -> Result<Arc<BazelLockfile>, HostVisibleLockfileError> {
+    let Some(existing_content) = existing_content else {
+        return Ok(Arc::new(empty_bazel_lockfile()));
+    };
+    let policy = if matches!(mode, LockfileMode::Error) {
+        UnsupportedVersionPolicy::Error
+    } else {
+        UnsupportedVersionPolicy::ReturnEmpty
+    };
+    match read_lockfile_v28(existing_content, policy) {
+        Ok(LockfileReadOutcome::Empty) => Ok(Arc::new(empty_bazel_lockfile())),
+        Ok(LockfileReadOutcome::Parsed(lockfile)) => Ok(Arc::new(lockfile)),
+        Err(error)
+            if error.surface() == LockfileParseErrorSurface::UnsupportedVersion
+                || is_caught_parse_surface(error.surface()) =>
+        {
+            let message = if error.surface() == LockfileParseErrorSurface::UnsupportedVersion {
+                unsupported_lockfile_version_message().into()
+            } else {
+                let error_message = error.to_string();
+                let suffix = if ["<<<<<<<", "=======", "|||||||", ">>>>>>>"]
+                    .iter()
+                    .any(|marker| error_message.contains(marker))
+                {
+                    " This looks like a merge conflict. See https://bazel.build/external/lockfile#merge-conflicts for advice."
+                } else {
+                    " Try deleting it and rerun the build."
+                };
+                format!(
+                    "Failed to read and parse the MODULE.bazel.lock file with error: {error_message}.{suffix}"
+                )
+                .into()
+            };
+            Err(HostVisibleLockfileError::BadLockfile { message })
+        }
+        Err(error) => Err(HostVisibleLockfileError::UncaughtParse { error }),
     }
 }
 

@@ -11,6 +11,7 @@
 pub mod dice;
 mod host_file;
 mod host_include;
+mod host_lockfile;
 mod host_module;
 mod host_package;
 pub mod interim_module;

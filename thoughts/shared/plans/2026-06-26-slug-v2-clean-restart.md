@@ -43,32 +43,24 @@ implementation/evidence, and orchestration reviews returned `ACCEPT`. No
 failed draft, registry scaffold, network claim, harness, Rust, Cargo,
 production edge, or activation is retained.
 
-The first three-file Host owner attempt reached six passing focused tests and
-one exact failing merge-diagnostic regression. The sole v28 reader discards
-the offending `<<<<<<<` integer spelling before the Host wrapper receives its
-typed caught error, so exact Bazel message-only merge classification is
-impossible inside the accepted allowlist. Both terminal source/parity and
-architecture/orchestration reviews returned `REPLAN`; raw-byte rescanning was
-rejected because an unrelated marker would be a false positive.
-
-The merge-message correction design is accepted. It adds only
-`lockfile_v28.rs` to the prior owner allowlist and permits one Version-domain
-failed-conversion message correction plus an inline full-reader regression.
-The exact class-prefixed Gson message, unchanged typed error metadata,
-ignored-marker negative discriminator, non-Version byte-for-byte behavior,
-and implementation-to-registry handoff all passed terminal review.
+The corrected private Host visible-lockfile owner is accepted in exactly four
+Rust files. It preserves Bazel's exact Version-domain Gson error text while
+leaving non-Version behavior unchanged, acquires file observations before
+mode, retains the complete semantic v28 value, and keeps direct parse holes
+typed. Focused 9, complete bzlmod 370, zero doctests, and all 12 GNU-Windows
+test executables passed with format, archive, diff, privacy, dependency, and
+scope gates. All three terminal latest-diff reviews returned `ACCEPT`; no
+registry consumer or activation is present.
 
 ### Current packet
 
-Implement only
-`WP-5-m1-host-visible-lockfile-owner-merge-message-correction`.
+Run only `WP-5-m1-host-registry-function-boundary-design`.
 
-Use the exact four-file contract in the owning subplan. In the sole v28
-reader, change only the failed Version-domain `java_parse_double` message and
-add its inline full-entry regression; preserve all non-Version messages and
-numeric behavior. Complete the held private Host owner tests, including exact
-merge/delete diagnostics and ignored-marker discrimination. Do not edit
-fixtures, Cargo, `lockfile_v28_tests.rs`, consumers, or activation.
+This packet is design only: do not edit Rust or fixtures and do not run Cargo.
+Freeze root-before-registry composition, unconditional acquisition of the
+accepted Host visible-lockfile value, existing registry policy/IO reuse,
+recorded-hash and selected-yanked consumption, error ownership, and the final
+private handoff. Preserve the dormant owner and every activation gate.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

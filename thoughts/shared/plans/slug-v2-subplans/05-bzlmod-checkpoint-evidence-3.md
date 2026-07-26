@@ -5860,6 +5860,45 @@ Next evidence: Implement only
 `WP-5-m1-host-visible-lockfile-owner-merge-message-correction` under the exact
 four-file contract above.
 
+##### Corrected Host visible-lockfile owner implementation status
+
+**Status:** Accepted after terminal latest-diff review on 2026-07-26.
+
+Exactly four Rust files now own the dormant private Host visible-lockfile
+boundary. `HostVisibleLockfileKey` computes `HostFileBytesKey` first, returns
+every path Need without a mode edge, and requests
+`RootModuleLockfileModeKey` before interpreting every Complete file outcome.
+Missing, file failure, mode-input failure, unsupported/caught parse failure,
+and the two direct parse holes remain distinct Complete results. The retained
+value is only an `Arc<BazelLockfile>` behind the containing result Arc, and
+complete-only equality/validity uses the sole six-field semantic value.
+
+The Host parser calls `read_lockfile_v28` directly. Off, Update, and Refresh
+return empty for noncurrent input; Error retains the exact unsupported
+diagnostic. Caught errors receive Bazel's exact delete or merge wrapper based
+only on the typed error message. The sole reader's failed Version-domain
+conversion now retains
+`java.lang.NumberFormatException: For input string: "<<<<<<<"` while the
+Facts/non-Version path remains exactly `invalid signed 32-bit integer`.
+Inline full-reader regressions pin both branches, unchanged surface/kind/None
+position, and exact Display text. The ignored-field marker plus ordinary bad
+Version row proves no raw-input classification.
+
+Focused Host/parser validation passed 9 tests. The complete bzlmod crate
+passed 370 tests: 186 unit tests and all eleven integration suites; doctests
+passed with zero tests. GNU-Windows no-run linked all 12 test executables.
+Formatting, archive status, diff checks, exact four-file scope, private-symbol
+and dependency scans, and the forbidden fixture/Cargo/repository-ignore,
+separate-test-file, public API, direct-IO, collection, consumer, registry, and
+activation gates passed.
+
+Pinned-source/parity, implementation/evidence, and
+architecture/orchestration terminal latest-diff reviews all returned
+`ACCEPT`. No fixture, Cargo, dependency, public re-export, registry
+consumption, root ordering, mapping, write state, or activation changed.
+Next evidence: Run only
+`WP-5-m1-host-registry-function-boundary-design`; it is design only.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
