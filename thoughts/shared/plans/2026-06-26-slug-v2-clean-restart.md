@@ -43,28 +43,27 @@ implementation/evidence, and orchestration reviews returned `ACCEPT`. No
 failed draft, registry scaffold, network claim, harness, Rust, Cargo,
 production edge, or activation is retained.
 
-The corrected Host RegistryFunction boundary design is accepted. The private
-construction key is root-free and ordered exactly as Bazel 9.2; later
-composition owns root first, override/list choice, all-registry construction,
-and sequential fetch. The design freezes unconditional full visible-lockfile
-consumption, raw mirror identity, a dedicated Refresh invalidation token, the
-exact HTTP(S)/file hash table, selected-yanked and vendor behavior, sticky
-local RegistryIo reuse, complete-only selective equality, and an oracle-first
-serial owner sequence. All three terminal latest-text reviews returned
-`ACCEPT`; no Rust, fixture, Cargo, IO behavior, consumer, or activation
-changed.
+The focused Host RegistryFunction oracle design is accepted. It changes only
+the metadata and expected output of two existing fixtures: three remote Off
+rows prove recorded absence, selected-yanked, and SHA consumption after a
+root recomputation discriminator; four `show_repo` rows prove ordered default,
+per-registry/later-wins, explicit-empty, and exit-2 unknown-registry mirror
+semantics without archive download. The exact packet is four paths, seven
+rows, zero new files or links, and at most 1,800 combined lines. Vendor reads,
+actual mirror fallback, and hourly Refresh turnover remain explicit later
+gates. All three terminal latest-text reviews returned `ACCEPT`; no fixture,
+Rust, Cargo, dependency, API, consumer, or activation changed during design.
 
 ### Current packet
 
-Run only `WP-5-m1-host-registry-function-oracle-design`.
+Implement only `WP-5-m1-host-registry-function-oracle`.
 
-This packet is design only: do not edit Rust or fixtures and do not run Cargo.
-Reuse the accepted registry-yanked/transport scaffolds where bounded and
-freeze the smallest discriminating rows for remote Off recorded
-absence/SHA/yanked reuse, Refresh invalidation, module-mirror precedence and
-invalid mappings, and exact registry-vendor hit, fatal read with no network
-fallback, and non-vendored/checksum-absent network request behavior. Preserve
-every implementation and activation gate.
+Edit exactly the two accepted fixture TOML files and their generated expected
+JSON files. Add the frozen three Off and four `show_repo` rows, run one pinned
+Bazel 9.2 generation and two distinct fresh-root replays for each fixture,
+then enforce the exact row, request, mutation/restoration, URL-order,
+provenance, metadata, four-path, 29-file/zero-link, 1,800-line, archive, diff,
+and credential gates. Do not edit Rust or Cargo.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

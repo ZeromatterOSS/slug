@@ -6552,3 +6552,199 @@ consumer, or activation changed.
 
 Next evidence: Run only
 `WP-5-m1-host-registry-function-oracle-design`; it is design only.
+
+### Stage 5 Host RegistryFunction oracle design
+
+`WP-5-m1-host-registry-function-oracle-design` reuses exactly two accepted
+fixtures and changes only these four paths:
+
+- `tests/v2_oracle/fixtures/registry-yanked-lockfile-mode/fixture.toml`;
+- `tests/v2_oracle/fixtures/registry-yanked-lockfile-mode/expected/oracle.json`;
+- `tests/v2_oracle/fixtures/registry-command-transport/fixture.toml`; and
+- `tests/v2_oracle/fixtures/registry-command-transport/expected/oracle.json`.
+
+Add no fixture, server, workspace file, archive, generator, harness behavior,
+or mutable external asset. Keep both existing HTTP servers and every existing
+workspace byte unchanged. The final combined inventory remains exactly 29
+regular files and zero symlinks. The current two-fixture inventory is 1,152
+newline-counted lines; cap the final combined inventory at 1,800 lines, for
+net growth of at most 648 lines. Update each touched fixture's existing
+description, `oracle_notes`, and `translation_notes` in place to name the new
+Off or `show_repo` evidence; retain every still-accurate existing claim.
+
+#### Remote Off lockfile consumption
+
+Insert exactly three rows into `registry-yanked-lockfile-mode` after its
+Update priming/replay rows and before its accepted Refresh row. Preserve the
+two existing registry arguments and BCR embedded-closure fallback.
+
+1. `off_replays_recorded_absence` changes the root module version from
+   `0.1.0` to `0.1.1`, uses `--lockfile_mode=off`, and allows
+   `yyy@1.0.0`. The root semantic mutation must force nonroot discovery;
+   without it, a zero-request result could be stale same-daemon
+   `ModuleFileValue` reuse rather than Off lockfile evidence. Expect exit 0,
+   `olddep@1.0.0`, and no `newdep@1.0.0`. Relative to the preceding
+   cumulative request manifest,
+   `/first/modules/aaa/1.0.0/MODULE.bazel` and
+   `/first/modules/yyy/metadata.json` do not increase, while
+   `/second/modules/aaa/1.0.0/MODULE.bazel` increases by one. Generate and
+   retain the complete cumulative manifest; only these discriminating deltas
+   are contractual because sibling module reads may be batched.
+2. `off_reuses_selected_yanked_reason_a` keeps Off but removes the allow
+   flag. Expect exit 37 and the exact accepted yanked diagnostic for
+   `yyy@1.0.0` with `reason-a`; exclude `reason-b`. No HTTP counter increases,
+   especially `/first/modules/yyy/metadata.json`.
+3. `off_enforces_recorded_sha_before_yanked` restores the allow flag and
+   changes the generated lockfile's unique yyy MODULE digest
+   `9114f034663d930400ebc5993990181e4a83dc5f4d5e0c80f8b7b570ebe86969`
+   to 64 zeroes. Expect exit 37 with the first-registry yyy MODULE URL and
+   exact checksum order: actual `9114...6969`, wanted 64 zeroes. Exclude every
+   yanked diagnostic. Only
+   `/first/modules/yyy/1.0.0/MODULE.bazel` increases by one and yyy metadata
+   does not increase.
+
+Before the existing Refresh row executes, add mutations that restore both the
+root version `0.1.1` to `0.1.0` and the zero digest to
+`9114...6969`. Preserve its existing Refresh assertions and the final Error
+checksum-before-yanked row. The complete nine-row cumulative request and
+lockfile manifests must replay exactly. These rows distinguish Bazel's
+HTTP(S) Off=`USE_AND_UPDATE` behavior from the live legacy Slug
+FetchUnrecorded shortcut: Off consumes recorded absence, selected-yanked
+state, and recorded SHA from the visible lockfile.
+
+#### Command mirror value and RepoSpec projection
+
+Insert exactly four rows into `registry-command-transport` after
+`workspace_file_registry` and before its existing invalid-primary-URL rows.
+Each row runs this base command; the first three add their successful mirror
+flags and the fourth adds the unknown-registry entry:
+
+```text
+mod show_repo @@yyy+
+--lockfile_mode=off
+--registry={{http_registry}}/b
+--registry=https://bcr.bazel.build
+```
+
+The existing b/yyy `source.json` supplies the immutable original URL
+`https://example.invalid/yyy-1.0.0.tar.gz`; no archive is fetched.
+
+1. `show_repo_default_module_mirrors` supplies exactly
+   `--module_mirrors=https://default-one.example/mirror,https://default-two.example/mirror`.
+   Expect exit 0 and the exact `urls` projection, in order:
+   `https://default-one.example/mirror/example.invalid/yyy-1.0.0.tar.gz`,
+   `https://default-two.example/mirror/example.invalid/yyy-1.0.0.tar.gz`,
+   then the original URL.
+2. `show_repo_per_registry_last_wins` supplies one default, then an older
+   explicit b-registry entry, then a later explicit b-registry entry
+   containing ordered `specific-one` and `specific-two` mirror bases. Expect
+   exit 0 and exactly those two transformed specific URLs followed by the
+   original URL. Exclude the default and older explicit mirror. This single
+   row proves per-registry override, later-duplicate wins, and retained
+   selected-list order. The three flags are exactly
+   `--module_mirrors=https://default.example/mirror`,
+   `--module_mirrors={{http_registry}}/b=https://stale.example/mirror`, and
+   `--module_mirrors={{http_registry}}/b=https://specific-one.example/mirror,https://specific-two.example/mirror`.
+3. `show_repo_explicit_empty_registry_override` supplies a nonempty default
+   through `--module_mirrors=https://default.example/mirror` and then an
+   explicit `--module_mirrors={{http_registry}}/b=` entry. Expect exit 0 and
+   a `urls` projection containing only the original source URL; exclude the
+   default mirror.
+4. `module_mirrors_unknown_registry` supplies a mirror entry for
+   `https://unknown.example`, which is absent from `--registry`, through
+   `--module_mirrors=https://unknown.example=https://mirror.example`. Expect
+   exact exit 2 and
+   `--module_mirrors references registries not listed in --registries:
+   https://unknown.example`. The cumulative HTTP manifest is unchanged. This
+   is command-input rejection evidence, not RegistryFunction execution.
+
+Assert the complete ordered `urls` list, not unordered substring presence.
+Retain exact normalized request-count manifests. These rows prove command
+mirror selection and the later RepoSpec URL projection without claiming an
+archive download, mirror request, fallback, RegistryFunction internal edge
+order, or vendor behavior.
+
+Add `RegistryFunction.java` to the yanked fixture's retained source anchors.
+Add exactly these mirror-specific anchors to the transport fixture while
+retaining its current anchors:
+
+- `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java`;
+- `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/modcommand/RepoOutputFormatter.java`;
+- `src/main/protobuf/failure_details.proto`.
+
+They source the command-mirror-first transformed URL list, the exact
+`show_repo` projection, and
+`FailureDetails.ExternalRepository.UNKNOWN_REGISTRY` exit 2 respectively.
+
+#### Deferred evidence and validation
+
+The hard-coded one-hour `RegistryFunction.LAST_INVALIDATION` turnover has no
+bounded command-oracle hook. Keep it pinned-source evidence and require
+focused retained-DICE token A→B→A evidence in the later private invalidation
+owner; the accepted Update→Refresh row proves Refresh refetch policy, not
+hourly token turnover.
+
+Vendor is consumed only during later registry-file reads, not
+RegistryFunction construction. Before any Host registry-file or IO-bridge
+Rust, design and accept
+`WP-5-m1-host-registry-file-vendor-oracle` for checksum-present vendored hit
+with no network request, fatal vendored-read failure with no network
+fallback, non-vendored or missing/wrong-kind vendor path network fallback,
+and checksum-absent network behavior. Before source URL/download activation,
+separately design and accept
+`WP-5-m1-host-module-mirror-fetch-oracle` for actual command-mirror,
+registry-mirror, original, and `source.json` backup request/fallback order.
+`show_repo` does not satisfy that gate.
+
+Run one pinned Bazel 9.2 generation for each fixture and two distinct
+fresh-root replays of each final generated fixture. Validate exact row names,
+order, arguments, exits, positive and negative output/message assertions,
+root/digest mutations and restoration, ordered `urls`, complete cumulative
+request/lockfile manifests, pinned source anchors, schema, normalization,
+four-path scope, unchanged server/workspace bytes, final 29-file/zero-link
+inventory, final line count and delta, archive status, diff checks, and
+credential scans.
+
+At fixture-growth checkpoint `df812c2c` / accepted baseline tree `c039c347`,
+the repository held 1,284 regular files, 14 links, and 33,789 lines. Before
+this packet it holds 1,297 regular files, 14 links, and 35,600 lines:
++13 files and +1,811 lines across accepted oracle packets `eb8c2d23` and
+`d20f6557`. This is oracle packet three after that checkpoint and at the cap
+remains no more than +13 files/+2,459 lines, so neither five packets nor the
+approximately 100-file/10,000-line threshold fires. Record the measured final
+delta after generation. If the later module-mirror-fetch oracle would be the
+fifth accepted oracle, run the required focused fixture-growth review before
+any sixth oracle packet.
+
+Stop on a fifth changed path, server/workspace/harness edit, new file or
+symlink, more than seven new rows, more than 1,800 combined lines, a missing
+root recomputation discriminator or digest/root restoration, a different
+exit/message/order/request delta, an archive request/download to any command
+mirror, registry metadata mirror, original source URL, or `source.json`
+backup in a `show_repo` row, sleep/clock manipulation, external mutable state,
+vendor or hourly-token claim, Rust/Cargo/dependency/API edit, or any
+implementation, consumer, or activation change.
+
+#### Host RegistryFunction oracle design status
+
+**Status:** Accepted after terminal latest-text review on 2026-07-26.
+
+The exact four-path packet adds three discriminating Off rows to the existing
+remote lockfile/yanked fixture and four `show_repo` mirror rows to the existing
+registry transport fixture. A root-version mutation prevents warm-cache false
+evidence; exact absence, selected-yanked, SHA, request-delta, restoration,
+mirror URL order, per-registry/later-wins/empty, and exit-2 unknown-registry
+assertions are frozen. Both fixture metadata blocks and exact pinned source
+anchors remain inside the same four files.
+
+The final inventory stays 29 regular files and zero links with a combined
+1,800-line cap, net at most +648. This is oracle packet three after
+`df812c2c`; no growth checkpoint is due. Vendor file reads, actual mirror
+downloads/fallback, and hourly Refresh turnover retain explicit later oracle
+or focused-DICE gates. Pinned-source/parity, native-implementability, and
+architecture/orchestration terminal latest-text reviews all returned
+`ACCEPT`. No fixture, expected output, Rust, Cargo, dependency, API, consumer,
+or activation changed during design.
+
+Next evidence: Implement only
+`WP-5-m1-host-registry-function-oracle` in the exact four paths above.
