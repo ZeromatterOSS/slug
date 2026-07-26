@@ -20,6 +20,7 @@ use allocative::Allocative;
 use allocative::Key as AllocativeKey;
 use allocative::Visitor;
 use async_trait::async_trait;
+use dice::Demand;
 use dice::DiceComputations;
 use dice::InjectedKey;
 use dice::Key;
@@ -762,6 +763,10 @@ impl Key for PathObservationKey {
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
     }
+
+    fn provide<'a>(&'a self, demand: &mut Demand<'a>) {
+        demand.provide_value_with(|| self.demand.dupe());
+    }
 }
 
 #[cfg(test)]
@@ -773,6 +778,7 @@ mod tests {
 
     use dice::DetectCycles;
     use dice::Dice;
+    use dice::DynKey;
     use dice::InjectedKey;
     use dice::Key;
     use dupe::Dupe;
@@ -902,6 +908,18 @@ mod tests {
         assert_ne!(host, materialized);
         assert_ne!(host, other_path);
         assert_ne!(host, other_operation);
+    }
+
+    #[test]
+    fn path_observation_key_provides_exact_demand_through_dyn_key() {
+        let expected = demand(
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(7)),
+            "/generation/repository/MODULE.bazel",
+            PathObservationOperation::FileBytes,
+        );
+        let key = DynKey::from_key(PathObservationKey::new(expected.dupe()));
+
+        assert_eq!(key.request_value::<PathObservationDemand>(), Some(expected));
     }
 
     #[test]

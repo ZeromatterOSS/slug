@@ -1786,3 +1786,39 @@ Next evidence: Implement only `WP-5-m1-demand-key-metadata` in
 regressions first, then the three `Key::provide` descriptors. Stop on any
 compute/value/equality, evaluation-data, runtime, Cargo, command, fixture,
 oracle, or DICE-core change.
+
+### Stage 5 demand-key metadata
+
+Status: Accepted
+
+The exact two-file packet adds three immutable `Key::provide` descriptors:
+`PathObservationKey` supplies its exact path demand, the private materialization
+result key supplies its exact shared full request, and
+`RepositorySourceFileKey` supplies a normalized workspace/module scope that
+deliberately excludes the source-relative path. Invalid relative workspaces
+supply no scope. All producers use lazy `provide_value_with`, so unrelated
+tracker probes neither clone nor normalize payloads.
+
+Direct erased-key regressions prove exact materialization-instance path
+identity, shared request identity, lexical workspace normalization, equal scope
+across different source files, distinct workspace/module scope, and invalid
+relative omission. No compute, value, equality, validity, evaluation-data, or
+DICE-core behavior changed.
+
+Validation passed `slug_workspace_v2` 30 tests, `slug_bzlmod_v2` 233 tests,
+focused producer reruns, GNU-Windows `slug_bzlmod_v2` compilation, formatting,
+diff/allowlist/forbidden-boundary checks, and archive guards. Independent
+DICE/source and architecture/hot-path reviews corrected eager payload
+construction to lazy providers; both latest-diff rereviews returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-workspace-demand-provenance-bootstrap` in new
+`app/slug_core_v2/src/runtime/demands.rs` plus
+`app/slug_core_v2/src/runtime/mod.rs`,
+`app/slug_core_v2/src/runtime/events.rs`, and
+`app/slug_core_v2/src/runtime/dice.rs`. Add the sparse workspace owner,
+single passive/eventful tracker, centralized production user-data factory,
+one exact-closure demand selector/shared closure-read seam, and retained-engine
+evidence. Stop on native I/O, epochs, retry, accept/discard, current-command
+event capture, publication, public command/server APIs, Cargo, DICE-core, or
+extra-file edits.

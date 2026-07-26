@@ -18,6 +18,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use async_trait::async_trait;
 use compact_str::CompactString;
+use dice::Demand;
 use dice::DiceComputations;
 use dice::DiceDataBuilder;
 use dice::InjectedKey;
@@ -436,6 +437,12 @@ impl fmt::Display for RepositoryMaterializationKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "repository-materialization:{}", self.module_name)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RepositorySourceScope {
+    pub workspace: NormalizedAbsolutePath,
+    pub module_name: CompactString,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -882,6 +889,10 @@ impl Key for RepositoryMaterializationResultKey {
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
     }
+
+    fn provide<'a>(&'a self, demand: &mut Demand<'a>) {
+        demand.provide_value_with(|| self.request.dupe());
+    }
 }
 
 #[async_trait]
@@ -1137,6 +1148,16 @@ impl Key for RepositorySourceFileKey {
 
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
+    }
+
+    fn provide<'a>(&'a self, demand: &mut Demand<'a>) {
+        if self.workspace.is_absolute() {
+            demand.provide_value_with(|| RepositorySourceScope {
+                workspace: NormalizedAbsolutePath::new(self.workspace.clone())
+                    .expect("an absolute repository-source workspace normalizes"),
+                module_name: self.module_name.clone(),
+            });
+        }
     }
 }
 
@@ -1526,6 +1547,8 @@ pub fn source_identity(bytes: &[u8]) -> Arc<str> {
 mod tests {
     use std::collections::hash_map::DefaultHasher;
 
+    use dice::DynKey;
+
     use super::*;
 
     fn immutable(root: &str, instance: u64) -> RepositoryMaterialization {
@@ -1557,6 +1580,86 @@ mod tests {
             &SourcePreparationOutcome::Complete(left),
             &SourcePreparationOutcome::Complete(right),
         ));
+    }
+
+    #[test]
+    fn materialization_result_key_provides_exact_request_through_dyn_key() {
+        let request = Arc::new(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: RepoSpec {
+                rule_id: crate::RepoRuleId {
+                    bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "http_archive".into(),
+                },
+                attributes: Arc::default(),
+            },
+            kind: RepositoryMaterializationKind::Immutable,
+        });
+        let key = DynKey::from_key(RepositoryMaterializationResultKey {
+            request: request.dupe(),
+        });
+
+        let provided = key
+            .request_value::<Arc<RepositoryMaterializationRequest>>()
+            .expect("result key must provide its complete materialization request");
+        assert!(Arc::ptr_eq(&provided, &request));
+    }
+
+    #[test]
+    fn repository_source_file_key_provides_workspace_module_scope_through_dyn_key() {
+        let first = DynKey::from_key(RepositorySourceFileKey {
+            workspace: PathBuf::from("/workspace/./source/.."),
+            module_name: "dep".into(),
+            repo_relative_path: PathBuf::from("MODULE.bazel"),
+        });
+        let second = DynKey::from_key(RepositorySourceFileKey {
+            workspace: PathBuf::from("/workspace"),
+            module_name: "dep".into(),
+            repo_relative_path: PathBuf::from("nested/BUILD.bazel"),
+        });
+        let invalid = DynKey::from_key(RepositorySourceFileKey {
+            workspace: PathBuf::from("relative/workspace"),
+            module_name: "dep".into(),
+            repo_relative_path: PathBuf::from("MODULE.bazel"),
+        });
+        let different_module = DynKey::from_key(RepositorySourceFileKey {
+            workspace: PathBuf::from("/workspace"),
+            module_name: "other".into(),
+            repo_relative_path: PathBuf::from("MODULE.bazel"),
+        });
+        let different_workspace = DynKey::from_key(RepositorySourceFileKey {
+            workspace: PathBuf::from("/other-workspace"),
+            module_name: "dep".into(),
+            repo_relative_path: PathBuf::from("MODULE.bazel"),
+        });
+        let expected = RepositorySourceScope {
+            workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            module_name: "dep".into(),
+        };
+
+        assert_eq!(
+            first.request_value::<RepositorySourceScope>(),
+            Some(expected.clone())
+        );
+        assert_eq!(
+            second.request_value::<RepositorySourceScope>(),
+            Some(expected)
+        );
+        assert_eq!(invalid.request_value::<RepositorySourceScope>(), None);
+        assert_ne!(
+            different_module.request_value::<RepositorySourceScope>(),
+            second.request_value::<RepositorySourceScope>()
+        );
+        assert_ne!(
+            different_workspace.request_value::<RepositorySourceScope>(),
+            second.request_value::<RepositorySourceScope>()
+        );
     }
 
     #[test]
