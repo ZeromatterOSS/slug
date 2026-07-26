@@ -4162,6 +4162,36 @@ fixture, Cargo, dependency, public API, consumer, or activation changed.
 Next evidence: Implement only
 `WP-5-m1-host-root-module-file-owner-corrected-retry`.
 
+##### Corrected root-module-file implementation status
+
+**Status:** Accepted on 2026-07-26.
+
+The exact three-file implementation adds one private
+`HostRootModuleFileKey` and value owning only evaluated root semantics,
+compact overrides, and sorted/deduplicated canonical relative module-file
+paths. It composes the accepted Host byte and package owners breadth-first,
+keeps every include occurrence for compile validation, nested discovery, and
+inline execution, and stores only marker-conditional root batches on terminal
+results. A test-only validation observer directly proves root-once, repeated
+shared-path occurrence, and next-horizon occurrence ordering without changing
+production identity or state.
+
+Focused Host tests passed 10/10. Full `slug_bzlmod_v2` passed 79 unit plus 214
+integration tests, `slug_loading_v2` passed 54, and `slug_core_v2` passed 102
+unit plus 13 integration tests; all doctest sets were empty and all 20
+GNU-Windows test executables linked. Privacy, forbidden-dependency, exact-scope,
+format, and diff checks passed. Exact Bazel-source, implementation/evidence,
+and architecture/DICE terminal latest-diff reviews all returned `ACCEPT`
+against Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+Next evidence: Design only
+`WP-5-m1-host-visible-lockfile-boundary-design`, before any Host registry key.
+The design must keep parsed/empty lockfile ownership distinct from consumer
+hash use, preserve the registry request even in Off mode, and cite
+`BazelLockFileFunction` plus `RegistryFunction`; no Rust or Cargo change is in
+scope.
+
 #### Later packet 9 gate: bootstrap activation and Host switch
 
 After packet 8, design only

@@ -34,6 +34,7 @@ use slug_workspace_v2::WorkspaceFileValue;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
 use starlark::codemap::Span;
+use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::LibraryExtension;
 use starlark::environment::Module;
@@ -147,6 +148,13 @@ pub fn inspect_nonroot_module_file(
     logical_id: LogicalModuleFileId,
     source: &[u8],
 ) -> anyhow::Result<NonrootModuleFileInspection> {
+    parse_and_inspect_nonroot_module_file(logical_id, source).map(|(_, inspection)| inspection)
+}
+
+fn parse_and_inspect_nonroot_module_file(
+    logical_id: LogicalModuleFileId,
+    source: &[u8],
+) -> anyhow::Result<(AstModule, NonrootModuleFileInspection)> {
     let source = std::str::from_utf8(source).context("MODULE file is not valid UTF-8")?;
     let dialect = nonroot_module_dialect();
     let ast = AstModule::parse(logical_id.0.as_str(), source.to_owned(), &dialect)
@@ -162,10 +170,13 @@ pub fn inspect_nonroot_module_file(
         &mut includes,
     )?;
 
-    Ok(NonrootModuleFileInspection {
-        logical_id,
-        includes: Arc::from(includes),
-    })
+    Ok((
+        ast,
+        NonrootModuleFileInspection {
+            logical_id,
+            includes: Arc::from(includes),
+        },
+    ))
 }
 
 fn nonroot_module_dialect() -> Dialect {
@@ -865,10 +876,10 @@ pub struct EvaluatedRootModule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct RootModuleEvaluation {
-    module: EvaluatedRootModule,
-    module_file_paths: Arc<[PathBuf]>,
-    overrides: RootModuleOverrides,
+pub(crate) struct RootModuleEvaluation {
+    pub(crate) module: EvaluatedRootModule,
+    pub(crate) module_file_paths: Arc<[PathBuf]>,
+    pub(crate) overrides: RootModuleOverrides,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1064,10 +1075,32 @@ impl ProjectionKey for RootModuleIgnoreDevDependencyProjectionKey {
     }
 }
 
-struct RootModuleSourceFile {
-    path: PathBuf,
-    source: Arc<String>,
-    _inspection: NonrootModuleFileInspection,
+pub(crate) async fn root_module_ignore_dev_dependency(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+) -> Result<bool, CompactString> {
+    let policy = ctx
+        .compute_opaque(&RootModuleCommandPolicyKey {
+            workspace: workspace.to_path_buf(),
+        })
+        .await
+        .map_err(|error| {
+            CompactString::new(format!(
+                "missing injected root module command policy: {error}"
+            ))
+        })?;
+    ctx.projection(&policy, &RootModuleIgnoreDevDependencyProjectionKey)
+        .map_err(|error| {
+            CompactString::new(format!(
+                "missing injected root module command policy: {error}"
+            ))
+        })
+}
+
+pub(crate) struct RootModuleSourceFile {
+    pub(crate) path: PathBuf,
+    pub(crate) source: Arc<String>,
+    pub(crate) _inspection: NonrootModuleFileInspection,
 }
 
 #[derive(Default)]
@@ -1113,23 +1146,8 @@ impl Key for RootModuleEvaluationKey {
             .is_ok();
         let mut event_batch = None;
         let value = async {
-            let policy = ctx
-                .compute_opaque(&RootModuleCommandPolicyKey {
-                    workspace: self.workspace.clone(),
-                })
-                .await
-                .map_err(|error| {
-                    CompactString::new(format!(
-                        "missing injected root module command policy: {error}"
-                    ))
-                })?;
-            let ignore_dev_dependency = ctx
-                .projection(&policy, &RootModuleIgnoreDevDependencyProjectionKey)
-                .map_err(|error| {
-                    CompactString::new(format!(
-                        "missing injected root module command policy: {error}"
-                    ))
-                })?;
+            let ignore_dev_dependency =
+                root_module_ignore_dev_dependency(ctx, &self.workspace).await?;
 
             let root_path = self.workspace.join("MODULE.bazel");
             let root_source = read_root_module_source(ctx, &self.workspace, &root_path).await?;
@@ -1179,15 +1197,14 @@ impl Key for RootModuleEvaluationKey {
             module_file_paths.sort();
             module_file_paths.dedup();
 
-            let print_capture = capture_events.then(RootModulePrintCapture::default);
-            let value = evaluate_root_module_closure(
+            let (value, captured) = evaluate_root_module_closure_with_events(
                 ignore_dev_dependency,
                 files,
                 include_indices,
                 module_file_paths.into(),
-                print_capture.as_ref(),
+                capture_events,
             );
-            event_batch = print_capture.map(RootModulePrintCapture::into_batch);
+            event_batch = captured;
             value
         }
         .await;
@@ -3838,6 +3855,72 @@ fn module_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
+fn root_module_globals() -> Globals {
+    GlobalsBuilder::extended_by(&[LibraryExtension::Print])
+        .with(module_globals)
+        .build()
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static VALIDATED_ROOT_MODULE_LOGICAL_IDS: RefCell<Vec<LogicalModuleFileId>> =
+        const { RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+pub(crate) fn clear_validated_root_module_logical_ids() {
+    VALIDATED_ROOT_MODULE_LOGICAL_IDS.with(|logical_ids| logical_ids.borrow_mut().clear());
+}
+
+#[cfg(test)]
+pub(crate) fn take_validated_root_module_logical_ids() -> Vec<LogicalModuleFileId> {
+    VALIDATED_ROOT_MODULE_LOGICAL_IDS
+        .with(|logical_ids| std::mem::take(&mut *logical_ids.borrow_mut()))
+}
+
+/// Parse, inspect, scope-check, and compile one root MODULE file without
+/// retaining any Starlark state. Host discovery uses this before crossing the
+/// next DICE await so preparation failures cannot request a later horizon.
+pub(crate) fn validate_root_module_source(
+    logical_id: LogicalModuleFileId,
+    source: &[u8],
+) -> Result<NonrootModuleFileInspection, CompactString> {
+    #[cfg(test)]
+    VALIDATED_ROOT_MODULE_LOGICAL_IDS
+        .with(|logical_ids| logical_ids.borrow_mut().push(logical_id.clone()));
+
+    let (ast, inspection) = parse_and_inspect_nonroot_module_file(logical_id, source)
+        .map_err(|error| CompactString::new(error.to_string()))?;
+    let module = Module::new();
+    let globals = root_module_globals();
+    let mut evaluator = Evaluator::new(&module);
+    evaluator
+        .prepare_module(ast, &globals)
+        .map_err(|error| CompactString::new(error.to_string()))?;
+    Ok(inspection)
+}
+
+pub(crate) fn evaluate_root_module_closure_with_events(
+    ignore_dev_dependency: bool,
+    files: Vec<RootModuleSourceFile>,
+    include_indices: SmallMap<CompactString, usize>,
+    module_file_paths: Arc<[PathBuf]>,
+    capture_events: bool,
+) -> (
+    Result<RootModuleEvaluation, CompactString>,
+    Option<EventBatch>,
+) {
+    let print_capture = capture_events.then(RootModulePrintCapture::default);
+    let value = evaluate_root_module_closure(
+        ignore_dev_dependency,
+        files,
+        include_indices,
+        module_file_paths,
+        print_capture.as_ref(),
+    );
+    (value, print_capture.map(RootModulePrintCapture::into_batch))
+}
+
 fn evaluate_root_module_closure(
     ignore_dev_dependency: bool,
     files: Vec<RootModuleSourceFile>,
@@ -3862,9 +3945,7 @@ fn evaluate_root_module_closure(
         .skip(1)
         .map(|_| Box::new(Module::new()))
         .collect::<Vec<_>>();
-    let globals = GlobalsBuilder::extended_by(&[LibraryExtension::Print])
-        .with(module_globals)
-        .build();
+    let globals = root_module_globals();
     let programs = {
         let mut asts = asts.into_iter();
         let root_ast = asts
