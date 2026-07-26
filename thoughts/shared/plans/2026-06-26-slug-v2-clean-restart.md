@@ -31,26 +31,28 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the private Host REPO evaluator and
-repository-ignore key passed three terminal latest-diff reviews, including an
-exact Bazel 9.2.0 source audit. The three-file owner preserves exact globals,
-restricted syntax and binder diagnostics, Latin-1/UTF events, Java
-replacement decoding and native path behavior, lossless Windows 8.3 demands,
-sequential root/vendor/file ordering, semantic equality, and transient Need
-behavior. Full bzlmod/loading/core and GNU-Windows link validation passed.
+Latest M1 accepted evidence: the private Host main-package lookup key passed
+three terminal latest-diff reviews, including an exact Bazel 9.2.0 source
+audit. The two-file owner validates exact package-name failures, preserves
+canonical-main deletion and `external` precedence, completes repository
+ignore before ordered root/BUILD probes, accepts resolved regular/special
+terminals, retains only the selected package-path entry and basename in
+successful equality, and keeps every Need transient. Retained lifecycle,
+typed resolver, full bzlmod/loading/core, and GNU-Windows link validation
+passed.
 
 ### Current packet
 
 Implement only
-`WP-5-m1-host-root-package-lookup-owner`.
+`WP-5-m1-host-root-include-horizon-owner`.
 
-Implement only the accepted two-file private Host main-package lookup owner.
-Preserve canonical-main identity, deletion and reserved-`external`
-precedence, repository-ignore completion, ordered package roots,
-`BUILD.bazel` before `BUILD`, resolved regular/special/symlink terminal
-kinds, logical-path-only successful equality, typed failures, and transient
-Needs. Add no include labels/bytes, public key/reexport, loading consumer, or
-command activation.
+Implement only the accepted three-file root include-label and same-horizon
+package-preflight owner. Add the crate-private parsed include seam, validate
+repo-relative labels and fragment basenames, derive package-key identity,
+deduplicate and compute every same-level package key before any include
+bytes, union every independent Need, preserve source-order terminal failures,
+and retain selected logical read paths. Do not call `HostFileBytesKey`, add a
+public reexport/loading consumer, or activate a root command.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

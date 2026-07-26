@@ -3766,16 +3766,17 @@ Run only `WP-5-m1-host-root-package-lookup-owner`. Edit exactly:
 - `app/slug_bzlmod_v2/src/lib.rs`.
 
 `HostRootPackageLookupKey { workspace, package: PackagePath }` first
-computes packet 3's package-lookup projection, checks the canonical main
-`PackageIdentifier`, returns Deleted for configured deletion, returns
-NoBuildFile for reserved `external`, completes packet 5, and returns Deleted
-for an ignore match. It then iterates ordered package roots outside
-`BUILD.bazel` then `BUILD` priority. Each candidate uses
+computes packet 3's package-lookup projection, validates the exact Bazel
+package-name domain and retains `InvalidPackageName` plus its diagnostic,
+checks the canonical main `PackageIdentifier`, returns Deleted for configured
+deletion, returns NoBuildFile for reserved `external`, completes packet 5,
+and returns Deleted for an ignore match. It then iterates ordered package
+roots outside `BUILD.bazel` then `BUILD` priority. Each candidate uses
 `ResolvedPathKey(Host, normalized root/package/basename)`, never directory
 listing or bytes. RegularFile and SpecialFile are files; Directory and
 Missing fall through; symlinks use their resolved terminal kind.
 
-Success retains the selected normalized logical package root and
+Success retains the selected normalized package-path entry root and
 `HostBuildFileName::{BuildDotBazel, Build}`. NoBuildFile and Deleted are
 distinct. Physical resolved path, route, metadata, marker contents, and
 package-policy diagnostic match are outside successful equality.
@@ -3787,6 +3788,37 @@ pruning, symlink and special markers, deletion-before-ignore/build,
 `external`, contained vendor and both ignore sources, typed failures, and
 Need invalid/self-unequal. No public key/reexport, include label, or include
 bytes is authorized.
+
+##### Implementation status
+
+**Status:** Accepted on 2026-07-25.
+
+The exact two-file packet adds the private Host root-package lookup key. It
+computes the projected package inputs first, preserves exact package-name,
+canonical-main deletion, reserved `external`, and repository-ignore
+precedence, then probes ordered package roots with `BUILD.bazel` before
+`BUILD` through `ResolvedPathKey(Host, ...)` only. Success retains the
+selected package-path entry root and basename; resolved physical identity,
+route, and marker metadata do not enter successful equality.
+
+The Bazel 9.2.0 source audit corrected two owner-contract gaps before
+acceptance: exact invalid-character/all-dot `InvalidPackageName` values occur
+before deletion, and successful lookup retains the package-path entry rather
+than `root/package`. Tests additionally pin root-over-basename priority,
+directory fallthrough, main/nonmain deletion, both ignore sources, contained
+vendor, special and symlink terminals, all four typed resolver failures,
+transient Needs, and retained missing/create/metadata/delete/restore pruning.
+
+Validation passed 11 focused tests, 63 bzlmod unit and 214 integration tests,
+54 loading tests, 102 core unit plus 13 integration tests, and zero doctests.
+All 12 bzlmod, six loading, and two core GNU-Windows test executables linked.
+Formatting, diff, archive, exact-file, privacy, no-direct-IO, no-bytes,
+no-activation, and dependency gates passed. Three terminal latest-diff
+reviews returned `ACCEPT`, including the source audit against exact Bazel
+9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+Next evidence: Implement only
+`WP-5-m1-host-root-include-horizon-owner`.
 
 #### Serial packet 7: root include-label and horizon owner
 

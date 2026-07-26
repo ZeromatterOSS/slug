@@ -10,6 +10,7 @@
 
 pub mod dice;
 mod host_file;
+mod host_package;
 pub mod interim_module;
 pub mod lockfile;
 pub mod module_eval;
