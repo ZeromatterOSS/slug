@@ -33,19 +33,23 @@ advances the **Current packet**, not an older `next` paragraph.
 
 Latest M1 accepted evidence: the private special-file-compatible Host byte
 projection passed its full owner/downstream/cross-target gates and three
-terminal reviews. The remaining root-MODULE missing/create/warning and include
-package-validation/repository-ignore ownership gaps now gate Host root keys.
+terminal reviews. The first root-prerequisite design replanned before Rust:
+missing-root mutation/retry/warning and deleted/ignored package lookup require
+separate owners before Host root keys.
 
 ### Current packet
 
-Design only `WP-5-m1-host-root-module-parity-prerequisites-design`.
+Design only
+`WP-5-m1-root-module-effects-and-package-policy-owner-redesign`.
 
-Freeze retained Bazel 9.2 oracle rows, exact allowlists, and exact tests for
-`WP-5-m1-root-module-missing-create-warning-owner` and
-`WP-5-m1-root-include-package-validation-owner`. Require terminally accepted
-implementation commits, same-daemon create/edit/delete restoration, and zero
-owner TODOs before Host root keys may start. Do not implement Host root keys
-or activate discovery in this design packet.
+Freeze a serial, independently reviewable boundary for the outside-DICE
+missing-root bootstrap request/apply/warning seam, normalized deleted-package
+request input, full `.bazelignore`/no-load `REPO.bazel` ignore evaluator and
+matcher, and repository package lookup. Resolve how a created root replaces
+the prior Missing observation before retry and how its warning reaches only
+the terminal sidecar. Resubmit the exact Host root-key prerequisite gate; do
+not write from DICE, invent a mutation-shaped path Need, use WORKSPACE as
+retained parity evidence, or activate Host root/discovery.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

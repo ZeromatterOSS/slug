@@ -3071,3 +3071,56 @@ semantic, architecture/DICE, and implementation terminal reviewers returned
 
 Next evidence: Design only
 `WP-5-m1-host-root-module-parity-prerequisites-design`.
+
+### Stage 5 Host root-module parity prerequisites design
+
+Status: Replanned before Rust
+
+Three independent source, implementation, and architecture audits rejected the
+proposed two-owner split. No Rust, fixture, harness, Cargo, or production file
+changed.
+
+Pinned Bazel 9.2 source at
+`8220c6198837d5c13d53fea211cf3282aa12408a` proves that
+`ModuleFileFunction.computeForRootModule` writes the exact 399-byte
+`BZLMOD_REMINDER`, emits the exact missing-root warning, and evaluates those
+bytes. A confined same-server observation confirmed missing→created/warned,
+warm silence, edit preservation, delete→recreated/warned, and exact reminder
+restoration with SHA-256
+`0e3e315145ac7ee7a4e0ac825e1c5e03c068ec1254dd42c3caaecb27e921dc4d`.
+The observation required a legacy workspace marker only to enter Bazel's
+client workspace. It is diagnostic evidence, not a retained Slug fixture or
+permission to support WORKSPACE.
+
+There is no retained missing-root oracle: `empty-module-build` and
+`negative-no-workspace` are ungenerated placeholders. More importantly,
+missing-root creation is a mutating retry effect, while the frozen Host root
+value can carry only path-observation Need. The runtime has no root-file
+mutation request/result epoch, stale-Missing replacement, or warning sidecar;
+`EvaluationEvent` contains only Starlark prints. Writing from a DICE compute,
+encoding creation as a path observation, or publishing a warning during a
+speculative attempt would violate the accepted ownership model.
+
+The retained `nonroot-include-composition` rows and
+`ModuleFileFunction.advanceHorizon` do prove that every reached package lookup
+precedes include bytes and failures are reported in source order. They also
+prove `BUILD.bazel` then `BUILD` selection, resolved symlink markers,
+canonical deleted-package identity, `.bazelignore`, and `REPO.bazel`
+invalidation. Those behaviors do not form one bounded owner. Live Slug lacks
+the deleted-package request input, vendor policy, full no-load REPO evaluator,
+Bazel wildcard-prefix matcher, ignored-prefix key, and repository package
+lookup. Loading cannot be reused because it already depends on bzlmod and its
+package/glob path omits these semantics.
+
+The correction must therefore freeze a serial boundary instead of hiding the
+gaps in two implementation commits: an outside-DICE missing-root bootstrap
+request/apply/warning seam; a normalized deleted-package request owner; a
+repository-ignore evaluator/matcher owner; and a repository package-lookup
+owner. Only then may it resubmit the Host root-key gate and the later
+command-side effect integration. Preserve the private Host byte leaf and
+composed evaluator; do not copy the evaluator, read include bytes before all
+same-horizon package checks, reject Bazel-compatible special-file include
+fragments, add direct DICE IO, or activate discovery.
+
+Next evidence: Design only
+`WP-5-m1-root-module-effects-and-package-policy-owner-redesign`.
