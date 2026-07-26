@@ -3419,6 +3419,26 @@ warm-nonreplay, all three UTF-8 modes, syntax/evaluation failure order,
 change, and A→B→A event behavior. Add no direct IO,
 legacy workspace key, loading glob, Cargo dependency, or public Host key.
 
+##### Stage 5 Host REPO evaluator and ignore-key first contract
+
+**Status:** Replanned before Rust on 2026-07-25.
+
+The pinned Bazel 9.2 source audit found three material mismatches in the
+packet above, so no Rust, fixture, formatting, or Cargo command was started.
+First, `IgnoredSubdirectoriesFunction.computeIgnoredPrefixes` contributes a
+contained vendor prefix for the current visited root immediately before
+probing that root's `.bazelignore`, and the first file terminates both later
+probes and later vendor contributions; it does not add vendor prefixes for
+every configured root in advance. Second, `.bazelignore` uses
+`PathFragment.create(line)` normalization followed by native `Path.of(line)`
+validation, so its semantic prefix domain includes an empty prefix and
+surviving leading `..` components that `PackagePath` cannot represent.
+Third, `ignore_directories()` accepts Bazel's exact `Sequence<String>`
+implementations—list, tuple, and range—not only list/tuple. The correction
+must also freeze the audited REPO globals, diagnostic ordering, Latin-1
+projection, native line/path behavior, and REPO-before-roots demand order
+before the same exact three-file implementation scope is retried.
+
 #### Serial packet 6: private Host main-package lookup
 
 Run only `WP-5-m1-host-root-package-lookup-owner`. Edit exactly:
@@ -3901,5 +3921,5 @@ implementation; semantics remained unchanged. All three terminal
 source/contract, implementation/evidence, and architecture/hot-path reviews
 returned `ACCEPT`.
 
-Next evidence: Implement only
-`WP-5-m1-host-repository-ignore-owner`.
+Next evidence: Correct only
+`WP-5-m1-host-repository-ignore-owner-correction` before retrying Rust.

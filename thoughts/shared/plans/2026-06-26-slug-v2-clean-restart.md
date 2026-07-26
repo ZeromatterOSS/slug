@@ -42,18 +42,19 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-host-repository-ignore-owner`.
+`WP-5-m1-host-repository-ignore-owner-correction`.
 
-Add only the private Host REPO evaluator and repository-ignore key in new
-`app/slug_bzlmod_v2/src/repo_file.rs`, the accepted
-`repository_ignore.rs`, and `lib.rs`. Evaluate workspace-root `REPO.bazel`
-through the accepted Host byte owner with exact Bazel no-load globals,
-call-order/cardinality diagnostics, UTF-8 Off/Warning/Error behavior, and
-marker-conditional ordered event capture. Compose the result with strictly
-sequential first-file `.bazelignore` discovery, replacement UTF-8 decoding,
-ordered package roots, and only contained vendor prefixes. Preserve typed
-Host/parse/evaluation/path failures, transient Need behavior, semantic
-equality, and A→B→A replay. Add no command activation or package lookup.
+Correct only the private Host REPO evaluator and repository-ignore contract
+before retrying Rust. Pin Bazel's exact `Sequence<String>` admission,
+Latin-1 projection and restricted-syntax/call diagnostics; normalize
+`.bazelignore` lines with host `PathFragment`/native-path semantics into a
+private prefix representation that can retain empty and leading-up-level
+prefixes; and make each visited package root contribute its contained vendor
+prefix immediately before that root's `.bazelignore` probe, with the first
+file terminating both later probes and later vendor contributions. Preserve
+the exact three-file implementation scope, REPO-before-root demand order,
+typed failures, event policy, semantic equality, and no activation/package
+lookup boundary. Start no Rust until the corrected latest text is accepted.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
