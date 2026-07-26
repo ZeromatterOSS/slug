@@ -4376,6 +4376,301 @@ schema fixture, semantic types/equality/defaults/error contract, and the
 smallest parser/renderer migration allowlist before returning to the Host
 read/mode oracle. Do not edit Rust or fixtures and do not run Cargo.
 
+#### Serial packet 10: exact Bazel v28 lockfile semantic owner
+
+Run `WP-5-m1-bazel-lockfile-v28-schema-design` before returning to the Host
+visible-lockfile boundary. This is a design packet; do not edit Rust or
+fixtures and do not run Cargo.
+
+##### Pinned Bazel 9.2 read and value contract
+
+Source of truth is Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, especially
+`BazelLockFileFunction`, `BazelLockFileValue`, `GsonTypeAdapterUtil`,
+`ModuleKey`, `Version`, `ModuleExtensionId`,
+`ModuleExtensionEvalFactors`, `LockFileModuleExtension`,
+`LockfileModuleExtensionMetadata`, `Facts`, `FactsAdapter`,
+`RepoRecordedInput`, `RepoSpec`, `RepoRuleId`, and
+`AttributeValuesAdapter`.
+
+The raw visible file is decoded with Java UTF-8 replacement behavior and
+scanned before structural JSON parsing. The first textual match of
+`"lockFileVersion":\s*(\d+)` anywhere in the file is the version gate.
+Recognized 28 enters Gson; a missing or other version produces the empty
+value outside Error mode and an unsupported-version error in Error mode.
+An overflowing matched decimal is a caught bad-lockfile failure. A nested or
+unknown matching field may admit an object with no top-level version, whose
+builder default is still 28.
+
+AutoValue-Gson starts from `BazelLockFileValue.builder()`. Missing or explicit
+JSON-null top-level properties therefore retain these defaults: signed
+`lockFileVersion = 28` and empty `registryFileHashes`,
+`selectedYankedVersions`, `moduleExtensions`, `facts`, and `factsVersions`.
+Unknown fields are skipped. Duplicate properties are encounter-ordered and
+the last non-null property wins. Rendering always emits all six top-level
+fields in that order, including empty `facts` and `factsVersions`, with
+Gson's two-space pretty format, disabled HTML escaping, and one final newline.
+
+The semantic value must retain exactly:
+
+- normalized optional SHA-256 registry entries, distinguishing an absent URL
+  from recorded `"not found"` and from 32 decoded checksum bytes;
+- typed selected-yanked module keys, including `<root>`, `_`, Bazel version
+  validation, unsigned-64-bit numeric identifiers, and discarded `+build`
+  metadata;
+- typed extension IDs with canonical label, extension name, and optional
+  typed module/usage isolation key;
+- every normalized factor entry for an extension. `general` is empty
+  OS/architecture; recognized `os:` and `arch:` components are last-wins,
+  unknown components are ignored, and rendering is OS then architecture;
+- required decoded `bzlTransitiveDigest` and `usagesDigest` byte slices,
+  ordered recorded inputs, insertion-preserving generated repo specs, and
+  optional complete extension metadata;
+- recursively sorted, object-root Facts with string keys, JSON/Starlark
+  null, Boolean, arbitrary integer, finite float, string, list, and dictionary
+  values through depth seven, plus Starlark numeric equality and signed-i32
+  fact versions;
+- every FILE, DIRENTS, DIRTREE, ENV, and REPO_MAPPING recorded-input key,
+  its nullable string value and exact escape grammar, plus the single
+  normalized parse-failure sentinel;
+- nullable `RepoSpec` fields, a typed optional-label `RepoRuleId`, and a
+  distinct AttributeValues domain supporting None, Boolean, narrowed i32
+  integer, string, canonical label, sequence, and insertion-preserving
+  dictionary values. Strings that resemble labels and strings already
+  wrapped in single quotes retain the adapter's extra quote layer.
+
+Map/set equality is order-independent and list equality is ordered. Original
+JSON spelling, whitespace, unknown fields, map insertion order where Bazel
+sorts before construction, and checksum/Base64/version spellings are not
+semantic identity. Map iteration order still matters to rendering where
+Bazel preserves producer insertion order, notably generated repo specs and
+AttributeValues dictionaries. Do not use one generic JSON enum for Facts and
+AttributeValues.
+
+The retained Rust owner must use the existing compact utility family
+deliberately: `CompactString`, immutable `Arc<[T]>`, `SmallMap` for
+order-preserving iteration with order-independent equality, `SmallSet` for
+metadata sets with the same equality/iteration split, and
+`SortedMap`/`SortedSet` only where the pinned producer or recursive Facts
+normalization is actually sorted. Deep values are `Clone + Allocative`;
+`Dupe` is reserved for pointer-sized or explicitly Arc-backed owners. Add no
+interner, Starlark heap, cache, DICE edge, filesystem read, or retained
+`serde_json::Value`. Lockfile module/version/label adapters stay private to
+this abstraction and do not widen the resolution graph's current `ModuleKey`.
+Existing `CanonicalLabel`, `CanonicalRepoName`, and `NonrootAttributeInt` may
+be reused only after focused parity proves the needed adapter identity; in
+particular root-label shorthand and Bazel's unvalidated recorded repository
+names must not inherit a stricter Slug parser accidentally.
+
+The exact parser cannot delegate to the current strict
+`serde_json::Value` path. It owns a non-retained Gson-compatible token layer
+that preserves encounter order, duplicate and null behavior, lenient grammar,
+and raw arbitrary-size number spelling until typed normalization. The only
+expected dependency addition is the already-workspace `base64`; do not enable
+`serde_json` arbitrary-precision or another global feature.
+
+##### Exact adapters and exceptional values
+
+Checksums normalize valid hex to lower-case decoded SHA-256 identity.
+Module-key parsing uses `<root>` specially, otherwise the first two `@`
+components while ignoring later ones. Extension IDs similarly use percent
+components zero through two while ignoring later ones; isolation keys use
+the first two plus components while ignoring later ones. Missing delimiter
+components are not accepted values. Digests are standard Base64 byte arrays
+of arbitrary length, not fixed SHA-256 values.
+
+The first four extension properties are required:
+`bzlTransitiveDigest`, `usagesDigest`, `recordedInputs`, and
+`generatedRepoSpecs`; metadata defaults absent. Metadata distinguishes null
+dependency sets from empty sets, requires `useAllRepos` in `NO`, `REGULAR`,
+or `DEV`, and defaults missing `reproducible` to false. Empty metadata is
+omitted when absent.
+
+Recorded-input strings split at their first literal space, unescape `\0`,
+`\\`, `\n`, and `\s`, drop the backslash from other escapes, and drop a
+terminal unmatched backslash. Malformed and unknown strings all become the same
+parse-failure key with empty-string value. That sentinel is intentionally
+not renderable. Replay validation that reaches it reports stale, and forced
+reevaluation can replace that entry, but `combineModuleExtensions` may retain
+an unevaluated old extension entry. Rendering any value still containing the
+sentinel throws `UnsupportedOperationException`; the pure owner returns a
+typed non-renderable error instead of inventing source spelling.
+
+`RepoSpec` missing/null fields remain nullable. A `RepoRuleId` without `%`
+has a null label and the whole string as rule name; the first `%` otherwise
+delimits the label and all remaining percent characters belong to the name.
+Rendering a present ID with a null label follows Bazel's exceptional
+boundary rather than fabricating a label. Attribute JSON numbers use Gson's
+`getAsInt()` narrowing and are a separate domain from arbitrary Facts
+numbers.
+
+Facts parse through Bazel's Starlark JSON decoder and normalize every nested
+dictionary. Normal lockfile construction omits empty per-extension Facts and
+emits fact versions only for retained nonempty Facts and nonzero versions,
+but the schema parser retains explicit empty-Facts and zero-version map
+entries and the renderer must not silently filter them.
+
+The outer visible/hidden SkyFunction catches only `IOException`,
+`JsonSyntaxException`, `NullPointerException`, and
+`IllegalArgumentException`. Caught visible failures become persistent
+`BAD_LOCKFILE`; caught hidden failures become empty. Gson wraps adapter-read
+`IllegalStateException` as caught `JsonSyntaxException`, including
+wrong-token/null `nextString()` failures and missing required extension
+properties. Direct custom-adapter `JsonParseException` and delimiter-driven
+`IndexOutOfBoundsException` remain uncaught holes. The recorded-input
+sentinel's `UnsupportedOperationException` is a later rendering failure
+outside this read catch. Executable evidence must distinguish, at minimum,
+invalid checksum or version/extension adapter failures and missing delimiter
+components from malformed JSON, invalid Base64, invalid Facts, missing
+metadata enum, and missing required properties. Do not flatten those Bazel
+9.2 exception holes into one Slug parse error.
+
+##### Frozen serial migration
+
+1. `WP-5-m1-bazel-lockfile-v28-schema-oracle` adds exactly:
+
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/fixture.toml`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/http_registry.py`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/expected/oracle.json`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/MODULE.bazel`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/BUILD.bazel`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/ext.bzl`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/input.txt`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/input_dir/entry.txt`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/registry/bazel_registry.json`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/registry/modules/subject/1.0.0/MODULE.bazel`;
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/registry/modules/subject/1.0.0/source.json`; and
+   - `tests/v2_oracle/fixtures/bazel-lockfile-v28-schema/workspace/registry/modules/subject/metadata.json`.
+
+   It uses one self-contained extension, that fixture-local loopback registry,
+   and command-local lockfile mutations embedded in `fixture.toml`. No harness,
+   lockfile-template asset, archive, symlink, or other registry file is
+   authorized. This is the first oracle packet after accepted fixture-growth
+   checkpoint `df812c2c`.
+
+   The fixture must first make Bazel 9.2 generate and manifest a comprehensive
+   v28 value. Its retained rows then prove minimal/default/null behavior,
+   unknown fields, duplicate/first-marker anomalies, the complete extension
+   value with multiple factors, both digests, all recorded-input kinds and
+   escapes, typed repo attributes, metadata, Facts and fact versions,
+   canonical rewrite shape, one Gson-default-lenient-only accepted spelling,
+   one genuinely malformed rejection, caught failures, uncaught
+   custom-adapter holes, and forced-evaluation malformed recorded-input stale
+   replacement. Exact output assertions
+   cover field names/order, lower-case checksum, build-suffix removal,
+   canonical labels/factors, padded Base64, string/label quoting, recursively
+   sorted Facts, all six top-level fields, and final newline.
+
+   Keep pure adapter algebra in later source-derived unit rows: delimiter
+   extras/missing components, numeric/version bounds, factor collisions,
+   every escape, RepoRuleId without `%`, AttributeValues narrowing, Facts
+   depth 7/8 and numeric equality, null/empty metadata sets, normalized key
+   collisions, and explicit zero fact version. Stop and replan instead of
+   changing the harness or claiming a field that real Bazel cannot
+   generate/retain.
+
+   Generate and validate serially with:
+
+   - `SLUG_V2_ORACLE_ROOT=target/v2o-lockfile-v28-generate python3 -B -m tools.v2_oracle run --fixture bazel-lockfile-v28-schema --tool bazel --bazel /usr/bin/bazel --update-expected`;
+   - `SLUG_V2_ORACLE_ROOT=target/v2o-lockfile-v28-replay-a python3 -B -m tools.v2_oracle run --fixture bazel-lockfile-v28-schema --tool bazel --bazel /usr/bin/bazel`;
+   - `SLUG_V2_ORACLE_ROOT=target/v2o-lockfile-v28-replay-b python3 -B -m tools.v2_oracle run --fixture bazel-lockfile-v28-schema --tool bazel --bazel /usr/bin/bazel`;
+   - `scripts/v2_archive_status.sh`; and
+   - `git diff --check`.
+
+2. `WP-5-m1-bazel-lockfile-v28-pure-owner` changes exactly:
+
+   - `app/slug_bzlmod_v2/Cargo.toml`;
+   - `app/slug_bzlmod_v2/src/lockfile_v28.rs`;
+   - `app/slug_bzlmod_v2/src/lockfile_v28_tests.rs`; and
+   - `app/slug_bzlmod_v2/src/lib.rs`.
+
+   Add only `base64 = { workspace = true }`. The new owner and tests are
+   private.
+   Implement the complete immutable value, every reader adapter, semantic
+   equality, typed parse/render errors, canonical renderer, and
+   parse-render-parse evidence together. There is no public re-export,
+   production caller, old-owner edit, planner, replay validator, registry,
+   Host, or DICE change. Parser and renderer remain one owner because
+   normalization, escaping, omission, map order, and non-renderable sentinels
+   are one adapter contract.
+
+   Validate serially with `cargo fmt --all -- --check`,
+   `cargo test -p slug_bzlmod_v2 lockfile_v28`,
+   `cargo test -p slug_bzlmod_v2`, `cargo test -p slug_bzlmod_v2 --doc`,
+   `cargo test -p slug_bzlmod_v2 --target x86_64-pc-windows-gnu --no-run`,
+   `scripts/v2_archive_status.sh`, `git status --short`, and
+   `git diff --check`.
+
+3. `WP-5-m1-bazel-lockfile-v28-live-cutover` atomically switches live
+   parse/render/read/planning, registry expectation, and retained replay
+   consumers to the accepted owner and deletes the old structs, parser, and
+   renderer in the same commit. Exact allowlist is:
+
+   - `app/slug_bzlmod_v2/src/lockfile_v28.rs`;
+   - `app/slug_bzlmod_v2/src/lockfile.rs`;
+   - `app/slug_bzlmod_v2/src/lib.rs`; and
+   - `app/slug_bzlmod_v2/tests/lockfile.rs`.
+
+   `registry_dice.rs` and its tests stay unchanged because
+   `registry_file_expectation()` preserves their exact accessor boundary. No
+   alias, compatibility adapter, dual production schema, retained raw JSON,
+   or literal-general extension wrapper may survive.
+
+   Preserve `registry_file_expectation()` as the typed consumer projection if
+   possible: missing URL is `Unrecorded`, recorded absence is distinct, and a
+   checksum is 32 decoded bytes. Replay APIs must become factor-qualified and
+   cover all five recorded-input domains or be deleted when exhaustive search
+   proves them test-only. A general-only traversal or silent validation of
+   DIRENTS, DIRTREE, REPO_MAPPING, or the parse-failure sentinel is forbidden.
+   Existing visible/hidden mode and fail-open behavior remains unchanged
+   except where the exact oracle corrects it.
+
+   Validate serially with `cargo fmt --all -- --check`,
+   `cargo test -p slug_bzlmod_v2 lockfile`,
+   `cargo test -p slug_bzlmod_v2`, `cargo test -p slug_loading_v2`,
+   `cargo test -p slug_core_v2`, `cargo test -p slug_bzlmod_v2 --doc`,
+   `cargo test -p slug_loading_v2 --doc`,
+   `cargo test -p slug_core_v2 --doc`,
+   `cargo test -p slug_bzlmod_v2 --target x86_64-pc-windows-gnu --no-run`,
+   `cargo test -p slug_loading_v2 --target x86_64-pc-windows-gnu --no-run`,
+   `cargo test -p slug_core_v2 --target x86_64-pc-windows-gnu --no-run`,
+   `scripts/v2_archive_status.sh`, `git status --short`, and
+   `git diff --check`. Require no matches from:
+
+   - `rg -n 'BazelLockfileModuleExtensionGeneral|\.general\b' app/slug_bzlmod_v2/src/lockfile.rs app/slug_bzlmod_v2/src/lockfile_v28.rs app/slug_bzlmod_v2/src/lib.rs app/slug_bzlmod_v2/tests/lockfile.rs`;
+   - `rg -n 'serde_json::Value|use serde_json::Value' app/slug_bzlmod_v2/src/lockfile.rs app/slug_bzlmod_v2/src/lockfile_v28.rs app/slug_bzlmod_v2/tests/lockfile.rs`; and
+   - `rg -n 'general_extension_entries|general-only' app/slug_bzlmod_v2/src/lockfile.rs app/slug_bzlmod_v2/src/lockfile_v28.rs app/slug_bzlmod_v2/tests/lockfile.rs`.
+
+The cutover end gate also requires semantic A-to-B-to-A tests,
+formatting/order equivalence pruning, every factor/metadata/fact in value
+equality, typed registry expectation parity, and the full hidden/visible mode
+regression. Host remains blocked until this gate accepts; its later value
+wraps `Arc<BazelLockfile>` and never clones the full maps.
+
+Stop and replan on a required harness change, inability to generate every
+claimed field, unresolved numeric/map-order identity, mismatch in a proposed
+shared label/repository/integer helper, global serde-feature side effects, a
+retained Starlark heap, pure-owner scope beyond its named private files, a
+cutover requiring root/mapping/activation changes, or any temporary second
+production schema.
+
+##### Lockfile v28 schema design status
+
+**Status:** Accepted after correction on 2026-07-26.
+
+Pinned-source, live consumer/representation, and orchestration-policy audits
+accepted the core typed value/equality and private-owner-plus-atomic-cutover
+sequence, then latest-text review corrected Gson's lenient read mode and
+`IllegalStateException` wrapping, conditional recorded-input replacement,
+compact utility semantics, exact file manifests, parser substrate, and
+per-packet validation. The live production owner remains unchanged and
+intentionally blocks Host lockfile ownership. No Rust, fixture, Cargo,
+dependency, public API, or activation changed. All three terminal latest-text
+rereviews returned `ACCEPT`.
+
+Next evidence: Run only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle`.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
