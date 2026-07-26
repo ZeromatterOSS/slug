@@ -3697,3 +3697,44 @@ source/lifecycle/architecture reviews returned `ACCEPT`.
 
 Next evidence: Implement only
 `WP-5-m1-root-package-policy-input-owner`.
+
+### Stage 5 root package-policy input owner allowlist correction
+
+Status: Replanned before retained Rust
+
+The frozen five-file packet could not exactly implement Bazel 9.2
+`PackageIdentifier.parse`. Bazel's
+`PackageIdentifier.java:145-152`, `LabelParser.java:140-165`,
+`LabelValidator.java:50-61,96-138`, and
+`RepositoryName.java:55,178-195` accept literal repository names matching
+ASCII `[A-Za-z0-9_.+-]*` except exact `.` and `..`, and strip only a terminal
+`...` package segment before applying Bazel's printable-ASCII package
+validation. Slug's public `CanonicalRepoName::new` deliberately has a
+different established grammar, while `PackagePath::parse` accepts a different
+general path domain. The provisional five-file draft therefore could not be
+Bazel-exact without changing unrelated accepted identity behavior.
+
+The corrected packet adds exactly
+`app/slug_identity_v2/src/repo.rs` to the prior five-file allowlist. That file
+adds only a crate-private, package-parser-specific literal repository
+constructor: empty is main, exact `.`/`..` are rejected, ASCII
+alphanumeric/`_-.+` are accepted, and no mapping occurs. Existing public
+canonical/apparent repository constructors, label parsers, repository
+mapping, and display behavior remain unchanged. `package.rs` owns the
+package-identifier-specific ASCII validation and terminal-`...`
+normalization without weakening public `PackagePath::parse`.
+
+Focused identity evidence must accept leading/trailing-dot and `+` literal
+repositories through both `@` and `@@`; reject exact dot names, `~`, `@`,
+slash, non-ASCII, and controls; accept Bazel package punctuation; reject
+Unicode, controls, DEL, backslash, colon, slash-boundary errors, and every
+remaining all-dot component; and pin terminal `...` normalization for main
+and nonmain identities. The other three bzlmod files and every normalized
+owner, `Arc`/`SmallSet`, opaque projection, DICE replay, missing-input, and
+forbidden-scope requirement from Serial packet 3 remain unchanged. Both
+terminal source and architecture reviews returned `REPLAN`; no Cargo command
+ran and no bzlmod implementation began.
+
+Next evidence: Implement only
+`WP-5-m1-root-package-policy-input-owner-correction` in the corrected six-file
+allowlist.

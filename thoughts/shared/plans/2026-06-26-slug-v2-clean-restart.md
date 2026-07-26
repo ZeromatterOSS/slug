@@ -42,16 +42,20 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-root-package-policy-input-owner`.
+`WP-5-m1-root-package-policy-input-owner-correction`.
 
 Add Bazel package-identifier parsing and the complete normalized root
-package-policy request/input owner in exactly the five files frozen by the
-accepted plan. Preserve supplied package-root order, compact canonical deleted
-packages, optional absolute vendor directory, and exact REPO UTF-8
-Off/Warning/Error normalization with A→B→A equality. Pin missing injection,
-all main/nonmain deleted spellings, duplicate expansion, empty roots, and
-workspace-keyed request identity. Do not parse raw package-path/client-cwd
-spelling, inspect the filesystem, evaluate REPO, or add a consumer.
+package-policy request/input owner in the corrected six-file allowlist. The
+sole correction adds `slug_identity_v2/src/repo.rs` for a crate-private
+package-parser-only Bazel repository-name constructor; existing label,
+repository-mapping, and public repository constructors remain unchanged.
+Preserve supplied package-root order, compact canonical deleted packages,
+optional absolute vendor directory, and exact REPO UTF-8 Off/Warning/Error
+normalization with A→B→A equality. Pin missing injection, all exact Bazel
+main/nonmain package spellings and validation, duplicate expansion, empty
+roots, and workspace-keyed request identity. Do not parse raw
+package-path/client-cwd spelling, inspect the filesystem, evaluate REPO, or
+add a consumer.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
