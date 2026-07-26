@@ -5462,6 +5462,191 @@ design and rereview only `WP-5-m1-host-visible-lockfile-boundary-design` now
 that the exact full-v28 value/error owner is live; do not resume the old
 provisional Host contract without that review.
 
+#### Host visible-lockfile boundary correction
+
+Run only `WP-5-m1-host-visible-lockfile-boundary-design`. This correction
+supersedes the provisional sequence and historical `REPLAN` under Serial
+packet 9. It is design only: do not edit Rust or fixtures and do not run Cargo.
+
+Commit `6100c33b` removes the old blocker. Production now has one sole complete
+Bazel v28 value, Java-compatible raw-byte reader, parsed first textual integer
+marker, semantic equality, and typed caught/direct error surfaces. Pinned
+Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
+especially `BazelLockFileFunction.java` and `GsonTypeAdapterUtil.java`, remains
+the parity authority.
+
+##### Oracle-first boundary
+
+First run only `WP-5-m1-host-visible-lockfile-oracle`. Add exactly seven
+regular files under a new `host-visible-lockfile-boundary` fixture:
+
+- `fixture.toml` and generated `expected/oracle.json`;
+- root `workspace/MODULE.bazel`;
+- immutable `workspace/lockfiles/invalid-utf8-v28.lock`; and
+- minimal `workspace/registry/bazel_registry.json`,
+  `workspace/registry/modules/subject/1.0.0/MODULE.bazel`, and
+  `workspace/registry/modules/subject/1.0.0/source.json`.
+
+Use cumulative `bazel mod graph` commands with
+`--registry=file://%workspace%/registry` so `RegistryFunction` requests the
+visible value while the file-registry consumer later ignores recorded hashes.
+The small fixture-local registry is intentional isolation for this call graph;
+reuse established deterministic file-registry shapes, but do not depend on or
+mutate another fixture's state. Pin exactly these nine ordered rows:
+
+1. absent lockfile in Off succeeds with the exact graph and no visible
+   manifest;
+2. a populated valid v28 lockfile in Off succeeds with the same graph and
+   retains the visible manifest;
+3. recognized-v28 malformed JSON in Off is caught as exit 48
+   `BAD_LOCKFILE`;
+4. a first textual noncurrent marker followed by malformed/current-looking
+   content succeeds as empty in Off;
+5. that same noncurrent content in Error is exit 48 with the exact unsupported
+   version diagnostic;
+6. recognized-v28 merge-conflict content is caught as exit 48 with Bazel's
+   merge-conflict advice suffix;
+7. move the immutable invalid-UTF8 v28 asset into place and prove replacement
+   bytes inside an ignored string succeed in Off;
+8. delete the visible file and prove Error succeeds as empty; and
+9. create recognized-v28 invalid-checksum content in Off and prove the direct
+   `JsonParseException` escape as Bazel's exit-37/internal-error class, without
+   the caught `BAD_LOCKFILE` wrapper.
+
+The accepted `bazel-lockfile-v28-schema` oracle remains the complete value and
+adapter authority, including its other two direct-hole rows. This fixture
+adds only Host read/mode discrimination. Pin release/commit/source provenance,
+exact exit and message shapes, graph output, every cumulative mutation, and
+the visible manifest. Run one pinned generation and two fresh-root replays,
+then source-anchor, fixture-schema, exact-file, mutation, manifest, archive,
+and diff checks. Cap growth at exactly seven regular files, zero symlinks, and
+900 newline-counted lines. The accepted fixture-growth checkpoint remains
+`df812c2c`; `eb8c2d23` is the first accepted oracle after it and this is the
+second, so no new checkpoint is due.
+
+Stop and replan on an eighth file, tenth row, HTTP server, harness/schema
+change, shared mutable fixture state, external network, generated lockfile
+template, archive/symlink, registry-consumer hash claim, unstable
+path/port/stack text, or an observed exit/message shape that differs from the
+pinned contract.
+
+##### Private Host owner
+
+Only after oracle `ACCEPT`, implement
+`WP-5-m1-host-visible-lockfile-owner` in exactly three files:
+
+- new private `app/slug_bzlmod_v2/src/host_lockfile.rs`;
+- `app/slug_bzlmod_v2/src/lockfile.rs`; and
+- private `mod host_lockfile;` in `app/slug_bzlmod_v2/src/lib.rs`.
+
+Do not edit `repository_ignore.rs` or `lockfile_v28.rs`. The live
+`read_lockfile_v28` already owns Java UTF-8 replacement before marker
+selection and full typed parsing; no second decoder, parser, value, or
+collection may enter.
+
+Add only crate-private `HostVisibleLockfileKey`,
+`HostVisibleLockfileValue`, and `HostVisibleLockfileError`. The key identity is
+one `NormalizedAbsolutePath` workspace. Its result is:
+
+```text
+PathOutcome<
+    Arc<Result<HostVisibleLockfileValue, HostVisibleLockfileError>>
+>
+
+HostVisibleLockfileValue {
+    lockfile: Arc<BazelLockfile>
+}
+```
+
+The error variants are exactly:
+
+```text
+LockfileModeInput {
+    workspace: NormalizedAbsolutePath,
+    message: CompactString,
+}
+File {
+    error: HostFileError,
+}
+BadLockfile {
+    message: CompactString,
+}
+UncaughtParse {
+    error: LockfileParseError,
+}
+```
+
+Expose only a crate-private `lockfile() -> &Arc<BazelLockfile>` accessor. The
+full value retains all six semantic fields. It retains no mode, path, bytes,
+digest, formatting, missing/noncurrent discriminator, write state, or
+`Ignored` variant. Derive or implement `Allocative`; cheap duplication is the
+containing `Arc`, not cloned maps. Add no retained collection, standard
+hash-map/set, interner, cache, lock, dependency, or public re-export.
+
+In `lockfile.rs`, add one crate-private typed Host parser entry that calls
+`read_lockfile_v28` directly. Off, Update, and Refresh use `ReturnEmpty`;
+Error uses `Error`. Absent and noncurrent inputs produce
+`Arc::new(empty_bazel_lockfile())`. Unsupported Error mode maps to Bazel's
+exact unsupported-version message. `CaughtJsonSyntax`, `CaughtNullPointer`,
+and `CaughtIllegalArgument` map to `BadLockfile` with Bazel's exact
+`BAD_LOCKFILE` wrapper, choosing merge-conflict advice when the caught message
+contains `<<<<<<<`, `=======`, `|||||||`, or `>>>>>>>`. Preserve
+`DirectAdapterJsonParse` and `DelimiterIndexOutOfBounds` as
+`UncaughtParse { error }`; never add the caught wrapper to them.
+
+Compute `HostFileBytesKey(workspace/MODULE.bazel.lock)` first. A path Need
+returns immediately and creates no mode dependency. After every Complete file
+outcome, compute `RootModuleLockfileModeKey` before interpreting Missing,
+Present, or typed file error. A missing injected mode, file failure,
+unsupported/caught failure, and direct parse hole remain distinct Complete
+errors. The key uses complete-only equality and validity: every Need is
+invalid and self-unequal, while separately allocated semantically equal
+`Arc<BazelLockfile>` values compare equal.
+
+Focused evidence must cover workspace-only key identity; file-before-mode
+order and no mode edge during Need; mode acquisition after Missing, Present,
+and file-error Complete outcomes; cumulative Needs; missing mode; missing,
+regular, special-file, symlink, and operational-error paths; one retained
+engine across create/edit/delete/recreate and mode A→B→A; all four
+mode/current/noncurrent/caught cells; first marker, leading-zero marker, and
+integer overflow; ordinary and merge-conflict caught diagnostics; malformed
+Java UTF-8; both direct error surfaces; every full-value field; separately
+allocated semantic equality; and formatting/key-order byte recomputation that
+prunes a downstream semantic projection.
+
+Validate serially with focused Host tests, the complete bzlmod suite, bzlmod
+doctests, GNU-Windows `--no-run`, formatting, archive status, diff checks,
+exact-three-file scope, private-symbol/dependency scans, and forbidden
+root/registry/loading/core/analysis/query/hidden/write/direct-IO/event/mapping
+and activation references. Stop on a fourth file, fixture or Cargo change,
+new dependency, public surface, direct filesystem IO inside DICE, mode
+dependency during Need, incomplete equality, copied UTF decoder, flattened
+direct failure, retained raw/formatted state, registry consumption, root
+ordering, mapping, or Host activation.
+
+Only owner `ACCEPT` advances to the existing
+`WP-5-m1-host-registry-function-boundary-design`. That later packet owns
+root-before-registry composition, unconditional visible-value acquisition,
+registry policy/IO, hash and yanked consumption, and final handoff; this
+packet changes none of them.
+
+##### Host visible-lockfile correction design status
+
+**Status:** Accepted after terminal correction review on 2026-07-26.
+
+Pinned-source/parity review resolved the outer caught exception set against
+the already accepted exit-37 direct adapter and delimiter evidence.
+Implementation review confirmed the three-file seam can call the sole v28
+reader without another decoder or collection owner. Architecture/orchestration
+review accepted the nine-row isolated oracle, exact fixture-growth accounting,
+file-before-mode Need boundary, typed uncaught errors, complete-only semantic
+equality, validation matrix, and later registry handoff. All three latest-text
+reviews returned `ACCEPT`; no Rust, fixture, Cargo, dependency, or activation
+changed.
+
+Next evidence: Run only `WP-5-m1-host-visible-lockfile-oracle` under the exact
+seven-file, nine-row contract above.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only

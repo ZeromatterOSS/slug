@@ -31,30 +31,27 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the sole-v28 raw-read live cutover passed 123
-focused tests; complete native bzlmod 361, loading 54, analysis 12, query 61,
-and core 115 suites; zero-test doctests for all five crates; and all 27
-GNU-Windows test executable links. It covers all twelve active direct-DICE
-updater closures, exact raw invalid-byte and parsed-first-marker behavior,
-semantic keep/delete/write planning and atomic apply, and caught versus direct
-errors. The accepted local boundary is sixteen files: fifteen tracked files
-plus the intentionally ignored root `Cargo.lock` with exactly two local
-dependency-array entries. Exact-source/parity, implementation/evidence, and
-architecture/orchestration terminal rereviews all returned `ACCEPT` after
-corrections for Keep evidence and Bazel's parsed leading-zero marker behavior.
-No fixture, production re-export, fallback, new key/lock/read, Host or
-exact-Off activation, or merge-conflict claim entered.
+Latest M1 accepted evidence: the corrected Host visible-lockfile boundary
+design passed pinned-source/parity, implementation-feasibility, and
+architecture/orchestration terminal review. It freezes an exact seven-file,
+nine-row oracle proving Off reads and parses current v28 content, caught
+`BAD_LOCKFILE` and merge advice, unsupported Error mode, Java UTF-8
+replacement, absence, and the uncaught adapter hole. Only after that oracle
+passes may a three-file private owner add the full `Arc<BazelLockfile>` Host
+value, file-before-mode DICE dependency order, complete-only equality, and
+separate caught versus uncaught errors. No Rust, fixture, Cargo, dependency,
+registry consumer, root/mapping edge, or activation changed during design.
 
 ### Current packet
 
-Design only
-`WP-5-m1-host-visible-lockfile-boundary-design`.
+Implement only `WP-5-m1-host-visible-lockfile-oracle`.
 
-Reopen the prior `REPLAN` now that the exact full-v28 value and error owner is
-live. Audit pinned Bazel 9.2 Host Off read/parse behavior, the separate
-path-only key, full `Arc` value identity, and the exact source/oracle-first
-boundary. Rereview the old provisional contract rather than inheriting it.
-Do not edit Rust or fixtures and do not run Cargo.
+Add the exact seven-file `host-visible-lockfile-boundary` fixture and its nine
+ordered `bazel mod graph` rows from the owning subplan. Generate with pinned
+Bazel 9.2, run two fresh-root replays, and enforce provenance, exact file/row
+and 900-line caps, manifests, mutations, archive, and diff gates. Do not edit
+Rust, Cargo, the harness, another fixture, or registry/Host production code.
+Stop on any observed exit or message-shape difference.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
