@@ -5043,6 +5043,42 @@ unchanged. Next implement only
 atomically replacing the live parse/render surface. Host ownership remains a
 later packet.
 
+##### Lockfile v28 live-cutover pre-implementation gate
+
+**Status:** Replan before Rust on 2026-07-26.
+
+The exact four-file cutover cannot activate the accepted reader on the current
+production DICE path. `read_lockfile_v28` requires raw bytes so Java-compatible
+UTF-8 replacement precedes the first textual version-marker scan, but
+`VisibleLockfileKey` obtains `WorkspaceFileValue::Present(Arc<String>)` from
+the strict-UTF workspace-file owner. Invalid bytes have already become a read
+error and cannot be reconstructed inside the four-file allowlist. This reaches
+the accepted stop condition for a cutover requiring activation-boundary
+changes.
+
+The remaining semantic replacement is bounded once that read boundary is
+corrected. `registry_file_expectation()` can preserve the unchanged
+`registry_dice.rs` consumer; exhaustive search proved the legacy general-only
+replay types and validators are test-only and should be deleted. The old
+`serde_json::Value`/`BTreeMap` schema, parser, renderer, registry validators,
+and exports must disappear. Planning must compare full v28 values so
+formatting/order-equivalent inputs prune while every factor, metadata, fact,
+and facts-version change remains semantic.
+
+Two independent source/implementation reviews returned `REPLAN`; the policy
+review accepted the four-file semantic architecture but explicitly left
+invalid-UTF-8 acquisition behind the existing text boundary. No Rust, test,
+fixture, Cargo, dependency, public API, DICE, or activation change was made.
+
+Next evidence: Design only
+`WP-5-m1-bazel-lockfile-v28-raw-read-live-cutover-design`. Audit the existing
+`WorkspaceRawFileKey`/`WorkspaceRawFileValue` path and freeze the smallest
+atomic cutover, provisionally adding only `module_eval.rs` and
+`tests/root_module_dice.rs` to the original four files. It must preserve exact
+caught versus direct-adapter/delimiter error surfaces and cover invalid-byte,
+mode, formatting/equality, and retained A-to-B-to-A behavior before any Rust
+edit or Cargo command.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
