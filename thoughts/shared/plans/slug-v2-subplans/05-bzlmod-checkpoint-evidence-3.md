@@ -6326,3 +6326,229 @@ implementation/evidence, and architecture/DICE reviewers returned `ACCEPT`.
 
 Next evidence: Implement only
 `WP-5-m1-host-repository-ignore-owner-corrected-retry`.
+
+### Stage 5 Host RegistryFunction boundary redesign
+
+#### Corrected boundary and source order
+
+`WP-5-m1-host-registry-function-boundary-design` supersedes the historical
+two-file Host registry proposal. Pinned Bazel 9.2
+`ModuleFileFunction.compute` obtains the root module before it chooses a
+registry override or registry list. Its later `getModuleFile` path constructs
+all chosen `RegistryKey` values before sequential registry-file fetches.
+`RegistryFunction`, however, has no root edge. Therefore the private
+RegistryFunction owner below is root-free. A later composition owner must
+compute `HostRootModuleFileKey` first, propagate its bootstrap/path Needs and
+typed error, choose the override or registry list, construct every Host
+registry, and only then fetch registry files in order. A non-registry override
+bypasses every registry key. No root value, provisional or final repository
+mapping, selection result, or source-preparation result enters registry
+construction identity.
+
+For each original registry URL, freeze this exact sequential construction
+order from `RegistryFunction.compute`:
+
+1. acquire `RootModuleLockfileModeKey`;
+2. acquire a vendor-directory-only projection from the root package-policy
+   input in every mode;
+3. only for Refresh, acquire a dedicated RegistryFunction invalidation token;
+4. acquire `HostVisibleLockfileKey` in Off, Update, Refresh, and Error and for
+   HTTP(S) and file registries;
+5. derive the resolved primary spelling by replacing `%workspace%` and borrow
+   the registry-hash and selected-yanked projections from the accepted full
+   lockfile;
+6. acquire the complete module-mirrors input and select by the original,
+   unsubstituted registry URL;
+7. validate the primary URI, scheme, and path; select the hash mode; validate
+   the selected mirror URI spellings; and construct the value.
+
+The Refresh token is Bazel's RegistryFunction/object-cache invalidation edge,
+not the existing per-command `RegistryRequestGenerationKey` used to retry
+registry IO. Off, Update, and Error have no Refresh-token dependency. A
+visible-lockfile path Need returns before mirrors or either URL validation.
+Missing lockfile is the accepted full empty v28 value; no mode or scheme may
+skip the visible owner. Mirror lookup uses the original key URL even when
+`%workspace%` changes the primary URL. Java evaluates the complete mirror
+input before entering `RegistryFactoryImpl`, so a missing mirror input
+precedes both mirror and primary URI errors. Once the input exists, the
+factory validates the resolved primary URI first: an invalid primary wins over
+an invalid selected mirror, and only a valid primary advances to ordered
+mirror URI validation.
+
+Command registry URLs and module mirrors require a new dormant raw request
+representation; do not reuse `RegistryUrls::from_request`, which currently
+performs `%workspace%` substitution and validation too early. Command
+registry normalization trims trailing slashes, keeps first occurrence order,
+and deduplicates. Root override registry spellings do not pass through that
+command normalization. Mirror registry keys and mirror bases trim trailing
+slashes; a later duplicate flag entry wins; `""` is the default; an explicit
+per-registry entry, including an empty entry, overrides the default; and an
+unknown nonempty registry key is a typed request-input error. Mirror URI
+syntax validation is distinct from primary registry scheme/path validation.
+Do not apply `%workspace%` or a supported-scheme/path restriction to mirror
+URIs. Construction only retains selected command mirrors. Later source
+construction owns command-mirror-first ordering, registry metadata mirrors,
+the original source URL, and `source.json` backups; no mirror fetch or URL
+transformation belongs here.
+
+#### Private RegistryFunction value
+
+After the oracle and input prerequisites below, add one private
+`HostRegistryFunctionKey` whose identity is the normalized workspace plus the
+exact original supplied registry-key spelling. Its complete-only result is:
+
+```text
+PathOutcome<
+    Arc<Result<HostRegistryFunctionValue, HostRegistryFunctionError>>
+>
+```
+
+Every Need is invalid and self-unequal. Complete errors and values are
+semantic. `HostRegistryFunctionValue` retains the original registry spelling,
+the resolved/validated primary registry base and scheme, a private
+`RegistryKnownFileHashesMode`, the accepted full `Arc<BazelLockfile>`, the
+vendor directory, the compact selected mirror slice, and the Refresh token
+only in Refresh. It exposes no unrestricted lockfile accessor: later private
+consumers may inspect only registry file hashes and selected-yanked entries.
+Custom equality compares original/resolved URL, scheme/hash mode, vendor,
+mirrors, the optional Refresh token, registry file hashes, and
+selected-yanked state. It ignores the other four lockfile fields, clones no
+lockfile map, and permits a downstream registry projection to prune their
+changes. Retaining the Refresh token ensures an hourly token change
+invalidates the constructed registry object and its lazy metadata cache.
+
+The construction error variants are limited to typed missing mode,
+vendor-projection, Refresh-token, visible-lockfile, and mirrors inputs plus
+distinct invalid primary-registry URL and invalid mirror URI errors. A
+visible path Need is not an error. Construction has no registry IO,
+filesystem read, request-generation, checksum, transport, local-read, yanked
+fetch, or source-preparation error. Do not reuse the legacy
+`RegistryPolicyKey`, `RootModuleFilesKey`, `VisibleLockfileRead`, or
+string-erased `RegistryFileError` at this boundary.
+
+The factory table is exact:
+
+| registry scheme | Off | Update | Refresh | Error |
+| --- | --- | --- | --- | --- |
+| HTTP(S) | `USE_AND_UPDATE` | `USE_AND_UPDATE` | `USE_IMMUTABLE_AND_UPDATE` | `ENFORCE` |
+| file | `IGNORE` | `IGNORE` | `IGNORE` | `IGNORE` |
+
+Construction retains but does not consume hashes, selected-yanked state,
+vendor, or mirrors. Later HTTP(S) file fetch uses `USE_AND_UPDATE` to replay a
+recorded absence, fetch an unrecorded URL, and verify a recorded SHA in both
+Off and Update. `USE_IMMUTABLE_AND_UPDATE` differs only by refetching a
+recorded absence. `ENFORCE` rejects an unrecorded URL before IO, replays an
+absence, and verifies a SHA. A file registry ignores hashes in every mode.
+Selected-yanked reuse is also later: HTTP(S) Refresh refetches metadata; all
+other HTTP(S) modes and every file mode first reuse an exact selected-yanked
+reason, otherwise treat any recorded `source.json` entry—recorded absence or
+recorded SHA—as not yanked, otherwise fetch metadata. Final repository
+mappings remain post-selection graph state and are forbidden from every
+registry key/value/error.
+
+#### Oracle-first, bounded owner sequence
+
+Do not edit Rust until focused Bazel evidence is accepted. Run these reviewed
+packets serially:
+
+1. `WP-5-m1-host-registry-function-oracle-design`, design only. Prefer
+   strengthening `registry-yanked-lockfile-mode` and
+   `registry-command-transport` instead of copying their registry/server
+   scaffolds. Freeze the smallest rows that discriminate remote Off recorded
+   absence/SHA and selected-yanked reuse from legacy FetchUnrecorded behavior;
+   Refresh refetch/invalidation; default/per-registry/empty-override/unknown
+   module mirrors; and registry vendor hit, fatal vendored-read failure with
+   no network fallback, and non-vendored/checksum-absent network paths with
+   request counts. Reuse the accepted lockfile-before-invalid-URL row. If
+   mirror or vendor consumption is deferred beyond the construction owner,
+   the oracle design may split those fetch-time rows into their exact later
+   consumer packet, but it must not claim unobserved behavior.
+2. Implement and accept that exact oracle before any Host registry Rust.
+   This will be packet three after fixture-growth checkpoint `df812c2c`; no
+   growth review is due unless the approximately 100-file/10,000-line
+   threshold is crossed.
+3. `WP-5-m1-host-registry-inputs-design`, design only. Freeze small, serial
+   private owners for raw registry/mirror input normalization, a vendor-only
+   package-policy projection, and a dedicated Refresh invalidation token.
+4. Implement the accepted input/projection owners before the pure
+   `HostRegistryFunctionKey`; keep all injection test-only and dormant.
+5. Implement the accepted pure RegistryFunction owner in a new private
+   `host_registry.rs` plus the private module declaration and only the exact
+   prerequisite owner files authorized by packet 3. It performs no IO.
+6. Design and implement a one-file private IO-bridge packet in
+   `registry_dice.rs`. Factor a Bazel-shaped expectation-aware remote executor
+   and a typed local executor while preserving every active legacy wrapper
+   and its legacy Off behavior byte-for-byte. The Host remote wrapper uses the
+   exact table above. The local wrapper reuses the existing nonsemantic
+   `RegistryIo` capability: Found remains sticky and drops generation; local
+   absence and read failure acquire generation.
+7. Design and implement a separate private Host registry-file owner. Its
+   result is
+   `SourcePreparationOutcome<Arc<Result<RegistryFileValue,
+   HostRegistryFileError>>>`: visible path Needs and the local branch's root
+   bootstrap/path Needs propagate and remain invalid/self-unequal. It consumes
+   the pure descriptor then the packet-6 bridge. Its local branch retains the
+   redundant direct `HostRootModuleFileKey` semantic edge required by the
+   accepted local replay oracle, but production composition must already have
+   completed the root before calling any construction or file key. Typed
+   construction, root, local, remote, vendor-path, vendor-file, and checksum
+   errors remain distinct; a Need is never an error. Do not use
+   `HostFileBytesKey` or direct filesystem IO for a local registry.
+8. Only after both private owners are accepted, design root-bootstrap and
+   atomic command-input activation, then the ordered discovery/source-
+   preparation composition and typed public error projection. That later
+   composition owns root first, override/list choice, all-registry
+   construction before sequential fetch, and the Host switch.
+
+Focused retained-DICE evidence for the pure owner must prove the exact input
+order; visible Need before mirror/validation; a Refresh-only invalidation
+edge; all four mode/scheme cells; original versus `%workspace%`-resolved
+identity; mirror default/override and error ordering; typed Complete errors;
+Need invalidity; mode, vendor, mirror, URL, hash, selected-yanked, and Refresh
+token A→B→A; separately allocated equal lockfiles; recomputation but
+downstream pruning for changes to each unrelated lockfile field; missing
+mirror input before URL errors; invalid primary before invalid selected
+mirror; ordered mirror validation; and no root, IO, request-generation,
+mapping, source-preparation, write, or activation edge. The later file owner
+must separately prove the complete remote
+mode/expectation matrix and generation-before/after-IO order, typed
+capability/transport/checksum failures, local absence/failure retry, Found
+stickiness across raw mutation, root-triggered reread, exact propagation of
+any redundant root bootstrap/path Need, and no path-observation Need
+originating from local registry bytes.
+
+Stop and replan on Rust before oracle acceptance; root inside
+`HostRegistryFunctionKey`; request-boundary URL validation; mirror lookup by
+the substituted URL; missing unconditional visible-lockfile acquisition;
+request generation used as Refresh invalidation; legacy Off semantics on the
+Host path; copied lockfile maps or standard map/set churn; direct IO or
+`HostFileBytesKey` for local registries; public input/key/transport surface;
+new dependency, cache, lock, or interner; construction-time fetch; root value
+retention; discovery, MVS, final mapping, source URL, lockfile write, or
+loading/core/analysis/query consumption; or any production activation.
+
+#### Host RegistryFunction boundary redesign status
+
+**Status:** Accepted after terminal latest-text review on 2026-07-26.
+
+The historical root-owning Host registry proposal is replaced by a pure,
+root-free RegistryFunction descriptor and a later root-first composition
+boundary. The frozen sequence matches pinned Bazel 9.2: mode, vendor,
+Refresh-only dedicated invalidation, unconditional full visible lockfile,
+resolved primary/hash/yanked derivation, original-key mirror input, primary
+validation/hash mode, then ordered mirror validation. Exact HTTP(S)/file
+hash modes, selected-yanked reuse including recorded absence, fatal vendored
+read behavior, raw command/mirror identity, complete-only equality, compact
+full-lockfile retention, and mapping exclusion are explicit.
+
+The accepted route is oracle first, then private raw input/projection owners,
+the pure construction owner, a legacy-preserving one-file RegistryIo bridge,
+and the separate Host file owner. The latter propagates redundant root Needs
+while preserving sticky local Found and generation-gated absence/failure.
+Pinned-source/parity, native-implementability, and
+architecture/orchestration terminal latest-text reviews all returned
+`ACCEPT`. No Rust, fixture, Cargo, dependency, public API, IO behavior,
+consumer, or activation changed.
+
+Next evidence: Run only
+`WP-5-m1-host-registry-function-oracle-design`; it is design only.

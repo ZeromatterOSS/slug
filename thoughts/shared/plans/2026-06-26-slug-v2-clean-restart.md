@@ -43,24 +43,28 @@ implementation/evidence, and orchestration reviews returned `ACCEPT`. No
 failed draft, registry scaffold, network claim, harness, Rust, Cargo,
 production edge, or activation is retained.
 
-The corrected private Host visible-lockfile owner is accepted in exactly four
-Rust files. It preserves Bazel's exact Version-domain Gson error text while
-leaving non-Version behavior unchanged, acquires file observations before
-mode, retains the complete semantic v28 value, and keeps direct parse holes
-typed. Focused 9, complete bzlmod 370, zero doctests, and all 12 GNU-Windows
-test executables passed with format, archive, diff, privacy, dependency, and
-scope gates. All three terminal latest-diff reviews returned `ACCEPT`; no
-registry consumer or activation is present.
+The corrected Host RegistryFunction boundary design is accepted. The private
+construction key is root-free and ordered exactly as Bazel 9.2; later
+composition owns root first, override/list choice, all-registry construction,
+and sequential fetch. The design freezes unconditional full visible-lockfile
+consumption, raw mirror identity, a dedicated Refresh invalidation token, the
+exact HTTP(S)/file hash table, selected-yanked and vendor behavior, sticky
+local RegistryIo reuse, complete-only selective equality, and an oracle-first
+serial owner sequence. All three terminal latest-text reviews returned
+`ACCEPT`; no Rust, fixture, Cargo, IO behavior, consumer, or activation
+changed.
 
 ### Current packet
 
-Run only `WP-5-m1-host-registry-function-boundary-design`.
+Run only `WP-5-m1-host-registry-function-oracle-design`.
 
 This packet is design only: do not edit Rust or fixtures and do not run Cargo.
-Freeze root-before-registry composition, unconditional acquisition of the
-accepted Host visible-lockfile value, existing registry policy/IO reuse,
-recorded-hash and selected-yanked consumption, error ownership, and the final
-private handoff. Preserve the dormant owner and every activation gate.
+Reuse the accepted registry-yanked/transport scaffolds where bounded and
+freeze the smallest discriminating rows for remote Off recorded
+absence/SHA/yanked reuse, Refresh invalidation, module-mirror precedence and
+invalid mappings, and exact registry-vendor hit, fatal read with no network
+fallback, and non-vendored/checksum-absent network request behavior. Preserve
+every implementation and activation gate.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
