@@ -5079,6 +5079,224 @@ caught versus direct-adapter/delimiter error surfaces and cover invalid-byte,
 mode, formatting/equality, and retained A-to-B-to-A behavior before any Rust
 edit or Cargo command.
 
+#### Lockfile v28 raw-read live-cutover correction
+
+Run only `WP-5-m1-bazel-lockfile-v28-raw-read-live-cutover-design`. This is a
+design packet; do not edit Rust or fixtures and do not run Cargo.
+
+##### Authority and one atomic result
+
+Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+`BazelLockFileFunction.java`, `BazelLockFileValue.java`,
+`BazelLockFileModule.java`, and `GsonTypeAdapterUtil.java` remain the source
+authority. The accepted `bazel-lockfile-v28-schema` oracle and private
+`lockfile_v28.rs` owner remain the executable/schema authority. This correction
+adds no fixture breadth; the last fixture-growth checkpoint remains
+`df812c2c`.
+
+The implementation packet must atomically make the accepted v28 value the sole
+live schema and feed raw observed bytes to it on the existing active DICE path.
+Its exact eight-file allowlist is:
+
+1. `app/slug_bzlmod_v2/src/lockfile_v28.rs`;
+2. `app/slug_bzlmod_v2/src/lockfile.rs`;
+3. `app/slug_bzlmod_v2/src/lib.rs`;
+4. `app/slug_bzlmod_v2/tests/lockfile.rs`;
+5. `app/slug_bzlmod_v2/src/module_eval.rs`; and
+6. `app/slug_bzlmod_v2/tests/root_module_dice.rs`;
+7. `app/slug_bzlmod_v2/tests/registry_dice.rs`; and
+8. `app/slug_loading_v2/tests/glob_invalidation.rs`.
+
+No `slug_workspace_v2`, `slug_core_v2`, loading implementation, registry
+implementation, Cargo, fixture, Host, root-module evaluation, mapping, or
+command transport file may change. The implementation stops if any such edit
+is required.
+
+##### Existing raw DICE ownership
+
+`WorkspaceRawFileKey { workspace, path }` already computes one
+`WorkspaceRawFileValue` from `WorkspaceRawSnapshotKey`. The injected snapshot
+retains `Arc<[u8]>`, Missing, and ReadError distinctly in an
+`Arc<SortedMap<PathBuf, _>>`. Normal runtime observation reads bytes once,
+derives text independently, and injects raw and text snapshots on one updater
+before its sole commit. There is no manual lock, filesystem read, fallback
+scanner, new key, or new identity decision in this packet.
+
+For non-Off modes, `VisibleLockfileKey` must replace only its
+`WorkspaceFileKey` dependency with `WorkspaceRawFileKey` and pass the raw bytes
+to one `lockfile.rs` helper. Preserve the legacy Off early return and lack of a
+file dependency; exact Bazel Off ownership remains reserved to the already
+accepted later Host visible-lockfile owner. Preserve root-before-visible
+composition and every other key dependency/order.
+
+Every direct-DICE helper that reaches the visible key must inject a raw snapshot
+on the same updater as its existing text snapshot. This includes
+`tests/root_module_dice.rs`, `tests/registry_dice.rs`, and
+`slug_loading_v2/tests/glob_invalidation.rs`; the latter two changes are
+test-harness plumbing only, not registry/loading behavior. Existing text-only
+cases derive raw values mechanically; only new invalid-byte cases provide an
+explicit raw override. No helper may fall back from missing raw state to the
+text key, and source-file UTF-8 behavior must not change.
+The loading test tracker must classify `WorkspaceRawFileKey` as its existing
+file-dependency identity so the active-mode raw edge and legacy Off absence
+remain directly asserted.
+
+##### Sole value, public surface, and deletions
+
+Rename the accepted sole production struct to `BazelLockfile`. A
+`cfg(test)`-only re-export may preserve the `BazelLockfileV28` spelling for the
+accepted private unit module, which is outside this packet's allowlist; no
+non-test alias, wrapper, adapter, or second schema may exist. Keep the complete
+six fields, compact strings/shared slices, `SmallMap`/`SmallSet`/`SortedMap`,
+custom Facts equality, `Allocative`, and direct streaming parser/renderer
+unchanged.
+
+Make the accepted parse/render error and error-surface types public through
+bounded read-only accessors, then route public `parse_bazel_lockfile` and
+`render_bazel_lockfile` directly through the sole owner. Keep
+`empty_bazel_lockfile`, visible/hidden input/read/snapshot types, planning and
+atomic apply, `BAZEL_9_LOCK_FILE_VERSION`, `RegistryFileExpectation`, and
+`registry_file_expectation()`. The registry accessor projects typed
+`RegistryFileHash`: missing URL is `Unrecorded`, `NotFound` is
+`RecordedAbsent`, and `Sha256` returns the decoded 32 bytes. `registry_dice.rs`
+stays byte-for-byte unchanged; its test file changes only to inject the raw
+snapshot already supplied by production runtime observation.
+
+Delete the old `BazelLockfileModuleExtension*`,
+`BazelLockfileRecordedInput`, `BazelLockfileRepoSpec`,
+`ModuleExtensionReplayInputs`, raw `serde_json::Value`/`BTreeMap` schema,
+parser, renderer, marker scan, registry validators, all six general-only
+replay validators, JSON helpers, and their exports. Exhaustive active-root
+search proved those replay/validator surfaces have no production consumer.
+Do not retain a deprecated spelling, conversion constructor, raw JSON field,
+or compatibility export.
+
+##### Exact read and error matrix
+
+One byte helper must call `read_lockfile_v28` after the mode decision:
+
+- absent is the exact empty v28 value;
+- Update and Refresh use `ReturnEmpty`, so missing/noncurrent first markers
+  become the exact empty value;
+- Error uses `Error`, mapping only `UnsupportedVersion` to Bazel's exact
+  unsupported-version diagnostic;
+- `CaughtJsonSyntax`, `CaughtNullPointer`, and
+  `CaughtIllegalArgument` use the visible `BAD_LOCKFILE` wrapper;
+- `DirectAdapterJsonParse` and `DelimiterIndexOutOfBounds` remain
+  distinguishable direct failures and are not rewritten as caught failures;
+- Java-compatible replacement occurs before marker scan and typed parsing.
+
+The visible string helper, if retained for callers/tests, delegates by
+borrowing its UTF-8 bytes; it is not a second parser. Visible and hidden input
+wrappers retain raw optional bytes and digest those exact bytes. Hidden parsing
+uses Update/`ReturnEmpty`: absent, noncurrent, and caught failures fail open to
+empty, while direct-adapter and delimiter failures propagate. Change the
+test-only/public hidden helper to a fallible byte boundary rather than
+flattening those uncaught holes. Merge-conflict advice, exact Bazel Off reads,
+and the separate Host path/error owner remain explicitly outside this
+correction; do not claim them.
+
+##### Semantic planning and discriminating evidence
+
+Update/Refresh planning must parse an existing value and compare the complete
+semantic v28 value before rendering. Formatting, object order, checksum case,
+build-suffix removal, factor spelling/order, and Starlark-equal numeric facts
+prune to `Keep`; an unsupported/missing marker compares as empty. A recognized
+v28 caught parse failure remains an error, not an overwrite. Error mode keeps
+only an equal full value and otherwise returns the existing missing,
+unsupported-version, or stale diagnostic. Rendering always emits the fixed six
+fields and terminal newline.
+
+Rewrite `tests/lockfile.rs` around the public production surface. It must prove:
+
+- the accepted comprehensive extension/Facts slice renders exactly;
+- all five recorded-input domains and every factor survive parse/render;
+- the parse-failure sentinel and null-label repo rule remain non-renderable;
+- every factor, metadata field, fact, and fact version participates in value
+  equality and planner Write/Error decisions;
+- semantic A-to-B-to-A planning and formatting/order-equivalent pruning;
+- all three registry expectation outcomes;
+- visible absent/current/noncurrent/malformed/marker-overflow behavior across
+  Update, Refresh, Error, and unchanged legacy Off;
+- hidden absent/noncurrent/caught fail-open and direct/delimiter propagation;
+- raw visible/hidden input digests and invalid UTF-8 replacement;
+- atomic apply writes only a prior `Write` plan and errors never write.
+
+Strengthen the retained-DICE test in `tests/root_module_dice.rs` with raw
+invalid-byte success, current caught/direct/delimiter failures, noncurrent
+Update/Refresh empty versus Error diagnostic, formatting-equivalent downstream
+reuse, and semantic A-to-B-to-A restoration on one engine. Prove the visible
+key depends on the raw key in active modes and preserves the legacy Off
+no-file-dependency shortcut. The registry and loading direct-DICE tests must
+retain their existing assertions after raw-snapshot injection; unchanged core
+tests remain downstream/public-wrapper evidence.
+
+##### Validation, reuse, and stop gates
+
+Reuse the retained Stage 9 compact-collection row and
+`WorkspaceRawFileKey`/`WorkspaceRawSnapshotKey` substrate directly; reject the
+V1 raw JSON/general-only replay shape. Run serially:
+
+- `cargo fmt --all -- --check`;
+- `cargo test -p slug_bzlmod_v2 lockfile`;
+- `cargo test -p slug_bzlmod_v2`;
+- `cargo test -p slug_loading_v2`;
+- `cargo test -p slug_core_v2`;
+- doctests for all three crates;
+- GNU-Windows `--no-run` for all three crates;
+- `scripts/v2_archive_status.sh`;
+- `git status --short`; and
+- `git diff --check`.
+
+Require no matches from the three prior forbidden scans. Also require no match
+from a multiline scoped scan
+`rg -nU 'impl Key for VisibleLockfileKey[\\s\\S]{0,2500}WorkspaceFileKey\\s*\\{[\\s\\S]{0,500}MODULE\\.bazel\\.lock' app/slug_bzlmod_v2/src/module_eval.rs`
+and no exact-name alias match from
+`rg -n 'type BazelLockfile(V28)?\\b|(?:pub(?:\\([^)]*\\))?\\s+)?use .* as BazelLockfile\\b'`
+over the eight-file scope.
+
+The sole spelling bridge is exactly:
+
+```rust
+#[cfg(test)]
+pub(crate) use BazelLockfile as BazelLockfileV28;
+```
+
+It must occur exactly once immediately after the renamed struct and be the
+only `as BazelLockfileV28` match. This is private test compilation support for
+the accepted out-of-allowlist unit module, not a production alias.
+
+Stop and replan on any new key/lock, raw/text snapshot injection change outside
+the test helper, altered root-module source semantics, registry consumer edit,
+Host/Off activation, merge-conflict claim, generic JSON retention, non-test
+alias, second parser/renderer, inability to preserve direct error surfaces, or
+ninth implementation file.
+
+##### Raw-read live-cutover correction design status
+
+**Status:** Accepted after correction on 2026-07-26.
+
+Exact-source, implementation-feasibility, and architecture/DICE latest-text
+reviews all returned `ACCEPT`. The original six-file draft was corrected before
+implementation because the direct-DICE registry and loading tests also injected
+only text snapshots. The accepted eight-file boundary now gives every direct
+caller same-updater raw state, teaches the loading tracker the raw file edge,
+and preserves production's existing atomic raw/text snapshot injection without
+a fallback, new key, lock, filesystem read, or core/workspace edit.
+
+The packet freezes one sole renamed v28 value, typed parse/render errors,
+selective caught/direct hidden and visible behavior, complete semantic planner
+equality, registry tri-state projection, deletion of the old raw/general-only
+schema and test-only replay APIs, the exact private test spelling bridge, and
+multiline/alias forbidden scans. Exact Off reads, merge-conflict advice, and
+the separate Host owner remain explicitly unclaimed. No Rust, tests, fixtures,
+Cargo, dependency, API, DICE, or activation changed during design.
+
+Next evidence: Implement only
+`WP-5-m1-bazel-lockfile-v28-raw-read-live-cutover` under the exact eight-file
+contract and serial validation matrix above.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
