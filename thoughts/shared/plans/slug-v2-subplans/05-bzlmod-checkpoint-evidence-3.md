@@ -1108,7 +1108,53 @@ reviews returned `ACCEPT`.
 Next evidence: Design only
 `WP-5-m1-root-module-event-producer-design-correction`. Determine whether the
 current separate-key root-MODULE include layout can preserve the accepted
-one-local-batch-per-file include rule while capture is marker-conditional and
-outside semantic equality. Do not edit Rust, Cargo, fixtures, oracles,
-runtime/command/server paths, loading/analysis evaluators, nonroot evaluation,
-or discovery behavior.
+one-local-batch include rule while capture is marker-conditional and outside
+semantic equality. Do not edit Rust, Cargo, fixtures, oracles, runtime/command/
+server paths, loading/analysis evaluators, nonroot evaluation, or discovery
+behavior.
+
+### Stage 5 root-MODULE event-producer design correction
+
+Status: `REPLAN` before Rust
+
+Bazel source inspected: pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, especially
+`ModuleFileFunction`, `ModuleThreadContext`, and `ModuleFileGlobals`.
+
+Bazel compiles the complete root include horizon before execution, then runs
+the root and every included compiled program inline on one Starlark thread and
+one print handler. Repeated `include()` calls execute repeatedly at their
+textual sites. A missing or unparseable later include therefore fails before
+any root directive or print executes.
+
+The live Slug layout cannot own that event stream. `ModuleFileEvaluationKey`
+executes the root immediately in its own evaluator; root `include()` only
+records a label; and `RootModuleFilesKey` later evaluates deduplicated includes
+as separate breadth-first DICE nodes. For root `before`, include `part`, and
+root `after`, per-file batches can produce only `before, after, part`, not
+Bazel's single `before, part, after` batch. Activation-closure ordering cannot
+interleave batches at a dynamic call site, repeated includes are already
+deduplicated, and marker-absent root output can escape before a later include
+preflight failure. Adding events to semantic values or reconstructing them
+from source positions would violate the accepted equality boundary and remain
+wrong for nested, conditional, repeated, and failing execution.
+
+The first producer must therefore wait for a composed root/include evaluator:
+preflight and prepare the complete closure, execute includes inline with
+per-file binding isolation, preserve repeated calls, and attach one explicit
+`EventBatch` only to the composite execution node. Marker absence retains
+direct print; marker presence selects one capture-only handler; semantic
+values and equality remain event-free. No current per-file evaluation node
+may become an event producer.
+
+Three independent corrected terminal audits returned `REPLAN`. No Rust,
+Cargo, fixture, expected-output, oracle, command, server, runtime, loading,
+analysis, nonroot, or discovery file changed.
+
+Next evidence: Design only
+`WP-5-m1-root-module-include-composition-event-oracle-design`. Strengthen the
+existing retained-daemon `module-include-change-invalidation` fixture with
+exact nested/repeated inline order, warm nonreplay, print-only edit
+whole-closure reexecution, missing/parse preflight suppression,
+runtime-failure prefix events, and complete recovery before designing the
+composed evaluator or event producer.
