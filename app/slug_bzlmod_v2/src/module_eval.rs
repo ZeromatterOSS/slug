@@ -24,8 +24,11 @@ use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::PackageIdentifier;
+use slug_identity_v2::PackagePath;
 use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
+use slug_identity_v2::TargetName;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
 use starlark::PrintHandler;
@@ -90,6 +93,44 @@ use crate::lockfile::parse_visible_lockfile_content_for_mode;
 pub struct NonrootIncludeRequest {
     pub path: CompactString,
     pub location: LogicalSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct ParsedRootInclude {
+    package: PackageIdentifier,
+    target: TargetName,
+    raw_label: CompactString,
+    location: LogicalSpan,
+}
+
+impl ParsedRootInclude {
+    pub(crate) fn package(&self) -> &PackageIdentifier {
+        &self.package
+    }
+
+    pub(crate) fn target(&self) -> &TargetName {
+        &self.target
+    }
+
+    pub(crate) fn raw_label(&self) -> &str {
+        self.raw_label.as_str()
+    }
+
+    pub(crate) fn location(&self) -> &LogicalSpan {
+        &self.location
+    }
+}
+
+pub(crate) fn parse_root_include(
+    request: &NonrootIncludeRequest,
+) -> Result<ParsedRootInclude, CompactString> {
+    let (package, target) = parse_root_include_label(request.path.as_str())?;
+    Ok(ParsedRootInclude {
+        package: PackageIdentifier::new(CanonicalRepoName::root(), package),
+        target,
+        raw_label: request.path.clone(),
+        location: request.location.clone(),
+    })
 }
 
 /// Parser-backed syntax information for a single non-root MODULE file. Source
@@ -1320,13 +1361,17 @@ impl Key for RootModuleGraphKey {
 }
 
 fn include_path(workspace: &Path, label: &str) -> Result<PathBuf, CompactString> {
+    let (package, target) = parse_root_include_label(label)?;
+    Ok(workspace.join(package.as_str()).join(target.as_str()))
+}
+
+fn parse_root_include_label(label: &str) -> Result<(PackagePath, TargetName), CompactString> {
     let Some(repo_relative) = label.strip_prefix("//") else {
         return Err(CompactString::new(format!(
             "bad include label '{label}': include() must be called with repo-relative labels (starting with double slashes)"
         )));
     };
     let (package, target) = match repo_relative.split_once(':') {
-        Some((package, "")) => (package, package.rsplit('/').next().unwrap_or_default()),
         Some((package, target)) => (package, target),
         None => (
             repo_relative,
@@ -1335,23 +1380,24 @@ fn include_path(workspace: &Path, label: &str) -> Result<PathBuf, CompactString>
     };
     if package.contains(':')
         || target.contains(':')
-        || repo_relative.contains('\\')
-        || repo_relative.chars().any(char::is_control)
         || !(package.is_empty() || package.split('/').all(valid_package_segment))
-        || !target.split('/').all(valid_target_segment)
-        || !target.ends_with(".MODULE.bazel")
+    {
+        return Err(CompactString::new(format!("bad include label '{label}'")));
+    }
+    let package = PackagePath::parse(package)
+        .map_err(|_| CompactString::new(format!("bad include label '{label}'")))?;
+    let target = TargetName::parse(target)
+        .map_err(|_| CompactString::new(format!("bad include label '{label}'")))?;
+    if !target.as_str().ends_with(".MODULE.bazel")
         || target
+            .as_str()
             .rsplit('/')
             .next()
             .is_some_and(|name| name.starts_with('.'))
     {
         return Err(CompactString::new(format!("bad include label '{label}'")));
     }
-    Ok(if package.is_empty() {
-        workspace.join(target)
-    } else {
-        workspace.join(package).join(target)
-    })
+    Ok((package, target))
 }
 
 fn valid_package_segment(segment: &str) -> bool {
@@ -1363,10 +1409,6 @@ fn valid_package_segment(segment: &str) -> bool {
                 && !matches!(byte, b':' | b'\\')
         })
         && !segment.bytes().all(|byte| byte == b'.')
-}
-
-fn valid_target_segment(segment: &str) -> bool {
-    !matches!(segment, "" | "." | "..")
 }
 
 fn validate_module_name(name: &str) -> anyhow::Result<()> {

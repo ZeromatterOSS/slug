@@ -3925,6 +3925,35 @@ packet.
 Next evidence: Implement only
 `WP-5-m1-host-root-include-horizon-owner-corrected-retry`.
 
+##### Corrected retry implementation status
+
+**Status:** Accepted on 2026-07-26.
+
+The corrected three-file owner parses the complete include-label horizon
+before lookup, preserves raw labels and spans only for diagnostics, and uses
+canonical package/target identities for lookup and selected paths. It
+deduplicates packages in first-seen order, evaluates the unique package keys
+in one `compute_join` group, retains every grouped Need, and then scans the
+original includes so the first source-order terminal wins while an earlier
+Need returns the full union. Semantic NoBuildFile/Deleted/InvalidPackageName
+failures remain distinct from typed operational lookup errors. The owner is
+private and dormant, with no include observation, byte read, public export,
+consumer, dependency, or activation.
+
+Six focused regressions cover exact label/canonical-target boundaries,
+parse-all-before-lookup, operational failure identity, first-seen dedupe,
+full grouped Need union, both mixed terminal/Need directions, first-source
+terminals, alternate roots, and colonless repeated-basename path derivation.
+Full validation passed 69 bzlmod unit plus 214 integration tests, 54 loading
+tests, 102 core unit plus 13 integration tests, zero failing doctests, and
+all 20 affected GNU-Windows test executables linked. Formatting, diff,
+archive, privacy, no-IO, and exact-scope gates passed. Three terminal
+latest-diff reviews returned `ACCEPT`, including the exact Bazel 9.2.0 source
+audit against commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+Next evidence: Implement only `WP-5-m1-host-root-module-keys`.
+
 #### Serial packet 8: dormant Host root keys
 
 Only after packets 0-7 have terminal ACCEPT, run

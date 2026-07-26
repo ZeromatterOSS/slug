@@ -31,26 +31,28 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the private Host main-package lookup key passed
-three terminal latest-diff reviews, including an exact Bazel 9.2.0 source
-audit. The two-file owner validates exact package-name failures, preserves
-canonical-main deletion and `external` precedence, completes repository
-ignore before ordered root/BUILD probes, accepts resolved regular/special
-terminals, retains only the selected package-path entry and basename in
-successful equality, and keeps every Need transient. Retained lifecycle,
-typed resolver, full bzlmod/loading/core, and GNU-Windows link validation
-passed.
+Latest M1 accepted evidence: the corrected private Host root include-horizon
+owner passed three terminal latest-diff reviews, including an exact Bazel
+9.2.0 source audit. The three-file owner parses the entire label horizon
+before lookup, canonicalizes package/target identities, evaluates all
+first-seen unique packages in one grouped DICE computation, preserves the
+full grouped Need union, and applies source-order terminal precedence without
+observing or reading include files. Six focused regressions, full
+bzlmod/loading/core tests, static/privacy gates, and all 20 affected
+GNU-Windows test executable links passed.
 
 ### Current packet
 
-Implement only
-`WP-5-m1-host-root-include-horizon-owner-corrected-retry`.
+Implement only `WP-5-m1-host-root-module-keys`.
 
-Implement only the corrected three-file root include-label and same-horizon
-preflight owner. Parse the full horizon before lookup, canonicalize targets,
-compute all first-seen package keys as one group, then preserve source-order
-terminal-versus-unresolved precedence and grouped Need union. Add no include
-bytes, public reexport/loading consumer, or activation.
+Add the private dormant Host root files/graph keys in new `host_module.rs`,
+with only the required crate-private evaluator/root-mapping seams in
+`module_eval.rs` and a private module declaration in `lib.rs`. Return typed
+Host preparation outcomes, use `HostFileBytesKey`, map a missing root to the
+accepted bootstrap Need, and run the complete include-package horizon before
+reading any fragment. Compile and execute the complete closure inline, then
+preserve accepted lockfile/graph ordering. Add no write, warning, public
+consumer, or activation.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
