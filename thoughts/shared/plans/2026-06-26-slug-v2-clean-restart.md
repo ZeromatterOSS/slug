@@ -40,24 +40,28 @@ with two misses each, 27 BCR-only `source.json` successes, one BCR descriptor,
 one loopback descriptor, and three exact subject entries. All 184 BCR hashes
 match Bazel's pinned tools lockfile. The class correction then replanned on
 its impossible runtime-port mutation anchor: unchanged harness mutations do
-not expand `{{http_registry}}`. Freeze the checked subject hash as an
-exactly-once static anchor before resuming the ignored two-row diagnostic
-draft. No Rust, Cargo, harness, public API, or activation changed.
+not expand `{{http_registry}}`. The exact checked-hash correction then
+replanned because case-only checksum normalization is value-equal and cannot
+itself cross Bazel's write gate. Couple it to a watched-input extension
+reevaluation and generated-repository dependency before resuming the ignored
+two-row diagnostic draft. No Rust, Cargo, harness, public API, or activation
+changed.
 
 ### Current packet
 
 Design-correct only
-`WP-5-m1-bazel-lockfile-v28-schema-oracle-mutation-anchor-correction`.
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-write-trigger-correction`.
 
 Preserve the exact twelve-file/no-harness boundary, 15-row cap, and corrected
-DIRTREE and URL-class evidence. Preserve fully anchored dynamic URLs in
-post-generation checks and assertions. For pre-command text mutation only,
-replace the exact lowercase SHA-256 of the checked subject `MODULE.bazel` with
-its uppercase spelling after proving it occurs exactly once in the generated
-lockfile and no uppercase copy exists; require canonical rewrite to restore
-the lowercase value. No port token, generic hash/suffix, fixed port, or harness
-expansion is allowed. Fold the separate print probe into the rewrite row to
-preserve the 15-row cap, then terminally rereview before resuming the draft.
+DIRTREE, URL-class, and exactly-once subject-hash evidence. In the combined
+rewrite/print row, also change checked `input.txt`, make the print target
+depend explicitly on both generated repositories, and run in update mode
+with the same extension environment. Require current-factor reevaluation to
+produce an unequal value while retaining the valid foreign factor, then
+require the post-command manifest to restore the lowercase checksum. A
+case-only mutation is never accepted as the write trigger. Fold the separate
+print probe into this row to preserve the 15-row cap, then terminally rereview
+before resuming the draft.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

@@ -4914,6 +4914,44 @@ Correct only
 Terminally rereview this exact mutation exception before resuming the held
 draft.
 
+##### Lockfile v28 schema oracle canonical-write status
+
+**Status:** Replan before retained fixture evidence on 2026-07-26.
+
+Pinned-source review accepted uppercase checksum parsing, lowercase rendering,
+the exact static subject-hash anchor, and the URL-class contract, but found a
+missing write precondition. `BazelLockFileModule` writes only when the newly
+computed semantic lockfile differs from the parsed old value. Uppercase and
+lowercase checksum spellings parse to the same value, and retaining a valid
+foreign factor also creates no inequality. A case-only row therefore cannot
+claim that Bazel will rewrite the raw uppercase bytes.
+
+Correct only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-write-trigger-correction`:
+
+- preserve the exactly-once lowercase subject hash and zero-uppercase
+  precondition, then uppercase that exact hash and inject the valid foreign
+  factor in the combined rewrite/print row;
+- in the same row, mutate checked `input.txt` to a second exact value. Make
+  `//:print_lockfile` depend explicitly on both `@alpha//:value.txt` and
+  `@beta//:value.txt`, run it in update mode with the same allowlisted
+  extension environment, and require the extension-evaluated marker;
+- require the watched FILE input and generated repo content/spec to change the
+  current factor semantically, forcing `newLockfile != oldLockfile`. The valid
+  compatible foreign factor remains retained. Stdout may capture the injected
+  pre-write spelling, but the after-command manifest must contain the exact
+  lowercase subject hash, changed current factor, and retained foreign factor;
+- row 3 must find that exact canonical retained state before adding DIRTREE.
+  Stop if the print target does not force both generated repositories,
+  extension evaluation is absent, current-factor semantics remain equal,
+  canonical lowercase output is absent, or foreign-factor retention fails.
+
+The unchanged harness, exact twelve files, combined 15-row sequence,
+500-entry scaffold partition, dynamic URL assertions, no generic mutation,
+2,500-line cap, and all later DIRTREE/adapter/exception/replay gates remain
+exact. Terminally rereview this explicit semantic write trigger before
+resuming the held draft.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
