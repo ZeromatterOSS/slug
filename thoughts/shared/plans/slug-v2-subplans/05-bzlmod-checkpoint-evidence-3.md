@@ -2485,3 +2485,25 @@ latest diff.
 
 Next evidence after terminal acceptance of this design:
 implement only `WP-5-m1-terminal-oracle-reapi-applicability`.
+
+### Stage 5 terminal oracle REAPI applicability
+
+Status: Accepted
+
+The generic harness now appends NativeLink remote flags only to Slug build
+commands in a remote-executor fixture. Positive completed REAPI evidence is
+required exactly for a build command whose declared `expected_exit` is zero;
+the ordinary actual-exit comparison remains independent. Expected-failing
+builds still receive the remote flag, while query receives neither the flag nor
+an evidence requirement.
+
+Focused regressions prove successful-build strictness, expected-failing build
+behavior, query exclusion, and both expected/actual exit mismatch directions.
+The two top-level oracle-harness test modules pass 52 tests. Formatting,
+diff-check, and exact three-file scope gates pass. Independent contract and
+architecture latest-diff reviews returned `ACCEPT`; the architecture reviewer
+withdrew an actual-exit suggestion after rereading the accepted contract and
+the bidirectional discriminator.
+
+Next evidence: Implement only the six-file, nine-row
+`WP-5-m1-terminal-event-execution-oracle`.

@@ -22,6 +22,7 @@ from tools.v2_oracle_lib.fixture import (
     Fixture,
     FixtureCommand,
     Mutation,
+    ReapiConfig,
     discover_fixtures,
     load_fixture,
 )
@@ -33,6 +34,7 @@ from tools.v2_oracle_lib.runner import (
     _argv,
     _apply_mutations,
     _extract_reapi_evidence,
+    _slug_reapi_argv,
     run_fixture,
 )
 
@@ -681,6 +683,130 @@ def test_extract_reapi_evidence_parses_slug_stderr() -> None:
 def test_extract_reapi_evidence_returns_none_for_non_reapi_stderr() -> None:
     stderr = '{"error":"analysis_not_implemented","command":"build"}\n'
     assert _extract_reapi_evidence(stderr) is None
+
+
+def _remote_fixture(command: FixtureCommand) -> Fixture:
+    return Fixture(
+        name="reapi-applicability",
+        root=Path("/fixture"),
+        workspace=Path("/fixture/workspace"),
+        expected=Path("/fixture/expected"),
+        commands=(command,),
+        reapi=ReapiConfig(remote_executor=True),
+    )
+
+
+def _actual_command(
+    command: FixtureCommand, *, actual_exit: int | None = None
+) -> dict[str, object]:
+    return {
+        "tool": "slug",
+        "commands": [
+            {
+                "exit_code": (
+                    command.expected_exit if actual_exit is None else actual_exit
+                ),
+                "name": command.name,
+                "normalized_stdout": "",
+                "normalized_stderr": "",
+                "manifest": [],
+            }
+        ],
+    }
+
+
+def test_successful_remote_build_gets_flags_and_requires_evidence() -> None:
+    command = FixtureCommand(
+        name="successful_build",
+        argv=("build", "//pkg:probe"),
+        compare="semantic",
+        expected_exit=0,
+    )
+    argv = _slug_reapi_argv(
+        ["slug", "build", "//pkg:probe"],
+        command,
+        "grpc://127.0.0.1:50051",
+        ("cpu=x86_64",),
+    )
+    assert argv[-2:] == [
+        "--remote_executor=grpc://127.0.0.1:50051",
+        "--remote_default_exec_properties=cpu=x86_64",
+    ]
+    failures = compare_result(
+        _remote_fixture(command), _actual_command(command), expected=None
+    )
+    assert any("REAPI evidence was not emitted" in failure for failure in failures)
+
+
+def test_expected_failing_remote_build_gets_flags_without_evidence_requirement() -> None:
+    command = FixtureCommand(
+        name="failed_build",
+        argv=("build", "//pkg:failure"),
+        compare="message_shape",
+        expected_exit=1,
+    )
+    argv = _slug_reapi_argv(
+        ["slug", "build", "//pkg:failure"],
+        command,
+        "grpc://127.0.0.1:50051",
+        (),
+    )
+    assert argv[-1] == "--remote_executor=grpc://127.0.0.1:50051"
+    assert compare_result(
+        _remote_fixture(command), _actual_command(command), expected=None
+    ) == []
+
+
+def test_reapi_evidence_applicability_is_independent_of_actual_exit() -> None:
+    successful_contract = FixtureCommand(
+        name="unexpected_build_failure",
+        argv=("build", "//pkg:probe"),
+        compare="message_shape",
+        expected_exit=0,
+    )
+    failures = compare_result(
+        _remote_fixture(successful_contract),
+        _actual_command(successful_contract, actual_exit=1),
+        expected=None,
+    )
+    assert any("exit code 1 != 0" in failure for failure in failures)
+    assert any("REAPI evidence was not emitted" in failure for failure in failures)
+
+    failing_contract = FixtureCommand(
+        name="unexpected_build_success",
+        argv=("build", "//pkg:failure"),
+        compare="message_shape",
+        expected_exit=1,
+    )
+    failures = compare_result(
+        _remote_fixture(failing_contract),
+        _actual_command(failing_contract, actual_exit=0),
+        expected=None,
+    )
+    assert any("exit code 0 != 1" in failure for failure in failures)
+    assert not any("REAPI evidence" in failure for failure in failures)
+
+
+def test_remote_fixture_query_gets_neither_flags_nor_evidence_requirement() -> None:
+    command = FixtureCommand(
+        name="query",
+        argv=("query", "//pkg:probe"),
+        compare="message_shape",
+        expected_exit=0,
+    )
+    base_argv = ["slug", "query", "//pkg:probe"]
+    assert (
+        _slug_reapi_argv(
+            base_argv,
+            command,
+            "grpc://127.0.0.1:50051",
+            ("cpu=x86_64",),
+        )
+        == base_argv
+    )
+    assert compare_result(
+        _remote_fixture(command), _actual_command(command), expected=None
+    ) == []
 
 
 def test_compare_rejects_missing_evidence_for_remote_fixture() -> None:

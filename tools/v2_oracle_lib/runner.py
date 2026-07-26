@@ -325,11 +325,14 @@ def _shutdown_slug_daemon(output_base: Path) -> None:
 
 def _slug_reapi_argv(
     argv: list[str],
-    service: NativeLinkService,
+    command: FixtureCommand,
+    endpoint: str,
     default_exec_properties: tuple[str, ...],
 ) -> list[str]:
     result = list(argv)
-    result.append(f"--remote_executor={service.endpoint}")
+    if command.argv[0] != "build":
+        return result
+    result.append(f"--remote_executor={endpoint}")
     for prop in default_exec_properties:
         result.append(f"--remote_default_exec_properties={prop}")
     return result
@@ -396,7 +399,8 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
             if nativelink_service is not None:
                 argv = _slug_reapi_argv(
                     argv,
-                    nativelink_service,
+                    command,
+                    nativelink_service.endpoint,
                     fixture.reapi.default_exec_properties,
                 )
             env = os.environ.copy()
