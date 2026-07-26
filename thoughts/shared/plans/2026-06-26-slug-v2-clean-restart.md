@@ -41,16 +41,16 @@ changed in the design packet.
 
 ### Current packet
 
-Run only
-`WP-5-m1-five-packet-fixture-growth-review`.
+Implement only
+`WP-5-m1-root-module-bootstrap-request-owner`.
 
-Inventory accepted fixture growth after baseline `42e38bc3` across root-patch,
-Local lifecycle, root-MODULE include events, terminal event/execution, and
-root main-package-policy oracle packets. Verify every retained row and asset
-remains discriminating, inspect repeated subtrees, and record one compact
-baseline/result in the oracle-harness owner plan. Do not edit or replay a
-fixture unless the review establishes a pruning allowlist. No Rust packet may
-start before terminal acceptance of this hygiene checkpoint.
+Add the typed root-bootstrap request/result/error/warning domain seam and one
+optional request to `SourcePreparationNeeds` in exactly the four files frozen
+by the accepted owner plan. Pin the exact 399 reminder bytes/hash/warning,
+matching/conflicting request union, cumulative union with both existing Need
+kinds, and invalid/self-unequal outcomes carrying the request. Do not add IO,
+DICE computation, a producer, runtime apply, warning publication, or a
+production consumer.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

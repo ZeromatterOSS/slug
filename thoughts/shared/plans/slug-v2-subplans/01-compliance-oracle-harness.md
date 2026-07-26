@@ -977,3 +977,33 @@ Two independent inventories, root tracked-archive synthesis, and a fresh
 terminal review returned `ACCEPT`. The pruning allowlist and affected replay
 set are both `none`. The next fixture-growth checkpoint starts from accepted
 tree `42e38bc3` and counts later accepted oracle packets only.
+
+### Fixture-growth hygiene checkpoint (2026-07-25, third review)
+
+The five-packet review compared tracked archives at baseline `42e38bc3` and
+accepted oracle tree `f01ebd33`. The fixture tree grew from 1,272 regular
+files, ten symlinks, and 31,208 newline-counted regular-file lines to 1,284
+regular files, 14 symlinks, and 33,789 lines: 12 regular files, four symlinks,
+and 2,581 lines.
+
+The accepted packet deltas were root-patch `9fa4fbde` (+3 regular, +1 symlink,
++104 lines), Local lifecycle `dcc19327` (+2 regular, +3 symlinks, +282),
+root-MODULE include events `699c3a8e` (+1 regular, +224), terminal
+event/execution `7f6c71c9` (no entries, +321), and root main-package-policy
+`f01ebd33` (+6 regular, +1,650). The four affected final fixtures retain 71
+rows, 56 more than the baseline.
+
+Every retained row, asset, mutation, manifest field, expected record, and
+negative assertion remains discriminating. The review found one stale-output
+hole in the Local regular-file row; `c039c347` retains its contract-mandated
+wrong-kind transition while requiring Bazel's observed refetch warning, so a
+cached preceding Missing result cannot pass. Its focused 16-row replay passed.
+No substantive subtree was copied. Repeated one-line unfetched registry
+metadata and package markers remain required at fixture-local paths; the
+relative lifecycle symlinks, nested include, existing terminal topology, and
+two-fragment root-policy topology each encode distinct behavior.
+
+Root tracked-archive synthesis and three independent corrected terminal
+reviews returned `ACCEPT`. The pruning allowlist and further affected replay
+set are both `none`. The next checkpoint starts from accepted tree `c039c347`
+and counts later accepted oracle packets only.
