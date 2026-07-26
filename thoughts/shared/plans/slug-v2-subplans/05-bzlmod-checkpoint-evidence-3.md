@@ -4952,6 +4952,25 @@ The unchanged harness, exact twelve files, combined 15-row sequence,
 exact. Terminally rereview this explicit semantic write trigger before
 resuming the held draft.
 
+##### Lockfile v28 schema oracle write-trigger correction
+
+**Status:** Accepted on 2026-07-26.
+
+Pinned-source, held-fixture implementability, and orchestration/evidence
+latest-text reviews all returned `ACCEPT`. The combined row can add the two
+generated repository labels to the existing print target, mutate the checked
+FILE input, uppercase the exactly-once subject checksum, inject a compatible
+foreign factor, and run in update mode with the same environment. The changed
+FILE digest and generated repo spec make the current factor unequal, forcing
+Bazel's write gate while `combineModuleExtensions` retains the foreign factor.
+Stdout may show the injected pre-write bytes; only the post-command manifest
+proves canonical lowercase output. No fixture edit or generation occurred
+during review.
+
+Next evidence: Resume only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle` under the complete corrected
+twelve-file, 15-row, 2,500-line contract.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only

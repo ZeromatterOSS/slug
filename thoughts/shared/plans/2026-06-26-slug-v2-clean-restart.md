@@ -42,26 +42,28 @@ match Bazel's pinned tools lockfile. The class correction then replanned on
 its impossible runtime-port mutation anchor: unchanged harness mutations do
 not expand `{{http_registry}}`. The exact checked-hash correction then
 replanned because case-only checksum normalization is value-equal and cannot
-itself cross Bazel's write gate. Couple it to a watched-input extension
-reevaluation and generated-repository dependency before resuming the ignored
-two-row diagnostic draft. No Rust, Cargo, harness, public API, or activation
-changed.
+itself cross Bazel's write gate. All three terminal reviews now accept the
+corrected watched-input/generated-repository semantic write trigger. Resume
+only the ignored two-row diagnostic draft under that accepted contract. No
+Rust, Cargo, harness, public API, or activation changed.
 
 ### Current packet
 
-Design-correct only
-`WP-5-m1-bazel-lockfile-v28-schema-oracle-write-trigger-correction`.
+Implement only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle`.
 
 Preserve the exact twelve-file/no-harness boundary, 15-row cap, and corrected
-DIRTREE, URL-class, and exactly-once subject-hash evidence. In the combined
+DIRTREE, URL-class, exactly-once subject-hash, and semantic-write evidence. In
+the combined
 rewrite/print row, also change checked `input.txt`, make the print target
 depend explicitly on both generated repositories, and run in update mode
 with the same extension environment. Require current-factor reevaluation to
 produce an unequal value while retaining the valid foreign factor, then
 require the post-command manifest to restore the lowercase checksum. A
 case-only mutation is never accepted as the write trigger. Fold the separate
-print probe into this row to preserve the 15-row cap, then terminally rereview
-before resuming the draft.
+print probe into this row to preserve the 15-row cap. Generate and run two
+fresh-root replays, then perform the exact source, scaffold, growth, archive,
+diff, and terminal review gates before retaining the fixture.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
