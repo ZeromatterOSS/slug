@@ -2507,3 +2507,49 @@ the bidirectional discriminator.
 
 Next evidence: Implement only the six-file, nine-row
 `WP-5-m1-terminal-event-execution-oracle`.
+
+### Stage 5 terminal event/execution oracle first implementation
+
+Status: Replanned
+
+The six fixture files generated and replayed the accepted nine Bazel 9.2 rows
+twice from fresh roots. Exact producer/failure ordering, nine exits, empty
+stdout, command-local V1/V2 manifests, warm nonreplay, zero new entries, and
+net fixture growth of 321 lines all passed. Runtime assembly of the analysis
+and action failure sentinels prevented echoed source/command text from
+satisfying their diagnostic patterns.
+
+The required downstream harness run exposed one direct consumer outside the
+allowlist: `test_fixture_parser_reads_commands_and_mutations` hard-codes two
+commands and the old mutation at command index one. The accepted six-file
+allowlist forbade correcting it, and the stop gate explicitly required replan
+on any escape. Both latest-diff reviews returned `REPLAN`. All six draft files
+were returned to clean `7a1ba309`; no oracle change was retained.
+
+### Stage 5 terminal event/execution oracle allowlist correction
+
+Status: Accepted
+
+Retry the semantically unchanged nine-row oracle with one exact seventh file:
+`tests/v2_oracle/test_v2_oracle.py`. In that file only, strengthen the direct
+fixture parser regression to:
+
+- assert the exact nine command names in accepted order, rather than only a
+  count;
+- select `empty_query_after_dependency_edit` at command index three; and
+- assert its exact two ordered `pkg/message.bzl` mutations: sentinel V1 to V2,
+  then `MESSAGE = "one"` to `"two"`.
+
+Preserve the separate daemon/REAPI parser regression. No runner, comparator,
+schema, other fixture, production code, new entry, row, sentinel, manifest,
+provenance, or growth contract changes. Validate the focused parser and both
+top-level harness modules in addition to pinned generation and two fresh-root
+replays. The exact retry allowlist is the original six fixture files plus this
+one test file.
+
+Two independent terminal reviews agreed that the six fixture files otherwise
+fully conform and that this is the sole correction. Fixture growth remains zero
+entries and 321 lines because the test edit is outside the fixture tree.
+
+Next evidence: Retry only the corrected seven-file
+`WP-5-m1-terminal-event-execution-oracle`.
