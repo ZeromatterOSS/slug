@@ -1,0 +1,424 @@
+[fixture]
+name = "root-module-package-policy"
+description = "Bazel 9.2 retained-daemon oracle for root MODULE include package lookup, package-path priority, deleted/vendor policy, first-root .bazelignore, full REPO.bazel evaluation, prefix glob matching, event preflight, and recovery."
+comparison = "semantic"
+daemon = true
+oracle_notes = "The first three rows prove every root include package is checked before any MODULE print. With --package_path=%workspace%:%workspace%/alternate, root1/pkg/BUILD beats root2/pkg/BUILD.bazel, proving package roots are outermost and BUILD names innermost; deleting root1's marker selects the alternate bytes under the same logical //pkg label. Later rows isolate all main deleted-package spellings, contained versus resolved-outside vendor directories, strictly first-file .bazelignore behavior, explicit-keyword-only REPO evaluation, warm print nonreplay, wildcard-prefix matching, failures, and same-daemon recovery. Reserved //external remains pinned-source evidence because a discriminating marker needs an unauthorized seeded directory; literal absolute outside-vendor argv spelling remains pinned-source evidence because the harness has no run-path argv token, while --vendor_dir=.. proves the same resolved absolute containment result."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java: computeForRootModule, advanceHorizon",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupFunction.java: compute, findPackageByBuildFile",
+  "src/main/java/com/google/devtools/build/lib/skyframe/IgnoredSubdirectoriesFunction.java: computeIgnoredPatterns, computeIgnoredPrefixes",
+  "src/main/java/com/google/devtools/build/lib/skyframe/RepoFileFunction.java: readAndParseRepoFile, evalRepoFile",
+  "src/main/java/com/google/devtools/build/lib/packages/RepoFileGlobals.java: repoCallable, ignoreDirectories",
+  "src/main/java/com/google/devtools/build/lib/packages/RepoThreadContext.java",
+  "src/main/java/com/google/devtools/build/lib/cmdline/IgnoredSubdirectories.java: matchingEntry",
+  "src/main/java/com/google/devtools/build/lib/vfs/UnixGlob.java: matchesPrefix",
+  "src/main/java/com/google/devtools/build/lib/actions/FileValue.java: isFile",
+]
+translation_notes = "The fixture is main-repository-only and has no registry or dependency scaffold. Both included fragments are checked seed inputs; the alternate fragment is temporarily rewritten for the logical-label diagnostic and then restored. BUILD markers and policy files are cumulative mutations. The alternate fragment serves both //alternate/pkg below the first package root and //pkg below the second root, discriminating logical include labels from selected package roots without duplicating assets. Every policy failure rejects the complete ROOT_MAIN_POLICY namespace, proving horizon package lookup before root or fragment execution. REPO prints remain separately namespaced so failure and warm replay are observable."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture root-module-package-policy --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture root-module-package-policy --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "missing_first_package_preflights_before_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - <workspace>/pkg\n - <workspace>/alternate/pkg"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z", "(?s)\\n - <workspace>/alternate/pkg(?!\\n - )"]
+
+[[commands]]
+name = "recovering_first_reports_second_before_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["unable to load package for '//alternate/pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:4:1: BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - <workspace>/alternate/pkg\n - <workspace>/alternate/alternate/pkg"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z", "(?s)\\n - <workspace>/alternate/alternate/pkg(?!\\n - )"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "pkg/BUILD"
+  content = ""
+
+[[commands]]
+name = "root_order_outranks_build_name_and_executes_source_order"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "alternate/pkg/BUILD.bazel"
+  content = ""
+
+[[commands]]
+name = "unchanged_warm_request_replays_no_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "removing_first_root_marker_selects_alternate_bytes"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "pkg/BUILD"
+
+[[commands]]
+name = "alternate_selected_runtime_failure_keeps_logical_include_label"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["include(\"//pkg:policy.MODULE.bazel\")", "alternate/pkg/policy.MODULE.bazel", "ROOT_MAIN_POLICY_ALT_SELECTED_FAILURE", "error executing MODULE.bazel file for <root>"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_PRIMARY)(?!.*ROOT_MAIN_POLICY_ALTERNATE)(?!.*ROOT_MAIN_POLICY_ROOT_AFTER).*ROOT_MAIN_POLICY_ROOT_BEFORE.*ROOT_MAIN_POLICY_ALT_RUNTIME_PREFIX.*\\Z"]
+
+  [[commands.mutations]]
+  path = "alternate/pkg/policy.MODULE.bazel"
+  content = "print(\"ROOT_MAIN_POLICY_ALT_RUNTIME_PREFIX\")\nfail(\"ROOT_MAIN_POLICY_ALT_SELECTED_FAILURE\")\n"
+
+[[commands]]
+name = "alternate_runtime_recovery_and_fallback_build_restore_first_root"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "alternate/pkg/policy.MODULE.bazel"
+  content = "print(\"ROOT_MAIN_POLICY_ALTERNATE\")\n"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "pkg/BUILD"
+  content = ""
+
+[[commands]]
+name = "build_bazel_displaces_fallback_and_reexecutes"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "pkg/BUILD.bazel"
+  content = ""
+
+[[commands]]
+name = "deleting_lower_priority_build_preserves_build_bazel_without_replay"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "pkg/BUILD"
+
+[[commands]]
+name = "deleted_unqualified_main_package_rejects_before_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate", "--deleted_packages=pkg"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["pkg", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "deleted_double_slash_main_package_is_same_identity"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate", "--deleted_packages=//pkg"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["pkg", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "deleted_single_at_main_package_is_same_identity"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate", "--deleted_packages=@//pkg"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["pkg", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "deleted_canonical_main_package_is_same_identity"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate", "--deleted_packages=@@//pkg"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["pkg", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "deleted_nonmain_literal_is_distinct_and_recovers"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate", "--deleted_packages=@other//pkg"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+[[commands]]
+name = "first_root_bazelignore_literal_prefix_rejects_package"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["pkg", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = ".bazelignore"
+  content = "pkg\n"
+
+[[commands]]
+name = "editing_first_root_bazelignore_recovers"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = ".bazelignore"
+  content = "not_pkg\n"
+
+[[commands]]
+name = "later_root_bazelignore_is_unobserved_while_first_file_exists"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "alternate/.bazelignore"
+  content = "pkg\n"
+
+[[commands]]
+name = "deleting_first_bazelignore_selects_later_file"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["pkg", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = ".bazelignore"
+
+[[commands]]
+name = "wildcards_are_literal_in_later_bazelignore_and_recover"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "alternate/.bazelignore"
+  content = "p*g\n"
+
+[[commands]]
+name = "restoring_later_bazelignore_rejects_before_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["pkg", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  path = "alternate/.bazelignore"
+  content = "pkg\n"
+
+[[commands]]
+name = "deleting_rejecting_later_bazelignore_recovers_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "alternate/.bazelignore"
+
+[[commands]]
+name = "explicit_repo_kwargs_and_nonmatching_ignore_execute"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "ROOT_REPO_POLICY_V1"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_REPO_POLICY_).)*ROOT_REPO_POLICY_V1(?:(?!ROOT_REPO_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "REPO.bazel"
+  content = "repo(default_visibility = [\"//visibility:public\"])\nprint(\"ROOT_REPO_POLICY_V1\")\nignore_directories([\"not_pkg\"])\n"
+
+[[commands]]
+name = "unchanged_repo_and_module_request_replays_no_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "repo_star_pattern_rejects_before_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["ROOT_REPO_POLICY_STAR", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?:(?!ROOT_REPO_POLICY_).)*ROOT_REPO_POLICY_STAR(?:(?!ROOT_REPO_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "repo(default_visibility = [\"//visibility:public\"])\nprint(\"ROOT_REPO_POLICY_STAR\")\nignore_directories([\"p*\"])\n"
+
+[[commands]]
+name = "repo_question_pattern_rejects_before_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["ROOT_REPO_POLICY_QUESTION", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?:(?!ROOT_REPO_POLICY_).)*ROOT_REPO_POLICY_QUESTION(?:(?!ROOT_REPO_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "repo(default_visibility = [\"//visibility:public\"])\nprint(\"ROOT_REPO_POLICY_QUESTION\")\nignore_directories([\"p?g\"])\n"
+
+[[commands]]
+name = "repo_recursive_pattern_rejects_before_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["ROOT_REPO_POLICY_RECURSIVE", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?:(?!ROOT_REPO_POLICY_).)*ROOT_REPO_POLICY_RECURSIVE(?:(?!ROOT_REPO_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "repo(default_visibility = [\"//visibility:public\"])\nprint(\"ROOT_REPO_POLICY_RECURSIVE\")\nignore_directories([\"**/pkg\"])\n"
+
+[[commands]]
+name = "repo_nonmatching_edit_recovers"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "ROOT_REPO_POLICY_RECOVER"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_REPO_POLICY_RECOVER(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "repo(default_visibility = [\"//visibility:public\"])\nprint(\"ROOT_REPO_POLICY_RECOVER\")\nignore_directories([\"not_pkg\"])\n"
+
+[[commands]]
+name = "repo_source_level_starstar_arguments_are_rejected"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["**kwargs arguments are not allowed in REPO.bazel files. Pass the arguments in explicitly.", "error parsing REPO.bazel file for the main repo"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "repo(**{\"default_visibility\": [\"//visibility:public\"]})\nignore_directories([\"not_pkg\"])\n"
+
+[[commands]]
+name = "duplicate_repo_call_is_rejected"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["'repo' can only be called once in the REPO.bazel file", "error evaluating REPO.bazel file for the main repo"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "repo(default_visibility = [\"//visibility:public\"])\nrepo(default_visibility = [\"//visibility:public\"])\n"
+
+[[commands]]
+name = "repo_after_other_function_is_rejected"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["if repo() is called, it must be called before any other functions"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "ignore_directories([\"not_pkg\"])\nrepo(default_visibility = [\"//visibility:public\"])\n"
+
+[[commands]]
+name = "duplicate_ignore_directories_is_rejected"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 37
+stderr_contains = ["'ignored_directories()' can only be called once"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "ignore_directories([\"not_pkg\"])\nignore_directories([\"not_pkg\"])\n"
+
+[[commands]]
+name = "valid_repo_recovery_executes_once"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully", "ROOT_REPO_POLICY_FINAL"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_REPO_POLICY_FINAL(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_REPO_POLICY_|ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "repo(default_visibility = [\"//visibility:public\"])\nprint(\"ROOT_REPO_POLICY_FINAL\")\nignore_directories([\"not_pkg\"])\n"
+
+[[commands]]
+name = "final_unchanged_warm_request_replays_no_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "matching_repo_policy_rejects_before_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["ROOT_REPO_POLICY_DELETE_GATE", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?:(?!ROOT_REPO_POLICY_).)*ROOT_REPO_POLICY_DELETE_GATE(?:(?!ROOT_REPO_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "REPO.bazel"
+  content = "repo(default_visibility = [\"//visibility:public\"])\nprint(\"ROOT_REPO_POLICY_DELETE_GATE\")\nignore_directories([\"pkg\"])\n"
+
+[[commands]]
+name = "deleting_rejecting_repo_recovers_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_REPO_POLICY_)(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "REPO.bazel"
+
+[[commands]]
+name = "resolved_outside_workspace_vendor_does_not_ignore_package"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate", "--vendor_dir=.."]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "contained_vendor_directory_ignores_package_before_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate", "--vendor_dir=pkg"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["pkg", "Package is considered deleted due to --deleted_packages"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_MAIN_POLICY_)(?!.*ROOT_REPO_POLICY_).*\\Z"]
+
+[[commands]]
+name = "clearing_contained_vendor_policy_recovers_module_events"
+argv = ["build", "//:probe", "--lockfile_mode=off", "--package_path=%workspace%:%workspace%/alternate"]
+expected_exit = 0
+stderr_contains = ["Build completed successfully"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_REPO_POLICY_)(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_BEFORE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_PRIMARY(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ALTERNATE(?:(?!ROOT_MAIN_POLICY_).)*ROOT_MAIN_POLICY_ROOT_AFTER(?:(?!ROOT_MAIN_POLICY_).)*\\Z"]

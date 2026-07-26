@@ -3589,3 +3589,41 @@ or production file changed.
 
 Next evidence: Implement only
 `WP-5-m1-root-main-package-policy-oracle`.
+
+### Stage 5 root main-package-policy oracle
+
+Status: Accepted
+
+The isolated `root-module-package-policy` fixture retains exactly the frozen
+six files and 38 Bazel 9.2 commands in 1,650 newline-counted lines. It proves
+same-horizon preflight before any root/include event, exact first-source
+failure and ordered package-root search lists, package-root-before-BUILD-name
+selection, alternate-root bytes with the logical include traceback,
+`BUILD.bazel` priority without lower-priority invalidation, all four main
+deleted-package spellings and a distinct nonmain literal, first-readable
+`.bazelignore`, literal ignore entries, full REPO evaluation/call errors,
+`*`/`?`/`**` prefix matching, cold/change-only REPO prints, and rejecting
+policy deletion plus vendor-option recovery in one retained daemon.
+
+Pinned-source `//external` evidence remains outside the fixture because the
+fixed allowlist and mutation schema cannot seed its missing parent directory.
+A literal absolute outside-workspace vendor argv remains source-backed because
+the harness has no run-directory argv token; `--vendor_dir=..` proves the same
+resolved-absolute containment branch without writing through `/tmp` or `/`.
+There is no registry, dependency, platform, checked-output, WORKSPACE, harness,
+special-file, or duplicated asset scaffold.
+
+Generation at `20260726-034413` and independent replay at
+`20260726-034549` passed. The corrected latest assertions passed fresh replays
+at `20260726-035133` and `20260726-035413`. The bounded correction made
+BUILD-name priority discriminating, made `.bazelignore` and REPO deletion
+recover from rejecting states, pinned complete REPO diagnostics, added
+contained-vendor recovery, and made both horizon failures retain the exact
+logical label, source location, complete ordered root list, and no-event
+boundary. All three terminal latest-text reviews returned `ACCEPT`.
+`python3 -B -m pytest tests/v2_oracle` remains unavailable because the system
+Python has no `pytest` module; this is an environment residual, while fixture
+schema loading and every Bazel comparison passed through the oracle runner.
+
+Next evidence: Run only the required focused five-packet fixture-growth
+checkpoint against accepted baseline `42e38bc3` before any Rust packet.

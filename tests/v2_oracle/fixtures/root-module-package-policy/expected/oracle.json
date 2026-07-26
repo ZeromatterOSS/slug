@@ -1,0 +1,1216 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_first_package_preflights_before_events",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - <workspace>/pkg\n - <workspace>/alternate/pkg\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034042-2949895-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 2aaff76e-8e54-4613-a9e5-9a0ccb4c10e8\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2aaff76e-8e54-4613-a9e5-9a0ccb4c10e8\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg\n - /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2aaff76e-8e54-4613-a9e5-9a0ccb4c10e8\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "pkg/BUILD"
+        }
+      ],
+      "name": "recovering_first_reports_second_before_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//alternate/pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:4:1: BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - <workspace>/alternate/pkg\n - <workspace>/alternate/alternate/pkg\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 04ec9c33-be4f-4b53-ab83-09d645afbd0c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/04ec9c33-be4f-4b53-ab83-09d645afbd0c\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//alternate/pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:4:1: BUILD file not found in any of the following directories. Add a BUILD file to a directory to mark it as a package.\n - /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg\n - /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/alternate/pkg\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/04ec9c33-be4f-4b53-ab83-09d645afbd0c\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "alternate/pkg/BUILD.bazel"
+        }
+      ],
+      "name": "root_order_outranks_build_name_and_executes_source_order",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 3e242bfc-2178-41f8-82e0-6189e672e8c1\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3e242bfc-2178-41f8-82e0-6189e672e8c1\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 4.683s, Critical Path: 0.01s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3e242bfc-2178-41f8-82e0-6189e672e8c1\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "unchanged_warm_request_replays_no_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 9b5491fa-db6c-456f-8954-c8abdd4b374c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/9b5491fa-db6c-456f-8954-c8abdd4b374c\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.032s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/9b5491fa-db6c-456f-8954-c8abdd4b374c\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "pkg/BUILD"
+        }
+      ],
+      "name": "removing_first_root_marker_selects_alternate_bytes",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 44340938-27b8-4ca8-9ddc-e346b1d3bf4c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/44340938-27b8-4ca8-9ddc-e346b1d3bf4c\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.040s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/44340938-27b8-4ca8-9ddc-e346b1d3bf4c\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "36",
+          "path": "alternate/pkg/policy.MODULE.bazel",
+          "replace": null
+        }
+      ],
+      "name": "alternate_selected_runtime_failure_keeps_logical_include_label",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALT_RUNTIME_PREFIX\nERROR: <workspace>/alternate/pkg/policy.MODULE.bazel:2:5: Traceback (most recent call last):\n\tFile \"<workspace>/MODULE.bazel\", line 3, column 8, in <toplevel>\n\t\tinclude(\"//pkg:policy.MODULE.bazel\")\n\tFile \"<builtin>\", in include\n\tFile \"<workspace>/alternate/pkg/policy.MODULE.bazel\", line 2, column 5, in <toplevel>\n\t\tfail(\"ROOT_MAIN_POLICY_ALT_SELECTED_FAILURE\")\nError in fail: ROOT_MAIN_POLICY_ALT_SELECTED_FAILURE\nERROR: Error computing the main repository mapping: error executing MODULE.bazel file for <root>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 28deb788-c789-4597-be9c-b8fd62001ee6\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/28deb788-c789-4597-be9c-b8fd62001ee6\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALT_RUNTIME_PREFIX\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:2:5: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel\", line 3, column 8, in <toplevel>\n\t\tinclude(\"//pkg:policy.MODULE.bazel\")\n\tFile \"<builtin>\", in include\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel\", line 2, column 5, in <toplevel>\n\t\tfail(\"ROOT_MAIN_POLICY_ALT_SELECTED_FAILURE\")\nError in fail: ROOT_MAIN_POLICY_ALT_SELECTED_FAILURE\nERROR: Error computing the main repository mapping: error executing MODULE.bazel file for <root>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/28deb788-c789-4597-be9c-b8fd62001ee6\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "91",
+          "path": "alternate/pkg/policy.MODULE.bazel",
+          "replace": null
+        },
+        {
+          "op": "create",
+          "path": "pkg/BUILD"
+        }
+      ],
+      "name": "alternate_runtime_recovery_and_fallback_build_restore_first_root",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: d5b1c020-4dd9-46a2-b532-bad05ba9a89e\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d5b1c020-4dd9-46a2-b532-bad05ba9a89e\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 2.799s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d5b1c020-4dd9-46a2-b532-bad05ba9a89e\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "pkg/BUILD.bazel"
+        }
+      ],
+      "name": "build_bazel_displaces_fallback_and_reexecutes",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: c97d486d-3498-417f-93b8-e52d9939029d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/c97d486d-3498-417f-93b8-e52d9939029d\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.029s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/c97d486d-3498-417f-93b8-e52d9939029d\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "pkg/BUILD"
+        }
+      ],
+      "name": "deleting_lower_priority_build_preserves_build_bazel_without_replay",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: db16130c-32d4-450b-bfcb-b5c47645c253\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/db16130c-32d4-450b-bfcb-b5c47645c253\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.021s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/db16130c-32d4-450b-bfcb-b5c47645c253\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=pkg"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=pkg"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [],
+      "name": "deleted_unqualified_main_package_rejects_before_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 74f74369-77a0-42d1-af70-849837df5794\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/74f74369-77a0-42d1-af70-849837df5794\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/74f74369-77a0-42d1-af70-849837df5794\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=//pkg"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=//pkg"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [],
+      "name": "deleted_double_slash_main_package_is_same_identity",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 6fb903a4-7c8e-453b-8f80-901d0d33986f\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/6fb903a4-7c8e-453b-8f80-901d0d33986f\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/6fb903a4-7c8e-453b-8f80-901d0d33986f\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=@//pkg"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=@//pkg"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [],
+      "name": "deleted_single_at_main_package_is_same_identity",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8e44b6a1-2b1e-46fd-871b-af976db794a6\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8e44b6a1-2b1e-46fd-871b-af976db794a6\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8e44b6a1-2b1e-46fd-871b-af976db794a6\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=@@//pkg"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=@@//pkg"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [],
+      "name": "deleted_canonical_main_package_is_same_identity",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: c72ac6e1-316c-4399-abb6-d95099651b7e\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/c72ac6e1-316c-4399-abb6-d95099651b7e\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/c72ac6e1-316c-4399-abb6-d95099651b7e\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=@other//pkg"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--deleted_packages=@other//pkg"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "deleted_nonmain_literal_is_distinct_and_recovers",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 59227bb5-59aa-4d0b-9d38-40a67d032b0b\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/59227bb5-59aa-4d0b-9d38-40a67d032b0b\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 3.320s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/59227bb5-59aa-4d0b-9d38-40a67d032b0b\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": ".bazelignore"
+        }
+      ],
+      "name": "first_root_bazelignore_literal_prefix_rejects_package",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ff51257e-265e-4e3e-972e-61fe70022c6d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ff51257e-265e-4e3e-972e-61fe70022c6d\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ff51257e-265e-4e3e-972e-61fe70022c6d\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "4",
+          "path": ".bazelignore",
+          "replace": null
+        }
+      ],
+      "name": "editing_first_root_bazelignore_recovers",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 45049837-7318-46f1-93d2-42d1874bfead\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/45049837-7318-46f1-93d2-42d1874bfead\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 3.331s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/45049837-7318-46f1-93d2-42d1874bfead\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "alternate/.bazelignore"
+        }
+      ],
+      "name": "later_root_bazelignore_is_unobserved_while_first_file_exists",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 2ae6d4c2-70a5-4494-bf31-4b3f7de06c92\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2ae6d4c2-70a5-4494-bf31-4b3f7de06c92\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.021s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2ae6d4c2-70a5-4494-bf31-4b3f7de06c92\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": ".bazelignore"
+        }
+      ],
+      "name": "deleting_first_bazelignore_selects_later_file",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 4fb00d35-c552-4ff8-ae89-18171fc281d9\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/4fb00d35-c552-4ff8-ae89-18171fc281d9\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/4fb00d35-c552-4ff8-ae89-18171fc281d9\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "4",
+          "path": "alternate/.bazelignore",
+          "replace": null
+        }
+      ],
+      "name": "wildcards_are_literal_in_later_bazelignore_and_recover",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 15b90573-a476-465a-9dc5-f20031afff75\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/15b90573-a476-465a-9dc5-f20031afff75\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 3.191s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/15b90573-a476-465a-9dc5-f20031afff75\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "4",
+          "path": "alternate/.bazelignore",
+          "replace": null
+        }
+      ],
+      "name": "restoring_later_bazelignore_rejects_before_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 3dc5f2bd-86d1-46ed-ae0a-9a629dd2a275\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3dc5f2bd-86d1-46ed-ae0a-9a629dd2a275\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3dc5f2bd-86d1-46ed-ae0a-9a629dd2a275\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "alternate/.bazelignore"
+        }
+      ],
+      "name": "deleting_rejecting_later_bazelignore_recovers_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: cbfba1ad-4f34-45c2-b3f4-ec27d3742b5a\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/cbfba1ad-4f34-45c2-b3f4-ec27d3742b5a\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 2.657s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/cbfba1ad-4f34-45c2-b3f4-ec27d3742b5a\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "REPO.bazel"
+        }
+      ],
+      "name": "explicit_repo_kwargs_and_nonmatching_ignore_execute",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/REPO.bazel:2:6: ROOT_REPO_POLICY_V1\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (3 packages loaded, 2 targets configured)\nINFO: Analyzed target //:probe (3 packages loaded, 3 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8d35dfab-3ea6-4b32-913c-b8eb400da476\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8d35dfab-3ea6-4b32-913c-b8eb400da476\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:2:6: ROOT_REPO_POLICY_V1\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (3 packages loaded, 2 targets configured)\nINFO: Analyzed target //:probe (3 packages loaded, 3 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.029s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8d35dfab-3ea6-4b32-913c-b8eb400da476\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "unchanged_repo_and_module_request_replays_no_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ed965dd1-dc92-45dc-94c0-6fd6bac6ac50\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ed965dd1-dc92-45dc-94c0-6fd6bac6ac50\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.020s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ed965dd1-dc92-45dc-94c0-6fd6bac6ac50\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "112",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "repo_star_pattern_rejects_before_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/REPO.bazel:2:6: ROOT_REPO_POLICY_STAR\nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: e7213cd8-8eeb-4825-b74b-461836e408a4\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e7213cd8-8eeb-4825-b74b-461836e408a4\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:2:6: ROOT_REPO_POLICY_STAR\nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e7213cd8-8eeb-4825-b74b-461836e408a4\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "109",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "repo_question_pattern_rejects_before_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/REPO.bazel:2:6: ROOT_REPO_POLICY_QUESTION\nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 66d6deb1-e214-47e3-b8d3-76ecca3e10a1\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/66d6deb1-e214-47e3-b8d3-76ecca3e10a1\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:2:6: ROOT_REPO_POLICY_QUESTION\nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/66d6deb1-e214-47e3-b8d3-76ecca3e10a1\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "114",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "repo_recursive_pattern_rejects_before_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/REPO.bazel:2:6: ROOT_REPO_POLICY_RECURSIVE\nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 41087063-0949-44d0-a165-6b2b1f92404d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/41087063-0949-44d0-a165-6b2b1f92404d\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:2:6: ROOT_REPO_POLICY_RECURSIVE\nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/41087063-0949-44d0-a165-6b2b1f92404d\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "118",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "repo_nonmatching_edit_recovers",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/REPO.bazel:2:6: ROOT_REPO_POLICY_RECOVER\nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 389db865-6538-4b52-bb96-d9567739cead\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/389db865-6538-4b52-bb96-d9567739cead\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:2:6: ROOT_REPO_POLICY_RECOVER\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 2.994s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/389db865-6538-4b52-bb96-d9567739cead\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "117",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "repo_source_level_starstar_arguments_are_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: <workspace>/REPO.bazel:1:6: **kwargs arguments are not allowed in REPO.bazel files. Pass the arguments in explicitly.\nERROR: Error computing the main repository mapping: error during computation of main repo mapping: error parsing REPO.bazel file for the main repo\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: a75a29d6-26f6-497f-b6ee-8e8bba826d82\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a75a29d6-26f6-497f-b6ee-8e8bba826d82\nComputing main repo mapping: \nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:1:6: **kwargs arguments are not allowed in REPO.bazel files. Pass the arguments in explicitly.\nERROR: Error computing the main repository mapping: error during computation of main repo mapping: error parsing REPO.bazel file for the main repo\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a75a29d6-26f6-497f-b6ee-8e8bba826d82\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "88",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "duplicate_repo_call_is_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nERROR: <workspace>/REPO.bazel:1:6: **kwargs arguments are not allowed in REPO.bazel files. Pass the arguments in explicitly.\nComputing main repo mapping: \nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/REPO.bazel\", line 2, column 5, in <toplevel>\n\t\trepo(default_visibility = [\"//visibility:public\"])\nError in repo: 'repo' can only be called once in the REPO.bazel file\nERROR: Error computing the main repository mapping: error during computation of main repo mapping: error evaluating REPO.bazel file for the main repo\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: fb5431a4-aee0-4254-a8c5-66f5b2094481\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/fb5431a4-aee0-4254-a8c5-66f5b2094481\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:1:6: **kwargs arguments are not allowed in REPO.bazel files. Pass the arguments in explicitly.\nComputing main repo mapping: \nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel\", line 2, column 5, in <toplevel>\n\t\trepo(default_visibility = [\"//visibility:public\"])\nError in repo: 'repo' can only be called once in the REPO.bazel file\nERROR: Error computing the main repository mapping: error during computation of main repo mapping: error evaluating REPO.bazel file for the main repo\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/fb5431a4-aee0-4254-a8c5-66f5b2094481\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "102",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "repo_after_other_function_is_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/REPO.bazel\", line 2, column 5, in <toplevel>\n\t\trepo(default_visibility = [\"//visibility:public\"])\nError in repo: 'repo' can only be called once in the REPO.bazel file\nComputing main repo mapping: \nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/REPO.bazel\", line 2, column 5, in <toplevel>\n\t\trepo(default_visibility = [\"//visibility:public\"])\nError in repo: if repo() is called, it must be called before any other functions\nERROR: Error computing the main repository mapping: error during computation of main repo mapping: error evaluating REPO.bazel file for the main repo\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: b4d67b5b-e4c4-4884-a01e-576d5916675a\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b4d67b5b-e4c4-4884-a01e-576d5916675a\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel\", line 2, column 5, in <toplevel>\n\t\trepo(default_visibility = [\"//visibility:public\"])\nError in repo: 'repo' can only be called once in the REPO.bazel file\nComputing main repo mapping: \nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel\", line 2, column 5, in <toplevel>\n\t\trepo(default_visibility = [\"//visibility:public\"])\nError in repo: if repo() is called, it must be called before any other functions\nERROR: Error computing the main repository mapping: error during computation of main repo mapping: error evaluating REPO.bazel file for the main repo\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b4d67b5b-e4c4-4884-a01e-576d5916675a\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 37,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "83",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "duplicate_ignore_directories_is_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/REPO.bazel\", line 2, column 5, in <toplevel>\n\t\trepo(default_visibility = [\"//visibility:public\"])\nError in repo: if repo() is called, it must be called before any other functions\nComputing main repo mapping: \nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/REPO.bazel\", line 2, column 19, in <toplevel>\n\t\tignore_directories([\"not_pkg\"])\nError in ignore_directories: 'ignored_directories()' can only be called once\nERROR: Error computing the main repository mapping: error during computation of main repo mapping: error evaluating REPO.bazel file for the main repo\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 4c376bfc-d204-4b8b-a37e-8ee05056493f\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/4c376bfc-d204-4b8b-a37e-8ee05056493f\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel\", line 2, column 5, in <toplevel>\n\t\trepo(default_visibility = [\"//visibility:public\"])\nError in repo: if repo() is called, it must be called before any other functions\nComputing main repo mapping: \nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel\", line 2, column 19, in <toplevel>\n\t\tignore_directories([\"not_pkg\"])\nError in ignore_directories: 'ignored_directories()' can only be called once\nERROR: Error computing the main repository mapping: error during computation of main repo mapping: error evaluating REPO.bazel file for the main repo\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/4c376bfc-d204-4b8b-a37e-8ee05056493f\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "64",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "valid_repo_recovery_executes_once",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/REPO.bazel\", line 2, column 19, in <toplevel>\n\t\tignore_directories([\"not_pkg\"])\nError in ignore_directories: 'ignored_directories()' can only be called once\nComputing main repo mapping: \nDEBUG: <workspace>/REPO.bazel:2:6: ROOT_REPO_POLICY_FINAL\nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1d558daa-deca-4050-bdba-8e8c2d2724f2\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1d558daa-deca-4050-bdba-8e8c2d2724f2\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel\", line 2, column 19, in <toplevel>\n\t\tignore_directories([\"not_pkg\"])\nError in ignore_directories: 'ignored_directories()' can only be called once\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:2:6: ROOT_REPO_POLICY_FINAL\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 3.965s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1d558daa-deca-4050-bdba-8e8c2d2724f2\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "final_unchanged_warm_request_replays_no_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 622f855b-2f84-44c3-9e8e-becb65f6190d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/622f855b-2f84-44c3-9e8e-becb65f6190d\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 0.018s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/622f855b-2f84-44c3-9e8e-becb65f6190d\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "115",
+          "path": "REPO.bazel",
+          "replace": null
+        }
+      ],
+      "name": "matching_repo_policy_rejects_before_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/REPO.bazel:2:6: ROOT_REPO_POLICY_DELETE_GATE\nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 35a2f84d-ea92-4f23-bd28-0fb760763d21\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/35a2f84d-ea92-4f23-bd28-0fb760763d21\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/REPO.bazel:2:6: ROOT_REPO_POLICY_DELETE_GATE\nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/35a2f84d-ea92-4f23-bd28-0fb760763d21\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "REPO.bazel"
+        }
+      ],
+      "name": "deleting_rejecting_repo_recovers_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 910c0f23-b272-4fbb-88fe-480ea22183b6\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/910c0f23-b272-4fbb-88fe-480ea22183b6\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 2.776s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/910c0f23-b272-4fbb-88fe-480ea22183b6\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--vendor_dir=.."
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--vendor_dir=.."
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "resolved_outside_workspace_vendor_does_not_ignore_package",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (2 packages loaded, 2 targets configured)\nINFO: Analyzed target //:probe (2 packages loaded, 2 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: fab40ae7-f453-4fd1-a79d-b1180490246c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/fab40ae7-f453-4fd1-a79d-b1180490246c\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (2 packages loaded, 2 targets configured)\nINFO: Analyzed target //:probe (2 packages loaded, 2 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 3.441s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/fab40ae7-f453-4fd1-a79d-b1180490246c\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--vendor_dir=pkg"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate",
+        "--vendor_dir=pkg"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [],
+      "name": "contained_vendor_directory_ignores_package_before_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 47f84355-4d1a-4253-9a08-e0c632e62118\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/47f84355-4d1a-4253-9a08-e0c632e62118\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: unable to load package for '//pkg:policy.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:3:1: Package is considered deleted due to --deleted_packages\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/47f84355-4d1a-4253-9a08-e0c632e62118\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:probe",
+        "--lockfile_mode=off",
+        "--package_path=%workspace%:%workspace%/alternate"
+      ],
+      "exit_code": 0,
+      "manifest": [],
+      "mutations": [],
+      "name": "clearing_contained_vendor_policy_recovers_module_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: <workspace>/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: <workspace>/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: <workspace>/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 1a818cdc-dac7-4296-98bc-34d81f5383b5\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1a818cdc-dac7-4296-98bc-34d81f5383b5\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:2:6: ROOT_MAIN_POLICY_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_PRIMARY\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/alternate/pkg/policy.MODULE.bazel:1:6: ROOT_MAIN_POLICY_ALTERNATE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/root-module-package-policy/20260726-034413-2957259-bazel/workspace/MODULE.bazel:5:6: ROOT_MAIN_POLICY_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\n[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt\nTarget //:probe up-to-date (nothing to build)\nINFO: Elapsed time: 3.679s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1a818cdc-dac7-4296-98bc-34d81f5383b5\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "root-module-package-policy",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

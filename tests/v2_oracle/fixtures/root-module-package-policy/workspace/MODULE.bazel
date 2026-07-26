@@ -1,0 +1,5 @@
+module(name = "root_module_package_policy", version = "1.0.0")
+print("ROOT_MAIN_POLICY_ROOT_BEFORE")
+include("//pkg:policy.MODULE.bazel")
+include("//alternate/pkg:policy.MODULE.bazel")
+print("ROOT_MAIN_POLICY_ROOT_AFTER")
