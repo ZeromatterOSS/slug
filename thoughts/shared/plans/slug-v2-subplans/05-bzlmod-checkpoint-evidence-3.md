@@ -3049,3 +3049,25 @@ returned `ACCEPT`.
 
 Next evidence: Implement only
 `WP-5-m1-bzlmod-private-host-raw-byte-projection`.
+
+### Stage 5 private Host raw-byte projection
+
+Status: Accepted
+
+The exact two-file packet adds a dormant crate-private Host byte key with only
+normalized logical-path identity. It resolves through the neutral path owner,
+follows symlinks, accepts regular and special files, preserves raw bytes,
+returns semantic Missing, rejects wrong terminal kinds, and projects
+observation, inconsistent-state, cycle, and expansion failures without
+retaining physical identity. Every Need remains invalid and self-unequal.
+
+The two exact inline tests passed. Full bzlmod passed 235 tests plus zero
+doctests; downstream loading passed 54 plus zero doctests, and core passed 92
+unit, 13 runtime, and zero doctests. Every bzlmod/loading/core GNU-Windows test
+executable linked. Formatting, diff, exact two-file, forbidden-reference,
+private-surface, consumer, and dependency gates passed. Three independent
+semantic, architecture/DICE, and implementation terminal reviewers returned
+`ACCEPT` without correction.
+
+Next evidence: Design only
+`WP-5-m1-host-root-module-parity-prerequisites-design`.

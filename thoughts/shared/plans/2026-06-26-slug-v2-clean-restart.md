@@ -31,17 +31,21 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
+Latest M1 accepted evidence: the private special-file-compatible Host byte
+projection passed its full owner/downstream/cross-target gates and three
+terminal reviews. The remaining root-MODULE missing/create/warning and include
+package-validation/repository-ignore ownership gaps now gate Host root keys.
+
 ### Current packet
 
-Implement only `WP-5-m1-bzlmod-private-host-raw-byte-projection`.
+Design only `WP-5-m1-host-root-module-parity-prerequisites-design`.
 
-Edit exactly new `app/slug_bzlmod_v2/src/host_file.rs` and the private module
-declaration in `app/slug_bzlmod_v2/src/lib.rs`. Add no reexport. Resolve one
-normalized absolute logical Host path, accept regular and special files,
-follow symlinks, return semantic Missing, reject Directory, and demand exact
-real-path bytes. Prove cumulative demands, typed terminals, raw bytes, Need
-invalidity, semantic pruning, symlink retargeting, and retained-engine
-A→B→Missing→error→A restoration before terminal review.
+Freeze retained Bazel 9.2 oracle rows, exact allowlists, and exact tests for
+`WP-5-m1-root-module-missing-create-warning-owner` and
+`WP-5-m1-root-include-package-validation-owner`. Require terminally accepted
+implementation commits, same-daemon create/edit/delete restoration, and zero
+owner TODOs before Host root keys may start. Do not implement Host root keys
+or activate discovery in this design packet.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
