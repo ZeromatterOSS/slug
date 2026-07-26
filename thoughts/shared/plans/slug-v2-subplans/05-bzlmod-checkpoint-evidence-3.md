@@ -2145,7 +2145,7 @@ deliberate protocol decision before its eager adapter is removed.
    missing/wrong-kind/symlink/error ordering and `PathOutcome` invalidity.
    `slug_workspace_v2` must not depend on bzlmod.
 
-6. A root/raw Host migration design, then
+6. `WP-5-m1-root-raw-host-migration-design`, then
    `WP-5-m1-typed-nonroot-discovery-composition-design`.
 
    First design the bzlmod root/raw Host migration. It must freeze either
@@ -2680,3 +2680,26 @@ terminal rereviews both returned `ACCEPT`.
 
 Next evidence: Implement only
 `WP-5-m1-host-directory-semantic-projection`.
+
+### Stage 5 Host directory semantic projection
+
+Status: Accepted
+
+`PathDirectoryListingKey` is now the directory-listing analogue of
+`PathFileBytesKey`. It resolves the logical path first, returns semantic
+Missing for resolved absence, classifies only a resolved terminal
+regular/special file as wrong-kind, follows symlinks, and requests exact
+physical `DirectoryEntries` only for a resolved directory. Post-lstat Missing
+is inconsistent state; observation and resolution failures retain complete
+logical semantic identity. Every Need remains invalid and self-unequal.
+
+The value reuses the existing sorted, unique, `Arc`-backed OS-native
+`PathDirectoryEntries`; no bzlmod dependency or production consumer was added.
+The workspace owner passed 32 unit plus zero doc tests, downstream core passed
+92 unit, 13 runtime, and zero doc tests, and all three owner/core GNU-Windows
+test executables linked. Formatting, diff, archive, dependency, consumer, and
+exact two-file gates passed. Independent semantic/lifecycle and
+architecture/hot-path reviewers both returned `ACCEPT`.
+
+Next evidence: Design only
+`WP-5-m1-root-raw-host-migration-design`.

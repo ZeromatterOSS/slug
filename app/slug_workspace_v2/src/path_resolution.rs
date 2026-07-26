@@ -23,6 +23,7 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 
 use crate::NormalizedAbsolutePath;
+use crate::PathDirectoryEntries;
 use crate::PathLstat;
 use crate::PathNodeKind;
 use crate::PathObservationDemand;
@@ -998,6 +999,287 @@ impl Key for PathFileBytesKey {
     }
 }
 
+/// Semantic direct entries after operational path resolution.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum PathDirectoryListing {
+    Present(PathDirectoryEntries),
+    Missing,
+}
+
+/// A directory-listing projection failure containing only semantic identity.
+#[derive(Debug, Clone, Allocative, Dupe)]
+pub enum PathDirectoryListingError {
+    Observation {
+        logical_path: NormalizedAbsolutePath,
+        operation: PathObservationOperation,
+        error: PathObservationError,
+    },
+    InconsistentState {
+        logical_path: NormalizedAbsolutePath,
+        operation: PathObservationOperation,
+        before: Option<PathLstat>,
+        after: Option<PathLstat>,
+    },
+    WrongKind {
+        logical_path: NormalizedAbsolutePath,
+        expected: PathNodeKind,
+        actual: PathNodeKind,
+    },
+    Cycle {
+        logical_path: NormalizedAbsolutePath,
+    },
+    InfiniteExpansion {
+        logical_path: NormalizedAbsolutePath,
+    },
+}
+
+impl PathDirectoryListingError {
+    pub fn logical_path(&self) -> &NormalizedAbsolutePath {
+        match self {
+            Self::Observation { logical_path, .. }
+            | Self::InconsistentState { logical_path, .. }
+            | Self::WrongKind { logical_path, .. }
+            | Self::Cycle { logical_path }
+            | Self::InfiniteExpansion { logical_path } => logical_path,
+        }
+    }
+
+    pub fn semantic_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::Observation {
+                    logical_path: left_path,
+                    operation: left_operation,
+                    error: left_error,
+                },
+                Self::Observation {
+                    logical_path: right_path,
+                    operation: right_operation,
+                    error: right_error,
+                },
+            ) => {
+                left_path == right_path
+                    && left_operation == right_operation
+                    && left_error == right_error
+            }
+            (
+                Self::InconsistentState {
+                    logical_path: left_path,
+                    operation: left_operation,
+                    before: left_before,
+                    after: left_after,
+                },
+                Self::InconsistentState {
+                    logical_path: right_path,
+                    operation: right_operation,
+                    before: right_before,
+                    after: right_after,
+                },
+            ) => {
+                left_path == right_path
+                    && left_operation == right_operation
+                    && left_before == right_before
+                    && left_after == right_after
+            }
+            (
+                Self::WrongKind {
+                    logical_path: left_path,
+                    expected: left_expected,
+                    actual: left_actual,
+                },
+                Self::WrongKind {
+                    logical_path: right_path,
+                    expected: right_expected,
+                    actual: right_actual,
+                },
+            ) => {
+                left_path == right_path
+                    && left_expected == right_expected
+                    && left_actual == right_actual
+            }
+            (
+                Self::Cycle {
+                    logical_path: left_path,
+                },
+                Self::Cycle {
+                    logical_path: right_path,
+                },
+            )
+            | (
+                Self::InfiniteExpansion {
+                    logical_path: left_path,
+                },
+                Self::InfiniteExpansion {
+                    logical_path: right_path,
+                },
+            ) => left_path == right_path,
+            (
+                Self::Observation { .. }
+                | Self::InconsistentState { .. }
+                | Self::WrongKind { .. }
+                | Self::Cycle { .. }
+                | Self::InfiniteExpansion { .. },
+                _,
+            ) => false,
+        }
+    }
+
+    fn from_resolution(logical_path: NormalizedAbsolutePath, error: PathResolutionError) -> Self {
+        match error {
+            PathResolutionError::Observation { demand, error, .. } => Self::Observation {
+                logical_path,
+                operation: demand.operation(),
+                error,
+            },
+            PathResolutionError::InconsistentState {
+                demand,
+                before,
+                after,
+                ..
+            } => Self::InconsistentState {
+                logical_path,
+                operation: demand.operation(),
+                before,
+                after,
+            },
+            PathResolutionError::Cycle { .. } => Self::Cycle { logical_path },
+            PathResolutionError::InfiniteExpansion { .. } => {
+                Self::InfiniteExpansion { logical_path }
+            }
+        }
+    }
+}
+
+impl PartialEq for PathDirectoryListingError {
+    fn eq(&self, other: &Self) -> bool {
+        self.semantic_eq(other)
+    }
+}
+
+impl Eq for PathDirectoryListingError {}
+
+/// Resolves and lists one exact logical directory.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct PathDirectoryListingKey {
+    namespace: PathObservationNamespace,
+    logical_path: NormalizedAbsolutePath,
+}
+
+impl PathDirectoryListingKey {
+    pub fn new(namespace: PathObservationNamespace, logical_path: NormalizedAbsolutePath) -> Self {
+        Self {
+            namespace,
+            logical_path,
+        }
+    }
+
+    pub const fn namespace(&self) -> PathObservationNamespace {
+        self.namespace
+    }
+
+    pub fn logical_path(&self) -> &NormalizedAbsolutePath {
+        &self.logical_path
+    }
+}
+
+impl fmt::Display for PathDirectoryListingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "path-directory-listing:{:?}:{:?}",
+            self.namespace,
+            self.logical_path.as_path()
+        )
+    }
+}
+
+#[async_trait]
+impl Key for PathDirectoryListingKey {
+    type Value = PathResult<PathDirectoryListing, PathDirectoryListingError>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let resolved = dice_invariant(
+            ctx.compute(&ResolvedPathKey::new(
+                self.namespace,
+                self.logical_path.dupe(),
+            ))
+            .await,
+        );
+        let resolved = match resolved {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => {
+                return PathOutcome::Complete(Err(PathDirectoryListingError::from_resolution(
+                    self.logical_path.dupe(),
+                    error,
+                )));
+            }
+            PathOutcome::Complete(Ok(resolved)) => resolved,
+        };
+        let lstat = match resolved.state() {
+            ResolvedPathState::Missing => {
+                return PathOutcome::Complete(Ok(PathDirectoryListing::Missing));
+            }
+            ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::Directory => lstat,
+            ResolvedPathState::Present(lstat) => {
+                return PathOutcome::Complete(Err(PathDirectoryListingError::WrongKind {
+                    logical_path: self.logical_path.dupe(),
+                    expected: PathNodeKind::Directory,
+                    actual: lstat.kind(),
+                }));
+            }
+        };
+
+        let demand = PathObservationDemand::new(
+            self.namespace,
+            resolved.real_path().dupe(),
+            PathObservationOperation::DirectoryEntries,
+        );
+        let observed = dice_invariant(ctx.compute(&PathObservationKey::new(demand.dupe())).await);
+        match observed {
+            PathOutcome::Need(need) => PathOutcome::Need(need),
+            PathOutcome::Complete(result) => match result.as_ref() {
+                PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries)) => {
+                    PathOutcome::Complete(Ok(PathDirectoryListing::Present(entries.dupe())))
+                }
+                PathObservationResult::DirectoryEntries(PathOperationResult::Missing) => {
+                    PathOutcome::Complete(Err(PathDirectoryListingError::InconsistentState {
+                        logical_path: self.logical_path.dupe(),
+                        operation: demand.operation(),
+                        before: Some(lstat),
+                        after: None,
+                    }))
+                }
+                PathObservationResult::DirectoryEntries(PathOperationResult::Error(error)) => {
+                    PathOutcome::Complete(Err(PathDirectoryListingError::Observation {
+                        logical_path: self.logical_path.dupe(),
+                        operation: demand.operation(),
+                        error: *error,
+                    }))
+                }
+                PathObservationResult::Lstat(_)
+                | PathObservationResult::ReadLink(_)
+                | PathObservationResult::FileBytes(_) => {
+                    unreachable!(
+                        "DirectoryEntries demand must return a DirectoryEntries observation"
+                    )
+                }
+            },
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt;
@@ -1022,6 +1304,9 @@ mod tests {
     use dice_futures::cancellation::CancellationContext;
     use dupe::Dupe;
 
+    use super::PathDirectoryListing;
+    use super::PathDirectoryListingError;
+    use super::PathDirectoryListingKey;
     use super::PathFileBytes;
     use super::PathFileBytesError;
     use super::PathFileBytesKey;
@@ -1032,6 +1317,8 @@ mod tests {
     use super::ResolvedPathState;
     use crate::NeedPathObservations;
     use crate::NormalizedAbsolutePath;
+    use crate::PathDirectoryEntries;
+    use crate::PathDirectoryName;
     use crate::PathIoErrorKind;
     use crate::PathLstat;
     use crate::PathNodeKind;
@@ -1339,6 +1626,31 @@ mod tests {
         )
     }
 
+    fn directory_entries_result(
+        namespace: PathObservationNamespace,
+        value: &str,
+        result: PathOperationResult<PathDirectoryEntries>,
+    ) -> ScriptEntry {
+        (
+            demand(namespace, value, PathObservationOperation::DirectoryEntries),
+            PathObservationResult::DirectoryEntries(result),
+        )
+    }
+
+    fn directory_entries(
+        namespace: PathObservationNamespace,
+        value: &str,
+        names: &[&str],
+    ) -> ScriptEntry {
+        let entries = PathDirectoryEntries::new(
+            names
+                .iter()
+                .map(|name| PathDirectoryName::new(*name).unwrap()),
+        )
+        .unwrap();
+        directory_entries_result(namespace, value, PathOperationResult::Present(entries))
+    }
+
     fn linked_file_script(
         namespace: PathObservationNamespace,
         target: &str,
@@ -1475,6 +1787,60 @@ mod tests {
             }
         }
         unreachable!("inclusive prefix loop always reaches the full byte script")
+    }
+
+    async fn resolve_directory_script(
+        namespace: PathObservationNamespace,
+        logical_path: &str,
+        script: &[ScriptEntry],
+    ) -> Result<PathDirectoryListing, PathDirectoryListingError> {
+        let key = PathDirectoryListingKey::new(namespace, path(logical_path));
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = dice.updater().commit().await;
+
+        for prefix_len in 0..=script.len() {
+            let epoch = PathObservationEpoch::new(
+                script[..prefix_len]
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            )
+            .unwrap();
+            let mut updater = transaction.into_updater();
+            updater
+                .changed_to(vec![(PathObservationEpochKey, epoch)])
+                .unwrap();
+            transaction = updater.commit().await;
+
+            let outcome = transaction.compute(&key).await.unwrap();
+            if prefix_len < script.len() {
+                let PathOutcome::Need(need) = &outcome else {
+                    panic!(
+                        "directory script for {logical_path:?} completed after {prefix_len} of {} observations",
+                        script.len()
+                    );
+                };
+                assert_eq!(
+                    need.demands(),
+                    &[script[prefix_len].0.dupe()],
+                    "unexpected directory demand after prefix {prefix_len} for {logical_path:?}"
+                );
+                assert!(!PathDirectoryListingKey::validity(&outcome));
+                assert!(!PathDirectoryListingKey::equality(&outcome, &outcome));
+            } else {
+                let PathOutcome::Complete(result) = outcome else {
+                    panic!("full directory script for {logical_path:?} did not complete");
+                };
+                assert!(PathDirectoryListingKey::validity(&PathOutcome::Complete(
+                    result.dupe()
+                )));
+                assert!(PathDirectoryListingKey::equality(
+                    &PathOutcome::Complete(result.dupe()),
+                    &PathOutcome::Complete(result.dupe())
+                ));
+                return result;
+            }
+        }
+        unreachable!("inclusive prefix loop always reaches the full directory script")
     }
 
     async fn update_projection_state(
@@ -2555,6 +2921,166 @@ mod tests {
     }
 
     #[test]
+    fn path_directory_listing_semantic_equality_is_field_complete_and_physical_identity_free() {
+        let host = PathObservationNamespace::Host;
+        let materialized =
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(42));
+        let key = PathDirectoryListingKey::new(host, path("/logical"));
+        assert_eq!(key.namespace(), host);
+        assert_eq!(key.logical_path().as_path(), Path::new("/logical"));
+        assert!(key.to_string().contains("path-directory-listing"));
+
+        let io = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let left = PathDirectoryListingError::from_resolution(
+            path("/logical"),
+            PathResolutionError::Observation {
+                namespace: host,
+                requested_path: path("/outer-a"),
+                demand: demand(
+                    host,
+                    "/physical-a",
+                    PathObservationOperation::DirectoryEntries,
+                ),
+                error: io,
+            },
+        );
+        let right = PathDirectoryListingError::from_resolution(
+            path("/logical"),
+            PathResolutionError::Observation {
+                namespace: materialized,
+                requested_path: path("/outer-b"),
+                demand: demand(
+                    materialized,
+                    "/different-root/physical-b",
+                    PathObservationOperation::DirectoryEntries,
+                ),
+                error: io,
+            },
+        );
+        assert!(left.semantic_eq(&right));
+        assert_eq!(left, right);
+        assert_eq!(left.logical_path().as_path(), Path::new("/logical"));
+
+        for unequal in [
+            PathDirectoryListingError::Observation {
+                logical_path: path("/other"),
+                operation: PathObservationOperation::DirectoryEntries,
+                error: io,
+            },
+            PathDirectoryListingError::Observation {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::Lstat,
+                error: io,
+            },
+            PathDirectoryListingError::Observation {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::DirectoryEntries,
+                error: PathObservationError::Io {
+                    kind: PathIoErrorKind::TimedOut,
+                    raw_os_error: Some(13),
+                },
+            },
+        ] {
+            assert_ne!(left, unequal);
+        }
+
+        let inconsistent = PathDirectoryListingError::InconsistentState {
+            logical_path: path("/logical"),
+            operation: PathObservationOperation::DirectoryEntries,
+            before: Some(lstat(PathNodeKind::Directory)),
+            after: None,
+        };
+        assert_ne!(
+            inconsistent,
+            PathDirectoryListingError::InconsistentState {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::DirectoryEntries,
+                before: Some(lstat(PathNodeKind::RegularFile)),
+                after: None,
+            }
+        );
+        assert_ne!(
+            inconsistent,
+            PathDirectoryListingError::InconsistentState {
+                logical_path: path("/logical"),
+                operation: PathObservationOperation::DirectoryEntries,
+                before: Some(lstat(PathNodeKind::Directory)),
+                after: Some(lstat(PathNodeKind::Directory)),
+            }
+        );
+
+        let wrong_kind = PathDirectoryListingError::WrongKind {
+            logical_path: path("/logical"),
+            expected: PathNodeKind::Directory,
+            actual: PathNodeKind::RegularFile,
+        };
+        assert_ne!(
+            wrong_kind,
+            PathDirectoryListingError::WrongKind {
+                logical_path: path("/logical"),
+                expected: PathNodeKind::RegularFile,
+                actual: PathNodeKind::RegularFile,
+            }
+        );
+        assert_ne!(
+            wrong_kind,
+            PathDirectoryListingError::WrongKind {
+                logical_path: path("/logical"),
+                expected: PathNodeKind::Directory,
+                actual: PathNodeKind::SpecialFile,
+            }
+        );
+
+        let cycle_a = PathDirectoryListingError::from_resolution(
+            path("/logical"),
+            PathResolutionError::Cycle {
+                namespace: host,
+                requested_path: path("/outer-a"),
+                chain: PathResolutionChain {
+                    path_to: Arc::from([path("/prefix")]),
+                    chain: Arc::from([path("/a"), path("/b")]),
+                },
+            },
+        );
+        let cycle_b = PathDirectoryListingError::from_resolution(
+            path("/logical"),
+            PathResolutionError::Cycle {
+                namespace: materialized,
+                requested_path: path("/outer-b"),
+                chain: PathResolutionChain {
+                    path_to: Arc::from([]),
+                    chain: Arc::from([path("/other")]),
+                },
+            },
+        );
+        assert_eq!(cycle_a, cycle_b);
+        assert_ne!(
+            cycle_a,
+            PathDirectoryListingError::InfiniteExpansion {
+                logical_path: path("/logical"),
+            }
+        );
+
+        let entries =
+            PathDirectoryEntries::new([PathDirectoryName::new("child").unwrap()]).unwrap();
+        let present = PathOutcome::Complete(Ok::<_, PathDirectoryListingError>(
+            PathDirectoryListing::Present(entries),
+        ));
+        assert!(PathDirectoryListingKey::equality(&present, &present));
+        assert!(!PathDirectoryListingKey::equality(
+            &present,
+            &PathOutcome::Complete(Ok(PathDirectoryListing::Missing))
+        ));
+        assert!(!PathDirectoryListingKey::equality(
+            &present,
+            &PathOutcome::Complete(Err(left))
+        ));
+    }
+
+    #[test]
     fn path_file_bytes_semantic_equality_is_field_complete_and_physical_identity_free() {
         let host = PathObservationNamespace::Host;
         let materialized =
@@ -2725,6 +3251,180 @@ mod tests {
         );
         assert!(!PathFileBytesKey::validity(&need));
         assert!(!PathFileBytesKey::equality(&need, &need));
+    }
+
+    #[tokio::test]
+    async fn path_directory_listing_cumulative_projection_is_total_and_exact() {
+        let ns = PathObservationNamespace::Host;
+        let present_entries = PathDirectoryEntries::new([
+            PathDirectoryName::new("z").unwrap(),
+            PathDirectoryName::new("a").unwrap(),
+        ])
+        .unwrap();
+        let present_listing = resolve_directory_script(
+            ns,
+            "/directory",
+            &[
+                present(ns, "/", PathNodeKind::Directory),
+                present(ns, "/directory", PathNodeKind::Directory),
+                directory_entries(ns, "/directory", &["z", "a"]),
+            ],
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            present_listing,
+            PathDirectoryListing::Present(present_entries)
+        );
+
+        assert_eq!(
+            resolve_directory_script(ns, "/directory", &[missing(ns, "/")])
+                .await
+                .unwrap(),
+            PathDirectoryListing::Missing
+        );
+        assert_eq!(
+            resolve_directory_script(
+                ns,
+                "/directory",
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    missing(ns, "/directory"),
+                ],
+            )
+            .await
+            .unwrap(),
+            PathDirectoryListing::Missing
+        );
+        assert_eq!(
+            resolve_directory_script(
+                ns,
+                "/file/child",
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    present(ns, "/file", PathNodeKind::RegularFile),
+                ],
+            )
+            .await
+            .unwrap(),
+            PathDirectoryListing::Missing
+        );
+
+        for (logical, kind) in [
+            ("/file", PathNodeKind::RegularFile),
+            ("/special", PathNodeKind::SpecialFile),
+        ] {
+            assert_eq!(
+                resolve_directory_script(
+                    ns,
+                    logical,
+                    &[
+                        present(ns, "/", PathNodeKind::Directory),
+                        present(ns, logical, kind),
+                    ],
+                )
+                .await
+                .unwrap_err(),
+                PathDirectoryListingError::WrongKind {
+                    logical_path: path(logical),
+                    expected: PathNodeKind::Directory,
+                    actual: kind,
+                }
+            );
+        }
+
+        let linked = resolve_directory_script(
+            ns,
+            "/link",
+            &[
+                present(ns, "/", PathNodeKind::Directory),
+                present(ns, "/link", PathNodeKind::Symlink),
+                read_link(ns, "/link", "/target"),
+                present(ns, "/target", PathNodeKind::Directory),
+                directory_entries(ns, "/target", &["child"]),
+            ],
+        )
+        .await
+        .unwrap();
+        assert!(matches!(linked, PathDirectoryListing::Present(_)));
+        assert_eq!(
+            resolve_directory_script(
+                ns,
+                "/link",
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    present(ns, "/link", PathNodeKind::Symlink),
+                    read_link_result(ns, "/link", PathOperationResult::Missing),
+                ],
+            )
+            .await
+            .unwrap_err(),
+            PathDirectoryListingError::InconsistentState {
+                logical_path: path("/link"),
+                operation: PathObservationOperation::ReadLink,
+                before: Some(lstat(PathNodeKind::Symlink)),
+                after: None,
+            }
+        );
+
+        let io = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        assert_eq!(
+            resolve_directory_script(
+                ns,
+                "/directory",
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    lstat_error(ns, "/directory", io),
+                ],
+            )
+            .await
+            .unwrap_err(),
+            PathDirectoryListingError::Observation {
+                logical_path: path("/directory"),
+                operation: PathObservationOperation::Lstat,
+                error: io,
+            }
+        );
+        assert_eq!(
+            resolve_directory_script(
+                ns,
+                "/directory",
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    present(ns, "/directory", PathNodeKind::Directory),
+                    directory_entries_result(ns, "/directory", PathOperationResult::Error(io),),
+                ],
+            )
+            .await
+            .unwrap_err(),
+            PathDirectoryListingError::Observation {
+                logical_path: path("/directory"),
+                operation: PathObservationOperation::DirectoryEntries,
+                error: io,
+            }
+        );
+        assert_eq!(
+            resolve_directory_script(
+                ns,
+                "/directory",
+                &[
+                    present(ns, "/", PathNodeKind::Directory),
+                    present(ns, "/directory", PathNodeKind::Directory),
+                    directory_entries_result(ns, "/directory", PathOperationResult::Missing,),
+                ],
+            )
+            .await
+            .unwrap_err(),
+            PathDirectoryListingError::InconsistentState {
+                logical_path: path("/directory"),
+                operation: PathObservationOperation::DirectoryEntries,
+                before: Some(lstat(PathNodeKind::Directory)),
+                after: None,
+            }
+        );
     }
 
     #[tokio::test]
