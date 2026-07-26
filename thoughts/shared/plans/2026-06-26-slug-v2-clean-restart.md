@@ -42,15 +42,16 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-host-repository-ignore-windows-long-path-correction`.
+`WP-5-m1-windows-long-path-observation-owner`.
 
-Correct only the Windows 8.3/long-path observation boundary exposed by the
-Host repository-ignore contract. Pin the exact Bazel 9.2
-`WindowsOsPathPolicy` call chain and observable failures, then design the
-smallest injected Host observation owner that preserves filesystem-dependent
-short-name expansion without direct filesystem IO inside DICE. Do not weaken
-parity to a pure lexical Windows policy. Start no Rust until the prerequisite
-and the resulting Host REPO/repository-ignore retry scope are accepted.
+Implement only the accepted producer-free six-file Windows long-path
+observation prerequisite. Add the lossless pre-normalization UTF-16 demand
+input, final normalized UTF-16 result, one sizing/one fill
+`GetLongPathNameW` owner in the existing outside-DICE native loop, exact
+failure/identity equality, repository-validation dirty rules, and exhaustive
+consumer closure. Run the focused/full/downstream/GNU-Windows gates. Add no
+producer, bzlmod consumer, dependency, reexport, activation, or package
+lookup.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

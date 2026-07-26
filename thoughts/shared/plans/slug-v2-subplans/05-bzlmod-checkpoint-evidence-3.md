@@ -3592,6 +3592,140 @@ Next design evidence must pin reachability and failures, then add only the
 smallest injected Host observation prerequisite before retrying the otherwise
 accepted three-file owner.
 
+##### Windows long-path observation prerequisite design
+
+Run only `WP-5-m1-windows-long-path-observation-owner`. Edit exactly:
+
+- `app/slug_workspace_v2/src/path_observation.rs`;
+- `app/slug_workspace_v2/src/path_resolution.rs`;
+- `app/slug_core_v2/src/runtime/path_observation.rs`;
+- `app/slug_core_v2/src/runtime/repository_io.rs`;
+- `app/slug_bzlmod_v2/src/host_file.rs`; and
+- `app/slug_bzlmod_v2/src/source_preparation.rs`.
+
+This is a producer-free observation prerequisite. Add
+`PathObservationOperation::WindowsLongPath` and
+`PathObservationResult::WindowsLongPath(Arc<[u16]>)`. Extend
+`PathObservationDemand` with one private optional lossless
+`Arc<[u16]>` Windows resolver input and a dedicated Host-only constructor. Its
+ordinary `NormalizedAbsolutePath` remains the lexically normalized absolute
+identity used by the existing demand/authority machinery, while the extra
+input retains the exact pre-normalization `.bazelignore` line as UTF-16 code
+units, including slash choice, repeated/trailing separators, `.` and `..`.
+The generic constructor cannot construct `WindowsLongPath`, and the dedicated
+constructor cannot construct another operation.
+
+The result is always Bazel's final Windows lexical normalization after the
+resolver step: normalize either the successful long spelling after exact
+prefix/slash postprocessing or the unchanged lossless input on resolver
+failure. Port `WindowsOsPathPolicy.normalize` and
+`Utils.removeRelativePaths` over UTF-16 units, including slash/repeated/
+trailing normalization, dot/up-level reduction, ASCII drive uppercasing, and
+absolute-root behavior. This intentionally erases the mechanism:
+`WindowsOsPathPolicy.DefaultShortPathResolver` catches every `IOException` and
+retains the original spelling before the shared lexical step. Failure and an
+identity-success that differ only by slash choice, repeated/trailing
+separators, or reducible dot components must therefore remain clean; only a
+changed final normalized UTF-16 spelling is dirty. Arc-backed unit storage
+preserves `Dupe`, semantic equality, and Windows filenames containing unpaired
+surrogate units. Operation/result identity, input-sensitive demand ordering,
+epoch construction, DICE complete equality, and Need invalidity remain exact.
+
+Extend the existing outside-DICE observation kernel with one direct,
+unrefined dispatch on the lossless input. First port exact
+`WindowsPathOperations.asLongPath`: retain an existing `\\?\` prefix,
+otherwise prepend it, and convert `/` to `\`. Port Bazel native
+`IsAbsoluteNormalizedWindowsPath` eligibility before calling the API, so raw
+dot/up-level input falls back even when its later lexical form would be
+eligible. On Windows, follow the existing local kernel32 FFI owner and call
+`GetLongPathNameW` with Bazel's exact one sizing call and one fill call—no
+growth retry. Preserve non-BMP UTF-16 and safely treat a zero,
+growth-overflowing, or unterminated fill as failure rather than reproducing
+Bazel native undefined behavior. Check sizing conversion and allocation
+against the documented Windows extended-path bound; an oversized size falls
+back without allocation. Preserve every returned UTF-16 unit, including an
+unpaired surrogate, exactly as JNI `NewString` does. A valid fill with
+`0 < written < capacity` and a terminator at `written` succeeds
+even when a concurrent shortening makes `written` smaller than the sizing
+result; the bounded Java UTF-16 code-unit sequence is not converted through
+Rust Unicode scalars. On success, port
+`removeUncPrefixAndUseSlashes`: remove the first four scalars only for
+`\\?\` or `\??\`, then replace `\` with `/`. Every failure returns the
+unchanged input, and both paths then pass through the same lexical normalizer.
+Do not call `canonicalize`, enumerate directories, inspect metadata, follow
+symlinks, add a native handle owner, or add a Cargo dependency. On non-Windows
+the adapter lexically normalizes the unchanged input; production is not
+authorized to request this operation there.
+
+Repository validation compares the effective spelling directly: stable equal
+output remains clean regardless of whether native resolution failed or
+identity-succeeded; only changed final UTF-16 spelling is dirty. Add explicit
+unreachable compile-closure arms to the existing Lstat/ReadLink/FileBytes/
+DirectoryEntries consumers in the five non-owner sites. Do not reinterpret
+the operation as ReadLink, DirectoryEntries, Lstat, or FileBytes: none carries
+alternate 8.3 spelling, and reuse would violate operation/result identity.
+
+Tests pin operation/result pairing and mismatch rejection, demand
+ordering/equality, exact one-call dispatch without Lstat refinement,
+Need invalidity/self-inequality, failure/identity-success equality, changed
+effective output, A→B→A replay, and repository-validation clean/dirty
+transitions. The pure Windows helper pins the exact 8.3 grammar,
+pre-normalization eligibility, `asLongPath`, dot/up-level, repeated and
+trailing separators, one sizing/fill attempt, one-call race safety,
+valid shortening success, oversized sizing and growth/unterminated fallback,
+non-BMP UTF-16, both removable prefix forms, slash conversion,
+unpaired-surrogate preservation, exact Windows lexical normalization,
+success, and every native failure falling back through the same normalizer.
+A native Windows
+smoke proves the imported
+`GetLongPathNameW` ABI on an existing ordinary long absolute path and a
+missing path. When the worker supports creation of a distinct NTFS 8.3 alias,
+also prove that alias expands to the long spelling; inability to create such
+an alias is recorded separately and must not be reported as passing that row.
+
+Run focused tests first, then full `slug_workspace_v2`, `slug_core_v2`,
+`slug_bzlmod_v2`, and `slug_loading_v2` unit/integration/doctests serially.
+Build and link every affected GNU-Windows no-run test executable. Run
+formatting, diff/archive, exact six-file allowlist, no-new-dependency,
+operation/result exhaustiveness, compact-result, no-DICE-IO, and no-producer
+gates. Add no bzlmod consumer, public convenience reexport, demand-loop
+special case, command activation, or package lookup.
+
+After this prerequisite reaches terminal `ACCEPT`, retry only the existing
+three-file Host REPO/repository-ignore contract with these additions:
+
+- port Bazel's exact 8.3 candidate predicate;
+- make no demand for relative, drive-relative, or native-ineligible input;
+- after the complete-file native-validation scan, sequentially compute
+  the dedicated `WindowsLongPath` Host demand with both the lexically
+  normalized absolute identity and the lossless original input for eligible
+  Windows absolute lines;
+- propagate an absent observation as Need before continuing the file, then
+  use the final normalized UTF-16 spelling before deduplication and absolute
+  rejection; retain that lossless spelling through typed error storage and
+  apply Bazel-compatible replacement only at the UTF-8 diagnostic-output
+  boundary;
+- preserve native-invalid-before-first-absolute precedence, sequential
+  multiple-line demands, graph reuse, and changed diagnostic replay; and
+- test relative no-demand, absolute Need/failure/success, dot/up-level input
+  that must not be resolved after reduction, names resolving to themselves,
+  backslash-failure→slash identity-success nonreplay, repeated/trailing
+  normalization, unpaired-surrogate output formatting, short/long
+  deduplication, first-unique-absolute selection, and exact expanded-path
+  diagnostics.
+
+**Status:** Accepted for implementation on 2026-07-25.
+
+The pinned Bazel source, live Rust feasibility, and architecture/DICE
+reviewers all accepted the latest six-file contract. Corrections replaced an
+early optional normalized-path result with lossless pre-normalization
+`Arc<[u16]>` demand input and final normalized `Arc<[u16]>` output; erased
+resolver mechanism from semantic equality; preserved unpaired surrogate
+units; froze exact `asLongPath`, native eligibility, shared lexical
+normalization, and one sizing/one fill behavior; and bounded unsafe allocation
+and fill races without changing valid shortening success. No Rust, fixture,
+formatting, or Cargo command ran in the design packet.
+
 #### Serial packet 6: private Host main-package lookup
 
 Run only `WP-5-m1-host-root-package-lookup-owner`. Edit exactly:
@@ -4074,6 +4208,5 @@ implementation; semantics remained unchanged. All three terminal
 source/contract, implementation/evidence, and architecture/hot-path reviews
 returned `ACCEPT`.
 
-Next evidence: Correct only
-`WP-5-m1-host-repository-ignore-windows-long-path-correction` before retrying
-Rust.
+Next evidence: Implement only
+`WP-5-m1-windows-long-path-observation-owner`.
