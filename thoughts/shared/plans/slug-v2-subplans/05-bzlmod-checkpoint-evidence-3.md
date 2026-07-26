@@ -1868,3 +1868,40 @@ reusable repository results, and only the private session operations needed by
 the following dormant runtime-session packet. Preserve rootless Local behavior
 and existing root/token ownership. Stop and replan if exact HTTP or Git staging
 requires the deferred PAX/GNU/link/special parity surface.
+
+### Stage 5 retained native materialization bridge
+
+Status: Accepted
+
+The retained materializer now performs one sorted, deduplicated native
+preflight over accepted repository validation and caller demands, returning
+the complete path epoch plus only clean exact reusable repository results.
+Full requests bind validation and acceptance; inherited clean entries can be
+replaced by the newly demanded same-ID request while competing identities
+within the current command fail with a typed conflict. Root snapshots remain
+pinned across unlocked observation and exact post-I/O token checks.
+
+The runtime-private native entrypoint preserves lexical, allocation-free Local
+success and stages HTTP/Git outcomes as stable Spec or current-generation
+Transport/Materialization results. HTTP retains the accepted capture-before
+saved-checksum precedence. Git retains its byte-identical command/stdout,
+temporary archive, and external-tar path, including real Git archive success
+and deterministic extraction-failure classification.
+
+Validation passed 23 focused repository tests, all 79 core unit and 13
+integration tests, GNU-Windows compilation, formatting, diff/utility/scope
+checks, and archive guards. Independent source/contract and
+architecture/hot-path reviews corrected inherited A-to-B replacement,
+malformed-checksum dual-failure precedence, and Git materialization-stage
+evidence; both latest-diff rereviews returned `ACCEPT`.
+
+Next evidence: Implement only `WP-5-m1-runtime-native-demand-session` in
+`app/slug_core_v2/src/runtime/demands.rs`,
+`app/slug_core_v2/src/runtime/repository_io.rs`, and
+`app/slug_core_v2/src/runtime/dice.rs`. Add the dormant manually driven
+command/session owner, preflight reporting, whole-transition workspace command
+lease, cumulative complete worksets/epochs, fixed generation bundle,
+repository-first/path-second progression, typed strict nonprogress, accepted
+snapshot restoration/replacement, ordered accept/discard evidence, and the
+private real-DICE handshake. Do not activate shared semantic retry or
+publication in any command surface.
