@@ -42,16 +42,18 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-repository-ignore-matcher-owner`.
+`WP-5-m1-host-repository-ignore-owner`.
 
-Add only the crate-private compact repository-ignore matcher/value in
-`app/slug_bzlmod_v2/src/repository_ignore.rs` plus its private module
-declaration in `lib.rs`. Own sorted/deduplicated literal prefixes, ordered
-original REPO patterns, compact precompiled segments, and exact
-component-aware `matching_entry(&PackagePath)`. Match Bazel 9 `UnixGlob`
-prefix semantics including `**`, segment `*`/`?`, leading-dot rules,
-escaping, and parentheses. Add no IO, DICE key, events, regex/glob
-dependency, loading dependency, or standard retained hash collection.
+Add only the private Host REPO evaluator and repository-ignore key in new
+`app/slug_bzlmod_v2/src/repo_file.rs`, the accepted
+`repository_ignore.rs`, and `lib.rs`. Evaluate workspace-root `REPO.bazel`
+through the accepted Host byte owner with exact Bazel no-load globals,
+call-order/cardinality diagnostics, UTF-8 Off/Warning/Error behavior, and
+marker-conditional ordered event capture. Compose the result with strictly
+sequential first-file `.bazelignore` discovery, replacement UTF-8 decoding,
+ordered package roots, and only contained vendor prefixes. Preserve typed
+Host/parse/evaluation/path failures, transient Need behavior, semantic
+equality, and A→B→A replay. Add no command activation or package lookup.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

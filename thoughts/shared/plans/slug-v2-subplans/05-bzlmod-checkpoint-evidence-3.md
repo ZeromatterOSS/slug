@@ -3860,3 +3860,46 @@ source/contract, implementation/evidence, and architecture reviews returned
 
 Next evidence: Implement only
 `WP-5-m1-repository-ignore-matcher-owner`.
+
+### Stage 5 repository-ignore matcher owner
+
+Status: Accepted
+
+The exact two-file packet adds one crate-private dormant
+`RepositoryIgnoreMatcher` with sorted/deduplicated
+`Arc<[PackagePath]>` literal prefixes and ordered
+`Arc<[CompiledPattern]>` REPO patterns. Each compiled pattern retains its
+exact `CompactString` source spelling and compact precompiled segment/atom
+slices. The outer value is `Allocative`, cheap `Dupe`, and manually equal
+only over normalized prefixes plus ordered original patterns; compiled state
+and bounded matching scratch are excluded.
+
+`matching_entry(&PackagePath)` checks component-aware literal prefixes first
+and then preserves first-matching pattern order. Its rolling bounded DP ports
+Bazel 9.2 `UnixGlob.matchesPrefix`: exhausted patterns match descendants,
+exact `**` consumes zero or more segments, root is zero segments, and
+ordinary segment matching preserves the exact empty, bare-star, leading-dot,
+one-star prefix/suffix, and generic wildcard branches. The generic branch
+drops parentheses, keeps regex metacharacters and backslash literal, and
+matches Java regex-dot behavior including its five excluded line
+terminators; fast paths retain literal parentheses and `?`. Actual REPO
+patterns remain unvalidated, ordered, duplicate-preserving, and return their
+exact original spelling.
+
+Seven focused tests pin literal root/exact/descendant/component boundaries,
+zero/many recursive segments, hidden entries, mixed wildcards, regex
+literals, optimization-sensitive parentheses and fast-path `?`, Java line
+terminators, malformed empty/absolute/trailing/doubled slash and embedded
+`**` patterns, precedence/order/duplicates, and semantic equality. Validation
+passed the focused 7, full bzlmod 248, loading 54, core 98 unit plus 13
+integration tests, and zero doctests. Every bzlmod/loading/core GNU-Windows
+test executable linked. Formatting, archive, diff, exact two-file allowlist,
+dependency, private-surface, compact-storage, bounded-scratch, and
+no-activation gates passed. The only compile correction stored literal
+Unicode scalars as `u32` because `char` lacks this repository's `Allocative`
+implementation; semantics remained unchanged. All three terminal
+source/contract, implementation/evidence, and architecture/hot-path reviews
+returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-host-repository-ignore-owner`.
