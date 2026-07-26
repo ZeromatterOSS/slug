@@ -6,12 +6,7 @@
  * found in the LICENSE-APACHE file in the root directory.
  */
 
-//! Private Bazel 9.2 lockfile-v28 semantic owner.
-//!
-//! This module intentionally has no production caller or public re-export
-//! until the later atomic live-cutover packet.
-
-#![allow(dead_code)] // Private pure owner; the following packet adds the sole caller.
+//! Bazel 9.2 lockfile-v28 semantic owner.
 
 use std::cmp::Ordering;
 use std::error::Error;
@@ -48,7 +43,7 @@ const LENIENT_STANDARD_BASE64: GeneralPurpose = GeneralPurpose::new(
 /// order-independent for maps and sets, ordered for lists, and uses Starlark
 /// numeric equality for Facts.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) struct BazelLockfileV28 {
+pub struct BazelLockfile {
     pub(crate) lock_file_version: i32,
     pub(crate) registry_file_hashes: SortedMap<CompactString, RegistryFileHash>,
     pub(crate) selected_yanked_versions: SortedMap<LockfileModuleKey, CompactString>,
@@ -60,7 +55,10 @@ pub(crate) struct BazelLockfileV28 {
     pub(crate) facts_versions: SortedMap<ModuleExtensionId, i32>,
 }
 
-impl Default for BazelLockfileV28 {
+#[cfg(test)]
+pub(crate) use BazelLockfile as BazelLockfileV28;
+
+impl Default for BazelLockfile {
     fn default() -> Self {
         Self {
             lock_file_version: LOCK_FILE_VERSION_28,
@@ -73,11 +71,15 @@ impl Default for BazelLockfileV28 {
     }
 }
 
-impl BazelLockfileV28 {
+impl BazelLockfile {
     /// Bazel semantic equality, independent of non-semantic map insertion
     /// order and spelling while retaining ordered list identity.
-    pub(crate) fn semantically_eq(&self, other: &Self) -> bool {
+    pub fn semantically_eq(&self, other: &Self) -> bool {
         self == other
+    }
+
+    pub fn lock_file_version(&self) -> i32 {
+        self.lock_file_version
     }
 }
 
@@ -354,7 +356,7 @@ pub(crate) enum UnsupportedVersionPolicy {
 #[derive(Debug, Clone, Allocative)]
 pub(crate) enum LockfileReadOutcome {
     Empty,
-    Parsed(BazelLockfileV28),
+    Parsed(BazelLockfile),
 }
 
 /// Decode Java-compatible UTF-8 replacement, apply the first textual version
@@ -365,13 +367,13 @@ pub(crate) fn read_lockfile_v28(
 ) -> Result<LockfileReadOutcome, LockfileParseError> {
     let source = java_utf8_decode(bytes);
     let marker = scan_version_marker(&source)?;
-    if marker.as_deref() != Some("28") {
+    if marker.map(|(value, _)| value) != Some(LOCK_FILE_VERSION_28) {
         return match unsupported_version_policy {
             UnsupportedVersionPolicy::ReturnEmpty => Ok(LockfileReadOutcome::Empty),
             UnsupportedVersionPolicy::Error => Err(parse_error(
                 LockfileParseErrorSurface::UnsupportedVersion,
                 LockfileParseErrorKind::UnsupportedVersion {
-                    found: marker.map(CompactString::from),
+                    found: marker.map(|(_, spelling)| CompactString::from(spelling)),
                 },
                 None,
                 "unsupported or missing lockfile version",
@@ -389,7 +391,7 @@ pub(crate) fn read_lockfile_v28(
 
 /// Render all six top-level fields in Bazel/Gson order and formatting.
 pub(crate) fn render_lockfile_v28(
-    lockfile: &BazelLockfileV28,
+    lockfile: &BazelLockfile,
 ) -> Result<CompactString, LockfileRenderError> {
     let mut writer = PrettyWriter::new();
     stream_render_lockfile(&mut writer, lockfile)?;
@@ -397,10 +399,24 @@ pub(crate) fn render_lockfile_v28(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
-pub(crate) struct SourcePosition {
+pub struct SourcePosition {
     pub(crate) byte_offset: usize,
     pub(crate) line: usize,
     pub(crate) column: usize,
+}
+
+impl SourcePosition {
+    pub fn byte_offset(self) -> usize {
+        self.byte_offset
+    }
+
+    pub fn line(self) -> usize {
+        self.line
+    }
+
+    pub fn column(self) -> usize {
+        self.column
+    }
 }
 
 /// Non-retained tokens from the Gson-compatible reader.
@@ -546,6 +562,7 @@ impl<'a> GsonTokenizer<'a> {
         Ok(Some((position, token)))
     }
 
+    #[allow(dead_code)]
     pub(crate) fn skip_value(&mut self) -> Result<(), LockfileParseError> {
         TokenReader::new(self).skip_value()
     }
@@ -1728,8 +1745,8 @@ impl ArrayCursor {
 
 fn stream_parse_lockfile(
     reader: &mut TokenReader<'_, '_>,
-) -> Result<BazelLockfileV28, LockfileParseError> {
-    let mut result = BazelLockfileV28::default();
+) -> Result<BazelLockfile, LockfileParseError> {
+    let mut result = BazelLockfile::default();
     let mut object = reader.begin_object()?;
     while let Some(name) = object.next_name(reader, AdapterDomain::ModuleExtension)? {
         if reader.take_null()? {
@@ -2235,7 +2252,7 @@ impl PrettyWriter {
 
 fn stream_render_lockfile(
     writer: &mut PrettyWriter,
-    lockfile: &BazelLockfileV28,
+    lockfile: &BazelLockfile,
 ) -> Result<(), LockfileRenderError> {
     writer.begin_object();
     writer.name("lockFileVersion");
@@ -2496,7 +2513,7 @@ fn starlark_float_to_string(value: f64) -> String {
     fixed
 }
 
-fn scan_version_marker(source: &str) -> Result<Option<&str>, LockfileParseError> {
+fn scan_version_marker(source: &str) -> Result<Option<(i32, &str)>, LockfileParseError> {
     const PREFIX: &str = "\"lockFileVersion\":";
     let mut offset = 0;
     while let Some(relative) = source[offset..].find(PREFIX) {
@@ -2513,17 +2530,17 @@ fn scan_version_marker(source: &str) -> Result<Option<&str>, LockfileParseError>
             .count();
         if digits_len > 0 {
             let spelling = &source[digits_start..digits_start + digits_len];
-            if spelling.parse::<i32>().is_err() {
-                return Err(parse_error(
+            let value = spelling.parse::<i32>().map_err(|_| {
+                parse_error(
                     LockfileParseErrorSurface::CaughtIllegalArgument,
                     LockfileParseErrorKind::VersionMarkerOverflow {
                         spelling: spelling.into(),
                     },
                     None,
                     "lockfile version marker overflows signed 32-bit integer",
-                ));
-            }
-            return Ok(Some(spelling));
+                )
+            })?;
+            return Ok(Some((value, spelling)));
         }
         offset = start;
     }
@@ -2812,7 +2829,7 @@ fn render_error(kind: LockfileRenderErrorKind, message: &str) -> LockfileRenderE
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
-pub(crate) enum AdapterDomain {
+pub enum AdapterDomain {
     Checksum,
     ModuleKey,
     Version,
@@ -2829,7 +2846,7 @@ pub(crate) enum AdapterDomain {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) enum LockfileParseErrorKind {
+pub enum LockfileParseErrorKind {
     UnsupportedVersion { found: Option<CompactString> },
     VersionMarkerOverflow { spelling: CompactString },
     MalformedJson,
@@ -2847,7 +2864,7 @@ pub(crate) enum LockfileParseErrorKind {
 /// `JsonParseException` and delimiter `IndexOutOfBoundsException` deliberately
 /// remain distinguishable uncaught holes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
-pub(crate) enum LockfileParseErrorSurface {
+pub enum LockfileParseErrorSurface {
     UnsupportedVersion,
     CaughtJsonSyntax,
     CaughtNullPointer,
@@ -2857,11 +2874,29 @@ pub(crate) enum LockfileParseErrorSurface {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) struct LockfileParseError {
+pub struct LockfileParseError {
     pub(crate) surface: LockfileParseErrorSurface,
     pub(crate) kind: LockfileParseErrorKind,
     pub(crate) position: Option<SourcePosition>,
     pub(crate) message: CompactString,
+}
+
+impl LockfileParseError {
+    pub fn surface(&self) -> LockfileParseErrorSurface {
+        self.surface
+    }
+
+    pub fn kind(&self) -> &LockfileParseErrorKind {
+        &self.kind
+    }
+
+    pub fn position(&self) -> Option<SourcePosition> {
+        self.position
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
 }
 
 impl fmt::Display for LockfileParseError {
@@ -2880,17 +2915,27 @@ impl fmt::Display for LockfileParseError {
 
 impl Error for LockfileParseError {}
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) enum LockfileRenderErrorKind {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+pub enum LockfileRenderErrorKind {
     RecordedInputParseFailureSentinel,
     RepoRuleIdWithoutLabel,
     InvalidRetainedValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) struct LockfileRenderError {
+pub struct LockfileRenderError {
     pub(crate) kind: LockfileRenderErrorKind,
     pub(crate) message: CompactString,
+}
+
+impl LockfileRenderError {
+    pub fn kind(&self) -> LockfileRenderErrorKind {
+        self.kind
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
 }
 
 impl fmt::Display for LockfileRenderError {

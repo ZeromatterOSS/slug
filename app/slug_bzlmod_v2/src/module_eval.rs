@@ -31,6 +31,8 @@ use slug_identity_v2::RepositoryMappingId;
 use slug_identity_v2::TargetName;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
+use slug_workspace_v2::WorkspaceRawFileKey;
+use slug_workspace_v2::WorkspaceRawFileValue;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
 use starlark::codemap::Span;
@@ -86,7 +88,7 @@ use crate::NonrootModuleKey;
 use crate::NonrootRepoImports;
 use crate::VisibleLockfileRead;
 use crate::lockfile::bad_visible_lockfile_message;
-use crate::lockfile::parse_visible_lockfile_content_for_mode;
+use crate::lockfile::parse_visible_lockfile_bytes_for_mode;
 
 /// A direct, literal `include()` request found while compiling one non-root
 /// MODULE file. The later closure evaluator supplies and executes these files.
@@ -990,7 +992,7 @@ impl Key for VisibleLockfileKey {
         }
 
         let value = match ctx
-            .compute(&WorkspaceFileKey {
+            .compute(&WorkspaceRawFileKey {
                 workspace: self.workspace.clone(),
                 path: self.workspace.join("MODULE.bazel.lock"),
             })
@@ -1000,11 +1002,11 @@ impl Key for VisibleLockfileKey {
             Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
         };
         let parsed = match value {
-            WorkspaceFileValue::Present(source) => {
-                parse_visible_lockfile_content_for_mode(&mode, Some(source.as_str()))
+            WorkspaceRawFileValue::Present(source) => {
+                parse_visible_lockfile_bytes_for_mode(&mode, Some(source.as_ref()))
             }
-            WorkspaceFileValue::Absent => parse_visible_lockfile_content_for_mode(&mode, None),
-            WorkspaceFileValue::ReadError(error) => {
+            WorkspaceRawFileValue::Absent => parse_visible_lockfile_bytes_for_mode(&mode, None),
+            WorkspaceRawFileValue::ReadError(error) => {
                 Err(bad_visible_lockfile_message(error.as_str()))
             }
         };

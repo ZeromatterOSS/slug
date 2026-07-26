@@ -31,32 +31,30 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the raw-read v28 live-cutover's complete
-direct-DICE closure passed exact-source/call-graph,
-implementation-feasibility, and architecture/orchestration review. An
-app-wide inventory expanded the held eight-file draft to thirteen Rust files
-covering every active root-request test transaction, plus direct test-only
-workspace dependencies for analysis and query and their two bounded local
-lockfile entries. The sixteen-file correction preserves production's existing
-atomic raw/text injection and admits no production re-export, fallback, new
-key/lock/read, fixture, Host, exact-Off, or semantic dependency bypass.
+Latest M1 accepted evidence: the sole-v28 raw-read live cutover passed 123
+focused tests; complete native bzlmod 361, loading 54, analysis 12, query 61,
+and core 115 suites; zero-test doctests for all five crates; and all 27
+GNU-Windows test executable links. It covers all twelve active direct-DICE
+updater closures, exact raw invalid-byte and parsed-first-marker behavior,
+semantic keep/delete/write planning and atomic apply, and caught versus direct
+errors. The accepted local boundary is sixteen files: fifteen tracked files
+plus the intentionally ignored root `Cargo.lock` with exactly two local
+dependency-array entries. Exact-source/parity, implementation/evidence, and
+architecture/orchestration terminal rereviews all returned `ACCEPT` after
+corrections for Keep evidence and Bazel's parsed leading-zero marker behavior.
+No fixture, production re-export, fallback, new key/lock/read, Host or
+exact-Off activation, or merge-conflict claim entered.
 
 ### Current packet
 
-Implement only
-`WP-5-m1-bazel-lockfile-v28-raw-read-live-cutover`.
+Design only
+`WP-5-m1-host-visible-lockfile-boundary-design`.
 
-Resume the held raw-read/sole-schema cutover under the exact sixteen-file
-correction in the owning subplan. Add mechanically derived same-updater raw
-snapshots to every active direct-DICE harness in bzlmod, loading, analysis, and
-query. Analysis and query may add only their direct
-`slug_workspace_v2` dev-dependency plus the corresponding two existing local
-`Cargo.lock` dependency-array entries. Preserve legacy Off's early no-file
-edge, caught versus direct failures, and complete semantic planning. Run the
-five-crate serial test/doctest/Windows matrix and all forbidden scans. Stop on
-a seventeenth file, production re-export or behavior edit, fallback, new
-key/lock/read, other dependency drift, fixture change, Host/exact-Off
-activation, merge-conflict claim, or second schema/parser/renderer.
+Reopen the prior `REPLAN` now that the exact full-v28 value and error owner is
+live. Audit pinned Bazel 9.2 Host Off read/parse behavior, the separate
+path-only key, full `Arc` value identity, and the exact source/oracle-first
+boundary. Rereview the old provisional contract rather than inheriting it.
+Do not edit Rust or fixtures and do not run Cargo.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

@@ -31,6 +31,9 @@ use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::install_registry_io;
 use slug_workspace_v2::WorkspaceFileValue;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::sorted_map::SortedMap;
@@ -128,6 +131,29 @@ fn snapshot_with_root(
     })
 }
 
+fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
+    Arc::new(WorkspaceRawSnapshot {
+        files: Arc::new(
+            snapshot
+                .files
+                .iter()
+                .map(|(path, value)| {
+                    let value = match value {
+                        WorkspaceFileValue::Present(source) => {
+                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                        }
+                        WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                        WorkspaceFileValue::ReadError(error) => {
+                            WorkspaceRawFileValue::ReadError(error.clone())
+                        }
+                    };
+                    (path.clone(), value)
+                })
+                .collect(),
+        ),
+    })
+}
+
 fn dice_with_io(io: Arc<FakeRegistryIo>) -> Arc<Dice> {
     let mut builder = Dice::builder();
     install_registry_io(&mut builder, io);
@@ -142,6 +168,7 @@ async fn transaction(
     urls: RegistryUrls,
 ) -> DiceTransaction {
     let root = workspace();
+    let raw_files = raw_snapshot_from_text(&files);
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
         .changed_to(vec![(
@@ -149,6 +176,14 @@ async fn transaction(
                 workspace: root.clone(),
             },
             files,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: root.clone(),
+            },
+            raw_files,
         )])
         .unwrap();
     inject_root_module_request_inputs(
@@ -593,13 +628,23 @@ async fn remote_io_fails_closed_when_required_inputs_or_capability_are_missing()
     let dice = dice_with_io(io.clone());
     let root = workspace();
     let lock = lockfile(None);
+    let files = snapshot(Some(&lock), []);
+    let raw_files = raw_snapshot_from_text(&files);
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
                 workspace: root.clone(),
             },
-            snapshot(Some(&lock), []),
+            files,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: root.clone(),
+            },
+            raw_files,
         )])
         .unwrap();
     inject_root_module_request_inputs(

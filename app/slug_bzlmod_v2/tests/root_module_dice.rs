@@ -22,6 +22,7 @@ use slug_bzlmod_v2::RootModuleFilesKey;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLockfileMode;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
+use slug_bzlmod_v2::VisibleLockfileKey;
 use slug_bzlmod_v2::VisibleLockfileRead;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_events_v2::CaptureEvaluationEvents;
@@ -29,6 +30,10 @@ use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::ApparentRepoName;
 use slug_workspace_v2::WorkspaceFileValue;
+use slug_workspace_v2::WorkspaceRawFileKey;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::sorted_map::SortedMap;
@@ -182,6 +187,37 @@ impl ActivationTracker for RootEventTracker {
     }
 }
 
+#[derive(Default)]
+struct LockfileDependencyTracker {
+    raw_edges: Mutex<Vec<bool>>,
+}
+
+impl LockfileDependencyTracker {
+    fn take(&self) -> Vec<bool> {
+        std::mem::take(&mut *self.raw_edges.lock().unwrap())
+    }
+}
+
+impl ActivationTracker for LockfileDependencyTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
+        _activation: ActivationData,
+    ) {
+        if key.downcast_ref::<VisibleLockfileKey>().is_some() {
+            let mut has_raw_edge = false;
+            while let Some(dependency) = deps.next() {
+                if dependency.downcast_ref::<WorkspaceRawFileKey>().is_some() {
+                    has_raw_edge = true;
+                    break;
+                }
+            }
+            self.raw_edges.lock().unwrap().push(has_raw_edge);
+        }
+    }
+}
+
 impl RequestInputs {
     fn defaults() -> Self {
         Self {
@@ -203,6 +239,43 @@ fn snapshot(
 ) -> Arc<WorkspaceSnapshot> {
     let workspace = workspace();
     Arc::new(WorkspaceSnapshot {
+        files: Arc::new(
+            entries
+                .into_iter()
+                .map(|(path, value)| (workspace.join(path), value))
+                .collect::<SortedMap<_, _>>(),
+        ),
+    })
+}
+
+fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
+    Arc::new(WorkspaceRawSnapshot {
+        files: Arc::new(
+            snapshot
+                .files
+                .iter()
+                .map(|(path, value)| {
+                    let value = match value {
+                        WorkspaceFileValue::Present(source) => {
+                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                        }
+                        WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                        WorkspaceFileValue::ReadError(error) => {
+                            WorkspaceRawFileValue::ReadError(error.clone())
+                        }
+                    };
+                    (path.clone(), value)
+                })
+                .collect(),
+        ),
+    })
+}
+
+fn raw_snapshot(
+    entries: impl IntoIterator<Item = (&'static str, WorkspaceRawFileValue)>,
+) -> Arc<WorkspaceRawSnapshot> {
+    let workspace = workspace();
+    Arc::new(WorkspaceRawSnapshot {
         files: Arc::new(
             entries
                 .into_iter()
@@ -254,6 +327,29 @@ async fn graph_and_module_value_observed(
     Arc<Result<slug_bzlmod_v2::RootModuleGraph, compact_str::CompactString>>,
     Arc<Result<slug_bzlmod_v2::RootModuleFiles, compact_str::CompactString>>,
 ) {
+    let raw_files = raw_snapshot_from_text(&files);
+    graph_and_module_value_with_raw_observed(
+        dice,
+        files,
+        raw_files,
+        inputs,
+        tracker,
+        capture_events,
+    )
+    .await
+}
+
+async fn graph_and_module_value_with_raw_observed(
+    dice: &Arc<Dice>,
+    files: Arc<WorkspaceSnapshot>,
+    raw_files: Arc<WorkspaceRawSnapshot>,
+    inputs: RequestInputs,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+) -> (
+    Arc<Result<slug_bzlmod_v2::RootModuleGraph, compact_str::CompactString>>,
+    Arc<Result<slug_bzlmod_v2::RootModuleFiles, compact_str::CompactString>>,
+) {
     let workspace = workspace();
     let mut user_data = UserComputationData {
         activation_tracker: tracker,
@@ -269,6 +365,14 @@ async fn graph_and_module_value_observed(
                 workspace: workspace.clone(),
             },
             files,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            raw_files,
         )])
         .unwrap();
     if let Some(command) = inputs.command {
@@ -1849,6 +1953,228 @@ async fn visible_lockfile_transitions_are_semantic_and_recover_on_retained_dice(
         ignored.as_ref().as_ref().unwrap().visible_lockfile,
         VisibleLockfileRead::Ignored
     );
+}
+
+#[tokio::test]
+async fn visible_lockfile_raw_bytes_drive_retained_dice_and_off_has_no_raw_edge() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let files = snapshot([
+        (
+            "MODULE.bazel",
+            WorkspaceFileValue::Present(Arc::new("module(name = 'root')\n".to_owned())),
+        ),
+        (
+            "MODULE.bazel.lock",
+            WorkspaceFileValue::ReadError(Arc::new("text lockfile must not be read".to_owned())),
+        ),
+    ]);
+    let module_bytes =
+        WorkspaceRawFileValue::Present(Arc::from(b"module(name = 'root')\n".as_slice()));
+    let lockfile_a = WorkspaceRawFileValue::Present(Arc::from(
+        b"{\"unknown\":\"\xff\",\"lockFileVersion\":28}".as_slice(),
+    ));
+    let raw_files = |lockfile| {
+        raw_snapshot([
+            ("MODULE.bazel", module_bytes.clone()),
+            ("MODULE.bazel.lock", lockfile),
+        ])
+    };
+    let tracker = Arc::new(LockfileDependencyTracker::default());
+
+    let first = graph_and_module_value_with_raw_observed(
+        &dice,
+        files.clone(),
+        raw_files(lockfile_a.clone()),
+        RequestInputs::defaults(),
+        Some(tracker.clone()),
+        false,
+    )
+    .await
+    .0;
+    let first = first.as_ref().as_ref().unwrap().clone();
+    assert_eq!(
+        first.visible_lockfile,
+        VisibleLockfileRead::Parsed(slug_bzlmod_v2::empty_bazel_lockfile().into())
+    );
+    assert_eq!(tracker.take(), [true]);
+
+    let reuse_tracker = Arc::new(RootEvaluationTracker::default());
+    let formatting_equivalent = graph_and_module_value_with_raw_observed(
+        &dice,
+        files.clone(),
+        raw_files(WorkspaceRawFileValue::Present(Arc::from(
+            b"{\n  \"facts\": {},\n  \"lockFileVersion\": 28,\n  \"moduleExtensions\": {},\n  \"registryFileHashes\": {},\n  \"selectedYankedVersions\": {}\n}\n"
+                .as_slice(),
+        ))),
+        RequestInputs::defaults(),
+        Some(reuse_tracker.clone()),
+        false,
+    )
+    .await
+    .0;
+    assert_eq!(formatting_equivalent.as_ref().as_ref().unwrap(), &first);
+    assert_eq!(reuse_tracker.take(), [EvaluationActivation::Reused]);
+
+    let malformed = graph_and_module_value_with_raw_observed(
+        &dice,
+        files.clone(),
+        raw_files(WorkspaceRawFileValue::Present(Arc::from(
+            b"{\"lockFileVersion\":28, nope".as_slice(),
+        ))),
+        RequestInputs::defaults(),
+        None,
+        false,
+    )
+    .await
+    .0;
+    let error = malformed.as_ref().as_ref().unwrap_err().to_string();
+    assert!(
+        error.contains("Failed to read and parse the MODULE.bazel.lock file"),
+        "{error}"
+    );
+
+    for bytes in [
+        b"{\"lockFileVersion\":28,\"registryFileHashes\":{\"u\":\"bad\"}}".as_slice(),
+        br#"{"lockFileVersion":28,"moduleExtensions":{"//:ext.bzl":{"general":{}}}}"#.as_slice(),
+    ] {
+        let direct = graph_and_module_value_with_raw_observed(
+            &dice,
+            files.clone(),
+            raw_files(WorkspaceRawFileValue::Present(Arc::from(bytes))),
+            RequestInputs::defaults(),
+            None,
+            false,
+        )
+        .await
+        .0;
+        let error = direct.as_ref().as_ref().unwrap_err().to_string();
+        assert!(
+            !error.contains("Failed to read and parse the MODULE.bazel.lock file"),
+            "{error}"
+        );
+    }
+
+    let leading_zero_current = graph_and_module_value_with_raw_observed(
+        &dice,
+        files.clone(),
+        raw_files(WorkspaceRawFileValue::Present(Arc::from(
+            br#"{"decoy":{"lockFileVersion":028},"lockFileVersion":28,"registryFileHashes":{"u":"not found"}}"#
+                .as_slice(),
+        ))),
+        RequestInputs::defaults(),
+        None,
+        false,
+    )
+    .await
+    .0;
+    assert_eq!(
+        leading_zero_current
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .visible_lockfile
+            .parsed()
+            .unwrap()
+            .registry_file_expectation("u")
+            .unwrap(),
+        slug_bzlmod_v2::RegistryFileExpectation::RecordedAbsent
+    );
+
+    let noncurrent = WorkspaceRawFileValue::Present(Arc::from(
+        br#"{"decoy":{"lockFileVersion":027},"lockFileVersion":28,"registryFileHashes":{"u":"not found"}}"#
+            .as_slice(),
+    ));
+    for mode in [LockfileMode::Update, LockfileMode::Refresh] {
+        let empty = graph_and_module_value_with_raw_observed(
+            &dice,
+            files.clone(),
+            raw_files(noncurrent.clone()),
+            RequestInputs {
+                lockfile_mode: Some(mode),
+                ..RequestInputs::defaults()
+            },
+            None,
+            false,
+        )
+        .await
+        .0;
+        assert_eq!(
+            empty.as_ref().as_ref().unwrap().visible_lockfile,
+            first.visible_lockfile
+        );
+    }
+    let noncurrent_error = graph_and_module_value_with_raw_observed(
+        &dice,
+        files.clone(),
+        raw_files(noncurrent),
+        RequestInputs {
+            lockfile_mode: Some(LockfileMode::Error),
+            ..RequestInputs::defaults()
+        },
+        None,
+        false,
+    )
+    .await
+    .0;
+    assert_eq!(
+        noncurrent_error.as_ref().as_ref().unwrap_err().as_str(),
+        "The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile."
+    );
+
+    let semantic_b = graph_and_module_value_with_raw_observed(
+        &dice,
+        files.clone(),
+        raw_files(WorkspaceRawFileValue::Present(Arc::from(
+            b"{\"lockFileVersion\":28,\"registryFileHashes\":{\"u\":\"not found\"}}".as_slice(),
+        ))),
+        RequestInputs::defaults(),
+        None,
+        false,
+    )
+    .await
+    .0;
+    assert_ne!(semantic_b.as_ref().as_ref().unwrap(), &first);
+
+    let restored = graph_and_module_value_with_raw_observed(
+        &dice,
+        files.clone(),
+        raw_files(lockfile_a),
+        RequestInputs::defaults(),
+        None,
+        false,
+    )
+    .await
+    .0;
+    assert_eq!(restored.as_ref().as_ref().unwrap(), &first);
+
+    let off_tracker = Arc::new(LockfileDependencyTracker::default());
+    let off_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let off = graph_and_module_value_with_raw_observed(
+        &off_dice,
+        files,
+        raw_snapshot([
+            ("MODULE.bazel", module_bytes),
+            (
+                "MODULE.bazel.lock",
+                WorkspaceRawFileValue::ReadError(Arc::new(
+                    "raw lockfile must not be read in off mode".to_owned(),
+                )),
+            ),
+        ]),
+        RequestInputs {
+            lockfile_mode: Some(LockfileMode::Off),
+            ..RequestInputs::defaults()
+        },
+        Some(off_tracker.clone()),
+        false,
+    )
+    .await
+    .0;
+    assert_eq!(
+        off.as_ref().as_ref().unwrap().visible_lockfile,
+        VisibleLockfileRead::Ignored
+    );
+    assert_eq!(off_tracker.take(), [false]);
 }
 
 #[tokio::test]

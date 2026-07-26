@@ -493,6 +493,29 @@ fn raw_workspace_snapshot(
     })
 }
 
+fn raw_workspace_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
+    Arc::new(WorkspaceRawSnapshot {
+        files: Arc::new(
+            snapshot
+                .files
+                .iter()
+                .map(|(path, value)| {
+                    let value = match value {
+                        WorkspaceFileValue::Present(source) => {
+                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                        }
+                        WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                        WorkspaceFileValue::ReadError(error) => {
+                            WorkspaceRawFileValue::ReadError(error.clone())
+                        }
+                    };
+                    (path.clone(), value)
+                })
+                .collect(),
+        ),
+    })
+}
+
 fn raw_snapshot(
     values: impl IntoIterator<Item = (&'static str, WorkspaceRawFileValue)>,
 ) -> Arc<WorkspaceRawSnapshot> {
@@ -799,13 +822,23 @@ async fn materialization_with_epoch(
 ) -> SourcePreparationOutcome<Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>>
 {
     let workspace = workspace();
+    let text = text_snapshot_with(root_source);
+    let raw = raw_workspace_snapshot_from_text(&text);
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
                 workspace: workspace.clone(),
             },
-            text_snapshot_with(root_source),
+            text,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            raw,
         )])
         .unwrap();
     updater.changed_to(vec![epoch]).unwrap();
@@ -847,13 +880,23 @@ async fn count_repository_materialization_with_epoch(
     counter_key: &RepositoryMaterializationCounterKey,
 ) -> usize {
     let workspace = workspace();
+    let text = text_snapshot_with(root_source);
+    let raw = raw_workspace_snapshot_from_text(&text);
     let mut updater = dice.updater_with_data(UserComputationData::default());
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
                 workspace: workspace.clone(),
             },
-            text_snapshot_with(root_source),
+            text,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            raw,
         )])
         .unwrap();
     updater.changed_to(vec![epoch]).unwrap();
@@ -1918,13 +1961,23 @@ async fn materialization_need_and_pure_spec_error_precede_path_observation() {
         let workspace = workspace.clone();
         let root_source = root_source.to_owned();
         async move {
+            let text = text_snapshot_with(&root_source);
+            let raw = raw_workspace_snapshot_from_text(&text);
             let mut updater = dice.updater_with_data(UserComputationData::default());
             updater
                 .changed_to(vec![(
                     WorkspaceSnapshotKey {
                         workspace: workspace.clone(),
                     },
-                    text_snapshot_with(&root_source),
+                    text,
+                )])
+                .unwrap();
+            updater
+                .changed_to(vec![(
+                    WorkspaceRawSnapshotKey {
+                        workspace: workspace.clone(),
+                    },
+                    raw,
                 )])
                 .unwrap();
             updater

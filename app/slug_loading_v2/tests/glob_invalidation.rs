@@ -32,6 +32,10 @@ use slug_loading_v2::keys::WorkspaceFileKey;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_workspace_v2::WorkspaceRawFileKey;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Identity {
@@ -84,7 +88,34 @@ fn tracked_identity(key: &DynKey) -> Option<Identity> {
     } else {
         key.downcast_ref::<WorkspaceFileKey>()
             .map(|key| Identity::File(key.path.clone()))
+            .or_else(|| {
+                key.downcast_ref::<WorkspaceRawFileKey>()
+                    .map(|key| Identity::File(key.path.clone()))
+            })
     }
+}
+
+fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
+    Arc::new(WorkspaceRawSnapshot {
+        files: Arc::new(
+            snapshot
+                .files
+                .iter()
+                .map(|(path, value)| {
+                    let value = match value {
+                        WorkspaceFileValue::Present(source) => {
+                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                        }
+                        WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                        WorkspaceFileValue::ReadError(error) => {
+                            WorkspaceRawFileValue::ReadError(error.clone())
+                        }
+                    };
+                    (path.clone(), value)
+                })
+                .collect(),
+        ),
+    })
 }
 
 impl ActivationTracker for Tracker {
@@ -209,6 +240,7 @@ async fn load_revision_with_inputs(
     lockfile_mode: LockfileMode,
 ) -> (Vec<String>, Vec<(Identity, EventKind)>, String) {
     let (files, directories) = observations(workspace);
+    let raw_files = raw_snapshot_from_text(&files);
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker.clone()),
         ..Default::default()
@@ -219,6 +251,14 @@ async fn load_revision_with_inputs(
                 workspace: workspace.to_path_buf(),
             },
             Arc::new(files),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            raw_files,
         )])
         .unwrap();
     updater
@@ -280,6 +320,7 @@ async fn evaluate_package_revision(
     lockfile_mode: LockfileMode,
 ) -> Result<(), String> {
     let (files, directories) = observations(workspace);
+    let raw_files = raw_snapshot_from_text(&files);
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker.clone()),
         ..Default::default()
@@ -290,6 +331,14 @@ async fn evaluate_package_revision(
                 workspace: workspace.to_path_buf(),
             },
             Arc::new(files),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            raw_files,
         )])
         .unwrap();
     updater
@@ -763,6 +812,7 @@ async fn root_module_graph_error_blocks_listing_and_build_observation() {
     write(&workspace.join("MODULE.bazel"), "module(name = )\n");
     write(&package.join("BUILD.bazel"), "this is also invalid\n");
     let (files, directories) = observations(&workspace);
+    let raw_files = raw_snapshot_from_text(&files);
     let tracker = Arc::new(Tracker::default());
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut updater = dice.updater_with_data(UserComputationData {
@@ -775,6 +825,14 @@ async fn root_module_graph_error_blocks_listing_and_build_observation() {
                 workspace: workspace.clone(),
             },
             Arc::new(files),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            raw_files,
         )])
         .unwrap();
     updater

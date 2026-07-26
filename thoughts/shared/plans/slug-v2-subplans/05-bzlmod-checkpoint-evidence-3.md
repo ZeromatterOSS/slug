@@ -5428,6 +5428,40 @@ Next evidence: Resume only
 sixteen-file correction and restart the serial validation matrix after all
 twelve missing updater sites have matching same-updater raw snapshots.
 
+##### Raw-read live-cutover implementation status
+
+**Status:** Accepted after terminal corrections on 2026-07-26.
+
+The cutover now has one sole production Bazel v28 value and live raw-byte
+visible-lockfile key. It deletes the legacy general-only schema and replay
+parser/renderer while preserving caught versus direct failures, exact byte
+digests, registry tri-state projection, semantic update planning, and atomic
+keep/delete/write apply. All twelve missing active direct-DICE updater sites
+now inject mechanically derived raw snapshots on the same updater and commit.
+Analysis and query own only their direct test-time `slug_workspace_v2`
+dependencies. The local root `Cargo.lock` is intentionally ignored and carries
+only the corresponding two dependency-array entries, so the accepted local
+boundary is sixteen files and the tracked implementation boundary is fifteen.
+
+Focused lockfile coverage passed 123 matched tests. The complete native suites
+passed bzlmod 361, loading 54, analysis 12, query 61, and core 115 tests; all
+five doctest suites passed with zero tests; all 27 GNU-Windows test executables
+compiled and linked. Formatting, archive status, diff checks, exact file and
+forbidden-symbol scans, direct-dependency checks, and the app-wide active
+updater inventory passed. The first full bzlmod run exposed the incomplete
+source-preparation test harness and expanded the provisional eight-file
+boundary to the accepted sixteen-file closure. Terminal review then corrected
+atomic apply evidence to include Keep and corrected marker scanning to compare
+Bazel's parsed first textual integer, including adversarial leading-zero
+markers. Exact-source/parity, implementation/evidence, and
+architecture/orchestration latest-diff rereviews all returned `ACCEPT`.
+
+No fixture, production re-export, fallback, new key, lock, filesystem read,
+Host or exact-Off activation, or merge-conflict claim entered. Next evidence:
+design and rereview only `WP-5-m1-host-visible-lockfile-boundary-design` now
+that the exact full-v28 value/error owner is live; do not resume the old
+provisional Host contract without that review.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only

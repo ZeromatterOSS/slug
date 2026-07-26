@@ -44,6 +44,9 @@ use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
 
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 enum EventKind {
@@ -230,6 +233,29 @@ fn workspace_snapshot(root: &std::path::Path) -> WorkspaceSnapshot {
     }
 }
 
+fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
+    Arc::new(WorkspaceRawSnapshot {
+        files: Arc::new(
+            snapshot
+                .files
+                .iter()
+                .map(|(path, value)| {
+                    let value = match value {
+                        WorkspaceFileValue::Present(source) => {
+                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                        }
+                        WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                        WorkspaceFileValue::ReadError(error) => {
+                            WorkspaceRawFileValue::ReadError(error.clone())
+                        }
+                    };
+                    (path.clone(), value)
+                })
+                .collect(),
+        ),
+    })
+}
+
 async fn analyze_revision(
     dice: &Arc<Dice>,
     tracker: &Arc<AnalysisTracker>,
@@ -247,6 +273,8 @@ async fn analyze_request(
     tracker: Option<Arc<dyn ActivationTracker>>,
     capture_events: bool,
 ) -> Result<AnalysisResult, String> {
+    let text = Arc::new(workspace_snapshot(workspace));
+    let raw = raw_snapshot_from_text(&text);
     let mut user_data = UserComputationData {
         activation_tracker: tracker,
         ..Default::default()
@@ -260,7 +288,15 @@ async fn analyze_request(
             WorkspaceSnapshotKey {
                 workspace: workspace.to_path_buf(),
             },
-            Arc::new(workspace_snapshot(workspace)),
+            text,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            raw,
         )])
         .unwrap();
     updater
@@ -343,6 +379,10 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
         (path, value)
     })
     .collect();
+    let text = Arc::new(WorkspaceSnapshot {
+        files: Arc::new(files),
+    });
+    let raw = raw_snapshot_from_text(&text);
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let key = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//pkg:write_file").unwrap(),
@@ -357,9 +397,15 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
                     (WorkspaceSnapshotKey {
                         workspace: workspace.clone(),
                     }),
-                    Arc::new(WorkspaceSnapshot {
-                        files: Arc::new(files),
-                    }),
+                    text,
+                )])
+                .unwrap();
+            updater
+                .changed_to(vec![(
+                    WorkspaceRawSnapshotKey {
+                        workspace: workspace.clone(),
+                    },
+                    raw,
                 )])
                 .unwrap();
             updater
@@ -449,13 +495,23 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     .unwrap();
 
     let dice = Dice::builder().build(DetectCycles::Enabled);
+    let text = Arc::new(workspace_snapshot(&workspace));
+    let raw = raw_snapshot_from_text(&text);
     let mut updater = dice.updater();
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
                 workspace: workspace.clone(),
             },
-            Arc::new(workspace_snapshot(&workspace)),
+            text,
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            raw,
         )])
         .unwrap();
     updater

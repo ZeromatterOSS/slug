@@ -40,6 +40,9 @@ use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_loading_v2::load_label::LoadLabel;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LoadActivation {
@@ -399,6 +402,29 @@ fn directory_snapshot(root: &Path) -> WorkspaceDirectorySnapshot {
     }
 }
 
+fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
+    Arc::new(WorkspaceRawSnapshot {
+        files: Arc::new(
+            snapshot
+                .files
+                .iter()
+                .map(|(path, value)| {
+                    let value = match value {
+                        WorkspaceFileValue::Present(source) => {
+                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                        }
+                        WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                        WorkspaceFileValue::ReadError(error) => {
+                            WorkspaceRawFileValue::ReadError(error.clone())
+                        }
+                    };
+                    (path.clone(), value)
+                })
+                .collect(),
+        ),
+    })
+}
+
 fn load_package(
     dice: &Arc<Dice>,
     runtime: &tokio::runtime::Runtime,
@@ -463,6 +489,10 @@ async fn load_package_request_with_event_capture(
             (path, value)
         })
         .collect();
+    let text = Arc::new(WorkspaceSnapshot {
+        files: Arc::new(files),
+    });
+    let raw = raw_snapshot_from_text(&text);
     let evaluator = BzlModuleEvaluator::new(workspace)?;
     let mut user_data = UserComputationData {
         cycle_detector: Some(bzl_load_cycle_detector()),
@@ -477,9 +507,13 @@ async fn load_package_request_with_event_capture(
         (WorkspaceSnapshotKey {
             workspace: workspace.to_path_buf(),
         }),
-        Arc::new(WorkspaceSnapshot {
-            files: Arc::new(files),
-        }),
+        text,
+    )])?;
+    updater.changed_to(vec![(
+        WorkspaceRawSnapshotKey {
+            workspace: workspace.to_path_buf(),
+        },
+        raw,
     )])?;
     updater.changed_to(vec![(
         (WorkspaceDirectorySnapshotKey {
@@ -541,6 +575,10 @@ async fn load_rule_capability_request(
             (path, value)
         })
         .collect();
+    let text = Arc::new(WorkspaceSnapshot {
+        files: Arc::new(files),
+    });
+    let raw = raw_snapshot_from_text(&text);
     let mut updater = dice.updater_with_data(UserComputationData {
         cycle_detector: Some(bzl_load_cycle_detector()),
         activation_tracker: Some(tracker),
@@ -550,9 +588,13 @@ async fn load_rule_capability_request(
         WorkspaceSnapshotKey {
             workspace: workspace.to_path_buf(),
         },
-        Arc::new(WorkspaceSnapshot {
-            files: Arc::new(files),
-        }),
+        text,
+    )])?;
+    updater.changed_to(vec![(
+        WorkspaceRawSnapshotKey {
+            workspace: workspace.to_path_buf(),
+        },
+        raw,
     )])?;
     updater.changed_to(vec![(
         WorkspaceDirectorySnapshotKey {

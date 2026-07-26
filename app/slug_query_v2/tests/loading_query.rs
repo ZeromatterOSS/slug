@@ -33,6 +33,9 @@ use slug_query_v2::SubtreePackageSetKey;
 use slug_query_v2::UnconfiguredPackageGraphKey;
 use slug_query_v2::evaluate_loading_query;
 use slug_query_v2::evaluate_loading_query_with_policy;
+use slug_workspace_v2::WorkspaceRawFileValue;
+use slug_workspace_v2::WorkspaceRawSnapshot;
+use slug_workspace_v2::WorkspaceRawSnapshotKey;
 
 fn scratch() -> PathBuf {
     let nanos = SystemTime::now()
@@ -95,8 +98,32 @@ fn observations(root: &Path) -> (WorkspaceSnapshot, WorkspaceDirectorySnapshot) 
     )
 }
 
+fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnapshot> {
+    Arc::new(WorkspaceRawSnapshot {
+        files: Arc::new(
+            snapshot
+                .files
+                .iter()
+                .map(|(path, value)| {
+                    let value = match value {
+                        WorkspaceFileValue::Present(source) => {
+                            WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                        }
+                        WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                        WorkspaceFileValue::ReadError(error) => {
+                            WorkspaceRawFileValue::ReadError(error.clone())
+                        }
+                    };
+                    (path.clone(), value)
+                })
+                .collect(),
+        ),
+    })
+}
+
 async fn transaction(dice: &Arc<Dice>, workspace: &Path) -> dice::DiceTransaction {
     let (files, directories) = observations(workspace);
+    let raw_files = raw_snapshot_from_text(&files);
     let mut updater = dice.updater();
     updater
         .changed_to(vec![(
@@ -104,6 +131,14 @@ async fn transaction(dice: &Arc<Dice>, workspace: &Path) -> dice::DiceTransactio
                 workspace: workspace.to_path_buf(),
             },
             Arc::new(files),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            raw_files,
         )])
         .unwrap();
     updater
@@ -217,6 +252,7 @@ async fn query_revision_order_with_policy(
     Vec<(QueryKeyIdentity, ActivationKind)>,
 ) {
     let (files, directories) = observations(workspace);
+    let raw_files = raw_snapshot_from_text(&files);
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker.clone()),
         ..Default::default()
@@ -227,6 +263,14 @@ async fn query_revision_order_with_policy(
                 workspace: workspace.to_path_buf(),
             },
             Arc::new(files),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            WorkspaceRawSnapshotKey {
+                workspace: workspace.to_path_buf(),
+            },
+            raw_files,
         )])
         .unwrap();
     updater
