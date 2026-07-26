@@ -5297,6 +5297,137 @@ Next evidence: Implement only
 `WP-5-m1-bazel-lockfile-v28-raw-read-live-cutover` under the exact eight-file
 contract and serial validation matrix above.
 
+#### Lockfile v28 direct-DICE test closure correction
+
+Run only
+`WP-5-m1-bazel-lockfile-v28-direct-dice-test-closure-correction-design`.
+This is a read-only correction packet. Preserve the held eight-file
+implementation draft, but do not edit another Rust file or run another Cargo
+command until this correction receives terminal review.
+
+##### Observed stop and retained implementation
+
+The held draft implemented the accepted sole-schema/raw-read cutover in exactly
+the eight allowed files. Its test-first focused run passed 123 matched tests,
+formatting, whitespace, old-schema, alias, and raw-versus-text-key gates. Parent
+validation then ran the complete bzlmod crate and found three failures in
+`tests/source_preparation_dice.rs`: direct DICE updaters injected text but not
+`WorkspaceRawSnapshotKey`, so active `VisibleLockfileKey` correctly failed
+closed on the missing injected raw snapshot. One earlier manually constructed
+registry updater had the same defect and was corrected inside its already
+allowed test file before the complete-crate rerun.
+
+`source_preparation_dice.rs` is a ninth implementation file, so the accepted
+stop gate fired. No production fallback, new key, lock, filesystem read,
+snapshot-owner change, or dependency removal is permitted. The implementation
+draft remains uncommitted and no validation beyond the failing complete
+bzlmod run is claimed.
+
+##### Exact corrected closure
+
+An app-wide scan of every `inject_root_module_request_inputs` caller and its
+downstream keys expands the atomic implementation boundary to exactly sixteen
+files:
+
+1. `app/slug_bzlmod_v2/src/lockfile_v28.rs`;
+2. `app/slug_bzlmod_v2/src/lockfile.rs`;
+3. `app/slug_bzlmod_v2/src/lib.rs`;
+4. `app/slug_bzlmod_v2/tests/lockfile.rs`;
+5. `app/slug_bzlmod_v2/src/module_eval.rs`;
+6. `app/slug_bzlmod_v2/tests/root_module_dice.rs`;
+7. `app/slug_bzlmod_v2/tests/registry_dice.rs`;
+8. `app/slug_loading_v2/tests/glob_invalidation.rs`;
+9. `app/slug_bzlmod_v2/tests/source_preparation_dice.rs`;
+10. `app/slug_loading_v2/tests/build_file_loading.rs`;
+11. `app/slug_loading_v2/tests/bzl_invalidation.rs`;
+12. `app/slug_analysis_v2/tests/starlark_rule.rs`; and
+13. `app/slug_query_v2/tests/loading_query.rs`;
+14. `app/slug_analysis_v2/Cargo.toml`;
+15. `app/slug_query_v2/Cargo.toml`; and
+16. `Cargo.lock`.
+
+The first eight files retain their accepted contract unchanged. The five added
+Rust files are test-harness plumbing only. In each existing active-mode updater,
+derive a `WorkspaceRawSnapshot` mechanically from the same text snapshot and
+inject it with `WorkspaceRawSnapshotKey` on that updater before its sole
+commit. Also correct the third manual updater already inside
+`glob_invalidation.rs`. Preserve explicit raw overrides only in the accepted
+invalid-byte lockfile tests. Do not change production loading, analysis, query,
+source-preparation, core, workspace, or registry behavior.
+
+Analysis and query do not directly depend on `slug_workspace_v2`, and Rust must
+not name the raw types through an unexposed transitive dependency. Add exactly
+`slug_workspace_v2 = { workspace = true }` to each crate's
+`[dev-dependencies]`. `Cargo.lock` may change only by adding
+`slug_workspace_v2` to the existing local `slug_analysis_v2` and
+`slug_query_v2` dependency arrays; no package, version, checksum, source, or
+other dependency may change. Do not re-export raw workspace types from
+production loading or add a production helper merely for tests.
+
+The required sites are the three text-only source-preparation updaters, the
+single build-file-loading updater, two bzl-invalidation active package
+updaters, two loading-query updaters, three Starlark-rule analysis updaters,
+and the third glob-invalidation updater. Direct `.bzl` evaluation helpers that
+do not inject a root request and do not compute `PackageLoadKey` remain
+unchanged. `host_module.rs` retains its separate dormant Host path. Normal core
+runtime observation already injects raw and text snapshots together and does
+not change.
+
+This closure is semantically required: source preparation consumes
+`RootModuleFilesKey`; loading, analysis, and query reach `PackageLoadKey`,
+which unconditionally computes `RootModuleGraphKey`. Both paths legitimately
+retain the active visible-lockfile edge. Removing or bypassing it would change
+failure ordering and dependency ownership rather than correct the test
+transaction.
+
+##### Validation and stop gates
+
+After terminal acceptance, resume the held implementation and run serially:
+
+- `cargo fmt --all -- --check`;
+- `cargo test -p slug_bzlmod_v2 lockfile`;
+- `cargo test -p slug_bzlmod_v2`;
+- `cargo test -p slug_loading_v2`;
+- `cargo test -p slug_analysis_v2`;
+- `cargo test -p slug_query_v2`;
+- `cargo test -p slug_core_v2`;
+- doctests for all five crates;
+- GNU-Windows `--no-run` for all five crates;
+- the original old-schema, generic-JSON, general-only, multiline text-key,
+  exact-alias, and one-bridge scans over the thirteen Rust files;
+- an app-wide inventory of root-request injection sites proving every active
+  path has matching raw snapshot injection or is production's existing atomic
+  runtime path;
+- `scripts/v2_archive_status.sh`;
+- `git status --short`; and
+- `git diff --check`.
+
+Stop and replan on a seventeenth implementation file, any production edit
+outside the original five Rust source files, a raw/text fallback, new key,
+lock, read, altered root/source/package/query/analysis semantics, Cargo or
+fixture change beyond the exact two dev-dependency manifest lines and two local
+lockfile dependency-array entries, Host/exact-Off activation, or inability to
+keep every added test snapshot on the existing same updater and commit.
+
+##### Direct-DICE closure correction design status
+
+**Status:** Accepted after two closure corrections on 2026-07-26.
+
+Exact-source/call-graph, implementation-feasibility, and
+architecture/orchestration latest-text reviews all returned `ACCEPT`. The
+first correction expanded the observed ninth test file to the complete
+thirteen-Rust-file active direct-DICE closure. The second added direct
+test-only `slug_workspace_v2` dependencies for analysis and query plus the
+strictly bounded local `Cargo.lock` entries, avoiding a production loading
+re-export. No Rust implementation, fixture, production API, DICE key, lock,
+filesystem read, or Cargo command changed during correction design; the
+uncommitted eight-file implementation draft remains held.
+
+Next evidence: Resume only
+`WP-5-m1-bazel-lockfile-v28-raw-read-live-cutover` under this exact
+sixteen-file correction and restart the serial validation matrix after all
+twelve missing updater sites have matching same-updater raw snapshots.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
