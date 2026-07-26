@@ -2703,3 +2703,50 @@ architecture/hot-path reviewers both returned `ACCEPT`.
 
 Next evidence: Design only
 `WP-5-m1-root-raw-host-migration-design`.
+
+### Stage 5 root/raw Host migration design
+
+Status: Replanned before Rust
+
+The parallel dormant Host spine, private special-file-compatible byte leaf,
+Need ownership, pinned Bazel 9.2 root/include stops, legacy-consumer inventory,
+and production/discovery separation survived review. The packet nevertheless
+reached terminal `REPLAN` after its one correction: all three latest reviewers
+proved that the proposed two-file Host registry packet was not implementable.
+`RegistryPolicy` internals, the installed `RegistryIoHandle`, remote policy,
+fetch, and request-generation helpers are private to `registry_dice.rs`.
+Delegating to legacy registry keys would restore the eager
+root/policy/error-erasure chain, while embedding `RegistryFileError` would
+admit its erased root and local-read variants. No Rust from this design was
+started or retained. The rejected detailed draft was removed; only the compact
+diagnostic inputs below remain.
+
+#### Preserved inputs for redesign
+
+- Full in-place root propagation is not bounded: legacy graph consumers in
+  loading and core terminalize ordinary results, so the reviewed direction
+  remains a dormant parallel Host spine.
+- The private bzlmod raw-byte leaf must resolve Host paths and accept both
+  regular and special files; public `PathFileBytesKey` rejects the latter.
+- Only `ModuleSourcePreparationKey` and
+  `RepositoryMaterializationKey` may translate path Need at their existing
+  `SourcePreparationOutcome::path_need` boundaries. All Host keys retain
+  invalid, self-unequal `PathOutcome::Need`.
+- Public Host root keys remain gated on separately accepted missing-root
+  create/warning ownership and include package-validation/repository-ignore
+  ownership, as pinned by Bazel 9.2
+  `8220c6198837d5c13d53fea211cf3282aa12408a`.
+- The redesign must cover the exact four source-preparation legacy edges and
+  preserve every other legacy consumer/export. Its new work is the private
+  registry boundary: accessible shared policy/transport, unchanged legacy
+  behavior, local Host isolation, and a remote-only typed error schema.
+
+Next evidence: Design only
+`WP-5-m1-root-raw-host-registry-boundary-redesign`.
+
+Audit the live private registry policy/transport closure and freeze either an
+exact crate-private policy-free remote bridge or a bounded shared-module move.
+Name the exact allowlist, unchanged-legacy tests, local-branch forbidden scan,
+and a Host-only remote error schema that cannot contain legacy root/local
+erasure. Then resubmit the complete serial root/raw Host contract; do not
+implement the otherwise viable private byte leaf in isolation.
