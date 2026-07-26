@@ -3981,6 +3981,38 @@ include acceptance, source-order error, repository-ignore event membership,
 lockfile A→B→A, and complete-only equality. The keys remain crate-private
 with zero loading/core/analysis/query consumer.
 
+##### Packet 8 pre-implementation audit status
+
+**Status:** Replan on 2026-07-26.
+
+Exact Bazel 9.2.0 source at commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` disproved the frozen
+files/graph boundary before Cargo. `ModuleFileFunction` produces only the
+executed root-module value, overrides, non-registry routing indexes, and
+canonical repository-relative module-file paths. It has no visible-lockfile,
+environment-policy, lockfile-mode, resolved-graph, or final repository-mapping
+edge. `RegistryFunction` requests the separate `BazelLockFileValue`, including
+in Off mode, and final repository mappings come only from the selected
+dependency graph. The legacy Slug `VisibleLockfileKey` Off shortcut and
+pre-resolution `root_mapping` helper therefore cannot be copied into a Host
+parity owner.
+
+The audit also clarified that REPO.bazel policy events may occur during
+include-package preflight; only include-fragment bytes and root/include MODULE
+execution events are forbidden before successful preflight. Bazel deduplicates
+package and file dependencies only within each breadth horizon. Every include
+occurrence is still read, compiled, contributes its nested includes, and
+executes inline. Successful module-file path identity is set-equivalent
+canonical repository-relative paths and excludes selected package-root
+identity.
+
+The provisional three-file Rust draft was removed before retention. No Rust,
+fixture, Cargo, dependency, public API, consumer, or activation changed.
+Three terminal audits returned `REPLAN`.
+
+Next evidence: Design only
+`WP-5-m1-host-root-module-file-boundary-correction`.
+
 #### Later packet 9 gate: bootstrap activation and Host switch
 
 After packet 8, design only

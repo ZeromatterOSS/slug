@@ -43,16 +43,16 @@ GNU-Windows test executable links passed.
 
 ### Current packet
 
-Implement only `WP-5-m1-host-root-module-keys`.
+Design only `WP-5-m1-host-root-module-file-boundary-correction`.
 
-Add the private dormant Host root files/graph keys in new `host_module.rs`,
-with only the required crate-private evaluator/root-mapping seams in
-`module_eval.rs` and a private module declaration in `lib.rs`. Return typed
-Host preparation outcomes, use `HostFileBytesKey`, map a missing root to the
-accepted bootstrap Need, and run the complete include-package horizon before
-reading any fragment. Compile and execute the complete closure inline, then
-preserve accepted lockfile/graph ordering. Add no write, warning, public
-consumer, or activation.
+Correct the dormant Host root packet against exact Bazel 9.2.0 ownership.
+Replace the proposed files/graph aggregate with a root-module-file-only value:
+no visible lockfile, environment or lockfile policy, resolved graph, or
+repository mapping. Freeze horizon-local dependency dedupe without global
+include-occurrence dedupe, canonical set-equivalent logical module-file paths,
+REPO policy-event membership before MODULE execution, and a later separate
+Host lockfile owner that still reads in Off. Do not edit Rust or fixtures and
+do not run Cargo.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
