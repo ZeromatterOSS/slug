@@ -31,27 +31,29 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the corrected Host visible-lockfile boundary
-design passed pinned-source/parity, implementation-feasibility, and
-architecture/orchestration terminal review. It freezes an exact seven-file,
-nine-row oracle proving Off reads and parses current v28 content, caught
-`BAD_LOCKFILE` and merge advice, unsupported Error mode, Java UTF-8
-replacement, absence, and the uncaught adapter hole. Only after that oracle
-passes may a three-file private owner add the full `Arc<BazelLockfile>` Host
-value, file-before-mode DICE dependency order, complete-only equality, and
-separate caught versus uncaught errors. No Rust, fixture, Cargo, dependency,
-registry consumer, root/mapping edge, or activation changed during design.
+Latest M1 accepted evidence: the first Host visible-lockfile oracle generation
+stopped before evidence because its sole local registry could not supply
+Bazel's injected `bazel_tools` module closure. A native Bazel 9.2 temporary
+probe proved the existing `lockfile-mode-off` query fixture already reads and
+rejects malformed current-v28 content in Off without that closure. The
+accepted correction reuses that fixture for the same nine rows in exactly
+three changed paths, with six final files, no registry/network scaffold, and
+separate caught, unsupported, merge-advice, UTF-8, absence, and direct-crash
+evidence. No failed expected output is accepted; no replay, Rust, Cargo,
+dependency, production edge, or activation changed.
 
 ### Current packet
 
-Implement only `WP-5-m1-host-visible-lockfile-oracle`.
+Implement only
+`WP-5-m1-host-visible-lockfile-oracle-embedded-closure-correction`.
 
-Add the exact seven-file `host-visible-lockfile-boundary` fixture and its nine
-ordered `bazel mod graph` rows from the owning subplan. Generate with pinned
-Bazel 9.2, run two fresh-root replays, and enforce provenance, exact file/row
-and 900-line caps, manifests, mutations, archive, and diff gates. Do not edit
-Rust, Cargo, the harness, another fixture, or registry/Host production code.
-Stop on any observed exit or message-shape difference.
+Remove the held untracked new-fixture draft and extend only the existing
+`lockfile-mode-off` fixture under the exact three-path, nine-query-row
+correction in the owning subplan. Preserve its existing workspace files,
+generate with pinned Bazel 9.2, run two fresh-root replays, and enforce the
+six-file/700-line, provenance, manifest, mutation, archive, and diff gates.
+Do not edit Rust, Cargo, the harness, another fixture, registry state, or
+production code.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

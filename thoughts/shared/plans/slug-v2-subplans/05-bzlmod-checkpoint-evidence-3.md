@@ -5647,6 +5647,80 @@ changed.
 Next evidence: Run only `WP-5-m1-host-visible-lockfile-oracle` under the exact
 seven-file, nine-row contract above.
 
+##### Host visible-lockfile oracle embedded-closure correction
+
+**Status:** Accepted after stopped first generation and terminal correction
+review on 2026-07-26.
+
+The exact seven-file draft stopped before exercising a lockfile row. All nine
+generated commands exited 37 while resolving
+`<root> -> bazel_tools@_ -> rules_license@1.0.0`: the accepted sole local
+registry could not supply Bazel's injected embedded module closure. The
+generated expected file records only that prerequisite failure and is not
+evidence. No replay ran and no draft file is accepted.
+
+A native temporary-copy observation found the smaller boundary:
+`bazel query //:data.txt --lockfile_mode=off` in the existing
+`lockfile-mode-off` fixture reads a recognized malformed v28 lockfile while
+computing the main repository mapping and exits 48 with Bazel's caught
+`BAD_LOCKFILE`, without resolving the mod-graph embedded closure. Correct only
+`WP-5-m1-host-visible-lockfile-oracle-embedded-closure-correction` by removing
+the held untracked `host-visible-lockfile-boundary` draft and extending the
+existing fixture in exactly three paths:
+
+- modify `tests/v2_oracle/fixtures/lockfile-mode-off/fixture.toml`;
+- regenerate
+  `tests/v2_oracle/fixtures/lockfile-mode-off/expected/oracle.json`; and
+- add
+  `tests/v2_oracle/fixtures/lockfile-mode-off/workspace/lockfiles/invalid-utf8-v28.lock`.
+
+Keep its existing `MODULE.bazel`, `BUILD.bazel`, and `data.txt`
+byte-identical. The final fixture has exactly six regular files, zero
+symlinks, and at most 700 newline-counted lines. Net growth is one regular
+file, zero links, plus the measured line delta. The fixture-growth checkpoint
+remains `df812c2c` at accepted baseline tree `c039c347`;
+`eb8c2d23` is packet one after it and this is packet two, so no checkpoint is
+due.
+
+Use exactly nine cumulative `query //:data.txt` rows with the same semantic
+order and byte mutations accepted above. Row 1 preserves the original absent
+Off/no-write evidence. All successful stdout is exactly `//:data.txt`. There
+is no registry argument, file, HTTP server, BCR/network assertion, injected
+closure, or registry hash-consumer claim. The populated row may retain an
+unrelated valid registry hash only as parser/value evidence. Row 3 proves the
+ordinary caught wrapper and delete advice but not merge advice. Rows 4 and 5
+share the first-noncurrent-marker content without an intervening mutation.
+Row 6 uses a recognized nested marker plus a top-level integer field whose
+caught conversion message contains `<<<<<<<`, proving merge advice and no
+delete advice. Row 7 deletes the current file then renames the immutable
+malformed-UTF8 asset into place. Row 8 deletes it and proves absent Error
+success. Row 9 remains last and proves exit-37 invalid-checksum
+`JsonParseException` without the caught wrapper.
+
+Keep fixture-wide `manifest_roots = ["MODULE.bazel.lock"]`. Rows 1 and 8 use
+`compare = "exact"` because the semantic comparator does not enforce an empty
+expected manifest. Other successful rows may use exact normalized output;
+present-file failure rows use semantic comparison plus strong positive and
+negative message patterns so their manifest digests are checked without
+pinning the complete crash stack. Record Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, the lockfile/parser and observed
+query dependency seams, reuse rationale, exact asset size/digest, row order,
+mutations, and manifests.
+
+Run one pinned generation and two distinct fresh-root replays, followed by
+fixture schema, exact row/order/mutation/manifest, source-anchor, exact
+three-path/final-six-file, invalid-UTF8 regular-file, line-growth, archive,
+diff, normalized path/stack, and credential scans. Stop on a different
+exit/message shape, a fourth retained path, a seventh fixture file, symlink,
+more than 700 lines, harness/other-fixture/plan/Rust/Cargo edit, registry or
+network scaffold, or any claim beyond visible lockfile read/parse behavior.
+
+Native feasibility and architecture/orchestration correction reviews returned
+`ACCEPT`. Pinned-source review of the original nine rows had already accepted
+their caught/direct semantics; the new native Bazel 9.2 observation replaces
+only the command path and fixture owner. Resume only the corrected existing
+fixture.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
