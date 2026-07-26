@@ -2565,3 +2565,25 @@ harness tests, exact exits/manifests/sentinels, diff/allowlist gates, and
 321-line fixture growth passed. Both terminal reviews returned `ACCEPT`.
 
 Next evidence: Implement only `WP-5-m1-loading-event-producer`.
+
+### Stage 5 loading event producer first implementation
+
+Status: Replanned
+
+The exact four-file candidate added marker-conditional local event batches to
+`BzlModuleEvalKey` and `PackageLoadKey`. Focused evidence discriminated
+dependency/parent/BUILD ownership, marker-off direct printing, explicit empty
+replacement, pre-evaluation empty publication, and runtime prefixes. The first
+focused run exposed that loading's globals did not actually contain `print`;
+the first correction added a copied-value Print overlay. Downstream
+`slug_core_v2` then segfaulted because frozen modules outlived that overlay's
+base-owned values. A process-static owner corrected the lifetime and passed all
+54 `slug_loading_v2` tests plus all 98 `slug_core_v2` tests, but this was the
+packet's second material correction. The terminal architecture review therefore
+returned `REPLAN` under the orchestration policy. No producer code is accepted
+or committed from this packet.
+
+Next evidence: Design only a loading-globals owner correction that expands the
+allowlist to `app/slug_loading_v2/src/package.rs`, constructs the standard
+loading globals plus `LibraryExtension::Print` in one owning `Globals` heap,
+and removes the copied-value overlay before retrying the unchanged producer.
