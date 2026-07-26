@@ -42,19 +42,15 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-host-repository-ignore-owner-correction`.
+`WP-5-m1-host-repository-ignore-windows-long-path-correction`.
 
-Correct only the private Host REPO evaluator and repository-ignore contract
-before retrying Rust. Pin Bazel's exact `Sequence<String>` admission,
-Latin-1 projection and restricted-syntax/call diagnostics; normalize
-`.bazelignore` lines with host `PathFragment`/native-path semantics into a
-private prefix representation that can retain empty and leading-up-level
-prefixes; and make each visited package root contribute its contained vendor
-prefix immediately before that root's `.bazelignore` probe, with the first
-file terminating both later probes and later vendor contributions. Preserve
-the exact three-file implementation scope, REPO-before-root demand order,
-typed failures, event policy, semantic equality, and no activation/package
-lookup boundary. Start no Rust until the corrected latest text is accepted.
+Correct only the Windows 8.3/long-path observation boundary exposed by the
+Host repository-ignore contract. Pin the exact Bazel 9.2
+`WindowsOsPathPolicy` call chain and observable failures, then design the
+smallest injected Host observation owner that preserves filesystem-dependent
+short-name expansion without direct filesystem IO inside DICE. Do not weaken
+parity to a pure lexical Windows policy. Start no Rust until the prerequisite
+and the resulting Host REPO/repository-ignore retry scope are accepted.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

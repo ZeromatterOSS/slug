@@ -3439,6 +3439,159 @@ must also freeze the audited REPO globals, diagnostic ordering, Latin-1
 projection, native line/path behavior, and REPO-before-roots demand order
 before the same exact three-file implementation scope is retried.
 
+##### Corrected retry contract: Host REPO evaluator and repository-ignore key
+
+Run only `WP-5-m1-host-repository-ignore-owner-corrected-retry`. Edit exactly:
+
+- new `app/slug_bzlmod_v2/src/repo_file.rs`;
+- `app/slug_bzlmod_v2/src/repository_ignore.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+`HostRepoFileKey { workspace: NormalizedAbsolutePath }` first computes
+`RootRepoFileSemanticsProjectionKey`, then reads
+`workspace/REPO.bazel` through `HostFileBytesKey`. Missing produces no
+patterns and no events. Its private complete value retains only the ordered,
+duplicate-preserving `Arc<[CompactString]>` ignore patterns. Evaluated
+`repo()` keyword values are deliberately discarded from this projection;
+the later package-argument owner must extend this same evaluator with a typed
+snapshot rather than create a second evaluator or retain debug `repr`.
+
+Every successful mode parses a byte-for-byte Latin-1 scalar projection,
+including input that is valid UTF-8. Invalid UTF-8 in Off emits nothing;
+Warning reports
+`not a valid UTF-8 encoded file; this can lead to inconsistent behavior and will be disallowed in a future version of Bazel`
+before parsing that Latin-1 projection; Error reports that text plus
+`. For a temporary workaround, see the --incompatible_enforce_starlark_utf8 flag.`
+and returns typed `InvalidUtf8` without parsing or printing. UTF diagnostics,
+syntax errors, restricted-syntax errors, compile/preparation errors,
+evaluation errors, policy-projection failures, and `HostFileError` remain
+distinct typed variants with the logical path retained where applicable.
+
+Parse permissively, then run a custom source-order AST checker with
+`where = "REPO.bazel files"`. It reports Bazel's exact messages for `load`,
+`def`/lambda, statement `for`, statement `if`, and nested source-level
+`*args` and `**kwargs`; nonliteral `**kwargs` adds Bazel's second literal-dict
+diagnostic. Rejected def/lambda/for/if children are not revisited.
+Comprehensions and conditional expressions remain allowed. The globals heap
+contains exactly Bazel's REPO
+globals `repo` and `ignore_directories` plus
+`False`, `True`, `None`, `min`, `max`, `abs`, `all`, `any`, `sorted`,
+`reversed`, `tuple`, `list`, `len`, `str`, `repr`, `bool`, `float`, `int`,
+`dict`, `set`, `enumerate`, `hash`, `range`, `hasattr`, `getattr`, `dir`,
+`fail`, `print`, `type`, and `zip`; `set` retains Bazel's flag-disabled
+failure. `native`, `struct`, package/module/depset/select/rule globals, and
+loads are absent.
+
+`repo()` evaluates arbitrary explicit keyword values, rejects positional
+arguments, requires at least one argument, is once-only, and, when present,
+must precede any `ignore_directories()` call; calls to universal globals such
+as `print` do not establish that ordering guard. `ignore_directories()` takes
+exactly one `dirs` argument, is once-only, and admits exactly the Java
+`Sequence<String>` counterparts provided by starlark-rust: list, tuple, or
+`starlark::values::range::Range`. It then uses normal value iteration and
+requires every element to be a string. A string, dict, set, or other merely
+iterable value is not admitted. Preserve exact Bazel call arity/type/order
+messages, including `'ignored_directories()' can only be called once`.
+Patterns are not validated, normalized, sorted, or deduplicated.
+
+A private `RepoEventReporter` is the single ordered seam for Starlark prints
+and diagnostics. The pure evaluator accepts that reporter, production uses a
+direct reporter, and tests use a recording reporter. With
+`CaptureEvaluationEvents`, every Complete cold/change compute stores exactly
+one ordered `EventBatch`, including an empty batch and batches ending in a
+failure; graph reuse emits nothing. Without the marker, output goes only to
+the normal direct print/diagnostic channels and no batch is stored. Need
+stores no batch, and no event enters semantic equality.
+
+Before adding the Host key, change `RepositoryIgnoreMatcher`'s private literal
+storage from `Arc<[PackagePath]>` to a private compact normalized-slash prefix
+type that can represent the empty prefix and surviving leading `..`
+components. Construction still sorts and deduplicates prefixes; empty matches
+every package, ordinary prefixes are component-aware, and a leading-up-level
+prefix cannot match a normalized `PackagePath`. Keep
+`matching_entry(&PackagePath)` and the exact ordered original REPO-pattern
+semantics accepted in packet 4. Semantic equality includes normalized
+prefixes and ordered original patterns, never compiled scratch state.
+
+`HostRepositoryIgnoreKey { workspace }` first computes
+`HostRepoFileKey`; a REPO Need or failure requests neither root inputs nor
+`.bazelignore`. It then computes `RootRepositoryIgnoreInputsProjectionKey`
+and visits package roots sequentially. For each root it first adds the vendor
+path relative to that root when the vendor is component-contained, including
+vendor equal to root as the empty prefix, then computes only that root's
+`HostFileBytesKey(root/.bazelignore)`. Missing or Directory continues;
+RegularFile or SpecialFile, including a resolved symlink target, parses and
+terminates the entire loop. Later roots contribute neither demands nor vendor
+prefixes after that first file. Observation/resolution failures and Need
+terminate immediately.
+
+`.bazelignore` parsing decodes UTF-8 with replacement and splits exactly like
+Java `BufferedReader.readLine` across LF, CRLF, and bare CR. Skip only empty
+lines and lines whose first scalar is `#`; do not trim, remove BOM, or treat
+later `#` as a comment. For every retained line, first compute Bazel
+`PathFragment.create(line)` normalization and perform native `Path.of(line)`
+validation while reading the complete file. This collapses repeated
+separators, trailing separators, `.`, and reducible `..`, while preserving
+leading `..`; `.` and `a/..` normalize to the empty prefix. Native-invalid
+lines win in read order even when an earlier normalized line is absolute.
+After the read, reject the first unique normalized absolute prefix. Unix
+treats backslash and drive-looking text as relative literals and rejects NUL;
+Windows treats backslash as a separator and rejects rooted/drive-absolute and
+native-invalid forms. Retain exact typed diagnostics:
+`Invalid path in <file>: '<normalized>': cannot be an absolute path` or
+`Invalid path in <file>: <native invalid-path message>`.
+
+Both keys return `PathOutcome<Arc<Result<_, typed error>>>`; Need is invalid
+and self-unequal, while Complete equality is semantic. Tests add the narrow
+regression first and pin:
+
+- missing/create/edit/delete/restore and A→B→A for REPO and `.bazelignore`;
+- every audited REPO global boundary, exact arity/type/order/typo diagnostic,
+  list/tuple/range admission, invalid sequence elements, arbitrary discarded
+  repo kwargs, nested expansion diagnostics, comprehensions, and absent
+  globals;
+- byte-for-byte Latin-1 parsing for valid and invalid UTF-8, all three modes,
+  warning/error-before-syntax behavior, prints before runtime failure, and
+  marker-off direct versus marker-on cold/warm/change/failure ordering;
+- Java line splitting, replacement decoding, comment/BOM/whitespace behavior,
+  normalization/deduplication, empty and leading-up-level prefixes, Unix and
+  pure Windows path tables, native-invalid-before-absolute precedence, and
+  exact errors;
+- REPO-before-roots demand order; current-root vendor-before-probe ordering;
+  first-file termination of later probes and vendor contributions; inclusive,
+  contained, outside, and multiple-root vendor cases; regular, special,
+  directory, missing, and resolved-symlink candidates; and every Need/failure
+  cut point; and
+- the accepted wildcard matcher table, full semantic equality/pruning, key
+  validity, private surface, compact Arc-backed storage, and exact file scope.
+
+Run the focused new tests, then full `slug_bzlmod_v2`,
+`slug_loading_v2`, and `slug_core_v2` unit/integration/doctests serially.
+Rebuild and link every affected GNU-Windows no-run test executable. Run
+formatting, diff/archive, exact three-file allowlist, no-new-dependency,
+private-surface, no-standard-retained-map, bounded-scratch, no-filesystem-IO,
+and no-activation/package-lookup gates. Direct reporter output is authorized;
+filesystem IO inside DICE, a public Host key/reexport, Cargo dependency,
+legacy workspace key, loading glob, command activation, or package lookup is
+not.
+
+##### Corrected retry contract status
+
+**Status:** Replanned before Rust on 2026-07-25.
+
+Pinned source/semantic and architecture reviews accepted the corrected REPO,
+root-order, prefix-domain, event, and equality contract, but the live
+implementation-feasibility review found one material unowned Windows edge.
+Bazel's `WindowsOsPathPolicy` may expand 8.3-looking segments through
+`WindowsPathOperations.getLongPath` while constructing the normalized
+`PathFragment` for a `.bazelignore` line. A pure lexical Windows helper with
+short-path expansion disabled would therefore diverge when the alias exists,
+while a direct native call inside the DICE key would violate the accepted
+observation boundary. No Rust, fixture, formatting, or Cargo command started.
+Next design evidence must pin reachability and failures, then add only the
+smallest injected Host observation prerequisite before retrying the otherwise
+accepted three-file owner.
+
 #### Serial packet 6: private Host main-package lookup
 
 Run only `WP-5-m1-host-root-package-lookup-owner`. Edit exactly:
@@ -3922,4 +4075,5 @@ source/contract, implementation/evidence, and architecture/hot-path reviews
 returned `ACCEPT`.
 
 Next evidence: Correct only
-`WP-5-m1-host-repository-ignore-owner-correction` before retrying Rust.
+`WP-5-m1-host-repository-ignore-windows-long-path-correction` before retrying
+Rust.
