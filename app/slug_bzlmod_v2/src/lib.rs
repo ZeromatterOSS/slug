@@ -15,6 +15,9 @@ mod host_module;
 mod host_package;
 pub mod interim_module;
 pub mod lockfile;
+mod lockfile_v28;
+#[cfg(test)]
+mod lockfile_v28_tests;
 pub mod module_eval;
 pub mod module_patch;
 mod package_policy;

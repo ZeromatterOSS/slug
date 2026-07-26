@@ -10,6 +10,7 @@ version = "0.1.0"
 allocative = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+base64 = { workspace = true }
 compact_str = { workspace = true }
 dice = { workspace = true }
 dice_futures = { workspace = true }

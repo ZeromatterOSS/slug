@@ -5015,6 +5015,34 @@ Residual risk: production still has the incomplete live schema. Implement only
 `WP-5-m1-bazel-lockfile-v28-pure-owner` under the accepted private four-file
 contract; the atomic live cutover and Host ownership remain later packets.
 
+##### Lockfile v28 pure owner
+
+**Status:** Accepted on 2026-07-26.
+
+The private four-file owner now implements the complete immutable v28 value,
+streaming Gson-compatible typed reader, direct canonical renderer, semantic
+equality, and typed caught/uncaught error surfaces. Retained state uses compact
+strings, shared slices, and Buck2-derived compact/sorted collections; no generic
+JSON tree or standard hash collection is retained. The owner remains private
+and dormant: only the workspace `base64` dependency was added, with no live
+lockfile caller, public re-export, Host/DICE change, or `Cargo.lock` drift.
+
+Validation passed 98 focused owner tests, 177 complete owner-crate unit tests
+plus every integration suite, zero doctests, every GNU-Windows owner-crate test
+executable link, formatting, archive integrity, whitespace, exact-scope, and
+forbidden-pattern checks. Corrected terminal source, native-observation, and
+orchestration/hot-path reviews all returned `ACCEPT`; their final checks covered
+domain-sensitive lone-surrogate normalization, Java decimal/suffix/hex
+`Double.parseDouble` fallback with exact rounding, Gson leniency, adapter
+identity/order, and the private direct-streaming architecture.
+
+Residual risk: the live `lockfile.rs` owner is still incomplete and intentionally
+unchanged. Next implement only
+`WP-5-m1-bazel-lockfile-v28-live-cutover` in `lockfile_v28.rs`, `lockfile.rs`,
+`lib.rs`, and `tests/lockfile.rs`; preserve the accepted private value while
+atomically replacing the live parse/render surface. Host ownership remains a
+later packet.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
