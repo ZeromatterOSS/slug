@@ -947,3 +947,40 @@ retained-root observer entrypoint, the minimum repository materializer call
 bridge, and one private runtime owner field plus initialization. Add no DICE
 key, injection, retry, sidecar, command activation, public API, dependency,
 fixture, or discovery behavior.
+
+### Stage 5 retained native-owner bridge
+
+Status: Accepted
+
+The three-file bridge exposes one `pub(super)` synchronous native observation
+entrypoint over the existing Unix and Windows adapters, adds the minimum
+retained-session native validation/observation calls, and gives each
+`WorkspaceRuntime` one distinct private `Arc<RepositoryMaterializer>` built
+from the canonical normalized workspace. It adds no DICE key or injection,
+retry, sidecar, command activation, dependency, source-preparation path,
+fixture, discovery behavior, or public API.
+
+Retained immutable roots are `Arc<TempDir>`-pinned from the locked snapshot
+through normalization, unlocked native I/O, and the post-I/O token check.
+Concurrent discard therefore yields stale state without destroying a root
+under observation; final root release remains outside the mutex. Native
+structural errors do not mutate accepted or provisional state, and duplicate
+accepted demands are rejected before acceptance so malformed validation cannot
+poison later cache reuse.
+
+Evidence covers Host and exact materialization authority, escaped physical
+paths, clean/edit/delete/recreate immutable validation, exact-byte recovery,
+logical Local symlink retargeting, malformed validation rejection with prior
+reuse preserved, and distinct exact runtime owners. Validation passed 19
+focused repository tests, 63 full unit tests, 13 integration tests, and zero
+doctests. Both GNU-Windows test executables linked; formatting, diff, exact
+three-file scope, dependency, and HTTP/Git byte-identity gates passed. Three
+independent corrected-diff terminal reviews returned `ACCEPT`.
+
+Next evidence: Design only
+`WP-5-m1-runtime-attempt-effect-sidecar-checkpoint-design`. Reconcile the
+accepted command effect owner and exact-version activation closure with the
+current runtime/materializer seams, then freeze bounded serial implementation
+packets for the sidecar and its later event/demand producers. Do not edit Rust,
+Cargo, fixtures, oracles, commands, server paths, source preparation, or
+discovery behavior.

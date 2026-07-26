@@ -57,6 +57,7 @@ use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryOutput;
 use slug_query_v2::QueryPolicy;
 use slug_query_v2::evaluate_loading_query_with_policy;
+use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceRawFileValue;
@@ -321,6 +322,8 @@ pub struct WorkspaceRuntime {
     next_revision: AtomicU64,
     next_registry_generation: AtomicU64,
     next_repository_materialization_generation: AtomicU64,
+    #[allow(dead_code)] // Activated by the later retry-driver packet.
+    repository_materializer: Arc<super::repository_io::RepositoryMaterializer>,
 }
 
 /// Stage 4 package-loading evidence attached to a requested target pattern.
@@ -496,6 +499,10 @@ impl WorkspaceRuntime {
         let workspace = workspace
             .canonicalize()
             .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
+        let repository_materializer = Arc::new(super::repository_io::RepositoryMaterializer::new(
+            NormalizedAbsolutePath::new(workspace.clone())
+                .context("normalizing repository materializer workspace")?,
+        ));
         let loader = BzlModuleEvaluator::new(&workspace)?;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -512,6 +519,7 @@ impl WorkspaceRuntime {
             next_revision: AtomicU64::new(1),
             next_registry_generation: AtomicU64::new(1),
             next_repository_materialization_generation: AtomicU64::new(1),
+            repository_materializer,
         })
     }
 
@@ -1150,6 +1158,22 @@ mod tests {
     use std::thread;
 
     use super::*;
+
+    #[test]
+    fn workspace_runtime_owns_distinct_exact_repository_materializers() {
+        let workspace = tempfile::tempdir().unwrap();
+        let first = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let second = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let expected =
+            NormalizedAbsolutePath::new(workspace.path().canonicalize().unwrap()).unwrap();
+
+        assert_eq!(first.repository_materializer.workspace(), &expected);
+        assert_eq!(second.repository_materializer.workspace(), &expected);
+        assert!(!Arc::ptr_eq(
+            &first.repository_materializer,
+            &second.repository_materializer,
+        ));
+    }
 
     fn serve_registry_once(body: &'static [u8]) -> (String, thread::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();

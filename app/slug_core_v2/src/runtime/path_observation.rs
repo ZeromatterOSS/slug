@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-// This private neutral kernel is deliberately callerless until the Unix and
-// Windows adapter packets land.
+// This private kernel is exposed only through the retained materializer
+// bridge; command/DICE activation remains deliberately absent.
 
 /*
  * Copyright (c) Meta Platforms, Inc. and affiliates.
@@ -46,7 +46,7 @@ struct RetainedMaterializationRoots<'owner> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum PathObservationKernelError {
+pub(super) enum PathObservationKernelError {
     ZeroRetainedInstance,
     DuplicateRetainedInstance(PathObservationInstanceId),
     DuplicateDemand(PathObservationDemand),
@@ -54,6 +54,22 @@ enum PathObservationKernelError {
     UnknownDemandInstance(PathObservationDemand),
     UnsupportedLstat,
     Epoch(PathObservationEpochError),
+}
+
+pub(super) fn observe_native<T>(
+    owner: &T,
+    roots: impl IntoIterator<Item = (PathObservationInstanceId, NormalizedAbsolutePath)>,
+    demands: impl IntoIterator<Item = PathObservationDemand>,
+) -> Result<PathObservationEpoch, PathObservationKernelError> {
+    let retained = RetainedMaterializationRoots::new(owner, roots)?;
+    #[cfg(unix)]
+    {
+        observe_unix(&retained, demands)
+    }
+    #[cfg(windows)]
+    {
+        windows_native::observe_windows(&retained, demands)
+    }
 }
 
 impl<'owner> RetainedMaterializationRoots<'owner> {
