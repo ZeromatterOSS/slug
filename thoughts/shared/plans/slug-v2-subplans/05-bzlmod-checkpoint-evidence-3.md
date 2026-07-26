@@ -1387,3 +1387,46 @@ the already accepted implementation mechanism.
 Next evidence: Implement only
 `WP-5-m1-root-module-composed-evaluator` in the exact first-packet allowlist.
 Stop on any frozen invariant or scope violation before event activation.
+
+### Stage 5 root-MODULE composed evaluator
+
+Status: Accepted
+
+The four-file packet replaced the public per-file root evaluator with private
+`RootModuleEvaluationKey`, below the visible-lockfile join and dependent on an
+opaque boolean projection of `ignore_dev_dependency`. It discovers the unique
+raw-label closure through exact workspace-file leaves, finishes every await,
+then parses and prepares the complete closure before executing root and
+included programs through one inline evaluator. Distinct labels have stable
+per-file binding modules; repeated textual calls reuse and reexecute the
+mapped program; include errors restore the prior file state before
+propagation.
+
+The public result is now one source-free `EvaluatedRootModule` plus sorted
+unique repo-relative `module_file_paths`. The old
+`ModuleFileEvaluation`/`ModuleFileEvaluationKey`/`evaluate_module_file`
+surface and `root`/`includes` partition were removed without a shim.
+Validated ignored dev dependencies and all validated root overrides are
+omitted during directive execution, and repository mapping consumes the
+already-filtered aggregate dependencies.
+
+Evidence covers full preflight precedence, inline dependency order,
+post-nested binding isolation, repeated-call effects, ordered
+root-to-child-to-nested runtime frames, canonical paths, missing/read/edit/
+delete/recreate and full semantic A-to-B-to-A recovery, ignore-dev
+reevaluation, and private-evaluator reuse for yanked-policy,
+environment-only, and lockfile-only changes. Both independent corrected-diff
+reviews returned `ACCEPT`.
+
+Validation passed:
+
+- `cargo test -p slug_bzlmod_v2` — 228 tests.
+- `cargo test -p slug_core_v2` — 67 unit and 13 integration tests.
+- `cargo check -p slug_bzlmod_v2 --target x86_64-pc-windows-gnu`.
+- `cargo fmt --all -- --check`, `git diff --check`, and
+  `scripts/v2_archive_status.sh`.
+
+Next evidence: Implement only
+`WP-5-m1-root-module-composite-event-producer` in its exact four-file
+allowlist. Preserve the accepted evaluator/schema semantics and activate only
+the private-key marker-conditional event sidecar.

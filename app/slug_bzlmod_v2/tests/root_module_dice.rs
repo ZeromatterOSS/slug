@@ -1,17 +1,21 @@
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 
+use dice::ActivationData;
+use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::DynKey;
 use dice::UserComputationData;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
-use slug_bzlmod_v2::ModuleFileEvaluationKey;
 use slug_bzlmod_v2::RootModuleCommandPolicy;
 use slug_bzlmod_v2::RootModuleCommandPolicyKey;
 use slug_bzlmod_v2::RootModuleEnvironmentPolicy;
 use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
+use slug_bzlmod_v2::RootModuleFilesKey;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLockfileMode;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
@@ -28,6 +32,85 @@ struct RequestInputs {
     command: Option<BzlmodCommandPolicyKey>,
     environment: Option<BzlmodEnvironmentPolicyKey>,
     lockfile_mode: Option<LockfileMode>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EvaluationActivation {
+    Evaluated,
+    Reused,
+}
+
+#[derive(Default)]
+struct RootEvaluationTracker {
+    events: Mutex<Vec<EvaluationActivation>>,
+}
+
+impl RootEvaluationTracker {
+    fn take(&self) -> Vec<EvaluationActivation> {
+        std::mem::take(&mut *self.events.lock().unwrap())
+    }
+
+    fn record(&self, activation: EvaluationActivation) {
+        let mut events = self.events.lock().unwrap();
+        if events.last() != Some(&activation) {
+            events.push(activation);
+        }
+    }
+}
+
+impl ActivationTracker for RootEvaluationTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
+        activation: ActivationData,
+    ) {
+        let activation = match activation {
+            ActivationData::Evaluated(_) => EvaluationActivation::Evaluated,
+            ActivationData::Reused => EvaluationActivation::Reused,
+        };
+        if key.to_string().starts_with("root-module-evaluation:") {
+            self.record(activation);
+            return;
+        }
+        // When the pure join itself is reused DICE does not reactivate its
+        // dependencies. Its recorded dependency edge still proves that the
+        // private composed evaluation was reused rather than evaluated.
+        let mut reused_composed_evaluation = false;
+        if key.downcast_ref::<RootModuleFilesKey>().is_some()
+            && activation == EvaluationActivation::Reused
+        {
+            while let Some(dependency) = deps.next() {
+                if dependency
+                    .to_string()
+                    .starts_with("root-module-evaluation:")
+                {
+                    reused_composed_evaluation = true;
+                    break;
+                }
+            }
+        }
+        if reused_composed_evaluation {
+            self.record(EvaluationActivation::Reused);
+            return;
+        }
+        // A downstream-only policy change can reevaluate the graph while DICE
+        // skips activating the unchanged join entirely. The retained
+        // RootModuleFilesKey -> private evaluation edge was established by the
+        // initial activation; an evaluated graph with that unchanged join and
+        // no direct evaluation event is therefore a composed-evaluation reuse.
+        if key.downcast_ref::<RootModuleGraphKey>().is_some()
+            && activation == EvaluationActivation::Evaluated
+            && self.events.lock().unwrap().is_empty()
+        {
+            while let Some(dependency) = deps.next() {
+                if dependency.downcast_ref::<RootModuleFilesKey>().is_some() {
+                    self.record(EvaluationActivation::Reused);
+                    break;
+                }
+            }
+        }
+    }
 }
 
 impl RequestInputs {
@@ -75,10 +158,25 @@ async fn graph_and_module_value(
     inputs: RequestInputs,
 ) -> (
     Arc<Result<slug_bzlmod_v2::RootModuleGraph, compact_str::CompactString>>,
-    Arc<Result<slug_bzlmod_v2::ModuleFileEvaluation, compact_str::CompactString>>,
+    Arc<Result<slug_bzlmod_v2::RootModuleFiles, compact_str::CompactString>>,
+) {
+    graph_and_module_value_tracked(dice, files, inputs, None).await
+}
+
+async fn graph_and_module_value_tracked(
+    dice: &Arc<Dice>,
+    files: Arc<WorkspaceSnapshot>,
+    inputs: RequestInputs,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+) -> (
+    Arc<Result<slug_bzlmod_v2::RootModuleGraph, compact_str::CompactString>>,
+    Arc<Result<slug_bzlmod_v2::RootModuleFiles, compact_str::CompactString>>,
 ) {
     let workspace = workspace();
-    let mut updater = dice.updater_with_data(UserComputationData::default());
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: tracker,
+        ..Default::default()
+    });
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
@@ -125,9 +223,8 @@ async fn graph_and_module_value(
         .await
         .unwrap();
     let module = transaction
-        .compute(&ModuleFileEvaluationKey {
+        .compute(&RootModuleFilesKey {
             workspace: workspace.clone(),
-            path: workspace.join("MODULE.bazel"),
         })
         .await
         .unwrap();
@@ -236,21 +333,22 @@ async fn root_graph_allows_an_omitted_module_declaration() {
     )
     .await
     .unwrap();
-    assert!(graph.root.header.is_none());
-    assert_eq!(graph.root.dependencies[0].name, "dep");
+    assert!(graph.module.header.is_none());
+    assert_eq!(graph.module.dependencies[0].name, "dep");
 }
 
 #[tokio::test]
-async fn root_graph_breadth_first_includes_and_preserves_file_states() {
+async fn root_graph_discovers_breadth_first_but_executes_inline_with_isolated_bindings() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let root = WorkspaceFileValue::Present(Arc::new("module(name = 'root')\ninclude('//:one.MODULE.bazel')\ninclude('//:two.MODULE.bazel')\nbazel_dep(name = 'dep', version = '1.0')\nlocal_path_override(module_name = 'dep', path = '../dep')\n".to_owned()));
-    let one =
-        WorkspaceFileValue::Present(Arc::new("include('//:nested.MODULE.bazel')\n".to_owned()));
+    let root = WorkspaceFileValue::Present(Arc::new("module(name = 'root')\nversion = '1.0'\ninclude('//:one.MODULE.bazel')\ninclude('//:two.MODULE.bazel')\nbazel_dep(name = 'dep', version = version)\nlocal_path_override(module_name = 'dep', path = '../dep')\n".to_owned()));
+    let one = WorkspaceFileValue::Present(Arc::new(
+        "version = 'one-local'\ninclude('//:nested.MODULE.bazel')\nbazel_dep(name = 'one', version = version)\n".to_owned(),
+    ));
     let two = WorkspaceFileValue::Present(Arc::new(
-        "bazel_dep(name = 'two', version = '2.0')\n".to_owned(),
+        "version = '2.0'\nbazel_dep(name = 'two', version = version)\n".to_owned(),
     ));
     let nested = WorkspaceFileValue::Present(Arc::new(
-        "bazel_dep(name = 'nested', version = '3.0')".to_owned(),
+        "version = '3.0'\nbazel_dep(name = 'nested', version = version)".to_owned(),
     ));
     let first = graph(
         &dice,
@@ -263,20 +361,34 @@ async fn root_graph_breadth_first_includes_and_preserves_file_states() {
     )
     .await
     .unwrap();
-    assert_eq!(first.root.header.as_ref().unwrap().name, "root");
+    assert_eq!(first.module.header.as_ref().unwrap().name, "root");
     assert_eq!(
         first
-            .includes
+            .module
+            .dependencies
             .iter()
-            .map(|file| file.path.file_name().unwrap().to_str().unwrap())
+            .map(|dependency| dependency.name.as_str())
             .collect::<Vec<_>>(),
+        ["nested", "one", "two", "dep"]
+    );
+    assert_eq!(
+        first
+            .module
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.version.as_str())
+            .collect::<Vec<_>>(),
+        ["3.0", "one-local", "2.0", "1.0"]
+    );
+    assert_eq!(
+        first.module_file_paths.as_ref(),
         [
-            "one.MODULE.bazel",
-            "two.MODULE.bazel",
-            "nested.MODULE.bazel"
+            PathBuf::from("MODULE.bazel"),
+            PathBuf::from("nested.MODULE.bazel"),
+            PathBuf::from("one.MODULE.bazel"),
+            PathBuf::from("two.MODULE.bazel"),
         ]
     );
-    assert_eq!(first.root.dependencies[0].name, "dep");
 
     let unchanged = graph_value(
         &dice,
@@ -362,7 +474,15 @@ async fn root_graph_breadth_first_includes_and_preserves_file_states() {
     )
     .await
     .unwrap();
-    assert_eq!(edited.includes.len(), 2);
+    assert_eq!(
+        edited.module_file_paths.as_ref(),
+        [
+            PathBuf::from("MODULE.bazel"),
+            PathBuf::from("one.MODULE.bazel"),
+            PathBuf::from("two.MODULE.bazel"),
+        ]
+    );
+    assert_eq!(edited.module.dependencies[0].name, "changed");
     let recreated = graph(
         &dice,
         snapshot([
@@ -374,7 +494,137 @@ async fn root_graph_breadth_first_includes_and_preserves_file_states() {
     )
     .await
     .unwrap();
-    assert_eq!(recreated.includes.len(), 3);
+    assert_eq!(recreated, first);
+}
+
+#[tokio::test]
+async fn root_graph_prepares_the_complete_closure_before_any_execution() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let error = graph(
+        &dice,
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "fail('root runtime must not execute')\ninclude('//:child.MODULE.bazel')\n"
+                        .to_owned(),
+                )),
+            ),
+            (
+                "child.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "include('//:nested.MODULE.bazel')\n".to_owned(),
+                )),
+            ),
+            (
+                "nested.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "bazel_dep(name = undefined_module_name)\n".to_owned(),
+                )),
+            ),
+        ]),
+    )
+    .await
+    .unwrap_err();
+    assert!(error.contains("undefined_module_name"), "{error}");
+    assert!(error.contains("nested.MODULE.bazel"), "{error}");
+    assert!(!error.contains("root runtime must not execute"), "{error}");
+}
+
+#[tokio::test]
+async fn root_graph_reexecutes_repeated_includes_and_restores_error_context() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let repeated = graph(
+        &dice,
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "include('//:repeat.MODULE.bazel')\ninclude('//:repeat.MODULE.bazel')\n"
+                        .to_owned(),
+                )),
+            ),
+            (
+                "repeat.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new("local_binding = 'safe'\n".to_owned())),
+            ),
+        ]),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        repeated.module_file_paths.as_ref(),
+        [
+            PathBuf::from("MODULE.bazel"),
+            PathBuf::from("repeat.MODULE.bazel")
+        ]
+    );
+
+    let duplicate = graph(
+        &dice,
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "include('//:repeat.MODULE.bazel')\ninclude('//:repeat.MODULE.bazel')\n"
+                        .to_owned(),
+                )),
+            ),
+            (
+                "repeat.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "single_version_override(module_name = 'repeated')\n".to_owned(),
+                )),
+            ),
+        ]),
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        duplicate.contains("multiple overrides for module repeated"),
+        "{duplicate}"
+    );
+
+    let nested_error = graph(
+        &dice,
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "include('//:child.MODULE.bazel')\n".to_owned(),
+                )),
+            ),
+            (
+                "child.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "include('//:nested.MODULE.bazel')\n".to_owned(),
+                )),
+            ),
+            (
+                "nested.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new("fail('nested runtime')\n".to_owned())),
+            ),
+        ]),
+    )
+    .await
+    .unwrap_err();
+    assert!(nested_error.contains("nested runtime"), "{nested_error}");
+    let root_frame = nested_error
+        .rfind("* /root-module-dice-test/MODULE.bazel:1, in <module>")
+        .unwrap_or_else(|| panic!("{nested_error}"));
+    let child_frame = nested_error[root_frame..]
+        .find("* /root-module-dice-test/child.MODULE.bazel:1, in include")
+        .map(|offset| root_frame + offset)
+        .unwrap_or_else(|| panic!("{nested_error}"));
+    let nested_frame = nested_error[child_frame..]
+        .find("* /root-module-dice-test/nested.MODULE.bazel:1, in include")
+        .map(|offset| child_frame + offset)
+        .unwrap_or_else(|| panic!("{nested_error}"));
+    assert!(root_frame < child_frame && child_frame < nested_frame);
+    assert_eq!(
+        nested_error[root_frame..].matches(", in include").count(),
+        2
+    );
 }
 
 #[tokio::test]
@@ -403,7 +653,7 @@ async fn root_graph_preserves_bazel_global_shapes_and_repository_mapping() {
     ]);
 
     let default = graph(&dice, files.clone()).await.unwrap();
-    assert_eq!(default.root.header.as_ref().unwrap().name, "root");
+    assert_eq!(default.module.header.as_ref().unwrap().name, "root");
     let Some(slug_bzlmod_v2::RootModuleOverride::NonRegistry(local)) =
         default.overrides.get("root_dep")
     else {
@@ -419,7 +669,13 @@ async fn root_graph_preserves_bazel_global_shapes_and_repository_mapping() {
         Some(slug_bzlmod_v2::OverrideAttributeValue::String(path))
             if path == "../root_dep"
     ));
-    assert!(default.root.dependencies[2].nodep);
+    assert!(
+        default
+            .module
+            .dependencies
+            .iter()
+            .any(|dependency| dependency.name == "nodep_dep" && dependency.nodep)
+    );
     for (apparent, canonical) in [
         ("root_dep", "root_dep+"),
         ("alias", "aliased_dep+"),
@@ -449,6 +705,14 @@ async fn root_graph_preserves_bazel_global_shapes_and_repository_mapping() {
     .as_ref()
     .clone()
     .unwrap();
+    assert!(
+        ignored
+            .module
+            .dependencies
+            .iter()
+            .all(|dependency| dependency.name != "dev_dep")
+    );
+    assert_eq!(ignored.overrides.iter().count(), 0);
     assert_eq!(
         ignored
             .repository_mapping
@@ -643,37 +907,146 @@ async fn root_override_owner_merges_includes_and_replays_a_b_a() {
 }
 
 #[tokio::test]
-async fn normalized_request_inputs_reuse_module_evaluation_across_a_b_a() {
+async fn root_evaluation_projects_only_ignore_dev_and_tracks_a_b_a() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let files = snapshot([(
-        "MODULE.bazel",
-        WorkspaceFileValue::Present(Arc::new(
-            "module(name = 'root')\nbazel_dep(name = 'dev_dep', dev_dependency = True)\n"
-                .to_owned(),
-        )),
-    )]);
-    let inputs_a = RequestInputs::defaults();
-    let inputs_b = RequestInputs {
-        command: Some(BzlmodCommandPolicyKey::from_flags(None, true).unwrap()),
+    let tracker = Arc::new(RootEvaluationTracker::default());
+    let files = |suffix: &str| {
+        snapshot([(
+            "MODULE.bazel",
+            WorkspaceFileValue::Present(Arc::new(format!(
+                "module(name = 'root')\n\
+                 bazel_dep(name = 'dev_dep', dev_dependency = True)\n\
+                 local_path_override(module_name = 'dev_dep', path = '../dev')\n\
+                 {suffix}\n"
+            ))),
+        )])
+    };
+
+    let (_, evaluated) = graph_and_module_value_tracked(
+        &dice,
+        files(""),
+        RequestInputs::defaults(),
+        Some(tracker.clone()),
+    )
+    .await;
+    assert_eq!(tracker.take(), [EvaluationActivation::Evaluated]);
+    let evaluated = evaluated.as_ref().as_ref().unwrap();
+    assert_eq!(evaluated.module.dependencies.len(), 1);
+    assert_eq!(evaluated.overrides.iter().count(), 1);
+
+    let command_yanked = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+        ..RequestInputs::defaults()
+    };
+    graph_and_module_value_tracked(&dice, files(""), command_yanked, Some(tracker.clone())).await;
+    assert_eq!(tracker.take(), [EvaluationActivation::Reused]);
+
+    let environment_only = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
         environment: Some(
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
         ),
-        lockfile_mode: Some(LockfileMode::Update),
+        ..RequestInputs::defaults()
     };
+    graph_and_module_value_tracked(&dice, files(""), environment_only, Some(tracker.clone())).await;
+    assert_eq!(tracker.take(), [EvaluationActivation::Reused]);
 
-    let (graph_a, module_a) = graph_and_module_value(&dice, files.clone(), inputs_a.clone()).await;
-    let (graph_b, module_b) = graph_and_module_value(&dice, files.clone(), inputs_b).await;
-    let (graph_a_again, module_a_again) = graph_and_module_value(&dice, files, inputs_a).await;
+    let lockfile = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+        environment: Some(
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+        ),
+        lockfile_mode: Some(LockfileMode::Refresh),
+        ..RequestInputs::defaults()
+    };
+    graph_and_module_value_tracked(&dice, files(""), lockfile, Some(tracker.clone())).await;
+    assert_eq!(tracker.take(), [EvaluationActivation::Reused]);
 
-    let graph_a = graph_a.as_ref().as_ref().unwrap();
-    let graph_b = graph_b.as_ref().as_ref().unwrap();
-    let graph_a_again = graph_a_again.as_ref().as_ref().unwrap();
-    assert_ne!(graph_a.command_policy, graph_b.command_policy);
-    assert_ne!(graph_a.environment_policy, graph_b.environment_policy);
-    assert_eq!(graph_a.command_policy, graph_a_again.command_policy);
-    assert_eq!(graph_a.environment_policy, graph_a_again.environment_policy);
-    assert!(Arc::ptr_eq(&module_a, &module_b));
-    assert!(Arc::ptr_eq(&module_a, &module_a_again));
+    let ignored_inputs = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap()),
+        environment: Some(
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+        ),
+        lockfile_mode: Some(LockfileMode::Refresh),
+        ..RequestInputs::defaults()
+    };
+    let (_, ignored) =
+        graph_and_module_value_tracked(&dice, files(""), ignored_inputs, Some(tracker.clone()))
+            .await;
+    assert_eq!(tracker.take(), [EvaluationActivation::Evaluated]);
+    let ignored = ignored.as_ref().as_ref().unwrap();
+    assert!(ignored.module.dependencies.is_empty());
+    assert_eq!(ignored.overrides.iter().count(), 0);
+
+    graph_and_module_value_tracked(
+        &dice,
+        files(""),
+        RequestInputs {
+            command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+            environment: Some(
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+            ),
+            lockfile_mode: Some(LockfileMode::Refresh),
+        },
+        Some(tracker.clone()),
+    )
+    .await;
+    assert_eq!(tracker.take(), [EvaluationActivation::Evaluated]);
+
+    graph_and_module_value_tracked(
+        &dice,
+        files("bazel_dep(name = 'source_change', version = '1.0')"),
+        RequestInputs {
+            command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+            environment: Some(
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+            ),
+            lockfile_mode: Some(LockfileMode::Refresh),
+        },
+        Some(tracker.clone()),
+    )
+    .await;
+    assert_eq!(tracker.take(), [EvaluationActivation::Evaluated]);
+
+    graph_and_module_value_tracked(
+        &dice,
+        files(""),
+        RequestInputs {
+            command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+            environment: Some(
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+            ),
+            lockfile_mode: Some(LockfileMode::Refresh),
+        },
+        Some(tracker.clone()),
+    )
+    .await;
+    assert_eq!(tracker.take(), [EvaluationActivation::Evaluated]);
+
+    let invalid_while_ignored = graph_and_module_value_tracked(
+        &dice,
+        snapshot([(
+            "MODULE.bazel",
+            WorkspaceFileValue::Present(Arc::new(
+                "module(name = 'root')\n\
+                 single_version_override(module_name = 'invalid', version = 'not valid')\n"
+                    .to_owned(),
+            )),
+        )]),
+        RequestInputs {
+            command: Some(BzlmodCommandPolicyKey::from_flags(None, true).unwrap()),
+            ..RequestInputs::defaults()
+        },
+        Some(tracker.clone()),
+    )
+    .await
+    .0;
+    let error = invalid_while_ignored
+        .as_ref()
+        .as_ref()
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("Invalid version"), "{error}");
 }
 
 #[tokio::test]
@@ -706,7 +1079,10 @@ async fn visible_lockfile_transitions_are_semantic_and_recover_on_retained_dice(
     )
     .await;
     assert_eq!(&absent, formatted.as_ref().as_ref().unwrap());
-    assert!(Arc::ptr_eq(&module_absent, &module_formatted));
+    assert_eq!(
+        module_absent.as_ref().as_ref().unwrap().module,
+        module_formatted.as_ref().as_ref().unwrap().module
+    );
 
     let malformed = graph_and_module_value(
         &dice,
@@ -736,7 +1112,10 @@ async fn visible_lockfile_transitions_are_semantic_and_recover_on_retained_dice(
     let (deleted, module_deleted) =
         graph_and_module_value(&dice, files(None), RequestInputs::defaults()).await;
     assert_eq!(deleted.as_ref().as_ref().unwrap(), &absent);
-    assert!(Arc::ptr_eq(&module_absent, &module_deleted));
+    assert_eq!(
+        module_absent.as_ref().as_ref().unwrap().module,
+        module_deleted.as_ref().as_ref().unwrap().module
+    );
 
     let (recreated, module_recreated) = graph_and_module_value(
         &dice,
@@ -747,7 +1126,10 @@ async fn visible_lockfile_transitions_are_semantic_and_recover_on_retained_dice(
     )
     .await;
     assert_eq!(recreated.as_ref().as_ref().unwrap(), &absent);
-    assert!(Arc::ptr_eq(&module_absent, &module_recreated));
+    assert_eq!(
+        module_absent.as_ref().as_ref().unwrap().module,
+        module_recreated.as_ref().as_ref().unwrap().module
+    );
 
     for mode in [
         LockfileMode::Update,

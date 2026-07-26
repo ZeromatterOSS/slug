@@ -10,9 +10,11 @@ use anyhow::Context;
 use async_trait::async_trait;
 use compact_str::CompactString;
 use dice::DiceComputations;
+use dice::DiceProjectionComputations;
 use dice::DiceTransactionUpdater;
 use dice::InjectedKey;
 use dice::Key;
+use dice::ProjectionKey;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_identity_v2::ApparentLabel;
@@ -810,34 +812,33 @@ impl RootModuleLockfileMode {
     }
 }
 
+/// The aggregate semantic result of executing the root MODULE.bazel and its
+/// complete inline include closure.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub struct ModuleFileEvaluation {
-    pub path: PathBuf,
+pub struct EvaluatedRootModule {
     pub header: Option<RootModuleHeader>,
-    pub includes: Arc<[CompactString]>,
     pub dependencies: Arc<[RootModuleDependency]>,
-    override_contributions: Arc<SmallMap<CompactString, RecordedRootModuleOverride>>,
 }
 
-impl ModuleFileEvaluation {
-    fn stripped_override_contributions(mut self) -> Self {
-        self.override_contributions = Arc::new(SmallMap::new());
-        self
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct RootModuleEvaluation {
+    module: EvaluatedRootModule,
+    module_file_paths: Arc<[PathBuf]>,
+    overrides: RootModuleOverrides,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RootModuleFiles {
-    pub root: ModuleFileEvaluation,
-    pub includes: Arc<[ModuleFileEvaluation]>,
+    pub module: EvaluatedRootModule,
+    pub module_file_paths: Arc<[PathBuf]>,
     pub visible_lockfile: VisibleLockfileRead,
     pub overrides: RootModuleOverrides,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RootModuleGraph {
-    pub root: ModuleFileEvaluation,
-    pub includes: Arc<[ModuleFileEvaluation]>,
+    pub module: EvaluatedRootModule,
+    pub module_file_paths: Arc<[PathBuf]>,
     pub visible_lockfile: VisibleLockfileRead,
     pub repository_mapping: RepositoryMapping,
     pub command_policy: RootModuleCommandPolicy,
@@ -993,42 +994,173 @@ pub fn inject_root_module_request_inputs(
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-pub struct ModuleFileEvaluationKey {
-    pub workspace: PathBuf,
-    pub path: PathBuf,
-}
-impl fmt::Display for ModuleFileEvaluationKey {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+struct RootModuleIgnoreDevDependencyProjectionKey;
+
+impl fmt::Display for RootModuleIgnoreDevDependencyProjectionKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "module-file-evaluation:{}", self.path.display())
+        f.write_str("root-module-ignore-dev-dependency-projection")
+    }
+}
+
+impl ProjectionKey for RootModuleIgnoreDevDependencyProjectionKey {
+    type DeriveFromKey = RootModuleCommandPolicyKey;
+    type Value = bool;
+
+    fn compute(
+        &self,
+        policy: &RootModuleCommandPolicy,
+        _ctx: &DiceProjectionComputations,
+    ) -> Self::Value {
+        policy.ignore_dev_dependency()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+struct RootModuleSourceFile {
+    path: PathBuf,
+    source: Arc<String>,
+    _inspection: NonrootModuleFileInspection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct RootModuleEvaluationKey {
+    workspace: PathBuf,
+}
+
+impl fmt::Display for RootModuleEvaluationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "root-module-evaluation:{}", self.workspace.display())
     }
 }
 
 #[async_trait]
-impl Key for ModuleFileEvaluationKey {
-    type Value = Arc<Result<ModuleFileEvaluation, CompactString>>;
+impl Key for RootModuleEvaluationKey {
+    type Value = Arc<Result<RootModuleEvaluation, CompactString>>;
+
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let value = match ctx
-            .compute(&WorkspaceFileKey {
+        let policy = match ctx
+            .compute_opaque(&RootModuleCommandPolicyKey {
                 workspace: self.workspace.clone(),
-                path: self.path.clone(),
             })
             .await
         {
-            Ok(value) => value,
+            Ok(policy) => policy,
+            Err(error) => {
+                return Arc::new(Err(CompactString::new(format!(
+                    "missing injected root module command policy: {error}"
+                ))));
+            }
+        };
+        let ignore_dev_dependency =
+            match ctx.projection(&policy, &RootModuleIgnoreDevDependencyProjectionKey) {
+                Ok(value) => value,
+                Err(error) => {
+                    return Arc::new(Err(CompactString::new(format!(
+                        "missing injected root module command policy: {error}"
+                    ))));
+                }
+            };
+
+        let root_path = self.workspace.join("MODULE.bazel");
+        let root_source = match read_root_module_source(ctx, &self.workspace, &root_path).await {
+            Ok(source) => source,
+            Err(error) => return Arc::new(Err(error)),
+        };
+        let root_inspection = match inspect_nonroot_module_file(
+            LogicalModuleFileId::new(root_path.display().to_string()),
+            root_source.as_bytes(),
+        ) {
+            Ok(inspection) => inspection,
             Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
         };
-        Arc::new(match value {
-            WorkspaceFileValue::Present(source) => evaluate_module_file(&self.path, &source),
-            WorkspaceFileValue::Absent => Err(CompactString::new(format!(
-                "workspace file is absent: {}",
-                self.path.display()
-            ))),
-            WorkspaceFileValue::ReadError(error) => Err(CompactString::new(error.as_str())),
-        })
+        let mut horizon = VecDeque::from(root_inspection.includes.to_vec());
+        let mut files = vec![RootModuleSourceFile {
+            path: root_path,
+            source: root_source,
+            _inspection: root_inspection,
+        }];
+        let mut include_indices = SmallMap::new();
+        while let Some(request) = horizon.pop_front() {
+            if include_indices.contains_key(request.path.as_str()) {
+                continue;
+            }
+            let path = match include_path(&self.workspace, request.path.as_str()) {
+                Ok(path) => path,
+                Err(error) => return Arc::new(Err(error)),
+            };
+            let source = match read_root_module_source(ctx, &self.workspace, &path).await {
+                Ok(source) => source,
+                Err(error) => return Arc::new(Err(error)),
+            };
+            let inspection = match inspect_nonroot_module_file(
+                LogicalModuleFileId::new(path.display().to_string()),
+                source.as_bytes(),
+            ) {
+                Ok(inspection) => inspection,
+                Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
+            };
+            let index = files.len();
+            include_indices.insert(request.path, index);
+            horizon.extend(inspection.includes.iter().cloned());
+            files.push(RootModuleSourceFile {
+                path,
+                source,
+                _inspection: inspection,
+            });
+        }
+
+        let mut module_file_paths = Vec::with_capacity(files.len());
+        for file in &files {
+            let path = match file.path.strip_prefix(&self.workspace) {
+                Ok(path) => path.to_path_buf(),
+                Err(error) => {
+                    return Arc::new(Err(CompactString::new(format!(
+                        "root MODULE file escaped its workspace: {}: {error}",
+                        file.path.display()
+                    ))));
+                }
+            };
+            module_file_paths.push(path);
+        }
+        module_file_paths.sort();
+        module_file_paths.dedup();
+
+        Arc::new(evaluate_root_module_closure(
+            ignore_dev_dependency,
+            files,
+            include_indices,
+            module_file_paths.into(),
+        ))
     }
+
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
+    }
+}
+
+async fn read_root_module_source(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+    path: &Path,
+) -> Result<Arc<String>, CompactString> {
+    let value = ctx
+        .compute(&WorkspaceFileKey {
+            workspace: workspace.to_path_buf(),
+            path: path.to_path_buf(),
+        })
+        .await
+        .map_err(|error| CompactString::new(error.to_string()))?;
+    match value {
+        WorkspaceFileValue::Present(source) => Ok(source),
+        WorkspaceFileValue::Absent => Err(CompactString::new(format!(
+            "workspace file is absent: {}",
+            path.display()
+        ))),
+        WorkspaceFileValue::ReadError(error) => Err(CompactString::new(error.as_str())),
     }
 }
 
@@ -1057,11 +1189,9 @@ impl fmt::Display for RootModuleFilesKey {
 impl Key for RootModuleFilesKey {
     type Value = Arc<Result<RootModuleFiles, CompactString>>;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let root_path = self.workspace.join("MODULE.bazel");
-        let root = match ctx
-            .compute(&ModuleFileEvaluationKey {
+        let evaluation = match ctx
+            .compute(&RootModuleEvaluationKey {
                 workspace: self.workspace.clone(),
-                path: root_path,
             })
             .await
         {
@@ -1071,38 +1201,6 @@ impl Key for RootModuleFilesKey {
             },
             Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
         };
-        let mut seen = SmallSet::new();
-        let mut horizon = VecDeque::from(root.includes.iter().cloned().collect::<Vec<_>>());
-        let mut includes = Vec::new();
-        while let Some(label) = horizon.pop_front() {
-            if !seen.insert(label.clone()) {
-                continue;
-            }
-            let path = match include_path(&self.workspace, label.as_str()) {
-                Ok(path) => path,
-                Err(error) => return Arc::new(Err(error)),
-            };
-            let value = match ctx
-                .compute(&ModuleFileEvaluationKey {
-                    workspace: self.workspace.clone(),
-                    path,
-                })
-                .await
-            {
-                Ok(value) => match value.as_ref().clone() {
-                    Ok(value) => value,
-                    Err(error) => return Arc::new(Err(error)),
-                },
-                Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
-            };
-            if value.header.is_some() {
-                return Arc::new(Err(CompactString::new(
-                    "if module() is called, it must be called before any other functions",
-                )));
-            }
-            horizon.extend(value.includes.iter().cloned());
-            includes.push(value);
-        }
         let visible_lockfile = match ctx
             .compute(&VisibleLockfileKey {
                 workspace: self.workspace.clone(),
@@ -1115,30 +1213,11 @@ impl Key for RootModuleFilesKey {
             },
             Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
         };
-        let mut overrides = SmallMap::new();
-        for file in std::iter::once(&root).chain(&includes) {
-            for (module_name, override_) in file.override_contributions.iter() {
-                let override_ = match materialize_override(override_, root.header.as_ref()) {
-                    Ok(override_) => override_,
-                    Err(error) => {
-                        return Arc::new(Err(CompactString::new(error.to_string())));
-                    }
-                };
-                if overrides.insert(module_name.clone(), override_).is_some() {
-                    return Arc::new(Err(CompactString::new(format!(
-                        "multiple overrides for module {module_name}"
-                    ))));
-                }
-            }
-        }
         Arc::new(Ok(RootModuleFiles {
-            root: root.stripped_override_contributions(),
-            includes: includes
-                .into_iter()
-                .map(ModuleFileEvaluation::stripped_override_contributions)
-                .collect(),
+            module: evaluation.module,
+            module_file_paths: evaluation.module_file_paths,
             visible_lockfile,
-            overrides: RootModuleOverrides(Arc::new(overrides)),
+            overrides: evaluation.overrides,
         }))
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1202,12 +1281,12 @@ impl Key for RootModuleGraphKey {
             }
         };
         Arc::new(Ok(RootModuleGraph {
-            repository_mapping: match root_mapping(&files.root, &files.includes, &command_policy) {
+            repository_mapping: match root_mapping(&files.module) {
                 Ok(mapping) => mapping,
                 Err(error) => return Arc::new(Err(error)),
             },
-            root: files.root,
-            includes: files.includes,
+            module: files.module,
+            module_file_paths: files.module_file_paths,
             visible_lockfile: files.visible_lockfile,
             command_policy,
             environment_policy,
@@ -3418,20 +3497,11 @@ include("//:late.MODULE.bazel")
     }
 }
 
-fn root_mapping(
-    root: &ModuleFileEvaluation,
-    includes: &[ModuleFileEvaluation],
-    policy: &RootModuleCommandPolicy,
-) -> Result<RepositoryMapping, CompactString> {
+fn root_mapping(module: &EvaluatedRootModule) -> Result<RepositoryMapping, CompactString> {
     let mut mapping = RepositoryMapping::new(
         RepositoryMappingId::new("root-module").map_err(CompactString::new)?,
     );
-    for dep in std::iter::once(root)
-        .chain(includes.iter())
-        .flat_map(|module| module.dependencies.iter())
-        .filter(|dep| !dep.dev_dependency || !policy.ignore_dev_dependency())
-        .filter(|dep| !dep.nodep)
-    {
+    for dep in module.dependencies.iter().filter(|dep| !dep.nodep) {
         let apparent = dep.repo_name.as_deref().unwrap_or(dep.name.as_str());
         mapping.insert(
             ApparentRepoName::new(apparent).map_err(CompactString::new)?,
@@ -3441,26 +3511,31 @@ fn root_mapping(
     Ok(mapping)
 }
 
-#[derive(Default, ProvidesStaticType)]
-struct Recorder {
-    state: RefCell<RecordedModuleFile>,
+#[derive(ProvidesStaticType)]
+struct RootEvaluationContext {
+    state: RefCell<RecordedRootModule>,
+    include_indices: SmallMap<CompactString, usize>,
 }
 
-#[derive(Default)]
-struct RecordedModuleFile {
+struct RecordedRootModule {
     header: Option<RootModuleHeader>,
     non_module_called: bool,
-    includes: Vec<CompactString>,
     dependencies: Vec<RootModuleDependency>,
     overrides: SmallMap<CompactString, RecordedRootModuleOverride>,
+    ignore_dev_dependency: bool,
+    current_file: usize,
 }
 
 fn record_override(
-    state: &mut RecordedModuleFile,
+    state: &mut RecordedRootModule,
     module_name: &str,
     override_: RecordedRootModuleOverride,
 ) -> anyhow::Result<()> {
     validate_module_name(module_name)?;
+    state.non_module_called = true;
+    if state.ignore_dev_dependency {
+        return Ok(());
+    }
     if state
         .overrides
         .insert(module_name.into(), override_)
@@ -3468,14 +3543,15 @@ fn record_override(
     {
         anyhow::bail!("multiple overrides for module {module_name}");
     }
-    state.non_module_called = true;
     Ok(())
 }
 
-fn recorder<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Recorder> {
+fn root_evaluation_context<'a>(
+    eval: &'a Evaluator<'_, '_, '_>,
+) -> anyhow::Result<&'a RootEvaluationContext> {
     eval.extra
         .and_then(|value| value.downcast_ref())
-        .context("MODULE.bazel global invoked without module recorder")
+        .context("MODULE.bazel global invoked without root evaluation context")
 }
 
 #[starlark_module]
@@ -3489,7 +3565,7 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         bazel_compatibility: UnpackList<&str>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        let mut state = recorder(eval)?.state.borrow_mut();
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
         if state.header.is_some() {
             anyhow::bail!("module() can only be called once");
         }
@@ -3513,9 +3589,24 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
     fn include(label: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
-        let mut state = recorder(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        state.includes.push(label.into());
+        let extra = eval.extra;
+        let context = extra
+            .and_then(|value| value.downcast_ref::<RootEvaluationContext>())
+            .context("MODULE.bazel include invoked without root evaluation context")?;
+        let index = *context
+            .include_indices
+            .get(label)
+            .with_context(|| format!("included MODULE file was not prepared: {label}"))?;
+        let previous_file = {
+            let mut state = context.state.borrow_mut();
+            state.non_module_called = true;
+            let previous_file = state.current_file;
+            state.current_file = index;
+            previous_file
+        };
+        let result = eval.eval_prepared_module_index(index);
+        context.state.borrow_mut().current_file = previous_file;
+        result.map_err(starlark::Error::into_anyhow)?;
         Ok(NoneType)
     }
     fn bazel_dep(
@@ -3537,15 +3628,17 @@ fn module_globals(builder: &mut GlobalsBuilder) {
             Some(NoneOr::Other("")) | None => (Some(name.into()), false),
             Some(NoneOr::Other(repo_name)) => (Some(repo_name.into()), false),
         };
-        let mut state = recorder(eval)?.state.borrow_mut();
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
         state.non_module_called = true;
-        state.dependencies.push(RootModuleDependency {
-            name: name.into(),
-            version: version.into(),
-            repo_name,
-            nodep,
-            dev_dependency,
-        });
+        if !dev_dependency || !state.ignore_dev_dependency {
+            state.dependencies.push(RootModuleDependency {
+                name: name.into(),
+                version: version.into(),
+                repo_name,
+                nodep,
+                dev_dependency,
+            });
+        }
         Ok(NoneType)
     }
     fn local_path_override(
@@ -3553,7 +3646,7 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] path: &str,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        let mut state = recorder(eval)?.state.borrow_mut();
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
         record_override(
             &mut state,
             module_name,
@@ -3584,7 +3677,10 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         validate_version(version, "single_version_override")?;
-        let mut state = recorder(eval)?.state.borrow_mut();
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
+        for patch in &patches.items {
+            let _ = normalize_patch_label(patch, state.header.as_ref())?;
+        }
         record_override(
             &mut state,
             module_name,
@@ -3611,7 +3707,7 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         for version in &versions.items {
             validate_version(version, "multiple_version_override")?;
         }
-        let mut state = recorder(eval)?.state.borrow_mut();
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
         record_override(
             &mut state,
             module_name,
@@ -3630,7 +3726,10 @@ fn module_globals(builder: &mut GlobalsBuilder) {
     ) -> anyhow::Result<NoneType> {
         let patches_to_validate = patch_strings(&attrs)?;
         let attributes = override_attributes(attrs)?;
-        let mut state = recorder(eval)?.state.borrow_mut();
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
+        for patch in patches_to_validate.iter() {
+            let _ = normalize_patch_label(patch.as_str(), state.header.as_ref())?;
+        }
         record_override(
             &mut state,
             module_name,
@@ -3655,7 +3754,10 @@ fn module_globals(builder: &mut GlobalsBuilder) {
     ) -> anyhow::Result<NoneType> {
         let patches_to_validate = patch_strings(&attrs)?;
         let attributes = override_attributes(attrs)?;
-        let mut state = recorder(eval)?.state.borrow_mut();
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
+        for patch in patches_to_validate.iter() {
+            let _ = normalize_patch_label(patch.as_str(), state.header.as_ref())?;
+        }
         record_override(
             &mut state,
             module_name,
@@ -3674,29 +3776,85 @@ fn module_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
-fn evaluate_module_file(path: &Path, source: &str) -> Result<ModuleFileEvaluation, CompactString> {
-    let ast = AstModule::parse(
-        &path.display().to_string(),
-        source.to_owned(),
-        &Dialect::Standard,
-    )
-    .map_err(|e| CompactString::new(e.to_string()))?;
+fn evaluate_root_module_closure(
+    ignore_dev_dependency: bool,
+    files: Vec<RootModuleSourceFile>,
+    include_indices: SmallMap<CompactString, usize>,
+    module_file_paths: Arc<[PathBuf]>,
+) -> Result<RootModuleEvaluation, CompactString> {
+    let asts = files
+        .iter()
+        .map(|file| {
+            AstModule::parse(
+                &file.path.display().to_string(),
+                file.source.as_str().to_owned(),
+                &nonroot_module_dialect(),
+            )
+            .map_err(|error| CompactString::new(error.to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let module = Module::new();
-    let recorder = Recorder::default();
+    let included_modules = files
+        .iter()
+        .skip(1)
+        .map(|_| Box::new(Module::new()))
+        .collect::<Vec<_>>();
     let globals = GlobalsBuilder::standard().with(module_globals).build();
+    let programs = {
+        let mut asts = asts.into_iter();
+        let root_ast = asts
+            .next()
+            .ok_or_else(|| CompactString::new("root MODULE file is absent"))?;
+        let mut evaluator = Evaluator::new(&module);
+        let mut programs = Vec::with_capacity(files.len());
+        programs.push(
+            evaluator
+                .prepare_module(root_ast, &globals)
+                .map_err(|error| CompactString::new(error.to_string()))?,
+        );
+        for (included_module, ast) in included_modules.iter().zip(asts) {
+            programs.push(
+                evaluator
+                    .prepare_module_in(included_module.as_ref(), ast, &globals)
+                    .map_err(|error| CompactString::new(error.to_string()))?,
+            );
+        }
+        programs
+    };
+    let context = RootEvaluationContext {
+        state: RefCell::new(RecordedRootModule {
+            header: None,
+            non_module_called: false,
+            dependencies: Vec::new(),
+            overrides: SmallMap::new(),
+            ignore_dev_dependency,
+            current_file: 0,
+        }),
+        include_indices,
+    };
     {
         let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&recorder);
+        evaluator.extra = Some(&context);
         evaluator
-            .eval_module(ast, &globals)
-            .map_err(|e| CompactString::new(e.to_string()))?;
+            .set_prepared_modules(programs)
+            .map_err(|error| CompactString::new(error.to_string()))?;
+        evaluator
+            .eval_prepared_module_index(0)
+            .map_err(|error| CompactString::new(error.to_string()))?;
     }
-    let recorder = recorder.state.into_inner();
-    Ok(ModuleFileEvaluation {
-        path: path.to_path_buf(),
-        header: recorder.header,
-        includes: recorder.includes.into(),
-        dependencies: recorder.dependencies.into(),
-        override_contributions: Arc::new(recorder.overrides),
+    let state = context.state.into_inner();
+    let mut overrides = SmallMap::new();
+    for (module_name, override_) in state.overrides {
+        let override_ = materialize_override(&override_, state.header.as_ref())
+            .map_err(|error| CompactString::new(error.to_string()))?;
+        overrides.insert(module_name, override_);
+    }
+    Ok(RootModuleEvaluation {
+        module: EvaluatedRootModule {
+            header: state.header,
+            dependencies: state.dependencies.into(),
+        },
+        module_file_paths,
+        overrides: RootModuleOverrides(Arc::new(overrides)),
     })
 }

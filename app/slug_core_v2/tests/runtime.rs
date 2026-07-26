@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -146,7 +147,7 @@ fn retained_runtime_exposes_typed_root_graph_for_a_b_a_request_inputs() {
         .unwrap();
 
     assert_eq!(
-        first.root_module_graph.root.header.as_ref().unwrap().name,
+        first.root_module_graph.module.header.as_ref().unwrap().name,
         "runtime_test"
     );
     assert_ne!(
@@ -228,12 +229,18 @@ fn retained_runtime_uses_root_graph_for_supported_module_directives() {
 
     assert!(result.workspace.module.error.is_none(), "{result:?}");
     assert_eq!(
-        result.root_module_graph.root.header.as_ref().unwrap().name,
+        result
+            .root_module_graph
+            .module
+            .header
+            .as_ref()
+            .unwrap()
+            .name,
         "runtime_test"
     );
     assert_eq!(
-        result.root_module_graph.root.dependencies[0].name,
-        "root_dep"
+        result.root_module_graph.module.dependencies[0].name,
+        "included_dep"
     );
     assert!(matches!(
         result.root_module_graph.overrides.get("root_dep"),
@@ -243,10 +250,16 @@ fn retained_runtime_uses_root_graph_for_supported_module_directives() {
                 Some(OverrideAttributeValue::String(path)) if path == "../root_dep"
             )
     ));
-    assert_eq!(result.root_module_graph.includes.len(), 1);
     assert_eq!(
-        result.root_module_graph.includes[0].dependencies[0].name,
-        "included_dep"
+        result.root_module_graph.module.dependencies[1].name,
+        "root_dep"
+    );
+    assert_eq!(
+        result.root_module_graph.module_file_paths.as_ref(),
+        [
+            PathBuf::from("MODULE.bazel"),
+            PathBuf::from("deps/deps.MODULE.bazel"),
+        ]
     );
     assert_eq!(
         result
