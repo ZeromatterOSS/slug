@@ -1225,3 +1225,43 @@ Next evidence: Implement only
 five-file allowlist above. Stop on old semantic-evidence loss, unstable
 sentinel order/count, warm replay, preflight event leakage, wrong runtime
 prefix, manifest drift, scope growth, or any harness/production edit.
+
+### Stage 5 root-MODULE include-composition event oracle
+
+Status: Accepted
+
+Bazel oracle: pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+The strengthened retained-daemon fixture contains exactly eight cumulative
+rows. Cold and semantic-edit rows emit the complete V1 root/dependency/nested
+stream with the nested file executed twice; the semantic edit changes the
+manifest from dep one to dep two. The unchanged warm row emits no event
+sentinel. A print-only nested V1-to-V2 edit reruns the complete logical-module
+stream while retaining the byte-identical dep-two manifest. Direct missing
+input and nested parser failure emit no event sentinel. Runtime failure emits
+exactly `ROOT_BEFORE, DEPS_BEFORE, NESTED_RUNTIME_PREFIX`; recovery emits the
+complete V2 stream and restores the same dep-two manifest.
+
+Anchored tempered-dot regexes enforce exact event order and cardinality rather
+than mere containment. A terminal assertion correction also makes the parse
+row reject the prior missing-file diagnostic, the runtime row reject missing
+and parse diagnostics, and recovery reject every prior failure class. The
+generated records show dep-one digest prefix `2c8b08` and shared dep-two prefix
+`27dd8e` for semantic, warm, print-only, and recovery rows.
+
+Generation and three independent Bazel replay runs passed all eight rows.
+Fixture listing, exact five-file scope, expected-record inventory, cumulative
+mutation uniqueness, source-anchor existence, JSON/schema, manifest
+relations, and diff checks passed. Two independent terminal fixture reviews
+returned `ACCEPT`. Growth is one regular file and 224 newline-counted lines,
+remaining far below the fixture-growth review threshold. No harness, BUILD,
+module payload, registry, Rust, Cargo, runtime, command/server, other fixture,
+nonroot, or discovery file changed.
+
+Next evidence: Design only
+`WP-5-m1-root-module-composed-evaluator-event-design`. Freeze the bzlmod-local
+preflight/preparation and single inline evaluator, per-file binding isolation,
+repeated include execution, composite semantic ownership, marker-conditional
+single event batch outside equality, DICE key transition, and retained-engine
+evidence before any Rust or Cargo edit.

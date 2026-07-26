@@ -1,3 +1,4 @@
 module(name = "include_change_root", version = "0.1.0")
-
+print("ROOT_INCLUDE_EVENT_ROOT_BEFORE")
 include("//:deps.MODULE.bazel")
+print("ROOT_INCLUDE_EVENT_ROOT_AFTER")

@@ -1,35 +1,39 @@
 [fixture]
 name = "module-include-change-invalidation"
-description = "Bazel 9.2 fixture proving included MODULE.bazel fragments are semantic inputs in one output base."
+description = "Bazel 9.2 retained-daemon oracle for root MODULE include preflight, inline execution/event order, warm nonreplay, invalidation, failure prefixes, and recovery."
 comparison = "semantic"
-oracle_notes = "The root MODULE.bazel includes deps.MODULE.bazel. One warm output base observes an included-fragment edit, its missing-file failure, and recreate recovery with the updated local repository content."
+daemon = true
+oracle_notes = "The exact cold sequence proves one inline root-MODULE event stream and two executions of the same raw nested include label. A semantic included-fragment edit switches the retained output from dep one to dep two; a warm request replays no prints; a print-only nested edit reruns the full stream without changing that dep-two output. Missing direct input and nested parse failure preflight before any execution. A nested runtime failure retains only the already executed root/deps/nested prefix, and same-daemon recovery emits the complete V2 stream exactly once."
 
 [provenance]
 bazel_release = "9.2.0"
 bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
-  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
-  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java",
-  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/CompiledModuleFile.java: parseAndCompile, includeStatements, runOnThread",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java: execNonRegistryModuleFile, advanceHorizon, execModuleFile",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleThreadContext.java: include",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java: include",
 ]
-translation_notes = "The local-path override keeps the include file itself as the only changing module-resolution input; this fixture makes no claim about module extensions or the hidden lockfile."
+translation_notes = "Bazel parses and compiles the complete direct and transitive include horizon before creating the one Starlark thread for a nonregistry logical module. include() then runs the already compiled file inline on that thread at each textual call site, so the identical nested label executes twice while compiled storage remains label-keyed. Missing or parse-invalid horizon input emits no print sentinel; runtime failure emits only its executed textual prefix; unchanged warm evaluation does not replay prints. The local-path override keeps the retained output discriminator local and makes no claim about module extensions or the hidden lockfile."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture module-include-change-invalidation --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture module-include-change-invalidation --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
-name = "build_before_include_edit"
-argv = ["build", "//:copy_version"]
+name = "cold_dep_one_inline_order"
+argv = ["build", "//:copy_version", "--lockfile_mode=off"]
 compare = "semantic"
 expected_exit = 0
 stderr_contains = ["Target //:copy_version up-to-date"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_NESTED_V1(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BETWEEN(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_NESTED_V1(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_AFTER(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_AFTER(?:(?!ROOT_INCLUDE_EVENT_).)*\\Z"]
 manifest_roots = ["bazel-bin/version.out"]
 
 [[commands]]
-name = "build_after_include_edit"
-argv = ["build", "//:copy_version"]
+name = "semantic_include_edit_to_dep_two"
+argv = ["build", "//:copy_version", "--lockfile_mode=off"]
 compare = "semantic"
 expected_exit = 0
 stderr_contains = ["Target //:copy_version up-to-date"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_NESTED_V1(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BETWEEN(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_NESTED_V1(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_AFTER(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_AFTER(?:(?!ROOT_INCLUDE_EVENT_).)*\\Z"]
 manifest_roots = ["bazel-bin/version.out"]
 
   [[commands.mutations]]
@@ -43,25 +47,81 @@ manifest_roots = ["bazel-bin/version.out"]
   replace = "path = \"modules/dep_two\""
 
 [[commands]]
-name = "build_after_include_delete"
-argv = ["build", "//:copy_version"]
+name = "unchanged_warm_request_has_no_events"
+argv = ["build", "//:copy_version", "--lockfile_mode=off"]
+compare = "semantic"
+expected_exit = 0
+stderr_contains = ["Target //:copy_version up-to-date"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_INCLUDE_EVENT_).*\\Z"]
+manifest_roots = ["bazel-bin/version.out"]
+
+[[commands]]
+name = "print_only_nested_v1_to_v2_reruns_full_stream"
+argv = ["build", "//:copy_version", "--lockfile_mode=off"]
+compare = "semantic"
+expected_exit = 0
+stderr_contains = ["Target //:copy_version up-to-date"]
+stderr_patterns = ["(?s)\\A(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_NESTED_V2(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BETWEEN(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_NESTED_V2(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_AFTER(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_AFTER(?:(?!ROOT_INCLUDE_EVENT_).)*\\Z"]
+manifest_roots = ["bazel-bin/version.out"]
+
+  [[commands.mutations]]
+  path = "nested.MODULE.bazel"
+  find = "ROOT_INCLUDE_EVENT_NESTED_V1"
+  replace = "ROOT_INCLUDE_EVENT_NESTED_V2"
+
+[[commands]]
+name = "missing_direct_include_preflights_before_events"
+argv = ["build", "//:copy_version", "--lockfile_mode=off"]
 compare = "message_shape"
 expected_exit = 48
 stderr_contains = ["deps.MODULE.bazel", "not a regular file"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_INCLUDE_EVENT_).*\\Z"]
 
   [[commands.mutations]]
   op = "delete"
   path = "deps.MODULE.bazel"
 
 [[commands]]
-name = "build_after_include_recreate"
-argv = ["build", "//:copy_version"]
-compare = "semantic"
-expected_exit = 0
-stderr_contains = ["Target //:copy_version up-to-date"]
-manifest_roots = ["bazel-bin/version.out"]
+name = "nested_parse_failure_preflights_before_events"
+argv = ["build", "//:copy_version", "--lockfile_mode=off"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["nested.MODULE.bazel", "error parsing MODULE.bazel file for <root>"]
+stderr_patterns = ["(?s)\\A(?!.*ROOT_INCLUDE_EVENT_)(?!.*not a regular file).*\\Z"]
 
   [[commands.mutations]]
   op = "create"
   path = "deps.MODULE.bazel"
-  content = "bazel_dep(name = \"dep\", repo_name = \"dep_alias\", version = \"2.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"modules/dep_two\")\n"
+  content = "print(\"ROOT_INCLUDE_EVENT_DEPS_BEFORE\")\ninclude(\"//:nested.MODULE.bazel\")\nprint(\"ROOT_INCLUDE_EVENT_DEPS_BETWEEN\")\ninclude(\"//:nested.MODULE.bazel\")\nprint(\"ROOT_INCLUDE_EVENT_DEPS_AFTER\")\nbazel_dep(name = \"dep\", repo_name = \"dep_alias\", version = \"2.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"modules/dep_two\")\n"
+
+  [[commands.mutations]]
+  path = "nested.MODULE.bazel"
+  find = "print(\"ROOT_INCLUDE_EVENT_NESTED_V2\")"
+  replace = "nested_parse_error ="
+
+[[commands]]
+name = "nested_runtime_failure_retains_exact_event_prefix"
+argv = ["build", "//:copy_version", "--lockfile_mode=off"]
+compare = "message_shape"
+expected_exit = 48
+stderr_contains = ["nested.MODULE.bazel", "ROOT_INCLUDE_RUNTIME_FAILURE", "error executing MODULE.bazel file for <root>"]
+stderr_patterns = ["(?s)\\A(?!.*not a regular file)(?!.*error parsing MODULE[.]bazel)(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_RUNTIME_PREFIX(?:(?!ROOT_INCLUDE_EVENT_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "nested.MODULE.bazel"
+  find = "nested_parse_error ="
+  replace = "print(\"ROOT_INCLUDE_EVENT_RUNTIME_PREFIX\")\nfail(\"ROOT_INCLUDE_RUNTIME_FAILURE\")\nprint(\"ROOT_INCLUDE_EVENT_RUNTIME_AFTER\")"
+
+[[commands]]
+name = "runtime_failure_recovery_emits_full_v2_stream"
+argv = ["build", "//:copy_version", "--lockfile_mode=off"]
+compare = "semantic"
+expected_exit = 0
+stderr_contains = ["Target //:copy_version up-to-date"]
+stderr_patterns = ["(?s)\\A(?!.*not a regular file)(?!.*error parsing MODULE[.]bazel)(?!.*ROOT_INCLUDE_RUNTIME_FAILURE)(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BEFORE(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_NESTED_V2(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_BETWEEN(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_NESTED_V2(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_DEPS_AFTER(?:(?!ROOT_INCLUDE_EVENT_).)*ROOT_INCLUDE_EVENT_ROOT_AFTER(?:(?!ROOT_INCLUDE_EVENT_).)*\\Z"]
+manifest_roots = ["bazel-bin/version.out"]
+
+  [[commands.mutations]]
+  path = "nested.MODULE.bazel"
+  find = "print(\"ROOT_INCLUDE_EVENT_RUNTIME_PREFIX\")\nfail(\"ROOT_INCLUDE_RUNTIME_FAILURE\")\nprint(\"ROOT_INCLUDE_EVENT_RUNTIME_AFTER\")"
+  replace = "print(\"ROOT_INCLUDE_EVENT_NESTED_V2\")"

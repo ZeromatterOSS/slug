@@ -3,7 +3,8 @@
     {
       "argv": [
         "build",
-        "//:copy_version"
+        "//:copy_version",
+        "--lockfile_mode=off"
       ],
       "cwd": "<workspace>",
       "duration_ms": "<duration_ms>",
@@ -12,7 +13,8 @@
       "executed_argv": [
         "<tool_executable>",
         "build",
-        "//:copy_version"
+        "//:copy_version",
+        "--lockfile_mode=off"
       ],
       "exit_code": 0,
       "manifest": [
@@ -27,16 +29,17 @@
         }
       ],
       "mutations": [],
-      "name": "build_before_include_edit",
-      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "name": "cold_dep_one_inline_order",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: <workspace>/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V1\nDEBUG: <workspace>/deps.MODULE.bazel:3:6: ROOT_INCLUDE_EVENT_DEPS_BETWEEN\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V1\nDEBUG: <workspace>/deps.MODULE.bazel:5:6: ROOT_INCLUDE_EVENT_DEPS_AFTER\nDEBUG: <workspace>/MODULE.bazel:4:6: ROOT_INCLUDE_EVENT_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
-      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 6692883e-f3de-4743-9349-219e9daa8053\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/6692883e-f3de-4743-9349-219e9daa8053\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 4.621s, Critical Path: 0.18s\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/6692883e-f3de-4743-9349-219e9daa8053\n",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 93c07d58-040b-4ac7-9ea1-e0eb669f35da\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/93c07d58-040b-4ac7-9ea1-e0eb669f35da\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V1\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:3:6: ROOT_INCLUDE_EVENT_DEPS_BETWEEN\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V1\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:5:6: ROOT_INCLUDE_EVENT_DEPS_AFTER\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:4:6: ROOT_INCLUDE_EVENT_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 4.484s, Critical Path: 0.16s\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/93c07d58-040b-4ac7-9ea1-e0eb669f35da\n",
       "stdout": ""
     },
     {
       "argv": [
         "build",
-        "//:copy_version"
+        "//:copy_version",
+        "--lockfile_mode=off"
       ],
       "cwd": "<workspace>",
       "duration_ms": "<duration_ms>",
@@ -45,7 +48,8 @@
       "executed_argv": [
         "<tool_executable>",
         "build",
-        "//:copy_version"
+        "//:copy_version",
+        "--lockfile_mode=off"
       ],
       "exit_code": 0,
       "manifest": [
@@ -62,27 +66,28 @@
       "mutations": [
         {
           "find": "version = \"1.0.0\"",
-          "old_digest_hint": "134",
+          "old_digest_hint": "323",
           "path": "deps.MODULE.bazel",
           "replace": "version = \"2.0.0\""
         },
         {
           "find": "path = \"modules/dep_one\"",
-          "old_digest_hint": "134",
+          "old_digest_hint": "323",
           "path": "deps.MODULE.bazel",
           "replace": "path = \"modules/dep_two\""
         }
       ],
-      "name": "build_after_include_edit",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:copy_version (3 packages loaded, 4 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "name": "semantic_include_edit_to_dep_two",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: <workspace>/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V1\nDEBUG: <workspace>/deps.MODULE.bazel:3:6: ROOT_INCLUDE_EVENT_DEPS_BETWEEN\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V1\nDEBUG: <workspace>/deps.MODULE.bazel:5:6: ROOT_INCLUDE_EVENT_DEPS_AFTER\nDEBUG: <workspace>/MODULE.bazel:4:6: ROOT_INCLUDE_EVENT_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:copy_version (3 packages loaded, 4 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: cb42f0f0-507c-4725-8c9c-9f35f95d5ddc\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/cb42f0f0-507c-4725-8c9c-9f35f95d5ddc\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:copy_version (3 packages loaded, 4 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 0.398s, Critical Path: 0.30s\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/cb42f0f0-507c-4725-8c9c-9f35f95d5ddc\n",
+      "stderr": "INFO: Invocation ID: 3a78f0ba-1354-4521-ab5d-0b6e7484933c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3a78f0ba-1354-4521-ab5d-0b6e7484933c\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V1\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:3:6: ROOT_INCLUDE_EVENT_DEPS_BETWEEN\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V1\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:5:6: ROOT_INCLUDE_EVENT_DEPS_AFTER\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:4:6: ROOT_INCLUDE_EVENT_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\nAnalyzing: target //:copy_version (2 packages loaded, 2 targets configured)\n\nINFO: Analyzed target //:copy_version (3 packages loaded, 4 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 2.597s, Critical Path: 0.14s\nINFO: 2 processes: 1 remote cache hit, 1 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3a78f0ba-1354-4521-ab5d-0b6e7484933c\n",
       "stdout": ""
     },
     {
       "argv": [
         "build",
-        "//:copy_version"
+        "//:copy_version",
+        "--lockfile_mode=off"
       ],
       "cwd": "<workspace>",
       "duration_ms": "<duration_ms>",
@@ -91,26 +96,33 @@
       "executed_argv": [
         "<tool_executable>",
         "build",
-        "//:copy_version"
+        "//:copy_version",
+        "--lockfile_mode=off"
       ],
-      "exit_code": 48,
-      "manifest": [],
-      "mutations": [
+      "exit_code": 0,
+      "manifest": [
         {
-          "op": "delete",
-          "path": "deps.MODULE.bazel"
+          "digest": "27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a",
+          "mode": "0o555",
+          "path": "version.out",
+          "root": "bazel-bin/version.out",
+          "size": 4,
+          "symlink_target": null,
+          "type": "file"
         }
       ],
-      "name": "build_after_include_delete",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: error reading '//:deps.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: not a regular file\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "mutations": [],
+      "name": "unchanged_warm_request_has_no_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (0 packages loaded, 0 targets configured)\nAnalyzing: target //:copy_version (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:copy_version (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 8a445cde-7678-4459-8264-f283beda0057\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8a445cde-7678-4459-8264-f283beda0057\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: error reading '//:deps.MODULE.bazel' included at /tmp/slug-wp5-gen.1oyBep/runs/module-include-change-invalidation/20260723-174418-1333268-bazel/workspace/MODULE.bazel:3:1: not a regular file\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8a445cde-7678-4459-8264-f283beda0057\n",
+      "stderr": "INFO: Invocation ID: f824377b-5e67-444b-80cb-aac92e13c71c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f824377b-5e67-444b-80cb-aac92e13c71c\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (0 packages loaded, 0 targets configured)\nAnalyzing: target //:copy_version (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:copy_version (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 0.027s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f824377b-5e67-444b-80cb-aac92e13c71c\n",
       "stdout": ""
     },
     {
       "argv": [
         "build",
-        "//:copy_version"
+        "//:copy_version",
+        "--lockfile_mode=off"
       ],
       "cwd": "<workspace>",
       "duration_ms": "<duration_ms>",
@@ -119,7 +131,8 @@
       "executed_argv": [
         "<tool_executable>",
         "build",
-        "//:copy_version"
+        "//:copy_version",
+        "--lockfile_mode=off"
       ],
       "exit_code": 0,
       "manifest": [
@@ -135,14 +148,156 @@
       ],
       "mutations": [
         {
-          "op": "create",
+          "find": "ROOT_INCLUDE_EVENT_NESTED_V1",
+          "old_digest_hint": "38",
+          "path": "nested.MODULE.bazel",
+          "replace": "ROOT_INCLUDE_EVENT_NESTED_V2"
+        }
+      ],
+      "name": "print_only_nested_v1_to_v2_reruns_full_stream",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: <workspace>/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V2\nDEBUG: <workspace>/deps.MODULE.bazel:3:6: ROOT_INCLUDE_EVENT_DEPS_BETWEEN\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V2\nDEBUG: <workspace>/deps.MODULE.bazel:5:6: ROOT_INCLUDE_EVENT_DEPS_AFTER\nDEBUG: <workspace>/MODULE.bazel:4:6: ROOT_INCLUDE_EVENT_ROOT_AFTER\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (0 packages loaded, 0 targets configured)\nAnalyzing: target //:copy_version (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:copy_version (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 3ceaf784-6375-479d-b931-2fa8e1e5687b\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3ceaf784-6375-479d-b931-2fa8e1e5687b\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V2\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:3:6: ROOT_INCLUDE_EVENT_DEPS_BETWEEN\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V2\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:5:6: ROOT_INCLUDE_EVENT_DEPS_AFTER\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:4:6: ROOT_INCLUDE_EVENT_ROOT_AFTER\nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (0 packages loaded, 0 targets configured)\nAnalyzing: target //:copy_version (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //:copy_version (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 0.037s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3ceaf784-6375-479d-b931-2fa8e1e5687b\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:copy_version",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:copy_version",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
           "path": "deps.MODULE.bazel"
         }
       ],
-      "name": "build_after_include_recreate",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "name": "missing_direct_include_preflights_before_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: error reading '//:deps.MODULE.bazel' included at <workspace>/MODULE.bazel:3:1: not a regular file\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 346f7360-f958-4978-b99d-504036d95c2e\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/346f7360-f958-4978-b99d-504036d95c2e\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 0.085s, Critical Path: 0.00s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/346f7360-f958-4978-b99d-504036d95c2e\n",
+      "stderr": "INFO: Invocation ID: f94a7514-a046-4125-8be7-6878a088bada\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f94a7514-a046-4125-8be7-6878a088bada\nComputing main repo mapping: \nERROR: Error computing the main repository mapping: error reading '//:deps.MODULE.bazel' included at /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:3:1: not a regular file\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f94a7514-a046-4125-8be7-6878a088bada\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:copy_version",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:copy_version",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "deps.MODULE.bazel"
+        },
+        {
+          "find": "print(\"ROOT_INCLUDE_EVENT_NESTED_V2\")",
+          "old_digest_hint": "38",
+          "path": "nested.MODULE.bazel",
+          "replace": "nested_parse_error ="
+        }
+      ],
+      "name": "nested_parse_failure_preflights_before_events",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nERROR: <workspace>/nested.MODULE.bazel:1:21: syntax error at 'newline': expected expression\nERROR: Error computing the main repository mapping: error parsing MODULE.bazel file for <root>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 0db2209e-2191-43d8-ac48-7e5365af8986\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/0db2209e-2191-43d8-ac48-7e5365af8986\nComputing main repo mapping: \nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:21: syntax error at 'newline': expected expression\nERROR: Error computing the main repository mapping: error parsing MODULE.bazel file for <root>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/0db2209e-2191-43d8-ac48-7e5365af8986\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:copy_version",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:copy_version",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "nested_parse_error =",
+          "old_digest_hint": "21",
+          "path": "nested.MODULE.bazel",
+          "replace": "print(\"ROOT_INCLUDE_EVENT_RUNTIME_PREFIX\")\nfail(\"ROOT_INCLUDE_RUNTIME_FAILURE\")\nprint(\"ROOT_INCLUDE_EVENT_RUNTIME_AFTER\")"
+        }
+      ],
+      "name": "nested_runtime_failure_retains_exact_event_prefix",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: <workspace>/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_RUNTIME_PREFIX\nERROR: <workspace>/nested.MODULE.bazel:2:5: Traceback (most recent call last):\n\tFile \"<workspace>/MODULE.bazel\", line 3, column 8, in <toplevel>\n\t\tinclude(\"//:deps.MODULE.bazel\")\n\tFile \"<builtin>\", in include\n\tFile \"<workspace>/deps.MODULE.bazel\", line 2, column 8, in <toplevel>\n\t\tinclude(\"//:nested.MODULE.bazel\")\n\tFile \"<builtin>\", in include\n\tFile \"<workspace>/nested.MODULE.bazel\", line 2, column 5, in <toplevel>\n\t\tfail(\"ROOT_INCLUDE_RUNTIME_FAILURE\")\nError in fail: ROOT_INCLUDE_RUNTIME_FAILURE\nERROR: Error computing the main repository mapping: error executing MODULE.bazel file for <root>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: ed403e84-123c-4af4-8f3d-6761d99ea09c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ed403e84-123c-4af4-8f3d-6761d99ea09c\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_RUNTIME_PREFIX\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:2:5: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel\", line 3, column 8, in <toplevel>\n\t\tinclude(\"//:deps.MODULE.bazel\")\n\tFile \"<builtin>\", in include\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel\", line 2, column 8, in <toplevel>\n\t\tinclude(\"//:nested.MODULE.bazel\")\n\tFile \"<builtin>\", in include\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel\", line 2, column 5, in <toplevel>\n\t\tfail(\"ROOT_INCLUDE_RUNTIME_FAILURE\")\nError in fail: ROOT_INCLUDE_RUNTIME_FAILURE\nERROR: Error computing the main repository mapping: error executing MODULE.bazel file for <root>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ed403e84-123c-4af4-8f3d-6761d99ea09c\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//:copy_version",
+        "--lockfile_mode=off"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//:copy_version",
+        "--lockfile_mode=off"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a",
+          "mode": "0o555",
+          "path": "version.out",
+          "root": "bazel-bin/version.out",
+          "size": 4,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "print(\"ROOT_INCLUDE_EVENT_RUNTIME_PREFIX\")\nfail(\"ROOT_INCLUDE_RUNTIME_FAILURE\")\nprint(\"ROOT_INCLUDE_EVENT_RUNTIME_AFTER\")",
+          "old_digest_hint": "122",
+          "path": "nested.MODULE.bazel",
+          "replace": "print(\"ROOT_INCLUDE_EVENT_NESTED_V2\")"
+        }
+      ],
+      "name": "runtime_failure_recovery_emits_full_v2_stream",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: <workspace>/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V2\nDEBUG: <workspace>/deps.MODULE.bazel:3:6: ROOT_INCLUDE_EVENT_DEPS_BETWEEN\nDEBUG: <workspace>/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V2\nDEBUG: <workspace>/deps.MODULE.bazel:5:6: ROOT_INCLUDE_EVENT_DEPS_AFTER\nDEBUG: <workspace>/MODULE.bazel:4:6: ROOT_INCLUDE_EVENT_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: d0086377-f49b-41d6-8939-2b7bfc199748\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d0086377-f49b-41d6-8939-2b7bfc199748\nComputing main repo mapping: \nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:2:6: ROOT_INCLUDE_EVENT_ROOT_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_DEPS_BEFORE\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V2\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:3:6: ROOT_INCLUDE_EVENT_DEPS_BETWEEN\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/nested.MODULE.bazel:1:6: ROOT_INCLUDE_EVENT_NESTED_V2\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/deps.MODULE.bazel:5:6: ROOT_INCLUDE_EVENT_DEPS_AFTER\nDEBUG: /run/media/system/Colossus/dev/slug/target/v2o/runs/module-include-change-invalidation/20260725-181235-2586349-bazel/workspace/MODULE.bazel:4:6: ROOT_INCLUDE_EVENT_ROOT_AFTER\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\nAnalyzing: target //:copy_version (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //:copy_version (7 packages loaded, 9 targets configured).\nINFO: Found 1 target...\nTarget //:copy_version up-to-date:\n  bazel-bin/version.out\nINFO: Elapsed time: 2.446s, Critical Path: 0.00s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d0086377-f49b-41d6-8939-2b7bfc199748\n",
       "stdout": ""
     }
   ],
