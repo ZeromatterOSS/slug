@@ -9,7 +9,7 @@
  */
 
 pub mod dice;
-pub mod events;
+mod events;
 mod path_observation;
 pub mod reapi;
 mod registry_io;

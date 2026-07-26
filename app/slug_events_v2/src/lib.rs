@@ -13,6 +13,13 @@ use allocative::Allocative;
 use compact_str::CompactString;
 use dupe::Dupe;
 
+/// Request-local capability selecting capture instead of direct event output.
+///
+/// Its presence in DICE per-transaction data is operational only. It is not a
+/// semantic input and does not participate in key equality.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Allocative, Dupe)]
+pub struct CaptureEvaluationEvents;
+
 /// One evaluation-local event captured for later command-owned publication.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum EvaluationEvent {

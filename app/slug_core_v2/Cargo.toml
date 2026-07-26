@@ -13,6 +13,7 @@ async-trait = { workspace = true }
 bytes = { workspace = true }
 dice = { workspace = true }
 dice_futures = { workspace = true }
+dupe = { workspace = true }
 http-body-util = { workspace = true }
 hyper = { workspace = true }
 hyper-rustls = { workspace = true }
@@ -20,11 +21,13 @@ hyper-util = { workspace = true, features = ["client-legacy", "http1", "http2", 
 slug_identity_v2 = { workspace = true }
 slug_analysis_v2 = { workspace = true }
 slug_bzlmod_v2 = { workspace = true }
+slug_events_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }
 slug_workspace_v2 = { workspace = true }
 slug_query_v2 = { workspace = true }
 sha2 = { workspace = true }
 starlark = { workspace = true }
+starlark_map = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
@@ -34,4 +37,3 @@ nix = { workspace = true }
 
 [dev-dependencies]
 compact_str = { workspace = true }
-starlark_map = { workspace = true }

@@ -1077,3 +1077,38 @@ Next evidence: Implement only
 any DICE edit, extra file, public core API, runtime field, producer, retry,
 sink/publication, source-preparation/discovery activation, or direct output
 change.
+
+### Stage 5 runtime attempt/effect sidecar implementation
+
+Status: Accepted
+
+The exact four-file packet adds the dependency-bottom
+`CaptureEvaluationEvents` marker and a private dormant core sidecar. One
+command owner retains sparse event lineage across serial attempts; roots and
+seals remain attempt-local. Rich Evaluated callbacks replace or explicitly
+clear node batches, Reused preserves eligible lineage, and terminal selection
+uses the exact DICE activation closure in dependency-first order without
+holding a mutex across the computation.
+
+Terminal review corrections made tracker installation an owner-locked,
+single-use Open-attempt transition that leaves user data untouched on
+occupied, duplicate, stale, or terminal failure. Selection consumes its sealed
+token, the checked attempt-ID allocator fails before mutation, and a gated
+real-DICE regression proves callbacks from a computation already in flight at
+seal time are quarantined. The marker remains inert because no producer,
+runtime field, retry, sink, publication, command/server path, or direct-output
+change entered the packet.
+
+Validation passed four event-crate tests, 67 core unit tests, 13 core
+integration tests, and zero doctests. Both GNU-Windows core test executables
+linked; formatting, diff, exact four-file scope, dependency, privacy, and
+forbidden-activation gates passed. Three independent corrected-diff terminal
+reviews returned `ACCEPT`.
+
+Next evidence: Design only
+`WP-5-m1-root-module-event-producer-design-correction`. Determine whether the
+current separate-key root-MODULE include layout can preserve the accepted
+one-local-batch-per-file include rule while capture is marker-conditional and
+outside semantic equality. Do not edit Rust, Cargo, fixtures, oracles,
+runtime/command/server paths, loading/analysis evaluators, nonroot evaluation,
+or discovery behavior.
