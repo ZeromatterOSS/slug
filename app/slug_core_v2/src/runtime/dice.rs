@@ -67,6 +67,9 @@ use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
 
 use super::RuntimeMode;
+use super::demands::WorkspaceDemandOwner;
+use super::events::AttemptEffectTracker;
+use super::events::CommandEffectError;
 use super::starlark::evaluate_file;
 
 pub trait IncrementalEngine {
@@ -317,6 +320,7 @@ fn read_file_observations(
 pub struct WorkspaceRuntime {
     workspace: PathBuf,
     dice: Arc<Dice>,
+    demand_owner: Arc<WorkspaceDemandOwner>,
     loader: BzlModuleEvaluator,
     runtime: tokio::runtime::Runtime,
     next_revision: AtomicU64,
@@ -499,9 +503,10 @@ impl WorkspaceRuntime {
         let workspace = workspace
             .canonicalize()
             .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
+        let normalized_workspace = NormalizedAbsolutePath::new(workspace.clone())
+            .context("normalizing retained workspace")?;
         let repository_materializer = Arc::new(super::repository_io::RepositoryMaterializer::new(
-            NormalizedAbsolutePath::new(workspace.clone())
-                .context("normalizing repository materializer workspace")?,
+            normalized_workspace.clone(),
         ));
         let loader = BzlModuleEvaluator::new(&workspace)?;
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -511,9 +516,12 @@ impl WorkspaceRuntime {
         let mut dice_builder = Dice::builder();
         super::registry_io::install(&mut dice_builder);
         super::repository_io::install(&mut dice_builder);
+        let dice = dice_builder.build(DetectCycles::Enabled);
+        let demand_owner = WorkspaceDemandOwner::new(&dice, normalized_workspace);
         Ok(Self {
             workspace,
-            dice: dice_builder.build(DetectCycles::Enabled),
+            dice,
+            demand_owner,
             loader,
             runtime,
             next_revision: AtomicU64::new(1),
@@ -525,6 +533,18 @@ impl WorkspaceRuntime {
 
     pub fn workspace(&self) -> &Path {
         &self.workspace
+    }
+
+    fn user_computation_data(
+        &self,
+        effects: Option<Arc<AttemptEffectTracker>>,
+    ) -> Result<UserComputationData, CommandEffectError> {
+        let mut data = UserComputationData {
+            cycle_detector: Some(bzl_load_cycle_detector()),
+            ..Default::default()
+        };
+        self.demand_owner.install(&self.dice, &mut data, effects)?;
+        Ok(data)
     }
 
     fn inject_bzlmod_request_inputs(
@@ -651,10 +671,10 @@ impl WorkspaceRuntime {
             directories: Arc::new(directories.into_iter().collect()),
         });
         self.runtime.block_on(async {
-            let mut updater = self.dice.updater_with_data(UserComputationData {
-                cycle_detector: Some(bzl_load_cycle_detector()),
-                ..Default::default()
-            });
+            let data = self
+                .user_computation_data(None)
+                .map_err(|error| QueryError::evaluation(error.to_string()))?;
+            let mut updater = self.dice.updater_with_data(data);
             updater
                 .changed_to(vec![(
                     WorkspaceSnapshotKey {
@@ -831,10 +851,10 @@ impl WorkspaceRuntime {
         });
         let revision = WorkspaceRevision(self.next_revision.fetch_add(1, Ordering::Relaxed));
         self.runtime.block_on(async {
-            let mut updater = self.dice.updater_with_data(UserComputationData {
-                cycle_detector: Some(bzl_load_cycle_detector()),
-                ..Default::default()
-            });
+            let data = self
+                .user_computation_data(None)
+                .context("installing passive workspace activation tracking")?;
+            let mut updater = self.dice.updater_with_data(data);
             updater
                 .changed_to(vec![(
                     (WorkspaceSnapshotKey {
@@ -978,7 +998,10 @@ impl WorkspaceRuntime {
     #[cfg(test)]
     fn current_root_module_graph_for_test(&self) -> anyhow::Result<Arc<RootModuleGraph>> {
         self.runtime.block_on(async {
-            let updater = self.dice.updater();
+            let updater = self.dice.updater_with_data(
+                self.user_computation_data(None)
+                    .context("installing passive workspace activation tracking")?,
+            );
             let mut transaction = updater.existing_state().await;
             let graph = transaction
                 .compute(&RootModuleGraphKey {
@@ -1157,7 +1180,46 @@ mod tests {
     use std::net::TcpListener;
     use std::thread;
 
+    use slug_events_v2::CaptureEvaluationEvents;
+
     use super::*;
+    use crate::runtime::events::CommandEffectOwner;
+
+    #[test]
+    fn runtime_user_data_factory_installs_one_passive_or_eventful_tracker() {
+        let workspace = tempfile::tempdir().unwrap();
+        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        runtime.runtime.block_on(async {
+            let passive = runtime.user_computation_data(None).unwrap();
+            assert!(passive.activation_tracker.is_some());
+            assert!(
+                passive
+                    .activation_tracker
+                    .as_ref()
+                    .unwrap()
+                    .tracks_rich_activations()
+            );
+            assert!(passive.cycle_detector.is_some());
+            assert!(passive.data.get::<CaptureEvaluationEvents>().is_err());
+
+            let effects = CommandEffectOwner::new();
+            let attempt = effects.begin_attempt().unwrap();
+            let eventful = runtime
+                .user_computation_data(Some(attempt.clone()))
+                .unwrap();
+            assert!(eventful.activation_tracker.is_some());
+            assert!(
+                eventful
+                    .activation_tracker
+                    .as_ref()
+                    .unwrap()
+                    .tracks_rich_activations()
+            );
+            assert!(eventful.cycle_detector.is_some());
+            assert!(eventful.data.get::<CaptureEvaluationEvents>().is_ok());
+            attempt.finish_suppressed().unwrap();
+        });
+    }
 
     #[test]
     fn workspace_runtime_owns_distinct_exact_repository_materializers() {
@@ -1200,7 +1262,11 @@ mod tests {
         slug_bzlmod_v2::RegistryRequestGeneration,
     ) {
         runtime.runtime.block_on(async {
-            let updater = runtime.dice.updater();
+            let updater = runtime.dice.updater_with_data(
+                runtime
+                    .user_computation_data(None)
+                    .expect("install passive workspace activation tracking"),
+            );
             let mut transaction = updater.existing_state().await;
             let urls = transaction
                 .compute(&slug_bzlmod_v2::RootModuleRegistryUrlsKey {
@@ -1223,7 +1289,11 @@ mod tests {
         url: &str,
     ) -> Arc<Result<slug_bzlmod_v2::RegistryFileValue, slug_bzlmod_v2::RegistryFileError>> {
         runtime.runtime.block_on(async {
-            let updater = runtime.dice.updater();
+            let updater = runtime.dice.updater_with_data(
+                runtime
+                    .user_computation_data(None)
+                    .expect("install passive workspace activation tracking"),
+            );
             let mut transaction = updater.existing_state().await;
             transaction
                 .compute(&slug_bzlmod_v2::RegistryFileKey {

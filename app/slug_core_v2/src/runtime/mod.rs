@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+mod demands;
 pub mod dice;
 mod events;
 mod path_observation;

@@ -1822,3 +1822,49 @@ one exact-closure demand selector/shared closure-read seam, and retained-engine
 evidence. Stop on native I/O, epochs, retry, accept/discard, current-command
 event capture, publication, public command/server APIs, Cargo, DICE-core, or
 extra-file edits.
+
+### Stage 5 workspace demand provenance bootstrap
+
+Status: Accepted
+
+The retained runtime now owns one canonical-workspace, weak-engine-bound sparse
+catalogue of immutable DICE-node demand descriptors. One composite activation
+tracker records evaluated, reused, abandoned, and late path/request/source
+metadata before optionally forwarding event effects. Event reservation is
+state-only; the capture marker and composite tracker are installed together
+only after every fallible occupied-slot, engine, and attempt check. All five
+retained-runtime updater sites use the centralized factory, while passive
+query/build paths retain the loading cycle detector and marker-absent direct
+printing.
+
+Terminal sealing weak-binds the exact installed demand owner. Selection accepts
+no replacement owner, reads one exact activation closure, validates event
+version/ordered roots/terminal state, and selects both sidecars from that same
+closure. The compact iterative selector copies only demand-bearing closure
+metadata, validates every path-bearing source-file anchor against exactly one
+boundary-local full request before merging equal semantic scopes, rejects
+request identity/workspace conflicts, and returns deterministic shared slices.
+
+Retained-engine evidence proves late post-retry catalogue enrichment, a cached
+metadata-free parent whose untouched demand-bearing child emits no later
+provider callback, unreachable abandoned-sibling exclusion, zero stale-event
+replay, exact installed-owner selection, atomic foreign/expired-engine failure,
+distinct nested equal-scope anchor validation, shared A/B/unscoped paths, and
+typed request/scope conflicts. Validation passed seven focused demand tests,
+four event tests, the runtime-factory regression, all 75 core unit and 13
+integration tests, GNU-Windows compilation, formatting, diff/allowlist and
+forbidden-boundary checks, and archive guards. Independent DICE/source and
+architecture/hot-path reviews corrected partial marker installation, dense
+catalogue reservation, retained-cache evidence, and caller-substitutable owner
+selection; both latest-diff rereviews returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-retained-native-materialization-bridge` in
+`app/slug_core_v2/src/runtime/repository_io.rs`. Add the retained-session
+`materialize_native` entrypoint with exact stable Spec versus
+current-generation Transport/Materialization classification, one deduplicated
+native validation pass, complete preflight path observations plus clean
+reusable repository results, and only the private session operations needed by
+the following dormant runtime-session packet. Preserve rootless Local behavior
+and existing root/token ownership. Stop and replan if exact HTTP or Git staging
+requires the deferred PAX/GNU/link/special parity surface.
