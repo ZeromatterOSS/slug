@@ -1,14 +1,176 @@
 [fixture]
 name = "lockfile-mode-off"
-description = "Bazel 9 fixture proving --lockfile_mode=off does not write MODULE.bazel.lock."
-comparison = "semantic"
+description = "Bazel 9.2 visible-lockfile read, mode, and caught-versus-direct error boundary."
+comparison = "message_shape"
 manifest_roots = ["MODULE.bazel.lock"]
-oracle_notes = "Self-contained root module fixture. The command queries a source-file target with --lockfile_mode=off and records MODULE.bazel.lock as a manifest root; the generated oracle manifest is empty, proving Bazel did not write the visible lockfile."
+oracle_notes = "Nine cumulative queries reuse the original source target to prove visible-lockfile parsing and its downstream main-repository-mapping handoff. They preserve the original absent Off/no-write row and distinguish populated v28, caught malformed input, first-marker version handling, merge advice, Java UTF-8 replacement, deletion, and an uncaught checksum adapter failure."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/GsonTypeAdapterUtil.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFactoryImpl.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/RepositoryMappingFunction.java",
+]
+translation_notes = "The query path computes the main repository mapping and therefore reads MODULE.bazel.lock. After row 8 reads absence as the empty value, RegistryFunction requests that value before RegistryFactoryImpl rejects the explicit scheme-less registry; the exact invalid-URL failure is only an ordering sentinel, not a registry-policy acceptance claim, and performs no registry IO. The immutable 39-byte invalid-UTF8 asset has SHA-256 f07fad0a50495205bd772b0db81ca5f2cf0094aec83aa260d884e0f1c2eaaa20 and embeds ED A0 80 inside an ignored JSON string. The existing MODULE.bazel, BUILD.bazel, and data.txt are reused byte-for-byte. The fixture-growth checkpoint is df812c2c at baseline tree c039c347; eb8c2d23 is packet one after it and this is packet two."
+generation_command = "SLUG_V2_ORACLE_ROOT=target/v2o-lockfile-mode-off-host-generate python3 -B -m tools.v2_oracle run --fixture lockfile-mode-off --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "SLUG_V2_ORACLE_ROOT=target/v2o-lockfile-mode-off-host-replay-a python3 -B -m tools.v2_oracle run --fixture lockfile-mode-off --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
 name = "query_without_lockfile_write"
-argv = ["query", "//:data.txt", "--lockfile_mode=off"]
+argv = ["query", "//:data.txt", "--lockfile_mode=off", "--noshow_progress"]
+compare = "exact"
+expected_exit = 0
+stdout_patterns = ["\\A//:data[.]txt\\Z"]
+
+[[commands]]
+name = "off_parses_populated_v28"
+argv = ["query", "//:data.txt", "--lockfile_mode=off", "--noshow_progress"]
 compare = "semantic"
 expected_exit = 0
-stdout_contains = ["//:data.txt"]
-manifest_roots = ["MODULE.bazel.lock"]
+stdout_patterns = ["\\A//:data[.]txt\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "registryFileHashes": {
+    "https://ignored.invalid/subject": "not found"
+  },
+  "selectedYankedVersions": {},
+  "moduleExtensions": {},
+  "facts": {},
+  "factsVersions": {}
+}
+'''
+
+[[commands]]
+name = "off_rejects_caught_malformed_v28"
+argv = ["query", "//:data.txt", "--lockfile_mode=off", "--noshow_progress"]
+compare = "semantic"
+expected_exit = 48
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "Failed to read and parse the MODULE.bazel.lock file",
+  "Try deleting it and rerun the build.",
+]
+stderr_patterns = ["(?s)\\A(?!.*This looks like a merge conflict).*\\Z"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{"lockFileVersion": 28,
+'''
+
+[[commands]]
+name = "off_noncurrent_first_marker_is_empty"
+argv = ["query", "//:data.txt", "--lockfile_mode=off", "--noshow_progress"]
+compare = "semantic"
+expected_exit = 0
+stdout_patterns = ["\\A//:data[.]txt\\Z"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{"decoy":{"lockFileVersion":27},"lockFileVersion":28,
+'''
+
+[[commands]]
+name = "error_rejects_noncurrent_first_marker"
+argv = ["query", "//:data.txt", "--lockfile_mode=error", "--noshow_progress"]
+compare = "semantic"
+expected_exit = 48
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "The version of MODULE.bazel.lock is not supported by this version of Bazel.",
+  "Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+]
+stderr_patterns = ["(?s)\\A(?!.*Failed to read and parse the MODULE[.]bazel[.]lock file).*\\Z"]
+
+[[commands]]
+name = "off_merge_conflict_gets_advice"
+argv = ["query", "//:data.txt", "--lockfile_mode=off", "--noshow_progress"]
+compare = "semantic"
+expected_exit = 48
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "Failed to read and parse the MODULE.bazel.lock file",
+  "This looks like a merge conflict.",
+  "https://bazel.build/external/lockfile#merge-conflicts for advice.",
+]
+stderr_patterns = ["(?s)\\A(?!.*Try deleting it and rerun the build[.]).*\\Z"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{"decoy":{"lockFileVersion":28},"lockFileVersion":"<<<<<<<"}
+'''
+
+[[commands]]
+name = "off_accepts_java_replacement_in_ignored_string"
+argv = ["query", "//:data.txt", "--lockfile_mode=off", "--noshow_progress"]
+compare = "semantic"
+expected_exit = 0
+stdout_patterns = ["\\A//:data[.]txt\\Z"]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "MODULE.bazel.lock"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "lockfiles/invalid-utf8-v28.lock"
+  destination = "MODULE.bazel.lock"
+
+[[commands]]
+name = "error_deleted_advances_to_invalid_registry_url"
+argv = ["query", "//:data.txt", "--lockfile_mode=error", "--registry=host-visible-lockfile-invalid-registry", "--noshow_progress"]
+compare = "exact"
+expected_exit = 48
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = ["ERROR: Error computing the main repository mapping: Invalid registry URL: host-visible-lockfile-invalid-registry: Registry URL has no scheme -- supported schemes are: http://, https:// and file://: host-visible-lockfile-invalid-registry"]
+stderr_patterns = [
+  "(?s)\\A(?!.*The version of MODULE[.]bazel[.]lock is not supported).*\\Z",
+  "(?s)\\A(?!.*Failed to read and parse the MODULE[.]bazel[.]lock file).*\\Z",
+  "(?s)\\A(?!.*This looks like a merge conflict).*\\Z",
+  "(?s)\\A(?!.*Try deleting it and rerun the build[.]).*\\Z",
+  "(?s)\\A(?!.*bazel crashed due to an internal error).*\\Z",
+  "(?s)\\A(?!.*JsonParseException).*\\Z",
+  "(?s)\\A(?!.*IndexOutOfBoundsException).*\\Z",
+  "(?s)\\A(?!.*Invalid checksum).*\\Z",
+]
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "MODULE.bazel.lock"
+
+[[commands]]
+name = "off_surfaces_uncaught_invalid_checksum"
+argv = ["query", "//:data.txt", "--lockfile_mode=off", "--noshow_progress"]
+compare = "semantic"
+expected_exit = 37
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "bazel crashed due to an internal error",
+  "com.google.gson.JsonParseException: Invalid checksum: not-a-checksum",
+]
+stderr_patterns = ["(?s)\\A(?!.*Failed to read and parse the MODULE[.]bazel[.]lock file).*Invalid checksum: not-a-checksum.*\\Z"]
+
+  [[commands.mutations]]
+  op = "create"
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "registryFileHashes": {
+    "https://ignored.invalid/subject": "not-a-checksum"
+  }
+}
+'''

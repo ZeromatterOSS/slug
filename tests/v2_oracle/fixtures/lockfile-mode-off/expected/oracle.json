@@ -4,7 +4,8 @@
       "argv": [
         "query",
         "//:data.txt",
-        "--lockfile_mode=off"
+        "--lockfile_mode=off",
+        "--noshow_progress"
       ],
       "cwd": "<workspace>",
       "duration_ms": "<duration_ms>",
@@ -14,16 +15,351 @@
         "<tool_executable>",
         "query",
         "//:data.txt",
-        "--lockfile_mode=off"
+        "--lockfile_mode=off",
+        "--noshow_progress"
       ],
       "exit_code": 0,
       "manifest": [],
       "mutations": [],
       "name": "query_without_lockfile_write",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>",
       "normalized_stdout": "//:data.txt",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 7614d09a-d8e9-4731-9bb7-69d0c2e292a3\n",
       "stdout": "//:data.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "43a7cd426d688febfecc36656fca8bb0dde97e93003f12df8f4ab2b8edbe50c3",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 206,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "MODULE.bazel.lock"
+        }
+      ],
+      "name": "off_parses_populated_v28",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "//:data.txt",
+      "stderr": "INFO: Invocation ID: 925c86d1-c1b4-412f-9040-bcf94aa3ae9b\n",
+      "stdout": "//:data.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "exit_code": 48,
+      "manifest": [
+        {
+          "digest": "5df4a0377d5b128b31b8df5f825418a85487ce53a0d1ce74c98e80c6db30a661",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 24,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "206",
+          "path": "MODULE.bazel.lock",
+          "replace": null
+        }
+      ],
+      "name": "off_rejects_caught_malformed_v28",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Error computing the main repository mapping: Failed to read and parse the MODULE.bazel.lock file with error: java.io.EOFException: End of input at line 2 column 1 path $.lockFileVersion. Try deleting it and rerun the build.",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 6155fb13-f73f-4f4d-968a-79fb2655d54c\nERROR: Error computing the main repository mapping: Failed to read and parse the MODULE.bazel.lock file with error: java.io.EOFException: End of input at line 2 column 1 path $.lockFileVersion. Try deleting it and rerun the build.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "5107f844d3e0858ad7a516f348b9b85847c295fa462b4092afb167a26d586e9b",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 54,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "24",
+          "path": "MODULE.bazel.lock",
+          "replace": null
+        }
+      ],
+      "name": "off_noncurrent_first_marker_is_empty",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "//:data.txt",
+      "stderr": "INFO: Invocation ID: affe02bb-91b0-4fb0-ad8b-c077695bb406\n",
+      "stdout": "//:data.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=error",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=error",
+        "--noshow_progress"
+      ],
+      "exit_code": 48,
+      "manifest": [
+        {
+          "digest": "5107f844d3e0858ad7a516f348b9b85847c295fa462b4092afb167a26d586e9b",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 54,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "error_rejects_noncurrent_first_marker",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Error computing the main repository mapping: The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: bfb27e33-c948-46f7-8eef-3990d76eeb3a\nERROR: Error computing the main repository mapping: The version of MODULE.bazel.lock is not supported by this version of Bazel. Please run `bazel mod deps --lockfile_mode=update` to update your lockfile.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "exit_code": 48,
+      "manifest": [
+        {
+          "digest": "426c159bc77be0f89814fe63e8457d34bb8429e711d1a06c2f69cc4b9ec3904f",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 61,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": null,
+          "old_digest_hint": "54",
+          "path": "MODULE.bazel.lock",
+          "replace": null
+        }
+      ],
+      "name": "off_merge_conflict_gets_advice",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Error computing the main repository mapping: Failed to read and parse the MODULE.bazel.lock file with error: java.lang.NumberFormatException: For input string: \"<<<<<<<\". This looks like a merge conflict. See https://bazel.build/external/lockfile#merge-conflicts for advice.",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 49ebc6e5-5777-4f2f-8e67-35bd6dc6fc7c\nERROR: Error computing the main repository mapping: Failed to read and parse the MODULE.bazel.lock file with error: java.lang.NumberFormatException: For input string: \"<<<<<<<\". This looks like a merge conflict. See https://bazel.build/external/lockfile#merge-conflicts for advice.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "f07fad0a50495205bd772b0db81ca5f2cf0094aec83aa260d884e0f1c2eaaa20",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 39,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "MODULE.bazel.lock"
+        },
+        {
+          "destination": "MODULE.bazel.lock",
+          "op": "rename",
+          "path": "lockfiles/invalid-utf8-v28.lock"
+        }
+      ],
+      "name": "off_accepts_java_replacement_in_ignored_string",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "//:data.txt",
+      "stderr": "INFO: Invocation ID: 9ddda365-eeeb-4796-b408-41410f26260e\n",
+      "stdout": "//:data.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=error",
+        "--registry=host-visible-lockfile-invalid-registry",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=error",
+        "--registry=host-visible-lockfile-invalid-registry",
+        "--noshow_progress"
+      ],
+      "exit_code": 48,
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "delete",
+          "path": "MODULE.bazel.lock"
+        }
+      ],
+      "name": "error_deleted_advances_to_invalid_registry_url",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Error computing the main repository mapping: Invalid registry URL: host-visible-lockfile-invalid-registry: Registry URL has no scheme -- supported schemes are: http://, https:// and file://: host-visible-lockfile-invalid-registry",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 43d0f591-2289-40cc-9398-06de685f0ff3\nERROR: Error computing the main repository mapping: Invalid registry URL: host-visible-lockfile-invalid-registry: Registry URL has no scheme -- supported schemes are: http://, https:// and file://: host-visible-lockfile-invalid-registry\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:data.txt",
+        "--lockfile_mode=off",
+        "--noshow_progress"
+      ],
+      "exit_code": 37,
+      "manifest": [
+        {
+          "digest": "281fccf9b0befa5b331e55bddc68770ea46d8a9da381b73fbad0b9b2721f5929",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 115,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "op": "create",
+          "path": "MODULE.bazel.lock"
+        }
+      ],
+      "name": "off_surfaces_uncaught_invalid_checksum",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nFATAL: bazel crashed due to an internal error. Printing stack trace:\njava.lang.RuntimeException: Unrecoverable error while evaluating node 'BazelLockFileValue.KEY' (requested by nodes 'RegistryKey[url=https://bcr.bazel.build/]')\n\tat com.google.devtools.build.skyframe.AbstractParallelEvaluator$Evaluate.run(AbstractParallelEvaluator.java:552)\n\tat com.google.devtools.build.lib.concurrent.AbstractQueueVisitor$WrappedRunnable.run(AbstractQueueVisitor.java:435)\n\tat java.base/java.util.concurrent.ForkJoinTask$AdaptedRunnableAction.exec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinTask.doExec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinPool.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinWorkerThread.run(Unknown Source)\nCaused by: com.google.gson.JsonParseException: Invalid checksum: not-a-checksum\n\tat com.google.devtools.build.lib.bazel.bzlmod.GsonTypeAdapterUtil$OptionalChecksumTypeAdapterFactory$OptionalChecksumTypeAdapter.read(GsonTypeAdapterUtil.java:379)\n\tat com.google.devtools.build.lib.bazel.bzlmod.GsonTypeAdapterUtil$OptionalChecksumTypeAdapterFactory$OptionalChecksumTypeAdapter.read(GsonTypeAdapterUtil.java:357)\n\tat com.google.gson.internal.bind.TypeAdapterRuntimeTypeWrapper.read(TypeAdapterRuntimeTypeWrapper.java:40)\n\tat com.google.gson.internal.bind.MapTypeAdapterFactory$Adapter.read(MapTypeAdapterFactory.java:200)\n\tat com.google.gson.internal.bind.MapTypeAdapterFactory$Adapter.read(MapTypeAdapterFactory.java:154)\n\tat com.google.devtools.build.lib.bazel.bzlmod.DelegateTypeAdapterFactory$1.read(DelegateTypeAdapterFactory.java:144)\n\tat com.google.devtools.build.lib.bazel.bzlmod.BazelLockFileValue_GsonTypeAdapter.read(BazelLockFileValue_GsonTypeAdapter.java:137)\n\tat com.google.devtools.build.lib.bazel.bzlmod.BazelLockFileValue_GsonTypeAdapter.read(BazelLockFileValue_GsonTypeAdapter.java:15)\n\tat com.google.gson.Gson.fromJson(Gson.java:1361)\n\tat com.google.gson.Gson.fromJson(Gson.java:1262)\n\tat com.google.gson.Gson.fromJson(Gson.java:1171)\n\tat com.google.gson.Gson.fromJson(Gson.java:1107)\n\tat com.google.devtools.build.lib.bazel.bzlmod.BazelLockFileFunction.getLockfileValue(BazelLockFileFunction.java:123)\n\tat com.google.devtools.build.lib.bazel.bzlmod.BazelLockFileFunction.compute(BazelLockFileFunction.java:87)\n\tat com.google.devtools.build.skyframe.AbstractParallelEvaluator$Evaluate.run(AbstractParallelEvaluator.java:471)\n\t... 6 more\nCaused by: com.google.devtools.build.lib.bazel.repository.downloader.Checksum$InvalidChecksumException: Invalid SHA-256 checksum 'not-a-checksum'\n\tat com.google.devtools.build.lib.bazel.repository.downloader.Checksum.fromString(Checksum.java:65)\n\tat com.google.devtools.build.lib.bazel.repository.downloader.Checksum.fromString(Checksum.java:59)\n\tat com.google.devtools.build.lib.bazel.bzlmod.GsonTypeAdapterUtil$OptionalChecksumTypeAdapterFactory$OptionalChecksumTypeAdapter.read(GsonTypeAdapterUtil.java:377)\n\t... 20 more",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 8396b295-0266-475d-92c4-50950143b34b\nFATAL: bazel crashed due to an internal error. Printing stack trace:\njava.lang.RuntimeException: Unrecoverable error while evaluating node 'BazelLockFileValue.KEY' (requested by nodes 'RegistryKey[url=https://bcr.bazel.build/]')\n\tat com.google.devtools.build.skyframe.AbstractParallelEvaluator$Evaluate.run(AbstractParallelEvaluator.java:552)\n\tat com.google.devtools.build.lib.concurrent.AbstractQueueVisitor$WrappedRunnable.run(AbstractQueueVisitor.java:435)\n\tat java.base/java.util.concurrent.ForkJoinTask$AdaptedRunnableAction.exec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinTask.doExec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinPool.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ForkJoinWorkerThread.run(Unknown Source)\nCaused by: com.google.gson.JsonParseException: Invalid checksum: not-a-checksum\n\tat com.google.devtools.build.lib.bazel.bzlmod.GsonTypeAdapterUtil$OptionalChecksumTypeAdapterFactory$OptionalChecksumTypeAdapter.read(GsonTypeAdapterUtil.java:379)\n\tat com.google.devtools.build.lib.bazel.bzlmod.GsonTypeAdapterUtil$OptionalChecksumTypeAdapterFactory$OptionalChecksumTypeAdapter.read(GsonTypeAdapterUtil.java:357)\n\tat com.google.gson.internal.bind.TypeAdapterRuntimeTypeWrapper.read(TypeAdapterRuntimeTypeWrapper.java:40)\n\tat com.google.gson.internal.bind.MapTypeAdapterFactory$Adapter.read(MapTypeAdapterFactory.java:200)\n\tat com.google.gson.internal.bind.MapTypeAdapterFactory$Adapter.read(MapTypeAdapterFactory.java:154)\n\tat com.google.devtools.build.lib.bazel.bzlmod.DelegateTypeAdapterFactory$1.read(DelegateTypeAdapterFactory.java:144)\n\tat com.google.devtools.build.lib.bazel.bzlmod.BazelLockFileValue_GsonTypeAdapter.read(BazelLockFileValue_GsonTypeAdapter.java:137)\n\tat com.google.devtools.build.lib.bazel.bzlmod.BazelLockFileValue_GsonTypeAdapter.read(BazelLockFileValue_GsonTypeAdapter.java:15)\n\tat com.google.gson.Gson.fromJson(Gson.java:1361)\n\tat com.google.gson.Gson.fromJson(Gson.java:1262)\n\tat com.google.gson.Gson.fromJson(Gson.java:1171)\n\tat com.google.gson.Gson.fromJson(Gson.java:1107)\n\tat com.google.devtools.build.lib.bazel.bzlmod.BazelLockFileFunction.getLockfileValue(BazelLockFileFunction.java:123)\n\tat com.google.devtools.build.lib.bazel.bzlmod.BazelLockFileFunction.compute(BazelLockFileFunction.java:87)\n\tat com.google.devtools.build.skyframe.AbstractParallelEvaluator$Evaluate.run(AbstractParallelEvaluator.java:471)\n\t... 6 more\nCaused by: com.google.devtools.build.lib.bazel.repository.downloader.Checksum$InvalidChecksumException: Invalid SHA-256 checksum 'not-a-checksum'\n\tat com.google.devtools.build.lib.bazel.repository.downloader.Checksum.fromString(Checksum.java:65)\n\tat com.google.devtools.build.lib.bazel.repository.downloader.Checksum.fromString(Checksum.java:59)\n\tat com.google.devtools.build.lib.bazel.bzlmod.GsonTypeAdapterUtil$OptionalChecksumTypeAdapterFactory$OptionalChecksumTypeAdapter.read(GsonTypeAdapterUtil.java:377)\n\t... 20 more\n",
+      "stdout": ""
     }
   ],
   "fixture": "lockfile-mode-off",

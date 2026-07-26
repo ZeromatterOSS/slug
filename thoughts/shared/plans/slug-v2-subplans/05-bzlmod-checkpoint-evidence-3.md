@@ -5682,30 +5682,47 @@ remains `df812c2c` at accepted baseline tree `c039c347`;
 `eb8c2d23` is packet one after it and this is packet two, so no checkpoint is
 due.
 
-Use exactly nine cumulative `query //:data.txt` rows with the same semantic
-order and byte mutations accepted above. Row 1 preserves the original absent
-Off/no-write evidence. All successful stdout is exactly `//:data.txt`. There
-is no registry argument, file, HTTP server, BCR/network assertion, injected
-closure, or registry hash-consumer claim. The populated row may retain an
-unrelated valid registry hash only as parser/value evidence. Row 3 proves the
-ordinary caught wrapper and delete advice but not merge advice. Rows 4 and 5
-share the first-noncurrent-marker content without an intervening mutation.
-Row 6 uses a recognized nested marker plus a top-level integer field whose
-caught conversion message contains `<<<<<<<`, proving merge advice and no
-delete advice. Row 7 deletes the current file then renames the immutable
-malformed-UTF8 asset into place. Row 8 deletes it and proves absent Error
-success. Row 9 remains last and proves exit-37 invalid-checksum
-`JsonParseException` without the caught wrapper.
+Use exactly nine cumulative `query //:data.txt --noshow_progress` rows with
+the same semantic order and byte mutations accepted above. Row 1 preserves
+the original absent Off/no-write evidence. All successful stdout is exactly
+`//:data.txt`. There is no fixture registry file, HTTP server, BCR/network
+assertion, injected closure scaffold, or accepted registry policy ownership.
+Only row 8 adds the exact scheme-less registry token named below as an
+ordering sentinel; it creates no file or network state. The
+populated row may retain an unrelated valid registry hash only as parser/value
+evidence. Row 3 proves the ordinary caught wrapper and delete advice but not
+merge advice. Rows 4 and 5 share the first-noncurrent-marker content without
+an intervening mutation. Row 6 uses a recognized nested marker plus a
+top-level integer field whose caught conversion message contains `<<<<<<<`,
+proving merge advice and no delete advice. Row 7 deletes the current file then
+renames the immutable malformed-UTF8 asset into place.
+
+Row 8 deletes the visible file and adds exactly
+`--registry=host-visible-lockfile-invalid-registry`. It remains exact
+comparison and expects exit 48, empty stdout, and an absent manifest. It
+asserts the exact `Invalid registry URL:
+host-visible-lockfile-invalid-registry: Registry URL has no scheme` diagnostic
+and supported-schemes suffix while negatively excluding unsupported version,
+caught parse, merge/delete advice, and fatal/direct surfaces.
+`RegistryFunction` requests the visible value before
+`RegistryFactoryImpl.createRegistry`, so this proves only that missing-file
+reading returned EMPTY and advanced to URL validation. It accepts no registry
+policy, fetch, or production consumer ownership. Any different parsing layer,
+exit, message, or replay is a stop. Row 9 remains last and proves exit-37
+invalid-checksum `JsonParseException` without the caught wrapper.
 
 Keep fixture-wide `manifest_roots = ["MODULE.bazel.lock"]`. Rows 1 and 8 use
 `compare = "exact"` because the semantic comparator does not enforce an empty
 expected manifest. Other successful rows may use exact normalized output;
 present-file failure rows use semantic comparison plus strong positive and
 negative message patterns so their manifest digests are checked without
-pinning the complete crash stack. Record Bazel 9.2.0 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`, the lockfile/parser and observed
-query dependency seams, reuse rationale, exact asset size/digest, row order,
-mutations, and manifests.
+pinning the complete crash stack. `--noshow_progress` suppresses the
+nondeterministic progress-line count that otherwise makes exact empty-manifest
+rows unstable; both fresh-root replays must still match exactly. Record Bazel
+9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, the
+lockfile/parser and observed query dependency seams through
+`RepositoryMappingFunction`, `RegistryFunction`, and `RegistryFactoryImpl`,
+reuse rationale, exact asset size/digest, row order, mutations, and manifests.
 
 Run one pinned generation and two distinct fresh-root replays, followed by
 fixture schema, exact row/order/mutation/manifest, source-anchor, exact
@@ -5718,8 +5735,40 @@ network scaffold, or any claim beyond visible lockfile read/parse behavior.
 Native feasibility and architecture/orchestration correction reviews returned
 `ACCEPT`. Pinned-source review of the original nine rows had already accepted
 their caught/direct semantics; the new native Bazel 9.2 observation replaces
-only the command path and fixture owner. Resume only the corrected existing
-fixture.
+only the command path and fixture owner. Two stopped generations first exposed
+an absent-Error missing-checksum sentinel whose selected embedded module
+drifted, then replaced it with the deterministic scheme-less URL sentinel
+above. A native probe and pinned-source, native-feasibility, and
+orchestration-policy reviews accepted the final narrowed boundary. Resume only
+the corrected existing fixture.
+
+##### Host visible-lockfile oracle correction implementation status
+
+**Status:** Accepted after terminal latest-diff review on 2026-07-26.
+
+The existing `lockfile-mode-off` fixture now owns nine cumulative query rows
+in exactly three changed paths. Pinned Bazel 9.2 generation and two distinct
+fresh-root replays passed with exits
+`0,0,48,0,48,48,0,48,37` and visible-manifest counts
+`0,1,1,1,1,1,1,0,1`. The final absent-Error row uses the exact scheme-less
+registry URL only as a deterministic read-before-URL-validation sentinel; the
+direct invalid-checksum crash remains last.
+
+The fixture has six regular files, zero symlinks, and 553 newline-counted
+lines, a net increase of one file and 500 lines over its prior state. The
+immutable malformed-UTF8 asset is 39 bytes with SHA-256
+`f07fad0a50495205bd772b0db81ca5f2cf0094aec83aa260d884e0f1c2eaaa20`.
+Existing `MODULE.bazel`, `BUILD.bazel`, and `data.txt` remain byte-identical.
+All source anchors, row/order/mutation/manifest, schema, asset, archive, diff,
+path/stack normalization, credential, and exact-scope gates passed.
+Pinned-source/parity and architecture/orchestration terminal reviews returned
+`ACCEPT`; the writer's complete validation returned `ACCEPT`.
+
+No failed draft or expected output, fixture registry, server, network claim,
+harness, Rust, Cargo, dependency, registry consumer ownership, or activation
+is retained. Next evidence: Implement only
+`WP-5-m1-host-visible-lockfile-owner` under the exact three-file private-owner
+contract above.
 
 #### Later activation gate: bootstrap and Host switch
 

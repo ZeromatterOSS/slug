@@ -31,29 +31,30 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the first Host visible-lockfile oracle generation
-stopped before evidence because its sole local registry could not supply
-Bazel's injected `bazel_tools` module closure. A native Bazel 9.2 temporary
-probe proved the existing `lockfile-mode-off` query fixture already reads and
-rejects malformed current-v28 content in Off without that closure. The
-accepted correction reuses that fixture for the same nine rows in exactly
-three changed paths, with six final files, no registry/network scaffold, and
-separate caught, unsupported, merge-advice, UTF-8, absence, and direct-crash
-evidence. No failed expected output is accepted; no replay, Rust, Cargo,
-dependency, production edge, or activation changed.
+Latest M1 accepted evidence: the corrected Host visible-lockfile oracle passed
+pinned Bazel 9.2 generation and two distinct fresh-root replays with exits
+`0,0,48,0,48,48,0,48,37`. Its nine cumulative query rows prove absent and
+populated Off behavior, caught malformed input, first-marker version gating,
+unsupported Error mode, merge advice, Java UTF-8 replacement, absent-Error
+progress through a deterministic scheme-less URL sentinel, and the direct
+adapter crash. The existing fixture changed in exactly three paths and now has
+six regular files, zero links, and 553 lines; all terminal source,
+implementation/evidence, and orchestration reviews returned `ACCEPT`. No
+failed draft, registry scaffold, network claim, harness, Rust, Cargo,
+production edge, or activation is retained.
 
 ### Current packet
 
-Implement only
-`WP-5-m1-host-visible-lockfile-oracle-embedded-closure-correction`.
+Implement only `WP-5-m1-host-visible-lockfile-owner`.
 
-Remove the held untracked new-fixture draft and extend only the existing
-`lockfile-mode-off` fixture under the exact three-path, nine-query-row
-correction in the owning subplan. Preserve its existing workspace files,
-generate with pinned Bazel 9.2, run two fresh-root replays, and enforce the
-six-file/700-line, provenance, manifest, mutation, archive, and diff gates.
-Do not edit Rust, Cargo, the harness, another fixture, registry state, or
-production code.
+Add the private Host owner in exactly three files:
+`app/slug_bzlmod_v2/src/host_lockfile.rs`,
+`app/slug_bzlmod_v2/src/lockfile.rs`, and the private module declaration in
+`app/slug_bzlmod_v2/src/lib.rs`. Preserve the accepted full-v28 typed parser,
+file-before-mode Need ordering, caught versus uncaught surfaces,
+complete-only semantic equality, exact test/validation matrix, and every
+forbidden consumer/activation boundary in the owning subplan. Do not edit
+fixtures, Cargo, `repository_ignore.rs`, or `lockfile_v28.rs`.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
