@@ -1430,3 +1430,48 @@ Next evidence: Implement only
 `WP-5-m1-root-module-composite-event-producer` in its exact four-file
 allowlist. Preserve the accepted evaluator/schema semantics and activate only
 the private-key marker-conditional event sidecar.
+
+### Stage 5 root-MODULE composite event producer
+
+Status: Accepted
+
+The private `RootModuleEvaluationKey` is now the sole root-MODULE evaluation
+event producer. It reads the request-local `CaptureEvaluationEvents` marker as
+an untracked boolean, funnels every semantic outcome through one completion
+path, and stores exactly one local `EventBatch` when capture is selected.
+Missing/read/parse/prepare/no-print outcomes store explicit empty batches;
+runtime failure stores the exact executed prefix. Marker absence stores
+nothing and leaves the evaluator's default direct-print handler selected.
+
+The capture-only print handler is created only after the last DICE await and
+is shared by the one root/include evaluator. It preserves raw print text and
+inline nested/repeated order. No event, marker, source, handler, or activation
+state enters the private key identity, semantic values, equality, file leaves,
+visible-lockfile join, or graph key. The public root globals enable `print`
+without changing the byte-identical nonroot evaluator region.
+
+Retained-DICE evidence proves the exact seven-event inline stream, warm and
+fresh-owner nonreplay, print-only V1-to-V2-to-V1 evaluation with equal graphs,
+marker absence and untracked marker addition, explicit empty direct-include
+missing/read and nested parse/prepare failures, exact runtime prefix and
+recovery, yanked/environment/visible-lockfile reuse, ignore-dev
+reevaluation/recovery, semantic source A-to-B-to-A recovery, and exactly one
+private event-bearing activation node. Both independent implementation
+reviews returned `ACCEPT`.
+
+Validation passed:
+
+- `cargo test -p slug_bzlmod_v2` — 231 tests.
+- `cargo test -p slug_core_v2 runtime::events` — 4 focused sidecar tests.
+- `cargo check -p slug_bzlmod_v2 --target x86_64-pc-windows-gnu`.
+- `cargo fmt --all -- --check`, `git diff --check`, and
+  `scripts/v2_archive_status.sh`.
+
+The root `Cargo.lock` is intentionally ignored and untracked; its generated
+local `slug_bzlmod_v2` entry already contains `slug_events_v2`, so the accepted
+allowlist required no tracked lockfile delta.
+
+Next evidence: Design only
+`WP-5-m1-runtime-native-demand-producer-design-correction`. Reconcile
+workspace-lifetime node-keyed demand provenance with the accepted retained
+materializer and exact-version activation closure before any Rust edit.

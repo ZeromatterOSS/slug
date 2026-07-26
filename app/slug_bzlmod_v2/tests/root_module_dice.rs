@@ -3,11 +3,14 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use dice::ActivationData;
+use dice::ActivationKind;
 use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::DynKey;
+use dice::RichActivation;
 use dice::UserComputationData;
+use dupe::Dupe;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -21,6 +24,9 @@ use slug_bzlmod_v2::RootModuleLockfileMode;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
 use slug_bzlmod_v2::VisibleLockfileRead;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_events_v2::CaptureEvaluationEvents;
+use slug_events_v2::EvaluationEvent;
+use slug_events_v2::EventBatch;
 use slug_identity_v2::ApparentRepoName;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceSnapshot;
@@ -113,6 +119,69 @@ impl ActivationTracker for RootEvaluationTracker {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RootEventActivation {
+    key: String,
+    kind: ActivationKind,
+    batch: Option<EventBatch>,
+}
+
+#[derive(Default)]
+struct RootEventTracker {
+    activations: Mutex<Vec<RootEventActivation>>,
+}
+
+impl RootEventTracker {
+    fn take(&self) -> Vec<RootEventActivation> {
+        std::mem::take(&mut *self.activations.lock().unwrap())
+    }
+
+    fn record(&self, activation: RootEventActivation) {
+        self.activations.lock().unwrap().push(activation);
+    }
+}
+
+impl ActivationTracker for RootEventTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
+        activation: ActivationData,
+    ) {
+        if !matches!(activation, ActivationData::Reused) {
+            return;
+        }
+        if key.downcast_ref::<RootModuleFilesKey>().is_some() {
+            while let Some(dependency) = deps.next() {
+                let dependency = dependency.to_string();
+                if dependency.starts_with("root-module-evaluation:") {
+                    self.record(RootEventActivation {
+                        key: dependency,
+                        kind: ActivationKind::Reused,
+                        batch: None,
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        true
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        self.record(RootEventActivation {
+            key: key.to_string(),
+            kind: activation.kind(),
+            batch: activation
+                .evaluation_data()
+                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .map(Dupe::dupe),
+        });
+    }
+}
+
 impl RequestInputs {
     fn defaults() -> Self {
         Self {
@@ -172,11 +241,28 @@ async fn graph_and_module_value_tracked(
     Arc<Result<slug_bzlmod_v2::RootModuleGraph, compact_str::CompactString>>,
     Arc<Result<slug_bzlmod_v2::RootModuleFiles, compact_str::CompactString>>,
 ) {
+    graph_and_module_value_observed(dice, files, inputs, tracker, false).await
+}
+
+async fn graph_and_module_value_observed(
+    dice: &Arc<Dice>,
+    files: Arc<WorkspaceSnapshot>,
+    inputs: RequestInputs,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+) -> (
+    Arc<Result<slug_bzlmod_v2::RootModuleGraph, compact_str::CompactString>>,
+    Arc<Result<slug_bzlmod_v2::RootModuleFiles, compact_str::CompactString>>,
+) {
     let workspace = workspace();
-    let mut updater = dice.updater_with_data(UserComputationData {
+    let mut user_data = UserComputationData {
         activation_tracker: tracker,
         ..Default::default()
-    });
+    };
+    if capture_events {
+        user_data.data.set(CaptureEvaluationEvents);
+    }
+    let mut updater = dice.updater_with_data(user_data);
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
@@ -237,6 +323,57 @@ async fn graph(
 ) -> Result<slug_bzlmod_v2::RootModuleGraph, String> {
     graph_value(dice, files)
         .await
+        .as_ref()
+        .clone()
+        .map_err(|error| error.to_string())
+}
+
+fn event_texts(batch: &EventBatch) -> Vec<&str> {
+    batch
+        .events()
+        .iter()
+        .map(|event| match event {
+            EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+        })
+        .collect()
+}
+
+fn root_event_activations(events: &[RootEventActivation]) -> Vec<&RootEventActivation> {
+    events
+        .iter()
+        .filter(|event| event.key.starts_with("root-module-evaluation:"))
+        .collect()
+}
+
+fn event_bearing_activations(events: &[RootEventActivation]) -> Vec<&RootEventActivation> {
+    events
+        .iter()
+        .filter(|event| event.batch.is_some())
+        .collect()
+}
+
+fn assert_single_root_batch(events: &[RootEventActivation], expected: &[&str]) {
+    let event_bearing = event_bearing_activations(events);
+    assert_eq!(event_bearing.len(), 1, "{events:#?}");
+    let event = event_bearing[0];
+    assert!(
+        event.key.starts_with("root-module-evaluation:"),
+        "{events:#?}"
+    );
+    assert_eq!(event.kind, ActivationKind::Evaluated);
+    assert_eq!(event_texts(event.batch.as_ref().unwrap()), expected);
+}
+
+async fn observed_graph(
+    dice: &Arc<Dice>,
+    files: Arc<WorkspaceSnapshot>,
+    inputs: RequestInputs,
+    tracker: &Arc<RootEventTracker>,
+    capture_events: bool,
+) -> Result<slug_bzlmod_v2::RootModuleGraph, String> {
+    graph_and_module_value_observed(dice, files, inputs, Some(tracker.clone()), capture_events)
+        .await
+        .0
         .as_ref()
         .clone()
         .map_err(|error| error.to_string())
@@ -625,6 +762,528 @@ async fn root_graph_reexecutes_repeated_includes_and_restores_error_context() {
         nested_error[root_frame..].matches(", in include").count(),
         2
     );
+}
+
+#[tokio::test]
+async fn root_event_batch_preserves_inline_order_and_never_replays() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootEventTracker::default());
+    let files = |nested: &str| {
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "module(name = 'root')\n\
+                     print('ROOT_BEFORE')\n\
+                     include('//:deps.MODULE.bazel')\n\
+                     print('ROOT_AFTER')\n"
+                        .to_owned(),
+                )),
+            ),
+            (
+                "deps.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "print('DEPS_BEFORE')\n\
+                     include('//:nested.MODULE.bazel')\n\
+                     print('DEPS_BETWEEN')\n\
+                     include('//:nested.MODULE.bazel')\n\
+                     print('DEPS_AFTER')\n"
+                        .to_owned(),
+                )),
+            ),
+            (
+                "nested.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(format!("print('{nested}')\n"))),
+            ),
+        ])
+    };
+    let v1 = [
+        "ROOT_BEFORE",
+        "DEPS_BEFORE",
+        "NESTED_V1",
+        "DEPS_BETWEEN",
+        "NESTED_V1",
+        "DEPS_AFTER",
+        "ROOT_AFTER",
+    ];
+    let v2 = [
+        "ROOT_BEFORE",
+        "DEPS_BEFORE",
+        "NESTED_V2",
+        "DEPS_BETWEEN",
+        "NESTED_V2",
+        "DEPS_AFTER",
+        "ROOT_AFTER",
+    ];
+
+    let graph_v1 = observed_graph(
+        &dice,
+        files("NESTED_V1"),
+        RequestInputs::defaults(),
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    let events = tracker.take();
+    assert_single_root_batch(&events, &v1);
+    assert_eq!(event_bearing_activations(&events).len(), 1);
+
+    let warm = observed_graph(
+        &dice,
+        files("NESTED_V1"),
+        RequestInputs::defaults(),
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(warm, graph_v1);
+    let events = tracker.take();
+    assert!(event_bearing_activations(&events).is_empty(), "{events:#?}");
+    assert!(
+        root_event_activations(&events)
+            .iter()
+            .all(|event| event.kind == ActivationKind::Reused),
+        "{events:#?}"
+    );
+
+    let fresh_tracker = Arc::new(RootEventTracker::default());
+    let fresh_owner = observed_graph(
+        &dice,
+        files("NESTED_V1"),
+        RequestInputs::defaults(),
+        &fresh_tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(fresh_owner, graph_v1);
+    let events = fresh_tracker.take();
+    assert!(event_bearing_activations(&events).is_empty(), "{events:#?}");
+
+    let graph_v2 = observed_graph(
+        &dice,
+        files("NESTED_V2"),
+        RequestInputs::defaults(),
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(graph_v2, graph_v1);
+    assert_single_root_batch(&tracker.take(), &v2);
+
+    let graph_v1_again = observed_graph(
+        &dice,
+        files("NESTED_V1"),
+        RequestInputs::defaults(),
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(graph_v1_again, graph_v1);
+    assert_single_root_batch(&tracker.take(), &v1);
+}
+
+#[tokio::test]
+async fn root_event_marker_is_untracked_and_failures_store_one_local_batch() {
+    let marker_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let marker_tracker = Arc::new(RootEventTracker::default());
+    let printed = |text: &str| {
+        snapshot([(
+            "MODULE.bazel",
+            WorkspaceFileValue::Present(Arc::new(format!(
+                "module(name = 'root')\nprint('{text}')\n"
+            ))),
+        )])
+    };
+
+    observed_graph(
+        &marker_dice,
+        printed("DIRECT_V1"),
+        RequestInputs::defaults(),
+        &marker_tracker,
+        false,
+    )
+    .await
+    .unwrap();
+    let events = marker_tracker.take();
+    let private = root_event_activations(&events);
+    assert!(
+        private
+            .iter()
+            .any(|event| event.kind == ActivationKind::Evaluated && event.batch.is_none()),
+        "{events:#?}"
+    );
+    assert!(event_bearing_activations(&events).is_empty());
+
+    observed_graph(
+        &marker_dice,
+        printed("DIRECT_V1"),
+        RequestInputs::defaults(),
+        &marker_tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    let events = marker_tracker.take();
+    assert!(event_bearing_activations(&events).is_empty(), "{events:#?}");
+    assert!(
+        root_event_activations(&events)
+            .iter()
+            .all(|event| event.kind == ActivationKind::Reused),
+        "{events:#?}"
+    );
+
+    observed_graph(
+        &marker_dice,
+        printed("DIRECT_V2"),
+        RequestInputs::defaults(),
+        &marker_tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_single_root_batch(&marker_tracker.take(), &["DIRECT_V2"]);
+
+    let failure_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let failure_tracker = Arc::new(RootEventTracker::default());
+    let cases = [
+        (
+            snapshot([(
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new("module(name = 'root')\n".to_owned())),
+            )]),
+            true,
+        ),
+        (
+            snapshot([
+                (
+                    "MODULE.bazel",
+                    WorkspaceFileValue::Present(Arc::new(
+                        "module(name = 'root')\n\
+                         print('ROOT_MUST_BE_SUPPRESSED')\n\
+                         include('//:child.MODULE.bazel')\n"
+                            .to_owned(),
+                    )),
+                ),
+                ("child.MODULE.bazel", WorkspaceFileValue::Absent),
+            ]),
+            false,
+        ),
+        (
+            snapshot([
+                (
+                    "MODULE.bazel",
+                    WorkspaceFileValue::Present(Arc::new(
+                        "module(name = 'root')\n\
+                         print('ROOT_MUST_BE_SUPPRESSED')\n\
+                         include('//:child.MODULE.bazel')\n"
+                            .to_owned(),
+                    )),
+                ),
+                (
+                    "child.MODULE.bazel",
+                    WorkspaceFileValue::ReadError(Arc::new("denied".to_owned())),
+                ),
+            ]),
+            false,
+        ),
+        (
+            snapshot([
+                (
+                    "MODULE.bazel",
+                    WorkspaceFileValue::Present(Arc::new(
+                        "module(name = 'root')\n\
+                         print('ROOT_MUST_BE_SUPPRESSED')\n\
+                         include('//:child.MODULE.bazel')\n"
+                            .to_owned(),
+                    )),
+                ),
+                (
+                    "child.MODULE.bazel",
+                    WorkspaceFileValue::Present(Arc::new(
+                        "print('CHILD_MUST_BE_SUPPRESSED')\n\
+                         include('//:nested.MODULE.bazel')\n"
+                            .to_owned(),
+                    )),
+                ),
+                (
+                    "nested.MODULE.bazel",
+                    WorkspaceFileValue::Present(Arc::new("module(name = 'nested'\n".to_owned())),
+                ),
+            ]),
+            false,
+        ),
+        (
+            snapshot([
+                (
+                    "MODULE.bazel",
+                    WorkspaceFileValue::Present(Arc::new(
+                        "module(name = 'root')\n\
+                         print('ROOT_MUST_BE_SUPPRESSED')\n\
+                         include('//:child.MODULE.bazel')\n"
+                            .to_owned(),
+                    )),
+                ),
+                (
+                    "child.MODULE.bazel",
+                    WorkspaceFileValue::Present(Arc::new(
+                        "print('CHILD_MUST_BE_SUPPRESSED')\n\
+                         include('//:nested.MODULE.bazel')\n"
+                            .to_owned(),
+                    )),
+                ),
+                (
+                    "nested.MODULE.bazel",
+                    WorkspaceFileValue::Present(Arc::new(
+                        "module(name = undefined_module_name)\n".to_owned(),
+                    )),
+                ),
+            ]),
+            false,
+        ),
+    ];
+    for (files, succeeds) in cases {
+        let result = observed_graph(
+            &failure_dice,
+            files,
+            RequestInputs::defaults(),
+            &failure_tracker,
+            true,
+        )
+        .await;
+        assert_eq!(result.is_ok(), succeeds, "{result:?}");
+        assert_single_root_batch(&failure_tracker.take(), &[]);
+    }
+
+    let runtime_files = |nested: &str| {
+        snapshot([
+            (
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "module(name = 'root')\n\
+                     print('ROOT_BEFORE')\n\
+                     include('//:deps.MODULE.bazel')\n\
+                     print('ROOT_AFTER')\n"
+                        .to_owned(),
+                )),
+            ),
+            (
+                "deps.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(
+                    "print('DEPS_BEFORE')\n\
+                     include('//:nested.MODULE.bazel')\n\
+                     print('DEPS_BETWEEN')\n\
+                     include('//:nested.MODULE.bazel')\n\
+                     print('DEPS_AFTER')\n"
+                        .to_owned(),
+                )),
+            ),
+            (
+                "nested.MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(nested.to_owned())),
+            ),
+        ])
+    };
+    let runtime = observed_graph(
+        &failure_dice,
+        runtime_files(
+            "print('NESTED_RUNTIME_PREFIX')\nfail('nested runtime')\nprint('NESTED_AFTER')\n",
+        ),
+        RequestInputs::defaults(),
+        &failure_tracker,
+        true,
+    )
+    .await;
+    assert!(runtime.unwrap_err().contains("nested runtime"));
+    assert_single_root_batch(
+        &failure_tracker.take(),
+        &["ROOT_BEFORE", "DEPS_BEFORE", "NESTED_RUNTIME_PREFIX"],
+    );
+
+    observed_graph(
+        &failure_dice,
+        runtime_files("print('NESTED_V2')\n"),
+        RequestInputs::defaults(),
+        &failure_tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_single_root_batch(
+        &failure_tracker.take(),
+        &[
+            "ROOT_BEFORE",
+            "DEPS_BEFORE",
+            "NESTED_V2",
+            "DEPS_BETWEEN",
+            "NESTED_V2",
+            "DEPS_AFTER",
+            "ROOT_AFTER",
+        ],
+    );
+}
+
+#[tokio::test]
+async fn root_event_replay_follows_only_ignore_dev_and_source_changes() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootEventTracker::default());
+    let files = |printed: &str, version: &str, with_lockfile: bool| {
+        let mut entries = vec![(
+            "MODULE.bazel",
+            WorkspaceFileValue::Present(Arc::new(format!(
+                "module(name = 'root')\n\
+                 print('{printed}')\n\
+                 bazel_dep(name = 'semantic_dep', version = '{version}')\n\
+                 bazel_dep(name = 'dev_dep', dev_dependency = True)\n"
+            ))),
+        )];
+        if with_lockfile {
+            entries.push((
+                "MODULE.bazel.lock",
+                WorkspaceFileValue::Present(Arc::new(
+                    "{\"lockFileVersion\":28,\"selectedYankedVersions\":{\"yyy@1.0.0\":\"reason\"}}\n"
+                        .to_owned(),
+                )),
+            ));
+        }
+        snapshot(entries)
+    };
+
+    observed_graph(
+        &dice,
+        files("POLICY_V1", "1.0", false),
+        RequestInputs::defaults(),
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_single_root_batch(&tracker.take(), &["POLICY_V1"]);
+
+    let command_yanked = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+        ..RequestInputs::defaults()
+    };
+    observed_graph(
+        &dice,
+        files("POLICY_V1", "1.0", false),
+        command_yanked,
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert!(event_bearing_activations(&tracker.take()).is_empty());
+
+    let environment_only = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+        environment: Some(
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+        ),
+        ..RequestInputs::defaults()
+    };
+    observed_graph(
+        &dice,
+        files("POLICY_V1", "1.0", false),
+        environment_only,
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert!(event_bearing_activations(&tracker.take()).is_empty());
+
+    let lockfile_only = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+        environment: Some(
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+        ),
+        ..RequestInputs::defaults()
+    };
+    observed_graph(
+        &dice,
+        files("POLICY_V1", "1.0", true),
+        lockfile_only,
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert!(event_bearing_activations(&tracker.take()).is_empty());
+
+    let ignored = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap()),
+        environment: Some(
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+        ),
+        ..RequestInputs::defaults()
+    };
+    let ignored_graph = observed_graph(
+        &dice,
+        files("POLICY_V1", "1.0", true),
+        ignored,
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        ignored_graph
+            .module
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.name.as_str())
+            .collect::<Vec<_>>(),
+        ["semantic_dep"]
+    );
+    assert_single_root_batch(&tracker.take(), &["POLICY_V1"]);
+
+    let active = RequestInputs {
+        command: Some(BzlmodCommandPolicyKey::from_flags(Some("all"), false).unwrap()),
+        environment: Some(
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(Some("all")).unwrap(),
+        ),
+        ..RequestInputs::defaults()
+    };
+    let graph_a = observed_graph(
+        &dice,
+        files("POLICY_V1", "1.0", true),
+        active.clone(),
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(graph_a.module.dependencies.len(), 2);
+    assert_single_root_batch(&tracker.take(), &["POLICY_V1"]);
+
+    let graph_b = observed_graph(
+        &dice,
+        files("POLICY_V2", "2.0", true),
+        active.clone(),
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_ne!(graph_b, graph_a);
+    assert_single_root_batch(&tracker.take(), &["POLICY_V2"]);
+
+    let graph_a_again = observed_graph(
+        &dice,
+        files("POLICY_V1", "1.0", true),
+        active,
+        &tracker,
+        true,
+    )
+    .await
+    .unwrap();
+    assert_eq!(graph_a_again, graph_a);
+    assert_single_root_batch(&tracker.take(), &["POLICY_V1"]);
 }
 
 #[tokio::test]

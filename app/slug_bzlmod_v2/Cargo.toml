@@ -17,6 +17,7 @@ dupe = { workspace = true }
 hex = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+slug_events_v2 = { workspace = true }
 slug_identity_v2 = { workspace = true }
 slug_workspace_v2 = { workspace = true }
 starlark = { workspace = true }

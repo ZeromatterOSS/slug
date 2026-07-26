@@ -17,6 +17,9 @@ use dice::Key;
 use dice::ProjectionKey;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_events_v2::CaptureEvaluationEvents;
+use slug_events_v2::EvaluationEvent;
+use slug_events_v2::EventBatch;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
@@ -1026,6 +1029,26 @@ struct RootModuleSourceFile {
     _inspection: NonrootModuleFileInspection,
 }
 
+#[derive(Default)]
+struct RootModulePrintCapture {
+    events: RefCell<Vec<EvaluationEvent>>,
+}
+
+impl RootModulePrintCapture {
+    fn into_batch(self) -> EventBatch {
+        EventBatch::from_events(self.events.into_inner())
+    }
+}
+
+impl PrintHandler for RootModulePrintCapture {
+    fn println(&self, text: &str) -> starlark::Result<()> {
+        self.events
+            .borrow_mut()
+            .push(EvaluationEvent::StarlarkPrint { text: text.into() });
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 struct RootModuleEvaluationKey {
     workspace: PathBuf,
@@ -1042,99 +1065,96 @@ impl Key for RootModuleEvaluationKey {
     type Value = Arc<Result<RootModuleEvaluation, CompactString>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let policy = match ctx
-            .compute_opaque(&RootModuleCommandPolicyKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(policy) => policy,
-            Err(error) => {
-                return Arc::new(Err(CompactString::new(format!(
-                    "missing injected root module command policy: {error}"
-                ))));
-            }
-        };
-        let ignore_dev_dependency =
-            match ctx.projection(&policy, &RootModuleIgnoreDevDependencyProjectionKey) {
-                Ok(value) => value,
-                Err(error) => {
-                    return Arc::new(Err(CompactString::new(format!(
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = async {
+            let policy = ctx
+                .compute_opaque(&RootModuleCommandPolicyKey {
+                    workspace: self.workspace.clone(),
+                })
+                .await
+                .map_err(|error| {
+                    CompactString::new(format!(
                         "missing injected root module command policy: {error}"
-                    ))));
+                    ))
+                })?;
+            let ignore_dev_dependency = ctx
+                .projection(&policy, &RootModuleIgnoreDevDependencyProjectionKey)
+                .map_err(|error| {
+                    CompactString::new(format!(
+                        "missing injected root module command policy: {error}"
+                    ))
+                })?;
+
+            let root_path = self.workspace.join("MODULE.bazel");
+            let root_source = read_root_module_source(ctx, &self.workspace, &root_path).await?;
+            let root_inspection = inspect_nonroot_module_file(
+                LogicalModuleFileId::new(root_path.display().to_string()),
+                root_source.as_bytes(),
+            )
+            .map_err(|error| CompactString::new(error.to_string()))?;
+            let mut horizon = VecDeque::from(root_inspection.includes.to_vec());
+            let mut files = vec![RootModuleSourceFile {
+                path: root_path,
+                source: root_source,
+                _inspection: root_inspection,
+            }];
+            let mut include_indices = SmallMap::new();
+            while let Some(request) = horizon.pop_front() {
+                if include_indices.contains_key(request.path.as_str()) {
+                    continue;
                 }
-            };
-
-        let root_path = self.workspace.join("MODULE.bazel");
-        let root_source = match read_root_module_source(ctx, &self.workspace, &root_path).await {
-            Ok(source) => source,
-            Err(error) => return Arc::new(Err(error)),
-        };
-        let root_inspection = match inspect_nonroot_module_file(
-            LogicalModuleFileId::new(root_path.display().to_string()),
-            root_source.as_bytes(),
-        ) {
-            Ok(inspection) => inspection,
-            Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
-        };
-        let mut horizon = VecDeque::from(root_inspection.includes.to_vec());
-        let mut files = vec![RootModuleSourceFile {
-            path: root_path,
-            source: root_source,
-            _inspection: root_inspection,
-        }];
-        let mut include_indices = SmallMap::new();
-        while let Some(request) = horizon.pop_front() {
-            if include_indices.contains_key(request.path.as_str()) {
-                continue;
+                let path = include_path(&self.workspace, request.path.as_str())?;
+                let source = read_root_module_source(ctx, &self.workspace, &path).await?;
+                let inspection = inspect_nonroot_module_file(
+                    LogicalModuleFileId::new(path.display().to_string()),
+                    source.as_bytes(),
+                )
+                .map_err(|error| CompactString::new(error.to_string()))?;
+                let index = files.len();
+                include_indices.insert(request.path, index);
+                horizon.extend(inspection.includes.iter().cloned());
+                files.push(RootModuleSourceFile {
+                    path,
+                    source,
+                    _inspection: inspection,
+                });
             }
-            let path = match include_path(&self.workspace, request.path.as_str()) {
-                Ok(path) => path,
-                Err(error) => return Arc::new(Err(error)),
-            };
-            let source = match read_root_module_source(ctx, &self.workspace, &path).await {
-                Ok(source) => source,
-                Err(error) => return Arc::new(Err(error)),
-            };
-            let inspection = match inspect_nonroot_module_file(
-                LogicalModuleFileId::new(path.display().to_string()),
-                source.as_bytes(),
-            ) {
-                Ok(inspection) => inspection,
-                Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
-            };
-            let index = files.len();
-            include_indices.insert(request.path, index);
-            horizon.extend(inspection.includes.iter().cloned());
-            files.push(RootModuleSourceFile {
-                path,
-                source,
-                _inspection: inspection,
-            });
-        }
 
-        let mut module_file_paths = Vec::with_capacity(files.len());
-        for file in &files {
-            let path = match file.path.strip_prefix(&self.workspace) {
-                Ok(path) => path.to_path_buf(),
-                Err(error) => {
-                    return Arc::new(Err(CompactString::new(format!(
+            let mut module_file_paths = Vec::with_capacity(files.len());
+            for file in &files {
+                let path = file.path.strip_prefix(&self.workspace).map_err(|error| {
+                    CompactString::new(format!(
                         "root MODULE file escaped its workspace: {}: {error}",
                         file.path.display()
-                    ))));
-                }
-            };
-            module_file_paths.push(path);
-        }
-        module_file_paths.sort();
-        module_file_paths.dedup();
+                    ))
+                })?;
+                module_file_paths.push(path.to_path_buf());
+            }
+            module_file_paths.sort();
+            module_file_paths.dedup();
 
-        Arc::new(evaluate_root_module_closure(
-            ignore_dev_dependency,
-            files,
-            include_indices,
-            module_file_paths.into(),
-        ))
+            let print_capture = capture_events.then(RootModulePrintCapture::default);
+            let value = evaluate_root_module_closure(
+                ignore_dev_dependency,
+                files,
+                include_indices,
+                module_file_paths.into(),
+                print_capture.as_ref(),
+            );
+            event_batch = print_capture.map(RootModulePrintCapture::into_batch);
+            value
+        }
+        .await;
+        if capture_events {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("root MODULE evaluation stores exactly one event batch");
+        }
+        Arc::new(value)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3781,6 +3801,7 @@ fn evaluate_root_module_closure(
     files: Vec<RootModuleSourceFile>,
     include_indices: SmallMap<CompactString, usize>,
     module_file_paths: Arc<[PathBuf]>,
+    print_capture: Option<&RootModulePrintCapture>,
 ) -> Result<RootModuleEvaluation, CompactString> {
     let asts = files
         .iter()
@@ -3799,7 +3820,9 @@ fn evaluate_root_module_closure(
         .skip(1)
         .map(|_| Box::new(Module::new()))
         .collect::<Vec<_>>();
-    let globals = GlobalsBuilder::standard().with(module_globals).build();
+    let globals = GlobalsBuilder::extended_by(&[LibraryExtension::Print])
+        .with(module_globals)
+        .build();
     let programs = {
         let mut asts = asts.into_iter();
         let root_ast = asts
@@ -3835,6 +3858,9 @@ fn evaluate_root_module_closure(
     {
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&context);
+        if let Some(print_capture) = print_capture {
+            evaluator.set_print_handler(print_capture);
+        }
         evaluator
             .set_prepared_modules(programs)
             .map_err(|error| CompactString::new(error.to_string()))?;
