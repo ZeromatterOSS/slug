@@ -2750,3 +2750,279 @@ Name the exact allowlist, unchanged-legacy tests, local-branch forbidden scan,
 and a Host-only remote error schema that cannot contain legacy root/local
 erasure. Then resubmit the complete serial root/raw Host contract; do not
 implement the otherwise viable private byte leaf in isolation.
+
+### Stage 5 root/raw Host registry-boundary redesign
+
+Status: Accepted
+
+Three independent latest-text reviewers returned `ACCEPT`. The one semantic
+correction added the exact bridge signature, the refresh-recorded-absence
+generation row, private-until-projection API ownership, normalized Host key
+identities/policy equality, and typed root-error propagation through both
+preparation boundaries. A final mechanical correction made the future-file
+call-site scan executable after every serial packet.
+
+#### Corrected boundary
+
+Retain the dormant parallel Host spine and the Bazel 9.2 root/include stops
+recorded above. Correct only the failed registry boundary: first extract one
+policy-input-only remote bridge inside `registry_dice.rs`, then let an isolated
+`host_registry.rs` consume it. The bridge receives already-complete lockfile
+mode and visible-lockfile inputs. It never computes a registry policy/file,
+root-module, or workspace snapshot key.
+
+The installed `RegistryIoHandle`, `RemotePolicy`, raw fetch/generation helpers,
+and legacy `RegistryPolicy` fields remain private to `registry_dice.rs`.
+`RegistryFileKey::compute_remote` continues to compute the legacy policy, then
+calls the bridge and exhaustively maps the new remote-only error back to the
+unchanged `RegistryFileError`. The Host remote branch calls the same bridge
+only after a complete Host policy. The Host local branch never touches the
+bridge, registry IO, or request generation.
+
+Packets 1–5 add no public surface. Every new Host key, value, and error remains
+crate-private while dormant. A separate accepted API-design packet must freeze
+the public typed projection required by `ModuleSourcePreparationError` and
+`RepositoryMaterializationError` before source preparation switches.
+
+#### Exact remote bridge
+
+`WP-5-m1-registry-remote-bridge` edits exactly
+`app/slug_bzlmod_v2/src/registry_dice.rs`. It adds:
+
+- crate-private `RootModuleRegistryUrls::urls`;
+- crate-private `RegistryRemoteError`; and
+- exactly:
+
+  ```rust
+  pub(crate) async fn read_remote_registry_file(
+      ctx: &mut DiceComputations<'_>,
+      workspace: &Path,
+      url: &RegistryFileUrl,
+      mode: &LockfileMode,
+      visible_lockfile: &VisibleLockfileRead,
+  ) -> Result<RegistryFileValue, RegistryRemoteError>
+  ```
+
+The bridge returns `Result<RegistryFileValue, RegistryRemoteError>`.
+`RegistryRemoteError` has exactly:
+
+- `MissingRequestGeneration { workspace: PathBuf, url: RegistryFileUrl,
+  message: CompactString }`;
+- `MissingIoCapability { url: RegistryFileUrl }`;
+- `MissingChecksumInError { url: RegistryFileUrl }`;
+- `InvalidLockfileExpectation { url: RegistryFileUrl,
+  message: CompactString }`;
+- `Transport { url: RegistryFileUrl, message: CompactString }`; and
+- `ChecksumMismatch { url: RegistryFileUrl, expected: [u8; 32],
+  actual: [u8; 32] }`.
+
+It contains no legacy error, root, local-file, policy-input, or Need variant.
+The legacy exhaustive mapping preserves its existing public enum and results.
+The dependency matrix remains exact:
+
+- Off, update/refresh unrecorded, and refresh recorded absence acquire
+  generation before IO;
+- update/error recorded absence performs neither generation nor IO;
+- error unrecorded returns missing-checksum without either;
+- recorded SHA reads first, acquires generation only after 404 or transport
+  failure, and gives verified success and checksum mismatch no generation
+  edge.
+
+The unchanged full `tests/registry_dice.rs` suite is the focused regression,
+especially
+`registry_policy_matches_lockfile_mode_matrix_before_io`,
+`unrecorded_remote_outcomes_retry_only_after_generation_changes`,
+`known_sha_failure_acquires_generation_but_verified_success_drops_it`,
+`known_sha_transport_failure_retries_after_generation_changes`,
+`checksum_mismatch_is_typed_and_stable_for_the_same_expectation`, and
+`remote_io_fails_closed_when_required_inputs_or_capability_are_missing`.
+This is a private extraction over already discriminating tests; do not add a
+duplicate matrix fixture.
+
+#### Corrected serial implementation
+
+1. Implement only `WP-5-m1-registry-remote-bridge` as specified above.
+
+2. `WP-5-m1-bzlmod-private-host-raw-byte-projection` edits only new
+   `app/slug_bzlmod_v2/src/host_file.rs` and
+   `app/slug_bzlmod_v2/src/lib.rs`. Add only a private module, key, value, and
+   `HostFileError`; reexport none of them. The normalized absolute logical Host
+   path computes `ResolvedPathKey`, accepts regular or special, follows
+   symlinks, returns semantic Missing, rejects Directory, and demands exact
+   real-path bytes.
+   Tests
+   `host_file_bytes_cumulative_projection_accepts_bazel_file_kinds` and
+   `host_file_bytes_semantic_lifecycle_prunes_physical_identity_and_restores`
+   prove cumulative demand, Need invalidity, raw bytes, typed terminals,
+   symlink retargeting, and A→B→Missing→error→A on one retained engine.
+
+3. `WP-5-m1-host-root-module-parity-prerequisites-design` freezes retained
+   Bazel 9.2 oracle rows, exact allowlists, and exact tests for two separately
+   reviewable implementation owners:
+   `WP-5-m1-root-module-missing-create-warning-owner` and
+   `WP-5-m1-root-include-package-validation-owner`. Host root keys
+   cannot start until both implementation commits have terminal `ACCEPT`,
+   same-daemon create/edit/delete restoration, and zero owner TODOs. Design
+   acceptance alone is insufficient.
+
+4. `WP-5-m1-host-root-module-keys`, gated on both prerequisite commits, puts
+   the new implementation in `app/slug_bzlmod_v2/src/host_module.rs`; packet 3
+   owns any exact prerequisite bridge allowlist. `lib.rs` adds only the private
+   module declaration. Crate-private `HostRootModuleFilesKey`,
+   `HostRootModuleGraphKey`, and `HostRootModuleError` remain dormant; their
+   values are exactly
+   `PathOutcome<Arc<Result<RootModuleFiles, HostRootModuleError>>>` and
+   `PathOutcome<Arc<Result<RootModuleGraph, HostRootModuleError>>>`.
+   Private Host evaluation/visible-lockfile keys use the private byte leaf.
+   Same-level Needs union without forcing undiscovered descendants;
+   root/includes precede lockfile; Off requests no lockfile; typed event
+   batches preserve executed prefixes and explicit pre-evaluation empties.
+   Exact tests are
+   `host_root_module_cumulative_need_union_and_lifecycle`,
+   `host_root_module_missing_create_warning_owner_is_observed`,
+   `host_root_module_include_package_validation_precedes_bytes`, and
+   `host_root_module_lockfile_events_replay_a_b_a`.
+
+5. `WP-5-m1-host-registry-keys`, gated on packet 4, edits only new
+   `app/slug_bzlmod_v2/src/host_registry.rs` and the private module declaration
+   in `app/slug_bzlmod_v2/src/lib.rs`; it adds no reexport.
+   `HostRegistryPolicyKey`, `HostRegistryFileKey`, and
+   `HostRegistryPolicy`, `HostRegistryPolicyError`, and
+   `HostRegistryFileError` remain crate-private. Policy-key identity is exactly
+   one `NormalizedAbsolutePath` workspace; file-key identity is exactly that
+   workspace plus `RegistryFileUrl`. Both keys use `complete_eq` and
+   `is_complete`. Their values are exactly
+   `PathOutcome<Arc<Result<HostRegistryPolicy,
+   HostRegistryPolicyError>>>` and
+   `PathOutcome<Arc<Result<RegistryFileValue,
+   HostRegistryFileError>>>`.
+
+   `HostRegistryPolicy` has exactly `urls: RegistryUrls`,
+   `mode: RootModuleLockfileMode`, and
+   `visible_lockfile: VisibleLockfileRead`; derived equality compares all three
+   fields and no other root semantics. The separate direct Host-root edge is
+   retained only by the local file branch, never by remote.
+
+   Crate-private `HostRegistryPolicyError` has exactly
+   `RegistryUrlsInput { workspace: NormalizedAbsolutePath,
+   message: CompactString }`, `LockfileModeInput { workspace:
+   NormalizedAbsolutePath, message: CompactString }`,
+   `RootModuleCompute { workspace: NormalizedAbsolutePath,
+   message: CompactString }`, and
+   `RootModule(HostRootModuleError)`.
+
+   Crate-private `HostRegistryFileError` has exactly
+   `InvalidFileUrl { url }`, `UnsupportedUrl { url }`,
+   `PolicyCompute { workspace, message }`,
+   `Policy(HostRegistryPolicyError)`,
+   `RootModuleCompute { workspace, message }`,
+   `RootModule(HostRootModuleError)`,
+   `LocalFileCompute { logical_path, message }`,
+   `LocalFile(HostFileError)`, and
+   `Remote(RegistryRemoteError)`. Need enters no error variant.
+
+   The Host policy consumes only injected URLs/mode plus
+   `HostRootModuleFilesKey`. Remote waits for complete policy, then calls the
+   bridge. Local waits for policy, retains a direct typed Host-root semantic
+   edge, and maps private Host bytes Present/Missing/error/Need to
+   Found/LocalAbsence/typed error/the same Need, with no transport or
+   generation edge.
+
+   Inline tests are
+   `host_registry_policy_preserves_typed_input_root_and_lockfile_errors`,
+   `host_registry_policy_propagates_root_need_before_remote_io`,
+   `host_local_registry_has_no_transport_or_generation_dependency`,
+   `host_local_registry_cumulative_host_lifecycle_is_typed`,
+   `host_remote_registry_matches_legacy_policy_and_error_matrix`,
+   `host_remote_registry_preserves_generation_capability_transport_and_checksum_errors`,
+   `host_registry_file_replays_root_and_ordered_urls_a_b_a`, and
+   `host_registry_need_is_transient`.
+
+6. `WP-5-m1-source-preparation-host-error-api-design`, gated on packet 5, is
+   design only. It reads the implemented crate-private Host error schemas and
+   freezes the exact public, source-preparation-owned typed projections,
+   variant fields, equality, exports, implementation allowlist, and mapping
+   tests. At minimum it must reserve these exact public replacements:
+   `ModuleSourcePreparationError::RootModule(SourcePreparationRootError)`,
+   `RepositoryMaterializationError::RootModule(SourcePreparationRootError)`,
+   `ModuleSourcePreparationError::RegistryPolicy(
+   SourcePreparationRegistryPolicyError)`, and the existing structured
+   registry-file variant with its payload changed to
+   `SourcePreparationRegistryFileError`. It must prove no projection can hold
+   a legacy `RegistryFileError` or root error string. Packet 7 cannot start on
+   implementation readiness alone; this API design needs terminal `ACCEPT`.
+
+7. `WP-5-m1-source-preparation-host-switch`, gated on accepted packet 6, edits
+   only
+   `app/slug_bzlmod_v2/src/source_preparation.rs` and
+   `app/slug_bzlmod_v2/tests/source_preparation_dice.rs`, plus only the exact
+   projection reexports accepted for `app/slug_bzlmod_v2/src/lib.rs`. It
+   switches the callerless `ModuleSourcePreparationKey` to Host
+   root/policy/file keys and makes private
+   `RepositoryMaterializationRequestKey` a complete-only path outcome. Only it
+   and `RepositoryMaterializationKey` convert Need at their existing
+   `SourcePreparationOutcome::path_need` boundaries.
+
+   Exact new tests are
+   `root_host_need_precedes_materialization_and_registry_io`,
+   `nonregistry_root_need_propagates_through_materialization_request`,
+   `registry_host_needs_propagate_through_module_source_preparation`, and
+   `module_source_preparation_host_need_is_transient`, plus
+   `complete_host_root_error_remains_typed_through_materialization_and_preparation`.
+   Existing cumulative
+   local-source, ordered registry fallback/raw-byte, and root-patch ordering
+   tests remain. The public preparation errors use only the accepted
+   source-preparation-owned projections, not private Host errors.
+
+#### Exact unchanged baseline and gates
+
+Through packet 6, legacy policy callers remain
+`registry_dice.rs:315,373`, `source_preparation.rs:1228`, and
+`tests/registry_dice.rs:698`; legacy file callers remain
+`source_preparation.rs:1325`, `tests/registry_dice.rs:176,189`, and
+`app/slug_core_v2/src/runtime/dice.rs:4443`; public exports remain
+`lib.rs:173,180`. IO installers and request-input injectors remain unchanged.
+Packet 7 may replace exactly the four source-preparation edges currently at
+`:627,1172,1228,1325`; every other legacy consumer/export remains.
+
+After every implementation packet run focused owner tests, full bzlmod
+tests/doctests, downstream loading/core suites, GNU-Windows no-run for changed
+owners and downstream binaries, formatting, diff, archive, dependency, and
+exact-file gates.
+
+The bridge-body scan
+`sed -n '/^pub(crate) async fn read_remote_registry_file/,/^}/p' app/slug_bzlmod_v2/src/registry_dice.rs | rg -n '\b(RegistryPolicyKey|RegistryFileKey|RootModuleFilesKey|Workspace[A-Za-z]*Key)\b'`
+returns zero. Its error-schema scan
+`sed -n '/^pub(crate) enum RegistryRemoteError/,/^}/p' app/slug_bzlmod_v2/src/registry_dice.rs | rg -n '\b(RootModule|Local|RegistryFileError|PathOutcome)\b'`
+returns zero. This visibility scan
+`rg -n 'pub\(crate\).*(RegistryIoHandle|RemotePolicy)|pub (struct|enum) (RegistryIoHandle|RemotePolicy)' app/slug_bzlmod_v2/src/registry_dice.rs`
+returns zero.
+
+The Host registry scan
+`rg -n '\b(RegistryPolicyKey|RegistryFileKey|RootModuleFilesKey|Workspace[A-Za-z]*Key|RegistryFileError|RegistryIo|RegistryIoHandle|RegistryRequestGenerationKey|read_exact|std::fs|tokio::fs)\b' app/slug_bzlmod_v2/src/host_registry.rs`
+returns zero. The Host activation scan
+`rg -n '\b(HostRootModuleFilesKey|HostRootModuleGraphKey|HostRegistryPolicyKey|HostRegistryFileKey)\b' app/slug_loading_v2 app/slug_core_v2 app/slug_analysis_v2 app/slug_query_v2`
+returns zero through packet 7.
+
+The bridge call-site scan
+`rg -n '\bread_remote_registry_file\(' app/slug_bzlmod_v2/src -g 'registry_dice.rs' -g 'host_registry.rs'`
+returns exactly its definition plus one legacy caller after packet 1, and its
+definition plus one legacy and one Host caller after packet 5. The legacy
+baseline command
+`rg -n '\b(RegistryPolicyKey|RegistryFileKey|install_registry_io|inject_registry_request_inputs|RegistryRequestGenerationKey|RootModuleRegistryUrlsKey)\b' app/slug_bzlmod_v2 app/slug_core_v2`
+is compared with the inventory above after each packet.
+
+After packet 7, both switched compute implementations pass this structural
+scan:
+`sed -n '/impl Key for RepositoryMaterializationRequestKey/,/^}/p; /impl Key for ModuleSourcePreparationKey/,/^}/p' app/slug_bzlmod_v2/src/source_preparation.rs | rg -n 'RootModuleFiles\(|RegistryFileError|CompactString::new\(error.to_string\(\)\)'`
+with zero matches. The four named source-preparation edge removals and the
+complete-root-error propagation test are mandatory together.
+
+Stop and replan on public key/transport-capability widening, legacy result or
+generation-order change, direct local IO, local generation dependency,
+terminalized Need, special-file rejection, production activation, nonroot
+discovery, loading/core/analysis/query edits, root/include work before both
+prerequisite owners are accepted, new dependency, cache, map, or lock.
+
+Next evidence after terminal acceptance: Implement only
+`WP-5-m1-registry-remote-bridge`.
