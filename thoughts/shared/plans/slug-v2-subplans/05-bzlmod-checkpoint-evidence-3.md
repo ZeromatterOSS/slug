@@ -4825,6 +4825,57 @@ Next evidence: Terminally rereview only
 `WP-5-m1-bazel-lockfile-v28-schema-oracle-bcr-provenance-correction` before
 resuming the preserved draft.
 
+##### Lockfile v28 schema oracle scaffold-classification status
+
+**Status:** Replan before retained fixture evidence on 2026-07-26.
+
+The first successful real BCR-backed generation disproved the corrected
+packet's universal companion rule. Its diagnostic visible lockfile contains
+500 registry entries: 156 BCR `modules/<name>/<version>/MODULE.bazel`
+successes with exactly two same-path loopback `"not found"` entries each; 27
+BCR `source.json` successes with no loopback companions; one BCR
+`bazel_registry.json`; one checked loopback registry descriptor; and three
+exact subject entries. This follows Bazel's separate owners: module discovery
+tries the ordered registry list, while `RepoSpecFunction` fetches
+`source.json` directly from the registry retained on the selected module.
+
+All 184 BCR URL/hash pairs exactly equal pinned commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`'s
+`src/test/tools/bzlmod/MODULE.bazel.lock`; the earlier 175-match result came
+from comparing a working-tree file rather than the pinned object. The
+two-command generated `expected/oracle.json`, visible lockfile, and target
+trees are diagnostic only. No semantic mutation row, fresh replay, tracked
+fixture, Rust, Cargo, harness, public API, or activation is accepted.
+
+Correct only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-scaffold-classification-correction`:
+
+- require exact set and value equality between every BCR entry and the pinned
+  tools lockfile, without a copied checker, lockfile, or handwritten module
+  list;
+- partition the remaining URLs exactly: each BCR `MODULE.bazel` entry has the
+  `/missing` and `/registry` same-path `"not found"` entries; BCR
+  `source.json` entries have neither; the BCR descriptor has no loopback-miss
+  claim; the checked loopback descriptor equals its fixture bytes; and the
+  only subject entries are `/missing/.../MODULE.bazel = "not found"` plus
+  checked `/registry/.../{MODULE.bazel,source.json}` hashes;
+- reject every unclassified registry URL, BCR hash mismatch, loopback success
+  mismatch, missing/extra class member, unexpected source companion, or
+  nonembedded user module on BCR. Counts are compact diagnostics; set equality
+  is the acceptance rule;
+- retain the whole-file manifest while anchoring every semantic assertion and
+  mutation to the complete subject URL or root extension ID. Never mutate a
+  generic hash, suffix, `"not found"`, `MODULE.bazel`, or `source.json`;
+- preserve subject-filtered request evidence and remove every synthetic-server
+  behavior. Fold the separate lockfile-print probe into the canonical
+  rewrite/foreign-factor row so the exact baseline, rewrite, DIRTREE stale and
+  replacement, adapter, and final three uncaught-hole sequence stays within
+  15 commands.
+
+All prior twelve-file, no-harness, 2,500-line, generated-versus-injected
+DIRTREE, replay, archive, diff, and exception-order gates remain exact.
+Terminally rereview this correction before resuming the held ignored draft.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only

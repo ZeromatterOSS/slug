@@ -33,25 +33,30 @@ advances the **Current packet**, not an older `next` paragraph.
 
 Latest M1 accepted evidence: exact Bazel 9.2.0 source, live consumer, and
 orchestration-policy audits froze the complete lockfile-v28 semantic owner
-sequence. Oracle generation remains stopped before retained evidence: after
-the DIRTREE correction, the frozen local registry could not serve Bazel's
-embedded rules-module closure, and source rereview proved its BCR hashes enter
-the exact lockfile manifest. Ground that scaffold in Bazel's pinned tools
-lockfile and remove the unaccepted synthetic-server draft before resuming. No
-Rust, Cargo, harness, public API, or activation changed.
+sequence. Oracle generation remains stopped before retained evidence. The
+first real BCR-backed generation disproved the overbroad two-loopback-misses
+rule: its diagnostic 500-entry manifest has 156 BCR `MODULE.bazel` successes
+with two misses each, 27 BCR-only `source.json` successes, one BCR descriptor,
+one loopback descriptor, and three exact subject entries. All 184 BCR hashes
+match Bazel's pinned tools lockfile. Correct the scaffold by URL class before
+resuming the ignored two-row diagnostic draft. No Rust, Cargo, harness, public
+API, or activation changed.
 
 ### Current packet
 
 Design-correct only
-`WP-5-m1-bazel-lockfile-v28-schema-oracle-bcr-provenance-correction`.
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-scaffold-classification-correction`.
 
 Preserve the exact twelve-file/no-harness boundary, 15-row cap, and corrected
-DIRTREE evidence. Match every retained BCR scaffold hash against Bazel 9.2's
-pinned tools lockfile and require the two paired loopback recorded-absence
-entries for the same closure suffix. Exclude the unique subject suffix from
-that scaffold; every semantic mutation and behavior assertion targets the
-subject/root-extension fields. Remove the synthetic server modules and
-rereview before resuming the draft.
+DIRTREE evidence. Match all 184 BCR scaffold hashes against Bazel 9.2's pinned
+tools lockfile. Require paired loopback recorded absences only for the 156 BCR
+`MODULE.bazel` discovery entries; require the 27 selected-registry
+`source.json` entries and BCR descriptor to have no invented companions.
+Classify the checked loopback descriptor and three exact subject entries
+separately, reject every unclassified URL, and keep every semantic mutation
+and behavior assertion on fully anchored subject/root-extension fields. Fold
+the separate print probe into the rewrite row to preserve the 15-row cap,
+then terminally rereview before resuming the draft.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
