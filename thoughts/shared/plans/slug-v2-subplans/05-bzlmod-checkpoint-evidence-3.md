@@ -3738,3 +3738,49 @@ ran and no bzlmod implementation began.
 Next evidence: Implement only
 `WP-5-m1-root-package-policy-input-owner-correction` in the corrected six-file
 allowlist.
+
+### Stage 5 normalized root package-policy input owner
+
+Status: Accepted
+
+The corrected six-file packet adds exact Bazel
+`PackageIdentifier.parse` ownership without changing Slug's established
+public repository or package-path grammars. A crate-private literal
+repository constructor accepts Bazel's ASCII `[A-Za-z0-9_.+-]*` domain except
+exact `.`/`..`; the package parser rejects targets, preserves literal
+single-`@` and double-`@@` nonmain identity without mapping, canonicalizes all
+main spellings, applies Bazel's printable-ASCII package validation, and
+strips only a terminal exact `...` component.
+
+The public normalized policy value retains one exact workspace, ordered and
+duplicate-preserving `Arc<[NormalizedAbsolutePath]>` roots, a direct compact
+`SmallSet<PackageIdentifier>` of structurally deduplicated repeated/comma
+deleted-package occurrences, an optional contained or outside absolute vendor
+directory, and exact Off/Warning/Error REPO UTF-8 semantics. Missing mode
+defaults to Warning; case-insensitive enum values and Bazel's complete
+boolean shorthand map to Error/Off exactly.
+
+One private normalized-workspace injected key owns the complete Arc-retained
+value. The public injection helper stages it in one `changed_to` operation.
+Three public opaque workspace keys compute that owner through
+`compute_opaque` and private `ProjectionKey`s, exposing only semantics,
+roots/vendor, or roots/deleted packages. Their equality compares all and only
+projected fields, so equal injection reuses, deleted-, semantics-, and
+vendor-only changes replay only their consumer, root changes replay both
+root consumers, and A→B→A restores exact A. All three fail closed with a
+typed workspace-specific missing-input result; independently injected
+workspaces do not alias.
+
+Validation passed all 15 identity tests, 241 bzlmod tests, 54 loading tests,
+98 core unit plus 13 integration tests, and zero doctests. Every
+identity/bzlmod/loading/core GNU-Windows test executable linked. Formatting,
+archive, diff, exact six-file allowlist, dependency, private-injected-key,
+no-consumer, no-filesystem, no-raw-path, and compact-collection gates passed.
+The only validation correction separated the missing-injection proof from a
+fresh two-workspace DICE graph because DICE memoizes a requested absent
+injected key; production code was unchanged. All three terminal source,
+implementation/evidence, and architecture/hot-path reviews returned
+`ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-neutral-diagnostic-event-contract`.

@@ -42,20 +42,14 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-root-package-policy-input-owner-correction`.
+`WP-5-m1-neutral-diagnostic-event-contract`.
 
-Add Bazel package-identifier parsing and the complete normalized root
-package-policy request/input owner in the corrected six-file allowlist. The
-sole correction adds `slug_identity_v2/src/repo.rs` for a crate-private
-package-parser-only Bazel repository-name constructor; existing label,
-repository-mapping, and public repository constructors remain unchanged.
-Preserve supplied package-root order, compact canonical deleted packages,
-optional absolute vendor directory, and exact REPO UTF-8 Off/Warning/Error
-normalization with A→B→A equality. Pin missing injection, all exact Bazel
-main/nonmain package spellings and validation, duplicate expansion, empty
-roots, and workspace-keyed request identity. Do not parse raw
-package-path/client-cwd spelling, inspect the filesystem, evaluate REPO, or
-add a consumer.
+Add only the neutral warning/error diagnostic event variant beside the
+accepted Starlark-print event in `app/slug_events_v2/src/lib.rs`. Preserve
+ordinary event `Clone`, batch-only `Dupe`, structural ordered equality, exact
+UTF-8/newline text, mixed print/diagnostic order, and shared batch storage.
+Add no producer, DICE key, policy, output, retry, REPO evaluator, bootstrap
+publication, or other activation edge.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

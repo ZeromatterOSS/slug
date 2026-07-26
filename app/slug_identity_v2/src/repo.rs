@@ -46,6 +46,26 @@ impl CanonicalRepoName {
     pub fn is_root(&self) -> bool {
         self.0.is_empty()
     }
+
+    pub(crate) fn new_for_bazel_package_identifier(name: &str) -> Result<Self, String> {
+        if name.is_empty() {
+            return Ok(Self::root());
+        }
+        if matches!(name, "." | "..") {
+            return Err(format!(
+                "invalid repository name {name:?}: repo names are not allowed to be {name:?}"
+            ));
+        }
+        if !name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.' | b'+'))
+        {
+            return Err(format!(
+                "invalid repository name {name:?}: repo names may contain only A-Z, a-z, 0-9, '-', '_', '.' and '+'"
+            ));
+        }
+        Ok(Self(name.to_owned()))
+    }
 }
 
 impl ApparentRepoName {

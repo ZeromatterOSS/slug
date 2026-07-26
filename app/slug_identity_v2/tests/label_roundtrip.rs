@@ -7,10 +7,132 @@ use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::PackageIdentifier;
+use slug_identity_v2::PackagePath;
 use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
 use slug_identity_v2::TargetName;
 use slug_identity_v2::serialization::StableSerialize;
+
+#[test]
+fn bazel_package_identifier_spellings_canonicalize_main_and_literal_repositories() {
+    let main = PackageIdentifier::new(
+        CanonicalRepoName::root(),
+        PackagePath::parse("pkg/sub").unwrap(),
+    );
+    for spelling in ["pkg/sub", "//pkg/sub", "@//pkg/sub", "@@//pkg/sub"] {
+        assert_eq!(
+            PackageIdentifier::parse_bazel_package_identifier(spelling).unwrap(),
+            main,
+            "{spelling}"
+        );
+    }
+
+    let apparent_literal =
+        PackageIdentifier::parse_bazel_package_identifier("@.literal.repo+.//pkg/sub").unwrap();
+    let canonical_literal =
+        PackageIdentifier::parse_bazel_package_identifier("@@.literal.repo+.//pkg/sub").unwrap();
+    assert_eq!(apparent_literal, canonical_literal);
+    let hash = |package: &PackageIdentifier| {
+        let mut hasher = DefaultHasher::new();
+        package.hash(&mut hasher);
+        hasher.finish()
+    };
+    assert_eq!(hash(&apparent_literal), hash(&canonical_literal));
+    assert_eq!(apparent_literal.to_string(), "@@.literal.repo+.//pkg/sub");
+    assert_eq!(apparent_literal.repo().as_str(), ".literal.repo+.");
+    assert_eq!(apparent_literal.package().as_str(), "pkg/sub");
+    for repo in [".repo", "repo.", "..repo", "repo..", "foo+bar"] {
+        let parsed =
+            PackageIdentifier::parse_bazel_package_identifier(&format!("@{repo}//pkg")).unwrap();
+        assert_eq!(parsed.repo().as_str(), repo);
+    }
+
+    let root = PackageIdentifier::new(CanonicalRepoName::root(), PackagePath::root());
+    for spelling in ["", "//", "@//", "@@//"] {
+        assert_eq!(
+            PackageIdentifier::parse_bazel_package_identifier(spelling).unwrap(),
+            root,
+            "{spelling:?}"
+        );
+    }
+}
+
+#[test]
+fn bazel_package_identifier_rejects_targets_and_invalid_repository_spellings() {
+    for spelling in [
+        "pkg:target",
+        "//pkg:target",
+        "@repo//pkg:target",
+        "@@repo//pkg:target",
+        "@repo",
+        "@@repo",
+        "@.//pkg",
+        "@..//pkg",
+        "@repo~name//pkg",
+        "@repo@name//pkg",
+        "@repo/name//pkg",
+        "@répo//pkg",
+        "@repo\u{1}//pkg",
+        "@bad!//pkg",
+    ] {
+        assert!(
+            PackageIdentifier::parse_bazel_package_identifier(spelling).is_err(),
+            "{spelling}"
+        );
+    }
+}
+
+#[test]
+fn bazel_package_identifier_uses_package_specific_ascii_and_component_validation() {
+    for package in [
+        "pkg",
+        "pkg/sub",
+        " !\"#$%&'()*+,-.;<=>?@[]^_`{|}~ ",
+        "pkg/...suffix",
+    ] {
+        let parsed = PackageIdentifier::parse_bazel_package_identifier(package).unwrap();
+        assert_eq!(parsed.package().as_str(), package);
+    }
+
+    for package in [
+        "/pkg",
+        "pkg/",
+        "pkg//sub",
+        ".",
+        "..",
+        "....",
+        "pkg/.",
+        "pkg/..",
+        "pkg/....",
+        "pkg/.../sub",
+        "pkg/.../...",
+        "pkg\\sub",
+        "pkg:target",
+        "pkg\u{1}",
+        "pkg\u{7f}",
+        "pkg/é",
+    ] {
+        assert!(
+            PackageIdentifier::parse_bazel_package_identifier(package).is_err(),
+            "{package:?}"
+        );
+    }
+}
+
+#[test]
+fn bazel_package_identifier_strips_only_a_terminal_exact_triple_dot_component() {
+    for (spelling, expected_repo, expected_package) in [
+        ("...", "", ""),
+        ("pkg/...", "", "pkg"),
+        ("@repo//...", "repo", ""),
+        ("@@repo//pkg/...", "repo", "pkg"),
+    ] {
+        let parsed = PackageIdentifier::parse_bazel_package_identifier(spelling).unwrap();
+        assert_eq!(parsed.repo().as_str(), expected_repo, "{spelling}");
+        assert_eq!(parsed.package().as_str(), expected_package, "{spelling}");
+    }
+}
 
 #[test]
 fn apparent_labels_roundtrip_many_examples() {

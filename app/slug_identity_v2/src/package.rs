@@ -134,6 +134,34 @@ impl PackageIdentifier {
         Self { repo, package }
     }
 
+    /// Parses Bazel's package-identifier spelling without repository mapping.
+    ///
+    /// This matches `PackageIdentifier.parse`: unqualified and explicit-main
+    /// spellings identify the main repository, while both one- and two-`@`
+    /// nonmain spellings use the literal repository name.
+    pub fn parse_bazel_package_identifier(value: &str) -> Result<Self, String> {
+        if value.contains(':') {
+            return Err(format!(
+                "invalid package identifier {value:?}: contains ':'"
+            ));
+        }
+
+        let (repo, package) = if let Some(rest) = value.strip_prefix("@@") {
+            parse_repository_package(value, rest)?
+        } else if let Some(rest) = value.strip_prefix('@') {
+            parse_repository_package(value, rest)?
+        } else if let Some(package) = value.strip_prefix("//") {
+            (CanonicalRepoName::root(), package)
+        } else {
+            (CanonicalRepoName::root(), value)
+        };
+        let package = package
+            .strip_suffix("/...")
+            .or_else(|| (package == "...").then_some(""))
+            .unwrap_or(package);
+        Ok(Self::new(repo, parse_bazel_package_path(package)?))
+    }
+
     pub fn repo(&self) -> &CanonicalRepoName {
         &self.repo
     }
@@ -141,6 +169,53 @@ impl PackageIdentifier {
     pub fn package(&self) -> &PackagePath {
         &self.package
     }
+}
+
+fn parse_repository_package<'a>(
+    original: &str,
+    rest: &'a str,
+) -> Result<(CanonicalRepoName, &'a str), String> {
+    let Some((repo, package)) = rest.split_once("//") else {
+        return Err(format!(
+            "invalid package identifier {original:?}: repository spelling must contain //"
+        ));
+    };
+    let repo = if repo.is_empty() {
+        CanonicalRepoName::root()
+    } else {
+        CanonicalRepoName::new_for_bazel_package_identifier(repo)?
+    };
+    Ok((repo, package))
+}
+
+fn parse_bazel_package_path(value: &str) -> Result<PackagePath, String> {
+    if value.is_empty() {
+        return Ok(PackagePath::root());
+    }
+    if value.starts_with('/') {
+        return Err("package names may not start with '/'".to_owned());
+    }
+    if !value
+        .bytes()
+        .all(|byte| (b' '..=b'~').contains(&byte) && !matches!(byte, b':' | b'\\'))
+    {
+        return Err(
+            "package names may contain only printable ASCII except ':' and '\\'".to_owned(),
+        );
+    }
+    if value.ends_with('/') {
+        return Err("package names may not end with '/'".to_owned());
+    }
+    if value.contains("//") {
+        return Err("package names may not contain '//' path separators".to_owned());
+    }
+    if value
+        .split('/')
+        .any(|component| component.bytes().all(|byte| byte == b'.'))
+    {
+        return Err("package name component contains only '.' characters".to_owned());
+    }
+    Ok(PackagePath(value.to_owned()))
 }
 
 impl fmt::Display for PackagePath {

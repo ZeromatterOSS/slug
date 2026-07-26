@@ -9,7 +9,22 @@
  */
 
 use std::collections::BTreeMap;
+use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
+use allocative::Allocative;
+use async_trait::async_trait;
+use dice::DetectCycles;
+use dice::Dice;
+use dice::DiceComputations;
+use dice::DiceTransaction;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodDiceInputs;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
@@ -26,6 +41,12 @@ use slug_bzlmod_v2::BzlmodVisibleLockfileDigest;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::ModuleKey;
 use slug_bzlmod_v2::ResolvedBzlmodGraphDiceKey;
+use slug_bzlmod_v2::RootPackageLookupInputsProjectionKey;
+use slug_bzlmod_v2::RootPackagePolicyInputs;
+use slug_bzlmod_v2::RootPackagePolicyProjectionError;
+use slug_bzlmod_v2::RootRepoFileSemanticsProjectionKey;
+use slug_bzlmod_v2::RootRepoFileUtf8Mode;
+use slug_bzlmod_v2::RootRepositoryIgnoreInputsProjectionKey;
 use slug_bzlmod_v2::YankedVersionPolicy;
 use slug_bzlmod_v2::digest_generated_repo_specs;
 use slug_bzlmod_v2::digest_included_module_files;
@@ -37,6 +58,9 @@ use slug_bzlmod_v2::digest_registry_policy;
 use slug_bzlmod_v2::digest_registry_source_specs;
 use slug_bzlmod_v2::digest_repo_mapping_entries;
 use slug_bzlmod_v2::digest_repo_mappings;
+use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_identity_v2::PackageIdentifier;
+use slug_workspace_v2::NormalizedAbsolutePath;
 
 fn registry_policy_digest() -> String {
     digest_registry_policy([BzlmodRegistryPolicyEntry::new(
@@ -1238,4 +1262,431 @@ fn dice_inputs_reject_empty_or_unstable_digests() {
     )
     .unwrap_err();
     assert!(bad.contains("invalid root_module_digest"));
+}
+
+fn normalized_path(value: &str) -> NormalizedAbsolutePath {
+    NormalizedAbsolutePath::new(value).unwrap()
+}
+
+fn root_package_policy_inputs(
+    workspace: &NormalizedAbsolutePath,
+    package_roots: &[&str],
+    deleted_packages: &[&str],
+    vendor_directory: Option<&str>,
+    utf8_mode: Option<&str>,
+) -> RootPackagePolicyInputs {
+    RootPackagePolicyInputs::new(
+        workspace.dupe(),
+        package_roots
+            .iter()
+            .map(|path| normalized_path(path))
+            .collect::<Vec<_>>(),
+        deleted_packages.iter().copied(),
+        vendor_directory.map(normalized_path),
+        utf8_mode,
+    )
+    .unwrap()
+}
+
+#[test]
+fn root_package_policy_normalizes_bazel_flags_without_inventing_package_roots() {
+    let workspace = normalized_path("/work/root");
+    let inputs = root_package_policy_inputs(
+        &workspace,
+        &["/roots/second", "/roots/first", "/roots/second"],
+        &["", "pkg,,//pkg,", "@repo//x,@@repo//x"],
+        Some("/outside/vendor"),
+        None,
+    );
+
+    assert_eq!(inputs.workspace(), &workspace);
+    assert_eq!(
+        inputs.package_roots(),
+        &[
+            normalized_path("/roots/second"),
+            normalized_path("/roots/first"),
+            normalized_path("/roots/second"),
+        ]
+    );
+    assert_eq!(
+        inputs.repo_file_semantics().utf8_mode,
+        RootRepoFileUtf8Mode::Warning
+    );
+    assert_eq!(
+        inputs.vendor_directory(),
+        Some(&normalized_path("/outside/vendor"))
+    );
+    assert_eq!(inputs.deleted_packages().len(), 3);
+    for package in ["", "pkg", "@repo//x"] {
+        assert!(
+            inputs
+                .deleted_packages()
+                .contains(&PackageIdentifier::parse_bazel_package_identifier(package).unwrap()),
+            "{package:?}"
+        );
+    }
+
+    let empty = root_package_policy_inputs(&workspace, &[], &[], None, Some("warning"));
+    assert!(empty.package_roots().is_empty());
+    assert!(empty.deleted_packages().is_empty());
+    assert_eq!(empty.vendor_directory(), None);
+
+    let contained_vendor =
+        root_package_policy_inputs(&workspace, &[], &[], Some("/work/root/vendor"), None);
+    assert_eq!(
+        contained_vendor.vendor_directory(),
+        Some(&normalized_path("/work/root/vendor"))
+    );
+}
+
+#[test]
+fn root_repo_file_utf8_mode_matches_bazel_bool_or_enum_conversion() {
+    for (value, expected) in [
+        ("off", RootRepoFileUtf8Mode::Off),
+        ("OFF", RootRepoFileUtf8Mode::Off),
+        ("warning", RootRepoFileUtf8Mode::Warning),
+        ("WaRnInG", RootRepoFileUtf8Mode::Warning),
+        ("error", RootRepoFileUtf8Mode::Error),
+        ("ERROR", RootRepoFileUtf8Mode::Error),
+        ("true", RootRepoFileUtf8Mode::Error),
+        ("TRUE", RootRepoFileUtf8Mode::Error),
+        ("1", RootRepoFileUtf8Mode::Error),
+        ("yes", RootRepoFileUtf8Mode::Error),
+        ("t", RootRepoFileUtf8Mode::Error),
+        ("y", RootRepoFileUtf8Mode::Error),
+        ("false", RootRepoFileUtf8Mode::Off),
+        ("FALSE", RootRepoFileUtf8Mode::Off),
+        ("0", RootRepoFileUtf8Mode::Off),
+        ("no", RootRepoFileUtf8Mode::Off),
+        ("f", RootRepoFileUtf8Mode::Off),
+        ("n", RootRepoFileUtf8Mode::Off),
+    ] {
+        assert_eq!(
+            RootRepoFileUtf8Mode::from_bazel_flag_value(value).unwrap(),
+            expected,
+            "{value}"
+        );
+    }
+    for value in ["", "warn", "on", "2", " error "] {
+        assert!(
+            RootRepoFileUtf8Mode::from_bazel_flag_value(value).is_err(),
+            "{value:?}"
+        );
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+enum RootPackagePolicyProjectionKind {
+    Semantics,
+    RepositoryIgnore,
+    PackageLookup,
+}
+
+#[derive(Debug, Clone, Allocative, Dupe)]
+struct RootPackagePolicyProjectionCounterKey {
+    workspace: NormalizedAbsolutePath,
+    kind: RootPackagePolicyProjectionKind,
+    #[allocative(skip)]
+    counter: Arc<AtomicUsize>,
+}
+
+impl PartialEq for RootPackagePolicyProjectionCounterKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.workspace == other.workspace
+            && self.kind == other.kind
+            && Arc::ptr_eq(&self.counter, &other.counter)
+    }
+}
+
+impl Eq for RootPackagePolicyProjectionCounterKey {}
+
+impl Hash for RootPackagePolicyProjectionCounterKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.workspace.hash(state);
+        self.kind.hash(state);
+        Arc::as_ptr(&self.counter).hash(state);
+    }
+}
+
+impl fmt::Display for RootPackagePolicyProjectionCounterKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "root-package-policy-projection-counter:{:?}:{}:{:p}",
+            self.kind,
+            self.workspace,
+            Arc::as_ptr(&self.counter)
+        )
+    }
+}
+
+#[async_trait]
+impl Key for RootPackagePolicyProjectionCounterKey {
+    type Value = Result<usize, RootPackagePolicyProjectionError>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let projected = match self.kind {
+            RootPackagePolicyProjectionKind::Semantics => ctx
+                .compute(&RootRepoFileSemanticsProjectionKey::new(
+                    self.workspace.dupe(),
+                ))
+                .await
+                .unwrap()
+                .map(|_| ()),
+            RootPackagePolicyProjectionKind::RepositoryIgnore => ctx
+                .compute(&RootRepositoryIgnoreInputsProjectionKey::new(
+                    self.workspace.dupe(),
+                ))
+                .await
+                .unwrap()
+                .map(|_| ()),
+            RootPackagePolicyProjectionKind::PackageLookup => ctx
+                .compute(&RootPackageLookupInputsProjectionKey::new(
+                    self.workspace.dupe(),
+                ))
+                .await
+                .unwrap()
+                .map(|_| ()),
+        };
+        projected.map(|()| self.counter.fetch_add(1, Ordering::SeqCst) + 1)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+async fn reinject_root_package_policy(
+    transaction: DiceTransaction,
+    inputs: RootPackagePolicyInputs,
+) -> DiceTransaction {
+    let mut updater = transaction.into_updater();
+    inject_root_package_policy_inputs(&mut updater, inputs).unwrap();
+    updater.commit().await
+}
+
+#[tokio::test]
+async fn root_package_policy_keys_are_workspace_scoped_and_missing_inputs_fail_closed() {
+    let workspace_a = normalized_path("/work/a");
+    let workspace_b = normalized_path("/work/b");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        root_package_policy_inputs(
+            &workspace_a,
+            &["/roots/a"],
+            &["a"],
+            Some("/vendor/a"),
+            Some("warning"),
+        ),
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+
+    let semantics_a = transaction
+        .compute(&RootRepoFileSemanticsProjectionKey::new(workspace_a.dupe()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(semantics_a.utf8_mode, RootRepoFileUtf8Mode::Warning);
+    assert_eq!(
+        transaction
+            .compute(&RootRepoFileSemanticsProjectionKey::new(workspace_b.dupe()))
+            .await
+            .unwrap(),
+        Err(RootPackagePolicyProjectionError::MissingInput {
+            workspace: workspace_b.dupe(),
+        })
+    );
+    assert_eq!(
+        transaction
+            .compute(&RootRepositoryIgnoreInputsProjectionKey::new(
+                workspace_b.dupe()
+            ))
+            .await
+            .unwrap(),
+        Err(RootPackagePolicyProjectionError::MissingInput {
+            workspace: workspace_b.dupe(),
+        })
+    );
+    assert_eq!(
+        transaction
+            .compute(&RootPackageLookupInputsProjectionKey::new(
+                workspace_b.dupe()
+            ))
+            .await
+            .unwrap(),
+        Err(RootPackagePolicyProjectionError::MissingInput {
+            workspace: workspace_b.dupe(),
+        })
+    );
+
+    let two_workspace_dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = two_workspace_dice.updater();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        root_package_policy_inputs(
+            &workspace_a,
+            &["/roots/a"],
+            &["a"],
+            Some("/vendor/a"),
+            Some("warning"),
+        ),
+    )
+    .unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        root_package_policy_inputs(
+            &workspace_b,
+            &["/roots/b"],
+            &["b"],
+            Some("/vendor/b"),
+            Some("error"),
+        ),
+    )
+    .unwrap();
+    transaction = updater.commit().await;
+    assert_eq!(
+        transaction
+            .compute(&RootRepoFileSemanticsProjectionKey::new(workspace_a.dupe()))
+            .await
+            .unwrap()
+            .unwrap(),
+        semantics_a
+    );
+    assert_eq!(
+        transaction
+            .compute(&RootRepoFileSemanticsProjectionKey::new(workspace_b))
+            .await
+            .unwrap()
+            .unwrap()
+            .utf8_mode,
+        RootRepoFileUtf8Mode::Error
+    );
+}
+
+#[tokio::test]
+async fn root_package_policy_projections_prune_unrelated_changes_and_restore_a() {
+    let workspace = normalized_path("/work/root");
+    let semantics_counter = Arc::new(AtomicUsize::new(0));
+    let ignore_counter = Arc::new(AtomicUsize::new(0));
+    let lookup_counter = Arc::new(AtomicUsize::new(0));
+    let semantics_key = RootPackagePolicyProjectionCounterKey {
+        workspace: workspace.dupe(),
+        kind: RootPackagePolicyProjectionKind::Semantics,
+        counter: semantics_counter.dupe(),
+    };
+    let ignore_key = RootPackagePolicyProjectionCounterKey {
+        workspace: workspace.dupe(),
+        kind: RootPackagePolicyProjectionKind::RepositoryIgnore,
+        counter: ignore_counter.dupe(),
+    };
+    let lookup_key = RootPackagePolicyProjectionCounterKey {
+        workspace: workspace.dupe(),
+        kind: RootPackagePolicyProjectionKind::PackageLookup,
+        counter: lookup_counter.dupe(),
+    };
+    let state_a = || {
+        root_package_policy_inputs(
+            &workspace,
+            &["/roots/a"],
+            &["a"],
+            Some("/vendor/a"),
+            Some("warning"),
+        )
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    inject_root_package_policy_inputs(&mut updater, state_a()).unwrap();
+    let mut transaction = updater.commit().await;
+
+    assert_eq!(transaction.compute(&semantics_key).await.unwrap(), Ok(1));
+    assert_eq!(transaction.compute(&ignore_key).await.unwrap(), Ok(1));
+    assert_eq!(transaction.compute(&lookup_key).await.unwrap(), Ok(1));
+
+    transaction = reinject_root_package_policy(transaction, state_a()).await;
+    assert_eq!(transaction.compute(&semantics_key).await.unwrap(), Ok(1));
+    assert_eq!(transaction.compute(&ignore_key).await.unwrap(), Ok(1));
+    assert_eq!(transaction.compute(&lookup_key).await.unwrap(), Ok(1));
+
+    transaction = reinject_root_package_policy(
+        transaction,
+        root_package_policy_inputs(
+            &workspace,
+            &["/roots/a"],
+            &["b"],
+            Some("/vendor/a"),
+            Some("warning"),
+        ),
+    )
+    .await;
+    assert_eq!(transaction.compute(&semantics_key).await.unwrap(), Ok(1));
+    assert_eq!(transaction.compute(&ignore_key).await.unwrap(), Ok(1));
+    assert_eq!(transaction.compute(&lookup_key).await.unwrap(), Ok(2));
+
+    transaction = reinject_root_package_policy(
+        transaction,
+        root_package_policy_inputs(
+            &workspace,
+            &["/roots/a"],
+            &["b"],
+            Some("/vendor/a"),
+            Some("error"),
+        ),
+    )
+    .await;
+    assert_eq!(transaction.compute(&semantics_key).await.unwrap(), Ok(2));
+    assert_eq!(transaction.compute(&ignore_key).await.unwrap(), Ok(1));
+    assert_eq!(transaction.compute(&lookup_key).await.unwrap(), Ok(2));
+
+    transaction = reinject_root_package_policy(
+        transaction,
+        root_package_policy_inputs(
+            &workspace,
+            &["/roots/a"],
+            &["b"],
+            Some("/vendor/b"),
+            Some("error"),
+        ),
+    )
+    .await;
+    assert_eq!(transaction.compute(&semantics_key).await.unwrap(), Ok(2));
+    assert_eq!(transaction.compute(&ignore_key).await.unwrap(), Ok(2));
+    assert_eq!(transaction.compute(&lookup_key).await.unwrap(), Ok(2));
+
+    transaction = reinject_root_package_policy(
+        transaction,
+        root_package_policy_inputs(
+            &workspace,
+            &["/roots/b"],
+            &["b"],
+            Some("/vendor/b"),
+            Some("error"),
+        ),
+    )
+    .await;
+    assert_eq!(transaction.compute(&semantics_key).await.unwrap(), Ok(2));
+    assert_eq!(transaction.compute(&ignore_key).await.unwrap(), Ok(3));
+    assert_eq!(transaction.compute(&lookup_key).await.unwrap(), Ok(3));
+
+    transaction = reinject_root_package_policy(transaction, state_a()).await;
+    assert_eq!(transaction.compute(&semantics_key).await.unwrap(), Ok(3));
+    assert_eq!(transaction.compute(&ignore_key).await.unwrap(), Ok(4));
+    assert_eq!(transaction.compute(&lookup_key).await.unwrap(), Ok(4));
+    let restored = transaction
+        .compute(&RootPackageLookupInputsProjectionKey::new(workspace))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(restored.package_roots(), &[normalized_path("/roots/a")]);
+    assert!(
+        restored
+            .deleted_packages()
+            .contains(&PackageIdentifier::parse_bazel_package_identifier("a").unwrap())
+    );
 }
