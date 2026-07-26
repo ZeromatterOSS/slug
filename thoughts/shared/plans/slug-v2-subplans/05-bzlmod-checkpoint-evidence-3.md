@@ -5770,6 +5770,96 @@ is retained. Next evidence: Implement only
 `WP-5-m1-host-visible-lockfile-owner` under the exact three-file private-owner
 contract above.
 
+##### Host visible-lockfile owner merge-message replan
+
+**Status:** Replanned before accepted Rust on 2026-07-26.
+
+The exact three-file draft established the private Host key/value/error seam
+and six of seven focused tests passed. Its retained-engine evidence covers the
+file-before-mode dependency boundary, cumulative Needs, Complete file forms,
+mode transitions, filesystem forms and errors, all four parse modes, full
+value/equality, direct failures, and opaque downstream semantic pruning. The
+seventh exact diagnostic test exposed an unimplementable boundary rather than
+a Host-wrapper test defect.
+
+Pinned Bazel 9.2 `BazelLockFileFunction.compute` selects merge advice only when
+the caught exception message contains a conflict marker. For the accepted
+`"lockFileVersion":"<<<<<<<"` row, Gson retains that spelling in the caught
+message. Slug's sole `read_lockfile_v28` instead reaches
+`json_reader_next_i32` and replaces the spelling with the fixed message
+`invalid signed 32-bit integer`. The Host entry therefore sees no marker and
+incorrectly selects delete advice.
+
+Scanning the complete raw input in `lockfile.rs` is not equivalent: an ignored
+field may contain `<<<<<<<` while an unrelated ordinary caught error occurs.
+Contextual rescanning would be a forbidden second decoder/parser. Independent
+pinned-source/parity and architecture/orchestration terminal reviews therefore
+returned `REPLAN`. The held uncommitted draft is not accepted production; no
+fixture, Cargo, dependency, public API, consumer, activation, direct IO, or
+collection change is accepted.
+
+Next run only
+`WP-5-m1-host-visible-lockfile-owner-merge-message-correction-design`. It is
+design only: do not edit Rust and do not run Cargo. Freeze the smallest
+four-file correction by adding only
+`app/slug_bzlmod_v2/src/lockfile_v28.rs` to the prior allowlist. That file may
+change only the failed `java_parse_double` message arm in
+`json_reader_next_i32`, using its existing decoded `spelling`, and only when
+`domain == AdapterDomain::Version`. Every non-Version domain retains the
+existing `invalid signed 32-bit integer` message byte-for-byte. For bytes
+`{"decoy":{"lockFileVersion":28},"lockFileVersion":"<<<<<<<"}`, the full
+`read_lockfile_v28(..., ReturnEmpty)` entry must return the unchanged
+`CaughtIllegalArgument` surface,
+`InvalidAdapterValue { domain: Version }` kind, and `None` position, with
+exact Display text
+`java.lang.NumberFormatException: For input string: "<<<<<<<"`. Add the
+focused full-entry regression inline under `#[cfg(test)]` in
+`lockfile_v28.rs`; do not edit the separate `lockfile_v28_tests.rs`, which
+would be a fifth file. The Host wrapper must continue classifying only
+`error.to_string()`.
+
+The corrected evidence must pin the complete ordinary and merge
+`BAD_LOCKFILE` messages. The exact merge result is
+`Failed to read and parse the MODULE.bazel.lock file with error: java.lang.NumberFormatException: For input string: "<<<<<<<". This looks like a merge conflict. See https://bazel.build/external/lockfile#merge-conflicts for advice.`
+Add the exact negative input
+`{"decoy":{"lockFileVersion":28},"ignored":"<<<<<<<","lockFileVersion":"ordinary"}`
+and pin its complete result to
+`Failed to read and parse the MODULE.bazel.lock file with error: java.lang.NumberFormatException: For input string: "ordinary". Try deleting it and rerun the build.`
+This row must contain no merge advice. Retain the separately allocated equal
+Complete Host-key values and every other owner evidence/validation gate above.
+
+Stop on raw/source marker inspection in the Host helper, another
+decoder/parser/error type, any other parse-error message/surface/kind/position
+change, any change to marker scanning, successful numeric parsing, the later
+exact-range failure, or direct surfaces, a fifth file, fixture or Cargo
+change, public surface, consumer, activation, or broadened parser work.
+Terminal `ACCEPT` of this design authorizes only the exact four-file corrected
+owner implementation. Only terminal `ACCEPT` of that implementation may
+advance to `WP-5-m1-host-registry-function-boundary-design`.
+
+##### Host visible-lockfile owner merge-message correction design status
+
+**Status:** Accepted after terminal latest-text review on 2026-07-26.
+
+The corrected packet adds only `lockfile_v28.rs` to the prior three-file Host
+owner allowlist. The sole parser's failed Version-domain integer conversion
+must retain the exact Gson/Java class-prefixed offending-spelling message
+while preserving its surface, kind, position, all non-Version messages, and
+every successful and range-failure numeric behavior. A full-reader inline
+regression avoids opening the separate test file.
+
+Exact complete Host merge/delete diagnostics and the ignored-field-marker plus
+ordinary bad Version discriminator prove message-only classification without
+raw-input inspection. The prior retained-DICE, equality, lifecycle,
+projection, parser, scope, and serial validation gates remain unchanged.
+Pinned-source/parity, implementation-feasibility, and
+architecture/orchestration terminal latest-text reviews all returned
+`ACCEPT`; no Rust edit or Cargo command occurred during the design packet.
+
+Next evidence: Implement only
+`WP-5-m1-host-visible-lockfile-owner-merge-message-correction` under the exact
+four-file contract above.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only

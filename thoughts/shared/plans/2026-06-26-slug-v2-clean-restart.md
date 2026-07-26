@@ -43,18 +43,32 @@ implementation/evidence, and orchestration reviews returned `ACCEPT`. No
 failed draft, registry scaffold, network claim, harness, Rust, Cargo,
 production edge, or activation is retained.
 
+The first three-file Host owner attempt reached six passing focused tests and
+one exact failing merge-diagnostic regression. The sole v28 reader discards
+the offending `<<<<<<<` integer spelling before the Host wrapper receives its
+typed caught error, so exact Bazel message-only merge classification is
+impossible inside the accepted allowlist. Both terminal source/parity and
+architecture/orchestration reviews returned `REPLAN`; raw-byte rescanning was
+rejected because an unrelated marker would be a false positive.
+
+The merge-message correction design is accepted. It adds only
+`lockfile_v28.rs` to the prior owner allowlist and permits one Version-domain
+failed-conversion message correction plus an inline full-reader regression.
+The exact class-prefixed Gson message, unchanged typed error metadata,
+ignored-marker negative discriminator, non-Version byte-for-byte behavior,
+and implementation-to-registry handoff all passed terminal review.
+
 ### Current packet
 
-Implement only `WP-5-m1-host-visible-lockfile-owner`.
+Implement only
+`WP-5-m1-host-visible-lockfile-owner-merge-message-correction`.
 
-Add the private Host owner in exactly three files:
-`app/slug_bzlmod_v2/src/host_lockfile.rs`,
-`app/slug_bzlmod_v2/src/lockfile.rs`, and the private module declaration in
-`app/slug_bzlmod_v2/src/lib.rs`. Preserve the accepted full-v28 typed parser,
-file-before-mode Need ordering, caught versus uncaught surfaces,
-complete-only semantic equality, exact test/validation matrix, and every
-forbidden consumer/activation boundary in the owning subplan. Do not edit
-fixtures, Cargo, `repository_ignore.rs`, or `lockfile_v28.rs`.
+Use the exact four-file contract in the owning subplan. In the sole v28
+reader, change only the failed Version-domain `java_parse_double` message and
+add its inline full-entry regression; preserve all non-Version messages and
+numeric behavior. Complete the held private Host owner tests, including exact
+merge/delete diagnostics and ignored-marker discrimination. Do not edit
+fixtures, Cargo, `lockfile_v28_tests.rs`, consumers, or activation.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
