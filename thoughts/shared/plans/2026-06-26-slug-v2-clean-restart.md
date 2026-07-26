@@ -38,25 +38,26 @@ first real BCR-backed generation disproved the overbroad two-loopback-misses
 rule: its diagnostic 500-entry manifest has 156 BCR `MODULE.bazel` successes
 with two misses each, 27 BCR-only `source.json` successes, one BCR descriptor,
 one loopback descriptor, and three exact subject entries. All 184 BCR hashes
-match Bazel's pinned tools lockfile. Correct the scaffold by URL class before
-resuming the ignored two-row diagnostic draft. No Rust, Cargo, harness, public
-API, or activation changed.
+match Bazel's pinned tools lockfile. The class correction then replanned on
+its impossible runtime-port mutation anchor: unchanged harness mutations do
+not expand `{{http_registry}}`. Freeze the checked subject hash as an
+exactly-once static anchor before resuming the ignored two-row diagnostic
+draft. No Rust, Cargo, harness, public API, or activation changed.
 
 ### Current packet
 
 Design-correct only
-`WP-5-m1-bazel-lockfile-v28-schema-oracle-scaffold-classification-correction`.
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-mutation-anchor-correction`.
 
 Preserve the exact twelve-file/no-harness boundary, 15-row cap, and corrected
-DIRTREE evidence. Match all 184 BCR scaffold hashes against Bazel 9.2's pinned
-tools lockfile. Require paired loopback recorded absences only for the 156 BCR
-`MODULE.bazel` discovery entries; require the 27 selected-registry
-`source.json` entries and BCR descriptor to have no invented companions.
-Classify the checked loopback descriptor and three exact subject entries
-separately, reject every unclassified URL, and keep every semantic mutation
-and behavior assertion on fully anchored subject/root-extension fields. Fold
-the separate print probe into the rewrite row to preserve the 15-row cap,
-then terminally rereview before resuming the draft.
+DIRTREE and URL-class evidence. Preserve fully anchored dynamic URLs in
+post-generation checks and assertions. For pre-command text mutation only,
+replace the exact lowercase SHA-256 of the checked subject `MODULE.bazel` with
+its uppercase spelling after proving it occurs exactly once in the generated
+lockfile and no uppercase copy exists; require canonical rewrite to restore
+the lowercase value. No port token, generic hash/suffix, fixed port, or harness
+expansion is allowed. Fold the separate print probe into the rewrite row to
+preserve the 15-row cap, then terminally rereview before resuming the draft.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

@@ -4876,6 +4876,44 @@ All prior twelve-file, no-harness, 2,500-line, generated-versus-injected
 DIRTREE, replay, archive, diff, and exception-order gates remain exact.
 Terminally rereview this correction before resuming the held ignored draft.
 
+##### Lockfile v28 schema oracle mutation-anchor status
+
+**Status:** Replan before retained fixture evidence on 2026-07-26.
+
+Terminal implementability review accepted the class/set checker and combined
+rewrite/print row, but rejected one infeasible mutation rule. With
+`http_registry_port = 0`, the complete subject URL contains a runtime-selected
+port. The unchanged harness expands `{{http_registry}}` in argv and staged
+workspace files, but mutation `find`/`replace` expands only
+`{{workspace_uri}}`. Therefore a pre-command lockfile mutation cannot anchor
+on the complete subject URL without a harness change or fixed collision-prone
+port. The ignored two-row output remains diagnostic and no generation resumed.
+
+Correct only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-mutation-anchor-correction`:
+
+- preserve complete dynamic subject-URL anchoring for post-generation
+  class/set checks, manifest assertions, request evidence, and every mutation
+  whose target does not contain a runtime token;
+- for the checksum case-normalization mutation only, derive the exact subject
+  `MODULE.bazel` SHA-256 from its checked fixture bytes. Before mutation,
+  require that exact lowercase 64-hex value occurs once in the visible
+  lockfile and its uppercase spelling occurs zero times. Replace that one
+  exact value with uppercase, then require Bazel's canonical rewrite to
+  restore the exact lowercase value;
+- this is an exact checked subject-value anchor, not permission to replace a
+  generic checksum, hash pattern, suffix, `"not found"`, `MODULE.bazel`, or
+  `source.json`. Stop on zero or multiple matches, a preexisting uppercase
+  match, another dynamic-port mutation need, fixed-port use, or harness
+  expansion;
+- retain the accepted 500-entry URL-class partition, 184/184 pinned BCR map
+  equality, exact loopback success hashes, fully anchored root-extension
+  mutations, combined rewrite/print row, twelve files, 15 commands, and
+  2,500-line cap unchanged.
+
+Terminally rereview this exact mutation exception before resuming the held
+draft.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
