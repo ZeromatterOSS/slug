@@ -2587,3 +2587,29 @@ Next evidence: Design only a loading-globals owner correction that expands the
 allowlist to `app/slug_loading_v2/src/package.rs`, constructs the standard
 loading globals plus `LibraryExtension::Print` in one owning `Globals` heap,
 and removes the copied-value overlay before retrying the unchanged producer.
+
+### Stage 5 loading event producer globals-owner correction design
+
+Status: Accepted
+
+Retry the producer in exactly five files: the prior Cargo, `bzl_module.rs`, and
+two focused test files plus `app/slug_loading_v2/src/package.rs`. In
+`package.rs`, build `loading_globals()` with
+`GlobalsBuilder::extended_by(&[LibraryExtension::Print])`, then add the
+unchanged package/select/native/attr/provider globals on that same builder. In
+`bzl_module.rs`, remove every copied-value/process-static globals overlay and
+bind the one-heap `loading_globals()` result locally at each evaluator. Preserve
+the existing `.map(|_| ())`, evaluator teardown before capture consumption,
+outer finalizer, event batches, tests, key values/equality/validity, and all
+other surfaces unchanged.
+
+Require the two focused loading tests, all 54 `slug_loading_v2` tests, the
+13-test serial core runtime, all 98 `slug_core_v2` tests, GNU-Windows loading
+compilation, formatting/diff/archive checks, and an exact five-file gate. Stop
+on any copied/static globals owner, extension beyond Print, event/equality/test
+change, sixth file, crash, panic, or downstream failure. Independent ownership
+and architecture reviews accepted the one-heap design; the scope reviewer’s
+sole revision was already incorporated by explicitly adding `package.rs`.
+
+Next evidence: Implement only the corrected five-file
+`WP-5-m1-loading-event-producer`.
