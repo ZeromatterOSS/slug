@@ -1,3 +1,20 @@
-load(":defs.bzl", "message_rule")
+load(
+    ":defs.bzl",
+    "analysis_failure_rule",
+    "execution_failure_rule",
+    "message_rule",
+)
 
-message_rule(name = "message")
+print("SLUG_TERMINAL_EVENT_BUILD")
+
+message_rule(
+    name = "message",
+)
+
+analysis_failure_rule(
+    name = "analysis_failure",
+)
+
+execution_failure_rule(
+    name = "execution_failure",
+)

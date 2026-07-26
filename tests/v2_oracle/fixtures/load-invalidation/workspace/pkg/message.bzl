@@ -1,1 +1,3 @@
+print("SLUG_TERMINAL_EVENT_DEP_BZL_V1")
+
 MESSAGE = "one"

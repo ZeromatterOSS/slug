@@ -64,9 +64,32 @@ def test_fixture_listing_includes_initial_stage1_set() -> None:
 def test_fixture_parser_reads_commands_and_mutations() -> None:
     fixture = load_fixture(FIXTURES / "load-invalidation")
     assert fixture.name == "load-invalidation"
-    assert len(fixture.commands) == 2
-    assert fixture.commands[1].mutations[0].path == "pkg/message.bzl"
-    assert fixture.commands[1].mutations[0].replace == 'MESSAGE = "two"'
+    assert [command.name for command in fixture.commands] == [
+        "cold_success_v1_order",
+        "unchanged_warm_build_no_replay",
+        "valid_empty_warm_query",
+        "empty_query_after_dependency_edit",
+        "unchanged_warm_query_no_replay",
+        "build_after_query_edit_only_analysis",
+        "eligible_analysis_failure_prefix",
+        "execution_failure_after_semantic_output",
+        "warm_message_after_failures_no_replay",
+    ]
+    assert [
+        (mutation.path, mutation.find, mutation.replace)
+        for mutation in fixture.commands[3].mutations
+    ] == [
+        (
+            "pkg/message.bzl",
+            "SLUG_TERMINAL_EVENT_DEP_BZL_V1",
+            "SLUG_TERMINAL_EVENT_DEP_BZL_V2",
+        ),
+        (
+            "pkg/message.bzl",
+            'MESSAGE = "one"',
+            'MESSAGE = "two"',
+        ),
+    ]
 
 
 def test_fixture_parser_reads_file_operations_and_provenance() -> None:

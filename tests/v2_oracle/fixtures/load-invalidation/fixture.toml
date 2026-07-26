@@ -1,27 +1,116 @@
 [fixture]
 name = "load-invalidation"
-description = "A loaded .bzl file edit changes the output produced by a second build in the same daemon."
+description = "Bazel 9.2 retained-server oracle for terminal Starlark event order, invalidation, warm nonreplay, query, and execution failure."
 comparison = "semantic"
-manifest_roots = ["bazel-bin/pkg"]
 daemon = true
-oracle_notes = "Same-daemon DICE invalidation: the second build runs in the same slug daemon, detects the message.bzl edit, and replays the affected computation."
+oracle_notes = "One retained server freezes root MODULE, dependency and parent .bzl, BUILD, and selected rule print order. Warm commands replay no cached prints. A dependency edit is first consumed by a valid empty query, after which build reruns only analysis. Eligible Starlark and action failures retain selected semantic prefixes, and the action failure reports its Bazel diagnostic before process stderr."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java: execModuleFile",
+  "src/main/java/com/google/devtools/build/lib/skyframe/BzlLoadFunction.java: computeBzlLoads, executeBzlFile",
+  "src/main/java/com/google/devtools/build/lib/packages/PackageFactory.java: executeBuildFileImpl",
+  "src/main/java/com/google/devtools/build/lib/analysis/RuleContext.java: createStarlarkThread",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleConfiguredTargetUtil.java: evalRule",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkActionFactory.java: runShell",
+  "src/main/java/com/google/devtools/build/lib/skyframe/ActionExecutionFunction.java",
+  "src/main/java/com/google/devtools/build/lib/buildtool/BuildTool.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/SkyframeActionExecutor.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/commands/QueryCommand.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/commands/QueryEnvironmentBasedCommand.java",
+  "src/main/java/com/google/devtools/build/lib/query2/SkyQueryEnvironment.java",
+]
+translation_notes = "Bazel prints all selected Starlark events and action diagnostics on stderr while query results use stdout. The NativeLink service is Slug-only, so the failing Bazel action is local; this fixture claims semantic-output-before-execution-error phase and channel order, not Bazel remote diagnostic wording."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture load-invalidation --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture load-invalidation --tool bazel --bazel /usr/bin/bazel"
 
 [reapi]
 remote_executor = true
 
 [[commands]]
-name = "prime"
+name = "cold_success_v1_order"
 argv = ["build", "//pkg:message"]
 compare = "semantic"
 expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_ROOT_MODULE(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_DEP_BZL_V1(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_PARENT_BZL(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_BUILD(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE(?:(?!SLUG_TERMINAL_EVENT_).)*\\Z"]
+manifest_roots = ["bazel-bin/pkg/message.txt"]
 
 [[commands]]
-name = "after_bzl_edit"
+name = "unchanged_warm_build_no_replay"
 argv = ["build", "//pkg:message"]
 compare = "semantic"
 expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?!.*SLUG_TERMINAL_EVENT_).*\\Z"]
+manifest_roots = ["bazel-bin/pkg/message.txt"]
 
-[[commands.mutations]]
-path = "pkg/message.bzl"
-find = "MESSAGE = \"one\""
-replace = "MESSAGE = \"two\""
+[[commands]]
+name = "valid_empty_warm_query"
+argv = ["query", "//pkg:message except //pkg:message"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?!.*SLUG_TERMINAL_EVENT_).*\\Z"]
+
+[[commands]]
+name = "empty_query_after_dependency_edit"
+argv = ["query", "//pkg:message except //pkg:message"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_DEP_BZL_V2(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_PARENT_BZL(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_BUILD(?:(?!SLUG_TERMINAL_EVENT_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "pkg/message.bzl"
+  find = "SLUG_TERMINAL_EVENT_DEP_BZL_V1"
+  replace = "SLUG_TERMINAL_EVENT_DEP_BZL_V2"
+
+  [[commands.mutations]]
+  path = "pkg/message.bzl"
+  find = "MESSAGE = \"one\""
+  replace = "MESSAGE = \"two\""
+
+[[commands]]
+name = "unchanged_warm_query_no_replay"
+argv = ["query", "//pkg:message except //pkg:message"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?!.*SLUG_TERMINAL_EVENT_).*\\Z"]
+
+[[commands]]
+name = "build_after_query_edit_only_analysis"
+argv = ["build", "//pkg:message"]
+compare = "semantic"
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_RULE_MESSAGE_TWO(?:(?!SLUG_TERMINAL_EVENT_).)*\\Z"]
+manifest_roots = ["bazel-bin/pkg/message.txt"]
+
+[[commands]]
+name = "eligible_analysis_failure_prefix"
+argv = ["build", "//pkg:analysis_failure"]
+compare = "message_shape"
+expected_exit = 1
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_RULE_ANALYSIS_FAILURE_PREFIX(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_TERMINAL_ANALYSIS_FAILURE(?:(?!SLUG_TERMINAL_EVENT_).)*\\Z"]
+
+[[commands]]
+name = "execution_failure_after_semantic_output"
+argv = ["build", "//pkg:execution_failure"]
+compare = "message_shape"
+expected_exit = 1
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_RULE_EXECUTION_FAILURE_PREFIX(?:(?!SLUG_TERMINAL_EVENT_).)*Action [^\\n]* failed(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC(?:(?!SLUG_TERMINAL_EVENT_).)*\\Z"]
+
+[[commands]]
+name = "warm_message_after_failures_no_replay"
+argv = ["build", "//pkg:message"]
+compare = "semantic"
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?!.*SLUG_TERMINAL_EVENT_).*\\Z"]
+manifest_roots = ["bazel-bin/pkg/message.txt"]

@@ -2553,3 +2553,15 @@ entries and 321 lines because the test edit is outside the fixture tree.
 
 Next evidence: Retry only the corrected seven-file
 `WP-5-m1-terminal-event-execution-oracle`.
+
+### Stage 5 terminal event/execution oracle corrected retry
+
+Status: Accepted
+
+The corrected seven-file retry retains nine exact Bazel 9.2 records, closes
+the direct parser consumer with all command names and both ordered row-4
+mutations, and adds no entry. Pinned generation, two fresh-root replays, 52
+harness tests, exact exits/manifests/sentinels, diff/allowlist gates, and
+321-line fixture growth passed. Both terminal reviews returned `ACCEPT`.
+
+Next evidence: Implement only `WP-5-m1-loading-event-producer`.
