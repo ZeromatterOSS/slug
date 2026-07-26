@@ -4208,5 +4208,33 @@ implementation; semantics remained unchanged. All three terminal
 source/contract, implementation/evidence, and architecture/hot-path reviews
 returned `ACCEPT`.
 
+##### Windows long-path observation prerequisite implementation
+
+**Status:** Accepted on 2026-07-25.
+
+The exact six-file implementation adds lossless raw `Arc<[u16]>` demand
+identity, final normalized `Arc<[u16]>` results, direct unrefined observer
+dispatch, exact 8.3/as-long-path/native-eligibility/prefix/lexical helpers,
+one checked sizing/fill `GetLongPathNameW` owner, effective-result validation,
+and exhaustive existing-consumer closure. The sole source-backed correction
+made the 8.3 predicate preserve Java's mixed semantics: regex-dot counts
+Unicode code points and excludes all five default line terminators, while
+total and capture limits remain UTF-16-unit based.
+
+Validation passed workspace 35, core 102 unit plus 13 integration, bzlmod
+248, loading 54, and zero doctests. Every affected GNU-Windows test executable
+linked, and the core executable imports `GetLongPathNameW` from
+`KERNEL32.dll`. Focused matrices cover lossless demand/result identity,
+Need/A→B→A, operation pairing, native eligibility, dot/up-level and
+separator normalization, both removable prefixes, one-call shortening and
+growth races, bounded allocation, non-BMP and unpaired-surrogate units,
+Java-dot astral/terminator cases, direct no-Lstat dispatch, and
+repository-validation dirty transitions. Formatting, diff/archive, exact
+six-file scope, no-dependency, no-producer, no-DICE-IO, and no-activation
+gates passed. No native Windows or provisioned NTFS 8.3 worker was available,
+so real alias expansion was not claimed; the pure matrix and GNU-Windows ABI
+link are the retained evidence. All three latest-diff source,
+implementation/evidence, and architecture/DICE reviewers returned `ACCEPT`.
+
 Next evidence: Implement only
-`WP-5-m1-windows-long-path-observation-owner`.
+`WP-5-m1-host-repository-ignore-owner-corrected-retry`.

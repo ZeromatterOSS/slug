@@ -127,6 +127,8 @@ trait ObservationOperations {
         &mut self,
         path: &NormalizedAbsolutePath,
     ) -> Result<PathDirectoryEntries, PrimaryFailure>;
+
+    fn windows_long_path(&mut self, input: &[u16]) -> Arc<[u16]>;
 }
 
 fn observe_with(
@@ -210,6 +212,12 @@ fn observe_one(
                 }
             },
         ),
+        PathObservationOperation::WindowsLongPath => {
+            let input = demand
+                .windows_long_path_input()
+                .expect("WindowsLongPath demand must retain its resolver input");
+            PathObservationResult::WindowsLongPath(operations.windows_long_path(input))
+        }
     }
 }
 
@@ -323,6 +331,10 @@ impl ObservationOperations for UnixPathObservationAdapter {
         path: &NormalizedAbsolutePath,
     ) -> Result<PathDirectoryEntries, PrimaryFailure> {
         unix_directory_entries_with(path, &mut LibcUnixDirectoryApi)
+    }
+
+    fn windows_long_path(&mut self, input: &[u16]) -> Arc<[u16]> {
+        Arc::from(windows_pure::windows_lexical_normalize(input))
     }
 }
 
@@ -582,9 +594,10 @@ fn invalid_directory_data() -> PrimaryFailure {
     })
 }
 
-#[cfg(any(test, windows))]
 mod windows_pure {
     use super::*;
+
+    pub(super) const WINDOWS_EXTENDED_PATH_MAX_UNITS: u32 = 32_767;
 
     pub(super) const ERROR_INVALID_FUNCTION: u32 = 1;
     pub(super) const ERROR_FILE_NOT_FOUND: u32 = 2;
@@ -711,6 +724,257 @@ mod windows_pure {
         }
         path.push(0);
         Ok(path)
+    }
+
+    fn is_separator(unit: u16) -> bool {
+        unit == b'/' as u16 || unit == b'\\' as u16
+    }
+
+    fn is_ascii_drive_letter(unit: u16) -> bool {
+        (b'A' as u16..=b'Z' as u16).contains(&unit) || (b'a' as u16..=b'z' as u16).contains(&unit)
+    }
+
+    fn has_unc_prefix(path: &[u16]) -> bool {
+        path.len() >= 4
+            && path[0] == b'\\' as u16
+            && ((path[1] == b'\\' as u16 && (path[2] == b'?' as u16 || path[2] == b'.' as u16))
+                || (path[1] == b'?' as u16 && path[2] == b'?' as u16))
+            && path[3] == b'\\' as u16
+    }
+
+    fn has_drive_specifier_prefix(path: &[u16]) -> bool {
+        let offset = if has_unc_prefix(path) { 4 } else { 0 };
+        path.get(offset)
+            .is_some_and(|unit| is_ascii_drive_letter(*unit))
+            && path.get(offset + 1) == Some(&(b':' as u16))
+            && path.get(offset + 2).is_some_and(|unit| is_separator(*unit))
+    }
+
+    fn contains_units(path: &[u16], needle: &[u16]) -> bool {
+        path.windows(needle.len())
+            .any(|candidate| candidate == needle)
+    }
+
+    fn java_regex_dot_count(units: &[u16]) -> Option<usize> {
+        let mut count = 0;
+        let mut index = 0;
+        while index < units.len() {
+            let unit = units[index];
+            if matches!(unit, 0x000A | 0x000D | 0x0085 | 0x2028 | 0x2029) {
+                return None;
+            }
+            index += if (0xD800..=0xDBFF).contains(&unit)
+                && units
+                    .get(index + 1)
+                    .is_some_and(|low| (0xDC00..=0xDFFF).contains(low))
+            {
+                2
+            } else {
+                1
+            };
+            count += 1;
+        }
+        Some(count)
+    }
+
+    pub(super) fn is_windows_short_path_segment(segment: &[u16]) -> bool {
+        if segment.len() > 12 {
+            return false;
+        }
+        for tilde in 1..=6.min(segment.len().saturating_sub(1)) {
+            if segment[tilde] != b'~' as u16 {
+                continue;
+            }
+            if !matches!(java_regex_dot_count(&segment[..tilde]), Some(1..=6)) {
+                continue;
+            }
+            let remainder = &segment[tilde + 1..];
+            let digits = remainder
+                .iter()
+                .take_while(|unit| (b'0' as u16..=b'9' as u16).contains(unit))
+                .count();
+            if digits == 0 || digits > 6 || tilde + digits >= 8 {
+                continue;
+            }
+            let suffix = &remainder[digits..];
+            if suffix.is_empty()
+                || (suffix[0] == b'.' as u16
+                    && matches!(java_regex_dot_count(&suffix[1..]), Some(0..=3)))
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Exact Java `WindowsPathOperations.asLongPath` transformation, without
+    /// the native call's trailing NUL.
+    pub(super) fn windows_as_long_path(path: &[u16]) -> Vec<u16> {
+        let verbatim = [b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16];
+        let mut result =
+            Vec::with_capacity(path.len() + usize::from(!path.starts_with(&verbatim)) * 4);
+        if !path.starts_with(&verbatim) {
+            result.extend(verbatim);
+        }
+        result.extend(path.iter().map(|unit| {
+            if *unit == b'/' as u16 {
+                b'\\' as u16
+            } else {
+                *unit
+            }
+        }));
+        result
+    }
+
+    /// Exact predicates used by Bazel's native `GetLongPath` entrypoint for
+    /// the absolute normalized Windows inputs reachable from PathFragment.
+    pub(super) fn is_absolute_normalized_windows_path(path: &[u16]) -> bool {
+        if path.is_empty() || path.contains(&(b'/' as u16)) || !has_drive_specifier_prefix(path) {
+            return false;
+        }
+        let current = [b'.' as u16, b'\\' as u16];
+        let parent = [b'.' as u16, b'.' as u16, b'\\' as u16];
+        let inner_current = [b'\\' as u16, b'.' as u16, b'\\' as u16];
+        let inner_parent = [b'\\' as u16, b'.' as u16, b'.' as u16, b'\\' as u16];
+        let trailing_current = [b'\\' as u16, b'.' as u16];
+        let trailing_parent = [b'\\' as u16, b'.' as u16, b'.' as u16];
+        !path.starts_with(&current)
+            && !contains_units(path, &inner_current)
+            && !path.ends_with(&trailing_current)
+            && !path.starts_with(&parent)
+            && !contains_units(path, &inner_parent)
+            && !path.ends_with(&trailing_parent)
+    }
+
+    pub(super) fn windows_remove_prefix_and_use_slashes(path: &[u16]) -> Vec<u16> {
+        let verbatim = [b'\\' as u16, b'\\' as u16, b'?' as u16, b'\\' as u16];
+        let nt = [b'\\' as u16, b'?' as u16, b'?' as u16, b'\\' as u16];
+        let path = if path.starts_with(&verbatim) || path.starts_with(&nt) {
+            &path[4..]
+        } else {
+            path
+        };
+        path.iter()
+            .map(|unit| {
+                if *unit == b'\\' as u16 {
+                    b'/' as u16
+                } else {
+                    *unit
+                }
+            })
+            .collect()
+    }
+
+    fn windows_segments(path: &[u16]) -> Vec<&[u16]> {
+        let mut segments = Vec::new();
+        let mut index = 0;
+        while index < path.len() {
+            while index < path.len() && is_separator(path[index]) {
+                index += 1;
+            }
+            let begin = index;
+            while index < path.len() && !is_separator(path[index]) {
+                index += 1;
+            }
+            if begin != index {
+                segments.push(&path[begin..index]);
+            }
+        }
+        segments
+    }
+
+    pub(super) fn windows_lexical_normalize(path: &[u16]) -> Vec<u16> {
+        let drive_length = if path.first().is_some_and(|unit| is_separator(*unit)) {
+            1
+        } else if path.len() >= 3
+            && is_ascii_drive_letter(path[0])
+            && path[1] == b':' as u16
+            && is_separator(path[2])
+        {
+            3
+        } else {
+            0
+        };
+        let absolute = drive_length != 0;
+        let skip = usize::from(drive_length > 1);
+        let mut normalized_segments: Vec<&[u16]> = Vec::new();
+        for segment in windows_segments(path).into_iter().skip(skip) {
+            if segment == [b'.' as u16] {
+                continue;
+            }
+            if segment == [b'.' as u16, b'.' as u16] {
+                if normalized_segments
+                    .last()
+                    .is_some_and(|prior| *prior != [b'.' as u16, b'.' as u16])
+                {
+                    normalized_segments.pop();
+                    continue;
+                }
+                if absolute {
+                    continue;
+                }
+            }
+            normalized_segments.push(segment);
+        }
+
+        let mut normalized = Vec::with_capacity(path.len());
+        if absolute {
+            if is_separator(path[0]) {
+                normalized.push(b'/' as u16);
+            } else {
+                normalized.push(if (b'a' as u16..=b'z' as u16).contains(&path[0]) {
+                    path[0] - (b'a' - b'A') as u16
+                } else {
+                    path[0]
+                });
+                normalized.extend([b':' as u16, b'/' as u16]);
+            }
+        }
+        for (index, segment) in normalized_segments.into_iter().enumerate() {
+            if index != 0 {
+                normalized.push(b'/' as u16);
+            }
+            normalized.extend_from_slice(segment);
+        }
+        normalized
+    }
+
+    pub(super) trait WindowsLongPathApi {
+        fn size(&mut self, input: &[u16]) -> u32;
+        fn fill(&mut self, input: &[u16], output: &mut [u16]) -> u32;
+    }
+
+    fn resolve_windows_long_path_with(
+        input: &[u16],
+        api: &mut impl WindowsLongPathApi,
+    ) -> Option<Vec<u16>> {
+        let query = windows_as_long_path(input);
+        if !is_absolute_normalized_windows_path(&query) {
+            return None;
+        }
+        let mut query = query;
+        query.push(0);
+        let capacity = api.size(&query);
+        if capacity == 0 || capacity > WINDOWS_EXTENDED_PATH_MAX_UNITS {
+            return None;
+        }
+        let output_units = usize::try_from(capacity).ok()?;
+        let mut output = vec![0u16; output_units];
+        let written = api.fill(&query, &mut output);
+        if written == 0 || written >= capacity || output[written as usize] != 0 {
+            return None;
+        }
+        Some(output[..written as usize].to_vec())
+    }
+
+    pub(super) fn observe_windows_long_path_with(
+        input: &[u16],
+        api: &mut impl WindowsLongPathApi,
+    ) -> Arc<[u16]> {
+        let effective = resolve_windows_long_path_with(input, api)
+            .map(|path| windows_remove_prefix_and_use_slashes(&path))
+            .unwrap_or_else(|| input.to_vec());
+        Arc::from(windows_lexical_normalize(&effective))
     }
 
     pub(super) fn find_name(raw: &[u16; 260]) -> Result<Vec<u16>, PrimaryFailure> {
@@ -1141,6 +1405,7 @@ mod windows_native {
         ) -> HANDLE;
         fn FindNextFileW(find_file: HANDLE, find_data: *mut WIN32_FIND_DATAW) -> BOOL;
         fn FindClose(find_file: HANDLE) -> BOOL;
+        fn GetLongPathNameW(short_path: *const u16, long_path: *mut u16, buffer_units: u32) -> u32;
     }
 
     struct KernelFileApi;
@@ -1280,6 +1545,25 @@ mod windows_native {
         }
     }
 
+    struct KernelLongPathApi;
+
+    impl WindowsLongPathApi for KernelLongPathApi {
+        fn size(&mut self, input: &[u16]) -> u32 {
+            // SAFETY: the pure owner supplies a live NUL-terminated UTF-16
+            // input and the API explicitly permits a null zero-sized output.
+            unsafe { GetLongPathNameW(input.as_ptr(), ptr::null_mut(), 0) }
+        }
+
+        fn fill(&mut self, input: &[u16], output: &mut [u16]) -> u32 {
+            let Ok(buffer_units) = u32::try_from(output.len()) else {
+                return 0;
+            };
+            // SAFETY: the input is live and NUL-terminated, while `output` is
+            // writable for exactly `buffer_units` UTF-16 code units.
+            unsafe { GetLongPathNameW(input.as_ptr(), output.as_mut_ptr(), buffer_units) }
+        }
+    }
+
     pub(super) fn observe_windows(
         retained: &RetainedMaterializationRoots<'_>,
         demands: impl IntoIterator<Item = PathObservationDemand>,
@@ -1382,6 +1666,10 @@ mod windows_native {
                 })
             })
         }
+
+        fn windows_long_path(&mut self, input: &[u16]) -> Arc<[u16]> {
+            observe_windows_long_path_with(input, &mut KernelLongPathApi)
+        }
     }
 
     #[cfg(test)]
@@ -1398,6 +1686,30 @@ mod windows_native {
             assert_eq!(std::mem::align_of::<FILE_BASIC_INFO>(), 8);
             assert_eq!(std::mem::size_of::<WIN32_FIND_DATAW>(), 592);
             assert_eq!(std::mem::align_of::<WIN32_FIND_DATAW>(), 4);
+        }
+
+        #[test]
+        fn get_long_path_name_w_native_smoke_covers_present_and_missing_paths() {
+            let temp = tempfile::tempdir().unwrap();
+            let present = temp.path().join("ordinary long directory name");
+            std::fs::create_dir(&present).unwrap();
+            let present = present.as_os_str().encode_wide().collect::<Vec<_>>();
+            let expected = Arc::<[u16]>::from(windows_lexical_normalize(&present));
+            assert_eq!(
+                observe_windows_long_path_with(&present, &mut KernelLongPathApi),
+                expected
+            );
+
+            let missing = temp.path().join("missing long directory name");
+            let missing = missing.as_os_str().encode_wide().collect::<Vec<_>>();
+            let mut query = windows_as_long_path(&missing);
+            query.push(0);
+            let mut api = KernelLongPathApi;
+            assert_eq!(api.size(&query), 0);
+            assert_eq!(
+                observe_windows_long_path_with(&missing, &mut KernelLongPathApi),
+                Arc::from(windows_lexical_normalize(&missing))
+            );
         }
     }
 }
@@ -1422,6 +1734,10 @@ mod windows_tests {
         raw
     }
 
+    fn wide(value: &str) -> Vec<u16> {
+        value.encode_utf16().collect()
+    }
+
     fn reparse(tag: u32, target: &[u16], substitute_offset: u16) -> Vec<u8> {
         let base = if tag == IO_REPARSE_TAG_MOUNT_POINT {
             16
@@ -1441,6 +1757,185 @@ mod windows_tests {
             bytes[start + index * 2..start + index * 2 + 2].copy_from_slice(&unit.to_le_bytes());
         }
         bytes
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    enum LongPathCall {
+        Size(Vec<u16>),
+        Fill(Vec<u16>, usize),
+    }
+
+    struct ScriptedLongPathApi {
+        calls: Vec<LongPathCall>,
+        size: u32,
+        written: u32,
+        output: Vec<u16>,
+    }
+
+    impl WindowsLongPathApi for ScriptedLongPathApi {
+        fn size(&mut self, input: &[u16]) -> u32 {
+            self.calls.push(LongPathCall::Size(input.to_vec()));
+            self.size
+        }
+
+        fn fill(&mut self, input: &[u16], output: &mut [u16]) -> u32 {
+            self.calls
+                .push(LongPathCall::Fill(input.to_vec(), output.len()));
+            let copied = self.output.len().min(output.len());
+            output[..copied].copy_from_slice(&self.output[..copied]);
+            self.written
+        }
+    }
+
+    fn scripted_long_path(size: u32, written: u32, output: &[u16]) -> ScriptedLongPathApi {
+        ScriptedLongPathApi {
+            calls: Vec::new(),
+            size,
+            written,
+            output: output.to_vec(),
+        }
+    }
+
+    #[test]
+    fn windows_long_path_lexical_and_native_predicates_are_exact_utf16() {
+        for accepted in [
+            "A~1",
+            "PROGRA~1",
+            "A~123456",
+            "A~1.",
+            "A~1.TXT",
+            "A~1.😀😀😀",
+        ] {
+            assert!(is_windows_short_path_segment(&wide(accepted)), "{accepted}");
+        }
+        for rejected in [
+            "~1",
+            "ABCDEF~12",
+            "A~",
+            "A~1234567",
+            "A~1.TOOL",
+            "TOOLONG~1.TXT",
+        ] {
+            assert!(
+                !is_windows_short_path_segment(&wide(rejected)),
+                "{rejected}"
+            );
+        }
+        for terminator in ['\n', '\r', '\u{0085}', '\u{2028}', '\u{2029}'] {
+            for rejected in [format!("A{terminator}~1"), format!("A~1.X{terminator}")] {
+                assert!(
+                    !is_windows_short_path_segment(&wide(&rejected)),
+                    "{rejected:?}"
+                );
+            }
+        }
+        assert_eq!(
+            windows_as_long_path(&wide("C:/PROGRA~1/tool")),
+            wide("\\\\?\\C:\\PROGRA~1\\tool")
+        );
+        assert_eq!(
+            windows_as_long_path(&wide("\\\\?\\C:/PROGRA~1")),
+            wide("\\\\?\\C:\\PROGRA~1")
+        );
+        assert!(is_absolute_normalized_windows_path(&wide(
+            "\\\\?\\C:\\PROGRA~1\\tool"
+        )));
+        assert!(!is_absolute_normalized_windows_path(&wide(
+            "\\\\?\\C:\\base\\..\\PROGRA~1"
+        )));
+        assert!(!is_absolute_normalized_windows_path(&wide(
+            "\\\\?\\C:\\base\\.\\PROGRA~1"
+        )));
+
+        assert_eq!(
+            windows_lexical_normalize(&wide("c:\\base\\\\dir\\.\\..\\PROGRA~1\\")),
+            wide("C:/base/PROGRA~1")
+        );
+        assert_eq!(
+            windows_lexical_normalize(&wide("/../../base//dir/")),
+            wide("/base/dir")
+        );
+        assert_eq!(
+            windows_lexical_normalize(&wide("../a/../../b")),
+            wide("../../b")
+        );
+        assert_eq!(
+            windows_remove_prefix_and_use_slashes(&wide("\\\\?\\C:\\long\\name")),
+            wide("C:/long/name")
+        );
+        assert_eq!(
+            windows_remove_prefix_and_use_slashes(&wide("\\??\\C:\\long\\name")),
+            wide("C:/long/name")
+        );
+        assert_eq!(
+            windows_remove_prefix_and_use_slashes(&[
+                b'C' as u16,
+                b':' as u16,
+                b'\\' as u16,
+                0xD800,
+            ]),
+            [b'C' as u16, b':' as u16, b'/' as u16, 0xD800]
+        );
+    }
+
+    #[test]
+    fn windows_long_path_uses_one_sizing_and_fill_and_preserves_shortening_and_surrogates() {
+        let input = wide("c:/PROGRA~1");
+        let query = wide("\\\\?\\c:\\PROGRA~1\0");
+        let returned = [
+            b'\\' as u16,
+            b'\\' as u16,
+            b'?' as u16,
+            b'\\' as u16,
+            b'c' as u16,
+            b':' as u16,
+            b'\\' as u16,
+            0xD800,
+            0,
+        ];
+        let mut api = scripted_long_path(32, 8, &returned);
+        assert_eq!(
+            observe_windows_long_path_with(&input, &mut api).as_ref(),
+            [b'C' as u16, b':' as u16, b'/' as u16, 0xD800]
+        );
+        assert_eq!(
+            api.calls,
+            [
+                LongPathCall::Size(query.clone()),
+                LongPathCall::Fill(query, 32)
+            ]
+        );
+    }
+
+    #[test]
+    fn windows_long_path_falls_back_once_for_ineligible_failure_growth_and_unterminated_fill() {
+        let ineligible = wide("c:/base/../PROGRA~1//");
+        let expected = wide("C:/PROGRA~1");
+        let mut unused = scripted_long_path(10, 9, &wide("\\\\?\\C:\\long\0"));
+        assert_eq!(
+            observe_windows_long_path_with(&ineligible, &mut unused).as_ref(),
+            expected
+        );
+        assert!(unused.calls.is_empty());
+
+        for mut api in [
+            scripted_long_path(0, 0, &[]),
+            scripted_long_path(WINDOWS_EXTENDED_PATH_MAX_UNITS + 1, 0, &[]),
+            scripted_long_path(8, 8, &wide("\\\\?\\C:\0")),
+            scripted_long_path(8, 7, &wide("\\\\?\\C:xy")),
+        ] {
+            assert_eq!(
+                observe_windows_long_path_with(&wide("c:/PROGRA~1"), &mut api).as_ref(),
+                wide("C:/PROGRA~1")
+            );
+            assert_eq!(
+                api.calls
+                    .iter()
+                    .filter(|call| matches!(call, LongPathCall::Fill(_, _)))
+                    .count(),
+                usize::from(api.size != 0 && api.size <= WINDOWS_EXTENDED_PATH_MAX_UNITS)
+            );
+        }
     }
 
     #[test]
@@ -2109,6 +2604,7 @@ mod tests {
         ReadLink(NormalizedAbsolutePath),
         FileBytes(NormalizedAbsolutePath),
         DirectoryEntries(NormalizedAbsolutePath),
+        WindowsLongPath(Arc<[u16]>),
     }
 
     struct ScriptedOperations {
@@ -2119,6 +2615,7 @@ mod tests {
         read_links: VecDeque<Result<Arc<PathBuf>, PrimaryFailure>>,
         file_bytes: VecDeque<Result<Arc<[u8]>, PrimaryFailure>>,
         directory_entries: VecDeque<Result<PathDirectoryEntries, PrimaryFailure>>,
+        windows_long_paths: VecDeque<Arc<[u16]>>,
     }
 
     impl ScriptedOperations {
@@ -2131,6 +2628,7 @@ mod tests {
                 read_links: VecDeque::new(),
                 file_bytes: VecDeque::new(),
                 directory_entries: VecDeque::new(),
+                windows_long_paths: VecDeque::new(),
             }
         }
 
@@ -2183,6 +2681,14 @@ mod tests {
             self.directory_entries
                 .pop_front()
                 .expect("script must supply a directory result")
+        }
+
+        fn windows_long_path(&mut self, input: &[u16]) -> Arc<[u16]> {
+            self.calls
+                .push(Call::WindowsLongPath(Arc::from(input.to_vec())));
+            self.windows_long_paths
+                .pop_front()
+                .expect("script must supply a Windows long-path result")
         }
     }
 
@@ -2373,6 +2879,35 @@ mod tests {
             epoch.get(&read).unwrap().as_ref(),
             PathObservationResult::ReadLink(PathOperationResult::Error(error))
                 if *error == unsupported
+        ));
+    }
+
+    #[test]
+    fn windows_long_path_dispatches_lossless_input_once_without_lstat_refinement() {
+        let temp = tempfile::tempdir().unwrap();
+        let owner = ();
+        let retained = RetainedMaterializationRoots::new(&owner, []).unwrap();
+        let input: Arc<[u16]> = Arc::from([
+            b'C' as u16,
+            b':' as u16,
+            b'/' as u16,
+            0xD800,
+            b'~' as u16,
+            b'1' as u16,
+        ]);
+        let result: Arc<[u16]> = Arc::from([b'C' as u16, b':' as u16, b'/' as u16, 0xD800]);
+        let demand =
+            PathObservationDemand::windows_long_path(path(temp.path(), "identity"), input.clone());
+        let mut operations = ScriptedOperations::unsupported();
+        operations.windows_long_paths.push_back(result.clone());
+
+        let epoch = observe_with(&retained, [demand.clone()], &mut operations).unwrap();
+
+        assert_eq!(operations.support_queries, 0);
+        assert_eq!(operations.calls, [Call::WindowsLongPath(input)]);
+        assert!(matches!(
+            epoch.get(&demand).unwrap().as_ref(),
+            PathObservationResult::WindowsLongPath(observed) if observed == &result
         ));
     }
 
@@ -2594,7 +3129,9 @@ mod tests {
                 PathObservationOperation::DirectoryEntries => operations
                     .directory_entries
                     .push_back(Err(PrimaryFailure::Final(original))),
-                PathObservationOperation::Lstat => unreachable!(),
+                PathObservationOperation::Lstat | PathObservationOperation::WindowsLongPath => {
+                    unreachable!()
+                }
             }
             let epoch = observe_with(&retained, [demand.clone()], &mut operations).unwrap();
             assert_eq!(operations.calls.len(), 1);

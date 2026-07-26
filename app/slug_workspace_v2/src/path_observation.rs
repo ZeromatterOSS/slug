@@ -257,6 +257,7 @@ pub enum PathObservationOperation {
     ReadLink,
     FileBytes,
     DirectoryEntries,
+    WindowsLongPath,
 }
 
 /// One exact operation requested from the outside-DICE observer.
@@ -265,6 +266,7 @@ pub struct PathObservationDemand {
     namespace: PathObservationNamespace,
     path: NormalizedAbsolutePath,
     operation: PathObservationOperation,
+    windows_long_path_input: Option<Arc<[u16]>>,
 }
 
 impl PathObservationDemand {
@@ -273,10 +275,29 @@ impl PathObservationDemand {
         path: NormalizedAbsolutePath,
         operation: PathObservationOperation,
     ) -> Self {
+        assert!(
+            operation != PathObservationOperation::WindowsLongPath,
+            "WindowsLongPath requires its dedicated Host demand constructor"
+        );
         Self {
             namespace,
             path,
             operation,
+            windows_long_path_input: None,
+        }
+    }
+
+    /// Requests Windows short-name expansion while retaining the exact raw
+    /// UTF-16 spelling independently from the normalized observation identity.
+    pub fn windows_long_path(
+        path: NormalizedAbsolutePath,
+        windows_long_path_input: Arc<[u16]>,
+    ) -> Self {
+        Self {
+            namespace: PathObservationNamespace::Host,
+            path,
+            operation: PathObservationOperation::WindowsLongPath,
+            windows_long_path_input: Some(windows_long_path_input),
         }
     }
 
@@ -290,6 +311,10 @@ impl PathObservationDemand {
 
     pub const fn operation(&self) -> PathObservationOperation {
         self.operation
+    }
+
+    pub fn windows_long_path_input(&self) -> Option<&[u16]> {
+        self.windows_long_path_input.as_deref()
     }
 }
 
@@ -592,6 +617,7 @@ pub enum PathObservationResult {
     ReadLink(PathOperationResult<Arc<PathBuf>>),
     FileBytes(PathOperationResult<Arc<[u8]>>),
     DirectoryEntries(PathOperationResult<PathDirectoryEntries>),
+    WindowsLongPath(Arc<[u16]>),
 }
 
 impl PathObservationResult {
@@ -601,6 +627,7 @@ impl PathObservationResult {
             Self::ReadLink(_) => PathObservationOperation::ReadLink,
             Self::FileBytes(_) => PathObservationOperation::FileBytes,
             Self::DirectoryEntries(_) => PathObservationOperation::DirectoryEntries,
+            Self::WindowsLongPath(_) => PathObservationOperation::WindowsLongPath,
         }
     }
 }
@@ -911,6 +938,45 @@ mod tests {
     }
 
     #[test]
+    fn windows_long_path_demand_retains_lossless_input_in_identity() {
+        let identity = path("/workspace/windows-long-path");
+        let slash = PathObservationDemand::windows_long_path(
+            identity.dupe(),
+            Arc::from("C:/PROGRA~1/./tool".encode_utf16().collect::<Vec<_>>()),
+        );
+        let backslash = PathObservationDemand::windows_long_path(
+            identity,
+            Arc::from("C:\\PROGRA~1\\.\\tool".encode_utf16().collect::<Vec<_>>()),
+        );
+
+        assert_eq!(slash.namespace(), PathObservationNamespace::Host);
+        assert_eq!(slash.operation(), PathObservationOperation::WindowsLongPath);
+        assert_eq!(
+            slash.windows_long_path_input(),
+            Some(
+                "C:/PROGRA~1/./tool"
+                    .encode_utf16()
+                    .collect::<Vec<_>>()
+                    .as_slice()
+            )
+        );
+        assert_ne!(slash, backslash);
+        let mut ordered = [backslash, slash.dupe()];
+        ordered.sort_unstable();
+        assert_eq!(ordered[0], slash);
+    }
+
+    #[test]
+    #[should_panic(expected = "WindowsLongPath requires its dedicated Host demand constructor")]
+    fn generic_demand_constructor_rejects_windows_long_path() {
+        let _ = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/workspace/windows-long-path"),
+            PathObservationOperation::WindowsLongPath,
+        );
+    }
+
+    #[test]
     fn path_observation_key_provides_exact_demand_through_dyn_key() {
         let expected = demand(
             PathObservationNamespace::Materialization(PathObservationInstanceId::new(7)),
@@ -1012,6 +1078,9 @@ mod tests {
             PathObservationResult::ReadLink(PathOperationResult::Missing),
             PathObservationResult::FileBytes(PathOperationResult::Error(io)),
             PathObservationResult::DirectoryEntries(PathOperationResult::Error(wrong_kind)),
+            PathObservationResult::WindowsLongPath(Arc::from(
+                "C:/Program Files".encode_utf16().collect::<Vec<_>>(),
+            )),
         ];
         assert_eq!(
             results.map(|result| result.operation()),
@@ -1020,6 +1089,7 @@ mod tests {
                 PathObservationOperation::ReadLink,
                 PathObservationOperation::FileBytes,
                 PathObservationOperation::DirectoryEntries,
+                PathObservationOperation::WindowsLongPath,
             ]
         );
         assert_ne!(io, wrong_kind);
@@ -1150,6 +1220,58 @@ mod tests {
                     ) if bytes.as_ref() == b"changed"
                 )
         ));
+    }
+
+    #[tokio::test]
+    async fn windows_long_path_dice_replays_a_b_a_and_need_remains_transient() {
+        let input: Arc<[u16]> = Arc::from("C:/PROGRA~1".encode_utf16().collect::<Vec<_>>());
+        let demand = PathObservationDemand::windows_long_path(path("/workspace/windows"), input);
+        let a: Arc<[u16]> = Arc::from("C:/Program Files".encode_utf16().collect::<Vec<_>>());
+        let b: Arc<[u16]> = Arc::from("C:/Programs".encode_utf16().collect::<Vec<_>>());
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let needed = transaction
+            .compute(&PathObservationKey::new(demand.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(needed, PathOutcome::Need(_)));
+        assert!(!PathObservationKey::validity(&needed));
+        assert!(!PathObservationKey::equality(&needed, &needed));
+
+        for expected in [a.dupe(), b, a] {
+            let mut updater = transaction.into_updater();
+            updater
+                .changed_to(vec![(
+                    PathObservationEpochKey,
+                    PathObservationEpoch::new([(
+                        demand.dupe(),
+                        PathObservationResult::WindowsLongPath(expected.dupe()),
+                    )])
+                    .unwrap(),
+                )])
+                .unwrap();
+            transaction = updater.commit().await;
+            let observed = transaction
+                .compute(&PathObservationKey::new(demand.dupe()))
+                .await
+                .unwrap();
+            assert!(matches!(
+                observed,
+                PathOutcome::Complete(result)
+                    if matches!(
+                        result.as_ref(),
+                        PathObservationResult::WindowsLongPath(actual)
+                            if actual == &expected
+                    )
+            ));
+        }
     }
 
     #[test]

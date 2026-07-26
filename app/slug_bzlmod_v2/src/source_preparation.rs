@@ -1089,7 +1089,8 @@ async fn observed_repository_source_file(
         }
         PathObservationResult::Lstat(_)
         | PathObservationResult::ReadLink(_)
-        | PathObservationResult::DirectoryEntries(_) => {
+        | PathObservationResult::DirectoryEntries(_)
+        | PathObservationResult::WindowsLongPath(_) => {
             unreachable!("FileBytes demand must return a FileBytes observation")
         }
     }
@@ -1517,7 +1518,8 @@ impl ModuleSourcePreparationKey {
                 }
                 PathObservationResult::Lstat(_)
                 | PathObservationResult::ReadLink(_)
-                | PathObservationResult::DirectoryEntries(_) => {
+                | PathObservationResult::DirectoryEntries(_)
+                | PathObservationResult::WindowsLongPath(_) => {
                     unreachable!("FileBytes demand must return a FileBytes observation")
                 }
             };

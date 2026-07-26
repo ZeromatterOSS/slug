@@ -983,7 +983,8 @@ impl Key for PathFileBytesKey {
                 }
                 PathObservationResult::Lstat(_)
                 | PathObservationResult::ReadLink(_)
-                | PathObservationResult::DirectoryEntries(_) => {
+                | PathObservationResult::DirectoryEntries(_)
+                | PathObservationResult::WindowsLongPath(_) => {
                     unreachable!("FileBytes demand must return a FileBytes observation")
                 }
             },
@@ -1262,7 +1263,8 @@ impl Key for PathDirectoryListingKey {
                 }
                 PathObservationResult::Lstat(_)
                 | PathObservationResult::ReadLink(_)
-                | PathObservationResult::FileBytes(_) => {
+                | PathObservationResult::FileBytes(_)
+                | PathObservationResult::WindowsLongPath(_) => {
                     unreachable!(
                         "DirectoryEntries demand must return a DirectoryEntries observation"
                     )

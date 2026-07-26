@@ -42,16 +42,15 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-windows-long-path-observation-owner`.
+`WP-5-m1-host-repository-ignore-owner-corrected-retry`.
 
-Implement only the accepted producer-free six-file Windows long-path
-observation prerequisite. Add the lossless pre-normalization UTF-16 demand
-input, final normalized UTF-16 result, one sizing/one fill
-`GetLongPathNameW` owner in the existing outside-DICE native loop, exact
-failure/identity equality, repository-validation dirty rules, and exhaustive
-consumer closure. Run the focused/full/downstream/GNU-Windows gates. Add no
-producer, bzlmod consumer, dependency, reexport, activation, or package
-lookup.
+Implement only the accepted corrected three-file Host REPO evaluator and
+repository-ignore key. Preserve exact Bazel REPO globals, restricted syntax,
+call diagnostics, Latin-1/UTF event behavior, list/tuple/range sequences,
+replacement-decoded `.bazelignore`, native validation, lossless Windows
+long-path demands, current-root vendor ordering, first-file termination,
+semantic equality, and Need/event replay. Add no command activation or
+package lookup.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

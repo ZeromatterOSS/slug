@@ -1061,6 +1061,10 @@ fn observation_is_dirty(
             PathObservationResult::DirectoryEntries(previous),
             PathObservationResult::DirectoryEntries(observed),
         ) => previous != observed,
+        (
+            PathObservationResult::WindowsLongPath(previous),
+            PathObservationResult::WindowsLongPath(observed),
+        ) => previous != observed,
         _ => true,
     }
 }
@@ -1080,6 +1084,7 @@ fn observation_has_error(result: &PathObservationResult) -> bool {
         PathObservationResult::DirectoryEntries(result) => {
             matches!(result, PathOperationResult::Error(_))
         }
+        PathObservationResult::WindowsLongPath(_) => false,
     }
 }
 
@@ -5147,6 +5152,26 @@ mod tests {
             &[],
             |_, _| PathObservationResult::DirectoryEntries(PathOperationResult::Present(
                 PathDirectoryEntries::new([PathDirectoryName::new("a").unwrap()]).unwrap()
+            ))
+        ));
+
+        let long_path_demand = PathObservationDemand::windows_long_path(
+            NormalizedAbsolutePath::new("/windows-long-path").unwrap(),
+            Arc::from("C:/PROGRA~1".encode_utf16().collect::<Vec<_>>()),
+        );
+        let long_path = PathObservationResult::WindowsLongPath(Arc::from(
+            "C:/Program Files".encode_utf16().collect::<Vec<_>>(),
+        ));
+        assert!(!validation_is_dirty(
+            &[(long_path_demand.clone(), long_path.clone())],
+            &[],
+            |_, _| long_path.clone()
+        ));
+        assert!(validation_is_dirty(
+            &[(long_path_demand, long_path)],
+            &[],
+            |_, _| PathObservationResult::WindowsLongPath(Arc::from(
+                "C:/Programs".encode_utf16().collect::<Vec<_>>()
             ))
         ));
     }
