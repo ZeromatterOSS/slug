@@ -3726,6 +3726,38 @@ normalization, and one sizing/one fill behavior; and bounded unsafe allocation
 and fill races without changing valid shortening success. No Rust, fixture,
 formatting, or Cargo command ran in the design packet.
 
+##### Corrected retry implementation status
+
+**Status:** Accepted on 2026-07-25.
+
+The exact three-file packet adds the private Host REPO evaluator and the
+repository-ignore key. It preserves Bazel 9.2.0's exact REPO globals,
+Latin-1/UTF behavior, restricted-syntax locations and traversal, binder
+diagnostics, ordered duplicate patterns, replacement-decoded
+`.bazelignore`, native Unix/Windows path validation, lossless Windows 8.3
+demands, current-root vendor ordering, first-file termination, transient
+Needs, semantic equality, and marker-conditional event batches.
+
+Review corrections removed the extra `chr`/`ord` globals, restored exact
+tag-era AST visitation, source-ordered argument binding and spelling
+suggestions, grouped malformed UTF-8 like Java's decoder, ported the relevant
+OpenJDK Windows parser branches, retained source locations in diagnostics,
+and admitted already-verbatim `\\?\C:` short-path candidates. Retained-DICE
+tests prove cold/change/failure/empty/A-to-B-to-A batches, warm nonreplay,
+REPO-before-roots, sequential root Needs, current-root vendor inclusion, and
+later-root termination.
+
+Validation passed 52 focused/unit tests and 266 total bzlmod tests, 54 loading
+tests, 102 core unit plus 13 integration tests, and zero doctests. All 12
+bzlmod, six loading, and two core GNU-Windows test executables linked.
+Formatting, diff, archive, exact-file, privacy, dependency, no-direct-IO,
+no-activation, and compact-storage gates passed. Three terminal latest-diff
+reviews returned `ACCEPT`, including a source audit against exact Bazel 9.2.0
+commit `8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+Next evidence: Implement only
+`WP-5-m1-host-root-package-lookup-owner`.
+
 #### Serial packet 6: private Host main-package lookup
 
 Run only `WP-5-m1-host-root-package-lookup-owner`. Edit exactly:

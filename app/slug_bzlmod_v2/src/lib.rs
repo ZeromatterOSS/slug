@@ -18,6 +18,7 @@ mod package_policy;
 pub mod parser;
 pub mod registry;
 pub mod registry_dice;
+mod repo_file;
 mod repository_ignore;
 pub mod resolution;
 mod root_bootstrap;

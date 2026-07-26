@@ -31,26 +31,26 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the root-module effect and main-package-policy
-redesign passed three terminal latest-text reviews. It freezes an oracle-first
-sequence followed by a typed bootstrap Need/domain owner, dormant
-outside-DICE native apply, normalized package-policy projections, neutral
-diagnostics, exact REPO/matcher/package/horizon owners, private Host root
-keys, and only then command-owned bootstrap activation. No Rust or fixture
-changed in the design packet.
+Latest M1 accepted evidence: the private Host REPO evaluator and
+repository-ignore key passed three terminal latest-diff reviews, including an
+exact Bazel 9.2.0 source audit. The three-file owner preserves exact globals,
+restricted syntax and binder diagnostics, Latin-1/UTF events, Java
+replacement decoding and native path behavior, lossless Windows 8.3 demands,
+sequential root/vendor/file ordering, semantic equality, and transient Need
+behavior. Full bzlmod/loading/core and GNU-Windows link validation passed.
 
 ### Current packet
 
 Implement only
-`WP-5-m1-host-repository-ignore-owner-corrected-retry`.
+`WP-5-m1-host-root-package-lookup-owner`.
 
-Implement only the accepted corrected three-file Host REPO evaluator and
-repository-ignore key. Preserve exact Bazel REPO globals, restricted syntax,
-call diagnostics, Latin-1/UTF event behavior, list/tuple/range sequences,
-replacement-decoded `.bazelignore`, native validation, lossless Windows
-long-path demands, current-root vendor ordering, first-file termination,
-semantic equality, and Need/event replay. Add no command activation or
-package lookup.
+Implement only the accepted two-file private Host main-package lookup owner.
+Preserve canonical-main identity, deletion and reserved-`external`
+precedence, repository-ignore completion, ordered package roots,
+`BUILD.bazel` before `BUILD`, resolved regular/special/symlink terminal
+kinds, logical-path-only successful equality, typed failures, and transient
+Needs. Add no include labels/bytes, public key/reexport, loading consumer, or
+command activation.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
