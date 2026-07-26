@@ -2302,3 +2302,186 @@ returned `ACCEPT` on the corrected latest diff.
 
 Next evidence after terminal acceptance of this checkpoint:
 design only `WP-5-m1-terminal-event-execution-oracle-design`.
+
+### Stage 5 terminal event/execution oracle design
+
+Status: Accepted
+
+#### Observed Bazel boundary
+
+Two independent retained Bazel 9.2.0 runs of a confined copy of
+`load-invalidation` established one stable stderr sequence:
+
+- cold build: root MODULE, dependency `.bzl`, parent `.bzl`, BUILD, then the
+  selected rule implementation;
+- unchanged warm build/query: no semantic print replay;
+- an edited dependency followed by an empty-result query: dependency `.bzl`,
+  parent `.bzl`, then BUILD, with no root or rule-implementation print;
+- the following build: only the invalidated rule implementation;
+- eligible analysis failure: the selected rule prefix before its Starlark
+  diagnostic, with cached loading prints absent; and
+- action failure: the selected rule prefix, Bazel's `Action ... failed`
+  diagnostic, then action stderr, all on stderr.
+
+The valid empty query has empty stdout. The harness captures stdout and stderr
+through separate pipes, so this packet asserts order only within each channel;
+it makes no cross-channel temporal claim. Bazel receives a local failing action
+while the fixture's NativeLink service is Slug-only, so the oracle freezes
+Bazel's semantic-output-before-execution-error phase/channel order, not Bazel
+remote-executor wording.
+
+Pinned source is Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`:
+
+- `ModuleFileFunction.execModuleFile` installs the root/nonregistry DEBUG print
+  handler while registry module printing is silent;
+- `BzlLoadFunction` computes loaded dependencies before parent execution,
+  installs the `.bzl` DEBUG handler, and keeps events outside cached value
+  equality;
+- `PackageFactory.executeBuildFileImpl` stores BUILD prints in the package-local
+  handler;
+- `RuleContext.createStarlarkThread` and
+  `StarlarkRuleConfiguredTargetUtil.evalRule` store rule prints and then
+  classify implementation failure;
+- `StarlarkActionFactory.runShell`, `ActionExecutionFunction`,
+  `BuildTool`, and `SkyframeActionExecutor` place action execution after
+  analysis and report the action failure before captured process stderr; and
+- `QueryCommand`, `QueryEnvironmentBasedCommand`, and `SkyQueryEnvironment`
+  write results to stdout, report empty results on stderr, and consume package
+  values without configured-target analysis.
+
+#### Required harness prerequisite
+
+Fixture-local TOML cannot express the mixed REAPI applicability. With
+`[reapi] remote_executor = true`, `runner.py` currently appends the Slug remote
+flag to every command and `compare.py` requires positive completed REAPI
+evidence for every row. Ordinary query performs no action, analysis failure
+never reaches execution, and failed execution emits an error rather than the
+successful completed-evidence object.
+
+Implement first, as
+`WP-5-m1-terminal-oracle-reapi-applicability`, in exactly:
+
+- `tools/v2_oracle_lib/runner.py`;
+- `tools/v2_oracle_lib/compare.py`; and
+- `tests/v2_oracle/test_v2_oracle.py`.
+
+For a remote-executor fixture, append remote flags only when the fixture
+command's first argument is `build`. Require and structurally validate positive
+REAPI evidence exactly when the first argument is `build` and the command
+contract's `expected_exit` is zero. The normal actual-exit comparison remains
+independent, so an expected-success build cannot evade evidence checking by
+failing. An expected-failing build still receives the remote flag and remains
+governed by its exit, stderr, and manifest assertions; query receives neither
+the flag nor an evidence requirement. Preserve the existing strict behavior
+for every current successful REAPI build fixture. Add focused regressions for
+successful build, failed build, and query applicability. Do not add a schema
+field, fixture special case, command-name check, tool-output heuristic, or
+production Slug change.
+
+#### Nine-row retained oracle
+
+Then implement `WP-5-m1-terminal-event-execution-oracle` by replacing the
+current two-row sequence with exactly these cumulative rows:
+
+1. `cold_success_v1_order`: `build //pkg:message`, exit zero, empty stdout,
+   manifest `one\n`, and exact once-only stderr order
+   `ROOT_MODULE`, `DEP_BZL_V1`, `PARENT_BZL`, `BUILD`,
+   `RULE_MESSAGE_ONE`.
+2. `unchanged_warm_build_no_replay`: the same build and byte-identical
+   manifest, exit zero, empty stdout, and the complete unique-prefix namespace
+   absent.
+3. `valid_empty_warm_query`: query
+   `//pkg:message except //pkg:message`, exit zero, exactly empty stdout, and
+   no unique-prefix sentinel.
+4. `empty_query_after_dependency_edit`: mutate both the dependency sentinel
+   V1 to V2 and `MESSAGE` from `one` to `two`, repeat the empty query, and
+   require exit zero, exactly empty stdout, and exact stderr order
+   `DEP_BZL_V2`, `PARENT_BZL`, `BUILD`, with root and every rule sentinel
+   absent.
+5. `unchanged_warm_query_no_replay`: repeat row 4 without mutation; stdout is
+   exactly empty, exit is zero, and the complete unique-prefix namespace is
+   absent.
+6. `build_after_query_edit_only_analysis`: build `//pkg:message`; only
+   `RULE_MESSAGE_TWO` is present, exit is zero, stdout is exactly empty, and
+   the manifest is `two\n`. This proves the query retained the loading result
+   while the downstream configured target still invalidated.
+7. `eligible_analysis_failure_prefix`: build a distinct
+   `//pkg:analysis_failure` target; only
+   `RULE_ANALYSIS_FAILURE_PREFIX` precedes `TERMINAL_ANALYSIS_FAILURE`, exit is
+   one, stdout is exactly empty, cached loading prints are absent, and no
+   action sentinel appears.
+8. `execution_failure_after_semantic_output`: build a distinct
+   `//pkg:execution_failure` target whose rule prints
+   `RULE_EXECUTION_FAILURE_PREFIX` and registers one `run_shell` output that
+   writes `TERMINAL_ACTION_FAILURE_DIAGNOSTIC` to stderr and exits nonzero.
+   Require the rule prefix before stable `Action ... failed` shape before the
+   action sentinel; expected exit is exactly one, stdout is exactly empty, and
+   analysis-failure and cached loading sentinels are absent.
+9. `warm_message_after_failures_no_replay`: build `//pkg:message`, retain the
+   row-6 `two\n` manifest, exit zero, exactly empty stdout, and reject the
+   complete unique-prefix namespace. This proves neither failed command
+   replays selected output into a later command.
+
+Use three sibling rule implementations rather than a mode attribute. Keep
+manifest roots command-local and exactly
+`["bazel-bin/pkg/message.txt"]` on rows 1, 2, 6, and 9; remove the fixture-level
+manifest root so query and failure records do not retain stale-output
+assertions. Set `stdout_patterns = ["\\A\\Z"]` on every row. Use one globally
+unique prefix for every semantic print, the analysis-failure token, and the
+action-stderr token. The same anchored negative over that complete namespace
+governs warm rows 2, 3, 5, and 9; eventful rows use anchored negative-tempered
+`stderr_patterns`. Semantic or message-shape comparison alone does not compare
+normalized stderr.
+
+The exact oracle allowlist is six existing files:
+
+- `tests/v2_oracle/fixtures/load-invalidation/fixture.toml`;
+- `tests/v2_oracle/fixtures/load-invalidation/expected/oracle.json`;
+- `tests/v2_oracle/fixtures/load-invalidation/workspace/MODULE.bazel`;
+- `tests/v2_oracle/fixtures/load-invalidation/workspace/pkg/BUILD.bazel`;
+- `tests/v2_oracle/fixtures/load-invalidation/workspace/pkg/defs.bzl`; and
+- `tests/v2_oracle/fixtures/load-invalidation/workspace/pkg/message.bzl`.
+
+The root `workspace/BUILD.bazel`, other fixtures, new files/symlinks,
+registry/platform scaffolding, Slug Rust/Cargo, server/CLI/runtime code, and
+BUILD metadata are forbidden.
+
+#### Growth, validation, and stop gates
+
+The latest fixture-growth checkpoint is accepted tree `42e38bc3`: 1,272
+regular files, ten symlinks, and 31,208 lines. The three later accepted oracle
+packets are root-patch `9fa4fbde`, Local lifecycle `dcc19327`, and root-MODULE
+include events `699c3a8e`; current growth is six regular files, four symlinks,
+610 lines, and eleven discriminating rows. This is packet four, below every
+hygiene trigger. The retained fixture has seven regular files, no symlinks, and
+121 lines; the verified nine-row prototype remained below 400 total fixture
+lines. Cap net fixture growth at 350 lines and add no entry.
+
+Generate with pinned Bazel 9.2, then run two independent fresh-root normalized
+replays and the focused fixture. Require nine unique command names and expected
+records, exact cumulative mutations, exact V1/V2 manifest relations, stable
+exit and diagnostic shapes, source-anchor existence, JSON/schema validation,
+terminal newlines, `git diff --check`, exact allowlists, tracked archive
+inventory, and credential guards.
+
+Stop and replan on more than nine rows, more than 350 net fixture lines, any
+new entry/scaffold, a cross-channel decisive ordering, unstable action
+diagnostic order, missing successful-build REAPI evidence, a query/failure
+evidence requirement, changed old REAPI-fixture behavior, or any allowlist
+escape. Do not weaken an exact sentinel negative to accept replay.
+
+Evidence: A two-run confined Bazel 9.2 probe passed the exact nine-row
+event/failure/query sequence, including dependency-edit query retention,
+analysis-only follow-up, eligible failure prefix, action diagnostic order, and
+warm nonreplay. Live harness inspection proved a fixture-local configuration
+cannot distinguish successful action builds from query and expected-failing
+builds, so the design splits one generic three-file applicability prerequisite
+from the six-file oracle. Fixture-growth review places this as packet four at
+only +6 regular files, +4 symlinks, and +610 lines before implementation.
+Independent fixture/discovery, Bazel source/observation, and
+architecture/maintainability rereviews returned `ACCEPT` on the corrected
+latest diff.
+
+Next evidence after terminal acceptance of this design:
+implement only `WP-5-m1-terminal-oracle-reapi-applicability`.
