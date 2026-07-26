@@ -1,0 +1,7 @@
+module(name = "lockfile_schema", version = "1.0.0")
+
+bazel_dep(name = "subject", version = "1.0.0")
+
+schema = use_extension("//:ext.bzl", "schema")
+schema.config(message = "tagged")
+use_repo(schema, "alpha", "beta")

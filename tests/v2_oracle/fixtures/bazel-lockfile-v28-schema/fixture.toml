@@ -1,0 +1,392 @@
+[fixture]
+name = "bazel-lockfile-v28-schema"
+description = "Bazel 9.2 exact visible MODULE.bazel.lock v28 schema and adapter-boundary oracle."
+comparison = "semantic"
+http_registry = true
+http_registry_port = 0
+oracle_notes = "A self-contained extension first generates all real Bazel v28 domains available to module_ctx. Later command-local mutations exercise retained schema and adapter boundaries; no template asset or harness behavior is used."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileValue.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Discovery.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/GsonTypeAdapterUtil.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/LockFileModuleExtension.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/LockfileModuleExtensionMetadata.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFileDownloadEvent.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RepoSpecFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/AttributeValuesAdapter.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/FactsAdapter.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/cache/DownloadCache.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/Checksum.java",
+  "src/main/java/com/google/devtools/build/lib/rules/repository/RepoRecordedInput.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkBaseExternalContext.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryContext.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/DirectoryTreeDigestFunction.java",
+  "src/MODULE.tools",
+  "src/test/tools/bzlmod/MODULE.bazel.lock",
+]
+translation_notes = "The loopback registry makes remote registry hashes and a selected yanked version deterministic. module_ctx generates FILE, DIRENTS, ENV, and REPO_MAPPING inputs; DIRTREE is injected only after the generated baseline because Bazel exposes watch_tree solely on repository_ctx, then real Bazel parses and retains it."
+generation_command = "SLUG_V2_ORACLE_ROOT=target/v2o-lockfile-v28-generate python3 -B -m tools.v2_oracle run --fixture bazel-lockfile-v28-schema --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "SLUG_V2_ORACLE_ROOT=target/v2o-lockfile-v28-replay-a python3 -B -m tools.v2_oracle run --fixture bazel-lockfile-v28-schema --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "generate_comprehensive_v28"
+argv = ["build", "@alpha//:value.txt", "@beta//:value.txt", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build", "--allow_yanked_versions=subject@1.0.0"]
+expected_exit = 0
+env_allowlist = ["LOCKFILE_SCHEMA_ENV"]
+stderr_contains = ["LOCKFILE_SCHEMA_EXTENSION_EVALUATED"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[commands.env]
+LOCKFILE_SCHEMA_ENV = "env value\\with\nnewline"
+
+[[commands]]
+name = "canonical_rewrite_retains_foreign_factor"
+argv = ["run", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build", "--allow_yanked_versions=subject@1.0.0"]
+expected_exit = 0
+env_allowlist = ["LOCKFILE_SCHEMA_ENV"]
+stderr_contains = ["LOCKFILE_SCHEMA_EXTENSION_EVALUATED"]
+stdout_contains = [
+  '"lockFileVersion": 28',
+  '"registryFileHashes"',
+  '"selectedYankedVersions"',
+  '"moduleExtensions"',
+  '"bzlTransitiveDigest"',
+  '"usagesDigest"',
+  '"recordedInputs"',
+  '"generatedRepoSpecs"',
+  '"moduleExtensionMetadata"',
+  '"facts"',
+  '"factsVersions"',
+  '"os:foreign,arch:foreign"',
+  "bfba4f5eab12ba25f330339b219c4f4dd722cba42f72835a4d902aff8af15635",
+  "rewritten value",
+]
+stdout_patterns = ["(?s)\\A(?!.*BFBA4F5EAB12BA25F330339B219C4F4DD722CBA42F72835A4D902AFF8AF15635).*os:foreign,arch:foreign.*rewritten value"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[commands.env]
+LOCKFILE_SCHEMA_ENV = "env value\\with\nnewline"
+
+  [[commands.mutations]]
+  path = "input.txt"
+  find = "file value"
+  replace = "rewritten value"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  find = "bfba4f5eab12ba25f330339b219c4f4dd722cba42f72835a4d902aff8af15635"
+  replace = "BFBA4F5EAB12BA25F330339B219C4F4DD722CBA42F72835A4D902AFF8AF15635"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  find = '''
+      }
+    }
+  },
+  "facts": {'''
+  replace = '''
+      },
+      "os:foreign,arch:foreign": {
+        "bzlTransitiveDigest": "Jw4ClDT5c00Z3GSp0TNPY74OcA2IbT8gBUgv1ego6j4=",
+        "usagesDigest": "6oBZTp2WunPCq7KIk2PmkB4Xfl7OHBAgyEmEf4IDXjc=",
+        "recordedInputs": [
+          "ENV:LOCKFILE_SCHEMA_ENV env\\svalue\\\\with\\nnewline",
+          "FILE:@@//input.txt 62e02c61587d9e7ddcd9db70b43c497b849858f8d7c296555e47757bd0ac56c2",
+          "DIRENTS:@@//input_dir 9ac716fbdfdffd921b9d0beadfb3b2b23e2af659b3f3ef76cb3c7cb9ed22a959",
+          "REPO_MAPPING:,subject subject+"
+        ],
+        "generatedRepoSpecs": {
+          "alpha": {
+            "repoRuleId": "@@//:ext.bzl%typed_repo",
+            "attributes": {
+              "bool_value": true,
+              "dict_value": {
+                "z": "last",
+                "a": "first"
+              },
+              "int_value": 17,
+              "label_value": "@@subject+//:probe",
+              "list_value": [
+                "z",
+                "a"
+              ],
+              "message": "tagged|env value\\with\nnewline|file value|entry.txt"
+            }
+          },
+          "beta": {
+            "repoRuleId": "@@//:ext.bzl%typed_repo",
+            "attributes": {
+              "bool_value": false,
+              "int_value": -3,
+              "label_value": "@@//:input.txt",
+              "message": "second"
+            }
+          }
+        },
+        "moduleExtensionMetadata": {
+          "explicitRootModuleDirectDeps": [
+            "alpha",
+            "beta"
+          ],
+          "explicitRootModuleDirectDevDeps": [],
+          "useAllRepos": "NO",
+          "reproducible": false
+        }
+      }
+    }
+  },
+  "facts": {'''
+
+[[commands]]
+name = "reject_stale_current_factor_dirtree"
+argv = ["build", "@alpha//:value.txt", "@beta//:value.txt", "--lockfile_mode=error", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build", "--allow_yanked_versions=subject@1.0.0"]
+expected_exit = 48
+env_allowlist = ["LOCKFILE_SCHEMA_ENV"]
+stderr_contains = ["MODULE.bazel.lock is no longer up-to-date", "directory tree at @@//input_dir changed"]
+
+[commands.env]
+LOCKFILE_SCHEMA_ENV = "env value\\with\nnewline"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  find = "bfba4f5eab12ba25f330339b219c4f4dd722cba42f72835a4d902aff8af15635"
+  replace = "BFBA4F5EAB12BA25F330339B219C4F4DD722CBA42F72835A4D902AFF8AF15635"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  find = '''
+          "FILE:@@//input.txt 3fc8732b6fb57d04872c5258e5b430e2f0a312fc7420d2d425c49dc6dc3664cb",
+          "DIRENTS:@@//input_dir 9ac716fbdfdffd921b9d0beadfb3b2b23e2af659b3f3ef76cb3c7cb9ed22a959",'''
+  replace = '''
+          "FILE:@@//input.txt 3fc8732b6fb57d04872c5258e5b430e2f0a312fc7420d2d425c49dc6dc3664cb",
+          "DIRENTS:@@//input_dir 9ac716fbdfdffd921b9d0beadfb3b2b23e2af659b3f3ef76cb3c7cb9ed22a959",
+          "DIRTREE:@@//input_dir stale-tree-digest",'''
+
+[[commands]]
+name = "force_replace_stale_dirtree"
+argv = ["build", "@alpha//:value.txt", "@beta//:value.txt", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build", "--allow_yanked_versions=subject@1.0.0"]
+expected_exit = 0
+env_allowlist = ["LOCKFILE_SCHEMA_ENV"]
+stderr_contains = ["LOCKFILE_SCHEMA_EXTENSION_EVALUATED"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[commands.env]
+LOCKFILE_SCHEMA_ENV = "env value\\with\nnewline"
+
+[[commands]]
+name = "rewrite_defaults_null_unknown_duplicate_first_marker"
+argv = ["build", "@alpha//:value.txt", "@beta//:value.txt", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build", "--allow_yanked_versions=subject@1.0.0"]
+expected_exit = 0
+env_allowlist = ["LOCKFILE_SCHEMA_ENV"]
+stderr_contains = ["LOCKFILE_SCHEMA_EXTENSION_EVALUATED"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[commands.env]
+LOCKFILE_SCHEMA_ENV = "env value\\with\nnewline"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "unknownNull": null,
+  "unknownObject": {"ignored": true},
+  "lockFileVersion": 27
+}
+'''
+
+[[commands]]
+name = "accept_gson_legacy_lenient_spelling"
+argv = ["build", "@alpha//:value.txt", "@beta//:value.txt", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build", "--allow_yanked_versions=subject@1.0.0"]
+expected_exit = 0
+env_allowlist = ["LOCKFILE_SCHEMA_ENV"]
+stderr_contains = ["LOCKFILE_SCHEMA_EXTENSION_EVALUATED"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[commands.env]
+LOCKFILE_SCHEMA_ENV = "env value\\with\nnewline"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "unknown": 'legacy-lenient'
+}
+'''
+
+[[commands]]
+name = "reject_overflowing_version_marker"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 48
+stderr_contains = ["Failed to read and parse the MODULE.bazel.lock file", "999999999999999999999999"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{"lockFileVersion": 999999999999999999999999}
+'''
+
+[[commands]]
+name = "reject_genuinely_malformed_json"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 48
+stderr_contains = ["Failed to read and parse the MODULE.bazel.lock file"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{"lockFileVersion": 28,
+'''
+
+[[commands]]
+name = "reject_invalid_base64_digest"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 48
+stderr_contains = ["Failed to read and parse the MODULE.bazel.lock file"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "moduleExtensions": {
+    "//:ext.bzl%schema": {
+      "general": {
+        "bzlTransitiveDigest": "!",
+        "usagesDigest": "AA==",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    }
+  }
+}
+'''
+
+[[commands]]
+name = "reject_non_object_facts"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 48
+stderr_contains = ["Failed to read and parse the MODULE.bazel.lock file", "Failed to decode facts JSON"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "facts": {
+    "//:ext.bzl%schema": []
+  }
+}
+'''
+
+[[commands]]
+name = "reject_missing_metadata_enum"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 48
+stderr_contains = ["Failed to read and parse the MODULE.bazel.lock file"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "moduleExtensions": {
+    "//:ext.bzl%schema": {
+      "general": {
+        "bzlTransitiveDigest": "AA==",
+        "usagesDigest": "AA==",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {},
+        "moduleExtensionMetadata": {
+          "reproducible": false
+        }
+      }
+    }
+  }
+}
+'''
+
+[[commands]]
+name = "reject_missing_required_extension_property"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 48
+stderr_contains = ["Failed to read and parse the MODULE.bazel.lock file"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "moduleExtensions": {
+    "//:ext.bzl%schema": {
+      "general": {
+        "usagesDigest": "AA==",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    }
+  }
+}
+'''
+
+[[commands]]
+name = "surface_uncaught_invalid_checksum"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 37
+stderr_contains = ["Invalid checksum"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "registryFileHashes": {
+    "https://schema.invalid/subject": "not-a-checksum"
+  }
+}
+'''
+
+[[commands]]
+name = "surface_uncaught_invalid_module_version"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 37
+stderr_contains = ["Unable to parse ModuleKey", "not_a_version"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "selectedYankedVersions": {
+    "subject@not_a_version": "invalid version hole"
+  }
+}
+'''
+
+[[commands]]
+name = "surface_uncaught_missing_extension_delimiter"
+argv = ["query", "//:print_lockfile", "--lockfile_mode=update", "--registry={{http_registry}}/missing", "--registry={{http_registry}}/registry", "--registry=https://bcr.bazel.build"]
+expected_exit = 37
+stderr_contains = ["IndexOutOfBoundsException"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel.lock"
+  content = '''
+{
+  "lockFileVersion": 28,
+  "moduleExtensions": {
+    "//:ext.bzl": {}
+  }
+}
+'''

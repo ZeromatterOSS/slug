@@ -4971,6 +4971,50 @@ Next evidence: Resume only
 `WP-5-m1-bazel-lockfile-v28-schema-oracle` under the complete corrected
 twelve-file, 15-row, 2,500-line contract.
 
+##### Lockfile v28 schema oracle
+
+**Status:** Accepted on 2026-07-26.
+
+The exact twelve-file fixture retains 15 ordered Bazel 9.2 commands. Its
+generated baseline covers all six top-level fields, selected-yanked state,
+current OS/architecture factor, both digests, natural
+FILE/DIRENTS/ENV/REPO_MAPPING inputs, typed generated repo specs and
+attributes, metadata, recursively normalized Facts, and fact version. The
+canonical row changes a watched input, forces both generated repositories,
+normalizes an exactly-once uppercase subject checksum, and retains a compatible
+foreign factor. Error mode then rejects an injected current-factor DIRTREE;
+update reevaluates the extension and restores the canonical row digest.
+Minimal/default/unknown/duplicate-first-marker and Gson-lenient rows converge
+canonically, followed by six caught parser/adapter failures and the exact
+invalid-checksum, invalid-version, and missing-delimiter uncaught holes.
+
+The fixture uses semantic comparison, so message-shape assertions remain while
+all five normalized visible-lockfile manifests are regression gates. A direct
+comparator test proved synthetic baseline-manifest drift fails. The complete
+500-entry registry map is exact set/value evidence: 184/184 BCR entries equal
+the pinned tools lockfile; 156 BCR module files have 312 paired loopback
+recorded absences; 27 selected-registry source files have no companions; one
+BCR descriptor, one checked loopback descriptor, and three exact subject
+entries complete the set with zero unclassified URLs. Request evidence remains
+filtered to subject paths, and no synthetic module server or semantic BCR
+mutation remains.
+
+Validation: semantic generation
+`20260726-111357-3325340-bazel`; final fresh-root replays
+`20260726-111556-3333495-bazel` and
+`20260726-111641-3337458-bazel`; exact exits
+`0,0,48,0,0,0,48,48,48,48,48,48,37,37,37`; 23/23 pinned
+source anchors; scaffold classifier; transition-digest equality; archive and
+staged diff checks. Growth is twelve regular files, zero symlinks, and 1,311
+lines, the first accepted oracle after checkpoint `df812c2c`; no fixture-growth
+checkpoint is due. All three corrected latest-diff source,
+implementation/evidence, and orchestration/maintainability reviews returned
+`ACCEPT`. No Rust, Cargo, harness, archive, public API, or activation changed.
+
+Residual risk: production still has the incomplete live schema. Implement only
+`WP-5-m1-bazel-lockfile-v28-pure-owner` under the accepted private four-file
+contract; the atomic live cutover and Host ownership remain later packets.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only

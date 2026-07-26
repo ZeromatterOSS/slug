@@ -1,0 +1,22 @@
+exports_files([
+    "input.txt",
+    "input_dir/entry.txt",
+])
+
+genrule(
+    name = "print_lockfile",
+    srcs = [
+        "@alpha//:value.txt",
+        "@beta//:value.txt",
+    ],
+    outs = ["print_lockfile.sh"],
+    cmd = """
+cat >$@ <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cat "$${BUILD_WORKSPACE_DIRECTORY}/MODULE.bazel.lock"
+EOF
+chmod +x $@
+""",
+    executable = True,
+)
