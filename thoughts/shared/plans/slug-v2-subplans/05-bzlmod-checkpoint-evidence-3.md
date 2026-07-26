@@ -3124,3 +3124,468 @@ fragments, add direct DICE IO, or activate discovery.
 
 Next evidence: Design only
 `WP-5-m1-root-module-effects-and-package-policy-owner-redesign`.
+
+### Stage 5 root-module effects and package-policy owner redesign
+
+Status: Accepted corrected implementation contract before Rust
+
+#### Bazel authority and retained evidence
+
+The source of truth is Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+`ModuleFileFunction.java:120-128,285-318,512-515,921-943` fixes the
+399-byte `BZLMOD_REMINDER`, missing-root write and warning, logical root path,
+and read/create failures. The confined same-server observation from the prior
+packet fixes missing→created/warned, warm silence, edit preservation,
+delete→recreated/warned, and exact restoration with SHA-256
+`0e3e315145ac7ee7a4e0ac825e1c5e03c068ec1254dd42c3caaecb27e921dc4d`.
+It remains diagnostic only: no retained fixture or Slug support may use
+WORKSPACE to enter Bazel's client workspace.
+
+`ModuleFileFunction.advanceHorizon` fixes parse-all, deduplicated
+package-lookups-at-one-level, first-source-order failure, and package
+preflight before any include-file value or bytes.
+`PackageLookupFunction.java` fixes deleted packages before the main/external
+split, reserved `//external`, ignored-subdirectory lookup, and, for the main
+repository, package-root order outside `BUILD.bazel`/`BUILD` priority.
+`FileValue.isFile()` accepts both RegularFile and SpecialFile.
+`IgnoredSubdirectoriesFunction.java`, `RepoFileFunction.java`,
+`RepoFileGlobals.java`, `RepoThreadContext.java`,
+`IgnoredSubdirectories.java`, and `UnixGlob.java` fix first-readable
+package-root `.bazelignore`, workspace-root `REPO.bazel`, contained vendor
+prefixes, no-load REPO evaluation and events, literal prefixes, and exact
+`matchesPrefix` patterns.
+
+The retained `nonroot-include-composition` and
+`nonroot-repository-path-state-symlinks` fixtures continue to prove the
+shared horizon and resolved-path rules, but they use the external-repository
+branch. Before root package Rust, add one discriminating main-repository
+oracle and then run the required five-packet fixture-growth review.
+
+#### Serial packet 0: root main-package-policy oracle
+
+Run only `WP-5-m1-root-main-package-policy-oracle`. Add the isolated fixture
+`tests/v2_oracle/fixtures/root-module-package-policy/` with exact tracked
+allowlist:
+
+- `fixture.toml`;
+- `expected/oracle.json`;
+- `workspace/MODULE.bazel`;
+- `workspace/BUILD.bazel`;
+- `workspace/pkg/policy.MODULE.bazel`; and
+- `workspace/alternate/pkg/policy.MODULE.bazel`.
+
+No harness edit, registry scaffold, checked output, WORKSPACE file, or
+absolute special-file symlink is authorized. Fixture mutations may create
+and remove the package-root BUILD markers, `.bazelignore`, `REPO.bazel`, and
+contained vendor directory needed by a row; they must restore each prior
+state before the next independent semantic transition.
+
+Retain exact argv and rows for: missing package rejects the complete
+root/policy print namespace; workspace fallback BUILD recovers; one exact
+`--package_path=%workspace%:%workspace%/alternate` row where the first
+root has only `pkg/BUILD` and the alternate has `pkg/BUILD.bazel` selects the
+first root, proving package-root order outranks basename priority; removing
+the first marker selects the alternate root; `BUILD.bazel` wins over `BUILD`
+within one root; unqualified and `//`
+deleted-package spellings are identical; canonical-main spelling is
+identical while a nonmain literal repository is distinct; `//external`
+cannot become a package; a contained vendor directory is ignored while an
+absolute outside-workspace vendor directory is not; `.bazelignore` is a
+literal prefix from the first package root containing it; REPO
+explicit `repo(k = v, ...)` arguments may precede `ignore_directories()`,
+while source-level `repo(**{...})` is rejected; duplicate/call-order errors
+retain exact failure diagnostics; `*`, `?`, and `**` prefix matching reject before
+any module print; REPO print is cold/change-only and warm-nonreplaying;
+editing/deleting every policy source recovers; all same-horizon packages
+preflight before any include event; and diagnostics retain the include label
+even when the selected bytes live below the alternate package root.
+
+If Bazel's available flags cannot express one row without a harness change,
+stop and retain that row as pinned-source plus later observation-backed Rust
+evidence; do not weaken package-root, REPO, event, or matcher semantics.
+After oracle acceptance, run the focused fixture-growth inventory required
+by AGENTS.md before packet 1. Record one compact baseline/result in the
+oracle-harness owner plan; do not prune self-contained provenance or update
+both routing history files.
+
+#### Serial packet 1: bootstrap domain request and transient carrier
+
+Run only `WP-5-m1-root-module-bootstrap-request-owner`. Edit exactly:
+
+- new `app/slug_bzlmod_v2/src/root_bootstrap.rs`;
+- `app/slug_bzlmod_v2/src/source_preparation.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`; and
+- `app/slug_bzlmod_v2/tests/source_preparation_dice.rs`.
+
+The public bzlmod domain seam owns
+`RootModuleBootstrapRequest { workspace: NormalizedAbsolutePath }`,
+`RootModuleBootstrapApplyResult::{AlreadyPresent, Created(
+RootModuleBootstrapWarning)}`,
+the typed create error with normalized module path plus
+`PathIoErrorKind`/raw OS code, the exact warning text, and the exact reminder
+bytes/hash. The request derives only
+`workspace.join("MODULE.bazel")`; no physical resolution, IO, generation,
+event, retry, DICE key, or terminal policy enters these types.
+
+Add one optional root-bootstrap request to `SourcePreparationNeeds`.
+Identical workspace requests deduplicate; different workspaces produce
+`ConflictingRootModuleBootstrap`. `try_union` remains cumulative with path
+and repository needs. Every carrier containing the request remains invalid
+and self-unequal through `SourcePreparationOutcome`; root creation is never
+encoded as `NeedPathObservations` or a terminal error.
+
+Tests pin request identity/path, exact 399 bytes/hash/warning, duplicate and
+conflicting union, union with both existing need kinds, and nonvalidating
+Need equality. No producer or core consumer is authorized.
+
+#### Serial packet 2: dormant outside-DICE native bootstrap owner
+
+Run only `WP-5-m1-root-module-bootstrap-native-owner`. Edit exactly:
+
+- new `app/slug_core_v2/src/runtime/root_bootstrap.rs`; and
+- `app/slug_core_v2/src/runtime/mod.rs`.
+
+The runtime-private `RootModuleBootstrapOwner` is constructed for one
+normalized workspace and applies only a matching bzlmod request outside
+DICE. It performs Bazel's exact non-atomic algorithm: if the logical
+`MODULE.bazel` currently exists, return `AlreadyPresent` without reading or
+writing it; otherwise `std::fs::write` the exact reminder to the logical
+path and return `Created(warning)`. The successful write result is Created
+even if another writer entered Bazel's exists/write race window. Do not use
+`create_new`, canonicalization, a temporary file, rename, a lock, or an
+atomic replacement. Following an existing or dangling symlink is therefore
+preserved rather than replaced.
+
+Inline real-filesystem tests pin create, warm no-overwrite, edit
+preservation, delete/recreate, exact bytes, a deterministic file-as-parent
+create failure, foreign workspace, and on Unix existing and dangling symlink
+behavior. The owner has zero DICE, demand, epoch, event, output, print, or
+production call sites. Packet 2 does not activate warning publication.
+
+#### Serial packet 3: complete root package-policy request input
+
+Run only `WP-5-m1-root-package-policy-input-owner`. Edit exactly:
+
+- `app/slug_identity_v2/src/package.rs`;
+- `app/slug_identity_v2/tests/label_roundtrip.rs`;
+- new `app/slug_bzlmod_v2/src/package_policy.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`; and
+- `app/slug_bzlmod_v2/tests/dice_inputs.rs`.
+
+Add `PackageIdentifier::parse_bazel_package_identifier`, matching Bazel
+`PackageIdentifier.parse`: reject targets; accept unqualified, `//`,
+single-`@`, and double-`@@` repository spellings; make all main spellings
+one canonical identity; and treat a single-`@` nonmain name as that literal
+repository identity without repository mapping.
+
+The injected value is one exact normalized workspace plus:
+
+- ordered `Arc<[NormalizedAbsolutePath]>` package roots, including a valid
+  empty list and without silently defaulting to the workspace;
+- a compact canonical deleted-package `SmallSet<PackageIdentifier>`;
+- an optional normalized absolute vendor directory; and
+- `RootRepoFileSemantics { utf8_mode:
+  RootRepoFileUtf8Mode::{Off, Warning, Error} }`, the exact sole Bazel-9
+  parsing option consumed by the later REPO evaluator. Its default is
+  `Warning`, matching `BuildLanguageOptions`; request normalization maps
+  `off`/`warning`/`error` and boolean shorthand exactly; and the enum
+  participates in structural equality and A→B→A replay.
+
+Packet 3 accepts already normalized package-root and vendor paths; it does not
+own raw `--package_path` strings, `%workspace%`, client cwd, relative-entry
+warnings, or filesystem existence. It expands repeated/comma-separated
+deleted-package occurrences, deduplicates structurally, and preserves the
+supplied normalized root order and absolute outside-workspace vendor path.
+Packet 9's outside-DICE command preflight later owns raw spelling,
+`%workspace%`/cwd resolution, Bazel's relative-entry warning, and
+command-boundary existence filtering before it constructs this value. A
+private injected key is identified by workspace; a public injection helper
+supplies the exact value. Missing injection fails closed.
+
+Freeze three opaque projection keys from that injected value:
+`RootRepoFileSemanticsProjectionKey(workspace)` returns only
+`RootRepoFileSemantics`; `RootRepositoryIgnoreInputsProjectionKey(workspace)`
+returns only ordered package roots plus vendor; and
+`RootPackageLookupInputsProjectionKey(workspace)` returns only ordered roots
+plus canonical deleted packages. Each projection computes the injected owner
+itself, compares every projected field, and fails closed on missing input.
+Thus a deleted-package-only change cannot replay REPO evaluation/events, a
+semantics-only change cannot perturb package-root probing, and a vendor-only
+change cannot replay REPO evaluation.
+Do not add these fields to `BzlmodCommandPolicyKey` or
+`RootModuleCommandPolicy`, and do not expose `--package_path`,
+`--deleted_packages`, or `--vendor_dir` through command/server/CLI yet.
+
+Tests pin Bazel spellings and target rejection, normalized root ordering and
+empty roots, canonical deleted identity and A→B→A DICE replay,
+contained/outside absolute vendor identity, exact semantics default/mode
+inequality/replay, and missing-input failure. No raw-option parser, core edit,
+or default injection is authorized.
+
+#### Serial packet 3a: neutral diagnostic-event extension
+
+Before the REPO evaluator, run only
+`WP-5-m1-neutral-diagnostic-event-contract`. Edit exactly
+`app/slug_events_v2/src/lib.rs`.
+
+Add `EvaluationDiagnosticLevel::{Warning, Error}` and
+`EvaluationEvent::Diagnostic { level, text: CompactString }` beside the
+accepted Starlark-print variant. Preserve ordinary event Clone, batch-only
+Dupe, structural ordered equality, and dependency-bottom ownership. Tests
+pin level inequality, exact UTF-8/newline text, mixed print/diagnostic order,
+and shared batch storage. Add no producer, DICE, policy, output, retry, or
+publication edge. This neutral variant is required both for REPO parser/eval
+diagnostics and for packet 9's later command-owned synthetic bootstrap
+warning; it does not make either event DICE-reachable by itself.
+
+#### Serial packet 4: ignored-subdirectory matcher/value owner
+
+Run only `WP-5-m1-repository-ignore-matcher-owner`. Edit exactly:
+
+- new `app/slug_bzlmod_v2/src/repository_ignore.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+The crate-private compact value owns sorted/deduplicated literal
+repository-relative prefixes, ordered REPO patterns with precompiled compact
+segments, and `matching_entry(&PackagePath)`. Prefix matching is
+component-aware. Port Bazel 9 `UnixGlob.matchesPrefix`, including `**`,
+segment `*`/`?`, leading-dot rules, regex-character escaping, and parenthesis
+behavior, with an iterative or bounded-DP implementation; add no `globset`, regex dependency, loading
+dependency, standard retained hash map, IO, DICE key, or events.
+
+Tests port the discriminating Bazel table for exact/prefix/child-depth,
+zero-or-more `**`, mixed wildcards, escaping/parentheses, ordering, and
+literal-prefix component boundaries. Semantic equality includes prefixes and
+ordered original patterns, not matcher scratch state.
+
+#### Serial packet 5: private Host REPO evaluator and ignore key
+
+Run only `WP-5-m1-host-repository-ignore-owner`. Edit exactly:
+
+- new `app/slug_bzlmod_v2/src/repo_file.rs`;
+- `app/slug_bzlmod_v2/src/repository_ignore.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+`HostRepoFileKey(workspace)` directly computes packet 3's semantics
+projection, then reads workspace-root `REPO.bazel` through
+`HostFileBytesKey`. Missing is the empty value. Present regular or special
+bytes are parsed and evaluated in the full Bazel no-load REPO environment
+needed here: the dot-bazel dialect rejects load/def/lambda/top-level
+for/if and source-level `*`/`**` argument expansion; `repo(k = v, ...)`
+accepts arbitrary explicit keyword values, requires at least one, is
+once-only, and precedes any
+`ignore_directories()` call; `ignore_directories()` accepts exactly one
+string list/tuple and is once-only. Preserve Bazel's exact call-order and
+cardinality diagnostics, including its source spelling where upstream has a
+diagnostic typo. REPO parsing implements the projected modes exactly:
+Off parses Bazel's Latin-1 byte projection without validation; Warning emits
+the exact invalid-UTF-8 diagnostic then parses that same projection; Error
+emits the exact diagnostic and returns the typed invalid-UTF-8 failure.
+UTF-8, syntax, compile, evaluation, Host observation, and compute failures
+remain distinct typed variants.
+
+REPO Starlark prints and packet 3a parser/evaluation diagnostics follow the
+accepted producer policy and remain outside semantic value equality. With
+`CaptureEvaluationEvents` present, cold/change computes attach their exact
+interleaved ordered batch to DICE evaluation data and unchanged graph/cache
+reuse emits nothing. With the marker absent, the evaluator installs the
+normal direct Starlark printer/diagnostic reporter and attaches no batch. It
+never both prints and captures, suppresses marker-off output, or reconstructs
+events in a caller.
+
+`HostRepositoryIgnoreKey(workspace)` directly computes packet 3's
+roots/vendor projection and the REPO key, then for every ordered package root
+adds a vendor prefix only when the absolute vendor directory is beneath that
+root. It probes `.bazelignore` roots strictly sequentially through
+`HostFileBytesKey`: a later root is not computed or observed until every
+earlier candidate is Complete Missing or a resolved Directory; the first
+RegularFile/SpecialFile, including a resolved symlink target, is read and
+stops the search. Other Host failures remain typed. As Bazel does through
+`InputStreamReader(UTF_8)`, malformed bytes decode with replacement rather
+than a UTF-8 error. Nonempty noncomment decoded lines are literal prefixes;
+absolute/invalid path lines are typed errors. It composes those prefixes with
+the ordered REPO patterns from packet 4.
+
+Both values are
+`PathOutcome<Arc<Result<_, typed error>>>`; Need is propagated, invalid, and
+self-unequal. Tests pin missing/create/edit/delete/restore for both files;
+strict sequential first-file `.bazelignore` including no later-root demands;
+replacement decoding; contained/outside vendor across roots;
+regular/special/symlink sources; exact typed syntax/call/runtime/path errors;
+explicit REPO kwargs coexistence and `**` rejection; the wildcard table;
+Need behavior; and marker-off direct versus marker-on cold,
+warm-nonreplay, all three UTF-8 modes, syntax/evaluation failure order,
+change, and A→B→A event behavior. Add no direct IO,
+legacy workspace key, loading glob, Cargo dependency, or public Host key.
+
+#### Serial packet 6: private Host main-package lookup
+
+Run only `WP-5-m1-host-root-package-lookup-owner`. Edit exactly:
+
+- new `app/slug_bzlmod_v2/src/host_package.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+`HostRootPackageLookupKey { workspace, package: PackagePath }` first
+computes packet 3's package-lookup projection, checks the canonical main
+`PackageIdentifier`, returns Deleted for configured deletion, returns
+NoBuildFile for reserved `external`, completes packet 5, and returns Deleted
+for an ignore match. It then iterates ordered package roots outside
+`BUILD.bazel` then `BUILD` priority. Each candidate uses
+`ResolvedPathKey(Host, normalized root/package/basename)`, never directory
+listing or bytes. RegularFile and SpecialFile are files; Directory and
+Missing fall through; symlinks use their resolved terminal kind.
+
+Success retains the selected normalized logical package root and
+`HostBuildFileName::{BuildDotBazel, Build}`. NoBuildFile and Deleted are
+distinct. Physical resolved path, route, metadata, marker contents, and
+package-policy diagnostic match are outside successful equality.
+Resolution, observation, cycle, expansion, input, and ignore failures remain
+typed; Need never enters an error.
+
+Tests pin root/build priority, empty roots, create/delete/restore, metadata
+pruning, symlink and special markers, deletion-before-ignore/build,
+`external`, contained vendor and both ignore sources, typed failures, and
+Need invalid/self-unequal. No public key/reexport, include label, or include
+bytes is authorized.
+
+#### Serial packet 7: root include-label and horizon owner
+
+Run only `WP-5-m1-host-root-include-horizon-owner`. Edit exactly:
+
+- new `app/slug_bzlmod_v2/src/host_include.rs`;
+- `app/slug_bzlmod_v2/src/module_eval.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+`module_eval.rs` adds only a crate-private parsed root include seam retaining
+canonical main package, target, raw label, and logical diagnostic span.
+Packet 7 validates the repo-relative label and `.MODULE.bazel`/non-dot
+basename, derives package-key identity without raw label/span, and after a
+successful package lookup derives the normalized Host read path from the
+selected logical package root plus the label's package/target. The logical
+module-file identity and diagnostics remain label-derived; never recover
+them by stripping a physical resolved path.
+
+The horizon adapter deduplicates every same-level package key, computes all
+keys before any include bytes, unions every independently reached Need, and
+returns that cumulative Need before every completed missing/deleted/error.
+Only once no key Needs does it report the first terminal lookup failure in
+original source order. Its success retains original include order and
+selected logical read paths. Tests pin label validation, dedupe, full Need
+union, mixed Need-plus-terminal-error precedence, first-source terminal
+failure, alternate-root logical selection, and a downstream counter proving
+zero include lstat/bytes demands until the whole horizon completes. Packet 7
+may not call `HostFileBytesKey`.
+
+#### Serial packet 8: dormant Host root keys
+
+Only after packets 0-7 have terminal ACCEPT, run
+`WP-5-m1-host-root-module-keys` with exact allowlist:
+
+- new `app/slug_bzlmod_v2/src/host_module.rs`;
+- `app/slug_bzlmod_v2/src/module_eval.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+The private root files/graph keys return
+`SourcePreparationOutcome<Arc<Result<_, typed Host error>>>`, not the prior
+fixed `PathOutcome`. Root bytes use `HostFileBytesKey`; a semantic Missing
+becomes packet 1's bootstrap Need. No write or warning occurs in DICE.
+At each breadth-first include horizon, inspect labels, run packet 7's entire
+package preflight, and only after Complete success read every fragment with
+the accepted `HostFileBytesKey`. Compile the full closure, execute inline,
+then follow the accepted lockfile/graph ordering. Reuse crate-private
+composed-evaluator/root-mapping seams from `module_eval.rs`; do not copy an
+evaluator.
+
+Tests pin cumulative root Need, missing→bootstrap request, package policy
+before bytes/events, all same-horizon Need union, root and include
+create/edit/delete/restore, selected alternate package root, SpecialFile
+include acceptance, source-order error, repository-ignore event membership,
+lockfile A→B→A, and complete-only equality. The keys remain crate-private
+with zero loading/core/analysis/query consumer.
+
+#### Later packet 9 gate: bootstrap activation and Host switch
+
+After packet 8, design only
+`WP-5-m1-root-module-bootstrap-activation`. It must reopen the private native
+demand driver and name packet 2's stateless owner as a retained
+`WorkspaceRuntime` field; native apply remains outside DICE. Bootstrap is the
+sole first progress class when its request coexists with repository or path
+Needs. Seal and drop the speculative transaction, apply the exact request,
+and after either AlreadyPresent or Created rebuild the path epoch by freshly
+reobserving and replacing all current Host-namespace observations while
+retaining independent materialization-namespace observations. Merging a new
+leaf into the stale epoch is forbidden: a dangling logical root may have
+recorded Missing on its resolved target.
+
+Record the exact request, apply result, and refreshed epoch in the command
+transition. A repeated equal request may retry only when apply plus Host
+replacement changed command state; equal request plus equal refreshed Host
+epoch is typed bootstrap internal-nonprogress. There is no retry cap. A typed
+native apply/create failure is a dedicated native-command error: it does not
+retry or become a DICE error, restores/aborts through the accepted fail-closed
+path, publishes no warnings or events, and does not attempt to undo any
+already-performed filesystem effect.
+
+The command owns any Created warning token across later retries. It is
+neither a DICE value nor a DICE-reachable event batch. Multiple Created
+results coalesce to one exact pending warning. After exact terminal closure
+selection, selected success or semantic failure prepends one command-owned
+synthetic packet-3a Warning diagnostic to the selected
+REPO/root-module/Starlark batches and moves that deterministic prefix into
+`CommandOutputBuffer` through the existing acceptance order. This preserves
+Bazel's warning-before-reminder evaluation order. Warm and
+AlreadyPresent-only commands are silent; internal abort/fail-closed paths
+drop the token while preserving the already-performed filesystem effect.
+
+Tests must cover bootstrap-before-repository/path progress, create/warn, warm
+silence, edit preservation, delete/recreate/warn, dangling-target
+replacement, AlreadyPresent refresh, repeated-equal strict nonprogress,
+multiple-Created coalescing, typed apply failure, retry failure, terminal
+success/failure ordering, cancellation, restoration, and exact once-only
+publication.
+
+Only terminal acceptance of activation may authorize public command-input
+transport, Host source-preparation switch, or a production Host root
+consumer. Package-root/deleted/vendor/REPO-semantics request injection must be
+vertically atomic with that switch. The outside-DICE request preflight owns
+raw package-path spelling, `%workspace%` and client-cwd resolution,
+command-boundary existence filtering, and the exact deferred warning for a
+relative entry when cwd differs from workspace. That warning joins the same
+command-owned terminal prefix in Bazel order; no workspace default may mask
+missing input.
+
+#### Common validation and hard stops
+
+Every Rust packet runs focused owner tests, full bzlmod tests/doctests,
+downstream loading/core suites, GNU-Windows no-run linkage for changed owners
+and downstream binaries, formatting, diff, archive, dependency, exact-file,
+private-surface, and forbidden-reference scans. Cargo commands sharing a
+target directory remain serial. New compact retained collections use
+Buck2-derived `SmallMap`/`SmallSet`, `Arc` slices, and normalized OS-native
+paths; add no standard hot-path map/set, surrogate string path identity,
+interner, cache, lock, or dependency.
+
+Stop and replan on direct filesystem IO inside DICE; a mutation-shaped path
+Need; root creation from a key; stale Missing merge; a DICE-owned synthetic
+bootstrap warning; direct or duplicate REPO output while capture is present;
+suppressed normal REPO print/diagnostic output while capture is absent;
+dropped captured REPO events; a literal-only REPO parser;
+loading package/glob reuse; workspace-only package-root default; lost selected
+package-root identity; physical-path-derived include identity; directory
+listing or bytes for BUILD lookup; regular-only include semantics; public
+Host keys before activation; WORKSPACE evidence; CLI/server activation before
+the vertical switch; or any production discovery/source-preparation consumer
+before packet 9 terminal acceptance.
+
+Three independent latest-text terminal reviews returned `ACCEPT`. The single
+bounded correction replaced source-level `repo(**kwargs)` with Bazel's
+explicit-keyword-only surface, froze package-root/build-name cross-product
+ordering and sequential replacement-decoded `.bazelignore`, added exact
+Off/Warning/Error REPO parsing plus a neutral diagnostic event prerequisite,
+made injected projections explicit, and separated captured DICE events from
+the command-owned bootstrap warning prefix. No Rust, fixture, harness, Cargo,
+or production file changed.
+
+Next evidence: Implement only
+`WP-5-m1-root-main-package-policy-oracle`.

@@ -31,25 +31,28 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the private special-file-compatible Host byte
-projection passed its full owner/downstream/cross-target gates and three
-terminal reviews. The first root-prerequisite design replanned before Rust:
-missing-root mutation/retry/warning and deleted/ignored package lookup require
-separate owners before Host root keys.
+Latest M1 accepted evidence: the root-module effect and main-package-policy
+redesign passed three terminal latest-text reviews. It freezes an oracle-first
+sequence followed by a typed bootstrap Need/domain owner, dormant
+outside-DICE native apply, normalized package-policy projections, neutral
+diagnostics, exact REPO/matcher/package/horizon owners, private Host root
+keys, and only then command-owned bootstrap activation. No Rust or fixture
+changed in the design packet.
 
 ### Current packet
 
-Design only
-`WP-5-m1-root-module-effects-and-package-policy-owner-redesign`.
+Implement only
+`WP-5-m1-root-main-package-policy-oracle`.
 
-Freeze a serial, independently reviewable boundary for the outside-DICE
-missing-root bootstrap request/apply/warning seam, normalized deleted-package
-request input, full `.bazelignore`/no-load `REPO.bazel` ignore evaluator and
-matcher, and repository package lookup. Resolve how a created root replaces
-the prior Missing observation before retry and how its warning reaches only
-the terminal sidecar. Resubmit the exact Host root-key prerequisite gate; do
-not write from DICE, invent a mutation-shaped path Need, use WORKSPACE as
-retained parity evidence, or activate Host root/discovery.
+Add the isolated root main-repository package-policy fixture with the exact
+six-file allowlist accepted in the owner plan. Freeze package-root-before-
+basename selection, deleted/main/external identity, vendor and first-root
+`.bazelignore`, full explicit-keyword/no-star REPO behavior and prints,
+wildcard-prefix matching, same-horizon preflight, and alternate-root label
+diagnostics. Do not edit the harness, add WORKSPACE or an absolute
+special-file symlink, start Rust, or weaken a row that cannot be expressed;
+after acceptance run the required focused five-packet fixture-growth review
+before the first Rust owner.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
