@@ -4671,6 +4671,67 @@ rereviews returned `ACCEPT`.
 Next evidence: Run only
 `WP-5-m1-bazel-lockfile-v28-schema-oracle`.
 
+##### Lockfile v28 schema oracle first-attempt status
+
+**Status:** Replan before retained fixture evidence on 2026-07-26.
+
+The exact pinned-source generation audit activated the accepted stop gate:
+`module_ctx` can naturally record FILE through watched `read`, DIRENTS through
+watched `readdir`, ENV through `getenv`, and REPO_MAPPING through an apparent
+label. DIRTREE is exposed only through `repository_ctx.watch_tree`; a
+generated repository implementation runs after extension evaluation and
+cannot put that recorded input into its owning lockfile extension value.
+Therefore the first command cannot honestly claim that real extension
+evaluation generated all five recorded-input kinds.
+
+A coordination race left an ignored, untracked 11-of-12-file working draft
+after the stop request but before any acceptable oracle output. Its sole
+generation attempt failed in harness postprocessing because the initial HTTP
+logger format was not JSONL; the allowed logger draft corrected that local
+format before the hold arrived. There is no generated `expected/oracle.json`,
+tracked fixture, accepted command row, Rust, Cargo, harness, symlink, archive,
+or external-network change. Preserve the draft without treating it as
+evidence until the corrected contract accepts.
+
+Correct only `WP-5-m1-bazel-lockfile-v28-schema-oracle-correction`:
+
+- keep the exact twelve-file allowlist and no-harness boundary;
+- make the generated baseline claim exactly registry hashes,
+  selected-yanked state, one current OS/architecture factor, both digests,
+  FILE/DIRENTS/ENV/REPO_MAPPING inputs, typed generated repo specs and
+  attributes, metadata, Facts, and fact version;
+- hand-inject one valid DIRTREE entry into the current factor, force replay to
+  report it stale, and force update reevaluation before asserting its
+  replacement. Inject a separate valid foreign factor only to prove
+  multi-factor parse/retain/render behavior; do not claim it was evaluated;
+- cap the cumulative retained-daemon fixture at 15 commands, twelve regular
+  files, zero symlinks, and 2,500 net text lines including expected output;
+- use only the fixture-local loopback registry plus Bazel's embedded modules.
+  Do not add BCR or any other external registry/network fallback;
+- put caught failures before the final three uncaught custom-adapter holes,
+  use a non-object Facts row rather than deferred depth algebra, and retain
+  the exact generation/two-fresh-replay/archive/diff commands already frozen.
+
+Rows remain: generated comprehensive baseline; semantic rewrite with a valid
+foreign factor; current-factor DIRTREE stale and forced replacement;
+default/null/unknown/duplicate plus first-marker anomaly; Gson-lenient
+acceptance; overflowing marker; malformed JSON; invalid Base64; invalid
+non-object Facts; missing metadata enum; missing required extension property;
+invalid-checksum and invalid-version direct `JsonParseException` holes; and a
+missing-extension-delimiter `IndexOutOfBoundsException` hole. Combine only
+when discrimination and cumulative mutation order remain exact; never exceed
+the caps.
+
+Stop again on a thirteenth file, harness/template/archive/symlink addition,
+ambiguous replacement, dynamic registry token inside mutation content,
+foreign-factor loss, unnormalized stack/port/path output, caught/uncaught
+behavior that differs from the pinned source, server destabilization before a
+later row, any external network, or a need to claim pure adapter algebra.
+
+Next evidence: Design-correct and terminally rereview only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-correction` before resuming the
+preserved draft.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
