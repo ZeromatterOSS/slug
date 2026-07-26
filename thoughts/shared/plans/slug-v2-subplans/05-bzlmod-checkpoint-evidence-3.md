@@ -1475,3 +1475,314 @@ Next evidence: Design only
 `WP-5-m1-runtime-native-demand-producer-design-correction`. Reconcile
 workspace-lifetime node-keyed demand provenance with the accepted retained
 materializer and exact-version activation closure before any Rust edit.
+
+### Stage 5 corrected runtime-native demand-producer design
+
+Status: Accepted
+
+This correction separates three kinds of state that the earlier runtime retry
+design conflated:
+
+- `WorkspaceRuntime` owns the retained `RepositoryMaterializer`, a
+  workspace-lifetime sparse DICE-node provenance catalogue, and the last
+  accepted complete injection/scope snapshot.
+- One external command owns one materializer session, fixed workspace,
+  registry, and repository-materialization generations, one command effect
+  owner, one exclusive workspace command-lease token, and cumulative complete
+  repository/path worksets.
+- One serial attempt owns one fresh updater/transaction, returned root values,
+  ordered root activations, and either a retry or terminal seal.
+
+The provenance catalogue is an append-only
+`SmallMap<DiceNodeId, DemandNodeMetadata>` for the lifetime of the one retained
+DICE engine. It is never pruned in the absence of a DICE eviction notification.
+Entries learned on speculative, abandoned, reused, or late activations are
+harmless: they do not schedule work by themselves, and only membership in the
+current exact-version terminal closure grants selection authority. A separate
+accepted snapshot is replaced only after explicit terminal acceptance. Retry,
+suppression, cancellation, closure failure, native failure, and discard leave
+that accepted snapshot unchanged.
+
+#### Key-static provenance and the sole tracker
+
+Demand provenance uses the existing `Key::provide`/`DynKey::request_value`
+channel, not transient `Need` values and not `store_evaluation_data`:
+
+- `PathObservationKey` provides its exact `PathObservationDemand`.
+- private `RepositoryMaterializationResultKey` provides its exact
+  `Arc<RepositoryMaterializationRequest>`.
+- `RepositorySourceFileKey` provides a public semantic
+  `RepositorySourceScope` containing normalized workspace and module identity,
+  deliberately excluding `repo_relative_path`.
+
+The DICE node already identifies the exact source-file key; equal scope
+descriptors deliberately union validation from multiple source files in the
+same repository. Path namespace, immutable instance, full repository request,
+and source-key identity are immutable key identity, so one node needs no
+versioned demand history. Evaluated and Reused rich callbacks both insert or
+confirm the descriptor. Absence supplies nothing. A different descriptor for
+an existing node latches a typed internal catalogue failure, and every later
+selection fails closed. Root-MODULE `EventBatch` remains the only current
+evaluation-data payload because event contents, unlike key-static demand
+metadata, can change across versions of the same node.
+
+Every retained-runtime transaction that can warm these keys must install the
+tracker from its first computation. One `RuntimeActivationTracker` is the only
+object ever placed in `UserComputationData.activation_tracker`:
+
+```text
+RuntimeActivationTracker
+├── Arc<WorkspaceDemandOwner>                 always present
+└── Option<Arc<AttemptEffectTracker>>          eventful attempts only
+```
+
+Current query/evaluate updaters use a centralized
+`WorkspaceRuntime::user_computation_data(None)` or equivalent factory. It
+installs the existing loading cycle detector and provenance-only tracker, but
+does not set `CaptureEvaluationEvents`; direct root `print` behavior therefore
+stays unchanged. The later shared driver passes an attempt delegate, and only
+that variant sets the capture marker. `AttemptEffectTracker` becomes the
+command-local event/root delegate rather than a second `ActivationTracker`.
+Demand recording always runs before optional event forwarding and remains
+useful after a command attempt seals; event recording remains attempt-token
+gated and quarantines late callbacks. A private owner/installer binds the
+demand owner to the retained `Arc<Dice>` so it cannot be reused with a
+replacement engine.
+
+#### One exact closure, semantic scope, and untouched cached nodes
+
+Terminal sealing copies ordered roots and one version under the attempt mutex,
+then releases every mutex before the single `activation_closure` call. The
+transaction and returned root values remain alive. Root order and exact
+version are checked, the catalogue is copied under its own short lock, and the
+same closure object is passed to both event and demand selectors. The closure's
+dependency-first nodes and direct dependency IDs include valid untouched
+cached intermediates even when they emitted no callback in the current
+command; their workspace-lifetime catalogue entries recover exact demand
+identity. Abandoned branches may remain catalogued but are absent from the
+terminal closure and cannot be selected.
+
+Selection first collects every reachable exact repository request, rejecting
+different full requests with the same `RepositoryMaterializationRequestId`.
+It then walks root-to-dependency reachability with an optional semantic scope:
+
+- entering a repository-source anchor assigns its semantic scope;
+- entering a different nested scope is a boundary and replaces, rather than
+  inherits, the outer scope;
+- equal scopes union;
+- a path reached with no scope is unscoped;
+- a path reached through one or more scopes belongs to every such scope;
+- the same node reached both scoped and unscoped is retained in both roles.
+
+Traversal deduplicates `(node, scope)` states rather than only node IDs. Every
+path-bearing source anchor must have exactly one full request descendant;
+zero or conflicting requests are typed internal failures. Globally observing
+one exact path may be deduplicated, but its result is copied into every owning
+repository validation and into the unscoped snapshot when both apply.
+
+No path prefix, canonical path, longest-prefix rule, Host namespace, or
+materialization namespace assigns semantic ownership. A Local repository may
+follow an ancestor symlink outside its logical root, two Local repositories
+may reach the same Host path, and an unscoped Host consumer may share that
+node. The repository-source dependency edge remains the only sound validation
+scope.
+
+#### Command work, generations, and strict progress
+
+One external command allocates exactly once its workspace revision, registry
+generation, repository-materialization generation, effect owner, and
+repository-session token. Every attempt reuses that bundle and creates a fresh
+updater, committed transaction, and semantic root computation.
+
+An explicit workspace command lease serializes the whole accepted-state
+transition, not just access to `RepositoryMaterializer`. Acquiring it changes a
+short locked phase from Idle to Open(token); no mutex guard remains held while
+the command runs. Every materializer `begin` is reachable only through this
+owner. The phase remains Open across preflight, every retry, selected-injection
+commit, transaction/root-value drop, materializer accept or discard, and
+accepted-snapshot replacement or restoration. It returns to Idle only after
+the entire terminal transition succeeds. Overlap returns typed Busy without
+allocating generations or opening a materializer session. A failed restoration
+leaves the lease fail-closed and retains the active session/root pins rather
+than exposing a mixed materializer/snapshot state to another command.
+
+Command preflight begins the sole session, reobserves accepted
+repository-scoped validation and accepted unscoped paths outside DICE,
+and constructs fresh complete initial repository/path epochs from only clean
+reusable state. Native observation may deduplicate the global exact-demand
+union, but preflight returns the results needed for every retained semantic
+scope. Local success remains allocation-free and rootless: request construction
+owns only lexical workspace-relative shape, while exact selected Host demands
+retain missing, wrong-kind, symlink-escape, boundaryless, and source-error
+ordering. Accepted and provisional `Arc<TempDir>` owners remain pinned while
+their instances can appear in an epoch.
+
+Retry scheduling consumes the typed `SourcePreparationNeeds` returned by the
+attempt; an invalid Need graph is never treated as a terminal closure.
+Repository work has strict priority:
+
+1. If any repository Need is present, materialize all newly demanded exact
+   requests in deterministic repository order outside DICE and inject the
+   entire cumulative result epoch. A repeated/conflicting repository Need
+   cannot be masked by a path Need.
+2. Only an attempt with no repository Need may observe newly demanded exact
+   paths, after all required immutable roots exist, and inject the entire
+   cumulative path epoch.
+3. Each retry must add one previously unknown exact full request result or one
+   previously unknown exact path observation. Equal/subset work yields typed
+   repository- or path-`InternalNonProgress`; the same request ID with a
+   different full request is a conflict. There is no retry count or cap.
+
+Every injected epoch is sorted, duplicate-free, cumulative, and a complete
+replacement, never a delta. Current-generation transport/materialization
+failures become cumulative results and terminalize only that command; the next
+command receives a new generation.
+
+#### Terminal transitions and three pin classes
+
+Accepted terminal success and an eligible final Starlark failure use this
+order:
+
+1. read and validate the one exact closure, then select both events and
+   demands from it;
+2. build and commit selected complete repository/path injections and
+   repository validations while all active/provisional roots remain pinned;
+3. drop the terminal transaction and every returned root value that could
+   retain an unselected instance;
+4. call materializer `accept` for only the selected exact requests/instances;
+5. atomically replace the accepted injection/scope snapshot;
+6. publish the already selected events;
+7. close the workspace command lease.
+
+Preflight, native-I/O, path, internal, closure, cancellation, or ineligible
+terminal failure restores the prior accepted complete injections, drops all
+attempt transactions/root values, explicitly discards the session, preserves
+the prior accepted snapshot, closes the workspace command lease, and publishes
+nothing. If restoration fails, fail closed with the lease non-Idle while
+retaining the session/root pins rather than releasing a root that a DICE value
+may still address.
+
+The three distinct pins are:
+
+- the terminal `DiceTransaction` and root values pin exact closure authority;
+- copied `Arc<TempDir>` owners pin immutable roots across unlocked native I/O
+  and the subsequent stale-token check;
+- the active materializer session pins every provisional root across retries
+  until the ordered accept/discard transition.
+
+No mutex spans a DICE compute/commit, `activation_closure`, await, native
+observation, Local/archive/Git materialization, or `TempDir` destruction.
+
+#### Serial implementation packets
+
+1. `WP-5-m1-demand-key-metadata`
+
+   Edit only:
+
+   - `app/slug_workspace_v2/src/path_observation.rs`
+   - `app/slug_bzlmod_v2/src/source_preparation.rs`
+
+   Add the three `Key::provide` descriptors and direct `DynKey` producer tests
+   first. Do not change compute/value/equality behavior, evaluation data,
+   runtime, Cargo, commands, fixtures, or oracles.
+
+2. `WP-5-m1-workspace-demand-provenance-bootstrap`
+
+   Edit only:
+
+   - new `app/slug_core_v2/src/runtime/demands.rs`
+   - `app/slug_core_v2/src/runtime/mod.rs`
+   - `app/slug_core_v2/src/runtime/events.rs`
+   - `app/slug_core_v2/src/runtime/dice.rs`
+
+   Add the sparse owner, composite tracker, passive/eventful installation,
+   centralized production user-data factory, exact-closure semantic selector,
+   and one shared closure-read seam. Convert every production
+   `WorkspaceRuntime` updater capable of bzlmod computation to the passive
+   factory. Do not add native I/O, epochs, retry, accept/discard, event capture
+   on current commands, publication, command/server APIs, or a DICE-core edit.
+
+3. `WP-5-m1-retained-native-materialization-bridge`
+
+   Edit only:
+
+   - `app/slug_core_v2/src/runtime/repository_io.rs`
+
+   Add the retained-session `materialize_native` entrypoint with exact stable
+   Spec versus current-generation Transport/Materialization classification;
+   batch accepted validation into one deduplicated native observation pass;
+   return the complete preflight path epoch plus clean reusable repository
+   results; retain allocation-free/rootless Local success; and expose only the
+   private session operations required by the next packet. Preserve the
+   existing root snapshots and post-I/O token checks.
+   Stop and replan rather than collapse failures to Transport if exact HTTP or
+   Git staging requires the deferred PAX/GNU/link/special parity surface.
+
+4. `WP-5-m1-runtime-native-demand-session`
+
+   Edit only:
+
+   - `app/slug_core_v2/src/runtime/demands.rs`
+   - `app/slug_core_v2/src/runtime/repository_io.rs`
+   - `app/slug_core_v2/src/runtime/dice.rs`
+
+   Add a dormant manually driven command/session owner, preflight reporting,
+   the full-transition workspace command lease, cumulative complete
+   worksets/epochs, fixed generation bundle, repository-first/path-second
+   progression, typed strict nonprogress, accepted-snapshot
+   restoration/replacement, and ordered
+   accept/discard evidence, and a private real-DICE handshake that manually
+   drives Need-to-repository-to-path-to-Complete attempts on one retained
+   runtime. Do not activate the shared semantic retry or publication loop in
+   build, query, daemon, CLI, server, source preparation, or discovery.
+
+Only after all four pass may residual sidecar item 4 own the shared
+build/query retry/publication driver, typed Need propagation through the
+entrypoints, source-preparation/discovery activation, legacy snapshot
+retirement, and terminal REAPI/publication order.
+
+#### Required retained-engine evidence and stop gates
+
+The four packets together must prove passive marker-absent direct printing;
+one tracker in passive and eventful modes; preoccupied-slot failure without
+marker/attempt mutation; warm untouched-descendant recovery; reused and
+abandoned-command provenance; unreachable-branch exclusion; exact
+foreign/replacement-engine and unavailable/dirty/not-verified closure failure;
+same Host path under two repository scopes; Local symlink escape overlapping
+another repository and an unscoped consumer; exact request/spec and immutable
+instance A-to-B replacement; repository-before-path attempts; fixed
+per-command/changing-next-command generations; cumulative complete epochs;
+typed equal-Need nonprogress; clean/edit/delete/recreate and Local-symlink
+retarget on one runtime; selected/unselected root lifetimes; ordinary Need
+retry dropping only its attempt transaction/effects while retaining cumulative
+command state and provisional roots; terminal cancellation, closure/native/
+stale-token/acceptance failure restoring the prior accepted injections before
+discard; whole-transition command-lease Busy and fail-closed behavior; and
+event/demand selection from the identical closure.
+
+Stop and replan on a DICE-core/API or new dependency edit; demand use of
+evaluation data; two activation trackers; any production retained-runtime
+updater bypassing the centralized tracker factory; command-local-only or
+pruned provenance; `HashMap`/`HashSet` hot-path ownership instead of Buck2
+compact collections/shared slices; path-derived repository ownership; a
+path-bearing scope without one exact request; overlapping sessions or any
+materializer `begin` outside the whole-transition workspace command lease; any
+lock across DICE/native I/O; delta epochs; retry caps; per-attempt generations;
+release of provisional roots before injection restoration and transaction
+drop; eager Local-root existence/kind/canonical-containment validation without
+separate oracle/design evidence; or shared command/server/query/build/
+discovery/oracle activation before the dormant session evidence passes.
+
+Independent DICE/source, architecture/lifecycle, and live native-feasibility
+reviews corrected the draft on passive universal tracking, one whole-transition
+workspace command lease, native failure-classification isolation, and the
+superseding rootless Local contract. All three latest terminal rereviews
+returned `ACCEPT`. This design packet changed no Rust, Cargo, fixture, oracle,
+command, server, source-preparation, discovery, or DICE-core file.
+
+Next evidence: Implement only `WP-5-m1-demand-key-metadata` in
+`app/slug_workspace_v2/src/path_observation.rs` and
+`app/slug_bzlmod_v2/src/source_preparation.rs`. Add direct `DynKey` producer
+regressions first, then the three `Key::provide` descriptors. Stop on any
+compute/value/equality, evaluation-data, runtime, Cargo, command, fixture,
+oracle, or DICE-core change.
