@@ -210,6 +210,7 @@ pub(super) struct RepositoryMaterializer {
 pub(super) struct RepositoryNativePreflight {
     path_observations: PathObservationEpoch,
     repository_results: RepositoryMaterializationResultEpoch,
+    reusable_requests: Arc<[Arc<RepositoryMaterializationRequest>]>,
 }
 
 #[allow(dead_code)]
@@ -220,6 +221,10 @@ impl RepositoryNativePreflight {
 
     pub(super) fn repository_results(&self) -> &RepositoryMaterializationResultEpoch {
         &self.repository_results
+    }
+
+    pub(super) fn reusable_requests(&self) -> &[Arc<RepositoryMaterializationRequest>] {
+        &self.reusable_requests
     }
 }
 
@@ -402,10 +407,15 @@ impl RepositoryMaterializer {
             .into_iter()
             .filter(|accepted| !validation_epoch_is_dirty(&accepted.validation, &observed))
             .collect::<Vec<_>>();
+        let reusable_requests = reusable
+            .iter()
+            .map(|accepted| accepted.request.clone())
+            .collect::<Arc<[_]>>();
         let repository_results = self.complete_validation(token, reusable)?;
         Ok(RepositoryNativePreflight {
             path_observations: observed,
             repository_results,
+            reusable_requests,
         })
     }
 
@@ -607,6 +617,35 @@ impl RepositoryMaterializer {
             .expect("repository materializer mutex poisoned");
         let active = matching_validated_active(&state, token)?;
         complete_epoch(&self.workspace, &active.entries)
+    }
+
+    pub(super) fn selected_epoch(
+        &self,
+        token: RepositorySessionToken,
+        selected: &[Arc<RepositoryMaterializationRequest>],
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        let state = self
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        let active = matching_validated_active(&state, token)?;
+        let mut entries = Vec::with_capacity(selected.len());
+        for request in selected {
+            let entry = active
+                .entries
+                .iter()
+                .find(|entry| entry.request.id == request.id)
+                .ok_or_else(|| {
+                    RepositorySessionError::UnknownSelection(request.id.canonical_repo.clone())
+                })?;
+            if entry.request != *request {
+                return Err(RepositorySessionError::ConflictingRequest(
+                    request.id.canonical_repo.clone(),
+                ));
+            }
+            entries.push(entry.clone());
+        }
+        complete_epoch(&self.workspace, &entries)
     }
 
     pub(super) fn observe_native(

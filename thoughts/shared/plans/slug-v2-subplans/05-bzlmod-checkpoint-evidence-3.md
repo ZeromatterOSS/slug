@@ -1895,13 +1895,31 @@ architecture/hot-path reviews corrected inherited A-to-B replacement,
 malformed-checksum dual-failure precedence, and Git materialization-stage
 evidence; both latest-diff rereviews returned `ACCEPT`.
 
-Next evidence: Implement only `WP-5-m1-runtime-native-demand-session` in
-`app/slug_core_v2/src/runtime/demands.rs`,
-`app/slug_core_v2/src/runtime/repository_io.rs`, and
-`app/slug_core_v2/src/runtime/dice.rs`. Add the dormant manually driven
-command/session owner, preflight reporting, whole-transition workspace command
-lease, cumulative complete worksets/epochs, fixed generation bundle,
-repository-first/path-second progression, typed strict nonprogress, accepted
-snapshot restoration/replacement, ordered accept/discard evidence, and the
-private real-DICE handshake. Do not activate shared semantic retry or
-publication in any command surface.
+### Stage 5 runtime native demand session
+
+Status: Accepted
+
+The retained runtime now owns a dormant, tokenized native-demand command
+session with one fixed workspace/registry/repository generation bundle, one
+command effect owner, cumulative complete repository/path epochs, deterministic
+repository-first progression, and restore-before-discard failure transitions.
+Opaque owner-branded attempt, seal, and terminal-selection wrappers preserve one
+exact event/demand closure and return selected events privately only after
+ordered materializer acceptance and accepted-snapshot replacement.
+
+The real-DICE handshake proves a combined two-repository-plus-path Need,
+repository priority, exact cumulative epochs, fixed injected generations across
+attempts and changed generations for the next command, typed repository/path
+nonprogress, inherited request replacement and competing-request conflict,
+post-injection acceptance restoration, fail-closed restoration/materializer
+ownership, closure failure cleanup, and foreign-sidecar rejection. Validation
+passed six focused session tests, all 85 core unit and 13 integration tests,
+zero doctests, the 23 retained-repository tests, GNU-Windows compilation,
+formatting, diff, utility, and scope gates. Independent lifecycle and
+architecture rereviews both returned `ACCEPT`.
+
+Next evidence: Design only a bounded residual-sidecar checkpoint for the shared
+build/query retry/publication driver. Freeze typed Need propagation through
+entrypoints, source-preparation/discovery activation, legacy snapshot
+retirement, cancellation ownership, and terminal REAPI/event publication order
+before activating any production command surface.

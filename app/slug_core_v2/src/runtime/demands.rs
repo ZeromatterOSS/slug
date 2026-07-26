@@ -184,6 +184,46 @@ pub(super) struct SelectedWorkspaceDemands {
 }
 
 impl SelectedWorkspaceDemands {
+    pub(super) fn empty() -> Self {
+        Self {
+            repository_requests: Arc::from([]),
+            repository_validations: Arc::from([]),
+            unscoped_paths: Arc::from([]),
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn for_test(
+        repository_requests: impl Into<Arc<[Arc<RepositoryMaterializationRequest>]>>,
+        unscoped_paths: impl Into<Arc<[PathObservationDemand]>>,
+    ) -> Self {
+        Self {
+            repository_requests: repository_requests.into(),
+            repository_validations: Arc::from([]),
+            unscoped_paths: unscoped_paths.into(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn for_test_with_validation(
+        repository_requests: impl Into<Arc<[Arc<RepositoryMaterializationRequest>]>>,
+        validation_request: Arc<RepositoryMaterializationRequest>,
+        validation_path: PathObservationDemand,
+    ) -> Self {
+        Self {
+            repository_requests: repository_requests.into(),
+            repository_validations: Arc::from([SelectedRepositoryValidation {
+                scope: RepositorySourceScope {
+                    workspace: validation_request.id.workspace.clone(),
+                    module_name: "test_validation".into(),
+                },
+                request: validation_request,
+                paths: Arc::from([validation_path]),
+            }]),
+            unscoped_paths: Arc::from([]),
+        }
+    }
+
     pub(super) fn repository_requests(&self) -> &[Arc<RepositoryMaterializationRequest>] {
         &self.repository_requests
     }
