@@ -1158,3 +1158,70 @@ exact nested/repeated inline order, warm nonreplay, print-only edit
 whole-closure reexecution, missing/parse preflight suppression,
 runtime-failure prefix events, and complete recovery before designing the
 composed evaluator or event producer.
+
+### Stage 5 root-MODULE include-composition event oracle design
+
+Status: Accepted before fixture edits
+
+Strengthen only the existing `module-include-change-invalidation` fixture and
+set `daemon = true`. Root prints `ROOT_BEFORE`, includes
+`deps.MODULE.bazel`, then prints `ROOT_AFTER`. The dependency fragment prints
+`DEPS_BEFORE`, includes one new print-only `nested.MODULE.bazel`, prints
+`DEPS_BETWEEN`, includes the same nested label again, prints `DEPS_AFTER`, and
+then retains the fixture's existing dependency and local-path override. This
+freezes one exact logical-module stream:
+
+```text
+ROOT_BEFORE, DEPS_BEFORE, NESTED_V1, DEPS_BETWEEN, NESTED_V1, DEPS_AFTER, ROOT_AFTER
+```
+
+Run exactly eight cumulative rows:
+
+1. cold dep-one success with the exact V1 stream;
+2. the existing included semantic version/path edit to dep two with the exact
+   V1 stream and changed manifest;
+3. unchanged warm dep-two success with zero event sentinels;
+4. print-only nested V1-to-V2 edit with the complete V2 stream and byte-equal
+   dep-two manifest;
+5. direct dependency-fragment deletion with the existing missing-file shape
+   and zero sentinels;
+6. dependency-fragment recreation plus parser-invalid nested content, proving
+   nested compile failure and zero root/dependency sentinels;
+7. valid nested print, runtime failure, and unreachable after-print, yielding
+   exactly `ROOT_BEFORE, DEPS_BEFORE, NESTED_RUNTIME_PREFIX`;
+8. nested V2 recovery with the complete V2 stream and dep-two manifest.
+
+Every success or runtime-prefix row uses one `(?s)\A...\Z` tempered-dot regex
+whose gaps reject the complete V1/V2/runtime/after sentinel union. It therefore
+proves exact order and cardinality, including two nested executions. Warm,
+missing, and parse rows use an anchored negative lookahead rejecting the
+entire event prefix. Stable diagnostic substrings and existing nonempty
+manifests remain separate assertions; semantic comparison is retained because
+exact Bazel progress text is not stable. The generated records must also prove
+rows 2, 3, 4, and 8 have identical dep-two manifests while row 1 is dep one.
+
+The exact implementation allowlist is:
+
+- `tests/v2_oracle/fixtures/module-include-change-invalidation/fixture.toml`
+- `tests/v2_oracle/fixtures/module-include-change-invalidation/expected/oracle.json`
+- `tests/v2_oracle/fixtures/module-include-change-invalidation/workspace/MODULE.bazel`
+- `tests/v2_oracle/fixtures/module-include-change-invalidation/workspace/deps.MODULE.bazel`
+- new `tests/v2_oracle/fixtures/module-include-change-invalidation/workspace/nested.MODULE.bazel`
+
+Add `CompiledModuleFile`, `ModuleThreadContext`, and the exact include
+preflight/execution methods to provenance. No harness, BUILD, module payload,
+Rust, Cargo, runtime, command/server, registry, other fixture, nonroot, or
+discovery edit is allowed. This adds one regular file and remains far below
+the fixture-growth review threshold.
+
+Independent pinned-source, maintainability, and harness audits converged on
+the compact eight-row/five-file design. The harness needs no extension; one
+review correction made root-before/root-after sentinels explicit so a
+separate root evaluator cannot pass. Three corrected terminal reviews returned
+`ACCEPT`; no file changed.
+
+Next evidence: Implement only
+`WP-5-m1-root-module-include-composition-event-oracle` under the exact
+five-file allowlist above. Stop on old semantic-evidence loss, unstable
+sentinel order/count, warm replay, preflight event leakage, wrong runtime
+prefix, manifest drift, scope growth, or any harness/production edit.
