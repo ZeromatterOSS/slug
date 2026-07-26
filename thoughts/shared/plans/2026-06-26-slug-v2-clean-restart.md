@@ -42,15 +42,16 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-root-module-bootstrap-request-owner`.
+`WP-5-m1-root-module-bootstrap-native-owner`.
 
-Add the typed root-bootstrap request/result/error/warning domain seam and one
-optional request to `SourcePreparationNeeds` in exactly the four files frozen
-by the accepted owner plan. Pin the exact 399 reminder bytes/hash/warning,
-matching/conflicting request union, cumulative union with both existing Need
-kinds, and invalid/self-unequal outcomes carrying the request. Do not add IO,
-DICE computation, a producer, runtime apply, warning publication, or a
-production consumer.
+Add the runtime-private outside-DICE `RootModuleBootstrapOwner` in exactly the
+two files frozen by the accepted owner plan. It must bind one normalized
+workspace, accept only a matching request, and implement Bazel's non-atomic
+logical-path exists/write algorithm with exact reminder bytes and typed
+result/error. Pin create, warm/edit/delete recovery, file-as-parent failure,
+foreign workspace, and Unix existing/dangling symlink behavior. Do not add a
+DICE key, demand, event, warning publication, retry, output, or production
+call site.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

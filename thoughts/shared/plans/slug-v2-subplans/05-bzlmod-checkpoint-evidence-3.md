@@ -3627,3 +3627,38 @@ schema loading and every Bazel comparison passed through the oracle runner.
 
 Next evidence: Run only the required focused five-packet fixture-growth
 checkpoint against accepted baseline `42e38bc3` before any Rust packet.
+
+### Stage 5 root-module bootstrap request owner
+
+Status: Accepted
+
+The public bzlmod domain seam now owns a normalized-workspace
+`RootModuleBootstrapRequest`, its lexically derived logical
+`MODULE.bazel` path, exact 399-byte reminder and SHA-256, fieldless exact
+warning token, `AlreadyPresent`/`Created` apply result, and typed create error
+with normalized logical path, `PathIoErrorKind`, and raw OS code. The private
+module is re-exported explicitly; it contains no filesystem, physical-path,
+DICE, event, retry, generation, or terminal-policy behavior.
+
+`SourcePreparationNeeds` carries one optional bootstrap request independently
+of path observations and the Arc-backed compact repository request map.
+Identical workspace requests deduplicate, differing workspaces return
+`ConflictingRootModuleBootstrap`, and the existing repository-conflict
+precedence is preserved before bootstrap conflict detection. Successful union
+retains bootstrap, path, and repository needs together. Bootstrap-bearing Need
+outcomes remain invalid and self-unequal through the unchanged complete-only
+DICE equality policy.
+
+Two focused tests pin request identity/path, the independent reminder literal,
+length, recomputed and fixed digest, exact warning, both apply-result shapes,
+all create-error fields, duplicate/conflicting/cumulative union, repository
+conflict precedence, and transient outcomes. Validation passed 237 bzlmod
+tests and zero doctests, 54 loading tests, 92 core unit plus 13 integration
+tests, and no-run linkage of every bzlmod/loading/core GNU-Windows test
+executable. Formatting, archive, diff, exact four-file allowlist, dependency,
+private-surface, and forbidden-reference gates passed. The compile-only digest
+inference correction and source-audit digest/accessor corrections changed no
+owner boundary; all three terminal latest-diff reviews returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-root-module-bootstrap-native-owner`.

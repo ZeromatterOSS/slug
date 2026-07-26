@@ -27,6 +27,9 @@ use slug_bzlmod_v2::ModuleSourcePreparation;
 use slug_bzlmod_v2::ModuleSourcePreparationError;
 use slug_bzlmod_v2::ModuleSourcePreparationKey;
 use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::ROOT_MODULE_BOOTSTRAP_REMINDER_BYTES;
+use slug_bzlmod_v2::ROOT_MODULE_BOOTSTRAP_REMINDER_SHA256;
+use slug_bzlmod_v2::ROOT_MODULE_BOOTSTRAP_WARNING_TEXT;
 use slug_bzlmod_v2::RegistryFileError;
 use slug_bzlmod_v2::RegistryFileUrl;
 use slug_bzlmod_v2::RegistryIo;
@@ -56,6 +59,10 @@ use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::RepositorySourceFileKey;
 use slug_bzlmod_v2::RepositorySourceFileValue;
 use slug_bzlmod_v2::RepositoryTransportError;
+use slug_bzlmod_v2::RootModuleBootstrapApplyResult;
+use slug_bzlmod_v2::RootModuleBootstrapCreateError;
+use slug_bzlmod_v2::RootModuleBootstrapRequest;
+use slug_bzlmod_v2::RootModuleBootstrapWarning;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationNeedsError;
 use slug_bzlmod_v2::SourcePreparationOutcome;
@@ -66,6 +73,7 @@ use slug_bzlmod_v2::install_registry_io;
 use slug_bzlmod_v2::install_repository_io;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathIoErrorKind;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
@@ -673,6 +681,7 @@ fn source_outcome_to_path<T>(outcome: SourcePreparationOutcome<T>) -> PathOutcom
     match outcome {
         SourcePreparationOutcome::Complete(value) => PathOutcome::Complete(value),
         SourcePreparationOutcome::Need(need) => {
+            assert!(need.root_module_bootstrap_request().is_none());
             assert!(need.repository_materializations().is_empty());
             PathOutcome::Need(
                 need.path_observations()
@@ -1401,6 +1410,151 @@ fn source_needs_union_deduplicates_and_rejects_conflicts_while_need_is_transient
         &need, &need
     ));
     assert!(!<RepositoryMaterializationKey as Key>::validity(&need));
+}
+
+#[test]
+fn root_module_bootstrap_request_pins_identity_path_reminder_and_warning() {
+    let workspace = NormalizedAbsolutePath::new("/workspace/root").unwrap();
+    let request = RootModuleBootstrapRequest {
+        workspace: workspace.clone(),
+    };
+
+    assert_eq!(request.workspace, workspace);
+    assert_eq!(
+        request.module_path(),
+        NormalizedAbsolutePath::new("/workspace/root/MODULE.bazel").unwrap()
+    );
+
+    let expected_reminder = b"\
+###############################################################################
+# Bazel now uses Bzlmod by default to manage external dependencies.
+# Please consider migrating your external dependencies from WORKSPACE to MODULE.bazel.
+#
+# For more details, please check https://github.com/bazelbuild/bazel/issues/18958
+###############################################################################
+";
+    assert_eq!(ROOT_MODULE_BOOTSTRAP_REMINDER_BYTES, expected_reminder);
+    assert_eq!(ROOT_MODULE_BOOTSTRAP_REMINDER_BYTES.len(), 399);
+    let reminder_digest: [u8; 32] = Sha256::digest(ROOT_MODULE_BOOTSTRAP_REMINDER_BYTES).into();
+    assert_eq!(ROOT_MODULE_BOOTSTRAP_REMINDER_SHA256, reminder_digest);
+    assert_eq!(
+        hex::encode(ROOT_MODULE_BOOTSTRAP_REMINDER_SHA256),
+        "0e3e315145ac7ee7a4e0ac825e1c5e03c068ec1254dd42c3caaecb27e921dc4d"
+    );
+
+    let warning = RootModuleBootstrapWarning;
+    assert_eq!(
+        warning.text(),
+        "--enable_bzlmod is set, but no MODULE.bazel file was found at the workspace root. \
+Bazel will create an empty MODULE.bazel file. Please consider migrating your external \
+dependencies from WORKSPACE to MODULE.bazel. For more details, please refer to \
+https://github.com/bazelbuild/bazel/issues/18958."
+    );
+    assert_eq!(warning.text(), ROOT_MODULE_BOOTSTRAP_WARNING_TEXT);
+
+    let already_present = RootModuleBootstrapApplyResult::AlreadyPresent;
+    let created = RootModuleBootstrapApplyResult::Created(warning);
+    assert_ne!(already_present, created);
+    assert!(matches!(
+        created,
+        RootModuleBootstrapApplyResult::Created(created_warning)
+            if created_warning.text() == ROOT_MODULE_BOOTSTRAP_WARNING_TEXT
+    ));
+
+    let create_error = RootModuleBootstrapCreateError {
+        module_path: request.module_path(),
+        kind: PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    assert_eq!(
+        create_error.module_path,
+        NormalizedAbsolutePath::new("/workspace/root/MODULE.bazel").unwrap()
+    );
+    assert_eq!(create_error.kind, PathIoErrorKind::PermissionDenied);
+    assert_eq!(create_error.raw_os_error, Some(13));
+}
+
+#[test]
+fn root_module_bootstrap_need_unions_cumulatively_and_remains_transient() {
+    let request = RootModuleBootstrapRequest {
+        workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+    };
+    let path_demand = demand(
+        "/workspace/MODULE.bazel",
+        PathObservationOperation::FileBytes,
+    );
+    let path_need =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(path_demand.dupe()));
+    let repository_request = materialization_request(
+        "/workspace",
+        "dep+",
+        "http_archive",
+        RepositoryMaterializationKind::Immutable,
+    );
+    let repository_need = SourcePreparationNeeds::repository(repository_request);
+    let bootstrap_need = SourcePreparationNeeds::root_module_bootstrap(request.clone());
+    let combined = bootstrap_need
+        .try_union(&SourcePreparationNeeds::root_module_bootstrap(
+            request.clone(),
+        ))
+        .unwrap()
+        .try_union(&path_need)
+        .unwrap()
+        .try_union(&repository_need)
+        .unwrap();
+
+    assert_eq!(combined.root_module_bootstrap_request(), Some(&request));
+    assert_eq!(
+        combined
+            .path_observations()
+            .expect("path demand must be retained")
+            .demands(),
+        &[path_demand]
+    );
+    assert_eq!(combined.repository_materializations().len(), 1);
+    assert!(matches!(
+        combined.try_union(&SourcePreparationNeeds::root_module_bootstrap(
+            RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/other-workspace").unwrap(),
+            },
+        )),
+        Err(SourcePreparationNeedsError::ConflictingRootModuleBootstrap)
+    ));
+
+    let conflicting_repository = materialization_request(
+        "/workspace",
+        "dep+",
+        "git_repository",
+        RepositoryMaterializationKind::Immutable,
+    );
+    let conflicting_both = SourcePreparationNeeds::repository(conflicting_repository)
+        .try_union(&SourcePreparationNeeds::root_module_bootstrap(
+            RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/other-workspace").unwrap(),
+            },
+        ))
+        .unwrap();
+    assert!(matches!(
+        combined.try_union(&conflicting_both),
+        Err(SourcePreparationNeedsError::ConflictingRepositoryRequest {
+            canonical_repo
+        }) if canonical_repo.as_str() == "dep+"
+    ));
+
+    let outcome = SourcePreparationOutcome::Need(combined.clone());
+    assert!(!<ModuleSourcePreparationKey as Key>::equality(
+        &outcome, &outcome
+    ));
+    assert!(!<ModuleSourcePreparationKey as Key>::validity(&outcome));
+
+    let repository_outcome = SourcePreparationOutcome::Need(combined);
+    assert!(!<RepositoryMaterializationKey as Key>::equality(
+        &repository_outcome,
+        &repository_outcome,
+    ));
+    assert!(!<RepositoryMaterializationKey as Key>::validity(
+        &repository_outcome
+    ));
 }
 
 #[test]

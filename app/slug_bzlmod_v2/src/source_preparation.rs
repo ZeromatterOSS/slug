@@ -57,6 +57,7 @@ use crate::RegistryFileUrl;
 use crate::RegistryFileValue;
 use crate::RegistryPolicyKey;
 use crate::RepoSpec;
+use crate::RootModuleBootstrapRequest;
 use crate::RootModuleFilesKey;
 use crate::RootModuleOverride;
 use crate::apply_unified_patch;
@@ -112,6 +113,7 @@ fn source_outcome_from_path<T>(outcome: PathOutcome<T>) -> SourcePreparationOutc
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct SourcePreparationNeeds {
+    root_module_bootstrap: Option<RootModuleBootstrapRequest>,
     path_observations: Option<NeedPathObservations>,
     repository_materializations:
         Arc<SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>>,
@@ -119,12 +121,22 @@ pub struct SourcePreparationNeeds {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum SourcePreparationNeedsError {
+    ConflictingRootModuleBootstrap,
     ConflictingRepositoryRequest { canonical_repo: CanonicalRepoName },
 }
 
 impl SourcePreparationNeeds {
+    pub fn root_module_bootstrap(request: RootModuleBootstrapRequest) -> Self {
+        Self {
+            root_module_bootstrap: Some(request),
+            path_observations: None,
+            repository_materializations: Arc::new(SmallMap::new()),
+        }
+    }
+
     pub fn path(need: NeedPathObservations) -> Self {
         Self {
+            root_module_bootstrap: None,
             path_observations: Some(need),
             repository_materializations: Arc::new(SmallMap::new()),
         }
@@ -134,9 +146,14 @@ impl SourcePreparationNeeds {
         let mut repository_materializations = SmallMap::new();
         repository_materializations.insert(request.id.clone(), Arc::new(request));
         Self {
+            root_module_bootstrap: None,
             path_observations: None,
             repository_materializations: Arc::new(repository_materializations),
         }
+    }
+
+    pub fn root_module_bootstrap_request(&self) -> Option<&RootModuleBootstrapRequest> {
+        self.root_module_bootstrap.as_ref()
     }
 
     pub fn path_observations(&self) -> Option<&NeedPathObservations> {
@@ -169,8 +186,20 @@ impl SourcePreparationNeeds {
                 }
             }
         }
-        debug_assert!(path_observations.is_some() || !requests.is_empty());
+        let root_module_bootstrap =
+            match (&self.root_module_bootstrap, &other.root_module_bootstrap) {
+                (Some(left), Some(right)) if left == right => Some(left.dupe()),
+                (Some(_), Some(_)) => {
+                    return Err(SourcePreparationNeedsError::ConflictingRootModuleBootstrap);
+                }
+                (Some(request), None) | (None, Some(request)) => Some(request.dupe()),
+                (None, None) => None,
+            };
+        debug_assert!(
+            root_module_bootstrap.is_some() || path_observations.is_some() || !requests.is_empty()
+        );
         Ok(Self {
+            root_module_bootstrap,
             path_observations,
             repository_materializations: Arc::new(requests),
         })
