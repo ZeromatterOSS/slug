@@ -1265,3 +1265,125 @@ preflight/preparation and single inline evaluator, per-file binding isolation,
 repeated include execution, composite semantic ownership, marker-conditional
 single event batch outside equality, DICE key transition, and retained-engine
 evidence before any Rust or Cargo edit.
+
+### Stage 5 root-MODULE composed evaluator/event design
+
+Status: Accepted
+
+Bazel source inspected: pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, especially
+`ModuleFileFunction`, `ModuleThreadContext`, `ModuleFileGlobals`, and
+`ModuleFileValue`.
+
+The current per-file evaluator is replaced by one private
+`RootModuleEvaluationKey` below the visible-lockfile join:
+
+```text
+RootModuleCommandPolicyKey -- ignore-dev projection --\
+WorkspaceFileKey(root and discovered includes) --------+--> RootModuleEvaluationKey
+                                                             |
+VisibleLockfileKey ------------------------------------------+--> RootModuleFilesKey
+                                                                  |
+                                                                  +--> RootModuleGraphKey
+```
+
+This split is mandatory. `RootModuleFilesKey` also owns visible-lockfile
+composition, so making it eventful would rerun or replay root Starlark prints
+on a lockfile-only change. The private key depends on an opaque DICE projection
+of only `ignore_dev_dependency`; yanked-policy and environment changes remain
+outside root evaluation, while an ignore-dev flip reruns the logical module as
+it does in Bazel. Validated dev dependencies and root overrides are omitted at
+directive execution when the projection is true. The public graph still
+retains the complete command/environment/mode values.
+
+The private key reads and parser-inspects the root, discovers unique raw
+include labels breadth-first, validates and reads the complete reachable
+closure, and retains only exact shared source text, paths, labels, and compact
+inspection data across DICE awaits. After the last await, one synchronous
+helper reparses and prepares every program before executing any program. Root
+and every distinct raw include label receive separate Starlark `Module`
+binding stores. One evaluator installs all prepared programs; `include()`
+saves the current file, dispatches the mapped opaque program index inline,
+restores the prior file before propagating either success or failure, and
+executes repeated calls to the same raw label repeatedly through the same
+program. No evaluator, module, prepared program, `Rc`, or `RefCell` crosses a
+DICE await, and no DICE call or lock occurs inside a Starlark global.
+
+One shared directive context owns the logical module header, ordering state,
+dependencies in execution order, and override uniqueness/materialization.
+The rejected public per-file execution model is removed without a shim:
+`ModuleFileEvaluation`, `ModuleFileEvaluationKey`, `evaluate_module_file`,
+their exports, and `RootModuleFiles`/`RootModuleGraph` `root` and `includes`
+fields are retired. The replacement public `EvaluatedRootModule` contains the
+aggregate header and dependency slice. `RootModuleFiles` and
+`RootModuleGraph` expose that value as `module`, plus a canonical sorted unique
+set of repo-relative `module_file_paths` and their existing lockfile,
+override, policy, and mapping fields. `root_mapping` consumes the aggregate
+dependencies. This matches Bazel's one `InterimModule` plus override and
+module-file-path set rather than preserving prototype compatibility.
+
+Implementation is split into two independently reviewable packets.
+
+1. `WP-5-m1-root-module-composed-evaluator` changes exactly:
+
+   - `app/slug_bzlmod_v2/src/module_eval.rs`
+   - `app/slug_bzlmod_v2/src/lib.rs`
+   - `app/slug_bzlmod_v2/tests/root_module_dice.rs`
+   - `app/slug_core_v2/tests/runtime.rs`
+
+   It lands the private key, opaque ignore-dev projection, full
+   preflight/preparation, inline dispatcher, aggregate schema, old-key
+   retirement, and downstream test migration. Focused evidence must prove
+   root/include/nested dependency order, distinct-file binding isolation,
+   repeated-call semantic effects, canonical module-file paths, runtime stack
+   attribution, missing/edit/delete/recreate and semantic A-to-B-to-A
+   transitions, ignore-dev reevaluation, and private-evaluator reuse under
+   yanked-policy, environment, and lockfile-only changes. The nonroot
+   inspector/evaluator/dispatcher region remains byte-identical.
+
+2. `WP-5-m1-root-module-composite-event-producer` then changes exactly:
+
+   - `Cargo.lock`
+   - `app/slug_bzlmod_v2/Cargo.toml`
+   - `app/slug_bzlmod_v2/src/module_eval.rs`
+   - `app/slug_bzlmod_v2/tests/root_module_dice.rs`
+
+   It adds only the existing workspace `slug_events_v2` dependency and makes
+   the private evaluation key the sole root-MODULE event producer. Marker
+   absence leaves the evaluator's default direct-print handler selected and
+   stores no evaluation data. Marker presence selects one capture-only handler
+   and stores exactly one local `EventBatch`, including explicit empty batches
+   for missing/read/parse/prepare/no-print outcomes and the exact executed
+   prefix on runtime failure. Events, the marker, sources, prepared programs,
+   and activation history remain outside semantic values and equality.
+   `RootModuleFilesKey`, file leaves, and graph keys never store event data.
+
+The event packet's retained-engine matrix must prove one cold
+root/dependency/nested batch with repeated nested execution; warm and
+fresh-owner nonreplay; print-only V1-to-V2-to-V1 evaluation with equal semantic
+graphs; semantic edits and recovery; explicit empty missing/parse/prepare
+batches; exact runtime prefix and full recovery; lockfile, yanked-policy, and
+environment reuse; ignore-dev and source reevaluation; marker-absent
+data absence; and exactly one event-bearing activation node. The accepted
+command-effect owner already proves exact-version closure selection and retry
+lineage, so neither packet edits runtime publication.
+
+Stop and replan on execution before complete reachable preparation,
+deduplicated call sites, shared bindings for distinct raw labels, fresh
+programs for repeated identical labels, an event or marker in semantic
+equality, event data on any node except the private evaluator, lockfile-only
+Starlark replay, evaluator-owned state across an await, a new preparation key,
+manual locking, a root-specific GC seam, or any edit to DICE, runtime,
+command/server, registry/source preparation, loading/analysis, nonroot
+evaluation, discovery, fixtures, oracle output, or the harness. Root include
+package-policy and cycle parity remain named later gaps; this design does not
+invent them.
+
+Three independent terminal reviews returned `ACCEPT`. No Rust, Cargo, fixture,
+oracle, runtime, nonroot, or other production file changed. No V1 code or
+ownership is extracted; the existing V2 prepared-program dispatcher is only
+the already accepted implementation mechanism.
+
+Next evidence: Implement only
+`WP-5-m1-root-module-composed-evaluator` in the exact first-packet allowlist.
+Stop on any frozen invariant or scope violation before event activation.
