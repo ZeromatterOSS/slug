@@ -2635,3 +2635,25 @@ terminal reviews both returned `ACCEPT`; residual publication integration
 remains owned by later packets.
 
 Next evidence: Implement only `WP-5-m1-analysis-event-producer`.
+
+### Stage 5 analysis event producer
+
+Status: Accepted
+
+`ConfiguredTargetAnalysisKey` now owns one marker-conditional local rule
+implementation batch. Capture begins only after package and dependency DICE
+awaits, is borrowed only by the synchronous local evaluator, and is consumed
+before result propagation. Dependency targets therefore retain separate nodes;
+marker absence preserves direct printing, pre-local failures store explicit
+empty batches, and local runtime or validation failures retain only their
+executed prefix. Analysis values, equality, validity, loading, runtime,
+execution, and publication are unchanged.
+
+The focused analysis rule suite passed 4 tests, the full analysis crate passed
+12 tests, and the downstream core crate passed 85 unit plus 13 runtime tests.
+All GNU-Windows analysis test executables linked. Formatting, diff, archive,
+and exact four-file gates passed. Independent lifetime/evidence and
+implementation reviews both returned `ACCEPT`; retry and publication
+integration remains owned by later packets.
+
+Next evidence: Implement only `WP-5-m1-private-shared-retry-driver`.

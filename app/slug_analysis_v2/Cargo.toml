@@ -15,6 +15,7 @@ dice_futures = { workspace = true }
 dupe = { workspace = true }
 futures = { workspace = true }
 slug_build_api_v2 = { workspace = true }
+slug_events_v2 = { workspace = true }
 slug_identity_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }
 starlark = { workspace = true }

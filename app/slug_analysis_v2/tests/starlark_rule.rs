@@ -14,11 +14,14 @@ use std::sync::Mutex;
 use std::time::SystemTime;
 
 use dice::ActivationData;
+use dice::ActivationKind;
 use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::DynKey;
+use dice::RichActivation;
 use dice::UserComputationData;
+use dupe::Dupe;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredTargetAnalysisKey;
@@ -29,6 +32,9 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_events_v2::CaptureEvaluationEvents;
+use slug_events_v2::EvaluationEvent;
+use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
@@ -75,6 +81,87 @@ impl ActivationTracker for AnalysisTracker {
             .unwrap()
             .push((key.configured_target.label().to_string(), kind));
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AnalysisEventActivation {
+    workspace: PathBuf,
+    configured_target: ConfiguredTargetKey,
+    kind: ActivationKind,
+    batch: Option<EventBatch>,
+}
+
+#[derive(Default)]
+struct AnalysisEventTracker {
+    activations: Mutex<Vec<AnalysisEventActivation>>,
+}
+
+impl AnalysisEventTracker {
+    fn take(&self) -> Vec<AnalysisEventActivation> {
+        std::mem::take(&mut *self.activations.lock().unwrap())
+    }
+}
+
+impl ActivationTracker for AnalysisEventTracker {
+    fn key_activated(
+        &self,
+        _key: &DynKey,
+        _deps: &mut dyn Iterator<Item = &DynKey>,
+        _activation_data: ActivationData,
+    ) {
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        true
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        let Some(key) = key.downcast_ref::<ConfiguredTargetAnalysisKey>() else {
+            return;
+        };
+        self.activations
+            .lock()
+            .unwrap()
+            .push(AnalysisEventActivation {
+                workspace: key.workspace.clone(),
+                configured_target: key.configured_target.clone(),
+                kind: activation.kind(),
+                batch: activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe),
+            });
+    }
+}
+
+fn event_texts(batch: &EventBatch) -> Vec<&str> {
+    batch
+        .events()
+        .iter()
+        .map(|event| match event {
+            EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+        })
+        .collect()
+}
+
+fn analysis_event<'a>(
+    activations: &'a [AnalysisEventActivation],
+    workspace: &std::path::Path,
+    configured_target: &ConfiguredTargetKey,
+) -> &'a AnalysisEventActivation {
+    let mut matching = activations.iter().filter(|activation| {
+        activation.kind == ActivationKind::Evaluated
+            && activation.workspace == workspace
+            && &activation.configured_target == configured_target
+    });
+    let activation = matching
+        .next()
+        .unwrap_or_else(|| panic!("missing evaluated activation: {activations:#?}"));
+    assert!(
+        matching.next().is_none(),
+        "duplicate evaluated activation: {activations:#?}"
+    );
+    activation
 }
 
 fn scratch() -> PathBuf {
@@ -146,10 +233,25 @@ async fn analyze_revision(
     workspace: &std::path::Path,
     key: &ConfiguredTargetKey,
 ) -> (Result<AnalysisResult, String>, Vec<(String, EventKind)>) {
-    let mut updater = dice.updater_with_data(UserComputationData {
-        activation_tracker: Some(tracker.clone()),
+    let result = analyze_request(dice, workspace, key, Some(tracker.clone()), false).await;
+    (result, tracker.take())
+}
+
+async fn analyze_request(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    key: &ConfiguredTargetKey,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+) -> Result<AnalysisResult, String> {
+    let mut user_data = UserComputationData {
+        activation_tracker: tracker,
         ..Default::default()
-    });
+    };
+    if capture_events {
+        user_data.data.set(CaptureEvaluationEvents);
+    }
+    let mut updater = dice.updater_with_data(user_data);
     updater
         .changed_to(vec![(
             WorkspaceSnapshotKey {
@@ -189,7 +291,7 @@ async fn analyze_revision(
                 .cloned()
                 .map_err(|error| error.to_string())
         });
-    (result, tracker.take())
+    result
 }
 
 fn assert_analysis_events(events: &[(String, EventKind)], expected: &[(&str, EventKind)]) {
@@ -434,6 +536,191 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     );
     assert_eq!(leaf.actions().len(), 1);
     assert_eq!(leaf.actions()[0].outputs()[0].path(), "leaf/second.txt");
+}
+
+#[tokio::test]
+async fn analysis_event_capture_is_target_local_empty_replacing_and_failure_prefix_preserving() {
+    let workspace = scratch();
+    for package in ["rules", "leaf", "parent"] {
+        fs::create_dir_all(workspace.join(package)).unwrap();
+    }
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    let definitions = |leaf_body: &str, parent_body: &str| {
+        format!(
+            r#"LeafInfo = provider(fields = {{"value": "leaf target name"}})
+ParentInfo = provider(fields = {{"value": "dependency leaf names"}})
+
+def _leaf_impl(ctx):
+{leaf_body}    return [DefaultInfo(files = depset([])), LeafInfo(value = ctx.label.name)]
+
+def _parent_impl(ctx):
+{parent_body}    values = [dep[LeafInfo].value for dep in ctx.attr.deps]
+    return [DefaultInfo(files = depset([])), ParentInfo(value = ",".join(values))]
+
+leaf = rule(implementation = _leaf_impl)
+parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()}})
+"#
+        )
+    };
+    fs::write(
+        workspace.join("rules/defs.bzl"),
+        definitions(
+            "    print(\"LEAF_LOCAL\")\n",
+            "    print(\"PARENT_LOCAL\")\n",
+        ),
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("leaf/BUILD.bazel"),
+        "load(\"//rules:defs.bzl\", \"leaf\")\nleaf(name = \"leaf\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("parent/BUILD.bazel"),
+        "load(\"//rules:defs.bzl\", \"parent\")\nparent(name = \"parent\", deps = [\"//leaf:leaf\"])\n",
+    )
+    .unwrap();
+    let configuration = ConfigurationKey::target("analysis-events").unwrap();
+    let leaf_key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//leaf:leaf").unwrap(),
+        configuration.clone(),
+    );
+    let parent_key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//parent:parent").unwrap(),
+        configuration,
+    );
+
+    let direct_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let direct_tracker = Arc::new(AnalysisEventTracker::default());
+    analyze_request(
+        &direct_dice,
+        &workspace,
+        &parent_key,
+        Some(direct_tracker.clone()),
+        false,
+    )
+    .await
+    .unwrap();
+    let direct = direct_tracker.take();
+    assert!(
+        analysis_event(&direct, &workspace, &leaf_key)
+            .batch
+            .is_none(),
+        "{direct:#?}"
+    );
+    assert!(
+        analysis_event(&direct, &workspace, &parent_key)
+            .batch
+            .is_none(),
+        "{direct:#?}"
+    );
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisEventTracker::default());
+    analyze_request(&dice, &workspace, &parent_key, Some(tracker.clone()), true)
+        .await
+        .unwrap();
+    let initial = tracker.take();
+    assert_eq!(
+        analysis_event(&initial, &workspace, &leaf_key)
+            .batch
+            .as_ref()
+            .map(event_texts),
+        Some(vec!["LEAF_LOCAL"])
+    );
+    assert_eq!(
+        analysis_event(&initial, &workspace, &parent_key)
+            .batch
+            .as_ref()
+            .map(event_texts),
+        Some(vec!["PARENT_LOCAL"])
+    );
+
+    fs::write(
+        workspace.join("rules/defs.bzl"),
+        definitions("    print(\"LEAF_LOCAL\")\n", ""),
+    )
+    .unwrap();
+    analyze_request(&dice, &workspace, &parent_key, Some(tracker.clone()), true)
+        .await
+        .unwrap();
+    let empty = tracker.take();
+    assert_eq!(
+        analysis_event(&empty, &workspace, &parent_key)
+            .batch
+            .as_ref()
+            .map(event_texts),
+        Some(Vec::new())
+    );
+
+    fs::write(
+        workspace.join("rules/defs.bzl"),
+        definitions(
+            "    print(\"LEAF_LOCAL\")\n",
+            "    print(\"PARENT_RUNTIME_PREFIX\")\n    fail(\"parent runtime\")\n    print(\"PARENT_RUNTIME_AFTER\")\n",
+        ),
+    )
+    .unwrap();
+    let error = analyze_request(&dice, &workspace, &parent_key, Some(tracker.clone()), true)
+        .await
+        .unwrap_err();
+    assert!(error.contains("parent runtime"), "{error}");
+    let local_failure = tracker.take();
+    assert_eq!(
+        analysis_event(&local_failure, &workspace, &parent_key)
+            .batch
+            .as_ref()
+            .map(event_texts),
+        Some(vec!["PARENT_RUNTIME_PREFIX"])
+    );
+
+    fs::write(
+        workspace.join("rules/defs.bzl"),
+        definitions(
+            "    print(\"LEAF_LOCAL\")\n",
+            "    print(\"PARENT_RECOVERED\")\n",
+        ),
+    )
+    .unwrap();
+    analyze_request(&dice, &workspace, &parent_key, Some(tracker.clone()), true)
+        .await
+        .unwrap();
+    let recovered = tracker.take();
+    assert_eq!(
+        analysis_event(&recovered, &workspace, &parent_key)
+            .batch
+            .as_ref()
+            .map(event_texts),
+        Some(vec!["PARENT_RECOVERED"])
+    );
+
+    fs::write(
+        workspace.join("rules/defs.bzl"),
+        definitions(
+            "    print(\"LEAF_RUNTIME_PREFIX\")\n    fail(\"leaf runtime\")\n    print(\"LEAF_RUNTIME_AFTER\")\n",
+            "    print(\"PARENT_MUST_NOT_RUN\")\n",
+        ),
+    )
+    .unwrap();
+    let error = analyze_request(&dice, &workspace, &parent_key, Some(tracker.clone()), true)
+        .await
+        .unwrap_err();
+    assert!(error.contains("leaf runtime"), "{error}");
+    let failed = tracker.take();
+    assert_eq!(
+        analysis_event(&failed, &workspace, &leaf_key)
+            .batch
+            .as_ref()
+            .map(event_texts),
+        Some(vec!["LEAF_RUNTIME_PREFIX"])
+    );
+    assert_eq!(
+        analysis_event(&failed, &workspace, &parent_key)
+            .batch
+            .as_ref()
+            .map(event_texts),
+        Some(Vec::new())
+    );
 }
 
 #[tokio::test]

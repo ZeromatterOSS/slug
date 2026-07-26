@@ -25,6 +25,7 @@ use slug_loading_v2::provider::FrozenUserProviderCallable;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
 use slug_loading_v2::provider::StarlarkDepset;
 use slug_loading_v2::provider::StarlarkUserProvider;
+use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -302,6 +303,7 @@ pub(crate) fn evaluate_loaded_rule(
     key: ConfiguredTargetKey,
     package_path: &str,
     dependencies: Vec<PreparedDependency>,
+    print_handler: Option<&dyn PrintHandler>,
 ) -> Result<AnalysisResult, String> {
     let target = package
         .targets
@@ -324,9 +326,14 @@ pub(crate) fn evaluate_loaded_rule(
         package_path: package_path.to_owned(),
         dependencies: dependencies.into(),
     });
-    let returned = Evaluator::new(&module)
-        .eval_function(implementation.frozen_value().to_value(), &[context], &[])
-        .map_err(|error| error.to_string())?;
+    let returned = {
+        let mut evaluator = Evaluator::new(&module);
+        if let Some(print_handler) = print_handler {
+            evaluator.set_print_handler(print_handler);
+        }
+        evaluator.eval_function(implementation.frozen_value().to_value(), &[context], &[])
+    }
+    .map_err(|error| error.to_string())?;
 
     let returned = ListRef::from_value(returned)
         .ok_or_else(|| "rule implementation must return a list of providers".to_owned())?;

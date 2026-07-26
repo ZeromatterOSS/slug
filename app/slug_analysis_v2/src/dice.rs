@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::cell::RefCell;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,8 +19,12 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use futures::FutureExt;
+use slug_events_v2::CaptureEvaluationEvents;
+use slug_events_v2::EvaluationEvent;
+use slug_events_v2::EventBatch;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::keys::PackageLoadKey;
+use starlark::PrintHandler;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -64,6 +69,26 @@ impl fmt::Display for ConfiguredTargetAnalysisKey {
 
 type AnalysisKeyValue = Arc<Result<AnalysisResult, AnalysisError>>;
 
+#[derive(Default)]
+struct AnalysisPrintCapture {
+    events: RefCell<Vec<EvaluationEvent>>,
+}
+
+impl AnalysisPrintCapture {
+    fn into_batch(self) -> EventBatch {
+        EventBatch::from_events(self.events.into_inner())
+    }
+}
+
+impl PrintHandler for AnalysisPrintCapture {
+    fn println(&self, text: &str) -> starlark::Result<()> {
+        self.events
+            .borrow_mut()
+            .push(EvaluationEvent::StarlarkPrint { text: text.into() });
+        Ok(())
+    }
+}
+
 #[async_trait]
 impl Key for ConfiguredTargetAnalysisKey {
     type Value = AnalysisKeyValue;
@@ -73,7 +98,21 @@ impl Key for ConfiguredTargetAnalysisKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        Arc::new(self.compute_inner(ctx).await)
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = Arc::new(
+            self.compute_inner(ctx, capture_events, &mut event_batch)
+                .await,
+        );
+        if capture_events {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("ConfiguredTargetAnalysisKey stores exactly one local event batch");
+        }
+        value
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -89,6 +128,8 @@ impl ConfiguredTargetAnalysisKey {
     async fn compute_inner(
         &self,
         ctx: &mut DiceComputations<'_>,
+        capture_events: bool,
+        event_batch: &mut Option<EventBatch>,
     ) -> Result<AnalysisResult, AnalysisError> {
         let label = self.configured_target.label();
         if !label.package().repo().is_root() {
@@ -176,13 +217,18 @@ impl ConfiguredTargetAnalysisKey {
                 })
             })
             .collect::<Result<Vec<_>, AnalysisError>>()?;
-        evaluate_loaded_rule(
+        let print_capture = capture_events.then(AnalysisPrintCapture::default);
+        let value = evaluate_loaded_rule(
             package,
             label.target().as_str(),
             self.configured_target.clone(),
             label.package().package().as_str(),
             dependencies,
-        )
-        .map_err(AnalysisError::new)
+            print_capture
+                .as_ref()
+                .map(|capture| capture as &dyn PrintHandler),
+        );
+        *event_batch = print_capture.map(AnalysisPrintCapture::into_batch);
+        value.map_err(AnalysisError::new)
     }
 }
