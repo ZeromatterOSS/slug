@@ -4192,9 +4192,193 @@ hash use, preserve the registry request even in Off mode, and cite
 `BazelLockFileFunction` plus `RegistryFunction`; no Rust or Cargo change is in
 scope.
 
-#### Later packet 9 gate: bootstrap activation and Host switch
+#### Serial packet 9: exact Host visible-lockfile boundary
 
-After packet 8, design only
+Run only `WP-5-m1-host-visible-lockfile-boundary-design`. This is a design
+packet; do not edit Rust or fixtures and do not run Cargo.
+
+Exact Bazel 9.2.0 source at commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` supersedes the legacy Slug
+Off-mode shortcut. `BazelLockFileFunction` always requests the visible
+`MODULE.bazel.lock` file dependency, then the lockfile-mode input, including
+in Off. Missing is the complete empty lockfile. Content with no recognized
+version or a version other than 28 is empty in Off, Update, and Refresh but is
+an unsupported-version error in Error. Recognized version 28 is fully decoded
+and parsed in every mode, so caught JSON syntax/structural failures occur even
+in Off. Ordinary read and caught current-version failures are persistent
+`BAD_LOCKFILE`; absent, noncurrent, and valid structurally empty inputs
+collapse to the same successful value. The exact custom-adapter exception
+boundary is deferred to the schema prerequisite below.
+
+`RegistryFunction` separately and unconditionally requests that full lockfile
+value after its mode, vendor, and Refresh-only invalidation inputs and before
+registry construction. Parsing and consumption are distinct boundaries.
+`RegistryFactoryImpl` maps HTTP(S) Off and Update to `USE_AND_UPDATE`, Error to
+`ENFORCE`, Refresh to `USE_IMMUTABLE_AND_UPDATE`, and `file://` to `IGNORE`.
+Thus Off still passes and may consume recorded hashes and selected-yanked
+versions; it never means `VisibleLockfileRead::Ignored`. Registry fetch,
+scheme policy, `%workspace%`, mirrors, vendor state, refresh invalidation, and
+yanked/hash consumption belong to a later Host registry packet.
+
+The visible owner itself has no root-module dependency. Root-before-lockfile
+ordering belongs to future resolution/nonroot consumers that obtain the root
+module before requesting a registry. It also owns no hidden lockfile, write
+plan, environment/yanked command policy, registry URL or IO state, selected
+graph, extension import, override, provisional mapping, or final
+`RepositoryMapping`.
+
+The following was the provisional sequence reviewed by this packet. It is not
+implementation authority unless the terminal status below accepts it.
+
+1. `WP-5-m1-host-visible-lockfile-oracle` adds only the new
+   `host-visible-lockfile-boundary` Bazel 9.2 fixture:
+
+   - `fixture.toml` and generated `expected/oracle.json`;
+   - root `workspace/MODULE.bazel`;
+   - immutable
+     `workspace/lockfiles/invalid-utf8-v28.lock`; and
+   - minimal `workspace/registry/bazel_registry.json` plus
+     `workspace/registry/modules/subject/1.0.0/MODULE.bazel` and
+     `workspace/registry/modules/subject/1.0.0/source.json`.
+
+   Use retained `bazel mod graph` requests through that local registry so
+   `RegistryFunction` must request the visible lockfile even though the scheme
+   later ignores hashes. Pin eight ordered rows: absent Off success; valid
+   populated v28 Off success; malformed recognized-v28 Off failure;
+   noncurrent malformed Off success as empty; the same noncurrent content in
+   Error producing the unsupported-version diagnostic; recognized-v28 merge
+   conflict producing Bazel's observed advice suffix; a valid JSON document
+   containing malformed UTF-8 in an ignored string succeeding through Java
+   replacement decoding; and deleted/absent Error success as empty. Record
+   exact exit/diagnostic classes, successful graph output, the visible
+   lockfile manifest, all cumulative mutations, source provenance, and the
+   fixture growth. Do not add HTTP hash-use rows here; those discriminate the
+   later registry consumer.
+
+2. After oracle `ACCEPT`, implement only
+   `WP-5-m1-host-visible-lockfile-owner` with this exact four-file allowlist:
+
+   - new private `app/slug_bzlmod_v2/src/host_lockfile.rs`;
+   - `app/slug_bzlmod_v2/src/lockfile.rs`;
+   - `app/slug_bzlmod_v2/src/repository_ignore.rs`; and
+   - the private module declaration in `app/slug_bzlmod_v2/src/lib.rs`.
+
+   Add only crate-private `HostVisibleLockfileKey`,
+   `HostVisibleLockfileValue`, and `HostVisibleLockfileError`. The key identity
+   is one `NormalizedAbsolutePath` workspace. Its exact value is:
+
+   ```text
+   PathOutcome<
+       Arc<Result<HostVisibleLockfileValue, HostVisibleLockfileError>>
+   >
+
+   HostVisibleLockfileValue {
+       lockfile: Arc<BazelLockfile>
+   }
+   ```
+
+   Freeze the private error variants as
+   `LockfileModeInput { workspace: NormalizedAbsolutePath, message:
+   CompactString }`, `File { error: HostFileError }`, and
+   `BadLockfile { message: CompactString }`. Add only a crate-private
+   `lockfile()` accessor returning `&Arc<BazelLockfile>`; expose no key, value,
+   error, or parser.
+
+   The successful value retains the complete structural v28 lockfile:
+   registry hashes, selected-yanked versions, extension records, facts, and
+   fact versions. It retains no mode, path, raw bytes, digest, formatting,
+   missing/noncurrent discriminator, or `Ignored` variant. Structural `Arc`
+   equality must compare separately allocated but semantically equal parsed
+   values while allowing later consumers to `Dupe` the full maps.
+
+   Compute `HostFileBytesKey(workspace/MODULE.bazel.lock)` first. A path Need
+   returns immediately and is invalid/self-unequal. After any Complete byte
+   result, compute `RootModuleLockfileModeKey` before interpreting a Missing,
+   typed Host file error, or Present bytes. Missing mode, typed `HostFileError`,
+   and parse/version failure remain distinct terminal Complete errors.
+   Missing becomes `Arc::new(empty_bazel_lockfile())` in every mode. Present
+   bytes use Bazel's Java `InputStreamReader` UTF-8 replacement semantics,
+   exact first numeric version-marker scan and overflow behavior, then the
+   existing full structural parser. Make only the existing pure
+   `repository_ignore::java_utf8_decode` helper crate-private and reuse it;
+   do not copy it or use Rust's behaviorally different `from_utf8_lossy`.
+   Factor exactly
+   `parse_visible_lockfile_bytes_for_host(mode: &LockfileMode, bytes: &[u8])
+   -> Result<Arc<BazelLockfile>, CompactString>` in `lockfile.rs`; preserve
+   every public and legacy `VisibleLockfileRead` API and its old Off behavior
+   unchanged.
+
+   Complete-only equality and validity are mandatory. Focused tests cover
+   workspace key identity; cumulative observation Needs; absent and
+   SpecialFile/symlink inputs; ordinary operational errors; missing mode after
+   a complete file dependency; absent→A→B→delete→A on one retained DICE
+   engine; all four mode/current/noncurrent/malformed cells; first numeric
+   marker and integer overflow; ordinary versus merge-conflict diagnostics;
+   malformed Java UTF-8 replacement; every full-value field; and
+   formatting/key-order changes that recompute bytes but prune a downstream
+   semantic projection. Dependency/event scans prove no root, registry,
+   loading/core/analysis/query consumer, hidden lockfile, write, direct IO,
+   event marker/batch, mapping, or activation edge.
+
+3. After owner `ACCEPT`, design only
+   `WP-5-m1-host-registry-function-boundary-design`. That packet must freeze
+   root-before-registry composition; mode/vendor/Refresh invalidation order;
+   unconditional visible-lockfile acquisition in all modes; URL validation
+   and `%workspace%`; mirrors; the exact HTTP(S)/file hash-mode table;
+   selected-yanked reuse; registry construction versus later fetch ownership;
+   and the typed Host IO/error/equality surface. It must explicitly remove the
+   legacy Host-path proposal to consume `RootModuleFilesKey` or reuse
+   `remote_policy`'s Off early return. Final mappings stay with the
+   post-selection dependency-graph owner.
+
+The existing Stage 5/Stage 9 statements that Off has no visible-file
+dependency, that Host registry policy obtains lockfile state through
+`RootModuleFilesKey`, or that Off returns `FetchUnrecorded` before inspecting
+the lockfile are legacy-only and superseded for the Host path. The public
+legacy path remains unchanged until a separately accepted activation packet.
+
+##### Host visible-lockfile boundary design status
+
+**Status:** Replan on 2026-07-26.
+
+Exact source review accepted the separate path-only Host owner, Off-mode read
+and parse behavior, `PathOutcome`, Java UTF-8 utility reuse, full-value
+`Arc` identity, root/registry/mapping exclusions, and oracle-first ordering.
+It rejected the proposed implementation sequence before Rust because the live
+`BazelLockfile` is not Bazel 9.2's full semantic value.
+
+The live parser drops every non-`general` OS/architecture extension factor and
+`moduleExtensionMetadata`; retains extension IDs, factors, Base64 digests,
+recorded inputs, generated repo specs, facts, and fact versions with weaker or
+raw identities; parses selected-yanked keys as unchecked strings rather than
+typed `ModuleKey`/`Version`; and retains registry checksum spellings instead
+of normalized optional SHA-256 values. Some malformed types survive as raw
+`serde_json::Value`. Consequently two inputs equal as Bazel
+`BazelLockFileValue`s may remain unequal in Slug, while distinct or invalid
+Bazel inputs may collapse or parse. The proposed claims of a complete v28
+value and every-field equality are not implementation authority.
+
+The exact Bazel exception surface also needs a source-bounded decision:
+`BazelLockFileFunction` catches `JsonSyntaxException`, `NullPointerException`,
+`IllegalArgumentException`, and `IOException`, while some custom Gson adapters
+throw the broader `JsonParseException`. Do not generalize every recognized-v28
+adapter failure to the same caught `BAD_LOCKFILE` path without executable
+evidence.
+
+All three terminal latest-text audits returned `REPLAN`. Next evidence:
+Design only `WP-5-m1-bazel-lockfile-v28-schema-design`. Audit
+`BazelLockFileValue`, `GsonTypeAdapterUtil`, `ModuleExtensionId`,
+`ModuleExtensionEvalFactors`, `LockFileModuleExtension`,
+`LockfileModuleExtensionMetadata`, `Facts`, recorded inputs, `RepoSpec`,
+`ModuleKey`/`Version`, and optional-checksum adapters against the live parser,
+renderer, replay consumers, and public tests. Freeze an oracle-first exact
+schema fixture, semantic types/equality/defaults/error contract, and the
+smallest parser/renderer migration allowlist before returning to the Host
+read/mode oracle. Do not edit Rust or fixtures and do not run Cargo.
+
+#### Later activation gate: bootstrap and Host switch
+
+After accepted Host visible-lockfile and registry ownership, design only
 `WP-5-m1-root-module-bootstrap-activation`. It must reopen the private native
 demand driver and name packet 2's stateless owner as a retained
 `WorkspaceRuntime` field; native apply remains outside DICE. Bootstrap is the
