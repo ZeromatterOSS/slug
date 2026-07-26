@@ -31,28 +31,27 @@ advances the **Current packet**, not an older `next` paragraph.
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
-Latest M1 accepted evidence: the corrected private Host root include-horizon
-owner passed three terminal latest-diff reviews, including an exact Bazel
-9.2.0 source audit. The three-file owner parses the entire label horizon
-before lookup, canonicalizes package/target identities, evaluates all
-first-seen unique packages in one grouped DICE computation, preserves the
-full grouped Need union, and applies source-order terminal precedence without
-observing or reading include files. Six focused regressions, full
-bzlmod/loading/core tests, static/privacy gates, and all 20 affected
-GNU-Windows test executable links passed.
+Latest M1 accepted evidence: the corrected Host root-module-file owner design
+passed three terminal latest-text reviews against exact Bazel 9.2.0 source.
+The private value owns only evaluated root semantics, compact overrides, and
+set-equivalent canonical relative module-file paths. It excludes lockfile,
+environment/mode policy, resolution, and repository mappings; preserves
+breadth-first grouped dependencies without globally deduplicating occurrences;
+and validates root plus each horizon before observing later dependency
+frontiers. Temporary Starlark state never crosses a DICE await.
 
 ### Current packet
 
-Design only `WP-5-m1-host-root-module-file-boundary-correction`.
+Implement only `WP-5-m1-host-root-module-file-owner-corrected-retry`.
 
-Correct the dormant Host root packet against exact Bazel 9.2.0 ownership.
-Replace the proposed files/graph aggregate with a root-module-file-only value:
-no visible lockfile, environment or lockfile policy, resolved graph, or
-repository mapping. Freeze horizon-local dependency dedupe without global
-include-occurrence dedupe, canonical set-equivalent logical module-file paths,
-REPO policy-event membership before MODULE execution, and a later separate
-Host lockfile owner that still reads in Off. Do not edit Rust or fixtures and
-do not run Cargo.
+Use the exact three-file allowlist: new private `host_module.rs`, the required
+crate-private validation/composed-evaluator seams in `module_eval.rs`, and only
+a private module declaration in `lib.rs`. Implement the corrected
+root-module-file value, bootstrap/path Needs, breadth-first package and Host
+byte groups, compile-before-next-frontier barriers, full-closure inline
+execution, marker-conditional root events, and complete-only equality. Add no
+lockfile, environment/mode policy, mapping, public consumer, write, warning,
+dependency, or activation.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

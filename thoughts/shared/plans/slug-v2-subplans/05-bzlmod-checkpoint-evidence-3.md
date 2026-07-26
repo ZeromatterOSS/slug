@@ -4013,6 +4013,155 @@ Three terminal audits returned `REPLAN`.
 Next evidence: Design only
 `WP-5-m1-host-root-module-file-boundary-correction`.
 
+#### Serial packet 8 correction: exact Host root-module-file owner
+
+Run only `WP-5-m1-host-root-module-file-boundary-correction`. Do not edit
+Rust or fixtures and do not run Cargo.
+
+Freeze the corrected implementation as
+`WP-5-m1-host-root-module-file-owner-corrected-retry` with the same eventual
+three-file allowlist:
+
+- new `app/slug_bzlmod_v2/src/host_module.rs`;
+- `app/slug_bzlmod_v2/src/module_eval.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+Add only crate-private `HostRootModuleFileKey`,
+`HostRootModuleFileValue`, and `HostRootModuleFileError`. The key is
+workspace-identified and returns
+`SourcePreparationOutcome<Arc<Result<HostRootModuleFileValue,
+HostRootModuleFileError>>>`. The successful value retains exactly the
+evaluated root module, the existing compact `RootModuleOverrides`, and a
+sorted/deduplicated `Arc<[PathBuf]>` representation of Bazel's set-equivalent
+canonical repository-relative module-file paths. It retains no raw label,
+selected package root, physical resolution identity, visible lockfile,
+environment or lockfile policy, resolved graph, provisional alias mapping,
+or final `RepositoryMapping`. The compact evaluator's existing
+`RootModuleOverrides` remains the sole override-definition owner; do not
+invent a parallel non-registry lookup until an exact consumer packet owns it.
+
+The root key computes only the ignore-dev command-policy projection before
+the logical root `HostFileBytesKey`. A root path Need becomes a path Need;
+semantic Missing becomes packet 1's sole bootstrap Need; a typed Host error,
+UTF-8 failure, or syntax failure is terminal. No write, warning token,
+lockfile read, environment-policy read, mapping construction, or repository
+resolution occurs in DICE.
+
+Inspect the root, then advance breadth-first include horizons. For every
+horizon:
+
+1. retain every include occurrence in source order;
+2. run packet 7's full parse/package preflight, which deduplicates only
+   first-seen package dependencies for its one grouped compute;
+3. after complete package success, deduplicate selected logical include paths
+   only for one grouped `HostFileBytesKey` compute;
+4. retain the union of every same-horizon byte Need, then scan the original
+   occurrences so an earlier terminal beats a later Need while an earlier
+   Need returns the full union; and
+5. read and compile-validate every occurrence in source order for UTF-8,
+   syntax, identifier resolution, and include discovery, then append only a
+   successfully validated occurrence's nested includes to the next horizon.
+
+Do not use a global visited set. Equal raw labels and distinct raw labels whose
+parsed Labels share one canonical repository-relative `toPathFragment` still
+compile per occurrence and contribute nested includes. For example,
+`//pkg:sub/x.MODULE.bazel` and `//pkg/sub:x.MODULE.bazel` use distinct valid
+package identities but collapse to `pkg/sub/x.MODULE.bazel` in the successful
+path set when both select the same root. Raw-label lookup may select the last
+compiled occurrence exactly as Bazel's linked map does, while every
+encountered `include()` call executes inline. Package/logical-file key dedupe
+is dependency reuse, not discovery, compilation, or execution dedupe.
+After root bytes complete, synchronously perform compile-equivalent root
+validation before requesting any include package. At every horizon,
+synchronously compile-validate each read occurrence before advancing to the
+next horizon. Reuse a crate-private `module_eval.rs` validation helper that
+parses the restricted dialect, checks MODULE/include syntax, and invokes the
+same globals plus Starlark prepare/identifier-resolution path, but discard its
+temporary Starlark Evaluator/Module/program state before the next DICE await.
+After the whole breadth-first closure is validated and discovered, use the
+shared synchronous evaluator to reparse/reprepare every occurrence before
+executing index 0. This bounded duplicate preparation preserves Bazel's
+failure/dependency order without retaining Starlark state across an await.
+Reuse only crate-private prepared-evaluator and ignore-dev seams from
+`module_eval.rs`; do not expose or copy `root_mapping`, `VisibleLockfileKey`,
+the evaluator, or its globals.
+
+Event ownership is explicit. With `CaptureEvaluationEvents`, a transient Need
+stores no own batch and every Complete stores exactly one: empty on terminal
+pre-execution failure, or the exact root/include Print prefix after execution
+success or failure. Without the marker, store no batch and use the normal
+direct root/include printer during execution; never both direct-print and
+capture. Do not copy child batches: package preflight retains
+`HostRepoFileKey` as a dependency, so activation-closure selection owns
+REPO.bazel Print/diagnostic membership under its already accepted producer
+policy. REPO events may precede include bytes and MODULE execution;
+root/include MODULE events may not occur before the whole closure compiles.
+
+The corrected regression matrix must discriminate:
+
+- cumulative root observation Needs and Missing→sole bootstrap Need;
+- root and include create/edit/delete/restore on one retained engine;
+- a breadth-first package barrier before any same-horizon include bytes;
+- one grouped same-horizon byte dependency set, full Need union, and both
+  terminal/Need source-order directions;
+- repeated equal raw labels and distinct raw labels with one canonical
+  repository-relative path fragment compiling per occurrence, expanding
+  nested horizons, and executing every call;
+- a root prepare/identifier-resolution failure requesting no include package
+  dependency, and a horizon-N prepare failure requesting no horizon-N+1
+  observation;
+- full-closure compile failure before an earlier root runtime failure;
+- selected alternate package roots and SpecialFile includes without either
+  identity entering successful equality;
+- first-source package, byte, UTF-8, syntax, and evaluation diagnostics with
+  raw label/span retained only in errors;
+- REPO child-event membership across preflight terminal and Need/retry, empty
+  root batches before execution, and ordered root/include Print prefixes;
+- canonical relative path set identity independent of encounter order and
+  collapsed across distinct raw labels with the same canonical
+  repository-relative path fragment;
+- lockfile A→B→A, environment-policy, and lockfile-mode changes producing no
+  root-key dependency or value change, plus a forbidden-reference/direct-
+  dependency scan for `root_mapping` and `RepositoryMapping`; and
+- complete-only equality plus self-unequal/invalid Need.
+
+Keep the module declaration private and retain zero
+loading/core/analysis/query consumer. The post-root visible-lockfile boundary
+becomes a separate design packet,
+`WP-5-m1-host-visible-lockfile-boundary-design`, before Host registry keys.
+That design must follow `BazelLockFileFunction`/`RegistryFunction`: registry
+requests the lockfile owner even in Off, parsed/empty lockfile state is
+separate from whether a consumer uses hashes, and no legacy
+`VisibleLockfileRead::Ignored` shortcut is inherited. Final main/module
+repository mappings remain deferred to the post-selection dependency-graph
+owner, including extension imports/overrides.
+
+##### Corrected root-module-file design status
+
+**Status:** Accepted on 2026-07-26.
+
+The corrected three-file retry now matches exact Bazel 9.2.0 root
+`ModuleFileFunction` ownership: one private root-module-file value contains
+only evaluated root semantics, compact overrides, and set-equivalent canonical
+relative module-file paths. Visible lockfile, environment/mode policy,
+resolution, and repository mappings are explicitly deferred. The design
+freezes breadth-first package and logical-file dependency groups, per-
+occurrence discovery/compile/expansion/execution, last raw-label lookup,
+source-order terminals, full Need unions, selected-root-free equality,
+marker-conditional root events, and dependency-owned REPO events.
+
+Exact source review added both compile barriers: compile-equivalent root
+validation precedes all include-package dependencies, and every horizon is
+validated before any next-horizon dependency. A crate-private validation
+helper may discard temporary Starlark state before awaits; the completed
+closure is then reparsed/reprepared through the shared evaluator for inline
+execution. Three terminal latest-text reviews returned `ACCEPT` against Bazel
+9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`. No Rust,
+fixture, Cargo, dependency, public API, consumer, or activation changed.
+
+Next evidence: Implement only
+`WP-5-m1-host-root-module-file-owner-corrected-retry`.
+
 #### Later packet 9 gate: bootstrap activation and Host switch
 
 After packet 8, design only
