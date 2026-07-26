@@ -1923,3 +1923,382 @@ build/query retry/publication driver. Freeze typed Need propagation through
 entrypoints, source-preparation/discovery activation, legacy snapshot
 retirement, cancellation ownership, and terminal REAPI/event publication order
 before activating any production command surface.
+
+### Stage 5 shared retry/publication driver checkpoint
+
+Status: Accepted
+
+The live checkout cannot activate the accepted native-demand session as one
+implementation packet. The leaf substrate is typed, but no production command
+root can currently return `SourcePreparationNeeds`:
+
+- `ModuleSourcePreparationKey`, `RepositorySourceFileKey`, and
+  `RepositoryMaterializationKey` return `SourcePreparationOutcome`, but
+  `ModuleSourcePreparationKey` has no production discovery caller.
+- `RootModuleGraphKey`, loading package and `.bzl` keys,
+  `ConfiguredTargetAnalysisKey`, and query graph/environment APIs erase
+  transient work into `CompactString`, `LoadingError`, `AnalysisError`,
+  `QueryError`, or `anyhow`.
+- root MODULE evaluation is the only marker-conditional semantic event
+  producer. Loading and analysis still use direct print handlers, so activating
+  retries now would leak speculative output.
+- build and query each own a duplicated one-attempt passive updater and allocate
+  registry/repository generations independently of the retained native command.
+- one-shot CLI and retained server own separate formatting and REAPI paths;
+  there is no command-owned selected-event output envelope.
+- root, loading, and query semantic reads still depend on eager
+  `WorkspaceSnapshot`, `WorkspaceRawSnapshot`, and
+  `WorkspaceDirectorySnapshot` injection.
+
+#### Command root and typed control boundary
+
+Each activated surface must have one explicit DICE command-root key, or one
+deterministic root bundle containing an always-present anchor. A terminal valid
+query may otherwise record no root, which makes exact closure selection
+impossible. Pure parsing, flag normalization, output-format validation, and
+other work that cannot emit an event or Need runs before lease acquisition.
+Everything that can emit an event or Need must be reachable from the sealed
+root closure.
+
+The command root returns only:
+
+```text
+SourcePreparationOutcome<Result<TerminalValue, TerminalSemanticError>>
+```
+
+`Need` is transient control state: it is invalid, unequal even to itself, never
+cached as a user error, and never converted to a string/error wrapper. Eligible
+Starlark failures remain `Complete(Err(...))` so their exact terminal closure
+can retain semantic demands and events. Infrastructure, native-I/O,
+nonprogress, conflict, closure, and cancellation failures abort and publish
+nothing.
+
+Discovery and joins must union the Needs from all independently reached
+branches with `SourcePreparationNeeds::try_union` in deterministic order; they
+must not force an otherwise-lazy branch merely to discover more work.
+Returning the first Need from branches already reached loses conflict and
+cumulative-work evidence. Build, loading, analysis, and query adapters must
+preserve the typed outcome through every layer; query may use a private
+internal carrier across its `QueryError`-fixed generic boundary, but only the
+outer command-root facade may unwrap it.
+
+#### Attempt, cancellation, and failure ownership
+
+One synchronous command owner holds one logical
+`Option<NativeDemandCommand>` abort guard across all of its attempts. Every
+ordinary return funnels through exactly one of consuming
+`progress`, accepted terminal finish, or restore-before-discard. Retry seals the
+attempt, clones/extracts the exact `SourcePreparationNeeds`, drops the outcome,
+returned semantic roots, transaction, and sealed attempt values, then performs
+repository-first native work. Terminal selection keeps the transaction and
+every returned root alive through the one exact closure read, then drops them
+before materializer acceptance.
+
+The current daemon is synchronous and serial (`&mut Daemon` in one listener
+loop); no extra server mutex is needed. It transports no cancellation token,
+and a disconnected client is noticed only when the completed response write
+fails. Initial activation therefore covers DICE cancellation/compute errors,
+native errors, normal early returns, and unwind cleanup only.
+Request-ID/client-disconnect cancellation requires a later protocol/server
+packet; no acceptance claim or test may name disconnect cancellation before
+the server transports a token and observes disconnect before response write.
+
+Attempt transaction, returned roots, outcome, and sealed values are scoped and
+declared so they drop before the outer abort guard. On unwind, the guard takes
+the command and invokes the same synchronous restore/discard funnel. It closes
+only after coherent restoration and discard. If cleanup/restoration fails,
+runtime/materializer ownership stays non-Idle with required pins retained.
+Drop must never silently call `close`. If this cannot be implemented without a
+nested-runtime panic, stop before activation and design a nonblocking outer
+cleanup owner.
+
+No mutex lock guard or borrowed state lock spans a DICE
+commit/compute/closure await, native observation or materialization, external
+execution, output write, or `TempDir` destruction. The logical abort owner
+intentionally spans the semantic command. Busy is decided before generations,
+request inputs, effect owner, or materializer session allocation.
+
+#### Terminal acceptance, publication, and REAPI order
+
+Freeze this semantic transition:
+
+1. compute one typed command root under a fresh owner-branded attempt;
+2. on `Need`, seal retry, drop the attempt transaction/root values, and consume
+   the command through strict repository-first/path-second progress;
+3. on `Complete`, seal and select the one exact event/demand closure while the
+   terminal transaction and returned roots remain live;
+4. build and commit selected complete repository/path injections and
+   validations while materializer roots remain pinned;
+5. drop the terminal transaction, returned roots, and unselected value owners;
+6. materializer-accept only selected exact requests/instances;
+7. atomically replace the accepted request-input/injection/scope snapshot;
+8. logically publish selected events into an infallible command-owned output
+   buffer;
+9. close the workspace lease and return the semantic result plus buffer.
+
+REAPI execution, output materialization, CLI writes, and socket writes occur
+only after step 9. Logical publication in step 8 is not a stdout/socket write.
+The private-driver packet deliberately refactors the dormant `accept` return so
+the buffer move occurs after accepted-snapshot replacement and before close,
+while remaining externally inaccessible until the closed command returns.
+External execution and writes are irreversible effects and cannot run under
+the DICE/materializer session or roll back accepted semantic state. No
+transaction, returned root, materializer session, or abort guard may reach
+`execute_action`, output materialization, stdout, or socket write. The final
+response composer retains selected Starlark output even when later execution
+fails and orders it before the execution diagnostic, subject to the required
+Bazel 9 oracle below. If the oracle disagrees, replan the phase split before
+implementation.
+
+Preflight, path, native, internal, closure, and explicit cancellation failures
+restore the prior complete request inputs and native injections, drop all
+attempt/restoration roots, discard the materializer session, preserve the prior
+accepted snapshot, close the lease, and expose no event buffer. Restoration
+failure remains fail-closed with the lease/session/root pins retained.
+
+#### Fixed inputs and legacy state
+
+Before production activation, the command bundle and accepted snapshot must
+cover every injected bzlmod request input: command policy, environment policy,
+lockfile mode, registry URLs, registry generation, repository generation, and
+workspace revision. Every attempt reinjects the same bundle; failure restores
+the prior accepted bundle. The current independent
+`inject_bzlmod_request_inputs` allocators must not survive on activated paths.
+The private-driver packet defines one complete normalized initial accepted
+bundle: default command/environment policy, update lockfile mode, empty
+registry URL list, zero generations/revision, and empty native epochs/scopes.
+First-command failure must restore that exact bundle.
+
+Production activation must not mix this retained snapshot with a newly injected
+eager workspace snapshot. Root MODULE, loading file/directory, analysis, and
+query semantic reads first migrate to Host path outcomes. Only after `rg`
+proves no production consumer remains may cleanup delete:
+
+- the three workspace snapshot values/keys and their file/raw/directory keys;
+- core `WorkspaceObservation`, recursive eager traversal, public observation
+  wrappers, and both snapshot-injection blocks;
+- the daemon `FilesystemObservationAdapter`;
+- loading snapshot-key reexports;
+- compatibility-only `RepositoryIo`, `LocalRepositoryIo`, their result/error
+  adapters, and no-op installation.
+
+The visible daemon `invalidated_files` metric needs an explicit replacement or
+deliberate protocol decision before its eager adapter is removed.
+
+#### Serial packets and stop gates
+
+1. `WP-5-m1-terminal-event-execution-oracle-design` and its separate oracle
+   implementation.
+
+   Extend the existing retained-server/REAPI fixture
+   `tests/v2_oracle/fixtures/load-invalidation`. The implementation allowlist is
+   exactly its `fixture.toml`, `workspace/**`, and `expected/oracle.json`; a
+   runner change requires the design review to prove why fixture-local capture
+   cannot express the evidence, then freeze the smallest exact extra file
+   before implementation. Capture stdout and stderr separately without
+   normalization that erases channel order. Freeze exact root-MODULE,
+   dependency `.bzl`, parent `.bzl`, BUILD, and rule-implementation print order
+   for success, eligible Starlark failure, fresh-command warm reuse, semantic
+   edit, and execution failure. Query rows include valid empty output, warm
+   reuse, and semantic edit. Prove whether selected semantic output precedes
+   the execution diagnostic and that a fresh command never replays cached
+   prints. No Slug Rust changes enter the oracle packets.
+
+2. `WP-5-m1-loading-event-producer`.
+
+   Edit only `app/slug_loading_v2/Cargo.toml` and
+   `app/slug_loading_v2/src/bzl_module.rs`, with focused evidence only in
+   `app/slug_loading_v2/tests/{bzl_invalidation.rs,build_file_loading.rs}`.
+   `BzlModuleEvalKey` owns one marker-conditional local `.bzl` event batch and
+   `PackageLoadKey` owns one local BUILD batch; dependency batches stay on
+   their own nodes. Marker absence preserves current direct printing. Explicit
+   empty batches clear prior versions, and runtime failures retain only prints
+   executed before the failure. Do not change key values/equality, typed Need,
+   runtime, commands, or publication.
+
+3. `WP-5-m1-analysis-event-producer`.
+
+   Edit only `app/slug_analysis_v2/Cargo.toml` and
+   `app/slug_analysis_v2/src/{dice.rs,starlark_rule.rs}`, with focused evidence
+   only in `app/slug_analysis_v2/tests/starlark_rule.rs`.
+   `ConfiguredTargetAnalysisKey` owns one marker-conditional local rule
+   implementation batch. Marker absence preserves direct printing; dependency
+   targets retain separate nodes. Do not change analysis values/equality,
+   loading, runtime, execution, or publication.
+
+4. `WP-5-m1-private-shared-retry-driver`.
+
+   Edit only `app/slug_core_v2/src/runtime/{dice.rs,events.rs,demands.rs}`.
+   Drive synthetic typed build/query command-root keys through one private
+   retained loop. Add the single-exit abort guard, fixed complete input bundle,
+   fresh updater/transaction per attempt, exact root recording, no-cap strict
+   progress, eligible terminal `Complete(Ok/Err)`, selected output buffering,
+   and every restoration/fail-closed seam. Do not activate production roots,
+   public APIs, CLI/server, REAPI, discovery, or legacy retirement. Stop rather
+   than introduce higher-ranked async closure machinery; concrete adapters or
+   an owned boxed attempt are preferred.
+
+5. `WP-5-m1-host-directory-semantic-projection`.
+
+   Edit only `app/slug_workspace_v2/src/{path_resolution.rs,lib.rs}`. Add the
+   directory-listing analogue of `PathFileBytesKey`, preserving exact
+   missing/wrong-kind/symlink/error ordering and `PathOutcome` invalidity.
+   `slug_workspace_v2` must not depend on bzlmod.
+
+6. A root/raw Host migration design, then
+   `WP-5-m1-typed-nonroot-discovery-composition-design`.
+
+   First design the bzlmod root/raw Host migration. It must freeze either
+   parallel typed Host root/policy/file keys for source preparation and
+   discovery while the legacy production keys remain, or the complete
+   propagation allowlist. The latter necessarily includes
+   `app/slug_bzlmod_v2/src/{module_eval.rs,source_preparation.rs,registry_dice.rs}`,
+   exports, and every live `RootModuleFilesKey`/`RootModuleGraphKey` consumer:
+   `RegistryPolicyKey` and local `RegistryFileKey` must not stringify a Host
+   Need into terminal `RegistryFileError`. This is a named design checkpoint
+   with exact tests and forbidden scans before Rust. Do not combine its
+   implementation with discovery.
+
+   The later discovery design remains gated on resolved repository path state,
+   deleted-package request ownership, repository-ignore ownership, package
+   lookup, and omitted-`module()` defaults. The accepted discovery-boundary and
+   package-policy oracles plus Bazel 9.2
+   `ModuleFileFunction.advanceHorizon` prove that every included MODULE
+   fragment's package is validated before its bytes are read or executed, and
+   that omitted `module()` has ordered validation semantics. Design one
+   DICE-owned nonroot preparation/evaluation key and breadth-first discovery
+   command root over the accepted private nonroot evaluator. It consumes
+   `ModuleSourcePreparationKey`, preserves registry/nonregistry provenance,
+   composes includes through exact source keys, unions all independently
+   reached Needs, and returns a typed final graph. Before Rust, this design
+   checkpoint must freeze its exact new owner file, implementation allowlist,
+   prerequisite owner commits, oracle rows, and implementation split.
+
+7. Separate loading and analysis typed-propagation designs, with
+   external-repository loading kept separate.
+
+   Schedule `WP-5-m1-loading-typed-propagation-design` for the root repository
+   without expanding current repository capability, then
+   `WP-5-m1-analysis-typed-propagation-design`. Each is a separate design
+   checkpoint that freezes an exact allowlist before Rust. The analysis design
+   must account for
+   `app/slug_analysis_v2/Cargo.toml`, where `slug_bzlmod_v2` is currently only a
+   dev-dependency. Both designs preserve `SourcePreparationOutcome` through
+   their layer and freeze focused create/edit/delete/recreate, symlink,
+   equal-Need, and event-suppression evidence. No entrypoint switch.
+
+   The loading implementation must also migrate root-repository file reads and
+   package-directory listings from eager snapshot projections to Host
+   `PathOutcome`, either in its exact allowlist or in an immediately following
+   bounded Host-loading packet. No Host Need may become `LoadingError`.
+
+   External repository identity, path, visibility, and typed-loading acceptance
+   stay in later loading design/implementation packets around
+   `app/slug_loading_v2/src/{bzl_module.rs,package.rs,visibility.rs,load_label.rs}`.
+   They remain gated on the resolved repository path-state, ignore,
+   deleted-package, and package-lookup owners; the root-repository propagation
+   packet must preserve the existing external-repository guards.
+
+8. Production build and query typed command roots as separate
+   design/implementation pairs.
+
+   `WP-5-m1-build-typed-command-root-design` must freeze the core analysis and
+   package-root bundle, its always-present anchor for an empty target set, its
+   exact core/Cargo/test allowlist, and deterministic Need union before Rust.
+   No event- or Need-producing compute may remain above or beside that root.
+
+   `WP-5-m1-query-typed-command-root-design` must freeze
+   `app/slug_query_v2/Cargo.toml`,
+   `src/{graph.rs,loading_environment.rs,generic.rs,evaluator.rs,lib.rs}`, and
+   focused tests in `tests/{loading_query.rs,query.rs}`. The implementation adds
+   one always-rooted typed query command key, preserves ordering and lazy
+   traversal, never exposes Need as `QueryError`, and proves valid empty queries
+   still seal a nonempty exact closure. It must decide whether the bzlmod
+   production dependency is direct or comes through an accepted loading-crate
+   reexport. Neither packet activates a runtime/server entrypoint.
+
+   After the typed query root, a separate query Host-migration
+   design/implementation pair migrates every direct workspace file/directory
+   consumer from eager snapshot projections to Host `PathOutcome`; no Need may
+   become `QueryError`.
+
+9. Preactivation Host gates, inactive opaque-envelope plumbing, then vertical
+   build and query activation.
+
+   Before either surface activates, an exact forbidden scan plus transitive
+   command-root audit must prove that surface reaches no semantic
+   `WorkspaceSnapshotKey`, `WorkspaceRawSnapshotKey`,
+   `WorkspaceDirectorySnapshotKey`, file/raw/directory projection of those
+   keys, or API that accepts or injects `WorkspaceObservation`. This gate
+   follows the accepted root/raw, loading, analysis, and query Host migrations;
+   activation stops if any eager semantic path remains.
+
+   First add only the private-to-opaque core envelope needed to make output
+   consumption structurally mandatory; do not activate a producer while any
+   caller can drop its buffer.
+
+   Build activation is one atomic vertical packet covering core
+   `runtime/{dice.rs,events.rs,mod.rs}`, CLI `commands/build.rs`, server
+   `src/{lib.rs,reapi.rs,tests.rs}`, and the exact focused CLI tests frozen by
+   its design. It switches one-shot and daemon build together, consumes the
+   event buffer exactly once, and preserves the existing post-core REAPI helper
+   boundary. Query activation follows as its own atomic vertical packet over
+   the corresponding core runtime files, CLI `commands/query.rs`, server
+   `src/{lib.rs,tests.rs}`, and exact focused CLI tests. Each packet removes
+   independent generation allocation and passive updating only for its surface
+   and proves one-shot/daemon equivalence, repository-before-path retries,
+   fixed generations, eligible terminal failure, restoration, nonempty empty
+   roots, and no lost or duplicate output.
+
+   The daemon filesystem scan may remain temporarily only to preserve an
+   explicitly accepted `invalidated_files` metric; its values must not enter
+   DICE or affect the activated command.
+
+10. `WP-5-m1-reapi-phase-alignment`.
+
+    Only after both vertical activations and the oracle are accepted, align and
+    deduplicate one-shot/daemon execution and materialization. Core exposes only
+    the opaque terminal result/output envelope. DICE IDs, Needs, session
+    tokens, generations, roots, materializer owners, and selected sidecars
+    remain private; server wire DTOs stay primitive. Execution-failure channel
+    order must match the oracle, and no request-disconnect cancellation claim
+    enters this packet.
+
+11. Legacy retirement as explicit gated subpackets.
+
+    Verify the already accepted Host migrations with exact forbidden scans;
+    do not reschedule root/raw, loading, analysis, query, or typed propagation
+    here. Retire only remaining loading compatibility consumers/reexports in
+    `slug_loading_v2/src/{bzl_module.rs,keys.rs}`, then any remaining query
+    compatibility consumers only in `slug_query_v2/src/graph.rs`. The final
+    definition/adapter deletion is
+    limited to workspace `src/lib.rs`, core
+    `runtime/{dice.rs,mod.rs,repository_io.rs}`, bzlmod
+    `src/{source_preparation.rs,lib.rs}`, and server `src/lib.rs`, plus exact
+    tests frozen by its design. Forbidden scans must prove the corresponding
+    production consumers are gone before each deletion. Keep neutral workspace
+    owner tests until the final packet and decide `invalidated_files` ownership
+    before removing the daemon adapter.
+
+Items 6 through 11 are routing checkpoints, not executable Rust packets. Each
+must first produce an independently accepted design with prerequisite commits,
+an exact allowlist, focused evidence, and a stop gate. No later item inherits
+permission to edit the files named here.
+
+Evidence: Live audits found typed leaf outcomes but no production typed command
+root, speculative loading/analysis print handlers, duplicated passive
+build/query snapshots and generation allocation, no command-owned output
+envelope, synchronous serial daemon ownership without disconnect cancellation,
+and REAPI effects that must remain post-lease. The accepted checkpoint freezes
+one abort-owned retry loop, fixed complete request inputs, exact closure
+selection, accepted snapshot replacement followed by infallible logical event
+buffering and lease close, post-close external effects, and vertically atomic
+output consumption. It serializes the retained oracle, loading and analysis
+event producers, private driver, directory projection, Host migrations,
+discovery prerequisites, typed loading/analysis/build/query roots, activation,
+REAPI alignment, and legacy deletion behind exact design gates. Independent
+discovery/source, lifecycle/architecture, and live-feasibility rereviews all
+returned `ACCEPT` on the corrected latest diff.
+
+Next evidence after terminal acceptance of this checkpoint:
+design only `WP-5-m1-terminal-event-execution-oracle-design`.
