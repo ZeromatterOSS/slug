@@ -15,6 +15,7 @@ mod path_observation;
 pub mod reapi;
 mod registry_io;
 mod repository_io;
+mod root_bootstrap;
 pub mod starlark;
 
 pub use dice::WorkspaceBuildEvaluation;

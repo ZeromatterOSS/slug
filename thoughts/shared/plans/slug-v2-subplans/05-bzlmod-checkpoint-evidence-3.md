@@ -3662,3 +3662,38 @@ owner boundary; all three terminal latest-diff reviews returned `ACCEPT`.
 
 Next evidence: Implement only
 `WP-5-m1-root-module-bootstrap-native-owner`.
+
+### Stage 5 dormant native root-module bootstrap owner
+
+Status: Accepted
+
+The runtime-private `RootModuleBootstrapOwner` binds one normalized workspace
+and rejects a foreign request with a typed private mismatch before deriving or
+inspecting any path. A matching request derives the logical module path once,
+uses exactly `Path::exists()`, returns `AlreadyPresent` without reading or
+writing when true, and otherwise uses ordinary `std::fs::write` of the pinned
+reminder. Every successful write returns `Created(warning)` without a
+post-write stat; write failures retain the logical path,
+`PathIoErrorKind::from(error.kind())`, and raw OS code.
+
+This preserves Bazel's non-atomic race and symlink behavior: no `try_exists`,
+metadata precheck, canonicalization, exclusive create, parent creation,
+temporary file, rename, lock, retry, readback, rollback, or atomic
+replacement was added. Existing symlinks with live targets remain untouched;
+dangling symlinks are followed by the write, their relative targets receive
+the reminder, and the links remain links. The module and owner/error APIs are
+private, narrowly dead-code-allowed, and have no non-test callsite, DICE,
+demand, epoch, event, output, print, or warning-publication edge.
+
+Six isolated real-filesystem tests cover initial create and exact bytes, warm
+silence/no-overwrite, edit preservation, delete/recreate, deterministic
+file-as-parent typed failure, foreign no-touch of both workspaces, and Unix
+existing/dangling symlinks. Validation passed 237 bzlmod tests, 54 loading
+tests, 98 core unit plus 13 integration tests, zero doctests, and no-run
+linkage of every bzlmod/loading/core GNU-Windows test executable. Formatting,
+archive, diff, exact two-file allowlist, dependency, private-surface,
+no-callsite, and forbidden-primitive gates passed. All three terminal
+source/lifecycle/architecture reviews returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-root-package-policy-input-owner`.

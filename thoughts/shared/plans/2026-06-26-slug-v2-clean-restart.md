@@ -42,16 +42,16 @@ changed in the design packet.
 ### Current packet
 
 Implement only
-`WP-5-m1-root-module-bootstrap-native-owner`.
+`WP-5-m1-root-package-policy-input-owner`.
 
-Add the runtime-private outside-DICE `RootModuleBootstrapOwner` in exactly the
-two files frozen by the accepted owner plan. It must bind one normalized
-workspace, accept only a matching request, and implement Bazel's non-atomic
-logical-path exists/write algorithm with exact reminder bytes and typed
-result/error. Pin create, warm/edit/delete recovery, file-as-parent failure,
-foreign workspace, and Unix existing/dangling symlink behavior. Do not add a
-DICE key, demand, event, warning publication, retry, output, or production
-call site.
+Add Bazel package-identifier parsing and the complete normalized root
+package-policy request/input owner in exactly the five files frozen by the
+accepted plan. Preserve supplied package-root order, compact canonical deleted
+packages, optional absolute vendor directory, and exact REPO UTF-8
+Off/Warning/Error normalization with A→B→A equality. Pin missing injection,
+all main/nonmain deleted spellings, duplicate expansion, empty roots, and
+workspace-keyed request identity. Do not parse raw package-path/client-cwd
+spelling, inspect the filesystem, evaluate REPO, or add a consumer.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
