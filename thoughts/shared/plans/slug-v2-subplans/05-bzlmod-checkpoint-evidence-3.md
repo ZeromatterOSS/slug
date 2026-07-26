@@ -984,3 +984,96 @@ current runtime/materializer seams, then freeze bounded serial implementation
 packets for the sidecar and its later event/demand producers. Do not edit Rust,
 Cargo, fixtures, oracles, commands, server paths, source preparation, or
 discovery behavior.
+
+### Stage 5 attempt/effect-sidecar implementation checkpoint
+
+Status: Accepted before Rust
+
+The exact-version DICE activation API is already sufficient: rich callbacks
+carry engine-owned node ID, version, Evaluated/Reused kind, evaluation data,
+and ordered direct dependencies; parentless callbacks carry ordered roots; and
+`activation_closure` returns the read-only dependency-first graph for one
+transaction version. The Stage 9 retained-DICE boundary remains unchanged:
+adopt this engine only behind the V2 runtime, with no Buck cell or label
+surface and no DICE source edit.
+
+Implement only `WP-5-m1-runtime-attempt-effect-sidecar` in exactly
+`app/slug_events_v2/src/lib.rs`, `app/slug_core_v2/Cargo.toml`,
+`app/slug_core_v2/src/runtime/events.rs`, and
+`app/slug_core_v2/src/runtime/mod.rs`. Add a public dependency-bottom
+zero-sized `CaptureEvaluationEvents` request marker; promote `starlark_map`
+from the core dev dependencies and add direct `dupe` and `slug_events_v2`
+dependencies. Replace the unused public core sink scaffold with a private
+`CommandEffectOwner`, serial attempt trackers, typed sealing/selection errors,
+and focused tests; make the module private. No `WorkspaceRuntime` field or
+other file is allowed.
+
+One owner spans one external command and multiple serial attempts, with exactly
+one Open attempt at a time. Roots, version, and sealing are attempt-local;
+event lineage is command-local. Installing an attempt places both its rich
+tracker and `CaptureEvaluationEvents` in `UserComputationData`. Evaluated
+`EventBatch` data replaces the node batch, including explicit empty; any other
+Evaluated callback clears prior current-command data for that node; Reused
+preserves the newest eligible evaluated batch. Sealing synchronizes once and
+quarantines late callbacks. It copies ordered roots, releases every mutex, and
+only then awaits `activation_closure`. Selection requires the exact sealed
+version and roots, follows closure dependency-before-parent order, deduplicates
+shared nodes, honors the terminal-version cutoff, and returns batches without
+publishing them. Closure, stale-attempt, overlap, double-seal, root/version,
+and allocator failures are typed and fail closed.
+
+Real-DICE evidence must manually drive multiple transactions without adding a
+retry loop. It proves an eventful child evaluated before a simulated Need and
+reused by the reachable terminal attempt publishes once; a later evaluated
+empty clears it; abandoned branches and post-seal callbacks publish nothing;
+a fresh command owner does not replay a warm cached batch; roots retain ordinal
+order and duplicates; dependencies publish before parent-local order; shared
+nodes deduplicate; and exact-version/foreign/unavailable/dirty closure failures
+select nothing. `SmallMap<DiceNodeId, ...>` stores only sparse command-local
+event lineage; ordered vectors/shared slices retain roots, histories, and
+selected batches.
+
+The neutral marker is mandatory because always-on capture would suppress
+today's direct evaluator output before a publisher exists. Marker absence
+preserves current direct printing; marker presence selects capture-only
+behavior in later producer packets. No producer, evaluator,
+`store_evaluation_data` production call, runtime/command/daemon/CLI/server
+integration, sink, publication, semantic value/equality, DICE key, retry,
+generation, path/repository operation, source preparation, discovery, REAPI,
+fixture, or oracle enters the sidecar packet.
+
+Serial residuals are frozen separately:
+
+1. A root-MODULE event-producer correction must conditionally capture only
+   when the marker is present and attach explicit local batches outside
+   semantic equality. It must stop and replan if the current separate-key
+   include layout cannot preserve the accepted one-local-batch include rule.
+   Nonroot registry/nonregistry evaluation and discovery remain deferred.
+2. Loading `.bzl`/BUILD producers and configured-analysis producers follow as
+   separate owner packets. Query adds no evaluator producer; it activates the
+   loading graph. The duplicate legacy core BUILD evaluator remains unchanged
+   until shared-driver activation can neutralize it atomically.
+3. A separately corrected runtime-native demand producer must retain
+   workspace-lifetime demand provenance keyed by DICE node ID and semantic
+   repository scope while event lineage remains command-lifetime. Untouched
+   cached closure nodes make a command-only demand set unsound. Local
+   repository validation groups by reachable repository-source scope, never
+   path prefix, because valid symlink escapes overlap Host paths. This packet
+   must preserve fixed per-command generations, repository-first/path-second
+   work, cumulative complete epochs, strict nonprogress, root pins, explicit
+   accept/discard, and no lock across DICE/native I/O.
+4. Only after those sidecars and producers pass may a new design packet own
+   the shared build/query retry/publication driver, typed Need propagation,
+   source-preparation/discovery activation, entrypoint convergence, legacy
+   snapshot retirement, and terminal REAPI/publication order.
+
+Independent live-DICE, runtime/materializer, and architecture audits found the
+initial command/attempt wording too narrow; the correction made serial
+cross-attempt lineage explicit. Three terminal rereviews returned `ACCEPT`.
+No Rust, Cargo, test, fixture, oracle, command, or server file changed.
+
+Next evidence: Implement only
+`WP-5-m1-runtime-attempt-effect-sidecar` in the exact four files above. Stop on
+any DICE edit, extra file, public core API, runtime field, producer, retry,
+sink/publication, source-preparation/discovery activation, or direct output
+change.
