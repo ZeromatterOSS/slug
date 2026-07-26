@@ -44,15 +44,13 @@ passed.
 ### Current packet
 
 Implement only
-`WP-5-m1-host-root-include-horizon-owner`.
+`WP-5-m1-host-root-include-horizon-owner-corrected-retry`.
 
-Implement only the accepted three-file root include-label and same-horizon
-package-preflight owner. Add the crate-private parsed include seam, validate
-repo-relative labels and fragment basenames, derive package-key identity,
-deduplicate and compute every same-level package key before any include
-bytes, union every independent Need, preserve source-order terminal failures,
-and retain selected logical read paths. Do not call `HostFileBytesKey`, add a
-public reexport/loading consumer, or activate a root command.
+Implement only the corrected three-file root include-label and same-horizon
+preflight owner. Parse the full horizon before lookup, canonicalize targets,
+compute all first-seen package keys as one group, then preserve source-order
+terminal-versus-unresolved precedence and grouped Need union. Add no include
+bytes, public reexport/loading consumer, or activation.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

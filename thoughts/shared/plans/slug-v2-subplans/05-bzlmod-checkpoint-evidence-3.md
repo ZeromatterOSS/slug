@@ -3838,15 +3838,92 @@ module-file identity and diagnostics remain label-derived; never recover
 them by stripping a physical resolved path.
 
 The horizon adapter deduplicates every same-level package key, computes all
-keys before any include bytes, unions every independently reached Need, and
-returns that cumulative Need before every completed missing/deleted/error.
-Only once no key Needs does it report the first terminal lookup failure in
-original source order. Its success retains original include order and
-selected logical read paths. Tests pin label validation, dedupe, full Need
-union, mixed Need-plus-terminal-error precedence, first-source terminal
-failure, alternate-root logical selection, and a downstream counter proving
-zero include lstat/bytes demands until the whole horizon completes. Packet 7
-may not call `HostFileBytesKey`.
+keys before any include bytes, then inspects their outcomes in original
+source order. An earlier completed missing/deleted/error beats a later
+unresolved package; an earlier unresolved package returns the union of every
+unresolved package Need already requested by the group. Its success retains
+original include order and selected logical read paths. Tests pin label
+validation and target canonicalization, dedupe, full grouped Need union, both
+terminal-before-Need and Need-before-terminal precedence directions,
+first-source terminal failure, alternate-root logical selection, and a
+downstream counter proving zero include lstat/bytes demands until the whole
+horizon completes. Packet 7 may not call `HostFileBytesKey`.
+
+##### First implementation attempt status
+
+**Status:** Replanned on 2026-07-25 with no source retained.
+
+The exact Bazel 9.2.0 audit found that the accepted packet contract inverted
+one mixed horizon precedence and omitted two target parser boundaries.
+`ModuleFileFunction.advanceHorizon` requests the whole deduplicated package
+group, then scans results in source order: an earlier completed terminal
+result beats a later unresolved result. The prior contract instead made any
+Need dominate every terminal. Bazel also rejects an explicit empty target
+such as `//pkg:` and canonicalizes a target ending in `/.` before applying the
+`.MODULE.bazel` and non-dot-basename checks.
+
+The provisional three-file Rust draft was removed before retention. No
+fixture, dependency, public API, include-byte path, or activation changed.
+
+Next evidence: Design only
+`WP-5-m1-host-root-include-horizon-design-correction`.
+
+#### Serial packet 7 correction: exact label and grouped-horizon precedence
+
+Run only `WP-5-m1-host-root-include-horizon-design-correction`. Do not edit
+Rust or fixtures and do not run Cargo.
+
+Freeze a corrected retry contract with the same eventual three-file
+allowlist. The parsed seam must reject explicit-empty targets, canonicalize a
+valid trailing `/.`, and apply `.MODULE.bazel`/non-dot checks and logical path
+derivation to the canonical target while retaining raw label and span only
+for diagnostics. Parse every label in source order before requesting any
+package key, return the first invalid label, and require the raw spelling to
+start exactly `//`; `@//`, `@@//`, and `@repo//` reject. A no-colon
+`//pkg/file.MODULE.bazel` uses package `pkg/file.MODULE.bazel` and default
+target `file.MODULE.bazel`, so its path deliberately repeats that basename.
+Suffix and non-dot checks use the basename after the last slash of the
+canonical target; target subdirectories otherwise remain valid.
+
+Package-key identity is canonical-main package only: target, raw label, and
+span do not participate, so same-package targets deduplicate. The horizon
+must request all first-seen unique package keys through one DICE computation
+group before interpreting any outcome.
+
+After the group returns, rewalk original includes in source order. If a
+completed terminal occurs before the first unresolved package, return that
+terminal. If an unresolved package occurs first, return the union of every
+unresolved package Need from the already-requested group. Only complete
+success reaches selected package-path entry root plus package plus canonical
+target derivation, retaining every original include entry in source order.
+Keep semantic NoBuildFile/Deleted/Invalid failures and typed operational
+lookup errors distinct. Require discriminating tests for parse-all-before-
+lookup, exact raw-prefix/default-target/canonical-target boundaries, both
+mixed-order directions, grouped dedupe/Need union, first-source terminals,
+alternate roots, and zero include observations before a successful whole
+horizon.
+
+##### Corrected design status
+
+**Status:** Accepted on 2026-07-25.
+
+The corrected retry retains the eventual three-file allowlist and freezes
+parse-all-before-lookup, exact raw `//` spelling, explicit-empty rejection,
+colonless default-target behavior, trailing-`/.` canonicalization, canonical
+basename checks, package-only first-seen dedupe, one `compute_join` group,
+both mixed terminal/Need source-order directions, full grouped Need union,
+typed semantic versus operational failures, and selected-root plus package
+plus canonical-target paths. Include observations and bytes remain gated
+until the whole package horizon succeeds.
+
+Three terminal reviews returned `ACCEPT`, including an exact Bazel 9.2.0
+source audit against commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. No Rust, fixture, Cargo,
+dependency, public API, byte path, or activation changed in the correction
+packet.
+
+Next evidence: Implement only
+`WP-5-m1-host-root-include-horizon-owner-corrected-retry`.
 
 #### Serial packet 8: dormant Host root keys
 
