@@ -4732,6 +4732,99 @@ Next evidence: Design-correct and terminally rereview only
 `WP-5-m1-bazel-lockfile-v28-schema-oracle-correction` before resuming the
 preserved draft.
 
+##### Lockfile v28 schema oracle embedded-closure status
+
+**Status:** Replan before retained fixture evidence on 2026-07-26.
+
+The accepted correction's loopback-only network gate is infeasible with the
+exact twelve-file fixture. Pinned Bazel 9.2's embedded `bazel_tools` module
+requests its ordinary buildozer, platforms, protobuf, rules_cc, rules_java,
+rules_license, rules_python, rules_shell, apple_support, and zlib module
+closure through the command registry list. The first corrected generation
+therefore exited 48 at missing `buildozer@8.5.1`; no extension or schema
+evidence ran. A race after the next hold added an in-memory HTTP draft for
+synthetic one-line embedded module declarations and a second failed probe.
+That invention is not Bazel source-of-truth content, is not accepted
+scaffolding, and must be removed before the next run. Neither probe produced
+`expected/oracle.json` or an accepted row.
+
+Correct only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-embedded-closure-correction`:
+
+- preserve the exact twelve files, 15 commands, 2,500-line cap, generated
+  four-input plus injected-DIRTREE contract, and no harness/template/archive
+  changes;
+- restore `http_registry.py` to serving only checked fixture registry bytes;
+  it must not synthesize embedded module files or proxy another registry;
+- append `--registry=https://bcr.bazel.build` after the loopback `/missing`
+  and `/registry` URLs on graph/extension commands, matching accepted
+  `registry-yanked-lockfile-mode` precedent;
+- use BCR only for Bazel's embedded-module closure. All asserted checksum,
+  recorded-absence, yanked, module, extension, rewrite, stale, and exception
+  evidence stays fixture-local. Filter the fixture request log to its unique
+  `subject` paths so embedded fallback attempts do not become asserted rows;
+- do not inspect, print, copy, or depend on the user's bazelrc contents.
+
+The BCR fallback is immutable upstream scaffolding for the pinned Bazel
+release, not a second asserted registry. Stop again if a non-embedded module
+requires BCR, if BCR-derived content enters a semantic assertion or mutation,
+if the fallback makes normalized output unstable, if the synthetic server
+behavior cannot be removed within `http_registry.py`, or if any prior
+allowlist, cap, discrimination, or exception gate fails.
+
+Next evidence: Terminally rereview only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-embedded-closure-correction` before
+resuming the preserved draft.
+
+##### Lockfile v28 schema oracle BCR-provenance status
+
+**Status:** Corrected after terminal replan on 2026-07-26.
+
+Pinned-source rereview rejected one overstatement in the embedded-closure
+correction. An exact generated `MODULE.bazel.lock` manifest necessarily
+retains `registryFileHashes` for BCR files used by the embedded-module
+closure. Those bytes therefore do participate in the expected manifest and
+cannot be called unasserted. The earlier list of ten requested modules also
+described only the first failed probe, not the complete closure reachable
+from Bazel's pinned `src/MODULE.tools`.
+
+Correct only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-bcr-provenance-correction`:
+
+- keep BCR last in the registry list solely to resolve the embedded-module
+  closure, and describe that closure by pinned source rather than a closed
+  handwritten module-name list;
+- add pinned Bazel
+  `src/test/tools/bzlmod/MODULE.bazel.lock` and `src/MODULE.tools` to fixture
+  provenance. Before acceptance, classify the complete embedded-closure
+  scaffold by URL suffix. Every retained BCR URL/hash must match the
+  corresponding pinned 9.2 source-lockfile entry, and each such suffix must
+  have exactly the two deterministic `"not found"` companions recorded from
+  the loopback `/missing` and `/registry` prefixes. Record the compact trio
+  comparison; do not copy the source lockfile into the fixture;
+- accept those exact BCR successes plus paired loopback misses only as
+  immutable/deterministic upstream scaffolding in the whole-file manifest.
+  The fixture's unique `subject` suffix is excluded from that closure set and
+  remains the sole semantic recorded-absence/checksum/yanked registry row.
+  Every other semantic contains/pattern assertion, case-normalization
+  mutation, stale/replacement transition, and exception row must target the
+  subject or root extension fields;
+- filter request-count evidence to loopback subject paths. Do not assert the
+  order, count, or handwritten membership of embedded fallback requests;
+- remove the synthetic embedded-module server behavior before any new
+  generation.
+
+All prior twelve-file, no-harness, generated-versus-injected DIRTREE,
+15-command, 2,500-line, row-order, replay, and validation gates remain exact.
+Stop again if a retained BCR entry lacks a pinned source-lockfile match, if
+its two loopback-miss companions are absent or extra, if a non-embedded user
+module reaches BCR, if a semantic mutation can match closure scaffolding, or
+if upstream scaffold content is duplicated into the fixture.
+
+Next evidence: Terminally rereview only
+`WP-5-m1-bazel-lockfile-v28-schema-oracle-bcr-provenance-correction` before
+resuming the preserved draft.
+
 #### Later activation gate: bootstrap and Host switch
 
 After accepted Host visible-lockfile and registry ownership, design only
