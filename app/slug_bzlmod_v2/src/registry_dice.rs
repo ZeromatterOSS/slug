@@ -9,6 +9,7 @@
  */
 
 use std::fmt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -39,6 +40,12 @@ pub struct RootModuleRegistryUrls(RegistryUrls);
 impl From<RegistryUrls> for RootModuleRegistryUrls {
     fn from(urls: RegistryUrls) -> Self {
         Self(urls)
+    }
+}
+
+impl RootModuleRegistryUrls {
+    pub(crate) fn urls(&self) -> &RegistryUrls {
+        &self.0
     }
 }
 
@@ -122,7 +129,7 @@ impl Key for RegistryPolicyKey {
             })
             .await
         {
-            Ok(urls) => urls.0,
+            Ok(urls) => urls.urls().dupe(),
             Err(error) => {
                 return Arc::new(Err(RegistryFileError::MissingRegistryUrls(
                     CompactString::new(error.to_string()),
@@ -261,6 +268,61 @@ pub enum RegistryFileError {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum RegistryRemoteError {
+    MissingRequestGeneration {
+        workspace: PathBuf,
+        url: RegistryFileUrl,
+        message: CompactString,
+    },
+    MissingIoCapability {
+        url: RegistryFileUrl,
+    },
+    MissingChecksumInError {
+        url: RegistryFileUrl,
+    },
+    InvalidLockfileExpectation {
+        url: RegistryFileUrl,
+        message: CompactString,
+    },
+    Transport {
+        url: RegistryFileUrl,
+        message: CompactString,
+    },
+    ChecksumMismatch {
+        url: RegistryFileUrl,
+        expected: [u8; 32],
+        actual: [u8; 32],
+    },
+}
+
+impl From<RegistryRemoteError> for RegistryFileError {
+    fn from(error: RegistryRemoteError) -> Self {
+        match error {
+            RegistryRemoteError::MissingRequestGeneration { message, .. } => {
+                Self::MissingRequestGeneration(message)
+            }
+            RegistryRemoteError::MissingIoCapability { .. } => Self::MissingIoCapability,
+            RegistryRemoteError::MissingChecksumInError { url } => {
+                Self::MissingChecksumInError { url }
+            }
+            RegistryRemoteError::InvalidLockfileExpectation { url, message } => {
+                Self::InvalidLockfileExpectation { url, message }
+            }
+            RegistryRemoteError::Transport { url, message } => Self::Transport { url, message },
+            RegistryRemoteError::ChecksumMismatch {
+                url,
+                expected,
+                actual,
+            } => Self::ChecksumMismatch {
+                url,
+                expected,
+                actual,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RegistryFileKey {
     pub workspace: PathBuf,
@@ -378,124 +440,16 @@ impl RegistryFileKey {
                 RegistryFileError::RootModuleFiles(CompactString::new(error.to_string()))
             })?;
         let policy = policy.as_ref().as_ref().map_err(|error| error.clone())?;
-        let remote_policy = self.remote_policy(policy)?;
-        match remote_policy {
-            RemotePolicy::ReuseRecordedAbsent => {
-                return Ok(RegistryFileValue::NotFound {
-                    source: RegistryNotFoundSource::RecordedAbsence,
-                    recordable_remote_expectation: Some(RegistryFileExpectation::RecordedAbsent),
-                });
-            }
-            RemotePolicy::EnforceMissing => {
-                return Err(RegistryFileError::MissingChecksumInError {
-                    url: self.url.clone(),
-                });
-            }
-            RemotePolicy::FetchUnrecorded => {
-                self.request_generation(ctx).await?;
-                return self.fetch_remote(ctx, None, true).await;
-            }
-            RemotePolicy::EnforceSha256(expected) => {
-                return self.fetch_remote(ctx, Some(expected), false).await;
-            }
-        }
-    }
-
-    fn remote_policy(&self, policy: &RegistryPolicy) -> Result<RemotePolicy, RegistryFileError> {
         let mode = policy.mode.semantic_mode();
-        if matches!(mode, LockfileMode::Off) {
-            return Ok(RemotePolicy::FetchUnrecorded);
-        }
-        let lockfile = match &policy.visible_lockfile {
-            VisibleLockfileRead::Parsed(lockfile) => lockfile,
-            VisibleLockfileRead::Ignored => {
-                return Err(RegistryFileError::InvalidLockfileExpectation {
-                    url: self.url.clone(),
-                    message: CompactString::new(
-                        "lockfile-reading mode received ignored visible lockfile",
-                    ),
-                });
-            }
-        };
-        let expectation = lockfile
-            .registry_file_expectation(self.url.as_str())
-            .map_err(|error| RegistryFileError::InvalidLockfileExpectation {
-                url: self.url.clone(),
-                message: CompactString::new(error),
-            })?;
-        Ok(match (mode, expectation) {
-            (LockfileMode::Update | LockfileMode::Refresh, RegistryFileExpectation::Unrecorded) => {
-                RemotePolicy::FetchUnrecorded
-            }
-            (LockfileMode::Error, RegistryFileExpectation::Unrecorded) => {
-                RemotePolicy::EnforceMissing
-            }
-            (
-                LockfileMode::Update | LockfileMode::Error,
-                RegistryFileExpectation::RecordedAbsent,
-            ) => RemotePolicy::ReuseRecordedAbsent,
-            (LockfileMode::Refresh, RegistryFileExpectation::RecordedAbsent) => {
-                RemotePolicy::FetchUnrecorded
-            }
-            (
-                LockfileMode::Update | LockfileMode::Refresh | LockfileMode::Error,
-                RegistryFileExpectation::RecordedSha256(digest),
-            ) => RemotePolicy::EnforceSha256(digest),
-            (LockfileMode::Off, _) => unreachable!("off returned before lockfile access"),
-        })
-    }
-
-    async fn fetch_remote(
-        &self,
-        ctx: &mut DiceComputations<'_>,
-        expected: Option<[u8; 32]>,
-        all_outcomes_retryable: bool,
-    ) -> Result<RegistryFileValue, RegistryFileError> {
-        let io = ctx
-            .global_data()
-            .get::<RegistryIoHandle>()
-            .map_err(|_| RegistryFileError::MissingIoCapability)?
-            .0
-            .clone();
-        match io.read_exact(&self.url).await {
-            Ok(RegistryIoOutcome::Found(bytes)) => {
-                let actual = sha256(&bytes);
-                if let Some(expected) = expected
-                    && actual != expected
-                {
-                    return Err(RegistryFileError::ChecksumMismatch {
-                        url: self.url.clone(),
-                        expected,
-                        actual,
-                    });
-                }
-                Ok(RegistryFileValue::Found {
-                    bytes,
-                    sha256: actual,
-                    recordable_remote_expectation: Some(RegistryFileExpectation::RecordedSha256(
-                        actual,
-                    )),
-                })
-            }
-            Ok(RegistryIoOutcome::NotFound) => {
-                if !all_outcomes_retryable {
-                    self.request_generation(ctx).await?;
-                }
-                Ok(RegistryFileValue::NotFound {
-                    source: RegistryNotFoundSource::Io404,
-                    recordable_remote_expectation: Some(RegistryFileExpectation::RecordedAbsent),
-                })
-            }
-            Err(error) => {
-                if !all_outcomes_retryable {
-                    self.request_generation(ctx).await?;
-                }
-                Err(RegistryFileError::Transport {
-                    url: self.url.clone(),
-                    message: error.message,
-                })
-            }
-        }
+        read_remote_registry_file(
+            ctx,
+            &self.workspace,
+            &self.url,
+            &mode,
+            &policy.visible_lockfile,
+        )
+        .await
+        .map_err(RegistryFileError::from)
     }
 
     async fn request_generation(
@@ -510,6 +464,146 @@ impl RegistryFileKey {
             RegistryFileError::MissingRequestGeneration(CompactString::new(error.to_string()))
         })
     }
+}
+
+pub(crate) async fn read_remote_registry_file(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+    url: &RegistryFileUrl,
+    mode: &LockfileMode,
+    visible_lockfile: &VisibleLockfileRead,
+) -> Result<RegistryFileValue, RegistryRemoteError> {
+    let remote_policy = remote_policy(url, mode, visible_lockfile)?;
+    match remote_policy {
+        RemotePolicy::ReuseRecordedAbsent => Ok(RegistryFileValue::NotFound {
+            source: RegistryNotFoundSource::RecordedAbsence,
+            recordable_remote_expectation: Some(RegistryFileExpectation::RecordedAbsent),
+        }),
+        RemotePolicy::EnforceMissing => {
+            Err(RegistryRemoteError::MissingChecksumInError { url: url.dupe() })
+        }
+        RemotePolicy::FetchUnrecorded => {
+            request_remote_generation(ctx, workspace, url).await?;
+            fetch_remote_registry_file(ctx, workspace, url, None, true).await
+        }
+        RemotePolicy::EnforceSha256(expected) => {
+            fetch_remote_registry_file(ctx, workspace, url, Some(expected), false).await
+        }
+    }
+}
+
+fn remote_policy(
+    url: &RegistryFileUrl,
+    mode: &LockfileMode,
+    visible_lockfile: &VisibleLockfileRead,
+) -> Result<RemotePolicy, RegistryRemoteError> {
+    if matches!(mode, LockfileMode::Off) {
+        return Ok(RemotePolicy::FetchUnrecorded);
+    }
+    let lockfile = match visible_lockfile {
+        VisibleLockfileRead::Parsed(lockfile) => lockfile,
+        VisibleLockfileRead::Ignored => {
+            return Err(RegistryRemoteError::InvalidLockfileExpectation {
+                url: url.dupe(),
+                message: CompactString::new(
+                    "lockfile-reading mode received ignored visible lockfile",
+                ),
+            });
+        }
+    };
+    let expectation = lockfile
+        .registry_file_expectation(url.as_str())
+        .map_err(|error| RegistryRemoteError::InvalidLockfileExpectation {
+            url: url.dupe(),
+            message: CompactString::new(error),
+        })?;
+    Ok(match (mode, expectation) {
+        (LockfileMode::Update | LockfileMode::Refresh, RegistryFileExpectation::Unrecorded) => {
+            RemotePolicy::FetchUnrecorded
+        }
+        (LockfileMode::Error, RegistryFileExpectation::Unrecorded) => RemotePolicy::EnforceMissing,
+        (LockfileMode::Update | LockfileMode::Error, RegistryFileExpectation::RecordedAbsent) => {
+            RemotePolicy::ReuseRecordedAbsent
+        }
+        (LockfileMode::Refresh, RegistryFileExpectation::RecordedAbsent) => {
+            RemotePolicy::FetchUnrecorded
+        }
+        (
+            LockfileMode::Update | LockfileMode::Refresh | LockfileMode::Error,
+            RegistryFileExpectation::RecordedSha256(digest),
+        ) => RemotePolicy::EnforceSha256(digest),
+        (LockfileMode::Off, _) => unreachable!("off returned before lockfile access"),
+    })
+}
+
+async fn fetch_remote_registry_file(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+    url: &RegistryFileUrl,
+    expected: Option<[u8; 32]>,
+    all_outcomes_retryable: bool,
+) -> Result<RegistryFileValue, RegistryRemoteError> {
+    let io = ctx
+        .global_data()
+        .get::<RegistryIoHandle>()
+        .map_err(|_| RegistryRemoteError::MissingIoCapability { url: url.dupe() })?
+        .0
+        .clone();
+    match io.read_exact(url).await {
+        Ok(RegistryIoOutcome::Found(bytes)) => {
+            let actual = sha256(&bytes);
+            if let Some(expected) = expected
+                && actual != expected
+            {
+                return Err(RegistryRemoteError::ChecksumMismatch {
+                    url: url.dupe(),
+                    expected,
+                    actual,
+                });
+            }
+            Ok(RegistryFileValue::Found {
+                bytes,
+                sha256: actual,
+                recordable_remote_expectation: Some(RegistryFileExpectation::RecordedSha256(
+                    actual,
+                )),
+            })
+        }
+        Ok(RegistryIoOutcome::NotFound) => {
+            if !all_outcomes_retryable {
+                request_remote_generation(ctx, workspace, url).await?;
+            }
+            Ok(RegistryFileValue::NotFound {
+                source: RegistryNotFoundSource::Io404,
+                recordable_remote_expectation: Some(RegistryFileExpectation::RecordedAbsent),
+            })
+        }
+        Err(error) => {
+            if !all_outcomes_retryable {
+                request_remote_generation(ctx, workspace, url).await?;
+            }
+            Err(RegistryRemoteError::Transport {
+                url: url.dupe(),
+                message: error.message,
+            })
+        }
+    }
+}
+
+async fn request_remote_generation(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &Path,
+    url: &RegistryFileUrl,
+) -> Result<RegistryRequestGeneration, RegistryRemoteError> {
+    ctx.compute(&RegistryRequestGenerationKey {
+        workspace: workspace.to_path_buf(),
+    })
+    .await
+    .map_err(|error| RegistryRemoteError::MissingRequestGeneration {
+        workspace: workspace.to_path_buf(),
+        url: url.dupe(),
+        message: CompactString::new(error.to_string()),
+    })
 }
 
 pub fn inject_registry_request_inputs(

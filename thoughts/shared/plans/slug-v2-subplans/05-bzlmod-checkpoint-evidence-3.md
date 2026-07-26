@@ -3026,3 +3026,26 @@ prerequisite owners are accepted, new dependency, cache, map, or lock.
 
 Next evidence after terminal acceptance: Implement only
 `WP-5-m1-registry-remote-bridge`.
+
+### Stage 5 registry remote bridge
+
+Status: Accepted
+
+The exact one-file extraction adds a crate-private remote-only error and a
+policy-input-only bridge. The legacy remote key still computes its own policy,
+then exhaustively maps every bridge error back to the unchanged public
+`RegistryFileError`. Off, every unrecorded fetch, refresh-recorded-absence,
+recorded absence, error-unrecorded, and recorded-SHA generation/IO ordering
+remain exact. Local registry behavior, installed IO ownership, public exports,
+callers, dependencies, and production activation are unchanged.
+
+The focused registry suite passed 12 tests. Full bzlmod passed 233 tests plus
+zero doctests; downstream loading passed 54 plus zero doctests, and core passed
+92 unit, 13 runtime, and zero doctests. Every bzlmod/loading/core GNU-Windows
+test executable linked. Formatting, diff, exact one-file, bridge-body,
+error-schema, visibility, and two-call-site gates passed. Independent
+semantic/source and architecture/implementation terminal reviewers both
+returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-bzlmod-private-host-raw-byte-projection`.
