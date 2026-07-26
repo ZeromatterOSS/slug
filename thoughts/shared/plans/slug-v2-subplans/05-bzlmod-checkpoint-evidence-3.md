@@ -2657,3 +2657,26 @@ implementation reviews both returned `ACCEPT`; retry and publication
 integration remains owned by later packets.
 
 Next evidence: Implement only `WP-5-m1-private-shared-retry-driver`.
+
+### Stage 5 private shared retry driver
+
+Status: Accepted
+
+Synthetic typed build and query roots now run through one private retained
+driver with a fixed complete command bundle, fresh transaction per attempt,
+exact terminal-root selection, cap-free strict progress, and terminal
+`Complete(Ok/Err)` handling. Selected injections commit under the live terminal
+transaction; materializer acceptance, accepted-snapshot replacement, output
+buffer movement, and lease close follow the frozen order. Cancellation,
+unwind, selected-injection failure, restoration failure, and irreversible
+post-accept failures preserve the required restore-or-fail-closed ownership.
+The driver remains dormant: no production command, public API, server, CLI,
+REAPI, discovery, or legacy-snapshot path is activated.
+
+The full core suite passed 92 unit, 13 runtime, and zero doc tests. Both
+GNU-Windows test executables linked. Formatting, diff, archive, and exact
+two-file scope gates passed. Independent lifecycle and architecture/policy
+terminal rereviews both returned `ACCEPT`.
+
+Next evidence: Implement only
+`WP-5-m1-host-directory-semantic-projection`.

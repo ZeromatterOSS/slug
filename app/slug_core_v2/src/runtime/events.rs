@@ -98,6 +98,12 @@ pub(super) struct SelectedEventBatches {
     batches: Arc<[EventBatch]>,
 }
 
+/// Infallible command-owned logical output, exposed only after acceptance.
+#[derive(Debug, Eq, PartialEq)]
+pub(super) struct CommandOutputBuffer {
+    batches: Arc<[EventBatch]>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct SelectedCommandSidecars {
     events: SelectedEventBatches,
@@ -112,9 +118,35 @@ impl SelectedCommandSidecars {
     pub(super) fn demands(&self) -> &SelectedWorkspaceDemands {
         &self.demands
     }
+
+    pub(super) fn into_parts(self) -> (SelectedEventBatches, SelectedWorkspaceDemands) {
+        (self.events, self.demands)
+    }
+
+    #[cfg(test)]
+    pub(super) fn for_test(demands: SelectedWorkspaceDemands) -> Self {
+        Self {
+            events: SelectedEventBatches {
+                batches: Arc::from([]),
+            },
+            demands,
+        }
+    }
 }
 
 impl SelectedEventBatches {
+    pub(super) fn batches(&self) -> &[EventBatch] {
+        &self.batches
+    }
+
+    pub(super) fn into_output_buffer(self) -> CommandOutputBuffer {
+        CommandOutputBuffer {
+            batches: self.batches,
+        }
+    }
+}
+
+impl CommandOutputBuffer {
     pub(super) fn batches(&self) -> &[EventBatch] {
         &self.batches
     }
@@ -466,6 +498,10 @@ impl AttemptEffectTracker {
 }
 
 impl SealedCommandAttempt {
+    pub(super) fn root_count(&self) -> usize {
+        self.roots.len()
+    }
+
     pub(super) async fn select(
         self,
         transaction: &DiceTransaction,

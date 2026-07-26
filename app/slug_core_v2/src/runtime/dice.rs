@@ -9,6 +9,9 @@
  */
 
 use std::fmt;
+use std::future::Future;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -16,6 +19,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use std::task::Poll;
 
 use allocative::Allocative;
 use anyhow::Context;
@@ -24,9 +28,11 @@ use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceComputations;
 use dice::DiceTransactionUpdater;
+use dice::InjectedKey;
 use dice::Key;
 use dice::UserComputationData;
 use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredTargetAnalysisKey;
@@ -43,10 +49,16 @@ use slug_bzlmod_v2::RepositoryMaterializationRequest;
 use slug_bzlmod_v2::RepositoryMaterializationRequestId;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+use slug_bzlmod_v2::RootModuleCommandPolicyKey;
+use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
 use slug_bzlmod_v2::RootModuleGraph;
 use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_bzlmod_v2::RootModuleLockfileModeKey;
+use slug_bzlmod_v2::RootModuleRegistryUrlsKey;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_events_v2::EvaluationEvent;
+use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
@@ -67,6 +79,8 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationEpochKey;
+use slug_workspace_v2::PathObservationKey;
+use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceRawFileValue;
@@ -82,9 +96,9 @@ use super::demands::WorkspaceDemandOwner;
 use super::events::AttemptEffectTracker;
 use super::events::CommandEffectError;
 use super::events::CommandEffectOwner;
+use super::events::CommandOutputBuffer;
 use super::events::SealedCommandAttempt;
 use super::events::SelectedCommandSidecars;
-use super::events::SelectedEventBatches;
 use super::starlark::evaluate_file;
 
 pub trait IncrementalEngine {
@@ -360,9 +374,70 @@ struct NativeDemandGenerationBundle {
 }
 
 #[allow(dead_code)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NativeDemandRequestInputBundle {
+    command_policy: BzlmodCommandPolicyKey,
+    environment_policy: BzlmodEnvironmentPolicyKey,
+    lockfile_mode: LockfileMode,
+    registry_urls: RegistryUrls,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NativeDemandInputBundle {
+    request: NativeDemandRequestInputBundle,
+    generations: NativeDemandGenerationBundle,
+}
+
+#[allow(dead_code)]
+impl NativeDemandRequestInputBundle {
+    fn normalized_initial() -> Self {
+        Self {
+            command_policy: BzlmodCommandPolicyKey::from_flags(None, false)
+                .expect("default bzlmod command policy is valid"),
+            environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+                .expect("default bzlmod environment policy is valid"),
+            lockfile_mode: LockfileMode::Update,
+            registry_urls: RegistryUrls::new(std::iter::empty::<&str>()),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct NativeDemandWorkspaceRevisionKey {
+    workspace: PathBuf,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Allocative)]
+struct NativeDemandWorkspaceRevision(WorkspaceRevision);
+
+impl Dupe for NativeDemandWorkspaceRevision {}
+
+impl fmt::Display for NativeDemandWorkspaceRevisionKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "native-demand-workspace-revision:{}",
+            self.workspace.display()
+        )
+    }
+}
+
+#[async_trait]
+impl InjectedKey for NativeDemandWorkspaceRevisionKey {
+    type Value = NativeDemandWorkspaceRevision;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+#[allow(dead_code)]
 #[derive(Clone)]
 struct AcceptedNativeDemandSnapshot {
-    generations: NativeDemandGenerationBundle,
+    inputs: NativeDemandInputBundle,
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
     selected: SelectedWorkspaceDemands,
@@ -384,6 +459,14 @@ struct NativeDemandSessionState {
     accepted: AcceptedNativeDemandSnapshot,
     #[cfg(test)]
     fail_next_restoration: bool,
+    #[cfg(test)]
+    fail_next_selected_injection: bool,
+    #[cfg(test)]
+    fail_next_replace_accepted: bool,
+    #[cfg(test)]
+    fail_next_close: bool,
+    #[cfg(test)]
+    trace: Vec<NativeDemandTestTrace>,
 }
 
 #[allow(dead_code)]
@@ -405,6 +488,7 @@ enum NativeDemandSessionError {
     PathEpoch(slug_workspace_v2::PathObservationEpochError),
     Effect(CommandEffectError),
     ForeignEffects,
+    Computation(anyhow::Error),
     Injection(anyhow::Error),
     Restoration(anyhow::Error),
 }
@@ -421,7 +505,7 @@ struct NativeDemandCommand<'a> {
     runtime: &'a WorkspaceRuntime,
     lease: NativeDemandLeaseToken,
     repository_session: super::repository_io::RepositorySessionToken,
-    generations: NativeDemandGenerationBundle,
+    inputs: NativeDemandInputBundle,
     effects: Arc<CommandEffectOwner>,
     prior: AcceptedNativeDemandSnapshot,
     reusable_requests:
@@ -456,6 +540,467 @@ struct NativeDemandTerminalSelection {
 }
 
 #[allow(dead_code)]
+struct NativeDemandPreparedAcceptance {
+    events: super::events::SelectedEventBatches,
+    snapshot: AcceptedNativeDemandSnapshot,
+    validation: Vec<super::repository_io::RepositoryValidation>,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeDemandAbortPhase {
+    Restorable,
+    Irreversible,
+    FailClosed,
+    Closed,
+}
+
+#[allow(dead_code)]
+struct NativeDemandAbortGuard<'a> {
+    command: Option<NativeDemandCommand<'a>>,
+    attempt: Option<NativeDemandAttempt>,
+    phase: NativeDemandAbortPhase,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
+enum SyntheticCommandValue {
+    Build(Arc<str>),
+    Query(Arc<[Arc<str>]>),
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
+struct SyntheticCommandError(Arc<str>);
+
+#[allow(dead_code)]
+type SyntheticCommandOutcome =
+    slug_bzlmod_v2::SourcePreparationOutcome<Result<SyntheticCommandValue, SyntheticCommandError>>;
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Eq, PartialEq, Allocative)]
+struct SyntheticCommandPlan {
+    id: u64,
+    workspace: NormalizedAbsolutePath,
+    repositories: Arc<[Arc<RepositoryMaterializationRequest>]>,
+    paths: Arc<[PathObservationDemand]>,
+    terminal: Result<SyntheticCommandValue, SyntheticCommandError>,
+    retry_event: Option<Arc<str>>,
+    terminal_event: Option<Arc<str>>,
+    behavior: SyntheticRootBehavior,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Allocative)]
+struct SyntheticBuildRootKey {
+    plan: Arc<SyntheticCommandPlan>,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Allocative)]
+struct SyntheticQueryRootKey {
+    plan: Arc<SyntheticCommandPlan>,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+enum SyntheticCommandRoot {
+    Build(SyntheticBuildRootKey),
+    Query(SyntheticQueryRootKey),
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Allocative)]
+enum SyntheticRootBehavior {
+    Normal,
+    PanicAfterInputs,
+    PendForCancellation,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Allocative)]
+struct SyntheticRepositoryDemandKey {
+    plan_id: u64,
+    index: usize,
+    request: Arc<RepositoryMaterializationRequest>,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Allocative)]
+enum SyntheticEventKind {
+    Retry,
+    Terminal,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Allocative)]
+struct SyntheticEventKey {
+    plan_id: u64,
+    kind: SyntheticEventKind,
+    text: Arc<str>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+struct SyntheticCommandResult {
+    terminal: Result<SyntheticCommandValue, SyntheticCommandError>,
+    output: CommandOutputBuffer,
+    attempts: usize,
+    terminal_root_count: usize,
+}
+
+#[allow(dead_code)]
+enum SyntheticAttemptResult {
+    Retry(slug_bzlmod_v2::SourcePreparationNeeds),
+    Terminal(
+        Result<SyntheticCommandValue, SyntheticCommandError>,
+        NativeDemandPreparedAcceptance,
+        usize,
+    ),
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NativeDemandTestTrace {
+    SelectedInjectionCommitted,
+    TerminalTransactionDropped,
+    MaterializerAccepted,
+    AcceptedSnapshotReplaced,
+    OutputBufferMoved,
+    LeaseClosed,
+    AttemptTransactionDroppedBeforeAbort,
+}
+
+macro_rules! impl_synthetic_root_identity {
+    ($key:ty, $name:literal) => {
+        impl PartialEq for $key {
+            fn eq(&self, other: &Self) -> bool {
+                self.plan == other.plan
+            }
+        }
+
+        impl Eq for $key {}
+
+        impl Hash for $key {
+            fn hash<H: Hasher>(&self, state: &mut H) {
+                self.plan.id.hash(state);
+            }
+        }
+
+        impl fmt::Display for $key {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}:{}", $name, self.plan.id)
+            }
+        }
+    };
+}
+
+impl_synthetic_root_identity!(SyntheticBuildRootKey, "synthetic-build-root");
+impl_synthetic_root_identity!(SyntheticQueryRootKey, "synthetic-query-root");
+
+impl PartialEq for SyntheticRepositoryDemandKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.plan_id == other.plan_id && self.index == other.index && self.request == other.request
+    }
+}
+
+impl Eq for SyntheticRepositoryDemandKey {}
+
+impl Hash for SyntheticRepositoryDemandKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.plan_id.hash(state);
+        self.index.hash(state);
+    }
+}
+
+impl fmt::Display for SyntheticRepositoryDemandKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "synthetic-repository-demand:{}:{}",
+            self.plan_id, self.index
+        )
+    }
+}
+
+impl fmt::Display for SyntheticEventKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "synthetic-{:?}-event:{}", self.kind, self.plan_id)
+    }
+}
+
+#[async_trait]
+impl Key for SyntheticRepositoryDemandKey {
+    type Value = ();
+
+    async fn compute(
+        &self,
+        _ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+    }
+
+    fn equality(_x: &Self::Value, _y: &Self::Value) -> bool {
+        true
+    }
+
+    fn provide<'a>(&'a self, demand: &mut dice::Demand<'a>) {
+        demand.provide_value_with(|| self.request.clone());
+    }
+}
+
+#[async_trait]
+impl Key for SyntheticEventKey {
+    type Value = ();
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.store_evaluation_data(EventBatch::from_events([EvaluationEvent::StarlarkPrint {
+            text: self.text.as_ref().into(),
+        }]))
+        .expect("synthetic event capture is installed");
+    }
+
+    fn equality(_x: &Self::Value, _y: &Self::Value) -> bool {
+        true
+    }
+}
+
+async fn compute_synthetic_command_root(
+    plan: &SyntheticCommandPlan,
+    ctx: &mut DiceComputations<'_>,
+) -> SyntheticCommandOutcome {
+    let workspace_path = plan.workspace.as_path().to_path_buf();
+    // Every attempt depends on the entire immutable command input bundle.
+    // The values themselves are consumed by real production keys later; this
+    // private root proves the retry driver does not silently mix snapshots.
+    ctx.compute(&NativeDemandWorkspaceRevisionKey {
+        workspace: workspace_path.clone(),
+    })
+    .await
+    .expect("synthetic command workspace revision is injected");
+    ctx.compute(&RegistryRequestGenerationKey {
+        workspace: workspace_path.clone(),
+    })
+    .await
+    .expect("synthetic command registry generation is injected");
+    ctx.compute(&RepositoryMaterializationGenerationKey {
+        workspace: workspace_path.clone(),
+    })
+    .await
+    .expect("synthetic command repository generation is injected");
+    ctx.compute(&RootModuleCommandPolicyKey {
+        workspace: workspace_path.clone(),
+    })
+    .await
+    .expect("synthetic command policy is injected");
+    ctx.compute(&RootModuleEnvironmentPolicyKey {
+        workspace: workspace_path.clone(),
+    })
+    .await
+    .expect("synthetic environment policy is injected");
+    ctx.compute(&RootModuleLockfileModeKey {
+        workspace: workspace_path.clone(),
+    })
+    .await
+    .expect("synthetic lockfile mode is injected");
+    ctx.compute(&RootModuleRegistryUrlsKey {
+        workspace: workspace_path,
+    })
+    .await
+    .expect("synthetic registry URLs are injected");
+    match plan.behavior {
+        SyntheticRootBehavior::Normal => {}
+        SyntheticRootBehavior::PanicAfterInputs => {
+            panic!("forced synthetic command root panic");
+        }
+        SyntheticRootBehavior::PendForCancellation => {
+            std::future::pending::<()>().await;
+            unreachable!("a pending synthetic command root cannot complete");
+        }
+    }
+
+    ctx.store_evaluation_data(EventBatch::empty())
+        .expect("synthetic root event capture is installed");
+    for (index, request) in plan.repositories.iter().enumerate() {
+        ctx.compute(&SyntheticRepositoryDemandKey {
+            plan_id: plan.id,
+            index,
+            request: request.clone(),
+        })
+        .await
+        .expect("synthetic repository demand computes");
+    }
+
+    let epoch = ctx
+        .compute(&RepositoryMaterializationResultEpochKey {
+            workspace: plan.workspace.clone(),
+        })
+        .await
+        .expect("synthetic command repository epoch is injected");
+    let expected_epoch = RepositoryMaterializationResultEpoch::new(
+        plan.workspace.clone(),
+        plan.repositories.iter().map(|request| {
+            slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
+                request: request.clone(),
+                result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
+                    slug_bzlmod_v2::RepositoryMaterializationSuccess::Local,
+                ),
+            }
+        }),
+    )
+    .expect("synthetic repository requests are distinct");
+    if epoch != expected_epoch {
+        let mut needs: Option<slug_bzlmod_v2::SourcePreparationNeeds> = None;
+        for request in plan.repositories.iter() {
+            let repository_need =
+                slug_bzlmod_v2::SourcePreparationNeeds::repository(request.as_ref().clone());
+            needs = Some(match needs {
+                Some(existing) => existing
+                    .try_union(&repository_need)
+                    .expect("synthetic repository requests are distinct"),
+                None => repository_need,
+            });
+        }
+        if let Some(path) = plan.paths.first() {
+            if let PathOutcome::Need(path_need) = ctx
+                .compute(&PathObservationKey::new(path.clone()))
+                .await
+                .expect("synthetic path projection computes")
+            {
+                let path_need = slug_bzlmod_v2::SourcePreparationNeeds::path(path_need);
+                needs = Some(match needs {
+                    Some(existing) => existing
+                        .try_union(&path_need)
+                        .expect("repository and path needs compose"),
+                    None => path_need,
+                });
+            }
+        }
+        if let Some(text) = &plan.retry_event {
+            ctx.compute(&SyntheticEventKey {
+                plan_id: plan.id,
+                kind: SyntheticEventKind::Retry,
+                text: text.clone(),
+            })
+            .await
+            .expect("synthetic retry event computes");
+        }
+        return slug_bzlmod_v2::SourcePreparationOutcome::Need(
+            needs.expect("a mismatched repository epoch has a repository need"),
+        );
+    }
+
+    for path in plan.paths.iter() {
+        if let PathOutcome::Need(need) = ctx
+            .compute(&PathObservationKey::new(path.clone()))
+            .await
+            .expect("synthetic path projection computes")
+        {
+            if let Some(text) = &plan.retry_event {
+                ctx.compute(&SyntheticEventKey {
+                    plan_id: plan.id,
+                    kind: SyntheticEventKind::Retry,
+                    text: text.clone(),
+                })
+                .await
+                .expect("synthetic retry event computes");
+            }
+            return slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                slug_bzlmod_v2::SourcePreparationNeeds::path(need),
+            );
+        }
+    }
+
+    if let Some(text) = &plan.terminal_event {
+        ctx.compute(&SyntheticEventKey {
+            plan_id: plan.id,
+            kind: SyntheticEventKind::Terminal,
+            text: text.clone(),
+        })
+        .await
+        .expect("synthetic terminal event computes");
+    }
+    slug_bzlmod_v2::SourcePreparationOutcome::Complete(plan.terminal.clone())
+}
+
+macro_rules! impl_synthetic_root_key {
+    ($key:ty) => {
+        #[async_trait]
+        impl Key for $key {
+            type Value = SyntheticCommandOutcome;
+
+            async fn compute(
+                &self,
+                ctx: &mut DiceComputations,
+                _cancellations: &CancellationContext,
+            ) -> Self::Value {
+                compute_synthetic_command_root(&self.plan, ctx).await
+            }
+
+            fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+                x.complete_eq(y)
+            }
+
+            fn validity(value: &Self::Value) -> bool {
+                value.is_complete()
+            }
+        }
+    };
+}
+
+impl_synthetic_root_key!(SyntheticBuildRootKey);
+impl_synthetic_root_key!(SyntheticQueryRootKey);
+
+impl SyntheticCommandRoot {
+    async fn compute(
+        &self,
+        transaction: &mut dice::DiceTransaction,
+    ) -> Result<SyntheticCommandOutcome, NativeDemandSessionError> {
+        if self.plan().behavior == SyntheticRootBehavior::PendForCancellation {
+            return match self {
+                Self::Build(key) => poll_then_cancel_synthetic_compute(transaction, key).await,
+                Self::Query(key) => poll_then_cancel_synthetic_compute(transaction, key).await,
+            };
+        }
+        match self {
+            Self::Build(key) => transaction.compute(key).await,
+            Self::Query(key) => transaction.compute(key).await,
+        }
+        .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}")))
+    }
+
+    fn plan(&self) -> &SyntheticCommandPlan {
+        match self {
+            Self::Build(key) => &key.plan,
+            Self::Query(key) => &key.plan,
+        }
+    }
+}
+
+async fn poll_then_cancel_synthetic_compute<K>(
+    transaction: &mut dice::DiceTransaction,
+    key: &K,
+) -> Result<SyntheticCommandOutcome, NativeDemandSessionError>
+where
+    K: Key<Value = SyntheticCommandOutcome>,
+{
+    let mut compute = Box::pin(transaction.compute(key));
+    std::future::poll_fn(|context| match compute.as_mut().poll(context) {
+        Poll::Pending => Poll::Ready(()),
+        Poll::Ready(_) => panic!("the cancellation seam's synthetic root unexpectedly completed"),
+    })
+    .await;
+    drop(compute);
+    Err(NativeDemandSessionError::Computation(anyhow::anyhow!(
+        "synthetic root compute future cancelled after its first pending poll"
+    )))
+}
+
+#[allow(dead_code)]
 impl NativeDemandSessionOwner {
     fn new(workspace: NormalizedAbsolutePath) -> Self {
         let generations = NativeDemandGenerationBundle {
@@ -468,7 +1013,10 @@ impl NativeDemandSessionOwner {
                 next_lease: 1,
                 phase: NativeDemandLeasePhase::Idle,
                 accepted: AcceptedNativeDemandSnapshot {
-                    generations,
+                    inputs: NativeDemandInputBundle {
+                        request: NativeDemandRequestInputBundle::normalized_initial(),
+                        generations,
+                    },
                     repository_results: RepositoryMaterializationResultEpoch::new(workspace, [])
                         .expect("empty repository epoch is valid"),
                     path_observations: PathObservationEpoch::empty(),
@@ -476,6 +1024,14 @@ impl NativeDemandSessionOwner {
                 },
                 #[cfg(test)]
                 fail_next_restoration: false,
+                #[cfg(test)]
+                fail_next_selected_injection: false,
+                #[cfg(test)]
+                fail_next_replace_accepted: false,
+                #[cfg(test)]
+                fail_next_close: false,
+                #[cfg(test)]
+                trace: Vec::new(),
             }),
         }
     }
@@ -536,6 +1092,10 @@ impl NativeDemandSessionOwner {
             .state
             .lock()
             .expect("native demand session mutex poisoned");
+        #[cfg(test)]
+        if std::mem::take(&mut state.fail_next_replace_accepted) {
+            return Err(NativeDemandSessionError::StaleLease);
+        }
         match state.phase {
             NativeDemandLeasePhase::Open { lease: active, .. } if active == lease => {
                 state.accepted = snapshot;
@@ -550,6 +1110,10 @@ impl NativeDemandSessionOwner {
             .state
             .lock()
             .expect("native demand session mutex poisoned");
+        #[cfg(test)]
+        if std::mem::take(&mut state.fail_next_close) {
+            return Err(NativeDemandSessionError::StaleLease);
+        }
         match state.phase {
             NativeDemandLeasePhase::Open { lease: active, .. } if active == lease => {
                 state.phase = NativeDemandLeasePhase::Idle;
@@ -565,6 +1129,68 @@ impl NativeDemandSessionOwner {
             .lock()
             .expect("native demand session mutex poisoned")
             .fail_next_restoration = true;
+    }
+
+    #[cfg(test)]
+    fn force_next_selected_injection_failure(&self) {
+        self.state
+            .lock()
+            .expect("native demand session mutex poisoned")
+            .fail_next_selected_injection = true;
+    }
+
+    #[cfg(test)]
+    fn force_next_replace_accepted_failure(&self) {
+        self.state
+            .lock()
+            .expect("native demand session mutex poisoned")
+            .fail_next_replace_accepted = true;
+    }
+
+    #[cfg(test)]
+    fn force_next_close_failure(&self) {
+        self.state
+            .lock()
+            .expect("native demand session mutex poisoned")
+            .fail_next_close = true;
+    }
+
+    #[cfg(test)]
+    fn take_selected_injection_failure(
+        &self,
+        lease: NativeDemandLeaseToken,
+    ) -> Result<bool, NativeDemandSessionError> {
+        let mut state = self
+            .state
+            .lock()
+            .expect("native demand session mutex poisoned");
+        if !matches!(
+            state.phase,
+            NativeDemandLeasePhase::Open { lease: active, .. } if active == lease
+        ) {
+            return Err(NativeDemandSessionError::StaleLease);
+        }
+        Ok(std::mem::take(&mut state.fail_next_selected_injection))
+    }
+
+    #[cfg(test)]
+    fn record_trace(&self, event: NativeDemandTestTrace) {
+        self.state
+            .lock()
+            .expect("native demand session mutex poisoned")
+            .trace
+            .push(event);
+    }
+
+    #[cfg(test)]
+    fn take_trace(&self) -> Vec<NativeDemandTestTrace> {
+        std::mem::take(
+            &mut self
+                .state
+                .lock()
+                .expect("native demand session mutex poisoned")
+                .trace,
+        )
     }
 
     #[cfg(test)]
@@ -809,21 +1435,34 @@ impl WorkspaceRuntime {
     fn begin_native_demand_command(
         &self,
     ) -> Result<NativeDemandPreflight<'_>, NativeDemandSessionError> {
+        self.begin_native_demand_command_with_inputs(
+            NativeDemandRequestInputBundle::normalized_initial(),
+        )
+    }
+
+    #[allow(dead_code)]
+    fn begin_native_demand_command_with_inputs(
+        &self,
+        request: NativeDemandRequestInputBundle,
+    ) -> Result<NativeDemandPreflight<'_>, NativeDemandSessionError> {
         let (lease, prior) = self.native_demand_sessions.acquire()?;
         // Busy is decided before any member of this fixed command bundle is
         // allocated.
-        let generations = NativeDemandGenerationBundle {
-            workspace_revision: WorkspaceRevision(
-                self.next_revision.fetch_add(1, Ordering::Relaxed),
-            ),
-            registry: RegistryRequestGeneration(
-                self.next_registry_generation
-                    .fetch_add(1, Ordering::Relaxed),
-            ),
-            repository: RepositoryMaterializationGeneration(
-                self.next_repository_materialization_generation
-                    .fetch_add(1, Ordering::Relaxed),
-            ),
+        let inputs = NativeDemandInputBundle {
+            request,
+            generations: NativeDemandGenerationBundle {
+                workspace_revision: WorkspaceRevision(
+                    self.next_revision.fetch_add(1, Ordering::Relaxed),
+                ),
+                registry: RegistryRequestGeneration(
+                    self.next_registry_generation
+                        .fetch_add(1, Ordering::Relaxed),
+                ),
+                repository: RepositoryMaterializationGeneration(
+                    self.next_repository_materialization_generation
+                        .fetch_add(1, Ordering::Relaxed),
+                ),
+            },
         };
         let repository_session = match self.repository_materializer.begin() {
             Ok(token) => token,
@@ -856,7 +1495,7 @@ impl WorkspaceRuntime {
                 runtime: self,
                 lease,
                 repository_session,
-                generations,
+                inputs,
                 effects: CommandEffectOwner::new(),
                 prior,
                 reusable_requests: preflight
@@ -869,6 +1508,85 @@ impl WorkspaceRuntime {
                 path_observations: preflight.path_observations().clone(),
             },
         })
+    }
+
+    #[allow(dead_code)]
+    fn drive_synthetic_command(
+        &self,
+        request: NativeDemandRequestInputBundle,
+        root: SyntheticCommandRoot,
+    ) -> Result<SyntheticCommandResult, NativeDemandSessionError> {
+        let preflight = self.begin_native_demand_command_with_inputs(request)?;
+        let mut guard = NativeDemandAbortGuard::new(preflight.into_command());
+        let mut attempts = 0usize;
+        loop {
+            attempts += 1;
+            if let Err(error) = guard.begin_attempt() {
+                return guard.abort(error);
+            }
+            let attempt_root = root.clone();
+            let attempt = self.runtime.block_on(async {
+                let data = guard.attempt_user_computation_data()?;
+                let mut updater = self.dice.updater_with_data(data);
+                guard.inject_attempt(&mut updater)?;
+                let mut transaction = updater.commit().await;
+                let root_outcome = attempt_root.compute(&mut transaction).await?;
+                match &root_outcome {
+                    slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) => {
+                        let needs = needs.clone();
+                        guard.seal_retry()?;
+                        drop(root_outcome);
+                        drop(attempt_root);
+                        drop(transaction);
+                        Ok(SyntheticAttemptResult::Retry(needs))
+                    }
+                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal) => {
+                        let terminal = terminal.clone();
+                        let sealed = guard.seal_terminal()?;
+                        let terminal_root_count = sealed.root_count();
+                        let selected = sealed.select(&transaction).await?;
+                        let prepared = guard.prepare_accept(selected, &transaction).await;
+                        drop(root_outcome);
+                        drop(attempt_root);
+                        drop(transaction);
+                        #[cfg(test)]
+                        self.native_demand_sessions
+                            .record_trace(NativeDemandTestTrace::TerminalTransactionDropped);
+                        let prepared = prepared?;
+                        Ok(SyntheticAttemptResult::Terminal(
+                            terminal,
+                            prepared,
+                            terminal_root_count,
+                        ))
+                    }
+                }
+            });
+            let attempt = match attempt {
+                Ok(attempt) => attempt,
+                Err(error) => {
+                    #[cfg(test)]
+                    self.native_demand_sessions
+                        .record_trace(NativeDemandTestTrace::AttemptTransactionDroppedBeforeAbort);
+                    return guard.abort(error);
+                }
+            };
+            match attempt {
+                SyntheticAttemptResult::Retry(needs) => {
+                    if let Err(error) = guard.progress(&needs) {
+                        return guard.abort(error);
+                    }
+                }
+                SyntheticAttemptResult::Terminal(terminal, prepared, terminal_root_count) => {
+                    let output = guard.accept_prepared(prepared)?;
+                    return Ok(SyntheticCommandResult {
+                        terminal,
+                        output,
+                        attempts,
+                        terminal_root_count,
+                    });
+                }
+            }
+        }
     }
 
     fn inject_bzlmod_request_inputs(
@@ -1421,7 +2139,7 @@ impl WorkspaceRuntime {
 #[allow(dead_code)]
 impl<'a> NativeDemandPreflight<'a> {
     fn generations(&self) -> NativeDemandGenerationBundle {
-        self.command.generations
+        self.command.inputs.generations
     }
 
     fn repository_results(&self) -> &RepositoryMaterializationResultEpoch {
@@ -1469,7 +2187,7 @@ impl NativeDemandCommand<'_> {
         inject_native_demand_snapshot(
             updater,
             self.runtime,
-            self.generations,
+            &self.inputs,
             self.repository_results.clone(),
             self.path_observations.clone(),
         )
@@ -1477,13 +2195,10 @@ impl NativeDemandCommand<'_> {
     }
 
     fn progress(
-        mut self,
+        &mut self,
         needs: &slug_bzlmod_v2::SourcePreparationNeeds,
-    ) -> Result<(Self, NativeDemandProgress), NativeDemandSessionError> {
-        match self.progress_inner(needs) {
-            Ok(progress) => Ok((self, progress)),
-            Err(error) => self.restore_after(error),
-        }
+    ) -> Result<NativeDemandProgress, NativeDemandSessionError> {
+        self.progress_inner(needs)
     }
 
     fn progress_inner(
@@ -1531,7 +2246,7 @@ impl NativeDemandCommand<'_> {
                     .materialize_native(
                         self.repository_session,
                         request.clone(),
-                        self.generations.repository,
+                        self.inputs.generations.repository,
                     )
                     .map_err(NativeDemandSessionError::Repository)?;
                 self.reusable_requests.shift_remove(&request.id);
@@ -1573,7 +2288,7 @@ impl NativeDemandCommand<'_> {
         Ok(NativeDemandProgress::Paths)
     }
 
-    fn discard(self) -> Result<(), NativeDemandSessionError> {
+    fn discard_in_place(&mut self) -> Result<(), NativeDemandSessionError> {
         #[cfg(test)]
         if self
             .runtime
@@ -1594,7 +2309,7 @@ impl NativeDemandCommand<'_> {
             inject_native_demand_snapshot(
                 &mut updater,
                 self.runtime,
-                prior.generations,
+                &prior.inputs,
                 prior.repository_results,
                 prior.path_observations,
             )
@@ -1608,59 +2323,6 @@ impl NativeDemandCommand<'_> {
             .discard(self.repository_session)
             .map_err(NativeDemandSessionError::Repository)?;
         self.runtime.native_demand_sessions.close(self.lease)
-    }
-
-    fn accept(
-        self,
-        selected: NativeDemandTerminalSelection,
-    ) -> Result<SelectedEventBatches, NativeDemandSessionError> {
-        if !Arc::ptr_eq(&self.effects, &selected.effects) {
-            return self.restore_after(NativeDemandSessionError::ForeignEffects);
-        }
-        let events = selected.sidecars.events().clone();
-        self.accept_selected(selected.sidecars.demands().clone())?;
-        Ok(events)
-    }
-
-    fn accept_selected(
-        self,
-        selected: SelectedWorkspaceDemands,
-    ) -> Result<(), NativeDemandSessionError> {
-        match self.selected_snapshot(selected) {
-            Ok((snapshot, validation)) => {
-                if let Err(error) = self.runtime.runtime.block_on(async {
-                    let mut updater = self.runtime.dice.updater_with_data(
-                        self.runtime
-                            .user_computation_data(None)
-                            .map_err(|error| anyhow::anyhow!(error.to_string()))?,
-                    );
-                    inject_native_demand_snapshot(
-                        &mut updater,
-                        self.runtime,
-                        snapshot.generations,
-                        snapshot.repository_results.clone(),
-                        snapshot.path_observations.clone(),
-                    )?;
-                    let transaction = updater.commit().await;
-                    drop(transaction);
-                    Ok::<_, anyhow::Error>(())
-                }) {
-                    return self.restore_after(NativeDemandSessionError::Injection(error));
-                }
-                if let Err(error) = self.runtime.repository_materializer.accept(
-                    self.repository_session,
-                    snapshot.selected.repository_requests(),
-                    validation,
-                ) {
-                    return self.restore_after(NativeDemandSessionError::Repository(error));
-                }
-                self.runtime
-                    .native_demand_sessions
-                    .replace_accepted(self.lease, snapshot)?;
-                self.runtime.native_demand_sessions.close(self.lease)
-            }
-            Err(error) => self.restore_after(error),
-        }
     }
 
     fn selected_snapshot(
@@ -1739,7 +2401,7 @@ impl NativeDemandCommand<'_> {
             .collect();
         Ok((
             AcceptedNativeDemandSnapshot {
-                generations: self.generations,
+                inputs: self.inputs.clone(),
                 repository_results,
                 path_observations,
                 selected,
@@ -1747,33 +2409,297 @@ impl NativeDemandCommand<'_> {
             validation,
         ))
     }
+}
 
-    fn restore_after<T>(
-        self,
+#[allow(dead_code)]
+impl<'a> NativeDemandAbortGuard<'a> {
+    fn new(command: NativeDemandCommand<'a>) -> Self {
+        Self {
+            command: Some(command),
+            attempt: None,
+            phase: NativeDemandAbortPhase::Restorable,
+        }
+    }
+
+    fn command(&self) -> &NativeDemandCommand<'a> {
+        self.command
+            .as_ref()
+            .expect("an armed native-demand guard owns its command")
+    }
+
+    fn begin_attempt(&mut self) -> Result<(), NativeDemandSessionError> {
+        assert!(
+            self.attempt.is_none(),
+            "a native-demand guard begins only one live attempt"
+        );
+        self.attempt = Some(self.command().begin_attempt()?);
+        Ok(())
+    }
+
+    fn attempt_user_computation_data(
+        &self,
+    ) -> Result<UserComputationData, NativeDemandSessionError> {
+        self.command().attempt_user_computation_data(
+            self.attempt
+                .as_ref()
+                .expect("native-demand attempt is live"),
+        )
+    }
+
+    fn inject_attempt(
+        &self,
+        updater: &mut DiceTransactionUpdater,
+    ) -> Result<(), NativeDemandSessionError> {
+        self.command().inject_attempt(updater)
+    }
+
+    fn seal_retry(&mut self) -> Result<(), NativeDemandSessionError> {
+        self.attempt
+            .as_ref()
+            .expect("native-demand retry attempt is live")
+            .seal_retry()?;
+        self.attempt = None;
+        Ok(())
+    }
+
+    fn seal_terminal(&mut self) -> Result<NativeDemandSealedAttempt, NativeDemandSessionError> {
+        let sealed = self
+            .attempt
+            .as_ref()
+            .expect("native-demand terminal attempt is live")
+            .seal_terminal()?;
+        self.attempt = None;
+        Ok(sealed)
+    }
+
+    fn progress(
+        &mut self,
+        needs: &slug_bzlmod_v2::SourcePreparationNeeds,
+    ) -> Result<NativeDemandProgress, NativeDemandSessionError> {
+        self.command
+            .as_mut()
+            .expect("native-demand command is armed")
+            .progress(needs)
+    }
+
+    fn suppress_attempt(&mut self) -> Result<(), NativeDemandSessionError> {
+        let Some(attempt) = self.attempt.as_ref() else {
+            return Ok(());
+        };
+        let result = attempt
+            .tracker
+            .finish_suppressed()
+            .map_err(NativeDemandSessionError::Effect);
+        self.attempt = None;
+        result
+    }
+
+    fn abort<T>(
+        &mut self,
         original: NativeDemandSessionError,
     ) -> Result<T, NativeDemandSessionError> {
-        match self.discard() {
-            Ok(()) => Err(original),
-            Err(error) => Err(error),
+        if self.phase != NativeDemandAbortPhase::Restorable {
+            self.phase = NativeDemandAbortPhase::FailClosed;
+            return Err(original);
+        }
+        let suppression = self.suppress_attempt();
+        let restoration = self
+            .command
+            .as_mut()
+            .expect("restorable native-demand guard owns its command")
+            .discard_in_place();
+        match restoration {
+            Err(error) => {
+                self.phase = NativeDemandAbortPhase::FailClosed;
+                Err(error)
+            }
+            Ok(()) => {
+                self.phase = NativeDemandAbortPhase::Closed;
+                self.command = None;
+                match suppression {
+                    Ok(()) => Err(original),
+                    Err(error) => Err(error),
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn discard(&mut self) -> Result<(), NativeDemandSessionError> {
+        let suppression = self.suppress_attempt();
+        let restoration = self
+            .command
+            .as_mut()
+            .expect("restorable native-demand guard owns its command")
+            .discard_in_place();
+        match restoration {
+            Err(error) => {
+                self.phase = NativeDemandAbortPhase::FailClosed;
+                Err(error)
+            }
+            Ok(()) => {
+                self.phase = NativeDemandAbortPhase::Closed;
+                self.command = None;
+                suppression
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn accept_selected_for_test(
+        &mut self,
+        demands: SelectedWorkspaceDemands,
+    ) -> Result<CommandOutputBuffer, NativeDemandSessionError> {
+        let selected = NativeDemandTerminalSelection {
+            effects: self.command().effects.clone(),
+            sidecars: SelectedCommandSidecars::for_test(demands),
+        };
+        let prepared = {
+            let command = self.command();
+            command.runtime.runtime.block_on(async {
+                let updater = command.runtime.dice.updater_with_data(
+                    command
+                        .runtime
+                        .user_computation_data(None)
+                        .map_err(NativeDemandSessionError::Effect)?,
+                );
+                let terminal_authority = updater.existing_state().await;
+                let prepared = self.prepare_accept(selected, &terminal_authority).await?;
+                drop(terminal_authority);
+                Ok::<_, NativeDemandSessionError>(prepared)
+            })
+        };
+        match prepared {
+            Ok(prepared) => self.accept_prepared(prepared),
+            Err(error) => self.abort(error),
+        }
+    }
+
+    async fn prepare_accept(
+        &self,
+        selected: NativeDemandTerminalSelection,
+        terminal_authority: &dice::DiceTransaction,
+    ) -> Result<NativeDemandPreparedAcceptance, NativeDemandSessionError> {
+        if !Arc::ptr_eq(&self.command().effects, &selected.effects) {
+            return Err(NativeDemandSessionError::ForeignEffects);
+        }
+        let (events, demands) = selected.sidecars.into_parts();
+        let (snapshot, validation) = self.command().selected_snapshot(demands)?;
+        commit_selected_native_demand_snapshot(self.command(), terminal_authority, &snapshot)
+            .await?;
+        Ok(NativeDemandPreparedAcceptance {
+            events,
+            snapshot,
+            validation,
+        })
+    }
+
+    fn accept_prepared(
+        &mut self,
+        prepared: NativeDemandPreparedAcceptance,
+    ) -> Result<CommandOutputBuffer, NativeDemandSessionError> {
+        let NativeDemandPreparedAcceptance {
+            events,
+            snapshot,
+            validation,
+        } = prepared;
+        let materializer_accept = {
+            let command = self.command();
+            command.runtime.repository_materializer.accept(
+                command.repository_session,
+                snapshot.selected.repository_requests(),
+                validation,
+            )
+        };
+        if let Err(error) = materializer_accept {
+            return self.abort(NativeDemandSessionError::Repository(error));
+        }
+        #[cfg(test)]
+        self.command()
+            .runtime
+            .native_demand_sessions
+            .record_trace(NativeDemandTestTrace::MaterializerAccepted);
+        self.phase = NativeDemandAbortPhase::Irreversible;
+
+        let replace = {
+            let command = self.command();
+            command
+                .runtime
+                .native_demand_sessions
+                .replace_accepted(command.lease, snapshot)
+        };
+        if let Err(error) = replace {
+            self.phase = NativeDemandAbortPhase::FailClosed;
+            return Err(error);
+        }
+        #[cfg(test)]
+        self.command()
+            .runtime
+            .native_demand_sessions
+            .record_trace(NativeDemandTestTrace::AcceptedSnapshotReplaced);
+        let output = events.into_output_buffer();
+        #[cfg(test)]
+        self.command()
+            .runtime
+            .native_demand_sessions
+            .record_trace(NativeDemandTestTrace::OutputBufferMoved);
+        let close = {
+            let command = self.command();
+            command.runtime.native_demand_sessions.close(command.lease)
+        };
+        if let Err(error) = close {
+            self.phase = NativeDemandAbortPhase::FailClosed;
+            return Err(error);
+        }
+        #[cfg(test)]
+        self.command()
+            .runtime
+            .native_demand_sessions
+            .record_trace(NativeDemandTestTrace::LeaseClosed);
+        self.phase = NativeDemandAbortPhase::Closed;
+        self.command = None;
+        Ok(output)
+    }
+}
+
+impl Drop for NativeDemandAbortGuard<'_> {
+    fn drop(&mut self) {
+        if self.phase != NativeDemandAbortPhase::Restorable {
+            return;
+        }
+        let _suppressed = self.suppress_attempt();
+        match self
+            .command
+            .as_mut()
+            .expect("restorable native-demand guard owns its command")
+            .discard_in_place()
+        {
+            Ok(()) => {
+                self.phase = NativeDemandAbortPhase::Closed;
+                self.command = None;
+            }
+            Err(_) => {
+                self.phase = NativeDemandAbortPhase::FailClosed;
+            }
         }
     }
 }
 
 #[allow(dead_code)]
 impl NativeDemandAttempt {
-    fn seal_retry(self) -> Result<(), NativeDemandSessionError> {
+    fn seal_retry(&self) -> Result<(), NativeDemandSessionError> {
         self.tracker
             .seal_retry()
             .map_err(NativeDemandSessionError::Effect)
     }
 
-    fn seal_terminal(self) -> Result<NativeDemandSealedAttempt, NativeDemandSessionError> {
+    fn seal_terminal(&self) -> Result<NativeDemandSealedAttempt, NativeDemandSessionError> {
         let sealed = self
             .tracker
             .seal_terminal()
             .map_err(NativeDemandSessionError::Effect)?;
         Ok(NativeDemandSealedAttempt {
-            effects: self.effects,
+            effects: self.effects.clone(),
             sealed,
         })
     }
@@ -1781,6 +2707,10 @@ impl NativeDemandAttempt {
 
 #[allow(dead_code)]
 impl NativeDemandSealedAttempt {
+    fn root_count(&self) -> usize {
+        self.sealed.root_count()
+    }
+
     async fn select(
         self,
         transaction: &dice::DiceTransaction,
@@ -1804,32 +2734,91 @@ impl NativeDemandTerminalSelection {
     }
 }
 
+async fn commit_selected_native_demand_snapshot(
+    command: &NativeDemandCommand<'_>,
+    terminal_authority: &dice::DiceTransaction,
+    snapshot: &AcceptedNativeDemandSnapshot,
+) -> Result<(), NativeDemandSessionError> {
+    #[cfg(test)]
+    if command
+        .runtime
+        .native_demand_sessions
+        .take_selected_injection_failure(command.lease)?
+    {
+        return Err(NativeDemandSessionError::Injection(anyhow::anyhow!(
+            "forced selected snapshot injection failure"
+        )));
+    }
+    let mut updater = command.runtime.dice.updater_with_data(
+        command
+            .runtime
+            .user_computation_data(None)
+            .map_err(|error| {
+                NativeDemandSessionError::Injection(anyhow::anyhow!(error.to_string()))
+            })?,
+    );
+    inject_native_demand_snapshot(
+        &mut updater,
+        command.runtime,
+        &snapshot.inputs,
+        snapshot.repository_results.clone(),
+        snapshot.path_observations.clone(),
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
+    let selected_snapshot_transaction = updater.commit().await;
+    drop(selected_snapshot_transaction);
+    // This explicit use after the selected commit makes the terminal
+    // transaction's authority lifetime part of the helper contract.
+    std::hint::black_box(terminal_authority);
+    #[cfg(test)]
+    command
+        .runtime
+        .native_demand_sessions
+        .record_trace(NativeDemandTestTrace::SelectedInjectionCommitted);
+    Ok(())
+}
+
 #[allow(dead_code)]
 fn inject_native_demand_snapshot(
     updater: &mut DiceTransactionUpdater,
     runtime: &WorkspaceRuntime,
-    generations: NativeDemandGenerationBundle,
+    inputs: &NativeDemandInputBundle,
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
 ) -> anyhow::Result<()> {
     let workspace = NormalizedAbsolutePath::new(runtime.workspace.clone())
         .context("normalizing native-demand workspace")?;
+    inject_root_module_request_inputs(
+        updater,
+        &runtime.workspace,
+        inputs.request.command_policy.clone(),
+        inputs.request.environment_policy.clone(),
+        inputs.request.lockfile_mode.clone(),
+    )
+    .context("injecting fixed root module request inputs")?;
+    inject_registry_request_inputs(
+        updater,
+        &runtime.workspace,
+        inputs.request.registry_urls.clone(),
+        inputs.generations.registry,
+    )
+    .context("injecting fixed registry request inputs")?;
     updater
         .changed_to(vec![(
             RepositoryMaterializationGenerationKey {
                 workspace: runtime.workspace.clone(),
             },
-            generations.repository,
+            inputs.generations.repository,
         )])
         .context("injecting fixed repository generation")?;
     updater
         .changed_to(vec![(
-            RegistryRequestGenerationKey {
+            NativeDemandWorkspaceRevisionKey {
                 workspace: runtime.workspace.clone(),
             },
-            generations.registry,
+            NativeDemandWorkspaceRevision(inputs.generations.workspace_revision),
         )])
-        .context("injecting fixed registry generation")?;
+        .context("injecting fixed workspace revision")?;
     updater
         .changed_to(vec![(
             RepositoryMaterializationResultEpochKey { workspace },
@@ -2140,6 +3129,706 @@ mod tests {
         })
     }
 
+    fn native_host_file_demand(path: PathBuf) -> PathObservationDemand {
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            PathObservationOperation::FileBytes,
+        )
+    }
+
+    fn synthetic_plan(
+        id: u64,
+        workspace: &NormalizedAbsolutePath,
+        repositories: impl IntoIterator<Item = Arc<RepositoryMaterializationRequest>>,
+        paths: impl IntoIterator<Item = PathObservationDemand>,
+        terminal: Result<SyntheticCommandValue, SyntheticCommandError>,
+    ) -> Arc<SyntheticCommandPlan> {
+        Arc::new(SyntheticCommandPlan {
+            id,
+            workspace: workspace.clone(),
+            repositories: repositories.into_iter().collect::<Vec<_>>().into(),
+            paths: paths.into_iter().collect::<Vec<_>>().into(),
+            terminal,
+            retry_event: Some("retry-only".into()),
+            terminal_event: Some("terminal-only".into()),
+            behavior: SyntheticRootBehavior::Normal,
+        })
+    }
+
+    fn output_text(output: &CommandOutputBuffer) -> Vec<&str> {
+        output
+            .batches()
+            .iter()
+            .flat_map(EventBatch::events)
+            .map(|event| match event {
+                EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+            })
+            .collect()
+    }
+
+    fn accepted_native_snapshot(runtime: &WorkspaceRuntime) -> AcceptedNativeDemandSnapshot {
+        runtime
+            .native_demand_sessions
+            .state
+            .lock()
+            .unwrap()
+            .accepted
+            .clone()
+    }
+
+    fn assert_current_native_snapshot(
+        runtime: &WorkspaceRuntime,
+        expected: &AcceptedNativeDemandSnapshot,
+    ) {
+        let retained = accepted_native_snapshot(runtime);
+        assert_eq!(retained.inputs, expected.inputs);
+        assert_eq!(retained.repository_results, expected.repository_results);
+        assert_eq!(retained.path_observations, expected.path_observations);
+        assert_eq!(retained.selected, expected.selected);
+        runtime.runtime.block_on(async {
+            let updater = runtime
+                .dice
+                .updater_with_data(runtime.user_computation_data(None).unwrap());
+            let mut transaction = updater.existing_state().await;
+            let workspace = runtime.workspace.clone();
+            assert_eq!(
+                transaction
+                    .compute(&NativeDemandWorkspaceRevisionKey {
+                        workspace: workspace.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                NativeDemandWorkspaceRevision(expected.inputs.generations.workspace_revision)
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RegistryRequestGenerationKey {
+                        workspace: workspace.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                expected.inputs.generations.registry
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RepositoryMaterializationGenerationKey {
+                        workspace: workspace.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                expected.inputs.generations.repository
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RootModuleCommandPolicyKey {
+                        workspace: workspace.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                slug_bzlmod_v2::RootModuleCommandPolicy::from(
+                    expected.inputs.request.command_policy.clone()
+                )
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RootModuleEnvironmentPolicyKey {
+                        workspace: workspace.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                slug_bzlmod_v2::RootModuleEnvironmentPolicy::from(
+                    expected.inputs.request.environment_policy.clone()
+                )
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RootModuleLockfileModeKey {
+                        workspace: workspace.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                slug_bzlmod_v2::RootModuleLockfileMode::from(
+                    expected.inputs.request.lockfile_mode.clone()
+                )
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RootModuleRegistryUrlsKey {
+                        workspace: workspace.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                slug_bzlmod_v2::RootModuleRegistryUrls::from(
+                    expected.inputs.request.registry_urls.clone()
+                )
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RepositoryMaterializationResultEpochKey {
+                        workspace: NormalizedAbsolutePath::new(workspace).unwrap(),
+                    })
+                    .await
+                    .unwrap(),
+                expected.repository_results
+            );
+            assert_eq!(
+                transaction.compute(&PathObservationEpochKey).await.unwrap(),
+                expected.path_observations
+            );
+        });
+    }
+
+    #[test]
+    fn synthetic_driver_enforces_strict_progress_terminal_output_and_fresh_nonreplay() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        fs::create_dir(root.join("vendor")).unwrap();
+        fs::create_dir(root.join("vendor-aux")).unwrap();
+        fs::write(root.join("first.txt"), "first").unwrap();
+        fs::write(root.join("second.txt"), "second").unwrap();
+        let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
+        let first_repo = local_native_request(&normalized, "dep+", "vendor");
+        let second_repo = local_native_request(&normalized, "aux+", "vendor-aux");
+        let first_path = native_host_file_demand(root.join("first.txt"));
+        let second_path = native_host_file_demand(root.join("second.txt"));
+        let plan = synthetic_plan(
+            100,
+            &normalized,
+            [first_repo, second_repo],
+            [first_path, second_path],
+            Ok(SyntheticCommandValue::Build("built".into())),
+        );
+        let root_key = SyntheticCommandRoot::Build(SyntheticBuildRootKey { plan });
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+
+        let first = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                root_key.clone(),
+            )
+            .unwrap();
+        assert_eq!(
+            first.terminal,
+            Ok(SyntheticCommandValue::Build("built".into()))
+        );
+        assert_eq!(first.attempts, 4);
+        assert_eq!(first.terminal_root_count, 1);
+        assert_eq!(output_text(&first.output), ["terminal-only"]);
+        assert_eq!(
+            runtime.native_demand_sessions.take_trace(),
+            [
+                NativeDemandTestTrace::SelectedInjectionCommitted,
+                NativeDemandTestTrace::TerminalTransactionDropped,
+                NativeDemandTestTrace::MaterializerAccepted,
+                NativeDemandTestTrace::AcceptedSnapshotReplaced,
+                NativeDemandTestTrace::OutputBufferMoved,
+                NativeDemandTestTrace::LeaseClosed,
+            ]
+        );
+
+        let fresh = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                root_key,
+            )
+            .unwrap();
+        assert_eq!(fresh.attempts, 1);
+        assert_eq!(fresh.terminal_root_count, 1);
+        assert!(
+            fresh.output.batches().is_empty(),
+            "a cached terminal child must not replay an earlier command's event"
+        );
+    }
+
+    #[test]
+    fn synthetic_root_identity_rejects_same_id_different_plan_reuse() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        fs::create_dir(root.join("vendor")).unwrap();
+        fs::create_dir(root.join("vendor-next")).unwrap();
+        let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let first_request = local_native_request(&normalized, "dep+", "vendor");
+        let first_plan = synthetic_plan(
+            105,
+            &normalized,
+            [first_request],
+            [],
+            Ok(SyntheticCommandValue::Build("first".into())),
+        );
+        let first = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey { plan: first_plan }),
+            )
+            .unwrap();
+        assert_eq!(
+            first.terminal,
+            Ok(SyntheticCommandValue::Build("first".into()))
+        );
+        runtime.native_demand_sessions.take_trace();
+
+        let second_request = local_native_request(&normalized, "dep+", "vendor-next");
+        let mut second_plan = synthetic_plan(
+            105,
+            &normalized,
+            [second_request.clone()],
+            [],
+            Ok(SyntheticCommandValue::Build("second".into())),
+        );
+        Arc::get_mut(&mut second_plan).unwrap().terminal_event = Some("second-event".into());
+        let second = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey { plan: second_plan }),
+            )
+            .unwrap();
+        assert_eq!(
+            second.terminal,
+            Ok(SyntheticCommandValue::Build("second".into()))
+        );
+        assert_eq!(output_text(&second.output), ["second-event"]);
+        assert_eq!(
+            accepted_native_snapshot(&runtime)
+                .selected
+                .repository_requests(),
+            &[second_request]
+        );
+    }
+
+    #[test]
+    fn synthetic_driver_has_no_retry_cap_and_accepts_complete_error_and_empty_query() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
+        let mut paths = Vec::new();
+        for index in 0..65 {
+            let path = root.join(format!("path-{index}.txt"));
+            fs::write(&path, index.to_string()).unwrap();
+            paths.push(native_host_file_demand(path));
+        }
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let long_plan = synthetic_plan(
+            110,
+            &normalized,
+            [],
+            paths,
+            Ok(SyntheticCommandValue::Build("many-paths".into())),
+        );
+        let long = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey { plan: long_plan }),
+            )
+            .unwrap();
+        assert_eq!(long.attempts, 66);
+        assert_eq!(output_text(&long.output), ["terminal-only"]);
+
+        let error_plan = synthetic_plan(
+            111,
+            &normalized,
+            [],
+            [],
+            Err(SyntheticCommandError("terminal error".into())),
+        );
+        let completed_error = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey { plan: error_plan }),
+            )
+            .unwrap();
+        assert_eq!(
+            completed_error.terminal,
+            Err(SyntheticCommandError("terminal error".into()))
+        );
+        assert_eq!(output_text(&completed_error.output), ["terminal-only"]);
+
+        let mut query_plan = synthetic_plan(
+            112,
+            &normalized,
+            [],
+            [],
+            Ok(SyntheticCommandValue::Query(Arc::from([]))),
+        );
+        Arc::get_mut(&mut query_plan).unwrap().terminal_event = None;
+        let query = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                SyntheticCommandRoot::Query(SyntheticQueryRootKey { plan: query_plan }),
+            )
+            .unwrap();
+        assert_eq!(
+            query.terminal,
+            Ok(SyntheticCommandValue::Query(Arc::from([])))
+        );
+        assert_eq!(query.attempts, 1);
+        assert_eq!(query.terminal_root_count, 1);
+        assert!(query.output.batches().is_empty());
+
+        let mut reopened = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        reopened.discard().unwrap();
+    }
+
+    #[test]
+    fn synthetic_driver_unwind_restores_the_complete_accepted_input_snapshot() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        fs::create_dir(root.join("vendor")).unwrap();
+        fs::write(root.join("probe.txt"), "probe").unwrap();
+        let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
+        let request = local_native_request(&normalized, "dep+", "vendor");
+        let path = native_host_file_demand(root.join("probe.txt"));
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let accepted_inputs = NativeDemandRequestInputBundle {
+            command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
+            environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
+                Some("all"),
+            )
+            .unwrap(),
+            lockfile_mode: LockfileMode::Refresh,
+            registry_urls: RegistryUrls::new(["https://accepted.example/"]),
+        };
+        let accepted_plan = synthetic_plan(
+            120,
+            &normalized,
+            [request],
+            [path],
+            Ok(SyntheticCommandValue::Build("accepted".into())),
+        );
+        runtime
+            .drive_synthetic_command(
+                accepted_inputs.clone(),
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey {
+                    plan: accepted_plan,
+                }),
+            )
+            .unwrap();
+        let before = runtime
+            .native_demand_sessions
+            .state
+            .lock()
+            .unwrap()
+            .accepted
+            .clone();
+
+        let rejected_inputs = NativeDemandRequestInputBundle {
+            command_policy: BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+                .unwrap(),
+            lockfile_mode: LockfileMode::Off,
+            registry_urls: RegistryUrls::new(["https://rejected.example/"]),
+        };
+        let mut panic_plan = synthetic_plan(
+            121,
+            &normalized,
+            [],
+            [],
+            Ok(SyntheticCommandValue::Build("unreachable".into())),
+        );
+        Arc::get_mut(&mut panic_plan).unwrap().behavior = SyntheticRootBehavior::PanicAfterInputs;
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            runtime
+                .drive_synthetic_command(
+                    rejected_inputs,
+                    SyntheticCommandRoot::Build(SyntheticBuildRootKey { plan: panic_plan }),
+                )
+                .unwrap();
+        }));
+        assert!(panic.is_err());
+
+        let after = runtime
+            .native_demand_sessions
+            .state
+            .lock()
+            .unwrap()
+            .accepted
+            .clone();
+        assert_eq!(after.inputs, before.inputs);
+        assert_eq!(after.repository_results, before.repository_results);
+        assert_eq!(after.path_observations, before.path_observations);
+        assert_eq!(after.selected, before.selected);
+        assert_eq!(after.inputs.request, accepted_inputs);
+
+        runtime.runtime.block_on(async {
+            let updater = runtime
+                .dice
+                .updater_with_data(runtime.user_computation_data(None).unwrap());
+            let mut transaction = updater.existing_state().await;
+            assert_eq!(
+                transaction
+                    .compute(&NativeDemandWorkspaceRevisionKey {
+                        workspace: root.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                NativeDemandWorkspaceRevision(before.inputs.generations.workspace_revision)
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RegistryRequestGenerationKey {
+                        workspace: root.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                before.inputs.generations.registry
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RepositoryMaterializationGenerationKey {
+                        workspace: root.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                before.inputs.generations.repository
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RootModuleCommandPolicyKey {
+                        workspace: root.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                slug_bzlmod_v2::RootModuleCommandPolicy::from(
+                    accepted_inputs.command_policy.clone()
+                )
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RootModuleEnvironmentPolicyKey {
+                        workspace: root.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                slug_bzlmod_v2::RootModuleEnvironmentPolicy::from(
+                    accepted_inputs.environment_policy.clone()
+                )
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RootModuleLockfileModeKey {
+                        workspace: root.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                slug_bzlmod_v2::RootModuleLockfileMode::from(accepted_inputs.lockfile_mode.clone())
+            );
+            assert_eq!(
+                transaction
+                    .compute(&RootModuleRegistryUrlsKey {
+                        workspace: root.clone(),
+                    })
+                    .await
+                    .unwrap(),
+                slug_bzlmod_v2::RootModuleRegistryUrls::from(accepted_inputs.registry_urls.clone())
+            );
+        });
+
+        let mut reopened = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        reopened.discard().unwrap();
+    }
+
+    #[test]
+    fn synthetic_compute_cancellation_restores_before_explicit_abort_and_reopens() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        fs::create_dir(root.join("vendor")).unwrap();
+        fs::write(root.join("probe.txt"), "probe").unwrap();
+        let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
+        let request = local_native_request(&normalized, "dep+", "vendor");
+        let path = native_host_file_demand(root.join("probe.txt"));
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let accepted_inputs = NativeDemandRequestInputBundle {
+            command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
+            environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
+                Some("all"),
+            )
+            .unwrap(),
+            lockfile_mode: LockfileMode::Refresh,
+            registry_urls: RegistryUrls::new(["https://accepted.example/"]),
+        };
+        let accepted_plan = synthetic_plan(
+            125,
+            &normalized,
+            [request],
+            [path],
+            Ok(SyntheticCommandValue::Build("accepted".into())),
+        );
+        runtime
+            .drive_synthetic_command(
+                accepted_inputs,
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey {
+                    plan: accepted_plan,
+                }),
+            )
+            .unwrap();
+        let before = accepted_native_snapshot(&runtime);
+        runtime.native_demand_sessions.take_trace();
+
+        let mut cancelled_plan = synthetic_plan(
+            126,
+            &normalized,
+            [],
+            [],
+            Ok(SyntheticCommandValue::Build("unreachable".into())),
+        );
+        Arc::get_mut(&mut cancelled_plan).unwrap().behavior =
+            SyntheticRootBehavior::PendForCancellation;
+        let error = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey {
+                    plan: cancelled_plan,
+                }),
+            )
+            .unwrap_err();
+        assert!(matches!(error, NativeDemandSessionError::Computation(_)));
+        assert_eq!(
+            runtime.native_demand_sessions.take_trace(),
+            [NativeDemandTestTrace::AttemptTransactionDroppedBeforeAbort]
+        );
+        assert_current_native_snapshot(&runtime, &before);
+
+        let mut reopened = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        reopened.discard().unwrap();
+    }
+
+    #[test]
+    fn synthetic_selected_injection_failure_restores_and_exposes_no_output() {
+        let workspace = tempfile::tempdir().unwrap();
+        let root = workspace.path().canonicalize().unwrap();
+        let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
+        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let accepted_plan = synthetic_plan(
+            130,
+            &normalized,
+            [],
+            [],
+            Ok(SyntheticCommandValue::Build("accepted".into())),
+        );
+        runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey {
+                    plan: accepted_plan,
+                }),
+            )
+            .unwrap();
+        let before = accepted_native_snapshot(&runtime);
+        runtime.native_demand_sessions.take_trace();
+
+        runtime
+            .native_demand_sessions
+            .force_next_selected_injection_failure();
+        let rejected_plan = synthetic_plan(
+            131,
+            &normalized,
+            [],
+            [],
+            Ok(SyntheticCommandValue::Build("must-not-publish".into())),
+        );
+        let error = runtime
+            .drive_synthetic_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                SyntheticCommandRoot::Build(SyntheticBuildRootKey {
+                    plan: rejected_plan,
+                }),
+            )
+            .unwrap_err();
+        assert!(matches!(error, NativeDemandSessionError::Injection(_)));
+        assert_eq!(
+            runtime.native_demand_sessions.take_trace(),
+            [
+                NativeDemandTestTrace::TerminalTransactionDropped,
+                NativeDemandTestTrace::AttemptTransactionDroppedBeforeAbort,
+            ]
+        );
+        assert_current_native_snapshot(&runtime, &before);
+        let mut reopened = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        reopened.discard().unwrap();
+    }
+
+    #[test]
+    fn synthetic_irreversible_owner_failures_are_workspace_fail_closed_without_output() {
+        for fail_close in [false, true] {
+            let workspace = tempfile::tempdir().unwrap();
+            let root = workspace.path().canonicalize().unwrap();
+            let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
+            let runtime = WorkspaceRuntime::new(&root).unwrap();
+            if fail_close {
+                runtime.native_demand_sessions.force_next_close_failure();
+            } else {
+                runtime
+                    .native_demand_sessions
+                    .force_next_replace_accepted_failure();
+            }
+            let plan = synthetic_plan(
+                if fail_close { 141 } else { 140 },
+                &normalized,
+                [],
+                [],
+                Ok(SyntheticCommandValue::Build("must-not-publish".into())),
+            );
+            let error = runtime
+                .drive_synthetic_command(
+                    NativeDemandRequestInputBundle::normalized_initial(),
+                    SyntheticCommandRoot::Build(SyntheticBuildRootKey { plan }),
+                )
+                .unwrap_err();
+            assert!(matches!(error, NativeDemandSessionError::StaleLease));
+            let trace = runtime.native_demand_sessions.take_trace();
+            let expected: &[NativeDemandTestTrace] = if fail_close {
+                &[
+                    NativeDemandTestTrace::SelectedInjectionCommitted,
+                    NativeDemandTestTrace::TerminalTransactionDropped,
+                    NativeDemandTestTrace::MaterializerAccepted,
+                    NativeDemandTestTrace::AcceptedSnapshotReplaced,
+                    NativeDemandTestTrace::OutputBufferMoved,
+                ]
+            } else {
+                &[
+                    NativeDemandTestTrace::SelectedInjectionCommitted,
+                    NativeDemandTestTrace::TerminalTransactionDropped,
+                    NativeDemandTestTrace::MaterializerAccepted,
+                ]
+            };
+            assert_eq!(trace, expected);
+            assert!(matches!(
+                runtime.begin_native_demand_command(),
+                Err(NativeDemandSessionError::Busy)
+            ));
+
+            // Materializer acceptance consumed its token and returned that
+            // owner to Idle. Only the workspace owner deliberately remains
+            // Busy after the irreversible bookkeeping fault.
+            let materializer = runtime.repository_materializer.begin().unwrap();
+            runtime
+                .repository_materializer
+                .discard(materializer)
+                .unwrap();
+        }
+    }
+
     #[test]
     fn runtime_user_data_factory_installs_one_passive_or_eventful_tracker() {
         let workspace = tempfile::tempdir().unwrap();
@@ -2217,7 +3906,10 @@ mod tests {
         );
         let runtime = WorkspaceRuntime::new(&root).unwrap();
         let preflight = runtime.begin_native_demand_command().unwrap();
-        assert_eq!(preflight.generations(), preflight.command.generations);
+        assert_eq!(
+            preflight.generations(),
+            preflight.command.inputs.generations
+        );
         assert_eq!(
             preflight.repository_results(),
             &RepositoryMaterializationResultEpoch::new(normalized.clone(), []).unwrap()
@@ -2233,13 +3925,13 @@ mod tests {
             path: path.clone(),
             generations: fixed,
         };
-        let command = preflight.into_command();
+        let mut command = NativeDemandAbortGuard::new(preflight.into_command());
 
-        let first = command.begin_attempt().unwrap();
+        command.begin_attempt().unwrap();
         let first_need = runtime.runtime.block_on(async {
             let mut updater = runtime
                 .dice
-                .updater_with_data(command.attempt_user_computation_data(&first).unwrap());
+                .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
             let first_outcome = transaction.compute(&key).await.unwrap();
@@ -2249,7 +3941,7 @@ mod tests {
                     panic!("first attempt unexpectedly completed: {value:?}")
                 }
             };
-            first.seal_retry().unwrap();
+            command.seal_retry().unwrap();
             drop(transaction);
             first_need
         });
@@ -2258,20 +3950,20 @@ mod tests {
             first_need.path_observations().unwrap().demands(),
             &[path.clone()]
         );
-        assert!(command.path_observations.get(&path).is_none());
-        let (command, progress) = command.progress(&first_need).unwrap();
+        assert!(command.command().path_observations.get(&path).is_none());
+        let progress = command.progress(&first_need).unwrap();
         assert_eq!(progress, NativeDemandProgress::Repositories);
         assert!(
-            command.path_observations.get(&path).is_none(),
+            command.command().path_observations.get(&path).is_none(),
             "repository priority must not observe a simultaneous path Need"
         );
-        assert_eq!(command.generations, fixed);
+        assert_eq!(command.command().inputs.generations, fixed);
 
-        let second = command.begin_attempt().unwrap();
+        command.begin_attempt().unwrap();
         let second_need = runtime.runtime.block_on(async {
             let mut updater = runtime
                 .dice
-                .updater_with_data(command.attempt_user_computation_data(&second).unwrap());
+                .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
             let second_outcome = transaction.compute(&key).await.unwrap();
@@ -2286,19 +3978,19 @@ mod tests {
                 second_need.path_observations().unwrap().demands(),
                 &[path.clone()]
             );
-            second.seal_retry().unwrap();
+            command.seal_retry().unwrap();
             drop(transaction);
             second_need
         });
-        let (command, progress) = command.progress(&second_need).unwrap();
+        let progress = command.progress(&second_need).unwrap();
         assert_eq!(progress, NativeDemandProgress::Paths);
-        assert_eq!(command.generations, fixed);
+        assert_eq!(command.command().inputs.generations, fixed);
 
-        let terminal = command.begin_attempt().unwrap();
-        let sidecars = runtime.runtime.block_on(async {
+        command.begin_attempt().unwrap();
+        let prepared = runtime.runtime.block_on(async {
             let mut updater = runtime
                 .dice
-                .updater_with_data(command.attempt_user_computation_data(&terminal).unwrap());
+                .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
             let terminal_outcome = transaction.compute(&key).await.unwrap();
@@ -2307,7 +3999,7 @@ mod tests {
                 slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
                     if value.as_ref() == "complete"
             ));
-            let sealed = terminal.seal_terminal().unwrap();
+            let sealed = command.seal_terminal().unwrap();
             let sidecars = sealed.select(&transaction).await.unwrap();
             assert_eq!(
                 sidecars.sidecars().demands().repository_requests(),
@@ -2317,11 +4009,15 @@ mod tests {
                 sidecars.sidecars().demands().unscoped_paths(),
                 &[path.clone()]
             );
+            let prepared = command
+                .prepare_accept(sidecars, &transaction)
+                .await
+                .unwrap();
             drop(terminal_outcome);
             drop(transaction);
-            sidecars
+            prepared
         });
-        let events = command.accept(sidecars).unwrap();
+        let events = command.accept_prepared(prepared).unwrap();
         assert!(events.batches().is_empty());
 
         let accepted = runtime.begin_native_demand_command().unwrap();
@@ -2345,19 +4041,19 @@ mod tests {
             path: path.clone(),
             generations: accepted.generations(),
         };
-        let accepted = accepted.into_command();
-        let probe = accepted.begin_attempt().unwrap();
+        let mut accepted = NativeDemandAbortGuard::new(accepted.into_command());
+        accepted.begin_attempt().unwrap();
         runtime.runtime.block_on(async {
             let mut updater = runtime
                 .dice
-                .updater_with_data(accepted.attempt_user_computation_data(&probe).unwrap());
+                .updater_with_data(accepted.attempt_user_computation_data().unwrap());
             accepted.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
             assert!(matches!(
                 transaction.compute(&next_key).await.unwrap(),
                 slug_bzlmod_v2::SourcePreparationOutcome::Complete(_)
             ));
-            probe.seal_retry().unwrap();
+            accepted.seal_retry().unwrap();
             drop(transaction);
         });
 
@@ -2371,9 +4067,15 @@ mod tests {
                 slug_workspace_v2::NeedPathObservations::singleton(unprocessed_path.clone()),
             ))
             .unwrap();
+        let error = accepted.progress(&inherited_with_path).unwrap_err();
         assert!(matches!(
-            accepted.progress(&inherited_with_path),
-            Err(NativeDemandSessionError::RepositoryInternalNonProgress)
+            error,
+            NativeDemandSessionError::RepositoryInternalNonProgress
+        ));
+        let restored_error = accepted.abort::<()>(error).unwrap_err();
+        assert!(matches!(
+            restored_error,
+            NativeDemandSessionError::RepositoryInternalNonProgress
         ));
 
         let replacement = local_native_request(&normalized, "dep+", "vendor-next");
@@ -2384,8 +4086,8 @@ mod tests {
                 .get(&unprocessed_path)
                 .is_none()
         );
-        let reopened = reopened.into_command();
-        let (reopened, progress) = reopened
+        let mut reopened = NativeDemandAbortGuard::new(reopened.into_command());
+        let progress = reopened
             .progress(&slug_bzlmod_v2::SourcePreparationNeeds::repository(
                 replacement.as_ref().clone(),
             ))
@@ -2398,9 +4100,15 @@ mod tests {
                     slug_workspace_v2::NeedPathObservations::singleton(unprocessed_path.clone()),
                 ))
                 .unwrap();
+        let error = reopened.progress(&conflict_with_path).unwrap_err();
         assert!(matches!(
-            reopened.progress(&conflict_with_path),
-            Err(NativeDemandSessionError::ConflictingRepository(repo)) if repo.as_str() == "dep+"
+            &error,
+            NativeDemandSessionError::ConflictingRepository(repo) if repo.as_str() == "dep+"
+        ));
+        let restored_error = reopened.abort::<()>(error).unwrap_err();
+        assert!(matches!(
+            restored_error,
+            NativeDemandSessionError::ConflictingRepository(repo) if repo.as_str() == "dep+"
         ));
 
         // Both failure paths restored the accepted A/path snapshot before
@@ -2413,8 +4121,8 @@ mod tests {
                 .get(&unprocessed_path)
                 .is_none()
         );
-        let restored = restored.into_command();
-        let (restored, progress) = restored
+        let mut restored = NativeDemandAbortGuard::new(restored.into_command());
+        let progress = restored
             .progress(&slug_bzlmod_v2::SourcePreparationNeeds::repository(
                 replacement.as_ref().clone(),
             ))
@@ -2422,22 +4130,29 @@ mod tests {
         assert_eq!(progress, NativeDemandProgress::Repositories);
         restored.discard().unwrap();
 
-        let repeated_path = runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command();
-        assert!(matches!(
-            repeated_path.progress(&slug_bzlmod_v2::SourcePreparationNeeds::path(
+        let mut repeated_path = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        let error = repeated_path
+            .progress(&slug_bzlmod_v2::SourcePreparationNeeds::path(
                 slug_workspace_v2::NeedPathObservations::singleton(path.clone()),
-            )),
-            Err(NativeDemandSessionError::PathInternalNonProgress)
+            ))
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            NativeDemandSessionError::PathInternalNonProgress
         ));
-        runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command()
-            .discard()
-            .unwrap();
+        repeated_path.abort::<()>(error).unwrap_err();
+        let mut final_command = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        final_command.discard().unwrap();
     }
 
     #[test]
@@ -2457,38 +4172,42 @@ mod tests {
         );
         let runtime = WorkspaceRuntime::new(&root).unwrap();
 
-        let initial = runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command();
-        let (initial, _) = initial
+        let mut initial = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        initial
             .progress(&slug_bzlmod_v2::SourcePreparationNeeds::repository(
                 accepted_request.as_ref().clone(),
             ))
             .unwrap();
-        let (initial, _) = initial
+        initial
             .progress(&slug_bzlmod_v2::SourcePreparationNeeds::path(
                 slug_workspace_v2::NeedPathObservations::singleton(path.clone()),
             ))
             .unwrap();
         initial
-            .accept_selected(SelectedWorkspaceDemands::for_test(
+            .accept_selected_for_test(SelectedWorkspaceDemands::for_test(
                 Arc::from([accepted_request.clone()]),
                 Arc::from([path.clone()]),
             ))
             .unwrap();
 
-        let failing = runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command();
-        let (failing, _) = failing
+        let mut failing = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        failing
             .progress(&slug_bzlmod_v2::SourcePreparationNeeds::repository(
                 unselected_request.as_ref().clone(),
             ))
             .unwrap();
         let error = failing
-            .accept_selected(SelectedWorkspaceDemands::for_test_with_validation(
+            .accept_selected_for_test(SelectedWorkspaceDemands::for_test_with_validation(
                 Arc::from([accepted_request.clone()]),
                 unselected_request,
                 path.clone(),
@@ -2503,29 +4222,36 @@ mod tests {
 
         let restored = runtime.begin_native_demand_command().unwrap();
         assert!(restored.path_observations().get(&path).is_some());
-        let restored = restored.into_command();
+        let mut restored = NativeDemandAbortGuard::new(restored.into_command());
+        let error = restored
+            .progress(&slug_bzlmod_v2::SourcePreparationNeeds::repository(
+                accepted_request.as_ref().clone(),
+            ))
+            .unwrap_err();
         assert!(matches!(
-            restored.progress(&slug_bzlmod_v2::SourcePreparationNeeds::repository(
-                accepted_request.as_ref().clone()
-            )),
-            Err(NativeDemandSessionError::RepositoryInternalNonProgress)
+            error,
+            NativeDemandSessionError::RepositoryInternalNonProgress
         ));
-        runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command()
-            .discard()
-            .unwrap();
+        restored.abort::<()>(error).unwrap_err();
+        let mut final_command = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        final_command.discard().unwrap();
     }
 
     #[test]
     fn native_demand_restoration_failure_keeps_lease_and_materializer_fail_closed() {
         let workspace = tempfile::tempdir().unwrap();
         let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
-        let command = runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command();
+        let mut command = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
         runtime
             .native_demand_sessions
             .force_next_restoration_failure();
@@ -2564,20 +4290,22 @@ mod tests {
         let workspace = tempfile::tempdir().unwrap();
         let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
         let foreign_runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
-        let command = runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command();
-        let attempt = command.begin_attempt().unwrap();
+        let mut command = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        command.begin_attempt().unwrap();
 
         runtime.runtime.block_on(async {
             let mut updater = runtime
                 .dice
-                .updater_with_data(command.attempt_user_computation_data(&attempt).unwrap());
+                .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
             assert!(transaction.compute(&NativeTerminalProbeKey).await.unwrap());
-            let sealed = attempt.seal_terminal().unwrap();
+            let sealed = command.seal_terminal().unwrap();
 
             let updater = foreign_runtime
                 .dice
@@ -2589,7 +4317,9 @@ mod tests {
         });
         command.discard().unwrap();
         let reopened = runtime.begin_native_demand_command().unwrap();
-        reopened.into_command().discard().unwrap();
+        NativeDemandAbortGuard::new(reopened.into_command())
+            .discard()
+            .unwrap();
     }
 
     #[test]
@@ -2597,38 +4327,57 @@ mod tests {
         let workspace = tempfile::tempdir().unwrap();
         let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
         let foreign_runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
-        let foreign = foreign_runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command();
-        let attempt = foreign.begin_attempt().unwrap();
+        let mut foreign = NativeDemandAbortGuard::new(
+            foreign_runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        foreign.begin_attempt().unwrap();
         let foreign_selection = foreign_runtime.runtime.block_on(async {
             let mut updater = foreign_runtime
                 .dice
-                .updater_with_data(foreign.attempt_user_computation_data(&attempt).unwrap());
+                .updater_with_data(foreign.attempt_user_computation_data().unwrap());
             foreign.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
             assert!(transaction.compute(&NativeTerminalProbeKey).await.unwrap());
-            let sealed = attempt.seal_terminal().unwrap();
+            let sealed = foreign.seal_terminal().unwrap();
             let selected = sealed.select(&transaction).await.unwrap();
             drop(transaction);
             selected
         });
 
-        let command = runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command();
-        assert!(matches!(
-            command.accept(foreign_selection),
-            Err(NativeDemandSessionError::ForeignEffects)
-        ));
-        runtime
-            .begin_native_demand_command()
-            .unwrap()
-            .into_command()
-            .discard()
-            .unwrap();
+        let mut command = NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        );
+        let error = runtime.runtime.block_on(async {
+            let updater = runtime
+                .dice
+                .updater_with_data(runtime.user_computation_data(None).unwrap());
+            let transaction = updater.existing_state().await;
+            let error = match command
+                .prepare_accept(foreign_selection, &transaction)
+                .await
+            {
+                Ok(_) => panic!("foreign command sidecars unexpectedly prepared"),
+                Err(error) => error,
+            };
+            drop(transaction);
+            error
+        });
+        assert!(matches!(error, NativeDemandSessionError::ForeignEffects));
+        command.abort::<()>(error).unwrap_err();
+        NativeDemandAbortGuard::new(
+            runtime
+                .begin_native_demand_command()
+                .unwrap()
+                .into_command(),
+        )
+        .discard()
+        .unwrap();
         foreign.discard().unwrap();
     }
 
