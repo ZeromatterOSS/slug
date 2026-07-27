@@ -1,0 +1,28 @@
+[
+    filegroup(
+        name = "bare_" + path,
+        srcs = [path],
+    )
+    for path in glob(["*"])
+]
+[
+    filegroup(
+        name = "txt_" + path,
+        srcs = [path],
+    )
+    for path in glob(["*.txt"])
+]
+[
+    filegroup(
+        name = "dot_" + path,
+        srcs = [path],
+    )
+    for path in glob([".*.txt"])
+]
+[
+    filegroup(
+        name = "multi_" + path,
+        srcs = [path],
+    )
+    for path in glob(["m*id*end.txt"])
+]

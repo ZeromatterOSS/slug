@@ -15,12 +15,15 @@
         "//pkg:all"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "valid_callable_forms",
-      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:dirs_subdir\n//pkg:empty_allowed\n//pkg:empty_default_include_allowed\n//pkg:exclude_alpha.txt\n//pkg:global_alpha.txt\n//pkg:global_skip.txt\n//pkg:macro_macro_caller.txt\n//pkg:tuple_alpha.txt\n//pkg:tuple_nested_child.txt\n//pkg:tuple_skip.txt",
-      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260722-214332-268028-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260722-214406-268661-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: f839d078-4765-491b-a296-e7fc45d2803f\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 37a8daca-9d75-4bde-adea-d760ef4f45ca\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:dirs_subdir\n//pkg:empty_allowed\n//pkg:empty_default_include_allowed\n//pkg:exclude_alpha.txt\n//pkg:global_alpha.txt\n//pkg:global_skip.txt\n//pkg:macro_macro_caller.txt\n//pkg:tuple_alpha.txt\n//pkg:tuple_nested_child.txt\n//pkg:tuple_skip.txt\n"
     },
     {
@@ -38,12 +41,15 @@
         "//default_empty:all"
       ],
       "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "omitted_allow_empty_uses_bazel9_default",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/default_empty/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob(),\nError in glob: all files in the glob have been excluded, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: package contains errors: default_empty: Traceback (most recent call last):\n\tFile \"<workspace>/default_empty/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob(),\nError in glob: all files in the glob have been excluded, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: Evaluation of query \"//default_empty:all\" failed",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 09e5a8d5-a410-40f6-87d1-3b8db635080d\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260722-214406-268661-bazel/workspace/default_empty/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob(),\nError in glob: all files in the glob have been excluded, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: package contains errors: default_empty: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260722-214406-268661-bazel/workspace/default_empty/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob(),\nError in glob: all files in the glob have been excluded, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: Evaluation of query \"//default_empty:all\" failed\n",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 36915ff5-e238-484b-9040-e099cc885efa\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260727-075210-4150482-bazel/workspace/default_empty/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob(),\nError in glob: all files in the glob have been excluded, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: package contains errors: default_empty: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260727-075210-4150482-bazel/workspace/default_empty/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob(),\nError in glob: all files in the glob have been excluded, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: Evaluation of query \"//default_empty:all\" failed\n",
       "stdout": ""
     },
     {
@@ -61,12 +67,15 @@
         "//empty_false:all"
       ],
       "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "explicit_allow_empty_false_rejects_empty_match",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/empty_false/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"missing*.txt\"], allow_empty = False),\nError in glob: glob pattern 'missing*.txt' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: package contains errors: empty_false: Traceback (most recent call last):\n\tFile \"<workspace>/empty_false/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"missing*.txt\"], allow_empty = False),\nError in glob: glob pattern 'missing*.txt' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: Evaluation of query \"//empty_false:all\" failed",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 0f75b3e7-3d9e-4bf6-b85e-16f68be07e8a\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260722-214406-268661-bazel/workspace/empty_false/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"missing*.txt\"], allow_empty = False),\nError in glob: glob pattern 'missing*.txt' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: package contains errors: empty_false: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260722-214406-268661-bazel/workspace/empty_false/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"missing*.txt\"], allow_empty = False),\nError in glob: glob pattern 'missing*.txt' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: Evaluation of query \"//empty_false:all\" failed\n",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 0ba7b3c3-98c3-4d1f-9adc-c069a7285723\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260727-075210-4150482-bazel/workspace/empty_false/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"missing*.txt\"], allow_empty = False),\nError in glob: glob pattern 'missing*.txt' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: package contains errors: empty_false: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260727-075210-4150482-bazel/workspace/empty_false/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"missing*.txt\"], allow_empty = False),\nError in glob: glob pattern 'missing*.txt' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: Evaluation of query \"//empty_false:all\" failed\n",
       "stdout": ""
     },
     {
@@ -84,13 +93,42 @@
         "//type_error:all"
       ],
       "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "allow_empty_requires_bool",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/type_error/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"*.txt\"], allow_empty = 5),\nError in glob: expected boolean for argument `allow_empty`, got `5`\nERROR: package contains errors: type_error: Traceback (most recent call last):\n\tFile \"<workspace>/type_error/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"*.txt\"], allow_empty = 5),\nError in glob: expected boolean for argument `allow_empty`, got `5`\nERROR: Evaluation of query \"//type_error:all\" failed",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 1f89cefb-d19e-46f0-b74c-ddaeeace3753\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260722-214406-268661-bazel/workspace/type_error/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"*.txt\"], allow_empty = 5),\nError in glob: expected boolean for argument `allow_empty`, got `5`\nERROR: package contains errors: type_error: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260722-214406-268661-bazel/workspace/type_error/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"*.txt\"], allow_empty = 5),\nError in glob: expected boolean for argument `allow_empty`, got `5`\nERROR: Evaluation of query \"//type_error:all\" failed\n",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 08e7d349-77d3-4fd3-b5df-df5186933f8f\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260727-075210-4150482-bazel/workspace/type_error/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"*.txt\"], allow_empty = 5),\nError in glob: expected boolean for argument `allow_empty`, got `5`\nERROR: package contains errors: type_error: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-callable-contract/20260727-075210-4150482-bazel/workspace/type_error/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"*.txt\"], allow_empty = 5),\nError in glob: expected boolean for argument `allow_empty`, got `5`\nERROR: Evaluation of query \"//type_error:all\" failed\n",
       "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//segment_matcher:all"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//segment_matcher:all"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "simple_segment_matcher",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//segment_matcher:bare_.hidden.txt\n//segment_matcher:bare_BUILD.bazel\n//segment_matcher:bare_m-left-id-right-end.txt\n//segment_matcher:dot_.hidden.txt\n//segment_matcher:multi_m-left-id-right-end.txt\n//segment_matcher:txt_m-left-id-right-end.txt",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 84f4607c-f700-46d0-a41e-53ed3300138a\nLoading: 0 packages loaded\n",
+      "stdout": "//segment_matcher:bare_.hidden.txt\n//segment_matcher:bare_BUILD.bazel\n//segment_matcher:bare_m-left-id-right-end.txt\n//segment_matcher:dot_.hidden.txt\n//segment_matcher:multi_m-left-id-right-end.txt\n//segment_matcher:txt_m-left-id-right-end.txt\n"
     }
   ],
   "fixture": "glob-callable-contract",

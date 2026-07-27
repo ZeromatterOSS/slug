@@ -1,8 +1,8 @@
 [fixture]
 name = "glob-callable-contract"
-description = "Bazel 9.2.0 glob callable defaults, sequence inputs, filtering, directory results, macro context, and diagnostics."
+description = "Bazel 9.2.0 glob callable defaults, sequence inputs, filtering, directory results, simple terminal-segment matching, macro context, and diagnostics."
 comparison = "message_shape"
-oracle_notes = "Focused M1 callable contract oracle; full pattern syntax, symlinks, external repositories, and query semantics are out of scope."
+oracle_notes = "Focused M1 callable and simple terminal-segment matcher oracle; broader pattern syntax, ordering, raw names, symlinks, invalidation, package boundaries, external repositories, and query semantics are out of scope."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -14,8 +14,12 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/packages/semantics/BuildLanguageOptions.java#incompatible_disallow_empty_glob",
   "src/test/java/com/google/devtools/build/lib/packages/PackageFactoryTest.java#testGlobDirectoryExclusion",
   "src/test/java/com/google/devtools/build/lib/skyframe/PackageFunctionTest.java#testGlobAllowEmpty_paramValueMustBeBoolean",
+  "src/main/java/com/google/devtools/build/lib/vfs/UnixGlob.java:212-248",
+  "src/main/java/com/google/devtools/build/lib/vfs/UnixGlob.java:257-312",
+  "src/test/java/com/google/devtools/build/lib/skyframe/GlobTestBase.java:248-285",
+  "src/test/java/com/google/devtools/build/lib/skyframe/GlobTestBase.java:499-511",
 ]
-translation_notes = "Rule names encode sorted glob results so query output captures the callable contract without depending on analysis. Separate invalid packages isolate default-empty, explicit allow_empty=False, and type-error diagnostics."
+translation_notes = "Rule names encode sorted glob results so query output captures the callable contract and bounded simple-segment membership without depending on analysis or glob result order. Separate invalid packages isolate default-empty, explicit allow_empty=False, and type-error diagnostics."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture glob-callable-contract --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture glob-callable-contract --tool bazel --bazel /usr/bin/bazel"
 
@@ -49,3 +53,9 @@ name = "allow_empty_requires_bool"
 argv = ["query", "//type_error:all"]
 expected_exit = 7
 stderr_patterns = ["expected boolean for argument `allow_empty`, got `5`"]
+
+[[commands]]
+name = "simple_segment_matcher"
+argv = ["query", "//segment_matcher:all"]
+expected_exit = 0
+stdout_patterns = ["\\A//segment_matcher:bare_\\.hidden\\.txt\\n//segment_matcher:bare_BUILD\\.bazel\\n//segment_matcher:bare_m-left-id-right-end\\.txt\\n//segment_matcher:dot_\\.hidden\\.txt\\n//segment_matcher:multi_m-left-id-right-end\\.txt\\n//segment_matcher:txt_m-left-id-right-end\\.txt\\Z"]
