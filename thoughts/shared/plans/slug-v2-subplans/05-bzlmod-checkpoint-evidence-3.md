@@ -7544,3 +7544,42 @@ returned `ACCEPT`; no Rust, Cargo, fixture, or production state changed.
 
 Next packet: implement only
 `WP-5-m1-host-registry-io-bridge` inside the exact one-file scope above.
+
+#### Host Registry IO bridge implementation status
+
+**Status:** Accepted after terminal latest-diff review on 2026-07-26.
+
+The bridge changes only `app/slug_bzlmod_v2/src/registry_dice.rs`, with 833
+additions and 96 deletions inside the accepted 850/120 cap. It factors the
+closed four-case execution plan, adds dormant crate-private Host remote and
+typed local entrypoints, rejects Host remote Ignore before generation,
+capability, or IO, and preserves legacy Off by selecting unverified fetch
+directly before lockfile inspection. Fetch, verify, replay, rejection, and
+local execution retain the accepted generation-before/after-IO ordering and
+exact typed values and failures. No public item, production key, dependency,
+consumer, activation, direct filesystem owner, cache, lock, map, set, or
+interner was added.
+
+Four inline tests prove the complete Host matrix, legacy translation,
+dependency and precedence order, exact values and typed equality, and
+discriminating retained retry/stickiness. The focused registry-sensitive
+source-preparation slice passed 5 tests. The complete bzlmod surface passed
+201 unit plus 184 integration tests; loading passed 54 and core passed 115;
+all doctests passed, and GNU-Windows built all 20 corresponding test
+executables. Formatting, diff, archive, exact scope/growth, credential,
+public-API baseline, call-site, and forbidden-edge gates passed.
+
+The first terminal review round accepted production semantics but required
+stronger evidence for complete result fields, remote error equality,
+successful unverified refetch, and checksum-mismatch stickiness. One bounded
+test-only correction made every transition discriminating. Source/parity and
+architecture/orchestration terminal latest-diff rereviews then returned
+`ACCEPT`.
+
+Next packet: design only
+`WP-5-m1-host-registry-file-vendor-oracle`. Reuse the accepted registry
+fixtures where possible and freeze checksum-present vendored hit with no
+network request, fatal vendored-read failure with no fallback, non-vendored
+or missing/wrong-kind vendor-path network fallback, and checksum-absent
+network behavior before designing or implementing the separate private Host
+registry-file owner.
