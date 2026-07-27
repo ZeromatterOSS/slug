@@ -2292,6 +2292,28 @@ archive, daemon cleanup, exact allowlist, and preservation of all 12 prior
 rows passed. Independent review returned `ACCEPT`; external repositories remain
 outside this root-repository slice.
 
+## Rank output contract replanned (2026-07-27)
+
+Bazel 9.2 `MinrankOutputFormatter` walks the strong-component graph by
+insertion-ordered successor layers for auto output; `MaxrankOutputFormatter`
+also preserves component iteration order within equal ranks. A one-rule native
+probe gave `rank_start` both a direct edge to `linear_end` and the longer
+`linear_start -> linear_mid -> linear_end` path. Bazel minrank auto printed
+`linear_start` before `linear_end`, matching source dependency order, while
+full order printed `linear_end` first by label. Cycles correctly shared rank
+zero and placed their exit at rank one.
+
+V2 `SelectedQueryGraph` sorts every successor list by selected-node index in
+`loading_environment.rs`, so the original dependency order required by exact
+auto rank output is no longer retained. Recovering it requires a deliberate
+retained-graph or output-completion boundary, outside the formatter-only
+packet. The six-row draft and one-rule probe asset were removed; no Rust,
+fixture, dependency, graph, DICE, or Stage 9 change remains.
+
+`WP-8-m3-query-label-output` is next: accept Bazel's explicit `--output=label`
+as the existing default label renderer and reject the prototype-only
+`--output=text` with Bazel 9's invalid-format diagnostic.
+
 ## `tests` / `visible` feasibility ranking accepted (2026-07-23)
 
 Bazel 9.2.0 `TestsFunction` is the smaller truthful residual query vertical.
