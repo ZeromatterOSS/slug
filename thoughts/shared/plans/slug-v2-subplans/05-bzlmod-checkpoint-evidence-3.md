@@ -11732,3 +11732,160 @@ projection accepts may a later design compose multi-segment and standalone
 results. Regular-or-special BUILD/`.bzl` acquisition, parser activation,
 transactional evaluator retry, include/exclude and `allow_empty` composition,
 callable diagnostics, and production publication remain separate.
+
+### Host package-boundary oracle design
+
+Status: **ACCEPT** for design-only
+`WP-5-m1-loading-host-package-boundary-oracle-design` on 2026-07-27 after
+independent source/fixture review and correction of the inventory arithmetic
+to 15 regular files at net +5. This packet changes only this owner-plan
+section. It authorizes neither fixture nor generated-oracle edits;
+implementation must follow the exact contract below as
+`WP-5-m1-loading-host-package-boundary-oracle`.
+
+Pinned Bazel 9.2.0 release commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` is the source of truth.
+`DirectoryDirentProducer.java:76-116` checks the repository ignore matcher
+before requesting `PackageLookupValue`, stops on that match, stops on a
+successful package, and continues every unsuccessful lookup.
+`PackageLookupFunction.java:91-122,157-180,253-325` validates first, maps
+`--deleted_packages` to the unsuccessful deleted value, obtains ignore
+policy, and finds an actual package from BUILD markers. The unsuccessful
+`packageExists() == false` taxonomy is
+`PackageLookupValue.java:49-68,220-389`.
+`IgnoredSubdirectoriesFunction.java:75-102,127-199` reads repository-root
+`.bazelignore` prefixes, while `IgnoredSubdirectories.java:169-185` retains
+the matching prefixes. `GlobsFunction.java:113-139` supplies that policy to
+glob work. `PackageOptions.java:94-111` uses the comma-separated package-name
+converter for `--deleted_packages`. The cross-repository path is latent for
+this observation: `BazelSkyframeExecutorConstants.java:29-33` selects ERROR,
+but `LocalRepositoryLookupFunction.java:27-35` always returns the main
+repository. Thus nested `MODULE.bazel` without BUILD is an ordinary
+continuing directory, not a repository boundary.
+
+The retained independent Bazel 9.2 observation is sufficient: `/usr/bin/bazel`
+accepts the command options after `query` and comma-separated package names;
+removing the stale `pkg/subpkg/BUILD.bazel` makes
+`//pkg:subpkg/hidden.txt` visible. No new fixture, generated output, or
+behavior probe belongs in this design packet.
+
+#### Exact replacement fixture contract
+
+Replace both stale commands with exactly one unmutated query row named
+`root_package_boundary_six_state_projection`. The command is exactly:
+
+```text
+query --noshow_progress --deleted_packages=pkg/deleted,pkg/ignored_deleted --output=label_kind 'labels(srcs, //pkg:globbed)'
+```
+
+Its `fixture.toml` argv serialization is exactly
+`["query", "--noshow_progress", "--deleted_packages=pkg/deleted,pkg/ignored_deleted", "--output=label_kind", "labels(srcs, //pkg:globbed)"]`.
+It uses fixture and command comparison `exact`, exits zero, has no mutation,
+no environment additions, and an empty manifest. Its raw stdout is exactly
+these three lines plus the final newline:
+
+```text
+source file //pkg:deleted/deleted.txt
+source file //pkg:nested_module/nested.txt
+source file //pkg:ordinary/ordinary.txt
+```
+
+The generated `normalized_stdout` contains the same three lines without a
+final newline because the harness normalizer strips surrounding whitespace.
+`fixture.toml` must contain provenance `bazel_release = "9.2.0"`, the pinned
+commit, the source anchors above, a translation note tying the six directory
+states to their visible/absent labels, and these exact generation and
+verification commands respectively:
+
+```text
+python3 -B -m tools.v2_oracle run --fixture glob-package-boundaries --tool bazel --bazel /usr/bin/bazel --update-expected
+python3 -B -m tools.v2_oracle run --fixture glob-package-boundaries --tool bazel --bazel /usr/bin/bazel
+```
+
+The command's `stdout_patterns` must be anchored to precisely that normalized
+three-line output with `\A` and `\Z`, without a trailing-newline expression,
+and no stderr pattern may claim unstable startup text.
+`expected/oracle.json` is generated only by the generation command; it owns
+the one exact normalized command record, including empty manifest and
+normalized stderr, while its raw `stdout` retains the final newline.
+Hand-writing it, retaining either old record, or weakening either the fixture
+or command comparator to `message_shape` or `semantic` is forbidden.
+
+The sole `pkg/BUILD.bazel` content is exactly
+`filegroup(name = "globbed", srcs = glob(["**/*.txt"]))\n`; it has no
+`exclude`, `allow_empty`, helper, or second glob. Therefore one row
+simultaneously discriminates all and only these states: ordinary
+`pkg/ordinary` continues; BUILD-bearing `pkg/subpkg` stops; BUILD-bearing
+`pkg/deleted` continues by deleted-package treatment; `.bazelignore` stops
+`pkg/ignored`; ignored-plus-deleted `pkg/ignored_deleted` stops (the
+ignore-first proof); and `pkg/nested_module/MODULE.bazel` without BUILD
+continues.
+
+The implementation asset allowlist is exact:
+
+- Retain and rewrite `fixture.toml` and generated `expected/oracle.json` for
+  the one exact row; retain `workspace/MODULE.bazel` with
+  `module(name = "glob_package_boundaries")`; retain and rewrite
+  `workspace/pkg/BUILD.bazel` to the sole glob above; retain
+  `workspace/pkg/subpkg/BUILD.bazel` exactly as
+  `# subpackage boundary\n` and `workspace/pkg/subpkg/hidden.txt` with
+  `hidden\n` as its excluded witness.
+- Add `workspace/.bazelignore` containing exactly
+  `pkg/ignored\npkg/ignored_deleted\n`; add
+  `workspace/pkg/ordinary/ordinary.txt` containing `ordinary\n`; add
+  `workspace/pkg/deleted/BUILD.bazel` containing exactly
+  `# deleted package boundary\n` and `deleted.txt` containing `deleted\n`;
+  add `workspace/pkg/ignored/ignored.txt` containing `ignored\n`; add
+  `workspace/pkg/ignored_deleted/BUILD.bazel` containing
+  `# ignored and deleted package boundary\n` and `ignored_deleted.txt`
+  containing `ignored_deleted\n`; and add
+  `workspace/pkg/nested_module/MODULE.bazel` containing
+  `module(name = "nested_module_boundary")\n` plus `nested.txt` containing
+  `nested\n`.
+- Delete `workspace/BUILD.bazel`, `workspace/pkg/keep.txt`,
+  `workspace/pkg/skip.txt`, and `workspace/pkg/sub/child.txt`; remove the
+  now-empty `pkg/sub` directory. Delete both stale commands
+  `query_exported_glob_files` and
+  `allow_empty_false_reports_subpackage_boundary_miss`, their mutation and
+  every explicit-exclude, keep/skip, sub-directory, and duplicate
+  `allow_empty` diagnostic claim. `glob-callable-contract` remains the sole
+  owner of that diagnostic evidence.
+
+No other fixture, root workspace, module, `.bzl`, harness, generated asset,
+or source path may change. The resulting fixture has exactly 15 regular files,
+zero symlinks, one command, and at most 120 newline-counted lines: at most 45
+in `expected/oracle.json`, 38 in `fixture.toml`, five in `pkg/BUILD.bazel`,
+and one line in every sentinel/marker text file. The only generated file is
+the oracle JSON. Relative to the stale 10-file/103-line/two-command fixture,
+the design estimate is +5 regular files, zero symlinks, no more than +17
+lines, and -1 command; implementation records the measured result instead.
+
+#### Required evidence and stop gates
+
+Generate once with pinned `/usr/bin/bazel`, then run two complete, exact
+replays from distinct fresh absolute run roots. Both replays must match the
+generated oracle byte-for-normalized-field under exact comparison and retain
+the three stdout lines in the stated Bazel order. Run the focused and full
+oracle-harness tests, fixture schema/listing and Python compilation checks,
+fixture asset/row/mutation inventory, exact per-file and aggregate cap checks,
+and `git diff --check`. Protect every other fixture and every harness path as
+unchanged. Before and after all Bazel runs, clean stale `slugd` and Bazel
+processes associated with the runs; do not inspect, print, copy, or record
+any Bazel RC, BuildBuddy credential, home configuration, run-root absolute
+path, or derived secret.
+
+This is oracle packet two after fixture-growth checkpoint `e2cc891d` (whose
+tree was 1,314 regular files, 24 symlinks, and 39,304 lines). Even the capped
+result remains below five packets, 100 files, and 10,000 lines; no growth
+review is due unless measured scope unexpectedly crosses a threshold.
+
+Stop and replan on a pinned-source contradiction; any label other than the
+three exact lines; a nonempty manifest; command mutation; stale-row or
+duplicate-allow-empty retention; asset/cap expansion; protected fixture or
+harness change; replay drift; process/credential/path leak; an ignored
+directory continuing; a deleted BUILD-bearing directory stopping; a nested
+module stopping; or a need to broaden the six-state claim. Do not run Rust or
+Cargo, edit DICE, Host owners, loading consumers, parser/evaluator, recursive
+traversal, native-Windows support, a new fixture, or Stage 9. The exact next
+implementation packet after this design accepts is
+`WP-5-m1-loading-host-package-boundary-oracle`.
