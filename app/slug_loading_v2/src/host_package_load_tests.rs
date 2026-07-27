@@ -16,7 +16,6 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
-use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_events_v2::CaptureEvaluationEvents;
@@ -35,8 +34,9 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 use starlark_map::small_map::SmallMap;
 
-use super::HostPackageLoadKey;
 use super::resolve_host_load_label;
+use crate::LoadingPreparationOutcome;
+use crate::RootPackageLoadKey;
 use crate::cycle_detector::bzl_load_cycle_detector;
 
 fn workspace() -> NormalizedAbsolutePath {
@@ -212,8 +212,8 @@ async fn transaction_with_policy(
     updater.commit().await
 }
 
-fn package_key() -> HostPackageLoadKey {
-    HostPackageLoadKey::new(workspace(), PackagePath::parse("pkg").unwrap())
+fn package_key() -> RootPackageLoadKey {
+    RootPackageLoadKey::new(workspace(), PackagePath::parse("pkg").unwrap())
 }
 
 fn event_texts(batch: &EventBatch) -> Vec<&str> {
@@ -227,10 +227,10 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
         .collect()
 }
 
-type HostPackageOutcome = <HostPackageLoadKey as Key>::Value;
+type HostPackageOutcome = <RootPackageLoadKey as Key>::Value;
 
 fn target_names(outcome: &HostPackageOutcome) -> Vec<&str> {
-    let SourcePreparationOutcome::Complete(value) = outcome else {
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
         panic!("complete Host source epoch returned Need");
     };
     value
@@ -244,7 +244,7 @@ fn target_names(outcome: &HostPackageOutcome) -> Vec<&str> {
 }
 
 fn terminal_error(outcome: &HostPackageOutcome) -> String {
-    let SourcePreparationOutcome::Complete(value) = outcome else {
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
         panic!("complete Host source epoch returned Need");
     };
     value.as_ref().as_ref().unwrap_err().to_string()
@@ -303,7 +303,7 @@ async fn host_package_need_is_transient_and_root_anchor_precedes_source() {
     let mut transaction = transaction(&dice, EpochBuilder::default().build(), false, None).await;
     let key = package_key();
     let outcome = transaction.compute(&key).await.unwrap();
-    let SourcePreparationOutcome::Need(need) = &outcome else {
+    let LoadingPreparationOutcome::Need(need) = &outcome else {
         panic!("empty Host epoch did not request the root observation");
     };
     assert_eq!(
@@ -312,8 +312,19 @@ async fn host_package_need_is_transient_and_root_anchor_precedes_source() {
             .as_path(),
         std::path::Path::new("/")
     );
-    assert!(!HostPackageLoadKey::validity(&outcome));
-    assert!(!HostPackageLoadKey::equality(&outcome, &outcome));
+    assert_ne!(
+        key,
+        RootPackageLoadKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+            PackagePath::parse("pkg").unwrap(),
+        )
+    );
+    assert_ne!(
+        key,
+        RootPackageLoadKey::new(workspace(), PackagePath::parse("other").unwrap())
+    );
+    assert!(!RootPackageLoadKey::validity(&outcome));
+    assert!(!RootPackageLoadKey::equality(&outcome, &outcome));
 }
 
 #[tokio::test]
@@ -332,7 +343,7 @@ async fn host_package_loads_bzl_and_owns_only_local_complete_events() {
     )
     .await;
     let outcome = transaction.compute(&package_key()).await.unwrap();
-    let SourcePreparationOutcome::Complete(value) = outcome else {
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
         panic!("complete Host source epoch returned Need");
     };
     let package = value.as_ref().as_ref().unwrap();

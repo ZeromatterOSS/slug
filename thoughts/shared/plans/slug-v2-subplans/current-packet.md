@@ -1,35 +1,32 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-loading-typed-propagation`
+Packet: `WP-5-m1-analysis-typed-propagation-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted root loading typed-propagation design; accepted dormant
-Host package/`.bzl` keys and public bzlmod preparation envelope
-Validation tier: public cross-crate API/representation
+Evidence: accepted public typed root-loading boundary; existing configured
+analysis and retained command-root owners
+Validation tier: design/source/call-graph and exact allowlist checks
 
-Implementation files:
+Design file:
 
-- `app/slug_loading_v2/src/bzl_module.rs`
-- `app/slug_loading_v2/src/lib.rs`
-- `app/slug_loading_v2/src/host_package_load_tests.rs`
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Result: rename the accepted private `HostPackageLoadKey` to public
-`RootPackageLoadKey`, expose its terminal error as an opaque
-`RootPackageLoadError`, and root-export loading aliases for the shared bzlmod
-preparation outcome and Need. Preserve the exact compute body, key identity,
-value, equality/validity, events, diagnostics, and display prefix.
+Result: inspect the configured-analysis call graph and freeze the smallest
+typed boundary that preserves loading/analysis Need through one analysis root.
+Name exact key/value identity, deterministic Need propagation, event ownership,
+production and test allowlists, and lifecycle/downstream coverage. Resolve the
+current analysis crate's development-only bzlmod dependency without leaking a
+second preparation envelope.
 
-Add no Cargo/dependency change, wrapper key/value/allocation, nested private
-error export, query/analysis/core/CLI/server caller, external repository or
-directory-discovery migration, fixture, oracle, materialization, runtime
-driver, legacy change, JVM, Java bytecode, or Bazel delegation. Stop on a
-fourth implementation file or any change to the accepted compute semantics.
+Keep the critical path toward the typed query root narrow. Add no Rust,
+fixture, oracle, CLI/server/runtime activation, external repository or
+toolchain/configuration breadth, execution/materialization, JVM, Java bytecode,
+or Bazel delegation. Stop if the design cannot preserve typed Need without
+expanding into those surfaces.
 
-Validate focused root-export/key/equality/Need/event/lifecycle tests, direct
-`slug_query_v2` compile coverage, GNU-Windows no-run linkage, formatting,
-`git diff --check`, archive status, and exact scope/export/no-caller/Cargo/
-dependency/legacy/IO/blocking/JVM guards. Obtain one terminal independent
-implementation review.
+Validate source/call-site citations, exact design-only scope, Markdown links,
+`git diff --check`, archive status, and manifest/canonical agreement. Obtain
+one independent reserved-boundary design review before scheduling Rust.

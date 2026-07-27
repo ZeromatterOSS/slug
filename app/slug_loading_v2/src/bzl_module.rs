@@ -1001,8 +1001,7 @@ impl fmt::Display for HostBzlModuleEvalKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-#[allow(dead_code)]
-pub(crate) enum HostPackageLoadError {
+enum RootPackageLoadErrorInner {
     RootModule(RootModuleLoadingAnchorError),
     Source(RootPackageSourceError),
     Input(HostSourceInputError),
@@ -1023,19 +1022,34 @@ pub(crate) enum HostPackageLoadError {
     Attempt(HostPackageAttemptError),
 }
 
-impl fmt::Display for HostPackageLoadError {
+/// Terminal root-package loading failure.
+///
+/// The concrete loading stages remain private so downstream typed callers
+/// cannot couple themselves to Host implementation details.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RootPackageLoadError {
+    inner: RootPackageLoadErrorInner,
+}
+
+impl RootPackageLoadError {
+    fn new(inner: RootPackageLoadErrorInner) -> Self {
+        Self { inner }
+    }
+}
+
+impl fmt::Display for RootPackageLoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::RootModule(error) => error.fmt(f),
-            Self::Source(error) => error.fmt(f),
-            Self::Input(error) => error.fmt(f),
-            Self::Parse { package, message } => {
+        match &self.inner {
+            RootPackageLoadErrorInner::RootModule(error) => error.fmt(f),
+            RootPackageLoadErrorInner::Source(error) => error.fmt(f),
+            RootPackageLoadErrorInner::Input(error) => error.fmt(f),
+            RootPackageLoadErrorInner::Parse { package, message } => {
                 write!(f, "parsing BUILD file for //{package}: {message}")
             }
-            Self::LoadLabel { package, error } => {
+            RootPackageLoadErrorInner::LoadLabel { package, error } => {
                 write!(f, "resolving a load in //{package}: {error}")
             }
-            Self::Bzl {
+            RootPackageLoadErrorInner::Bzl {
                 origin,
                 load,
                 error,
@@ -1057,28 +1071,27 @@ impl fmt::Display for HostPackageLoadError {
                     write!(f, "loading `{load}`: {error}")
                 }
             }
-            Self::Attempt(error) => write!(f, "{error:?}"),
+            RootPackageLoadErrorInner::Attempt(error) => write!(f, "{error:?}"),
         }
     }
 }
 
-impl std::error::Error for HostPackageLoadError {}
+impl std::error::Error for RootPackageLoadError {}
 
+/// DICE identity for loading one root-repository package through Host inputs.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-#[allow(dead_code)]
-pub(crate) struct HostPackageLoadKey {
+pub struct RootPackageLoadKey {
     workspace: NormalizedAbsolutePath,
     package: PackagePath,
 }
 
-#[allow(dead_code)]
-impl HostPackageLoadKey {
-    fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+impl RootPackageLoadKey {
+    pub fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
         Self { workspace, package }
     }
 }
 
-impl fmt::Display for HostPackageLoadKey {
+impl fmt::Display for RootPackageLoadKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "host-package-load:{}//{}", self.workspace, self.package)
     }
@@ -1263,16 +1276,15 @@ impl Key for HostBzlModuleEvalKey {
     }
 }
 
-#[allow(dead_code)]
-fn host_package_complete(
-    result: Result<LoadedPackage, HostPackageLoadError>,
-) -> SourcePreparationOutcome<Arc<Result<LoadedPackage, HostPackageLoadError>>> {
+fn root_package_complete(
+    result: Result<LoadedPackage, RootPackageLoadError>,
+) -> SourcePreparationOutcome<Arc<Result<LoadedPackage, RootPackageLoadError>>> {
     SourcePreparationOutcome::Complete(Arc::new(result))
 }
 
 #[async_trait]
-impl Key for HostPackageLoadKey {
-    type Value = SourcePreparationOutcome<Arc<Result<LoadedPackage, HostPackageLoadError>>>;
+impl Key for RootPackageLoadKey {
+    type Value = SourcePreparationOutcome<Arc<Result<LoadedPackage, RootPackageLoadError>>>;
 
     async fn compute(
         &self,
@@ -1295,8 +1307,8 @@ impl Key for HostPackageLoadKey {
                 }
                 SourcePreparationOutcome::Complete(anchor) => {
                     if let Err(error) = anchor.as_ref() {
-                        return host_package_complete(Err(HostPackageLoadError::RootModule(
-                            error.clone(),
+                        return root_package_complete(Err(RootPackageLoadError::new(
+                            RootPackageLoadErrorInner::RootModule(error.clone()),
                         )));
                     }
                 }
@@ -1314,8 +1326,8 @@ impl Key for HostPackageLoadKey {
                 SourcePreparationOutcome::Complete(source) => match source.as_ref() {
                     Ok(source) => source.dupe(),
                     Err(error) => {
-                        return host_package_complete(Err(HostPackageLoadError::Source(
-                            error.clone(),
+                        return root_package_complete(Err(RootPackageLoadError::new(
+                            RootPackageLoadErrorInner::Source(error.clone()),
                         )));
                     }
                 },
@@ -1323,13 +1335,17 @@ impl Key for HostPackageLoadKey {
             let source_text = match host_source_text(&source) {
                 Ok(source) => source,
                 Err(error) => {
-                    return host_package_complete(Err(HostPackageLoadError::Input(error)));
+                    return root_package_complete(Err(RootPackageLoadError::new(
+                        RootPackageLoadErrorInner::Input(error),
+                    )));
                 }
             };
             let source_name = match host_source_name(&source) {
                 Ok(name) => name,
                 Err(error) => {
-                    return host_package_complete(Err(HostPackageLoadError::Input(error)));
+                    return root_package_complete(Err(RootPackageLoadError::new(
+                        RootPackageLoadErrorInner::Input(error),
+                    )));
                 }
             };
             let ast = match AstModule::parse_with_string_encoding(
@@ -1340,10 +1356,12 @@ impl Key for HostPackageLoadKey {
             ) {
                 Ok(ast) => ast,
                 Err(error) => {
-                    return host_package_complete(Err(HostPackageLoadError::Parse {
-                        package: self.package.clone(),
-                        message: Arc::from(error.to_string()),
-                    }));
+                    return root_package_complete(Err(RootPackageLoadError::new(
+                        RootPackageLoadErrorInner::Parse {
+                            package: self.package.clone(),
+                            message: Arc::from(error.to_string()),
+                        },
+                    )));
                 }
             };
             let mut loaded_modules = Vec::new();
@@ -1352,10 +1370,12 @@ impl Key for HostPackageLoadKey {
                 let label = match resolve_host_load_label(&self.package, &load) {
                     Ok(label) => label,
                     Err(error) => {
-                        return host_package_complete(Err(HostPackageLoadError::LoadLabel {
-                            package: self.package.clone(),
-                            error,
-                        }));
+                        return root_package_complete(Err(RootPackageLoadError::new(
+                            RootPackageLoadErrorInner::LoadLabel {
+                                package: self.package.clone(),
+                                error,
+                            },
+                        )));
                     }
                 };
                 let child = HostBzlModuleEvalKey::new(self.workspace.dupe(), label.clone());
@@ -1373,7 +1393,7 @@ impl Key for HostPackageLoadKey {
                                 .copied()
                                 .map(char::from)
                                 .collect();
-                            return host_package_complete(Err(HostPackageLoadError::Bzl {
+                            let inner = RootPackageLoadErrorInner::Bzl {
                                 origin: Arc::from(if self.package.as_str().is_empty() {
                                     build_name
                                 } else {
@@ -1382,7 +1402,8 @@ impl Key for HostPackageLoadKey {
                                 load: Arc::from(load),
                                 label,
                                 error: Arc::new(error.clone()),
-                            }));
+                            };
+                            return root_package_complete(Err(RootPackageLoadError::new(inner)));
                         }
                     },
                 };
@@ -1408,12 +1429,9 @@ impl Key for HostPackageLoadKey {
                 SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
                 SourcePreparationOutcome::Complete(terminal) => {
                     event_batch = Some(terminal.event_batch.clone());
-                    host_package_complete(
-                        terminal
-                            .result
-                            .clone()
-                            .map_err(HostPackageLoadError::Attempt),
-                    )
+                    root_package_complete(terminal.result.clone().map_err(|error| {
+                        RootPackageLoadError::new(RootPackageLoadErrorInner::Attempt(error))
+                    }))
                 }
             }
         }

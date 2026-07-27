@@ -12781,3 +12781,19 @@ oracle, materialization, runtime driver, JVM, Java bytecode, or Bazel
 delegation. Stop if Rust requires changing the accepted key identity/value,
 exposing a nested private error, adding a fourth implementation file, or
 converting Need to an error.
+
+#### Root loading typed-propagation implementation status
+
+Status: **ACCEPT** for `WP-5-m1-loading-typed-propagation` on 2026-07-27
+after one terminal independent implementation review.
+
+The three-file visibility-only patch root-exports `RootPackageLoadKey`, its
+opaque terminal error, and the shared preparation outcome/Need aliases. It
+adds no wrapper or caller and preserves the accepted compute, identity,
+equality/validity, event, display, and diagnostic behavior. Focused tests pass
+4/4; direct `slug_query_v2` compile coverage and loading/query GNU-Windows
+no-run linkage pass. Formatting, diff/archive, exact scope/export/no-caller/
+Cargo/dependency/legacy/IO/blocking/JVM guards pass.
+
+Next design only `WP-5-m1-analysis-typed-propagation-design`, bounded to the
+minimum typed analysis boundary required before the query command-root design.
