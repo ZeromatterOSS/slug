@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicU64;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 
@@ -11,14 +12,20 @@ use dice::ActivationData;
 use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::DiceTransaction;
 use dice::DynKey;
+use dice::Key;
 use dice::UserComputationData;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
+use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::VisibilitySource;
+use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
@@ -32,14 +39,27 @@ use slug_query_v2::QueryNodeKind;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
+use slug_query_v2::QueryPreparationOutcome;
+use slug_query_v2::RootQueryCommandKey;
 use slug_query_v2::SubtreePackageSetKey;
 use slug_query_v2::UnconfiguredPackageGraphKey;
 use slug_query_v2::evaluate_loading_query;
 use slug_query_v2::evaluate_loading_query_with_policy;
 use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
+use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathLstat;
+use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationDemand;
+use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationEpochKey;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathObservationOperation;
+use slug_workspace_v2::PathObservationResult;
+use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
+use starlark_map::small_map::SmallMap;
 
 fn scratch() -> PathBuf {
     static NEXT_SCRATCH: AtomicU64 = AtomicU64::new(0);
@@ -3556,5 +3576,368 @@ async fn path_queries_reuse_dice_graphs_and_invalidate_only_demanded_closure() {
         events
             .iter()
             .all(|(identity, _)| !matches!(identity, QueryKeyIdentity::SubtreePackageSet(_)))
+    );
+}
+
+#[derive(Default)]
+struct RootQueryEpochBuilder {
+    entries: SmallMap<PathObservationDemand, PathObservationResult>,
+}
+
+impl RootQueryEpochBuilder {
+    fn demand(path: &str, operation: PathObservationOperation) -> PathObservationDemand {
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            operation,
+        )
+    }
+
+    fn node(&mut self, path: &str, kind: PathNodeKind, variant: i64) {
+        self.entries.insert(
+            Self::demand(path, PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, variant, variant, variant, variant, 0o755,
+            ))),
+        );
+    }
+
+    fn directory(&mut self, path: &str, variant: i64) {
+        self.node(path, PathNodeKind::Directory, variant);
+    }
+
+    fn missing(&mut self, path: &str) {
+        self.entries.insert(
+            Self::demand(path, PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Missing),
+        );
+    }
+
+    fn file(&mut self, path: &str, source: &str, variant: i64) {
+        self.node(path, PathNodeKind::RegularFile, variant);
+        self.entries.insert(
+            Self::demand(path, PathObservationOperation::FileBytes),
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                source.as_bytes(),
+            ))),
+        );
+    }
+
+    fn base(variant: i64) -> Self {
+        let mut builder = Self::default();
+        builder.directory("/", variant);
+        builder.directory("/workspace", variant);
+        builder.file("/workspace/MODULE.bazel", "", variant);
+        builder.missing("/workspace/REPO.bazel");
+        builder.missing("/workspace/.bazelignore");
+        builder
+    }
+
+    fn package(&mut self, name: &str, source: &str, variant: i64) {
+        self.directory(&format!("/workspace/{name}"), variant);
+        self.file(&format!("/workspace/{name}/BUILD.bazel"), source, variant);
+    }
+
+    fn rules(&mut self, implementation: &str, variant: i64) {
+        self.package("rules", "", variant);
+        self.file(
+            "/workspace/rules/defs.bzl",
+            &format!("def make(name):\n    native.{implementation}(name = name)\n"),
+            variant,
+        );
+    }
+
+    fn deleted_rules(&mut self, variant: i64) {
+        self.package("rules", "", variant);
+        self.missing("/workspace/rules/defs.bzl");
+    }
+
+    fn build(self) -> PathObservationEpoch {
+        PathObservationEpoch::new(self.entries).unwrap()
+    }
+}
+
+fn root_query_workspace() -> NormalizedAbsolutePath {
+    NormalizedAbsolutePath::new("/workspace").unwrap()
+}
+
+#[derive(Default)]
+struct RootAnchorTracker {
+    activations: AtomicUsize,
+}
+
+impl ActivationTracker for RootAnchorTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        _deps: &mut dyn Iterator<Item = &DynKey>,
+        _activation: ActivationData,
+    ) {
+        if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
+            self.activations.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+async fn root_query_transaction(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+    tracker: Arc<RootAnchorTracker>,
+) -> DiceTransaction {
+    let user_data = UserComputationData {
+        cycle_detector: Some(bzl_load_cycle_detector()),
+        activation_tracker: Some(tracker),
+        ..Default::default()
+    };
+    let mut updater = dice.updater_with_data(user_data);
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            root_query_workspace(),
+            [root_query_workspace()],
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        root_query_workspace().as_path(),
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    updater.commit().await
+}
+
+fn root_query_key(source: &str) -> RootQueryCommandKey {
+    RootQueryCommandKey::new(
+        root_query_workspace(),
+        source,
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+        QueryOutputCompletion::Standard,
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    for invalid in ["deps(", "attr(name, value, //first:t)"] {
+        assert!(
+            RootQueryCommandKey::new(
+                root_query_workspace(),
+                invalid,
+                QueryOrder::Auto,
+                QueryPolicy::default(),
+                QueryOutputCompletion::Standard,
+            )
+            .is_err()
+        );
+    }
+    let empty_key = root_query_key("set()");
+    let variants = [
+        RootQueryCommandKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+            "set()",
+            QueryOrder::Auto,
+            QueryPolicy::default(),
+            QueryOutputCompletion::Standard,
+        )
+        .unwrap(),
+        RootQueryCommandKey::new(
+            root_query_workspace(),
+            "set(//first:t)",
+            QueryOrder::Auto,
+            QueryPolicy::default(),
+            QueryOutputCompletion::Standard,
+        )
+        .unwrap(),
+        RootQueryCommandKey::new(
+            root_query_workspace(),
+            "set()",
+            QueryOrder::Full,
+            QueryPolicy::default(),
+            QueryOutputCompletion::Standard,
+        )
+        .unwrap(),
+        RootQueryCommandKey::new(
+            root_query_workspace(),
+            "set()",
+            QueryOrder::Auto,
+            QueryPolicy {
+                strict_test_suite: true,
+            },
+            QueryOutputCompletion::Standard,
+        )
+        .unwrap(),
+        RootQueryCommandKey::new(
+            root_query_workspace(),
+            "set()",
+            QueryOrder::Auto,
+            QueryPolicy::default(),
+            QueryOutputCompletion::LabelKind,
+        )
+        .unwrap(),
+    ];
+    assert!(variants.iter().all(|variant| variant != &empty_key));
+
+    let mut no_anchor = root_query_transaction(
+        &dice,
+        PathObservationEpoch::new(SmallMap::new()).unwrap(),
+        tracker.clone(),
+    )
+    .await;
+    let empty_need = no_anchor.compute(&empty_key).await.unwrap();
+    assert!(matches!(empty_need, QueryPreparationOutcome::Need(_)));
+    assert!(!RootQueryCommandKey::validity(&empty_need));
+    assert!(!RootQueryCommandKey::equality(&empty_need, &empty_need));
+
+    let mut base = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::base(1).build(),
+        tracker.clone(),
+    )
+    .await;
+    let empty = base.compute(&empty_key).await.unwrap();
+    let QueryPreparationOutcome::Complete(empty_result) = &empty else {
+        panic!("valid empty query did not complete after its root anchor");
+    };
+    assert!(empty_result.as_ref().as_ref().unwrap().labels.is_empty());
+    assert!(RootQueryCommandKey::validity(&empty));
+    assert!(RootQueryCommandKey::equality(&empty, &empty));
+    assert!(tracker.activations.load(Ordering::Relaxed) >= 2);
+
+    let lazy_key = root_query_key("//first:t union //later:t");
+    let lazy_need = base.compute(&lazy_key).await.unwrap();
+    let QueryPreparationOutcome::Need(needs) = &lazy_need else {
+        panic!("missing first package escaped as a semantic QueryError");
+    };
+    let paths = needs
+        .path_observations()
+        .unwrap()
+        .demands()
+        .iter()
+        .map(|demand| demand.path().as_path())
+        .collect::<Vec<_>>();
+    assert!(paths.contains(&Path::new("/workspace/first")));
+    assert!(!paths.contains(&Path::new("/workspace/later")));
+
+    let mut complete_epoch = RootQueryEpochBuilder::base(2);
+    complete_epoch.rules("filegroup", 2);
+    complete_epoch.package(
+        "first",
+        "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
+        2,
+    );
+    complete_epoch.package("later", "filegroup(name = \"t\")\n", 2);
+    let mut complete = root_query_transaction(&dice, complete_epoch.build(), tracker.clone()).await;
+    let result = complete.compute(&lazy_key).await.unwrap();
+    let QueryPreparationOutcome::Complete(query_result) = &result else {
+        panic!("complete typed root query returned Need");
+    };
+    assert_eq!(
+        query_result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//first:t", "//later:t"]
+    );
+    assert!(RootQueryCommandKey::equality(&result, &result));
+
+    let full_key = RootQueryCommandKey::new(
+        root_query_workspace(),
+        "set(//later:t //first:t)",
+        QueryOrder::Full,
+        QueryPolicy::default(),
+        QueryOutputCompletion::Standard,
+    )
+    .unwrap();
+    let QueryPreparationOutcome::Complete(full) = complete.compute(&full_key).await.unwrap() else {
+        panic!("Full order returned Need")
+    };
+    assert_eq!(
+        full.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//later:t", "//first:t"]
+    );
+
+    let QueryPreparationOutcome::Complete(loadfiles) = complete
+        .compute(&root_query_key("loadfiles(//first:t)"))
+        .await
+        .unwrap()
+    else {
+        panic!("loadfiles returned Need")
+    };
+    assert_eq!(
+        loadfiles.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//rules:defs.bzl"]
+    );
+
+    let kind_key = RootQueryCommandKey::new(
+        root_query_workspace(),
+        "//first:t",
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+        QueryOutputCompletion::LabelKind,
+    )
+    .unwrap();
+    let QueryPreparationOutcome::Complete(v1) = complete.compute(&kind_key).await.unwrap() else {
+        panic!("kind returned Need")
+    };
+    assert_eq!(
+        v1.as_ref().as_ref().unwrap().label_kind_stdout(),
+        "filegroup rule //first:t\n"
+    );
+
+    let mut edited_epoch = RootQueryEpochBuilder::base(3);
+    edited_epoch.rules("test_suite", 3);
+    edited_epoch.package(
+        "first",
+        "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
+        3,
+    );
+    let mut edited = root_query_transaction(&dice, edited_epoch.build(), tracker.clone()).await;
+    let QueryPreparationOutcome::Complete(v2) = edited.compute(&kind_key).await.unwrap() else {
+        panic!("edit returned Need")
+    };
+    assert_eq!(
+        v2.as_ref().as_ref().unwrap().label_kind_stdout(),
+        "test_suite rule //first:t\n"
+    );
+
+    let mut deleted_epoch = RootQueryEpochBuilder::base(4);
+    deleted_epoch.deleted_rules(4);
+    deleted_epoch.package(
+        "first",
+        "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
+        4,
+    );
+    let mut deleted = root_query_transaction(&dice, deleted_epoch.build(), tracker.clone()).await;
+    let QueryPreparationOutcome::Complete(deleted) = deleted.compute(&kind_key).await.unwrap()
+    else {
+        panic!("delete returned Need")
+    };
+    assert!(deleted.as_ref().is_err());
+
+    let mut restored_epoch = RootQueryEpochBuilder::base(5);
+    restored_epoch.rules("filegroup", 5);
+    restored_epoch.package(
+        "first",
+        "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
+        5,
+    );
+    let mut restored = root_query_transaction(&dice, restored_epoch.build(), tracker).await;
+    let QueryPreparationOutcome::Complete(restored) = restored.compute(&kind_key).await.unwrap()
+    else {
+        panic!("restore returned Need")
+    };
+    assert_eq!(
+        restored.as_ref().as_ref().unwrap().label_kind_stdout(),
+        "filegroup rule //first:t\n"
     );
 }

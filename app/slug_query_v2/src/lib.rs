@@ -18,7 +18,16 @@ mod parser;
 pub(crate) mod provenance;
 mod traversal;
 
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    Eq,
+    PartialEq,
+    Hash,
+    allocative::Allocative
+)]
 pub struct QueryPolicy {
     pub strict_test_suite: bool,
 }
@@ -26,6 +35,7 @@ pub struct QueryPolicy {
 pub use evaluator::QueryOrder;
 pub use evaluator::QueryOutput;
 pub use evaluator::QueryOutputCompletion;
+pub use evaluator::RootQueryCommandKey;
 pub use evaluator::evaluate_loading_query;
 pub use evaluator::evaluate_loading_query_with_policy;
 pub use evaluator::evaluate_loading_query_with_policy_and_output_completion;
@@ -52,3 +62,5 @@ pub use graph::SubtreePackageSet;
 pub use graph::SubtreePackageSetKey;
 pub use graph::UnconfiguredPackageGraph;
 pub use graph::UnconfiguredPackageGraphKey;
+pub use slug_loading_v2::LoadingPreparationNeeds as QueryPreparationNeeds;
+pub use slug_loading_v2::LoadingPreparationOutcome as QueryPreparationOutcome;

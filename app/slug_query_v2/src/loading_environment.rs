@@ -18,11 +18,16 @@ use compact_str::CompactString;
 use dice::DiceComputations;
 use dupe::Dupe;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetPattern;
+use slug_loading_v2::LoadingPreparationNeeds;
+use slug_loading_v2::LoadingPreparationOutcome;
+use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestRuleKind;
 use slug_loading_v2::discover_build_file_companion;
 use slug_loading_v2::keys::PackageLoadKey;
+use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -36,6 +41,7 @@ use crate::generic::TestTargetKind;
 use crate::graph::QueryError;
 use crate::graph::QueryLabel;
 use crate::graph::QueryNode;
+use crate::graph::RootUnconfiguredPackageGraphKey;
 use crate::graph::SubtreePackageSetKey;
 use crate::graph::UnconfiguredPackageGraph;
 use crate::graph::UnconfiguredPackageGraphKey;
@@ -50,6 +56,8 @@ use crate::traversal::ResolvedGraph;
 pub(crate) struct LoadingQueryEnvironment<'a, 'd> {
     ctx: &'a mut DiceComputations<'d>,
     workspace: PathBuf,
+    root_workspace: Option<NormalizedAbsolutePath>,
+    preparation_needs: Option<LoadingPreparationNeeds>,
     policy: QueryPolicy,
     evaluation_graph: ResolvedGraph<QueryLabel>,
     node_kinds: SmallMap<QueryLabel, CompactString>,
@@ -66,6 +74,8 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         Self {
             ctx,
             workspace,
+            root_workspace: None,
+            preparation_needs: None,
             policy,
             evaluation_graph: ResolvedGraph::new(),
             node_kinds: SmallMap::new(),
@@ -74,19 +84,63 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         }
     }
 
+    pub(crate) fn new_root(
+        ctx: &'a mut DiceComputations<'d>,
+        workspace: NormalizedAbsolutePath,
+        policy: QueryPolicy,
+    ) -> Self {
+        Self {
+            ctx,
+            workspace: workspace.as_path().to_path_buf(),
+            root_workspace: Some(workspace),
+            preparation_needs: None,
+            policy,
+            evaluation_graph: ResolvedGraph::new(),
+            node_kinds: SmallMap::new(),
+            generated_file_labels: SmallSet::new(),
+            candidates: QueryCandidateArena::new(),
+        }
+    }
+
+    pub(crate) fn take_preparation_needs(&mut self) -> Option<LoadingPreparationNeeds> {
+        self.preparation_needs.take()
+    }
+
+    fn preparation_restart(&mut self, need: LoadingPreparationNeeds) -> QueryError {
+        self.preparation_needs = Some(match self.preparation_needs.take() {
+            Some(existing) => existing
+                .try_union(&need)
+                .expect("query preparation Needs must be compatible"),
+            None => need,
+        });
+        QueryError::preparation_restart()
+    }
+
     async fn package_graph(
         &mut self,
         package: &str,
     ) -> Result<Arc<UnconfiguredPackageGraph>, QueryError> {
-        let value = self
-            .ctx
+        if let Some(workspace) = self.root_workspace.clone() {
+            let package = PackagePath::parse(package).map_err(QueryError::evaluation)?;
+            return match self
+                .ctx
+                .compute(&RootUnconfiguredPackageGraphKey::new(workspace, package))
+                .await
+                .expect("root query graph DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                LoadingPreparationOutcome::Complete(value) => value.as_ref().clone(),
+            };
+        }
+        self.ctx
             .compute(&UnconfiguredPackageGraphKey {
                 workspace: self.workspace.clone(),
                 package: PathBuf::from(package),
             })
             .await
-            .map_err(|error| QueryError::evaluation(error.to_string()))?;
-        value.as_ref().clone()
+            .map_err(|error| QueryError::evaluation(error.to_string()))?
+            .as_ref()
+            .clone()
     }
 
     async fn lookup_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
@@ -96,6 +150,9 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             )));
         }
         let graph = self.package_graph(label.package()).await.map_err(|error| {
+            if error.is_preparation_restart() {
+                return error;
+            }
             if error.message.contains("no BUILD.bazel or BUILD file")
                 || error.message.contains("package directory is absent")
             {
@@ -116,6 +173,41 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             ))
         })?;
         Ok(node)
+    }
+
+    async fn package_load_provenance(
+        &mut self,
+        package: &str,
+    ) -> Result<(PathBuf, Arc<[slug_loading_v2::BzlModuleIdentity]>), QueryError> {
+        if let Some(workspace) = self.root_workspace.clone() {
+            let package = PackagePath::parse(package).map_err(QueryError::evaluation)?;
+            return match self
+                .ctx
+                .compute(&RootPackageLoadKey::new(workspace, package))
+                .await
+                .expect("root package loading DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                LoadingPreparationOutcome::Complete(value) => value
+                    .as_ref()
+                    .as_ref()
+                    .map(|loaded| (loaded.build_file.clone(), loaded.reachable_loads.clone()))
+                    .map_err(|error| QueryError::evaluation(error.to_string())),
+            };
+        }
+        let value = self
+            .ctx
+            .compute(&PackageLoadKey {
+                workspace: self.workspace.clone(),
+                package: self.workspace.join(package),
+            })
+            .await
+            .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        value
+            .as_ref()
+            .as_ref()
+            .map(|loaded| (loaded.build_file.clone(), loaded.reachable_loads.clone()))
+            .map_err(|error| QueryError::evaluation(error.to_string()))
     }
 
     async fn resolve_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
@@ -156,6 +248,9 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                         continue;
                     }
                     let node = self.lookup_single(label).await.map_err(|error| {
+                        if error.is_preparation_restart() {
+                            return error;
+                        }
                         let message = error.to_string();
                         error.with_message(format!(
                             "Invalid visibility label '{}': {message}",
@@ -642,23 +737,11 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                     continue;
                 }
                 let owner = candidate.owner_package();
-                let package = self.workspace.join(owner.as_str());
-                let value = self
-                    .ctx
-                    .compute(&PackageLoadKey {
-                        workspace: self.workspace.clone(),
-                        package,
-                    })
-                    .await
-                    .map_err(|error| QueryError::evaluation(error.to_string()))?;
-                let loaded = value
-                    .as_ref()
-                    .as_ref()
-                    .map_err(|error| QueryError::evaluation(error.to_string()))?;
+                let (build_file, reachable_loads) =
+                    self.package_load_provenance(owner.as_str()).await?;
 
                 if include_buildfiles {
-                    let basename = loaded
-                        .build_file
+                    let basename = build_file
                         .file_name()
                         .and_then(|value| value.to_str())
                         .ok_or_else(|| {
@@ -670,7 +753,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                     }
                 }
 
-                for load in loaded.reachable_loads.iter() {
+                for load in reachable_loads.iter() {
                     let label = QueryLabel::from_canonical(load.label.clone());
                     if !seen_bzl_labels.insert(label.clone()) {
                         continue;
@@ -726,6 +809,9 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             };
             for label in attribute.labels.iter().cloned() {
                 self.resolve_single(label.clone()).await.map_err(|error| {
+                    if error.is_preparation_restart() {
+                        return error;
+                    }
                     let message =
                         format!("in '{}' of rule {}: {error}", attribute.name, node.label);
                     error.with_message(message)

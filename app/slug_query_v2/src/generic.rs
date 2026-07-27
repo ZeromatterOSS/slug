@@ -754,6 +754,9 @@ where
         .test_suite_members(suite, attribute)
         .await
         .map_err(|error| {
+            if error.is_preparation_restart() {
+                return error;
+            }
             let message = format!(
                 "couldn't expand '{}' attribute of test_suite {}: {error}",
                 attribute.name(),

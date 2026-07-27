@@ -23,9 +23,13 @@ use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::PackagePath;
 use slug_loading_v2::AttributeProvenance;
+use slug_loading_v2::LoadedPackage;
+use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::PackageGroupContents;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::RuleCapability;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestMetadata;
@@ -35,6 +39,7 @@ use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectoryKey;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::package::StarlarkRuleImplementation;
+use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -145,6 +150,28 @@ pub struct UnconfiguredPackageGraphKey {
     pub package: PathBuf,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub(crate) struct RootUnconfiguredPackageGraphKey {
+    workspace: NormalizedAbsolutePath,
+    package: PackagePath,
+}
+
+impl RootUnconfiguredPackageGraphKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+        Self { workspace, package }
+    }
+}
+
+impl fmt::Display for RootUnconfiguredPackageGraphKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "root-unconfigured-package-graph://{}",
+            self.package.as_str()
+        )
+    }
+}
+
 impl fmt::Display for UnconfiguredPackageGraphKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "unconfigured-package-graph:{}", self.package.display())
@@ -180,12 +207,13 @@ pub struct QueryError {
     kind: QueryErrorKind,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative, Dupe)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative, Dupe)]
 enum QueryErrorKind {
     Syntax,
     Evaluation,
     TargetMissing,
     PackageLoading,
+    PreparationRestart,
 }
 
 impl QueryError {
@@ -226,8 +254,23 @@ impl QueryError {
     }
 
     pub fn with_message(mut self, message: impl Into<String>) -> Self {
+        if self.is_preparation_restart() {
+            return self;
+        }
         self.message = Arc::from(message.into());
         self
+    }
+
+    pub(crate) fn preparation_restart() -> Self {
+        Self {
+            message: Arc::from(""),
+            exit_code: i32::MIN,
+            kind: QueryErrorKind::PreparationRestart,
+        }
+    }
+
+    pub(crate) fn is_preparation_restart(&self) -> bool {
+        matches!(self.kind, QueryErrorKind::PreparationRestart)
     }
 }
 
@@ -240,6 +283,7 @@ impl fmt::Display for QueryError {
 impl std::error::Error for QueryError {}
 
 type GraphValue = Arc<Result<Arc<UnconfiguredPackageGraph>, QueryError>>;
+type RootGraphValue = LoadingPreparationOutcome<GraphValue>;
 type PackageSetValue = Arc<Result<SubtreePackageSet, QueryError>>;
 
 #[async_trait]
@@ -267,6 +311,52 @@ impl Key for UnconfiguredPackageGraphKey {
     }
 }
 
+#[async_trait]
+impl Key for RootUnconfiguredPackageGraphKey {
+    type Value = RootGraphValue;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match ctx
+            .compute(&RootPackageLoadKey::new(
+                self.workspace.clone(),
+                self.package.clone(),
+            ))
+            .await
+            .expect("root package loading DICE invariant")
+        {
+            LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(loaded) => {
+                LoadingPreparationOutcome::Complete(Arc::new(
+                    loaded
+                        .as_ref()
+                        .as_ref()
+                        .map_err(|error| QueryError::package_loading(error.to_string()))
+                        .and_then(|loaded| {
+                            package_graph_from_loaded(
+                                self.workspace.as_path(),
+                                Path::new(self.package.as_str()),
+                                loaded,
+                            )
+                            .map(Arc::new)
+                        }),
+                ))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 async fn compute_package_graph(
     ctx: &mut DiceComputations<'_>,
     workspace: &Path,
@@ -284,6 +374,14 @@ async fn compute_package_graph(
         .as_ref()
         .as_ref()
         .map_err(|error| QueryError::package_loading(error.to_string()))?;
+    package_graph_from_loaded(workspace, package, loaded)
+}
+
+fn package_graph_from_loaded(
+    workspace: &Path,
+    package: &Path,
+    loaded: &LoadedPackage,
+) -> Result<UnconfiguredPackageGraph, QueryError> {
     let package_name = path_to_package(package)?;
     let build_basename = loaded
         .build_file

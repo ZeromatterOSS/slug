@@ -13067,3 +13067,29 @@ concurrency, event owner, fixture/oracle, JVM, Java bytecode, or Bazel
 delegation. Stop if implementation requires changing the public legacy
 facade, exposing the carrier, adding `traversal.rs` or another ninth file,
 forcing an otherwise-lazy branch, or representing Need as text.
+
+#### Typed query command-root implementation status
+
+Status: **ACCEPT** for `WP-5-m1-query-typed-command-root` on 2026-07-27 after
+one terminal independent implementation review and one focused test-only
+correction rereview.
+
+The seven-file patch adds the dormant public `RootQueryCommandKey`, its
+always-present root-module anchor, private typed root-package graph, and
+root-mode query environment. Typed Needs remain in the environment side
+channel; the inert sentinel only unwinds the fixed generic call chain and
+cannot escape as a Complete/public error. Legacy keys, facades, callers,
+ordering, and eager subtree/companion paths remain unchanged.
+
+The focused regression passes 1/1 and proves every identity field, both
+preflight rejection classes, empty-query anchor activation, typed Need and
+lazy later-operand suppression, Auto/Full order, Host-backed `loadfiles()`,
+Complete/Need equality and validity, and same-DICE `.bzl`
+edit/delete/restore. The full query crate passes 17 unit, 41 loading-query,
+and 6 query tests. Direct core compile coverage, query/core GNU-Windows
+no-run linkage, formatting, diff/archive, exact scope/export/no-caller/Cargo/
+dependency/legacy/carrier/IO/blocking/JVM guards pass.
+
+Next design only `WP-5-m1-query-host-migration-design`, bounded to the
+remaining eager subtree discovery and build-companion query paths before any
+runtime activation.

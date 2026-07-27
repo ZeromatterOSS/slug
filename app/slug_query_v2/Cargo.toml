@@ -15,10 +15,10 @@ dupe = { workspace = true }
 futures = { workspace = true }
 nom = { workspace = true }
 slug_identity_v2 = { workspace = true }
+slug_bzlmod_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }
+slug_workspace_v2 = { workspace = true }
 starlark_map = { workspace = true }
 
 [dev-dependencies]
-slug_bzlmod_v2 = { workspace = true }
-slug_workspace_v2 = { workspace = true }
 tokio = { workspace = true }

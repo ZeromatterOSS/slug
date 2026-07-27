@@ -10,10 +10,19 @@
 
 //! Public loading-query evaluation facade.
 
+use std::fmt;
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use allocative::Allocative;
+use async_trait::async_trait;
 use compact_str::CompactString;
+use dice::CancellationContext;
 use dice::DiceComputations;
+use dice::Key;
+use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
+use slug_loading_v2::LoadingPreparationOutcome;
+use slug_workspace_v2::NormalizedAbsolutePath;
 
 use crate::QueryPolicy;
 use crate::generic::QueryEvaluator;
@@ -24,11 +33,117 @@ pub use crate::output::QueryOutput;
 use crate::parse_query_expression;
 use crate::validate_loading_query;
 
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, Allocative)]
 pub enum QueryOutputCompletion {
     #[default]
     Standard,
     LabelKind,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct RootQueryCommandKey {
+    workspace: NormalizedAbsolutePath,
+    source: CompactString,
+    order: QueryOrder,
+    policy: QueryPolicy,
+    completion: QueryOutputCompletion,
+}
+
+impl RootQueryCommandKey {
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        source: impl Into<CompactString>,
+        order: QueryOrder,
+        policy: QueryPolicy,
+        completion: QueryOutputCompletion,
+    ) -> Result<Self, QueryError> {
+        let source = source.into();
+        let expression = parse_query_expression(&source)
+            .map_err(|error| QueryError::syntax(error.to_string()))?;
+        validate_loading_query(&expression)
+            .map_err(|error| QueryError::syntax(error.to_string()))?;
+        Ok(Self {
+            workspace,
+            source,
+            order,
+            policy,
+            completion,
+        })
+    }
+}
+
+impl fmt::Display for RootQueryCommandKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "root-query-command:{}", self.source)
+    }
+}
+
+#[async_trait]
+impl Key for RootQueryCommandKey {
+    type Value = LoadingPreparationOutcome<Arc<Result<QueryOutput, QueryError>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match ctx
+            .compute(&RootModuleLoadingAnchorKey::new(self.workspace.clone()))
+            .await
+            .expect("root module loading anchor DICE invariant")
+        {
+            LoadingPreparationOutcome::Need(need) => {
+                return LoadingPreparationOutcome::Need(need);
+            }
+            LoadingPreparationOutcome::Complete(anchor) => {
+                if let Err(error) = anchor.as_ref() {
+                    return LoadingPreparationOutcome::Complete(Arc::new(Err(
+                        QueryError::package_loading(error.to_string()),
+                    )));
+                }
+            }
+        }
+
+        let expression = match parse_query_expression(&self.source) {
+            Ok(expression) => expression,
+            Err(error) => {
+                return LoadingPreparationOutcome::Complete(Arc::new(Err(QueryError::syntax(
+                    error.to_string(),
+                ))));
+            }
+        };
+        let mut evaluator = QueryEvaluator::new(LoadingQueryEnvironment::new_root(
+            ctx,
+            self.workspace.clone(),
+            self.policy,
+        ));
+        let result =
+            evaluate_parsed_query(&mut evaluator, &expression, self.order, self.completion).await;
+        if result
+            .as_ref()
+            .is_err_and(QueryError::is_preparation_restart)
+        {
+            return LoadingPreparationOutcome::Need(
+                evaluator
+                    .environment
+                    .take_preparation_needs()
+                    .expect("query restart sentinel requires typed preparation Needs"),
+            );
+        }
+        assert!(
+            evaluator.environment.take_preparation_needs().is_none(),
+            "typed query Needs require the private restart sentinel"
+        );
+        LoadingPreparationOutcome::Complete(Arc::new(result))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
 }
 
 pub async fn evaluate_loading_query(
@@ -70,6 +185,15 @@ pub async fn evaluate_loading_query_with_policy_and_output_completion(
         parse_query_expression(source).map_err(|error| QueryError::syntax(error.to_string()))?;
     validate_loading_query(&expression).map_err(|error| QueryError::syntax(error.to_string()))?;
     let mut evaluator = QueryEvaluator::new(LoadingQueryEnvironment::new(ctx, workspace, policy));
+    evaluate_parsed_query(&mut evaluator, &expression, order, completion).await
+}
+
+async fn evaluate_parsed_query(
+    evaluator: &mut QueryEvaluator<LoadingQueryEnvironment<'_, '_>>,
+    expression: &crate::QueryExpression,
+    order: QueryOrder,
+    completion: QueryOutputCompletion,
+) -> Result<QueryOutput, QueryError> {
     let targets = evaluator.evaluate(&expression).await?;
     if completion == QueryOutputCompletion::LabelKind {
         evaluator.environment.complete_label_kinds(&targets).await?;
