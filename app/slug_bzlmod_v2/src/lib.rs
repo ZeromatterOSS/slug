@@ -14,6 +14,7 @@ mod host_include;
 mod host_lockfile;
 mod host_module;
 mod host_package;
+mod host_registry;
 mod host_registry_inputs;
 pub mod interim_module;
 pub mod lockfile;

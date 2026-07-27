@@ -7356,3 +7356,52 @@ Source/parity, implementation/evidence, and architecture/orchestration
 terminal latest-diff reviews all returned `ACCEPT`. Next packet: implement
 only the accepted pure, root-free `WP-5-m1-host-registry-function` owner.
 Perform no registry IO and retain every later file/fetch/activation boundary.
+
+#### Host RegistryFunction owner implementation status
+
+**Status:** Accepted after terminal latest-diff review on 2026-07-26.
+
+The dormant pure owner changes exactly three paths with 1,543 additions and
+no deletions. The new private `HostRegistryFunctionKey` is identified by the
+normalized workspace and exact original registry spelling. It acquires mode,
+vendor projection, Refresh-only invalidation, the visible lockfile, and
+module mirrors in pinned Bazel order; propagates the sole visible-file Need;
+selects mirrors by the unsubstituted spelling; and constructs the complete
+descriptor without root evaluation, registry IO, request generation,
+repository mapping, source preparation, writes, or production activation.
+
+The descriptor retains compact original and `%workspace%`-resolved spellings,
+the exact HTTP(S)/file hash mode, shared full lockfile, optional vendor path,
+ordered selected mirrors, and the Refresh token only in Refresh. Manual
+equality observes only the descriptor fields plus registry-file hashes and
+selected-yanked state. Narrow borrowed accessors expose hash expectations and
+selected-yanked reasons without exposing or copying the lockfile maps. The
+packet-local URI scanner preserves Java `URI(String)` construction semantics
+needed by `RegistryFactoryImpl`, including opaque versus hierarchical paths,
+registry-authority fallback, scoped and embedded IPv6, signed-32-bit ports,
+empty authority before query/fragment, ordered syntax-only mirrors, and
+verbatim spelling.
+
+Eleven focused tests prove all twelve scheme/mode cells, exact successful and
+failure dependency prefixes, zero edges for absent injected inputs, Need and
+Complete-error equality, original/resolved identity, default/override/empty
+mirror shapes, URI error ordering, retained A-to-B-to-A invalidation, and
+forbidden construction edges. Retained DICE proves owner recomputation plus
+downstream pruning for module extensions, facts, and facts versions.
+Lock-file version uses direct descriptor equality only because the accepted
+visible v28 parser cannot produce a Complete non-v28 value; no unreachable
+retained transition is claimed.
+
+The complete `slug_bzlmod_v2` surface passed 197 unit plus 184 integration
+tests, zero failures, and zero doctests. GNU-Windows compile-only validation
+built all twelve test executables. Formatting, exact three-path/1,550-line
+cap, diff, archive, credential, utility-reuse, and forbidden-edge gates
+passed. Source/parity and architecture/orchestration terminal latest-diff
+reviews returned `ACCEPT` after the URI, allocation, equality, and retained
+evidence corrections.
+
+Next packet: design only the one-file private Host Registry IO bridge. It
+must factor Bazel-shaped expectation-aware remote and typed local executors
+inside `registry_dice.rs` while preserving every active legacy wrapper and
+legacy Off behavior byte-for-byte. Do not implement the Host registry-file
+owner or activate any Host consumer in that design packet.

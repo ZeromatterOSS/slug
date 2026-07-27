@@ -216,6 +216,12 @@ impl InjectedKey for HostModuleMirrorsInputKey {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub(crate) struct HostRegistryRefreshToken(u64);
 
+impl HostRegistryRefreshToken {
+    pub(crate) fn new(value: u64) -> Self {
+        Self(value)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub(crate) struct HostRegistryRefreshTokenKey {
     workspace: NormalizedAbsolutePath,
