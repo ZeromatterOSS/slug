@@ -8297,3 +8297,196 @@ local registry-file transport, exact listing bytes/order and diagnostic
 projection, checksum-enabled event/lockfile effects, mutable no-checksum
 effects, and relevant same-daemon transitions. Do not edit Rust or redesign
 the bridge until that oracle is accepted and implemented.
+
+### Stage 5 local registry-directory transport oracle design
+
+`WP-5-m1-host-registry-local-directory-oracle-design` strengthens only the
+accepted `nonroot-interim-module-graph` fixture. That retained-daemon Bazel
+9.2 fixture already contains the complete local registry and embedded-module
+closure, six ordinary-file rows, and an ignored `devonly@1.0.0` module with
+regular `MODULE.bazel` and `source.json`. It is the smaller owner than the
+thirteen-row, two-registry discovery fixture and avoids copying any module or
+registry scaffold.
+
+The observed `/usr/bin/bazel` 9.2.0 distribution runs Azul OpenJDK
+25.0.2+10-LTS. OpenJDK
+`src/java.base/share/classes/sun/net/www/protocol/file/FileURLConnection.java`
+handles a directory by taking its direct `File.list()` names, sorting them
+with `Collator.getInstance()`, appending `'\n'` after every name, and encoding
+the complete string with `String.getBytes()`. The oracle deliberately uses
+two ASCII, Windows-safe names with distinct alphabetic prefixes and makes no
+claim beyond the observed runtime, locale, and default charset:
+
+```text
+module(name = 'devonly', version = '1.0.0')
+print('DIRECTORY_LISTING_SENTINEL')
+```
+
+The exact transport bytes are the two displayed lines in that order, each
+newline-terminated: 80 bytes, SHA-256
+`0bd130df32a894c40b5d19afab988c7c8beb4a134eccec4744e4619d66db1408`,
+and SRI `sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=`. The
+ordinary `devonly` module file is 44 bytes with SHA-256
+`ad25b8e864b5a6977648385006a87b8bb7b53b8a06e8d2bdd61bd35848ca6154`
+and SRI `sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=`.
+
+Pinned Bazel 9.2 source owns the projections:
+
+- `IndexRegistry.java:145-162,245-255` sends `MODULE.bazel` through
+  `grabFile(..., useChecksum=true)` and posts a
+  `RegistryFileDownloadEvent` containing the listing SHA;
+- `ModuleFileFunction.java:189-214,262-277` parses and executes those bytes,
+  validates the declared name/version, and retains the event map;
+- `IndexRegistry.java` `grabJsonFile`, `parseJson`, and
+  `getYankedVersions` decode registry JSON as UTF-8 but fetch mutable
+  `metadata.json` with `useChecksum=false`;
+- `YankedVersionsFunction.java:47-61` projects a metadata parse `IOException`
+  as an exact warning and fails open, so the command must succeed;
+- `RepoSpecFunction.java:48-74`,
+  `BazelModuleResolutionFunction.java:105-147`, and
+  `ArchiveRepoSpecBuilder.java` carry the checksum-enabled module bytes into
+  the `remote_module_file_integrity` printed by `mod show_repo`; and
+- `BazelLockFileModule.java:167-176` deliberately removes every `file:`
+  registry hash from the visible lockfile. Therefore the internal
+  checksum-enabled event is observable through `show_repo`, while every
+  successful local-registry row must retain visible
+  `"registryFileHashes": {}`. Mutable metadata posts no event by source
+  contract; the oracle can prove its byte and fail-open projection, not that
+  hidden negative fact independently.
+
+The exact six-path allowlist is:
+
+- `tests/v2_oracle/fixtures/nonroot-interim-module-graph/fixture.toml`;
+- `tests/v2_oracle/fixtures/nonroot-interim-module-graph/expected/oracle.json`;
+- `workspace/registry/modules/devonly/1.0.0/MODULE.directory/module(name = 'devonly', version = '1.0.0')`;
+- `workspace/registry/modules/devonly/1.0.0/MODULE.directory/print('DIRECTORY_LISTING_SENTINEL')`;
+- `workspace/registry/modules/devonly/1.0.0/MODULE.directory-link`, a relative
+  symlink to `MODULE.directory`; and
+- `workspace/registry/modules/devonly/metadata.directory-link`, a relative
+  symlink to `1.0.0/MODULE.directory`.
+
+The two child files each contain exactly
+`CHILD_CONTENT_IS_NOT_TRANSPORT\n`. Their non-Starlark contents are not
+transport input; successful module evaluation additionally discriminates JDK
+filename listing from child-content concatenation. Both symlinks remain
+staged during the accepted six-row prefix, where `devonly` is an ignored
+nonroot dev dependency.
+
+Append exactly five rows. Each sets `compare = "semantic"` so its nonempty
+command-level manifest is compared rather than merely captured:
+
+1. `regular_local_registry_file_baseline`. Leave the terminal accepted row's
+   now-unreachable `subject` collision untouched, replace the root's
+   `subject` and `shared` dependencies with
+   `devonly@1.0.0`, and advance root version `0.1.3` to `0.1.4`. Run
+   `mod show_repo @@devonly+ --lockfile_mode=update
+   --registry=file://%workspace%/registry`. Require exit 0, the ordinary
+   module SRI above, no directory print or metadata warning, and a semantic
+   `MODULE.bazel.lock` manifest whose visible `registryFileHashes` is empty.
+   This row is the suffix restoration baseline.
+2. `directory_module_listing_bytes_and_checksum`. Rename regular
+   `MODULE.bazel` to `MODULE.regular`, promote `MODULE.directory-link` to
+   `MODULE.bazel`, and advance root version to `0.1.5`. Repeat `show_repo` in
+   Update mode. Require exit 0, the exact directory-listing SRI above, silent
+   registry `print`, no directory-read diagnostic, and a byte-identical
+   visible-lockfile manifest. The changed printed integrity and unchanged
+   filtered lockfile jointly discriminate the internal checksum-bearing
+   bytes from visible local-hash publication.
+3. `mutable_metadata_directory_lists_then_fails_open`. Promote
+   `metadata.directory-link` to `metadata.json`, advance root version to
+   `0.1.6`, and run the same `show_repo` under
+   `--lockfile_mode=refresh`. Require exit 0, the directory module SRI and
+   successful `devonly` repo definition, and the exact warning prefix
+   `Could not read metadata file for
+   module devonly from registry`, the `metadata.json` URL, and the pinned
+   Gson wrong-token diagnostic. Exclude `Is a directory`, the print
+   sentinel, and any yanked rejection. The visible lockfile must remain
+   byte-identical and keep no metadata URL/hash.
+4. `parked_directory_links_are_absent`. Park both live symlinks back at their
+   exact staged names, advance root version to `0.1.7`, and run
+   `mod graph --lockfile_mode=off` with the local registry. Regular
+   `MODULE.regular` remains parked, so require exit 37 and the exact
+   `devonly@1.0.0` local-registry `MODULE.bazel: not found` chain. Exclude
+   declaration, metadata, and directory-read diagnostics. The failed command
+   must leave the visible-lockfile manifest byte-identical.
+5. `regular_local_registry_file_restores_exactly`. Restore
+   `MODULE.regular` to `MODULE.bazel` and restore root version `0.1.7` to
+   `0.1.4`, making the root, module path, staged symlinks, and metadata state
+   byte-for-byte equal to row 1. Repeat the Update `show_repo`; require the
+   ordinary SRI, no directory print or metadata warning, and the exact row-1
+   lockfile manifest.
+
+The existing mutation harness may rename regular files and symlinks but
+intentionally rejects directory rename/delete. This contract never mutates a
+real directory: it moves only the ordinary module file and the two staged
+symlinks. No harness change or directory special case is permitted.
+
+Visible-lockfile replay requires no new normalizer. The pinned source filters
+all local URLs before serialization, and two read-only Bazel 9.2 probes in
+distinct `/tmp/slug-local-lock-probe.*` roots produced the same 1,228-byte
+lockfile SHA-256
+`0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7`,
+with `"registryFileHashes": {}` and no `file:` or temporary-root text.
+Generation remains the authority for the exact fixture digest after the
+five accepted mutations.
+
+Implementation may change exactly two existing regular files, add two
+regular child files, and add two relative symlinks. The final fixture is
+exactly eleven commands, 54 regular files, two symlinks, and at most 998
+newline-counted lines: net at most two regular files, two symlinks, and 600
+lines from the current 52/0/398 baseline. The full tracked fixture tree is at
+most 1,303 regular files, 16 symlinks, and 37,203 lines from the accepted
+1,301/14/36,603 baseline; ignored Python bytecode is excluded.
+
+Run one pinned Bazel 9.2 generation and two absolute, distinct fresh-root
+replays, then shut down every used Bazel output-base server. Validate the
+exact six-path diff, symlink targets and restoration, two child basenames and
+contents, 80/44-byte hashes and SRIs, eleven unique rows in exact order,
+arguments/exits/mutations, positive and negative diagnostics, all five
+semantic lockfile manifests and their equality groups, fixture metadata and
+OpenJDK/Bazel anchors, parser plus focused packet-validator tests, inventory
+and line caps, schema, normalization, archive status, credential scan, and
+host-path-free normalized generated fields. Raw captured stdout/stderr retain
+the oracle run's diagnostic evidence by existing harness contract.
+
+This is the fifth accepted oracle packet after fixture-growth checkpoint
+`df812c2c` / baseline tree `c039c347`, following `eb8c2d23`, `d20f6557`,
+`204ee408`, and `dd57518e`. After implementation acceptance, run the required
+focused fixture-growth review before scheduling a sixth oracle packet.
+Inventory growth by packet, fixture, and repeated subtree; revalidate that
+each retained row remains discriminating; and preserve pinned provenance,
+hermetic replay, failure isolation, and exact expected output.
+
+Stop on different listing bytes/order/SRI, a metadata command failure instead
+of fail-open success, a visible local registry hash or fresh-root-dependent
+lockfile, different absence/recovery behavior, a twelfth command, a seventh
+changed path, a third symlink, a cap overflow,
+directory mutation, absolute symlink, harness/server/Rust/Cargo/dependency/API
+edit, a fifth new asset entry, direct bridge correction, Host owner redesign,
+consumer, or activation.
+Terminal acceptance requires source/parity, native evidence, and
+architecture/orchestration latest-text review.
+
+#### Local registry-directory transport oracle design status
+
+Status: `ACCEPT` after terminal latest-text review on 2026-07-26.
+
+The accepted six-path/four-entry design reuses the pinned retained-daemon
+`nonroot-interim-module-graph` fixture. Five semantic rows move the same
+`devonly` registry URL through regular, directory, mutable-metadata
+fail-open, absent, and exact regular/root restoration states. Exact
+80-byte directory and 44-byte regular SRIs, visible local-hash filtering,
+relative staged symlinks, manifest equality, fresh-root replay, inventory,
+and stop gates are frozen without a fixture, harness, Rust, Cargo,
+dependency, API, consumer, or activation edit.
+
+Two distinct-root Bazel 9.2 probes closed the provisional lockfile-normalizer
+question: both produced the same path-free visible lockfile, matching
+`BazelLockFileModule`'s explicit `file:` filter. Source/parity,
+implementation/evidence, and architecture/orchestration terminal reviews all
+returned `ACCEPT`.
+
+Next packet: implement only
+`WP-5-m1-host-registry-local-directory-oracle` inside the exact contract
+above. After acceptance, run the required five-packet fixture-growth review
+before scheduling any sixth oracle.
