@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-loading-host-glob-transactional-attempt-owner`.
+`WP-5-m1-loading-host-package-key-input-ownership-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

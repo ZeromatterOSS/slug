@@ -25,6 +25,29 @@ use super::traversal::HostGlobTraversalKeyError;
 use super::traversal::HostGlobTraversalOperation;
 use super::traversal::HostGlobTraversalOutcome;
 
+/// Callable-facing operation retained in one prepared-request identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub(crate) enum HostGlobLoadingOperation {
+    Files,
+    FilesAndDirs,
+}
+
+/// Exact raw pattern and operation requested by one BUILD `glob()` attempt.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub(crate) struct HostGlobLoadingRequest {
+    pattern: Arc<[u8]>,
+    operation: HostGlobLoadingOperation,
+}
+
+impl HostGlobLoadingRequest {
+    pub(crate) fn new(pattern: impl Into<Arc<[u8]>>, operation: HostGlobLoadingOperation) -> Self {
+        Self {
+            pattern: pattern.into(),
+            operation,
+        }
+    }
+}
+
 /// Input rejected before the adapter creates or computes a traversal key.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub(super) enum HostGlobLoadingInputError {
@@ -46,6 +69,28 @@ impl HostGlobLoadingMatches {
 
 pub(super) type HostGlobLoadingOutcome =
     SourcePreparationOutcome<Arc<Result<HostGlobLoadingMatches, HostGlobTraversalError>>>;
+
+/// Opaque crate-local preservation of request-construction diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct HostGlobRequestInputError(HostGlobLoadingInputError);
+
+/// Opaque crate-local preservation of a complete traversal diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostGlobRequestTraversalError(HostGlobTraversalError);
+
+/// Raw, sorted package-relative matches prepared for one request.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct HostGlobRequestMatches(HostGlobLoadingMatches);
+
+impl HostGlobRequestMatches {
+    pub(crate) fn paths(&self) -> &[Arc<[u8]>] {
+        self.0.paths()
+    }
+}
+
+pub(crate) type HostGlobPrepared =
+    Arc<Result<HostGlobRequestMatches, HostGlobRequestTraversalError>>;
+pub(crate) type HostGlobRequestOutcome = SourcePreparationOutcome<HostGlobPrepared>;
 
 fn project_traversal_outcome(outcome: HostGlobTraversalOutcome) -> HostGlobLoadingOutcome {
     outcome.map(|value| {
@@ -82,6 +127,38 @@ pub(super) async fn compute_host_glob_for_loading(
     Ok(project_traversal_outcome(dice_invariant(
         ctx.compute(&key).await,
     )))
+}
+
+/// Compute one shared callable request through the caller's DICE transaction.
+pub(crate) async fn compute_host_glob_request(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    logical_package_root: NormalizedAbsolutePath,
+    package: PackagePath,
+    request: HostGlobLoadingRequest,
+) -> Result<HostGlobRequestOutcome, HostGlobRequestInputError> {
+    let operation = match request.operation {
+        HostGlobLoadingOperation::Files => HostGlobTraversalOperation::Files,
+        HostGlobLoadingOperation::FilesAndDirs => HostGlobTraversalOperation::FilesAndDirs,
+    };
+    compute_host_glob_for_loading(
+        ctx,
+        workspace,
+        logical_package_root,
+        package,
+        request.pattern,
+        operation,
+    )
+    .await
+    .map(|outcome| {
+        outcome.map(|value| {
+            Arc::new(match value.as_ref() {
+                Ok(matches) => Ok(HostGlobRequestMatches(matches.dupe())),
+                Err(error) => Err(HostGlobRequestTraversalError(error.clone())),
+            })
+        })
+    })
+    .map_err(HostGlobRequestInputError)
 }
 
 #[cfg(all(test, unix))]

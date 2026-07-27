@@ -56,9 +56,14 @@ use crate::attrs::AttributeValue;
 use crate::attrs::CoercedAttributeValue;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::FrozenBzlLifetimeEntry;
+use crate::glob::GlobError;
 use crate::glob::GlobSpec;
 use crate::glob::PackageListing;
 use crate::glob::expand_glob;
+use crate::host_glob::HostGlobLoadingOperation;
+use crate::host_glob::HostGlobLoadingRequest;
+use crate::host_glob::HostGlobPrepared;
+use crate::host_glob::HostGlobRequestTraversalError;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::UserProviderCallable;
@@ -400,20 +405,85 @@ struct RecordedTarget {
     visibility: VisibilitySource,
 }
 
+#[derive(Debug)]
+#[allow(dead_code)] // The Host branch remains dormant until its future package key lands.
+enum PackageGlobSource {
+    Listing(PackageListing),
+    Host(HostGlobAttemptState),
+}
+
+#[derive(Debug)]
+struct HostGlobAttemptState {
+    prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
+    control: RefCell<Option<HostGlobAttemptControl>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostGlobAttemptControl {
+    Pending(HostGlobLoadingRequest),
+    Terminal(HostGlobAttemptError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostGlobAttemptError {
+    Traversal(HostGlobRequestTraversalError),
+    UnsupportedPath { path: Arc<[u8]> },
+}
+
+#[derive(Debug)]
+struct HostGlobControlTransfer;
+
+impl fmt::Display for HostGlobControlTransfer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("private Host glob attempt control transfer")
+    }
+}
+
+impl std::error::Error for HostGlobControlTransfer {}
+
 #[derive(Debug, ProvidesStaticType)]
 pub(crate) struct PackageRecorder {
-    listing: PackageListing,
+    glob_source: PackageGlobSource,
     package: CompactString,
     state: RefCell<PackageState>,
 }
 
+#[allow(dead_code)] // The Host attempt methods are exercised privately before activation.
 impl PackageRecorder {
     pub(crate) fn new(listing: PackageListing, package: impl Into<CompactString>) -> Self {
         Self {
-            listing,
+            glob_source: PackageGlobSource::Listing(listing),
             package: package.into(),
             state: RefCell::new(PackageState::default()),
         }
+    }
+
+    pub(crate) fn new_host(
+        prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
+        package: impl Into<CompactString>,
+    ) -> Self {
+        Self {
+            glob_source: PackageGlobSource::Host(HostGlobAttemptState {
+                prepared,
+                control: RefCell::new(None),
+            }),
+            package: package.into(),
+            state: RefCell::new(PackageState::default()),
+        }
+    }
+
+    pub(crate) fn take_host_glob_control(&self) -> Option<HostGlobAttemptControl> {
+        match &self.glob_source {
+            PackageGlobSource::Listing(_) => None,
+            PackageGlobSource::Host(host) => host.control.borrow_mut().take(),
+        }
+    }
+
+    pub(crate) fn is_host_glob_control_error(error: &starlark::Error) -> bool {
+        matches!(
+            error.kind(),
+            starlark::ErrorKind::Native(error) if error.is::<HostGlobControlTransfer>()
+        )
     }
 
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> {
@@ -661,9 +731,113 @@ impl PackageRecorder {
     }
 
     fn glob(&self, spec: GlobSpec) -> anyhow::Result<Vec<String>> {
-        let matches = expand_glob(&self.listing, &spec)?;
+        let matches = match &self.glob_source {
+            PackageGlobSource::Listing(listing) => expand_glob(listing, &spec)?,
+            PackageGlobSource::Host(host) => self.host_glob(host, &spec)?,
+        };
         self.state.borrow_mut().used_globs.push(spec);
         Ok(matches)
+    }
+
+    fn host_glob(
+        &self,
+        host: &HostGlobAttemptState,
+        spec: &GlobSpec,
+    ) -> anyhow::Result<Vec<String>> {
+        let operation = if spec.exclude_directories {
+            HostGlobLoadingOperation::Files
+        } else {
+            HostGlobLoadingOperation::FilesAndDirs
+        };
+        let mut include_matched = Vec::with_capacity(spec.includes.len());
+        let mut matches = Vec::new();
+        for pattern in spec.includes.iter() {
+            let paths = self.host_glob_request(host, pattern.as_bytes(), operation)?;
+            include_matched.push(!paths.is_empty());
+            matches.extend(paths);
+        }
+        let mut excluded = SmallSet::new();
+        for pattern in spec.excludes.iter() {
+            excluded.extend(self.host_glob_request(host, pattern.as_bytes(), operation)?);
+        }
+
+        if !spec.allow_empty {
+            if let Some((index, _)) = include_matched
+                .iter()
+                .enumerate()
+                .find(|(_, matched)| !**matched)
+            {
+                return Err(GlobError::EmptyPattern {
+                    pattern: spec.includes[index].to_string(),
+                }
+                .into());
+            }
+        }
+
+        matches.retain(|path| !excluded.contains(path));
+        matches.sort_unstable();
+        matches.dedup();
+        if !spec.allow_empty && matches.is_empty() {
+            return Err(GlobError::AllExcluded.into());
+        }
+        Ok(matches)
+    }
+
+    fn host_glob_request(
+        &self,
+        host: &HostGlobAttemptState,
+        pattern: &[u8],
+        operation: HostGlobLoadingOperation,
+    ) -> anyhow::Result<Vec<String>> {
+        let request = HostGlobLoadingRequest::new(Arc::<[u8]>::from(pattern), operation);
+        let Some(prepared) = host.prepared.get(&request) else {
+            return self.transfer_host_glob(host, HostGlobAttemptControl::Pending(request));
+        };
+        let matches = match prepared.as_ref() {
+            Ok(matches) => matches,
+            Err(error) => {
+                return self.transfer_host_glob(
+                    host,
+                    HostGlobAttemptControl::Terminal(HostGlobAttemptError::Traversal(
+                        error.clone(),
+                    )),
+                );
+            }
+        };
+        matches
+            .paths()
+            .iter()
+            .map(|path| {
+                let value = match std::str::from_utf8(path) {
+                    Ok(value) => value,
+                    Err(_) => {
+                        return self.transfer_host_glob(
+                            host,
+                            HostGlobAttemptControl::Terminal(
+                                HostGlobAttemptError::UnsupportedPath { path: path.clone() },
+                            ),
+                        );
+                    }
+                };
+                Ok(if value.starts_with('@') {
+                    format!(":{value}")
+                } else {
+                    value.to_owned()
+                })
+            })
+            .collect()
+    }
+
+    fn transfer_host_glob<T>(
+        &self,
+        host: &HostGlobAttemptState,
+        control: HostGlobAttemptControl,
+    ) -> anyhow::Result<T> {
+        let previous = host.control.borrow_mut().replace(control);
+        if previous.is_some() {
+            anyhow::bail!("Host glob attempt produced more than one control transfer");
+        }
+        Err(HostGlobControlTransfer.into())
     }
 
     pub(crate) fn finish(
@@ -675,6 +849,9 @@ impl PackageRecorder {
         load_fingerprint: [u8; 32],
         retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
     ) -> LoadedPackage {
+        if let PackageGlobSource::Host(host) = &self.glob_source {
+            debug_assert!(host.control.borrow().is_none());
+        }
         let mut state = self.state.into_inner();
         let mut implicit_candidates = state
             .targets

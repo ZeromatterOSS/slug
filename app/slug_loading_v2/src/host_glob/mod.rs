@@ -50,6 +50,12 @@ use slug_workspace_v2::ResolvedPathKey;
 use slug_workspace_v2::ResolvedPathState;
 
 mod adapter;
+pub(crate) use adapter::HostGlobLoadingOperation;
+pub(crate) use adapter::HostGlobLoadingRequest;
+pub(crate) use adapter::HostGlobPrepared;
+pub(crate) use adapter::HostGlobRequestInputError;
+pub(crate) use adapter::HostGlobRequestTraversalError;
+pub(crate) use adapter::compute_host_glob_request;
 #[cfg(all(test, unix))]
 mod tests;
 mod traversal;

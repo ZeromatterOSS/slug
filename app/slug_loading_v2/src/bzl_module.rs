@@ -25,21 +25,29 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::PackagePath;
+use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark::PrintHandler;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
+use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::cycle_detector::BzlLoadCycle;
 use crate::cycle_detector::BzlLoadCycleGuard;
 use crate::glob::PackageListing;
+use crate::host_glob::HostGlobLoadingRequest;
+use crate::host_glob::HostGlobPrepared;
+use crate::host_glob::HostGlobRequestInputError;
+use crate::host_glob::compute_host_glob_request;
 use crate::keys::BzlModuleEvalKey;
 use crate::keys::BzlParseKey;
 use crate::keys::LoadLabelResolutionKey;
@@ -51,6 +59,8 @@ use crate::keys::WorkspaceDirectoryValue;
 use crate::keys::WorkspaceFileKey;
 use crate::keys::WorkspaceFileValue;
 use crate::load_label::LoadLabel;
+use crate::package::HostGlobAttemptControl;
+use crate::package::HostGlobAttemptError;
 use crate::package::LoadedPackage;
 use crate::package::PackageRecorder;
 use crate::package::loading_globals;
@@ -509,6 +519,212 @@ impl BzlLoadManifest {
 }
 
 type LoadResult<T> = Arc<Result<T, LoadingError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)] // Private dormant owner; activated only by a future Host package key.
+enum HostPackageAttemptError {
+    Loading(LoadingError),
+    Glob(HostGlobAttemptError),
+    Input(HostGlobRequestInputError),
+    Invariant(&'static str),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)]
+struct HostPackageAttemptTerminal {
+    result: Result<LoadedPackage, HostPackageAttemptError>,
+    event_batch: EventBatch,
+}
+
+#[allow(dead_code)]
+type HostPackageAttemptOutcome = SourcePreparationOutcome<Arc<HostPackageAttemptTerminal>>;
+
+#[allow(dead_code)]
+struct HostPackageAttemptInput<'a> {
+    workspace: NormalizedAbsolutePath,
+    logical_package_root: NormalizedAbsolutePath,
+    package: PackagePath,
+    package_dir: PathBuf,
+    build_file: PathBuf,
+    source: Arc<String>,
+    package_label: CompactString,
+    loaded_modules: &'a [(String, FrozenBzlModule)],
+    capture_events: bool,
+}
+
+#[allow(dead_code)]
+enum HostPackageAttemptStep {
+    Pending {
+        request: HostGlobLoadingRequest,
+        event_batch: EventBatch,
+    },
+    Terminal(HostPackageAttemptTerminal),
+}
+
+#[allow(dead_code)]
+fn host_package_terminal(
+    result: Result<LoadedPackage, HostPackageAttemptError>,
+    event_batch: EventBatch,
+) -> HostPackageAttemptStep {
+    HostPackageAttemptStep::Terminal(HostPackageAttemptTerminal {
+        result,
+        event_batch,
+    })
+}
+
+#[allow(dead_code)]
+fn evaluate_host_package_attempt(
+    input: &HostPackageAttemptInput<'_>,
+    prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
+) -> HostPackageAttemptStep {
+    let ast = match AstModule::parse(
+        &input.build_file.display().to_string(),
+        input.source.as_ref().clone(),
+        &Dialect::Standard,
+    ) {
+        Ok(ast) => ast,
+        Err(error) => {
+            return host_package_terminal(
+                Err(HostPackageAttemptError::Loading(LoadingError::new(
+                    error.to_string(),
+                ))),
+                EventBatch::empty(),
+            );
+        }
+    };
+    let recorder = PackageRecorder::new_host(prepared, input.package_label.clone());
+    let module = Module::new();
+    let loader = LocalBzlLoader {
+        modules: input
+            .loaded_modules
+            .iter()
+            .map(|(load, module)| (load.as_str(), module.module.dupe()))
+            .collect(),
+    };
+    let print_capture = input.capture_events.then(LoadingPrintCapture::default);
+    let globals = loading_globals();
+    let evaluation = {
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&recorder);
+        evaluator.set_loader(&loader);
+        if let Some(print_capture) = print_capture.as_ref() {
+            evaluator.set_print_handler(print_capture);
+        }
+        evaluator.eval_module(ast, &globals).map(|_| ())
+    };
+    let event_batch = print_capture
+        .map(LoadingPrintCapture::into_batch)
+        .unwrap_or_else(EventBatch::empty);
+    let control = recorder.take_host_glob_control();
+
+    match (evaluation, control) {
+        (Ok(()), None) => {
+            let direct_load_roots = first_seen_direct_roots(input.loaded_modules);
+            let retained_bzl_modules = flattened_lifetime_closure(input.loaded_modules);
+            let reachable_loads = retained_bzl_modules
+                .iter()
+                .map(|entry| entry.identity.clone())
+                .collect::<Vec<_>>();
+            let load_fingerprint = package_load_fingerprint(input.loaded_modules);
+            host_package_terminal(
+                Ok(recorder.finish(
+                    input.package_dir.clone(),
+                    input.build_file.clone(),
+                    direct_load_roots.into(),
+                    reachable_loads.into(),
+                    load_fingerprint,
+                    retained_bzl_modules.into(),
+                )),
+                event_batch,
+            )
+        }
+        (Ok(()), Some(_)) => host_package_terminal(
+            Err(HostPackageAttemptError::Invariant(
+                "successful package attempt retained Host glob control",
+            )),
+            event_batch,
+        ),
+        (Err(error), Some(control)) => {
+            if !PackageRecorder::is_host_glob_control_error(&error) {
+                return host_package_terminal(
+                    Err(HostPackageAttemptError::Invariant(
+                        "Host glob control accompanied a different evaluator error",
+                    )),
+                    event_batch,
+                );
+            }
+            match control {
+                HostGlobAttemptControl::Pending(request) => HostPackageAttemptStep::Pending {
+                    request,
+                    event_batch,
+                },
+                HostGlobAttemptControl::Terminal(error) => {
+                    host_package_terminal(Err(HostPackageAttemptError::Glob(error)), event_batch)
+                }
+            }
+        }
+        (Err(error), None) => {
+            let error = if PackageRecorder::is_host_glob_control_error(&error) {
+                HostPackageAttemptError::Invariant(
+                    "Host glob control error had no attempt-local control",
+                )
+            } else {
+                HostPackageAttemptError::Loading(LoadingError::new(error.to_string()))
+            };
+            host_package_terminal(Err(error), event_batch)
+        }
+    }
+}
+
+#[allow(dead_code)]
+async fn evaluate_host_package_attempts(
+    ctx: &mut DiceComputations<'_>,
+    input: HostPackageAttemptInput<'_>,
+) -> HostPackageAttemptOutcome {
+    let mut prepared = Arc::new(SmallMap::new());
+    loop {
+        // The synchronous attempt returns only compact terminal state or one
+        // request, so no evaluator/module/recorder borrow can cross this await.
+        match evaluate_host_package_attempt(&input, prepared.dupe()) {
+            HostPackageAttemptStep::Terminal(terminal) => {
+                return SourcePreparationOutcome::Complete(Arc::new(terminal));
+            }
+            HostPackageAttemptStep::Pending {
+                request,
+                event_batch,
+            } => {
+                let outcome = match compute_host_glob_request(
+                    ctx,
+                    input.workspace.dupe(),
+                    input.logical_package_root.dupe(),
+                    input.package.clone(),
+                    request.dupe(),
+                )
+                .await
+                {
+                    Ok(outcome) => outcome,
+                    Err(error) => {
+                        return SourcePreparationOutcome::Complete(Arc::new(
+                            HostPackageAttemptTerminal {
+                                result: Err(HostPackageAttemptError::Input(error)),
+                                event_batch,
+                            },
+                        ));
+                    }
+                };
+                match outcome {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(value) => {
+                        let replaced = Arc::make_mut(&mut prepared).insert(request, value);
+                        debug_assert!(replaced.is_none());
+                    }
+                }
+            }
+        }
+    }
+}
 
 impl BzlModuleEvaluator {
     pub fn new(workspace: impl Into<PathBuf>) -> anyhow::Result<Self> {
@@ -1288,3 +1504,7 @@ fn flattened_lifetime_closure(
     }
     entries
 }
+
+#[cfg(all(test, unix))]
+#[path = "host_package_attempt_tests.rs"]
+mod host_package_attempt_tests;
