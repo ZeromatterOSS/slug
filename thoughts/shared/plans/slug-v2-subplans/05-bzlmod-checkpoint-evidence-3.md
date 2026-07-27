@@ -8534,3 +8534,58 @@ missing, URL-conversion, generation-order, legacy, and cross-platform
 behavior. Do not edit Rust until that correction receives terminal
 latest-text review, and do not redesign the private Host registry-file owner,
 consumer, or activation in the same packet.
+
+#### Local registry-directory runtime bridge correction design status
+
+Status: `REPLAN` before Rust on 2026-07-26.
+
+The live runtime seam remains structurally bounded: production
+`HyperRegistryIo::read_local_exact` already receives the selected native
+`Path`, the default trait method preserves every legacy implementation, and
+the existing DICE caller performs local IO before requesting generation.
+The production correction plus its regular, missing, non-directory-error,
+URL-diagnostic, and symlink-to-directory tests could therefore remain inside
+`app/slug_core_v2/src/runtime/registry_io.rs`; the unchanged typed DICE caller
+and its existing tests preserve IO-before-generation ordering.
+
+The exact byte contract is not bounded by the accepted ASCII oracle, however.
+Pinned Bazel 9.2 source at `8220c619` in
+`src/main/cpp/blaze.cc:384,418-428,456` shows that the default launch sets
+`file.encoding=ISO-8859-1` and the root locale before appending any explicit
+user JVM options. OpenJDK 25.0.2 source at `405a5699`,
+`FileURLConnection.java:76-87,180-205`, follows a directory, obtains every
+direct child name through `File.list()`, stable-sorts the names with the
+root/default `RuleBasedCollator`, appends one newline per name, and encodes
+the complete string through that Bazel-selected default charset. Empty
+directories return zero bytes; child kinds and contents are not inspected.
+Filename decoding still comes from the platform/JNU path boundary on Unix
+(`UnixFileSystem_md.c:296-358`, `java_props_md.c:439-467`, and
+`jni_util.c:699-835`) and native UTF-16 enumeration on Windows
+(`WinNTFileSystem_md.c:695-813`).
+
+The accepted oracle deliberately uses only two ASCII, Windows-safe names with
+different lowercase prefixes and explicitly makes no broader collation or
+charset claim. Rust lexical ordering plus UTF-8 emission would match those 80
+bytes while disagreeing with Bazel for case, accents, characters outside
+ISO-8859-1, and malformed/native-only names. The workspace has no
+Java-compatible `RuleBasedCollator`, filename transcoder, or equivalent
+pinned-data dependency; its transitive ICU components do not include a
+collator and cannot be presumed equal to the OpenJDK provider and data.
+
+An oracle-bounded one-file implementation was therefore rejected as a Bazel
+9 subset, despite being mechanically feasible. No Rust, fixture, harness,
+Cargo, dependency, API, DICE key, Host owner, consumer, or activation
+changed.
+
+Next packet: design only
+`WP-5-m1-host-registry-local-directory-collation-charset-oracle-design`.
+Freeze the smallest Bazel 9.2 oracle and source matrix that discriminates
+root `Collator` ordering from Rust lexical ordering, the launcher's
+ISO-8859-1 output and replacement behavior from UTF-8, empty and followed
+directory behavior, stable collator ties/native enumeration order, direct
+special-entry names, inaccessible-list diagnostics, and the Unix/Windows
+filename-decoding boundary. Include a native Windows observation/source
+contract and decide there whether explicit `--host_jvm_args` overrides are
+part of the supported semantic input. Do not edit fixtures, harnesses, Rust,
+Cargo, dependencies, the private Host registry-file owner, a consumer, or
+activation before terminal latest-text review.
