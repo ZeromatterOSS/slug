@@ -45,7 +45,7 @@ Start from the live checkout, not from memory.
 - A request to follow or continue the implementation plan, including
   `/goal follow the implementation plan`, must use
   `.codex/skills/slug-agent-orchestration/SKILL.md`. Its compact startup path
-  and `thoughts/shared/plans/slug-v2-current-packet.md` are the compact
+  and `thoughts/shared/plans/slug-v2-subplans/current-packet.md` are the compact
   scheduling entrypoint. Canonical **Live Status** remains authoritative if
   they disagree.
 - If the user names a prompt or plan, read that prompt/plan before editing.

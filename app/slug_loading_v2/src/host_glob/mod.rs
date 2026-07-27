@@ -51,6 +51,7 @@ use slug_workspace_v2::ResolvedPathState;
 
 #[cfg(all(test, unix))]
 mod tests;
+mod traversal;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
 enum HostGlobSegmentPatternKind {

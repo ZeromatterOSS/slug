@@ -653,6 +653,41 @@ regular-or-special BUILD/`.bzl` acquisition, parser/evaluator retry, and
 consumer publication remain later packets. Nested `MODULE.bazel` without
 BUILD continues and no incorrect-repository detector is authorized.
 
+### Stage 4 private Host glob traversal owner
+
+Status: Landed, private and dormant
+Source ref/commit(s): Bazel
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+`GlobComputationProducer`, `FragmentProducer`, `DirectoryDirentProducer`, and
+`GlobTestBase`; Buck2 baseline
+`088c75c7e36805df99c3de29062baa95db700b8b` only for approved immutable,
+`Dupe`, `Allocative`, and compact-worklist patterns; V1 glob/loading retained
+as rejected reference only
+V2 commit(s): traversal oracle `5abff72e`; implementation/evidence in this
+commit
+Source class: V2-owned Bazel-parity traversal over retained Host observations;
+no Buck/V1 glob semantics, traversal, ownership, consumer, or JVM machinery
+imported
+Reusable primitive or lesson: shared `Arc` slices, temporary `VecDeque`, and
+the existing `SmallSet` only for multi-`**` visitation; no dependency, cache,
+interner, retained standard collection, or global registry
+V2 wrapper/boundary: private Unix-dormant `HostGlobTraversalKey` owns one
+checked full pattern and operation, composes segment candidates with
+root-package boundaries, and returns sorted/deduplicated raw matches or exact
+complete-error-before-Need state. It has zero production callers.
+Bazel oracle: exact nine-label Bazel 9.2 traversal row plus the protected
+six-state boundary row in `glob-package-boundaries`
+Validation: focused traversal 13, direct boundary 7, full loading 86,
+workspace 36, bzlmod 394, doctests, GNU-Windows no-run linkage, formatting,
+diff/scope/caller/dependency/IO/lock/event guards, and independent final
+`ACCEPT`
+Decision: retain only the approved compact utility patterns. Reject V1
+behavior and all JVM/Bazel production delegation. Keep the traversal dormant
+until a separate private loading adapter consumes one full pattern/operation.
+Residual risk: consumer/callable transactions, include/exclude/`allow_empty`,
+BUILD/`.bzl` acquisition, external repositories, SUBPACKAGES, native-Windows
+byte ordering, and lone-surrogate parity remain later packets.
+
 ### Stage 6 depset/provider/rule context tests
 
 Status: Partially landed

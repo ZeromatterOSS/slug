@@ -18,15 +18,15 @@ This table is the scheduling authority for a clean root agent. Historical
 checkpoint sections below are evidence only. A request such as
 `/goal follow the implementation plan` uses the repo orchestration skill and
 advances the **Current packet**, not an older `next` paragraph. The compact
-[current-packet manifest](./slug-v2-current-packet.md) supplies startup details
+[current-packet manifest](./slug-v2-subplans/current-packet.md) supplies startup details
 and must name the same packet.
 
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | Host loading observations and private glob prerequisites through oracle `5abff72e`; full evidence is in the Stage 5 owner plan | implement private recursive traversal before consumer activation; Host publication/retry, byte-aware ingress, native Windows ordering, BUILD/`.bzl` acquisition, registry transports, and discovery composition remain | `WP-5-m1-loading-pure-host-glob-traversal-owner` |
+| M1: one semantic spine | partial | Host loading observations and private glob traversal owner through this commit; full evidence is in the Stage 5 owner plan | private loading adapter and later callable activation; Host publication/retry, byte-aware ingress, native Windows ordering, BUILD/`.bzl` acquisition, registry transports, and discovery composition remain | pause while the bounded M3 Pattern contract is current |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
-| M3: `query` | **active** | 13/16 default functions plus text, graph, and `label_kind` output through `72aece4d`; full evidence is in the Stage 8 owner plan | `attr`, `filter`, and `kind` share an exact Java-compatible `Pattern` blocker; external repositories, pattern breadth, and remaining formats remain | future proposal `WP-8-m3-query-java-pattern-functions` may bundle the Rust Pattern substrate with all three functions after the root freezes its owner, allowlist, evidence, and validation contract; no JVM execution/delegation or loading/glob overlap |
+| M3: `query` | **active** | 13/16 default functions plus text, graph, and `label_kind` output through `72aece4d`; full evidence is in the Stage 8 owner plan | `attr`, `filter`, and `kind` share an exact Java-compatible `Pattern` blocker; external repositories, pattern breadth, and remaining formats remain | root-only contract packet `WP-8-m3-query-java-pattern-functions-contract`; no JVM execution/delegation or loading/glob overlap |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -35,10 +35,10 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-loading-pure-host-glob-traversal-owner`.
+`WP-8-m3-query-java-pattern-functions-contract`.
 
 Read its bounded contract from the
-[current-packet manifest](./slug-v2-current-packet.md).
+[current-packet manifest](./slug-v2-subplans/current-packet.md).
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of

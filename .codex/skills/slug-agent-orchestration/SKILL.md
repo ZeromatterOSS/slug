@@ -11,7 +11,7 @@ commits.
 ## Start
 
 1. Read `AGENTS.md` and
-   `thoughts/shared/plans/slug-v2-current-packet.md`.
+   `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 2. Compare its packet ID with canonical **Current packet** using a targeted
    search. If they differ, stop and report the mismatch to the root; only the
    root may reconcile scheduling documents. Otherwise read only the owner

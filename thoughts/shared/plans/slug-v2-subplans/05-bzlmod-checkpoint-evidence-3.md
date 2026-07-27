@@ -12240,3 +12240,42 @@ checkpoint `e2cc891d`. This is oracle packet three, below every growth-review
 threshold. No harness, Rust, Cargo, DICE, parser, consumer, other fixture, or
 Stage 9 row changed. Next implement only the accepted private three-file
 `WP-5-m1-loading-pure-host-glob-traversal-owner`.
+
+### Pure Host glob traversal owner
+
+Status: **ACCEPT** for
+`WP-5-m1-loading-pure-host-glob-traversal-owner` on 2026-07-27 after one
+independent implementation review and focused correction rereviews.
+
+The private three-file owner lands in this commit at +1,354/-0, below the
++2,340/-45 contract. Checked construction preserves the workspace, logical
+package root, one-byte package identity, one validated full pattern, and
+FILES/FILES_AND_DIRS operation. FIFO traversal composes the accepted segment
+candidate and root-package-boundary keys, implements literal/simple-star and
+standalone-`**` zero/recursive transitions, suppresses repeated multi-`**`
+states, ranks complete errors independently of completion order, returns Need
+only after reached complete errors are exhausted, and sorts/deduplicates raw
+matches once.
+
+Retained state uses shared `Arc` slices, `Dupe`, and `Allocative`; traversal
+uses a temporary `VecDeque`, and only multi-`**` visitation uses the existing
+`starlark_map::SmallSet`. No dependency, global cache/interner, Buck/V1 glob
+implementation, direct filesystem IO, lock, event, public export, or production
+caller was added. Complete-only DICE equality/validity and same-graph
+create/delete/marker/deleted/ignore/restoration behavior are discriminatingly
+covered.
+
+Root validation passed formatting, 13 focused traversal tests, and all 7
+direct Host boundary tests. Recorded pre-close validation also passed the full
+loading suite (86 tests), workspace suite (36), bzlmod units/integrations
+(394), doctests, and GNU-Windows no-run linkage; no production code changed
+after that cross-target pass. The reviewer-required tests cover repeated
+`**`, every boundary kind with ignore-first zero lookup, reverse-recorded FIFO
+error rank, all key identity fields, and same-graph policy restoration. Final
+rereview returned `ACCEPT`.
+
+The owner remains dormant with zero parser, evaluator, callable, query, or
+consumer activation. Future glob work begins with a separately bounded private
+loading adapter; it does not reopen JVM execution, native-Windows byte order,
+BUILD/`.bzl` acquisition, include/exclude composition, `allow_empty`, or
+evaluator transaction ownership.
