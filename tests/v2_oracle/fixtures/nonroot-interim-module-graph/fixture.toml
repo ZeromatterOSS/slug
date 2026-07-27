@@ -1,9 +1,9 @@
 [fixture]
 name = "nonroot-interim-module-graph"
-description = "Bazel 9.2 registry nonroot InterimModule graph semantics and local directory transport."
+description = "Bazel 9.2 registry nonroot InterimModule graph semantics and exact local directory collation/charset transport."
 comparison = "message_shape"
 daemon = true
-oracle_notes = "A retained local registry isolates nonroot graph semantics. subject's nodep shared@2 request upgrades root-introduced shared@1 without becoming a subject edge; the subject's dev dependency and single_version_override are ignored. Nonzero compatibility_level and max_compatibility_level are Bazel 9 no-op source inputs only. Five appended semantic rows select the previously ignored devonly module and move its local-registry MODULE.bazel through ordinary, directory-listing, mutable-metadata fail-open, absent, and exact restoration states while comparing the visible lockfile."
+oracle_notes = "A retained local registry isolates nonroot graph semantics. subject's nodep shared@2 request upgrades root-introduced shared@1 without becoming a subject edge; the subject's dev dependency and single_version_override are ignored. Nonzero compatibility_level and max_compatibility_level are Bazel 9 no-op source inputs only. Eight appended semantic rows select the previously ignored devonly module and move its local-registry MODULE.bazel through ordinary, ASCII directory-listing, mutable-metadata fail-open, absent, exact restoration, ROOT-collated ISO-8859-1 directory-listing, empty followed-directory, and final ordinary-restoration states while comparing the visible lockfile."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -20,8 +20,9 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ArchiveRepoSpecBuilder.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java",
+  "src/main/cpp/blaze.cc",
 ]
-translation_notes = "Bazel 9.2 ModuleFileGlobals stores compatibility_level as 0 and max_compatibility_level as -1; this fixture does not infer those internal values from command output. Nonroot execution ignores dev dependencies and module overrides. The observed Azul OpenJDK 25.0.2 file URL handler sorts a directory's direct names and transports their newline-terminated listing. IndexRegistry checksums MODULE.bazel bytes for remote_module_file_integrity but fetches mutable metadata.json without a checksum; YankedVersionsFunction warns and fails open on metadata parse failure. BazelLockFileModule filters file: registry hashes from the visible lockfile, permitting exact distinct-root replay."
+translation_notes = "Bazel 9.2 ModuleFileGlobals stores compatibility_level as 0 and max_compatibility_level as -1; this fixture does not infer those internal values from command output. Nonroot execution ignores dev dependencies and module overrides. Bazel's default server launch selects ROOT locale and ISO-8859-1. OpenJDK 25.0.2 source openjdk/jdk25u@405a5699ebd097464ed3fc9345414b0774a2edc9 owns FileURLConnection direct-name enumeration, stable ROOT RuleBasedCollator sorting, LF termination, ISO-8859-1 replacement, Unix JNU decoding, and Windows UTF-16 enumeration. The portable seven-name directory produces exact 91-byte SRI sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=; the followed empty directory produces a found zero-byte MODULE value. Explicit host_jvm_args charset/collator input remains supported Bazel behavior but is deferred behind WP-5-m1-host-jvm-registry-byte-input-design. IndexRegistry checksums MODULE.bazel bytes for remote_module_file_integrity but fetches mutable metadata.json without a checksum; YankedVersionsFunction warns and fails open on metadata parse failure. BazelLockFileModule filters file: registry hashes from the visible lockfile, permitting exact distinct-root replay."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-interim-module-graph --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-interim-module-graph --tool bazel --bazel /usr/bin/bazel"
 
@@ -204,4 +205,124 @@ manifest_roots = ["MODULE.bazel.lock"]
   [[commands.mutations]]
   path = "MODULE.bazel"
   find = "version = \"0.1.7\""
+  replace = "version = \"0.1.4\""
+
+[[commands]]
+name = "portable_directory_root_collation_and_latin1_bytes"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\""]
+stdout_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT).*"]
+stderr_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT)(?!.*Is a directory)(?!.*MODULE\\.bazel: not found).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.bazel"
+  destination = "registry/modules/devonly/1.0.0/MODULE.regular"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable-link"
+  destination = "registry/modules/devonly/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# a"
+  content = "CHILD_CONTENT_IS_NOT_TRANSPORT\n"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# B"
+  content = "CHILD_CONTENT_IS_NOT_TRANSPORT\n"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# Ã©"
+  content = "CHILD_CONTENT_IS_NOT_TRANSPORT\n"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# Ā"
+  content = "CHILD_CONTENT_IS_NOT_TRANSPORT\n"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.4\""
+  replace = "version = \"0.1.8\""
+
+[[commands]]
+name = "empty_followed_directory_is_found"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+expected_exit = 37
+stderr_contains = ["the MODULE.bazel file of devonly@1.0.0 declares a different name ()"]
+stdout_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT).*"]
+stderr_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT)(?!.*module devonly@1\\.0\\.0 not found in registries:)(?!.*MODULE\\.bazel: not found)(?!.*Is a directory).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.bazel"
+  destination = "registry/modules/devonly/1.0.0/MODULE.portable-link"
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# a"
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# B"
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# Ã©"
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# Ā"
+
+  [[commands.mutations]]
+  op = "delete"
+  path = "registry/modules/devonly/1.0.0/MODULE.empty/placeholder"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.empty-link"
+  destination = "registry/modules/devonly/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.8\""
+  replace = "version = \"0.1.9\""
+
+[[commands]]
+name = "regular_file_restores_after_empty_directory"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\""]
+stdout_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT).*"]
+stderr_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT)(?!.*Is a directory)(?!.*MODULE\\.bazel: not found).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.bazel"
+  destination = "registry/modules/devonly/1.0.0/MODULE.empty-link"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.empty/placeholder"
+  content = "EMPTY_DIRECTORY_PLACEHOLDER\n"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.regular"
+  destination = "registry/modules/devonly/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.9\""
   replace = "version = \"0.1.4\""

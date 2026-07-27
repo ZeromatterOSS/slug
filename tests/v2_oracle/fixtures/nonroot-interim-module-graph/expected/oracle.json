@@ -470,6 +470,214 @@
       "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
       "stderr": "INFO: Invocation ID: 669dcaf4-53fa-4053-b251-5100f5d1d569\n no actions running\n",
       "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.regular",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.bazel"
+        },
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.bazel",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable-link"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# a"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# B"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# \u00c3\u00a9"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# \u0100"
+        },
+        {
+          "find": "version = \"0.1.4\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.8\""
+        }
+      ],
+      "name": "portable_directory_root_collation_and_latin1_bytes",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)",
+      "stderr": "INFO: Invocation ID: <uuid>\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 37,
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.portable-link",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.bazel"
+        },
+        {
+          "op": "delete",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# a"
+        },
+        {
+          "op": "delete",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# B"
+        },
+        {
+          "op": "delete",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# \u00c3\u00a9"
+        },
+        {
+          "op": "delete",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# \u0100"
+        },
+        {
+          "op": "delete",
+          "path": "registry/modules/devonly/1.0.0/MODULE.empty/placeholder"
+        },
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.bazel",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.empty-link"
+        },
+        {
+          "find": "version = \"0.1.8\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.9\""
+        }
+      ],
+      "name": "empty_followed_directory_is_found",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: <uuid>\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.empty-link",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.bazel"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.empty/placeholder"
+        },
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.bazel",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.regular"
+        },
+        {
+          "find": "version = \"0.1.9\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.4\""
+        }
+      ],
+      "name": "regular_file_restores_after_empty_directory",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
+      "stderr": "INFO: Invocation ID: <uuid>\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n"
     }
   ],
   "fixture": "nonroot-interim-module-graph",

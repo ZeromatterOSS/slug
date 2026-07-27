@@ -1,0 +1,1 @@
+module(name = 'devonly', version = '1.0.0')
