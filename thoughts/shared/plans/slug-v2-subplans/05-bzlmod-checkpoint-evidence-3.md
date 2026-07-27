@@ -10454,3 +10454,50 @@ post-checkpoint oracle packet three only after terminal acceptance.
 
 Next packet: retry only
 `WP-5-m1-loading-host-dirent-glob-oracle`.
+
+### Corrected Host-dirent glob oracle retry stop
+
+Status: `REPLAN` on 2026-07-27 from clean baseline `245dfc09`. The corrected
+pinned `/usr/bin/bazel` generation kept all eleven commands on server epoch 1
+but exposed two further material semantic contradictions.
+
+Rows one through four exited 7 before the FIFO setup because top-level
+`glob(["specials/*"])` matched nothing and Bazel 9.2's active
+`--incompatible_disallow_empty_glob` behavior defaults `allow_empty` to false.
+The direct-FIFO row likewise exited 7 because files-only `glob(["state*"])`
+was empty, rather than succeeding with the frozen three-label output.
+Separately, the regular-to-directory row exited 0 but retained both
+`//pkg:state_files_state` and `//pkg:state_all_state`, contradicting the frozen
+expectation that the files-only target disappears. The baseline,
+symlink-to-special, regular restoration, corrected matched-cycle failure, and
+same-epoch recovery otherwise matched their corrected expectations.
+
+Per the stop gate, no `allow_empty` flag, output, topology, or row was changed
+and no replay ran. The generated expectation and every harness, fixture,
+BUILD, regular-asset, and symlink draft were removed; every non-plan
+implementation path returned byte-for-byte to `245dfc09`. No implementation,
+fixture growth, Rust, Cargo, dependency, API, DICE key, consumer, or activation
+was accepted. The preserved ignored evidence is
+`target/v2o/runs/glob-directory-invalidation/20260727-035647-3971454-bazel/`.
+This stopped retry still does not count as post-checkpoint oracle packet three:
+accepted growth after `22de3631` remains two packets at +4 regular,
++3 symlinks, and +1,065 lines.
+
+This is a second material semantic correction after the cycle/BUILD
+correction, so the implementation packet ends instead of taking another
+inline patch. Next, design and terminally rereview only
+`WP-5-m1-loading-host-dirent-glob-oracle-semantics-redesign`.
+
+Audit all five generated-target glob calls and explicitly freeze
+`allow_empty` semantics for every state. Reproduce the regular-to-directory
+result in isolated cold and same-daemon controls, trace why the warm row
+retains `state_files_state` despite files-only operation, and distinguish true
+Bazel incremental behavior from mutation or visibility artifacts. Then
+refreeze every row and output, the exact topology/row count/allowlist/caps, and
+whether the accepted typed-dirent observation implementation remains the next
+prerequisite. A bounded reviewed delta is permitted if discriminating
+cold-versus-warm evidence requires it. Permit only pinned-source inspection
+and confined temporary Bazel probes. Do not edit or regenerate the harness,
+fixture, expectation, assets, Rust, Cargo, APIs, owners, consumers, or
+activation, and do not retry either the oracle or typed observation before
+terminal acceptance.
