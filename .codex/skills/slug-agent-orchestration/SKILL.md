@@ -31,8 +31,9 @@ packet touches one of its listed surfaces.
 | Work | Route |
 |------|-------|
 | Small read-only/mechanical | Root |
+| Simple exact-oracle formatter/CLI/query slice | Root |
 | Audit, oracle, focused tests, one abstraction | Terra medium |
-| Approved difficult Rust/DICE/Starlark/query | Terra high |
+| Approved difficult Rust/DICE/Starlark/query architecture | Terra high |
 | Reserved decision or risky final review | Sol low |
 | Concrete unresolved architecture miss | Sol high |
 
@@ -48,7 +49,8 @@ specific question; agents read shared files from disk.
 When the user identifies token pressure, default to root-only serial work and
 no implementation delegation. Do not run speculative audits, reconstruct
 accepted evidence, or delegate mechanical work. Prefer the next observable
-vertical slice over substrate breadth.
+vertical slice over substrate breadth. Keep simple query, formatter, and CLI
+slices on the root exact-oracle path unless they cross a reserved boundary.
 
 ## Packet
 
