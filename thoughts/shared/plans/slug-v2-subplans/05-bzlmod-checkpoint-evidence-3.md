@@ -9275,3 +9275,74 @@ termination-expected acknowledgement, and verified exact-process death before
 restart. Status remains responsive while a dedicated worker serializes
 commands; no lock is held across DICE computation. Never unlink, kill, or
 replace from reachability alone.
+
+### Host JVM startup/reuse oracle pre-implementation stop
+
+Status: `REPLAN` after terminal latest-text review on 2026-07-26, before
+retained harness or fixture edits.
+
+The seven-path
+`WP-5-m1-host-jvm-registry-startup-reuse-oracle` stopped at its preflight
+gate. Pinned Bazel 9.2 accepts `--build_event_json_file` on `mod graph` and
+`mod show_repo`. `ModCommand.java:107-136` posts `NoBuildEvent`, but that alone
+does not disable BEP. The decisive boundary is
+`BazelBuildEventServiceModule.java:209-223`, which omits `mod` from
+`ALLOWED_COMMANDS`; `BuildEventServiceModule.java:388-424` therefore returns
+before `createBepTransports`, and its JSON-file creation path at lines 839-945
+is never reached. A native `mod graph` probe exited zero without creating the
+requested file. Therefore none of the five planned semantic `mod show_repo`
+rows can satisfy the same-command requirement for exactly one original
+structured-command-line event.
+
+A separate pinned `build //...` probe did create exactly one
+`structuredCommandLine` event labelled `original` with exactly one
+`startup options` section. Its synthetic empty `StartupOption` values encoded
+as empty JSON objects with absent `combinedForm`, not explicit JSON empty
+strings. The observed ordered CLI projection was output base, synthetic empty,
+each hermetic RC-suppression option followed by synthetic empty, then each
+host-JVM occurrence followed by synthetic empty. Any eventual extractor must
+map absent `combinedForm` to the semantic empty string while rejecting other
+schema/cardinality drift. The populated/synthetic source chain is pinned at
+`blaze.cc:2069-2075` and `CommandLineEvent.java:280-300`; the live JSON
+observation pins the absent-field encoding.
+
+Preflight also found that the packet cannot both forbid server/transport edits
+and replace Slug's unauthenticated fire-and-forget cleanup. Authenticated
+Status, instance tokens, termination acknowledgement, and verified Slug
+process identity do not exist yet. The bounded oracle may implement exact
+Bazel cleanup only. It must preserve the legacy Slug path without claiming it
+as accepted lifecycle evidence, and the new fixture must fail closed as
+unsupported for Slug epoch capture until the later transport packet. Epoch
+observation must be gated to an opted-in fixture: observe every command in
+this fixture to establish epoch 1, but do not broaden observation to the other
+`daemon = true` fixtures.
+
+The writer's temporary failing-test draft was fully removed. At the stop,
+`git status --short`, `git diff --check`, and `git diff --name-only` were
+empty at `571db092`; no test, generation, expected file, fixture inventory, or
+production code changed, and every probe server was shut down and verified
+dead.
+
+Next packet: design only
+`WP-5-m1-host-jvm-registry-startup-reuse-oracle-command-shape-correction`.
+Before any edit, freeze:
+
+- the smallest explicit `build //...` diagnostic companion commands that
+  preserve the five semantic `mod show_repo` transitions, exact startup argv,
+  epoch, and graph identity without hiding a second tool invocation inside one
+  fixture command;
+- the corrected total command/row count, exact CLI and RC combined-form lists,
+  absent-field-to-empty projection, source-grouped `--announce_rc`, expected
+  manifests, scope, growth, and line caps;
+- fixture-opt-in epoch observation across every command in this fixture only;
+- exact Bazel-only shutdown, primary-error preservation, exit/death/endpoint
+  verification, and focused failure tests; and
+- an explicit no-claim boundary for Slug cleanup/Status until authenticated
+  transport exists.
+
+Do not edit a harness, fixture, expected file, RC, Rust, Cargo, dependency,
+API, DICE key, runtime, CLI/server, private Host owner, consumer, or activation
+before terminal latest-text review. Stop on a hidden paired invocation,
+same-command BEP claim for `mod`, explicit-empty-only JSON parser, global
+daemon observation, PID-only Slug evidence, legacy Slug cleanup acceptance,
+lost primary failure, or any production work.
