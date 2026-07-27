@@ -13,15 +13,16 @@
 //! This is a deliberately small V2 adaptation of Buck2's
 //! `buck2_util::cycle_detector::LazyCycleDetector`. Modern DICE exposes user
 //! cycle-detector events, but does not resolve this loading-key cycle itself.
-//! The detector records only `BzlModuleEvalKey` nodes, waits for the active
-//! graph to become idle, and then releases blocked dependency waits with the
-//! discovered cycle.
+//! The detector records isolated legacy and Host `.bzl` key families, waits for
+//! the active graph to become idle, and then releases blocked dependency waits
+//! with the discovered cycle.
 
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
+use allocative::Allocative;
 use dice::DynKey;
 use dice::UserCycleDetector;
 use dice::UserCycleDetectorGuard;
@@ -32,6 +33,7 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
+use crate::bzl_module::HostBzlModuleEvalKey;
 use crate::keys::BzlModuleEvalKey;
 
 /// Create the detector that must be installed in one loading-capable DICE
@@ -43,7 +45,7 @@ pub fn bzl_load_cycle_detector() -> Arc<dyn UserCycleDetector> {
     Arc::new(BzlLoadCycleDetector::new())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct BzlLoadCycle {
     pub(crate) path: Arc<[BzlModuleEvalKey]>,
     pub(crate) keys: Arc<[BzlModuleEvalKey]>,
@@ -58,12 +60,84 @@ impl BzlLoadCycle {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostBzlLoadCycle {
+    pub(crate) path: Arc<[HostBzlModuleEvalKey]>,
+    pub(crate) keys: Arc<[HostBzlModuleEvalKey]>,
+}
+
+impl HostBzlLoadCycle {
+    fn from_detected(cycle: DetectedBzlLoadCycle) -> Self {
+        Self {
+            path: cycle
+                .path
+                .iter()
+                .map(|key| match key {
+                    BzlLoadCycleNode::Host(key) => key.clone(),
+                    BzlLoadCycleNode::Legacy(_) => {
+                        panic!("Host bzl cycle contained a legacy loading key")
+                    }
+                })
+                .collect(),
+            keys: cycle
+                .keys
+                .iter()
+                .map(|key| match key {
+                    BzlLoadCycleNode::Host(key) => key.clone(),
+                    BzlLoadCycleNode::Legacy(_) => {
+                        panic!("Host bzl cycle contained a legacy loading key")
+                    }
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum BzlLoadCycleNode {
+    Legacy(BzlModuleEvalKey),
+    Host(HostBzlModuleEvalKey),
+}
+
+#[derive(Debug, Clone)]
+struct DetectedBzlLoadCycle {
+    path: Arc<[BzlLoadCycleNode]>,
+    keys: Arc<[BzlLoadCycleNode]>,
+}
+
+impl BzlLoadCycle {
+    fn from_detected(cycle: DetectedBzlLoadCycle) -> Self {
+        Self {
+            path: cycle
+                .path
+                .iter()
+                .map(|key| match key {
+                    BzlLoadCycleNode::Legacy(key) => key.clone(),
+                    BzlLoadCycleNode::Host(_) => {
+                        panic!("legacy bzl cycle contained a Host loading key")
+                    }
+                })
+                .collect(),
+            keys: cycle
+                .keys
+                .iter()
+                .map(|key| match key {
+                    BzlLoadCycleNode::Legacy(key) => key.clone(),
+                    BzlLoadCycleNode::Host(_) => {
+                        panic!("legacy bzl cycle contained a Host loading key")
+                    }
+                })
+                .collect(),
+        }
+    }
+}
+
 /// The typed guard retrieved from `DiceComputations` while evaluating a bzl
 /// module. It is intentionally not a process-global singleton.
 pub(crate) struct BzlLoadCycleGuard {
     key: BzlModuleEvalKey,
     sender: mpsc::UnboundedSender<Event>,
-    receiver: Mutex<oneshot::Receiver<BzlLoadCycle>>,
+    receiver: Mutex<oneshot::Receiver<DetectedBzlLoadCycle>>,
 }
 
 impl BzlLoadCycleGuard {
@@ -77,7 +151,7 @@ impl BzlLoadCycleGuard {
         let mut receiver = self.receiver.lock().await;
         tokio::select! {
             value = future => Ok(value),
-            cycle = &mut *receiver => Err(cycle.unwrap_or_else(|_| BzlLoadCycle::new(Vec::new(), Vec::new()))),
+            cycle = &mut *receiver => Err(cycle.map(BzlLoadCycle::from_detected).unwrap_or_else(|_| BzlLoadCycle::new(Vec::new(), Vec::new()))),
         }
     }
 }
@@ -85,7 +159,47 @@ impl BzlLoadCycleGuard {
 impl UserCycleDetectorGuard for BzlLoadCycleGuard {
     fn add_edge(&self, key: &DynKey) {
         if let Some(key) = key.downcast_ref::<BzlModuleEvalKey>() {
-            let _ignored = self.sender.send(Event::Edge(self.key.clone(), key.clone()));
+            let _ignored = self.sender.send(Event::Edge(
+                BzlLoadCycleNode::Legacy(self.key.clone()),
+                BzlLoadCycleNode::Legacy(key.clone()),
+            ));
+        }
+    }
+
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+}
+
+pub(crate) struct HostBzlLoadCycleGuard {
+    key: HostBzlModuleEvalKey,
+    sender: mpsc::UnboundedSender<Event>,
+    receiver: Mutex<oneshot::Receiver<DetectedBzlLoadCycle>>,
+}
+
+impl HostBzlLoadCycleGuard {
+    pub(crate) async fn guard_this<R, F>(&self, future: F) -> Result<R, HostBzlLoadCycle>
+    where
+        F: Future<Output = R>,
+    {
+        let mut receiver = self.receiver.lock().await;
+        tokio::select! {
+            value = future => Ok(value),
+            cycle = &mut *receiver => Err(cycle.map(HostBzlLoadCycle::from_detected).unwrap_or_else(|_| HostBzlLoadCycle {
+                path: Arc::from([]),
+                keys: Arc::from([]),
+            })),
+        }
+    }
+}
+
+impl UserCycleDetectorGuard for HostBzlLoadCycleGuard {
+    fn add_edge(&self, key: &DynKey) {
+        if let Some(key) = key.downcast_ref::<HostBzlModuleEvalKey>() {
+            let _ignored = self.sender.send(Event::Edge(
+                BzlLoadCycleNode::Host(self.key.clone()),
+                BzlLoadCycleNode::Host(key.clone()),
+            ));
         }
     }
 
@@ -143,10 +257,13 @@ impl BzlLoadCycleDetector {
         Self { sender, task }
     }
 
-    fn start(&self, key: BzlModuleEvalKey) -> Arc<BzlLoadCycleGuard> {
+    fn start_legacy(&self, key: BzlModuleEvalKey) -> Arc<BzlLoadCycleGuard> {
         let (sender, receiver) = oneshot::channel();
         // The receiver lives for as long as DICE holds the computation guard.
-        let _ignored = self.sender.send(Event::Started(key.clone(), sender));
+        let _ignored = self.sender.send(Event::Started(
+            BzlLoadCycleNode::Legacy(key.clone()),
+            sender,
+        ));
         Arc::new(BzlLoadCycleGuard {
             key,
             sender: self.sender.clone(),
@@ -154,43 +271,60 @@ impl BzlLoadCycleDetector {
         })
     }
 
-    fn finish(&self, key: BzlModuleEvalKey) {
+    fn start_host(&self, key: HostBzlModuleEvalKey) -> Arc<HostBzlLoadCycleGuard> {
+        let (sender, receiver) = oneshot::channel();
+        let _ignored = self
+            .sender
+            .send(Event::Started(BzlLoadCycleNode::Host(key.clone()), sender));
+        Arc::new(HostBzlLoadCycleGuard {
+            key,
+            sender: self.sender.clone(),
+            receiver: Mutex::new(receiver),
+        })
+    }
+
+    fn finish(&self, key: BzlLoadCycleNode) {
         let _ignored = self.sender.send(Event::Finished(key));
     }
 }
 
 impl UserCycleDetector for BzlLoadCycleDetector {
     fn start_computing_key(&self, key: &DynKey) -> Option<Arc<dyn UserCycleDetectorGuard>> {
-        key.downcast_ref::<BzlModuleEvalKey>()
-            .map(|key| self.start(key.clone()) as Arc<dyn UserCycleDetectorGuard>)
+        if let Some(key) = key.downcast_ref::<BzlModuleEvalKey>() {
+            return Some(self.start_legacy(key.clone()));
+        }
+        key.downcast_ref::<HostBzlModuleEvalKey>()
+            .map(|key| self.start_host(key.clone()) as Arc<dyn UserCycleDetectorGuard>)
     }
 
     fn finished_computing_key(&self, key: &DynKey) {
         if let Some(key) = key.downcast_ref::<BzlModuleEvalKey>() {
-            self.finish(key.clone());
+            self.finish(BzlLoadCycleNode::Legacy(key.clone()));
+        } else if let Some(key) = key.downcast_ref::<HostBzlModuleEvalKey>() {
+            self.finish(BzlLoadCycleNode::Host(key.clone()));
         }
     }
 }
 
 enum Event {
-    Started(BzlModuleEvalKey, oneshot::Sender<BzlLoadCycle>),
-    Finished(BzlModuleEvalKey),
-    Edge(BzlModuleEvalKey, BzlModuleEvalKey),
+    Started(BzlLoadCycleNode, oneshot::Sender<DetectedBzlLoadCycle>),
+    Finished(BzlLoadCycleNode),
+    Edge(BzlLoadCycleNode, BzlLoadCycleNode),
 }
 
 enum NodeState {
     Known,
     Finished,
-    CycleDetected(BzlLoadCycle),
+    CycleDetected(DetectedBzlLoadCycle),
     Working {
         edges: SmallSet<u32>,
-        sender: oneshot::Sender<BzlLoadCycle>,
+        sender: oneshot::Sender<DetectedBzlLoadCycle>,
     },
 }
 
 struct CycleDetectorState {
-    node_ids: SmallMap<BzlModuleEvalKey, u32>,
-    nodes: Vec<(BzlModuleEvalKey, NodeState)>,
+    node_ids: SmallMap<BzlLoadCycleNode, u32>,
+    nodes: Vec<(BzlLoadCycleNode, NodeState)>,
     dirtied: SmallSet<u32>,
 }
 
@@ -203,7 +337,7 @@ impl CycleDetectorState {
         }
     }
 
-    fn node_id(&mut self, key: &BzlModuleEvalKey) -> u32 {
+    fn node_id(&mut self, key: &BzlLoadCycleNode) -> u32 {
         if let Some(id) = self.node_ids.get(key) {
             return *id;
         }
@@ -302,14 +436,16 @@ impl CycleDetectorState {
     }
 
     fn notify_cycle(&mut self, path: Vec<u32>, ids: Vec<u32>) {
-        let cycle = BzlLoadCycle::new(
-            path.iter()
+        let cycle = DetectedBzlLoadCycle {
+            path: path
+                .iter()
                 .map(|id| self.nodes[*id as usize].0.clone())
                 .collect(),
-            ids.iter()
+            keys: ids
+                .iter()
                 .map(|id| self.nodes[*id as usize].0.clone())
                 .collect(),
-        );
+        };
         for id in ids {
             let state = std::mem::replace(
                 &mut self.nodes[id as usize].1,

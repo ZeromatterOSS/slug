@@ -12679,3 +12679,25 @@ blocking/JVM guards. Stop and `REPLAN` if implementation requires exposing a
 private bzlmod owner, changing `PackageLoadKey` or `BzlModuleEvalKey`, command
 activation, external repository mapping/materialization, arbitrary
 invalid-UTF-8 source parsing, a fresh graph, or a sixth file.
+
+#### Host package-loading key implementation status
+
+Status: **ACCEPT** for
+`WP-5-m1-loading-host-package-key-input-ownership` on 2026-07-27 after one
+terminal independent implementation review.
+
+The five-file implementation adds the accepted public bzlmod source projection,
+private dormant Host package/module keys, and isolated Host cycle nodes without
+changing legacy loading or adding a caller. Focused source and Host-loading
+tests pass, including one retained graph covering marker, BUILD, `.bzl`,
+nested-package, load-edge, cycle, package-policy, and restoration transitions.
+Both changed crates passed their full suites before the final test-only
+strengthening; the direct `slug_core_v2` compile dependent and GNU-Windows
+no-run linkage pass. Formatting, diff/archive, scope/export/caller/Cargo/
+dependency/legacy/IO/blocking/JVM guards pass.
+
+Next design only
+`WP-5-m1-loading-typed-propagation-design`. Freeze the minimum root-repository
+typed loading boundary needed by later simple query work; keep external
+repositories, analysis, command/runtime activation, and broader discovery out
+of scope.

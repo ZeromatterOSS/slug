@@ -9,7 +9,12 @@
 
 #![allow(dead_code)] // Dormant until the later Host root-module packets.
 
+#[cfg(unix)]
+use std::ffi::OsString;
 use std::fmt;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStringExt;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -21,6 +26,7 @@ use dupe::Dupe;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
+use slug_identity_v2::TargetName;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationNamespace;
@@ -31,8 +37,13 @@ use slug_workspace_v2::ResolvedPathState;
 
 use crate::RootPackageLookupInputsProjectionKey;
 use crate::RootPackagePolicyProjectionError;
+use crate::host_file::HostFileBytes;
+use crate::host_file::HostFileBytesKey;
+use crate::host_file::HostFileError;
 use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::HostRepositoryIgnoreKey;
+use crate::source_preparation::SourcePreparationNeeds;
+use crate::source_preparation::SourcePreparationOutcome;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 pub(crate) enum HostBuildFileName {
@@ -267,6 +278,482 @@ impl Key for HostRootPackageLookupKey {
     }
 }
 
+/// A validated root-repository `.bzl` target in Bazel's internal byte shape.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe)]
+pub struct RootPackageBzlTarget {
+    raw: Arc<[u8]>,
+}
+
+impl RootPackageBzlTarget {
+    pub fn parse(value: &str) -> Result<Self, RootPackageBzlTargetError> {
+        let target = TargetName::parse(value).map_err(|message| {
+            RootPackageBzlTargetError::InvalidTarget {
+                target: Arc::from(value),
+                message: Arc::from(message),
+            }
+        })?;
+        if target.as_str() != value {
+            return Err(RootPackageBzlTargetError::InvalidTarget {
+                target: Arc::from(value),
+                message: Arc::from("target path must use its canonical spelling"),
+            });
+        }
+        if !value.ends_with(".bzl") {
+            return Err(RootPackageBzlTargetError::InvalidTarget {
+                target: Arc::from(value),
+                message: Arc::from("load target must end with `.bzl`"),
+            });
+        }
+        let mut raw = Vec::with_capacity(value.len());
+        for scalar in value.chars() {
+            let byte = u8::try_from(u32::from(scalar)).map_err(|_| {
+                RootPackageBzlTargetError::NonLatin1Scalar {
+                    target: Arc::from(value),
+                    scalar: u32::from(scalar),
+                }
+            })?;
+            raw.push(byte);
+        }
+        if raw.is_empty()
+            || raw.first() == Some(&b'/')
+            || raw.last() == Some(&b'/')
+            || raw
+                .split(|byte| *byte == b'/')
+                .any(|component| component.is_empty() || matches!(component, b"." | b".."))
+            || raw
+                .iter()
+                .any(|byte| *byte < b' ' || *byte == b'\x7f' || matches!(byte, b':' | b'\\'))
+        {
+            return Err(RootPackageBzlTargetError::InvalidTarget {
+                target: Arc::from(value),
+                message: Arc::from("target is not a normalized relative `.bzl` path"),
+            });
+        }
+        Ok(Self { raw: raw.into() })
+    }
+
+    pub fn raw_bytes(&self) -> &[u8] {
+        &self.raw
+    }
+
+    fn internal_string(&self) -> String {
+        self.raw.iter().copied().map(char::from).collect()
+    }
+}
+
+impl fmt::Display for RootPackageBzlTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.internal_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum RootPackageBzlTargetError {
+    InvalidTarget { target: Arc<str>, message: Arc<str> },
+    NonLatin1Scalar { target: Arc<str>, scalar: u32 },
+}
+
+impl fmt::Display for RootPackageBzlTargetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidTarget { target, message } => {
+                write!(f, "invalid root .bzl target `{target}`: {message}")
+            }
+            Self::NonLatin1Scalar { target, scalar } => write!(
+                f,
+                "root .bzl target `{target}` contains non-Latin-1 scalar U+{:04X}",
+                scalar
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RootPackageBzlTargetError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+enum RootPackageSourceRequest {
+    Build(PackagePath),
+    Bzl {
+        package: PackagePath,
+        target: RootPackageBzlTarget,
+    },
+}
+
+impl RootPackageSourceRequest {
+    fn package(&self) -> &PackagePath {
+        match self {
+            Self::Build(package) | Self::Bzl { package, .. } => package,
+        }
+    }
+}
+
+/// Selects and reads one root-package BUILD or `.bzl` source through Host DICE
+/// owners, including Bazel package-boundary and special-file behavior.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RootPackageSourceKey {
+    workspace: NormalizedAbsolutePath,
+    request: RootPackageSourceRequest,
+}
+
+impl RootPackageSourceKey {
+    pub fn for_build(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+        Self {
+            workspace,
+            request: RootPackageSourceRequest::Build(package),
+        }
+    }
+
+    pub fn for_bzl(
+        workspace: NormalizedAbsolutePath,
+        package: PackagePath,
+        target: RootPackageBzlTarget,
+    ) -> Self {
+        Self {
+            workspace,
+            request: RootPackageSourceRequest::Bzl { package, target },
+        }
+    }
+}
+
+impl fmt::Display for RootPackageSourceKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.request {
+            RootPackageSourceRequest::Build(package) => {
+                write!(
+                    f,
+                    "root-package-source:{}//{}:<BUILD>",
+                    self.workspace, package
+                )
+            }
+            RootPackageSourceRequest::Bzl { package, target } => write!(
+                f,
+                "root-package-source:{}//{}:{}",
+                self.workspace, package, target
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct RootPackageSource {
+    package_root: NormalizedAbsolutePath,
+    logical_path: NormalizedAbsolutePath,
+    relative_path: Arc<[u8]>,
+    bytes: Arc<[u8]>,
+}
+
+impl RootPackageSource {
+    pub fn package_root(&self) -> &NormalizedAbsolutePath {
+        &self.package_root
+    }
+
+    pub fn logical_path(&self) -> &NormalizedAbsolutePath {
+        &self.logical_path
+    }
+
+    pub fn relative_path(&self) -> &Arc<[u8]> {
+        &self.relative_path
+    }
+
+    pub fn bytes(&self) -> &Arc<[u8]> {
+        &self.bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum RootPackageSourceErrorInner {
+    PackageLookup {
+        package: PackagePath,
+        error: HostRootPackageLookupError,
+    },
+    NoBuildFile {
+        package: PackagePath,
+    },
+    DeletedPackage {
+        package: PackagePath,
+    },
+    InvalidPackageName {
+        package: PackagePath,
+        message: Arc<str>,
+    },
+    LabelCrossesPackageBoundary {
+        package: PackagePath,
+        containing_package: PackagePath,
+    },
+    Source {
+        logical_path: NormalizedAbsolutePath,
+        error: HostFileError,
+    },
+    Missing {
+        logical_path: NormalizedAbsolutePath,
+    },
+    UnsupportedPlatformPath {
+        target: RootPackageBzlTarget,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RootPackageSourceError {
+    inner: RootPackageSourceErrorInner,
+}
+
+impl RootPackageSourceError {
+    fn new(inner: RootPackageSourceErrorInner) -> Self {
+        Self { inner }
+    }
+}
+
+impl fmt::Display for RootPackageSourceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.inner {
+            RootPackageSourceErrorInner::PackageLookup { package, error } => {
+                write!(f, "looking up root package //{package}: {error}")
+            }
+            RootPackageSourceErrorInner::NoBuildFile { package } => {
+                write!(f, "no BUILD.bazel or BUILD file in package //{package}")
+            }
+            RootPackageSourceErrorInner::DeletedPackage { package } => {
+                write!(f, "package //{package} is deleted or ignored")
+            }
+            RootPackageSourceErrorInner::InvalidPackageName { message, .. } => f.write_str(message),
+            RootPackageSourceErrorInner::LabelCrossesPackageBoundary {
+                package,
+                containing_package,
+            } => write!(
+                f,
+                "label in package //{package} crosses boundary of subpackage //{containing_package}"
+            ),
+            RootPackageSourceErrorInner::Source {
+                logical_path,
+                error,
+            } => write!(
+                f,
+                "reading root package source {}: {error:?}",
+                logical_path.as_path().display()
+            ),
+            RootPackageSourceErrorInner::Missing { logical_path } => write!(
+                f,
+                "root package source is missing: {}",
+                logical_path.as_path().display()
+            ),
+            RootPackageSourceErrorInner::UnsupportedPlatformPath { target } => write!(
+                f,
+                "root .bzl target cannot be represented on this platform: {target}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RootPackageSourceError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.inner {
+            RootPackageSourceErrorInner::PackageLookup { error, .. } => Some(error),
+            RootPackageSourceErrorInner::NoBuildFile { .. }
+            | RootPackageSourceErrorInner::DeletedPackage { .. }
+            | RootPackageSourceErrorInner::InvalidPackageName { .. }
+            | RootPackageSourceErrorInner::LabelCrossesPackageBoundary { .. }
+            | RootPackageSourceErrorInner::Source { .. }
+            | RootPackageSourceErrorInner::Missing { .. }
+            | RootPackageSourceErrorInner::UnsupportedPlatformPath { .. } => None,
+        }
+    }
+}
+
+fn containing_package_candidates(
+    package: &PackagePath,
+    target: &RootPackageBzlTarget,
+) -> Vec<PackagePath> {
+    let raw = target.raw_bytes();
+    let parent = raw
+        .iter()
+        .rposition(|byte| *byte == b'/')
+        .map_or(&[][..], |index| &raw[..index]);
+    let parent: String = parent.iter().copied().map(char::from).collect();
+    let mut candidate = if parent.is_empty() {
+        package.as_str().to_owned()
+    } else if package.as_str().is_empty() {
+        parent
+    } else {
+        format!("{}/{parent}", package.as_str())
+    };
+    let mut candidates = Vec::new();
+    loop {
+        let parsed = PackagePath::parse(&candidate)
+            .expect("validated target parents remain normalized package paths");
+        let is_declared = &parsed == package;
+        candidates.push(parsed);
+        if is_declared {
+            break;
+        }
+        candidate.truncate(
+            candidate
+                .rfind('/')
+                .expect("a target parent below its declared package has a slash"),
+        );
+    }
+    candidates
+}
+
+fn append_bzl_target(
+    mut package_dir: PathBuf,
+    target: &RootPackageBzlTarget,
+) -> Result<PathBuf, RootPackageSourceError> {
+    for component in target.raw_bytes().split(|byte| *byte == b'/') {
+        #[cfg(unix)]
+        package_dir.push(OsString::from_vec(component.to_vec()));
+        #[cfg(not(unix))]
+        {
+            let component = std::str::from_utf8(component).map_err(|_| {
+                RootPackageSourceError::new(RootPackageSourceErrorInner::UnsupportedPlatformPath {
+                    target: target.dupe(),
+                })
+            })?;
+            package_dir.push(component);
+        }
+    }
+    Ok(package_dir)
+}
+
+fn source_complete_error(
+    inner: RootPackageSourceErrorInner,
+) -> SourcePreparationOutcome<Arc<Result<RootPackageSource, RootPackageSourceError>>> {
+    SourcePreparationOutcome::Complete(Arc::new(Err(RootPackageSourceError::new(inner))))
+}
+
+#[async_trait]
+impl Key for RootPackageSourceKey {
+    type Value = SourcePreparationOutcome<Arc<Result<RootPackageSource, RootPackageSourceError>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let declared_package = self.request.package();
+        let candidates = match &self.request {
+            RootPackageSourceRequest::Build(package) => vec![package.clone()],
+            RootPackageSourceRequest::Bzl { package, target } => {
+                containing_package_candidates(package, target)
+            }
+        };
+        let mut selected = None;
+        for candidate in candidates {
+            let lookup = dice_invariant(
+                ctx.compute(&HostRootPackageLookupKey::new(
+                    self.workspace.dupe(),
+                    candidate.clone(),
+                ))
+                .await,
+            );
+            let lookup = match lookup {
+                PathOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
+                }
+                PathOutcome::Complete(value) => value,
+            };
+            match lookup.as_ref() {
+                Err(error) => {
+                    return source_complete_error(RootPackageSourceErrorInner::PackageLookup {
+                        package: candidate,
+                        error: error.clone(),
+                    });
+                }
+                Ok(HostRootPackageLookup::Package(package)) => {
+                    if &candidate != declared_package {
+                        return source_complete_error(
+                            RootPackageSourceErrorInner::LabelCrossesPackageBoundary {
+                                package: declared_package.clone(),
+                                containing_package: candidate,
+                            },
+                        );
+                    }
+                    selected = Some(package.dupe());
+                    break;
+                }
+                Ok(HostRootPackageLookup::NoBuildFile) if &candidate == declared_package => {
+                    return source_complete_error(RootPackageSourceErrorInner::NoBuildFile {
+                        package: candidate,
+                    });
+                }
+                Ok(HostRootPackageLookup::Deleted) if &candidate == declared_package => {
+                    return source_complete_error(RootPackageSourceErrorInner::DeletedPackage {
+                        package: candidate,
+                    });
+                }
+                Ok(HostRootPackageLookup::InvalidPackageName { message })
+                    if &candidate == declared_package =>
+                {
+                    return source_complete_error(
+                        RootPackageSourceErrorInner::InvalidPackageName {
+                            package: candidate,
+                            message: message.clone(),
+                        },
+                    );
+                }
+                Ok(HostRootPackageLookup::NoBuildFile)
+                | Ok(HostRootPackageLookup::Deleted)
+                | Ok(HostRootPackageLookup::InvalidPackageName { .. }) => {}
+            }
+        }
+        let selected = selected.expect("declared package candidate returns or selects a package");
+        let package_dir = selected
+            .package_root()
+            .as_path()
+            .join(declared_package.as_str());
+        let (logical_path, relative_path): (PathBuf, Arc<[u8]>) = match &self.request {
+            RootPackageSourceRequest::Build(_) => {
+                let name = selected.build_file_name().as_str();
+                (package_dir.join(name), Arc::from(name.as_bytes()))
+            }
+            RootPackageSourceRequest::Bzl { target, .. } => (
+                match append_bzl_target(package_dir, target) {
+                    Ok(path) => path,
+                    Err(error) => {
+                        return SourcePreparationOutcome::Complete(Arc::new(Err(error)));
+                    }
+                },
+                target.raw.clone(),
+            ),
+        };
+        let logical_path = NormalizedAbsolutePath::new(logical_path)
+            .expect("selected package roots and validated target remain normalized absolute");
+        let source = dice_invariant(
+            ctx.compute(&HostFileBytesKey::new(logical_path.dupe()))
+                .await,
+        );
+        match source {
+            PathOutcome::Need(need) => {
+                SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
+            }
+            PathOutcome::Complete(Err(error)) => {
+                source_complete_error(RootPackageSourceErrorInner::Source {
+                    logical_path,
+                    error,
+                })
+            }
+            PathOutcome::Complete(Ok(HostFileBytes::Missing)) => {
+                source_complete_error(RootPackageSourceErrorInner::Missing { logical_path })
+            }
+            PathOutcome::Complete(Ok(HostFileBytes::Present(bytes))) => {
+                SourcePreparationOutcome::Complete(Arc::new(Ok(RootPackageSource {
+                    package_root: selected.package_root().dupe(),
+                    logical_path,
+                    relative_path,
+                    bytes,
+                })))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(unix)]
@@ -338,9 +825,19 @@ mod tests {
     #[cfg(unix)]
     use super::HostRootPackageLookupKey;
     #[cfg(unix)]
+    use super::RootPackageBzlTarget;
+    #[cfg(unix)]
+    use super::RootPackageSource;
+    #[cfg(unix)]
+    use super::RootPackageSourceError;
+    #[cfg(unix)]
+    use super::RootPackageSourceKey;
+    #[cfg(unix)]
     use crate::RootPackagePolicyInputs;
     #[cfg(unix)]
     use crate::inject_root_package_policy_inputs;
+    #[cfg(unix)]
+    use crate::source_preparation::SourcePreparationOutcome;
 
     #[cfg(unix)]
     type ScriptEntry = (PathObservationDemand, PathObservationResult);
@@ -497,6 +994,24 @@ mod tests {
     }
 
     #[cfg(unix)]
+    async fn source(
+        policy: RootPackagePolicyInputs,
+        entries: Vec<ScriptEntry>,
+        key: RootPackageSourceKey,
+    ) -> SourcePreparationOutcome<Arc<Result<RootPackageSource, RootPackageSourceError>>> {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        inject_root_package_policy_inputs(&mut updater, policy).unwrap();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::new(entries).unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await.compute(&key).await.unwrap()
+    }
+
+    #[cfg(unix)]
     fn package(
         outcome: &PathOutcome<
             Arc<Result<HostRootPackageLookup, super::HostRootPackageLookupError>>,
@@ -629,6 +1144,217 @@ mod tests {
         let selected = package(&outcome);
         assert_eq!(selected.package_root(), &path("/root-b"));
         assert_eq!(selected.build_file_name(), HostBuildFileName::BuildDotBazel);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn root_bzl_target_is_validated_before_key_identity() {
+        let target = RootPackageBzlTarget::parse("defs/\u{e9}.bzl").unwrap();
+        assert_eq!(target.raw_bytes(), b"defs/\xe9.bzl");
+        assert_eq!(target.to_string(), "defs/\u{e9}.bzl");
+
+        for invalid in [
+            "",
+            "/x.bzl",
+            "../x.bzl",
+            "./x.bzl",
+            "a/../x.bzl",
+            "a/./x.bzl",
+            "a//x.bzl",
+            "a\\x.bzl",
+            "a:x.bzl",
+            "a/\u{1}x.bzl",
+            "a/x.bzl/",
+            "a/x.scl",
+            "\u{100}.bzl",
+        ] {
+            assert!(
+                RootPackageBzlTarget::parse(invalid).is_err(),
+                "{invalid:?} entered source-key identity"
+            );
+        }
+
+        let package = PackagePath::parse("pkg").unwrap();
+        let key = RootPackageSourceKey::for_bzl(
+            path("/workspace"),
+            package.clone(),
+            RootPackageBzlTarget::parse("defs/a.bzl").unwrap(),
+        );
+        assert_ne!(
+            key,
+            RootPackageSourceKey::for_bzl(
+                path("/workspace"),
+                package.clone(),
+                RootPackageBzlTarget::parse("defs/b.bzl").unwrap(),
+            )
+        );
+        assert_ne!(
+            key,
+            RootPackageSourceKey::for_build(path("/workspace"), package.clone())
+        );
+        assert_ne!(
+            key,
+            RootPackageSourceKey::for_bzl(
+                path("/other"),
+                package,
+                RootPackageBzlTarget::parse("defs/a.bzl").unwrap(),
+            )
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn source_projection_selects_special_build_and_nested_bzl_bytes() {
+        let build_roots = ["/root-a", "/root-b"];
+        let mut build_entries = repository_prelude(&build_roots, 31);
+        build_entries.extend([
+            present("/root-a/pkg", PathNodeKind::Directory, 31),
+            missing("/root-a/pkg/BUILD.bazel"),
+            present("/root-a/pkg/BUILD", PathNodeKind::SpecialFile, 31),
+            bytes("/root-a/pkg/BUILD", b"build-source"),
+            present("/root-b/pkg", PathNodeKind::Directory, 31),
+            present("/root-b/pkg/BUILD.bazel", PathNodeKind::RegularFile, 31),
+        ]);
+        let build = source(
+            inputs(&build_roots, &[], None),
+            build_entries,
+            RootPackageSourceKey::for_build(path("/workspace"), PackagePath::parse("pkg").unwrap()),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(build) = &build else {
+            panic!("complete BUILD observations returned Need");
+        };
+        let build = build.as_ref().as_ref().unwrap();
+        assert_eq!(build.package_root(), &path("/root-a"));
+        assert_eq!(build.logical_path(), &path("/root-a/pkg/BUILD"));
+        assert_eq!(build.relative_path().as_ref(), b"BUILD");
+        assert_eq!(build.bytes().as_ref(), b"build-source");
+        assert!(RootPackageSourceKey::validity(
+            &SourcePreparationOutcome::Complete(Arc::new(Ok(build.dupe())))
+        ));
+
+        let bzl_roots = ["/root"];
+        let mut bzl_entries = repository_prelude(&bzl_roots, 32);
+        bzl_entries.extend([
+            present("/root/pkg", PathNodeKind::Directory, 32),
+            present("/root/pkg/defs", PathNodeKind::Directory, 32),
+            missing("/root/pkg/defs/BUILD.bazel"),
+            missing("/root/pkg/defs/BUILD"),
+            present("/root/pkg/BUILD.bazel", PathNodeKind::RegularFile, 32),
+            present("/root/pkg/defs/lib.bzl", PathNodeKind::SpecialFile, 32),
+            bytes("/root/pkg/defs/lib.bzl", b"bzl-source"),
+        ]);
+        let bzl = source(
+            inputs(&bzl_roots, &[], None),
+            bzl_entries,
+            RootPackageSourceKey::for_bzl(
+                path("/workspace"),
+                PackagePath::parse("pkg").unwrap(),
+                RootPackageBzlTarget::parse("defs/lib.bzl").unwrap(),
+            ),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(bzl) = bzl else {
+            panic!("complete .bzl observations returned Need");
+        };
+        let bzl = bzl.as_ref().as_ref().unwrap();
+        assert_eq!(bzl.logical_path(), &path("/root/pkg/defs/lib.bzl"));
+        assert_eq!(bzl.relative_path().as_ref(), b"defs/lib.bzl");
+        assert_eq!(bzl.bytes().as_ref(), b"bzl-source");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn source_projection_preserves_package_policy_and_missing_source_errors() {
+        let roots = ["/root"];
+        let key =
+            RootPackageSourceKey::for_build(path("/workspace"), PackagePath::parse("pkg").unwrap());
+        let deleted = source(inputs(&roots, &["//pkg"], None), Vec::new(), key).await;
+        let SourcePreparationOutcome::Complete(deleted) = deleted else {
+            panic!("deleted package requested observations");
+        };
+        assert_eq!(
+            deleted.as_ref().as_ref().unwrap_err().to_string(),
+            "package //pkg is deleted or ignored"
+        );
+
+        let invalid = source(
+            inputs(&roots, &[], None),
+            Vec::new(),
+            RootPackageSourceKey::for_build(
+                path("/workspace"),
+                PackagePath::parse("bad:name").unwrap(),
+            ),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(invalid) = invalid else {
+            panic!("invalid package requested observations");
+        };
+        assert!(
+            invalid
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .starts_with("Invalid package name 'bad:name':")
+        );
+
+        let mut missing_entries = repository_prelude(&roots, 33);
+        missing_entries.extend([
+            present("/root/pkg", PathNodeKind::Directory, 33),
+            present("/root/pkg/BUILD.bazel", PathNodeKind::RegularFile, 33),
+            missing("/root/pkg/missing.bzl"),
+        ]);
+        let missing = source(
+            inputs(&roots, &[], None),
+            missing_entries,
+            RootPackageSourceKey::for_bzl(
+                path("/workspace"),
+                PackagePath::parse("pkg").unwrap(),
+                RootPackageBzlTarget::parse("missing.bzl").unwrap(),
+            ),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(missing) = missing else {
+            panic!("complete missing-source observations returned Need");
+        };
+        assert_eq!(
+            missing.as_ref().as_ref().unwrap_err().to_string(),
+            "root package source is missing: /root/pkg/missing.bzl"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn source_projection_rejects_nested_package_and_keeps_need_transient() {
+        let roots = ["/root"];
+        let mut entries = repository_prelude(&roots, 41);
+        entries.extend([
+            present("/root/pkg", PathNodeKind::Directory, 41),
+            present("/root/pkg/sub", PathNodeKind::Directory, 41),
+            present("/root/pkg/sub/BUILD.bazel", PathNodeKind::RegularFile, 41),
+        ]);
+        let key = RootPackageSourceKey::for_bzl(
+            path("/workspace"),
+            PackagePath::parse("pkg").unwrap(),
+            RootPackageBzlTarget::parse("sub/lib.bzl").unwrap(),
+        );
+        let crossing = source(inputs(&roots, &[], None), entries, key.clone()).await;
+        let SourcePreparationOutcome::Complete(crossing) = crossing else {
+            panic!("subpackage marker observations returned Need");
+        };
+        let error = crossing.as_ref().as_ref().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "label in package //pkg crosses boundary of subpackage //pkg/sub"
+        );
+
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        inject_root_package_policy_inputs(&mut updater, inputs(&roots, &[], None)).unwrap();
+        let need = updater.commit().await.compute(&key).await.unwrap();
+        assert!(!RootPackageSourceKey::validity(&need));
+        assert!(!RootPackageSourceKey::equality(&need, &need));
     }
 
     #[cfg(unix)]

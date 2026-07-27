@@ -10,6 +10,8 @@
 
 use std::cell::RefCell;
 use std::fmt;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -25,10 +27,18 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_bzlmod_v2::RootModuleLoadingAnchorError;
+use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
+use slug_bzlmod_v2::RootPackageBzlTarget;
+use slug_bzlmod_v2::RootPackageBzlTargetError;
+use slug_bzlmod_v2::RootPackageSource;
+use slug_bzlmod_v2::RootPackageSourceError;
+use slug_bzlmod_v2::RootPackageSourceKey;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
+use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -38,11 +48,14 @@ use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
+use starlark::syntax::StringEncoding;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::cycle_detector::BzlLoadCycle;
 use crate::cycle_detector::BzlLoadCycleGuard;
+use crate::cycle_detector::HostBzlLoadCycle;
+use crate::cycle_detector::HostBzlLoadCycleGuard;
 use crate::glob::PackageListing;
 use crate::host_glob::HostGlobLoadingRequest;
 use crate::host_glob::HostGlobPrepared;
@@ -522,7 +535,7 @@ type LoadResult<T> = Arc<Result<T, LoadingError>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 #[allow(dead_code)] // Private dormant owner; activated only by a future Host package key.
-enum HostPackageAttemptError {
+pub(crate) enum HostPackageAttemptError {
     Loading(LoadingError),
     Glob(HostGlobAttemptError),
     Input(HostGlobRequestInputError),
@@ -577,10 +590,11 @@ fn evaluate_host_package_attempt(
     input: &HostPackageAttemptInput<'_>,
     prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
 ) -> HostPackageAttemptStep {
-    let ast = match AstModule::parse(
+    let ast = match AstModule::parse_with_string_encoding(
         &input.build_file.display().to_string(),
         input.source.as_ref().clone(),
         &Dialect::Standard,
+        StringEncoding::BazelInternal,
     ) {
         Ok(ast) => ast,
         Err(error) => {
@@ -723,6 +737,700 @@ async fn evaluate_host_package_attempts(
                 }
             }
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostRootBzlLabel {
+    package: PackagePath,
+    target: RootPackageBzlTarget,
+}
+
+impl HostRootBzlLabel {
+    fn new(package: PackagePath, target: RootPackageBzlTarget) -> Self {
+        Self { package, target }
+    }
+
+    fn canonical_label(&self) -> CanonicalLabel {
+        CanonicalLabel::parse(&format!("@@//{}:{}", self.package, self.target))
+            .expect("validated root .bzl identity is a canonical label")
+    }
+}
+
+impl fmt::Display for HostRootBzlLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "//{}:{}", self.package, self.target)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostLoadLabelError {
+    Invalid {
+        load: Arc<str>,
+        message: Arc<str>,
+    },
+    Target {
+        load: Arc<str>,
+        error: RootPackageBzlTargetError,
+    },
+    UnsupportedExternalRepository {
+        load: Arc<str>,
+    },
+    ExternalPackage {
+        load: Arc<str>,
+    },
+}
+
+impl fmt::Display for HostLoadLabelError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Invalid { load, message } => {
+                write!(f, "invalid load label `{load}`: {message}")
+            }
+            Self::Target { load, error } => {
+                write!(f, "invalid load label `{load}`: {error}")
+            }
+            Self::UnsupportedExternalRepository { load } => write!(
+                f,
+                "external repository load is not available in the root Host loader: {load}"
+            ),
+            Self::ExternalPackage { load } => {
+                write!(
+                    f,
+                    "Starlark files may not be loaded from //external: {load}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for HostLoadLabelError {}
+
+fn resolve_host_load_label(
+    requesting_package: &PackagePath,
+    load: &str,
+) -> Result<HostRootBzlLabel, HostLoadLabelError> {
+    let (package, target) = if let Some(target) = load.strip_prefix(':') {
+        (
+            requesting_package.clone(),
+            RootPackageBzlTarget::parse(target).map_err(|error| HostLoadLabelError::Target {
+                load: Arc::from(load),
+                error,
+            })?,
+        )
+    } else {
+        if load.starts_with("@@") && !load.starts_with("@@//") {
+            return Err(HostLoadLabelError::UnsupportedExternalRepository {
+                load: Arc::from(load),
+            });
+        }
+        let apparent = if let Some(root) = load.strip_prefix("@@//") {
+            format!("//{root}")
+        } else {
+            load.to_owned()
+        };
+        let label =
+            ApparentLabel::parse(&apparent).map_err(|message| HostLoadLabelError::Invalid {
+                load: Arc::from(load),
+                message: Arc::from(message),
+            })?;
+        if !label.repo().is_root() {
+            return Err(HostLoadLabelError::UnsupportedExternalRepository {
+                load: Arc::from(load),
+            });
+        }
+        (
+            label.package().clone(),
+            RootPackageBzlTarget::parse(label.target().as_str()).map_err(|error| {
+                HostLoadLabelError::Target {
+                    load: Arc::from(load),
+                    error,
+                }
+            })?,
+        )
+    };
+    if package.as_str() == "external" {
+        return Err(HostLoadLabelError::ExternalPackage {
+            load: Arc::from(load),
+        });
+    }
+    Ok(HostRootBzlLabel::new(package, target))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostSourceInputError {
+    UnsupportedSourceEncoding {
+        logical_path: NormalizedAbsolutePath,
+    },
+    #[cfg(not(unix))]
+    UnsupportedPathEncoding {
+        logical_path: NormalizedAbsolutePath,
+    },
+}
+
+impl fmt::Display for HostSourceInputError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedSourceEncoding { logical_path } => write!(
+                f,
+                "Host Starlark source is not valid UTF-8: {}",
+                logical_path.as_path().display()
+            ),
+            #[cfg(not(unix))]
+            Self::UnsupportedPathEncoding { logical_path } => write!(
+                f,
+                "Host Starlark source path is not representable without loss: {}",
+                logical_path.as_path().display()
+            ),
+        }
+    }
+}
+
+fn host_source_text(source: &RootPackageSource) -> Result<Arc<String>, HostSourceInputError> {
+    String::from_utf8(source.bytes().to_vec())
+        .map(Arc::new)
+        .map_err(|_| HostSourceInputError::UnsupportedSourceEncoding {
+            logical_path: source.logical_path().dupe(),
+        })
+}
+
+fn host_source_name(source: &RootPackageSource) -> Result<String, HostSourceInputError> {
+    #[cfg(unix)]
+    {
+        Ok(source
+            .logical_path()
+            .as_path()
+            .as_os_str()
+            .as_bytes()
+            .iter()
+            .copied()
+            .map(char::from)
+            .collect())
+    }
+    #[cfg(not(unix))]
+    {
+        source
+            .logical_path()
+            .as_path()
+            .to_str()
+            .map(str::to_owned)
+            .ok_or_else(|| HostSourceInputError::UnsupportedPathEncoding {
+                logical_path: source.logical_path().dupe(),
+            })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostBzlModuleError {
+    Source(RootPackageSourceError),
+    Input(HostSourceInputError),
+    Parse {
+        label: HostRootBzlLabel,
+        message: Arc<str>,
+    },
+    LoadLabel {
+        source: HostRootBzlLabel,
+        error: HostLoadLabelError,
+    },
+    Child {
+        load: Arc<str>,
+        label: HostRootBzlLabel,
+        error: Arc<HostBzlModuleError>,
+    },
+    Cycle(HostBzlLoadCycle),
+    Evaluation(LoadingError),
+    Freeze {
+        label: HostRootBzlLabel,
+        message: Arc<str>,
+    },
+}
+
+impl fmt::Display for HostBzlModuleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Source(error) => error.fmt(f),
+            Self::Input(error) => error.fmt(f),
+            Self::Parse { label, message } => write!(f, "parsing {label}: {message}"),
+            Self::LoadLabel { source, error } => {
+                write!(f, "resolving a load in {source}: {error}")
+            }
+            Self::Child { load, error, .. } => {
+                write!(f, "loading `{load}`: {error}")
+            }
+            Self::Cycle(_) => f.write_str("cycle detected in extension files"),
+            Self::Evaluation(error) => error.fmt(f),
+            Self::Freeze { label, message } => write!(f, "freezing {label}: {message}"),
+        }
+    }
+}
+
+impl std::error::Error for HostBzlModuleError {}
+
+#[allow(dead_code)]
+impl HostBzlModuleError {
+    fn cycle(&self) -> Option<&HostBzlLoadCycle> {
+        match self {
+            Self::Cycle(cycle) => Some(cycle),
+            Self::Child { error, .. } => error.cycle(),
+            Self::Source(_)
+            | Self::Input(_)
+            | Self::Parse { .. }
+            | Self::LoadLabel { .. }
+            | Self::Evaluation(_)
+            | Self::Freeze { .. } => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostBzlModuleEvalKey {
+    workspace: NormalizedAbsolutePath,
+    label: HostRootBzlLabel,
+}
+
+impl HostBzlModuleEvalKey {
+    fn new(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
+        Self { workspace, label }
+    }
+}
+
+impl fmt::Display for HostBzlModuleEvalKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "host-bzl-module:{}:{}", self.workspace, self.label)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)]
+pub(crate) enum HostPackageLoadError {
+    RootModule(RootModuleLoadingAnchorError),
+    Source(RootPackageSourceError),
+    Input(HostSourceInputError),
+    Parse {
+        package: PackagePath,
+        message: Arc<str>,
+    },
+    LoadLabel {
+        package: PackagePath,
+        error: HostLoadLabelError,
+    },
+    Bzl {
+        origin: Arc<str>,
+        load: Arc<str>,
+        label: HostRootBzlLabel,
+        error: Arc<HostBzlModuleError>,
+    },
+    Attempt(HostPackageAttemptError),
+}
+
+impl fmt::Display for HostPackageLoadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootModule(error) => error.fmt(f),
+            Self::Source(error) => error.fmt(f),
+            Self::Input(error) => error.fmt(f),
+            Self::Parse { package, message } => {
+                write!(f, "parsing BUILD file for //{package}: {message}")
+            }
+            Self::LoadLabel { package, error } => {
+                write!(f, "resolving a load in //{package}: {error}")
+            }
+            Self::Bzl {
+                origin,
+                load,
+                error,
+                ..
+            } => {
+                if let Some(cycle) = error.cycle() {
+                    let path = cycle
+                        .path
+                        .iter()
+                        .map(|key| key.label.to_string())
+                        .collect::<Vec<_>>();
+                    let keys = cycle
+                        .keys
+                        .iter()
+                        .map(|key| key.label.to_string())
+                        .collect::<Vec<_>>();
+                    f.write_str(&render_bzl_cycle(origin, &path, &keys))
+                } else {
+                    write!(f, "loading `{load}`: {error}")
+                }
+            }
+            Self::Attempt(error) => write!(f, "{error:?}"),
+        }
+    }
+}
+
+impl std::error::Error for HostPackageLoadError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+pub(crate) struct HostPackageLoadKey {
+    workspace: NormalizedAbsolutePath,
+    package: PackagePath,
+}
+
+#[allow(dead_code)]
+impl HostPackageLoadKey {
+    fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+        Self { workspace, package }
+    }
+}
+
+impl fmt::Display for HostPackageLoadKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "host-package-load:{}//{}", self.workspace, self.package)
+    }
+}
+
+#[track_caller]
+fn host_dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
+    result.unwrap_or_else(|error| panic!("Host loading DICE invariant failed: {error:?}"))
+}
+
+fn host_bzl_complete(
+    result: Result<FrozenBzlModule, HostBzlModuleError>,
+) -> SourcePreparationOutcome<Arc<Result<FrozenBzlModule, HostBzlModuleError>>> {
+    SourcePreparationOutcome::Complete(Arc::new(result))
+}
+
+#[async_trait]
+impl Key for HostBzlModuleEvalKey {
+    type Value = SourcePreparationOutcome<Arc<Result<FrozenBzlModule, HostBzlModuleError>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = async {
+            let source = match host_dice_invariant(
+                ctx.compute(&RootPackageSourceKey::for_bzl(
+                    self.workspace.dupe(),
+                    self.label.package.clone(),
+                    self.label.target.dupe(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(source) => match source.as_ref() {
+                    Ok(source) => source.dupe(),
+                    Err(error) => {
+                        return host_bzl_complete(Err(HostBzlModuleError::Source(error.clone())));
+                    }
+                },
+            };
+            let source_text = match host_source_text(&source) {
+                Ok(source) => source,
+                Err(error) => return host_bzl_complete(Err(HostBzlModuleError::Input(error))),
+            };
+            let source_name = match host_source_name(&source) {
+                Ok(name) => name,
+                Err(error) => return host_bzl_complete(Err(HostBzlModuleError::Input(error))),
+            };
+            let ast = match AstModule::parse_with_string_encoding(
+                &source_name,
+                source_text.as_ref().clone(),
+                &Dialect::Standard,
+                StringEncoding::BazelInternal,
+            ) {
+                Ok(ast) => ast,
+                Err(error) => {
+                    return host_bzl_complete(Err(HostBzlModuleError::Parse {
+                        label: self.label.clone(),
+                        message: Arc::from(error.to_string()),
+                    }));
+                }
+            };
+            let loads = ast
+                .loads()
+                .into_iter()
+                .map(|load| load.module_id.to_owned())
+                .collect::<Vec<_>>();
+            let mut loaded_modules = Vec::with_capacity(loads.len());
+            for load in &loads {
+                let label = match resolve_host_load_label(&self.label.package, load) {
+                    Ok(label) => label,
+                    Err(error) => {
+                        return host_bzl_complete(Err(HostBzlModuleError::LoadLabel {
+                            source: self.label.clone(),
+                            error,
+                        }));
+                    }
+                };
+                let child = HostBzlModuleEvalKey::new(self.workspace.dupe(), label.clone());
+                let guard = host_dice_invariant(ctx.cycle_guard::<HostBzlLoadCycleGuard>())
+                    .expect("Host bzl loading requires the request cycle detector");
+                let child_value = match guard.guard_this(ctx.compute(&child)).await {
+                    Ok(result) => host_dice_invariant(result),
+                    Err(cycle) => {
+                        let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+                        return host_bzl_complete(Err(HostBzlModuleError::Cycle(cycle)));
+                    }
+                };
+                let module = match child_value {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                        Ok(module) => module.clone(),
+                        Err(error) => {
+                            return host_bzl_complete(Err(HostBzlModuleError::Child {
+                                load: Arc::from(load.as_str()),
+                                label,
+                                error: Arc::new(error.clone()),
+                            }));
+                        }
+                    },
+                };
+                loaded_modules.push((load.clone(), module));
+            }
+
+            let module = Module::new();
+            let manifest = BzlLoadManifest::new(
+                BzlModuleIdentity {
+                    label: self.label.canonical_label(),
+                    workspace_path: source.logical_path().as_path().to_path_buf(),
+                },
+                digest(source_text.as_str()),
+                loaded_modules.iter().map(|(_, module)| module),
+            );
+            let loader = LocalBzlLoader {
+                modules: loaded_modules
+                    .iter()
+                    .map(|(load, module)| (load.as_str(), module.module.dupe()))
+                    .collect(),
+            };
+            let evaluation_context = BzlEvaluationContext::new(self.label.to_string());
+            let print_capture = capture_events.then(LoadingPrintCapture::default);
+            let globals = loading_globals();
+            {
+                let mut evaluator = Evaluator::new(&module);
+                evaluator.extra = Some(&evaluation_context);
+                evaluator.set_loader(&loader);
+                if let Some(print_capture) = print_capture.as_ref() {
+                    evaluator.set_print_handler(print_capture);
+                }
+                let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
+                drop(evaluator);
+                event_batch = print_capture.map(LoadingPrintCapture::into_batch);
+                if let Err(error) = evaluation {
+                    return host_bzl_complete(Err(HostBzlModuleError::Evaluation(
+                        LoadingError::new(error.to_string()),
+                    )));
+                }
+            }
+            let module = match module.freeze() {
+                Ok(module) => module,
+                Err(error) => {
+                    return host_bzl_complete(Err(HostBzlModuleError::Freeze {
+                        label: self.label.clone(),
+                        message: Arc::from(format!("{error:?}")),
+                    }));
+                }
+            };
+            host_bzl_complete(Ok(FrozenBzlModule {
+                module,
+                path: source.logical_path().as_path().to_path_buf(),
+                loads,
+                retained_bzl_modules: retained_module_closure(&loaded_modules),
+                manifest,
+            }))
+        }
+        .await;
+        if capture_events && value.is_complete() {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("HostBzlModuleEvalKey stores one local Complete event batch");
+        }
+        value
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[allow(dead_code)]
+fn host_package_complete(
+    result: Result<LoadedPackage, HostPackageLoadError>,
+) -> SourcePreparationOutcome<Arc<Result<LoadedPackage, HostPackageLoadError>>> {
+    SourcePreparationOutcome::Complete(Arc::new(result))
+}
+
+#[async_trait]
+impl Key for HostPackageLoadKey {
+    type Value = SourcePreparationOutcome<Arc<Result<LoadedPackage, HostPackageLoadError>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = async {
+            match host_dice_invariant(
+                ctx.compute(&RootModuleLoadingAnchorKey::new(self.workspace.dupe()))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(anchor) => {
+                    if let Err(error) = anchor.as_ref() {
+                        return host_package_complete(Err(HostPackageLoadError::RootModule(
+                            error.clone(),
+                        )));
+                    }
+                }
+            }
+            let source = match host_dice_invariant(
+                ctx.compute(&RootPackageSourceKey::for_build(
+                    self.workspace.dupe(),
+                    self.package.clone(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(source) => match source.as_ref() {
+                    Ok(source) => source.dupe(),
+                    Err(error) => {
+                        return host_package_complete(Err(HostPackageLoadError::Source(
+                            error.clone(),
+                        )));
+                    }
+                },
+            };
+            let source_text = match host_source_text(&source) {
+                Ok(source) => source,
+                Err(error) => {
+                    return host_package_complete(Err(HostPackageLoadError::Input(error)));
+                }
+            };
+            let source_name = match host_source_name(&source) {
+                Ok(name) => name,
+                Err(error) => {
+                    return host_package_complete(Err(HostPackageLoadError::Input(error)));
+                }
+            };
+            let ast = match AstModule::parse_with_string_encoding(
+                &source_name,
+                source_text.as_ref().clone(),
+                &Dialect::Standard,
+                StringEncoding::BazelInternal,
+            ) {
+                Ok(ast) => ast,
+                Err(error) => {
+                    return host_package_complete(Err(HostPackageLoadError::Parse {
+                        package: self.package.clone(),
+                        message: Arc::from(error.to_string()),
+                    }));
+                }
+            };
+            let mut loaded_modules = Vec::new();
+            for load in ast.loads() {
+                let load = load.module_id.to_owned();
+                let label = match resolve_host_load_label(&self.package, &load) {
+                    Ok(label) => label,
+                    Err(error) => {
+                        return host_package_complete(Err(HostPackageLoadError::LoadLabel {
+                            package: self.package.clone(),
+                            error,
+                        }));
+                    }
+                };
+                let child = HostBzlModuleEvalKey::new(self.workspace.dupe(), label.clone());
+                let child_value = host_dice_invariant(ctx.compute(&child).await);
+                let module = match child_value {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                        Ok(module) => module.clone(),
+                        Err(error) => {
+                            let build_name: String = source
+                                .relative_path()
+                                .iter()
+                                .copied()
+                                .map(char::from)
+                                .collect();
+                            return host_package_complete(Err(HostPackageLoadError::Bzl {
+                                origin: Arc::from(if self.package.as_str().is_empty() {
+                                    build_name
+                                } else {
+                                    format!("{}/{build_name}", self.package)
+                                }),
+                                load: Arc::from(load),
+                                label,
+                                error: Arc::new(error.clone()),
+                            }));
+                        }
+                    },
+                };
+                loaded_modules.push((load, module));
+            }
+            let package_dir = source.package_root().as_path().join(self.package.as_str());
+            let attempts = evaluate_host_package_attempts(
+                ctx,
+                HostPackageAttemptInput {
+                    workspace: self.workspace.dupe(),
+                    logical_package_root: source.package_root().dupe(),
+                    package: self.package.clone(),
+                    package_dir,
+                    build_file: source.logical_path().as_path().to_path_buf(),
+                    source: source_text,
+                    package_label: CompactString::new(self.package.as_str()),
+                    loaded_modules: &loaded_modules,
+                    capture_events,
+                },
+            )
+            .await;
+            match attempts {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(terminal) => {
+                    event_batch = Some(terminal.event_batch.clone());
+                    host_package_complete(
+                        terminal
+                            .result
+                            .clone()
+                            .map_err(HostPackageLoadError::Attempt),
+                    )
+                }
+            }
+        }
+        .await;
+        if capture_events && value.is_complete() {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("HostPackageLoadKey stores one local Complete event batch");
+        }
+        value
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
     }
 }
 
@@ -1508,3 +2216,7 @@ fn flattened_lifetime_closure(
 #[cfg(all(test, unix))]
 #[path = "host_package_attempt_tests.rs"]
 mod host_package_attempt_tests;
+
+#[cfg(all(test, unix))]
+#[path = "host_package_load_tests.rs"]
+mod host_package_load_tests;

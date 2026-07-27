@@ -1,42 +1,34 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-loading-host-package-key-input-ownership`
+Packet: `WP-5-m1-loading-typed-propagation-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted Host package-loading key input and ownership design; pinned
-Bazel 9.2 package/BzlLoad source; existing Host root-module, package lookup,
-special-capable file, raw-string parser, glob traversal/adapter/attempt, and
-legacy cycle-detector owners
-Validation tier: public cross-crate DICE identity, lifecycle, and event owner
+Evidence: accepted dormant Host package/`.bzl` keys and their public bzlmod
+source projection; pinned Bazel 9.2 package/BzlLoad source; existing loading,
+query, and retained command-root owners
+Validation tier: design/source/call-graph and exact allowlist checks
 
-Implementation files:
+Design file:
 
-- `app/slug_bzlmod_v2/src/host_package.rs`
-- `app/slug_bzlmod_v2/src/lib.rs`
-- `app/slug_loading_v2/src/bzl_module.rs`
-- `app/slug_loading_v2/src/cycle_detector.rs`
-- new `app/slug_loading_v2/src/host_package_load_tests.rs`
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Result: implement the accepted public bzlmod `RootPackageBzlTarget` and
-`RootPackageSourceKey` projection plus dormant private
-`HostBzlModuleEvalKey`/`HostPackageLoadKey`. Preserve exact package/BUILD/
-special-byte selection, nested-package checks, root-only load labels,
-Bazel-internal parsing, typed Need/errors, complete-only equality/validity,
-local event batches, legacy-versus-Host cycle isolation, same-DICE lifecycle,
-and the accepted transactional glob-attempt boundary.
+Result: freeze the smallest root-repository typed loading boundary that lets a
+later query command root consume the accepted dormant `HostPackageLoadKey`.
+Name the exact public/private API, DICE value and identity, deterministic Need
+propagation, local event ownership, call graph, implementation allowlist, and
+focused lifecycle/downstream tests. Account for remaining root-repository file
+and package-directory consumers so no Host Need can become `LoadingError`.
 
-Add no dependency, fixture, command/query/analysis/core caller, public loading
-export, legacy key/value/diagnostic change, external repository or
-materialization breadth, direct IO, injected semantic value, fresh graph,
-blocking/lock-across-compute path, JVM, Java bytecode, or Bazel delegation.
-Stop on a sixth implementation file, a private bzlmod-owner exposure, arbitrary
-invalid-UTF-8 source parsing, legacy behavior change, or required activation.
+Prefer the direct path to simple `query` package/target reads. Add no Rust,
+Cargo/dependency change, fixture, oracle, command/runtime/server activation,
+analysis migration, external repository mapping/materialization, legacy
+retirement, JVM, Java bytecode, or Bazel delegation. Stop if the design cannot
+preserve typed Need through loading without expanding into those surfaces.
 
-Validate focused source/key/cycle/lifecycle/event tests, full
-`slug_bzlmod_v2` and `slug_loading_v2`, one direct `slug_core_v2` compile
-dependent, GNU-Windows no-run linkage, formatting, diff/archive status, and
-exact scope/public/Cargo/dependency/caller/legacy/IO/lock/blocking/JVM guards.
-Obtain one terminal independent implementation review.
+Validate pinned-source citations, existing call sites and tests, exact
+design-only scope, Markdown links, `git diff --check`, archive status, and
+manifest/canonical agreement. Obtain one independent reserved-boundary design
+review before scheduling Rust.
