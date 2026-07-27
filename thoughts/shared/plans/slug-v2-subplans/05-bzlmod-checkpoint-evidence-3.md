@@ -7593,7 +7593,7 @@ registry-file owner.
 - `tests/v2_oracle/fixtures/registry-yanked-lockfile-mode/expected/oracle.json`;
 - `workspace/vendor-hit/_registries/127.0.0.1/first/modules/yyy/1.0.0/MODULE.bazel`;
 - `workspace/vendor-fatal/_registries/127.0.0.1/first/modules/yyy/1.0.0/MODULE.bazel`;
-- `workspace/vendor-missing/_registries/127.0.0.1/first/modules/aaa/1.0.0/MODULE.bazel`;
+- `workspace/vendor-hit/_registries/127.0.0.1/first/modules/aaa/1.0.0/MODULE.bazel`;
   and
 - `workspace/vendor-wrong-kind/_registries/127.0.0.1/first/modules/yyy/1.0.0/MODULE.bazel/wrong-kind.txt`.
 
@@ -7681,7 +7681,7 @@ row keeps the three existing registry arguments,
    A-to-B-to-C-to-D-to-A command-input restoration evidence, not a claim that
    equal restored state rereads the vendor file.
 
-Freeze every new asset byte-for-byte. `vendor-missing`'s misleading aaa file
+Freeze every new asset byte-for-byte. `vendor-hit`'s misleading aaa file
 is exactly
 `module(name = "aaa", version = "1.0.0")\nbazel_dep(name = "olddep", version = "1.0.0")\n`,
 SHA
@@ -7708,7 +7708,7 @@ and `update_replays_selected_yanked_reason_b` retain 5; and the final
 `error_checksum_precedes_yanked_rejection` row adds 5 to 6. Do not retain the
 old 3/3/3/4 values. Strengthen the existing
 `refresh_refetches_metadata_and_recorded_absence` row with
-`--vendor_dir=vendor-missing`, `--repository_cache=`, and
+`--vendor_dir=vendor-hit`, `--repository_cache=`, and
 `--repo_contents_cache=`. The valid, semantically distinct first-registry aaa
 vendor file depends on `olddep`; the now-live HTTP aaa depends on `newdep`.
 Refresh turns the recorded absence into checksum-empty fetch, so the row must
@@ -7744,15 +7744,16 @@ credentials, host-path absence, and `git diff --check`. Terminal acceptance
 requires source/parity, implementation/evidence, and
 architecture/orchestration latest-diff review.
 
-Stop and replan on a yyy request in the hit or fatal rows; no yyy request in
-either fallback row; a fatal vendor read that reaches network or exits other
-than 37; Refresh using the misleading aaa vendor bytes or failing to request
-first aaa; any Off lockfile change; stale root or vendor bytes after
-restoration; a server/harness/registry-byte edit; symlink, fifth asset,
-seventh path, sixth row, fifteenth command, or cap overflow; permission,
-sleep, or mutable external-state tricks; a new fixture; or any vendor-command,
-file-registry, mirror, archive/source-download, Rust, Host owner, consumer, or
-activation claim.
+Stop and replan on a first-registry yyy MODULE request in either hit row; any
+request-count change in the fatal row; no yyy request in either fallback row;
+a fatal vendor read that reaches network or exits other than 37; Refresh using
+the misleading aaa vendor bytes or failing to request first aaa; any Off
+lockfile change; stale root or vendor bytes after restoration; a
+server/harness/registry-byte edit; symlink, fifth asset, seventh path, sixth
+row, fifteenth command, or cap overflow; permission, sleep, or mutable
+external-state tricks; a new fixture; or any vendor-command, file-registry,
+mirror, archive/source-download, Rust, Host owner, consumer, or activation
+claim.
 
 #### Host registry-file vendor oracle design status
 
@@ -7777,3 +7778,24 @@ retain the intended downstream yyy MODULE counts 4→5/5/5/6, and narrow the
 stop gate to yyy MODULE requests in hit rows plus every request-count change
 in the fatal row. Preserve every other accepted boundary, asset byte, hash,
 row, cap, source anchor, and exclusion from the stopped draft.
+
+#### Corrected Host registry-file vendor oracle design status
+
+Status: `ACCEPT` after terminal latest-text review on 2026-07-26.
+
+The correction changed only the four scheduled text sites: the misleading aaa
+asset now shares `vendor-hit` with the checksum-present yyy asset, Refresh
+uses that vendor tree, and the stop gate distinguishes yyy MODULE requests
+from permitted RepoSpec metadata while forbidding every fatal-row request
+change. The six-path, four-asset, fourteen-command scope, exact hashes,
+4→5/5/5/6 downstream yyy MODULE sequence, caps, anchors, metadata updates,
+validation contract, and exclusions remain unchanged. Source/parity,
+implementation/evidence, and architecture/orchestration terminal latest-text
+reviews all returned `ACCEPT`.
+
+Next packet: implement only
+`WP-5-m1-host-registry-file-vendor-oracle` in the exact accepted six paths.
+Run one pinned Bazel 9.2 generation and two distinct fresh-root replays before
+terminal latest-diff review. Do not edit the server, harness, existing
+registry bytes, Rust, Cargo, dependencies, APIs, DICE, consumers, or
+activation.
