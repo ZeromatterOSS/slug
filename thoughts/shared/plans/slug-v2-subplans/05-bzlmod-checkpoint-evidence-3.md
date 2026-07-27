@@ -8856,3 +8856,172 @@ Freeze ordered last-wins startup-property identity plus daemon
 restart/invalidation without weakening the still-required native-Windows
 portable, empty, and lone-surrogate observation gate. Do not retry the
 runtime bridge or activate a consumer first.
+
+### Host JVM registry byte-input design first attempt
+
+Status: `REPLAN` after terminal latest-text review on 2026-07-26; no fixture,
+harness, or Rust edit started.
+
+`WP-5-m1-host-jvm-registry-byte-input-design` cannot freeze the requested
+single ordered startup-property identity. Pinned Bazel 9.2 source at
+`8220c619` has two intentionally different representations:
+
+- `src/main/cpp/option_processor.cc:80-171,374-465,603-655`,
+  `src/main/cpp/rc_file.cc:85-135,192-248`, and
+  `src/main/cpp/startup_options.cc:205-286,407-441` preserve every
+  `--host_jvm_args` occurrence. Sources are ordered system, workspace, home,
+  comma-ordered `BAZELRC`, and occurrence-ordered explicit `--bazelrc`;
+  generic `startup` entries across those files precede all matching
+  `startup:<platform>` entries, and explicit CLI occurrences are last.
+  Both `--host_jvm_args=X` and the separated unary form canonicalize to the
+  same stored occurrence.
+- `src/main/cpp/blaze.cc:360-465` emits fixed
+  `file.encoding=ISO-8859-1` and empty country/language/variant properties
+  before the ordered user occurrences. Pinned OpenJDK
+  `openjdk/jdk25u@405a5699ebd097464ed3fc9345414b0774a2edc9`,
+  `src/hotspot/share/runtime/arguments.cpp:1250-1326,1962-1981,`
+  `2136-2156,2488-2515,3993-4015`, applies duplicate writable `-D`
+  properties in order and retains the last value when a fresh JVM starts.
+- Bazel emits those occurrences again in canonical server arguments at
+  `blaze.cc:568-583,660-665,949-952`, but
+  `blaze.cc:978-1067` compares nonvolatile canonical arguments as an
+  order-insensitive multiset that retains occurrence counts.
+  `blaze.cc:1072-1122,1530-1579` restarts only when that multiset differs.
+  Source origin is diagnostic and `--option_sources=` is volatile.
+- Independently, `blaze.cc:1987-1993` copies every current request occurrence
+  and its source into the `RunRequest`; pinned line 1990 also appends a second,
+  empty `StartupOption` for every logical occurrence.
+  `src/main/java/com/google/devtools/build/lib/server/GrpcServerImpl.java:568-574,607-619`,
+  `src/main/java/com/google/devtools/build/lib/runtime/BlazeCommandDispatcher.java:743-752`,
+  and
+  `src/main/java/com/google/devtools/build/lib/runtime/CommandLineEvent.java:269-284,317-324`
+  preserve all populated and synthetic records internally, then emit only
+  empty-source records through the original structured-command-line BEP
+  startup-options section. Every synthetic record is therefore emitted as an
+  empty `combinedForm`; a populated CLI record is emitted because CLI source
+  is empty, while a populated RC-sourced record is filtered from this section.
+  `BlazeCommandDispatcher.java:547-580` separately exposes populated RC
+  options through `--announce_rc`, skipping every empty-source record and
+  grouping consecutive populated options by source into one
+  `Reading 'startup' options from <source>: <joined options>` info event.
+  After reorder-only reuse, diagnostics can therefore expose the new request
+  order while the live daemon retains its original launch order and byte
+  semantics.
+
+Two isolated Bazel 9.2 observations confirmed that split. An `A,B` request
+followed by `B,A` retained PID `3841796`; replacing one occurrence restarted
+as PID `3841958`. A separate conflicting
+UTF-8-then-ISO-8859-1 launch retained its ISO-8859-1 bytes and PID after the
+requested order reversed on the same output base, while the reversed order
+on a fresh output base launched a new PID and produced UTF-8 bytes. Every
+probe server was shut down and verified dead.
+
+Therefore a pure reorder must reuse the old daemon, old effective byte
+semantics, and old DICE graph. Recomputing and injecting the newly requested
+last-wins value would disagree with Bazel. Adding, removing, or changing one
+occurrence must complete shutdown before a fresh daemon, fresh effective
+semantics, and fresh DICE graph can receive the command. There is no
+same-graph startup-property invalidation transition.
+
+The provisional closed property projection is also not an acceptable parity
+boundary. OpenJDK source shows that direct registry-directory bytes can
+depend on `file.encoding` including `COMPAT` and invalid-name fallback;
+categoryless `user.language`, `user.script`, `user.country`, `user.variant`,
+`user.extensions`, and legacy-dominant `user.region`;
+`java.locale.useOldISOCodes`; `java.locale.providers`; embedded runtime
+provider data; native filename decoding; and native enumeration order for
+collator ties. Category-specific display/format properties do not feed
+`Collator.getInstance()` in this path. Bazel additionally accepts arbitrary
+JVM agents, module/classpath changes, `--extra_classpath`, and alternate
+`--server_javabase` inputs that can alter providers or Java behavior. Silently
+ignoring them is wrong, while a Slug-only unsupported-input error would make
+Slug a forbidden Bazel-success subset.
+
+Bazel sanitizes `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, and
+`JAVA_TOOL_OPTIONS` and selects server `LC_ALL` in
+`blaze.cc:1305-1382`; those launch-environment rules, `file.encoding=COMPAT`,
+the platform-owned non-overridable `native.encoding`/`sun.jnu.encoding`, and
+the exact embedded or explicit Java runtime are part of the boundary. A
+finite Rust property fold may not claim completeness unless it proves the
+entire accepted JVM/provider/data surface. A pinned OpenJDK lifetime helper
+is only a candidate until its packaging, exact launch ordering, arbitrary JVM
+argument behavior, provider/classpath/module behavior, failure diagnostics,
+protocol, and Unix/Windows lifecycle are reviewed.
+
+The eventual ownership split must keep at least these values distinct:
+
+1. the current request's ordered startup occurrence stream with diagnostic
+   source provenance;
+2. the ordered occurrence stream that actually launched the retained daemon;
+3. the occurrence-counted, order-insensitive canonical server-reuse identity;
+4. the effective registry-directory semantics retained by the daemon that
+   actually launched; and
+5. a typed semantic DICE input on which directory-byte production depends.
+
+The fifth value is installed in the graph-construction transaction before
+any consumer can compute. It is never a process global, ambient lookup,
+`DiceDataBuilder` capability value, or per-build/per-query
+`BzlmodRequestInputs` field. A multiset mismatch discards the whole graph; an
+equal multiset performs no reinjection. `RegistryIo` remains the IO
+capability, not the semantic owner.
+
+Live Slug has prerequisites that prevent a direct owner packet:
+
+- `slug_cli_v2/src/commands/mod.rs` recognizes only `--output_base`, scans it
+  beyond the startup prefix, and discards other prefix flags;
+- build and query independently treat socket reachability as sufficient
+  daemon identity;
+- daemon start removes a socket without an output-base client lock, writes an
+  unauthenticated PID before readiness, and shutdown is fire-and-forget;
+- the server protocol has no tagged status/identity handshake; and
+- `WorkspaceRuntime::new` installs one registry IO capability and one DICE
+  graph for the daemon lifetime.
+
+The lifecycle owner must serialize identity comparison, shutdown, completed
+termination, startup, readiness, and command submission under an
+output-base client lock. A tagged status response must authenticate the live
+daemon and return its actual retained identity; a competing client must never
+unlink or replace a live socket. A build/query wire request may carry a
+primitive copy of the current ordered occurrences and source strings for
+Bazel-shaped diagnostics only. That request-local copy must never replace the
+retained launched stream, drive registry semantics, or become a DICE
+injection.
+
+Next packet: design only
+`WP-5-m1-host-jvm-registry-byte-input-oracle-boundary-correction`.
+It must freeze:
+
+- the exact source/native matrix for startup-property grammar, RC generic /
+  platform / CLI ordering, fixed-default precedence, `COMPAT`, invalid
+  charset fallback, locale/region/extensions/provider behavior, arbitrary
+  valid and JVM-invalid arguments, explicit Java/classpath inputs, sanitized
+  environment, and exact JVM-start diagnostics;
+- the smallest oracle-harness startup-argument seam and retained-fixture rows
+  proving default 91-byte, UTF-8 94-byte, fresh conflicting last-wins,
+  same-multiset reorder retaining old bytes, occurrence-change restart, and
+  exact default restoration without copying registry scaffolding;
+- a source/native or protocol discriminator showing reorder-only request
+  diagnostics change while PID, directory bytes, retained launch semantics,
+  and graph identity remain unchanged, using explicit CLI occurrences to pin
+  Bazel 9.2's exact populated plus synthetic-empty startup-option BEP records;
+  RC occurrences must pin their synthetic empty BEP records plus the
+  source-grouped populated `--announce_rc` info events;
+- whether exact parity uses a pinned OpenJDK lifetime helper or another
+  reviewed mechanism, with no ignore/reject subset;
+- the full canonical server identity plus locked, authenticated,
+  shutdown-complete lifecycle boundary;
+- graph-construction ownership and dependency for the semantic DICE value;
+  and
+- the still-required real-Windows portable seven-name, empty-directory, and
+  `CreateFileW` lone-surrogate observations plus the native server transport
+  decision.
+
+Do not edit a fixture, harness, Rust, Cargo, dependency, API, DICE key,
+runtime bridge, private Host registry-file owner, consumer, or activation
+before terminal latest-text review. Stop on ordered-vector daemon equality;
+set/deduplicated identity; origin-sensitive restart; new semantics after a
+reorder-only request; a multiset change reaching the old daemon; request-local
+startup injection; capability-only semantic ownership; missing client
+serialization or shutdown completion; silent ignore or Slug-only rejection
+of a Bazel-valid JVM input; a claimed `sun.jnu.encoding` override; a copied
+fixture; or any bridge/completeness claim before native Windows evidence.
