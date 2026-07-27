@@ -1,31 +1,35 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-private-opaque-terminal-envelope-design`
+Packet: `WP-5-m1-private-opaque-terminal-envelope`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted dormant typed build/query roots and executable
-preactivation Host transitive-closure gate
-Validation tier: design/source/ownership audit
+Evidence: accepted corrected private opaque terminal-envelope design over the
+dormant shared retry driver
+Validation tier: private cross-module Rust ownership boundary
 
-Design files:
+Implementation files:
 
-- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
+- `app/slug_core_v2/src/runtime/events.rs`
+- `app/slug_core_v2/src/runtime/dice.rs`
+- `app/slug_core_v2/src/runtime/mod.rs`
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Result: freeze the smallest private opaque terminal result/output envelope
-needed between the accepted typed query command root, the retry/effect owner,
-and a future atomic CLI/server activation packet. Specify ownership, exact
-success/Need/semantic/infrastructure states, output-completion projection,
-terminal closure/effect selection, retry rules, and invalidation boundaries.
+Result: add public `#[must_use]` opaque `AcceptedCommand<T>`,
+`TerminalOutput`, and `CommandOutput<T>` with private construction/storage.
+Refactor dormant acceptance to return only the envelope. Its sole public
+projection borrows `&T`, retains the original terminal and unrendered selected
+event buffer, and exposes no parts.
 
-Audit current query/build result adapters and typed-root value shapes from the
-live checkout. Prefer a query-first activation route that gets simple query
-operations working without coupling execution or build output publication.
-Name exact future implementation files, tests, call-site removals, validation,
-and stop conditions.
+Do not render events: current Starlark print capture lacks Bazel source
+locations. Prove terminal identity, success/error/empty projection, exact
+single projection, retry-only exclusion, retained terminal events, and no
+envelope on every failure seam. Validate focused/full core, direct
+query/loading/analysis, GNU-Windows, formatting, diff, exact three-file scope,
+no Cargo/caller, and unchanged six activation-blocker matches.
 
-Add no Rust, production caller, public API, Cargo/dependency change,
-CLI/server behavior, activation, snapshot retirement, execution, JVM,
-Java-bytecode, or Bazel delegation. Obtain one terminal design review.
+Add no production caller, raw event/buffer API, renderer, Cargo/dependency
+change, CLI/server behavior, activation, snapshot retirement, execution,
+REAPI, JVM, Java-bytecode, or Bazel delegation. Obtain one terminal
+implementation review.

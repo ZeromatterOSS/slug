@@ -13510,3 +13510,168 @@ Design next only `WP-5-m1-private-opaque-terminal-envelope-design`. Freeze the
 private terminal result/output boundary required for an atomic typed query
 activation; add no production caller, CLI/server behavior, execution, JVM,
 Java-bytecode, or Bazel delegation.
+
+### Private opaque terminal envelope design
+
+Status: **REPLAN** for
+`WP-5-m1-private-opaque-terminal-envelope-design` on 2026-07-27.
+
+The live checkout already has the required semantic pieces. A typed query root
+returns
+`SourcePreparationOutcome<Arc<Result<QueryOutput, QueryError>>>`; output
+completion is part of root identity and the retained `QueryOutput` formats
+text, graph, label-kind, and package output without re-entering DICE. The
+shared retry owner already keeps `Need` outside terminal state, selects one
+exact terminal event/demand closure, commits the selected native snapshot,
+moves selected events into `CommandOutputBuffer`, closes the lease, and only
+then returns. Its synthetic result nevertheless exposes `terminal` and
+`CommandOutputBuffer` as separate private fields. Activating that shape would
+let a future adapter consume the semantic result while silently dropping
+selected output.
+
+Implement the inactive envelope in exactly:
+
+- `app/slug_core_v2/src/runtime/events.rs`;
+- `app/slug_core_v2/src/runtime/dice.rs`; and
+- `app/slug_core_v2/src/runtime/mod.rs`.
+
+Add one `#[must_use]` public `AcceptedCommand<T>` with private terminal and
+selected-event fields. Construction remains `pub(super)` and is possible only
+inside the accepted terminal path after selected-snapshot replacement and
+successful lease close. Expose no terminal getter, event getter, iterator,
+clone, `into_parts`, or public constructor. Its only public semantic access is
+a consuming `finish` operation:
+
+```text
+AcceptedCommand<T>::finish(
+    self,
+    FnOnce(T) -> TerminalOutput<R>,
+) -> CommandOutput<R>
+```
+
+`TerminalOutput<R>` is constructed by the post-core query/build projection and
+contains one retained value, exit code, stdout, and terminal stderr.
+`CommandOutput<R>` contains the same retained value and primitive streams
+after core has automatically rendered every selected event before terminal
+stderr. It may expose consuming primitive parts only after this merge. This
+makes selected output inseparable from the first access to the terminal value;
+the callback cannot inspect or discard the event buffer. `finish` calls the
+projection exactly once and does not clone the terminal value, events, or
+streams.
+
+Render batches and their events in selected closure order. A
+`StarlarkPrint` contributes its exact text plus one line terminator to stderr.
+A neutral diagnostic contributes its already-formatted exact text plus one
+line terminator; invent no severity prefix. Selected event stderr precedes
+terminal stderr. Terminal stdout stays a separate channel, so the accepted
+Bazel oracle's within-channel claim is preserved without inventing
+cross-channel order. Empty batches and an empty selected buffer add no bytes.
+
+Refactor the dormant acceptance seam to
+`accept_prepared<T>(prepared, terminal) -> AcceptedCommand<T>`. The buffer may
+move into a local value after accepted-snapshot replacement and before close,
+as today, but no envelope may be constructed or escape until close succeeds.
+The synthetic driver stores only `AcceptedCommand<Result<...>>`, never
+parallel terminal/output fields. `Need`, cancellation, DICE/closure/native
+failure, restoration, materializer rejection, snapshot replacement failure,
+and close failure return no envelope. Both `Complete(Ok(...))` and
+`Complete(Err(...))` are terminal and enter the envelope after exact closure
+selection. Retry seals and drops its transaction/root/outcome before progress;
+it cannot publish or accumulate a command output buffer.
+
+Focused core tests must prove:
+
+1. success and typed semantic error each project once through the envelope;
+2. selected batch/event order, exact multiline text, diagnostic order, event
+   stderr before terminal stderr, stdout separation, and empty-buffer identity;
+3. the retained generic value, exit code, and primitive streams survive the
+   consuming merge without a terminal/event clone path;
+4. retry-only events remain absent while terminal-reachable reused events
+   remain, and a valid empty query still returns an accepted envelope;
+5. every forced preaccept/accept/close failure exposes no envelope and retains
+   the existing restoration or fail-closed behavior; and
+6. the public surface exposes only the opaque envelope and post-merge output,
+   with no public DICE IDs, Needs, generations, leases, roots, materializer
+   owners, selected sidecars, batches, or raw events.
+
+Run focused envelope/session tests, full `slug_core_v2`, direct query/loading/
+analysis compile checks, GNU-Windows no-run linkage, formatting,
+`git diff --check`, and exact three-file/no-Cargo/no-caller guards. Scan the
+activated CLI/server adapters from the preactivation gate and require the same
+six matches: this packet removes none and activates nothing.
+
+Stop rather than add a second output owner, generic async/HRTB driver, event
+clone, public raw buffer/event access, formatter re-entry into DICE, execution,
+REAPI, CLI/server call, eager snapshot change, JVM, Java bytecode, or Bazel
+delegation. This command-local single-consumption structure does not alter a
+retained hot-path representation and needs no Buck2-derived collection.
+
+After acceptance, design a query-first atomic vertical activation. This is an
+intentional scheduling refinement from the older build-first wording: query
+has no execution/materialization phase, its typed root and closure gate are
+accepted, and prioritizing it reaches simple query operations sooner without
+changing either build semantics or the shared envelope. That later design must
+freeze exact core/CLI/server/test files, remove the one-shot and daemon query
+legacy adapter matches together, keep the daemon observation scan metric-only,
+and prove one-shot/daemon equivalence before Rust.
+
+The terminal review returned `REPLAN` for two precise reasons. Captured
+`StarlarkPrint` currently retains only message text while Bazel's accepted
+stderr shape includes source location, so this packet cannot irreversibly
+render selected events. The moving `FnOnce(T)` projection also could replace
+the accepted terminal with unrelated output rather than retain it.
+
+### Private opaque terminal envelope design correction
+
+Status: **ACCEPT** for
+`WP-5-m1-private-opaque-terminal-envelope-design` on 2026-07-27.
+
+The correction preserves the same exact three-file implementation allowlist
+and acceptance/failure ordering, but defers event rendering. Add one
+`#[must_use]` public `AcceptedCommand<T>` whose private fields retain the exact
+accepted terminal and `CommandOutputBuffer`. Construction remains
+`pub(super)` after successful lease close. It has no terminal/event getter,
+iterator, clone, public constructor, or `into_parts`.
+
+Its only public operation is a consuming borrowed projection:
+
+```text
+AcceptedCommand<T>::project(
+    self,
+    FnOnce(&T) -> TerminalOutput,
+) -> CommandOutput<T>
+```
+
+`TerminalOutput` has one exact public constructor
+`TerminalOutput::new(exit_code: i32, stdout: String, stderr: String)`.
+`CommandOutput<T>` privately retains the original `T`, the unrendered selected
+event buffer, and those terminal streams. It is also `#[must_use]`, has no
+clone, getters, iterator, public constructor, or consuming parts. Therefore
+the callback can inspect but cannot move, replace, or stash the accepted
+terminal, and no caller can reach terminal streams or value while dropping
+selected events. Projection runs exactly once; event bytes are neither
+rendered nor exposed in this packet.
+
+Refactor
+`accept_prepared<T>(prepared, terminal) -> AcceptedCommand<T>` and make the
+synthetic driver store only that envelope. Focused tests prove borrowed
+success/error/empty-query projection, exact terminal identity retention,
+single projection, retry-only exclusion, terminal-reachable event retention,
+and no envelope on every accepted failure seam. Private module tests may
+inspect fields to prove retention; no test-only accessor enters the public
+surface. Keep all earlier focused/full/downstream/Windows/scope/call-site
+validation and stop gates except the superseded rendering assertions.
+
+After this inactive envelope is accepted, design and implement one
+source-aware command-event prerequisite before activation. The live Starlark
+`PrintHandler::println(&self, text: &str)` supplies no source span, so that
+design must cite the accepted Bazel 9.2 `DEBUG: <path>:<line>:<column>: <text>`
+shape, freeze the smallest Starlark/event/producer representation change, and
+prove exact location plus warm nonreplay without string reconstruction from
+fixture text. Only after source-aware rendering can a consuming publication
+method expose `CommandOutput<T>` as primitive streams. Query-first activation
+remains the next vertical route after that prerequisite; the reviewer
+confirmed that scheduling refinement is sound.
+
+The focused correction rereview returned `ACCEPT`. Implement next only
+`WP-5-m1-private-opaque-terminal-envelope`.
