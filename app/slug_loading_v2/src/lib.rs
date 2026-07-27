@@ -14,6 +14,7 @@ mod cycle_detector;
 pub mod file_discovery;
 pub mod glob;
 pub mod globals;
+mod host_glob;
 pub mod keys;
 pub mod load_label;
 pub mod package;

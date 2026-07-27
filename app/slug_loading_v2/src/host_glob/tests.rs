@@ -1,0 +1,889 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory or the Apache License, Version 2.0
+ * found in the LICENSE-APACHE file in the root directory. You may select,
+ * at your option, one of the above-listed licenses.
+ */
+
+use std::ffi::OsString;
+use std::fmt;
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::ffi::OsStringExt;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+
+use allocative::Allocative;
+use async_trait::async_trait;
+use dice::ActivationData;
+use dice::ActivationTracker;
+use dice::DetectCycles;
+use dice::Dice;
+use dice::DiceComputations;
+use dice::DynKey;
+use dice::Key;
+use dice::UserComputationData;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
+use slug_bzlmod_v2::SourcePreparationNeeds;
+use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_workspace_v2::*;
+
+use super::*;
+
+fn path(value: &str) -> NormalizedAbsolutePath {
+    NormalizedAbsolutePath::new(value).unwrap()
+}
+
+fn pattern(value: &[u8]) -> HostGlobSegmentPattern {
+    HostGlobSegmentPattern::new(Arc::<[u8]>::from(value)).unwrap()
+}
+
+fn invalid(value: &[u8]) -> HostGlobInvalidPattern {
+    let HostGlobSegmentPatternError::Invalid { reason, .. } =
+        HostGlobSegmentPattern::new(Arc::<[u8]>::from(value)).unwrap_err()
+    else {
+        panic!("expected invalid pattern")
+    };
+    reason
+}
+
+fn deferred(value: &[u8]) -> HostGlobDeferredPattern {
+    let HostGlobSegmentPatternError::Deferred { reason, .. } =
+        HostGlobSegmentPattern::new(Arc::<[u8]>::from(value)).unwrap_err()
+    else {
+        panic!("expected deferred pattern")
+    };
+    reason
+}
+
+#[test]
+fn pattern_constructor_preserves_invalid_deferred_and_supported_identity() {
+    assert_eq!(
+        invalid(b"what?"),
+        HostGlobInvalidPattern::QuestionMarkForbidden
+    );
+    assert_eq!(invalid(b""), HostGlobInvalidPattern::Empty);
+    assert_eq!(invalid(b"/a"), HostGlobInvalidPattern::Absolute);
+    assert_eq!(invalid(b"a//b"), HostGlobInvalidPattern::EmptySegment);
+    assert_eq!(invalid(b"."), HostGlobInvalidPattern::DotSegment);
+    assert_eq!(invalid(b"a/../b"), HostGlobInvalidPattern::UpLevelSegment);
+    assert_eq!(
+        invalid(b"a/**x"),
+        HostGlobInvalidPattern::EmbeddedRecursiveWildcard
+    );
+
+    assert_eq!(deferred(b"**"), HostGlobDeferredPattern::RecursiveWildcard);
+    assert_eq!(deferred(b"a/b"), HostGlobDeferredPattern::MultiSegment);
+    assert_eq!(deferred(b"a\0b"), HostGlobDeferredPattern::NulPathByte);
+    assert_eq!(deferred(b"a(b)*"), HostGlobDeferredPattern::Parenthesis);
+    assert_eq!(deferred(b"a[b]*"), HostGlobDeferredPattern::Bracket);
+    assert_eq!(deferred(b"a{b}*"), HostGlobDeferredPattern::Brace);
+    assert_eq!(deferred(br"a\b*"), HostGlobDeferredPattern::Backslash);
+
+    let literal = pattern(b"\xe9.txt");
+    assert_eq!(literal.kind, HostGlobSegmentPatternKind::Literal);
+    assert_eq!(literal.bytes(), b"\xe9.txt");
+    let wildcard = pattern(b"a*b*c.txt");
+    assert_eq!(wildcard.kind, HostGlobSegmentPatternKind::SimpleWildcard);
+    assert_eq!(wildcard.bytes(), b"a*b*c.txt");
+
+    let same = pattern(b"a*b*c.txt");
+    let different = pattern(b"a*b*d.txt");
+    assert_eq!(wildcard, same);
+    assert_ne!(wildcard, different);
+}
+
+#[test]
+fn simple_matcher_preserves_raw_dot_and_nonadjacent_star_semantics() {
+    assert!(simple_segment_matches(b"*", b".hidden.txt"));
+    assert!(!simple_segment_matches(b"*.txt", b".hidden.txt"));
+    assert!(simple_segment_matches(b".h*.txt", b".hidden.txt"));
+    assert!(simple_segment_matches(
+        b"m*id*end.txt",
+        b"m-left-id-right-end.txt"
+    ));
+    assert!(simple_segment_matches(b"\xe9*.txt", b"\xe9.txt"));
+    assert!(!simple_segment_matches(b"\xc3\xa9*.txt", b"\xe9.txt"));
+    assert!(simple_segment_matches(b"\xc3\xa9*.txt", b"\xc3\xa9.txt"));
+    assert!(!simple_segment_matches(b"a*b*c", b"a-x-X-c"));
+    assert!(!simple_segment_matches(b"*", b""));
+}
+
+#[test]
+fn candidate_value_sorts_raw_bytes_and_preserves_equal_name_order() {
+    let candidates = HostGlobSegmentCandidates::from_vec(vec![
+        HostGlobSegmentCandidate {
+            component: Arc::from(&b"\xe9"[..]),
+            kind: HostGlobSegmentCandidateKind::Directory,
+        },
+        HostGlobSegmentCandidate {
+            component: Arc::from(&b"same"[..]),
+            kind: HostGlobSegmentCandidateKind::Directory,
+        },
+        HostGlobSegmentCandidate {
+            component: Arc::from(&b"\xc3\xa9"[..]),
+            kind: HostGlobSegmentCandidateKind::NonDirectory,
+        },
+        HostGlobSegmentCandidate {
+            component: Arc::from(&b"same"[..]),
+            kind: HostGlobSegmentCandidateKind::NonDirectory,
+        },
+    ]);
+    let projected = candidates
+        .candidates()
+        .iter()
+        .map(|candidate| (candidate.component.as_ref(), candidate.kind))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        projected,
+        vec![
+            (b"same".as_slice(), HostGlobSegmentCandidateKind::Directory),
+            (
+                b"same".as_slice(),
+                HostGlobSegmentCandidateKind::NonDirectory
+            ),
+            (
+                b"\xc3\xa9".as_slice(),
+                HostGlobSegmentCandidateKind::NonDirectory
+            ),
+            (b"\xe9".as_slice(), HostGlobSegmentCandidateKind::Directory),
+        ]
+    );
+}
+
+#[test]
+fn key_complete_only_equality_and_need_validity_are_exact() {
+    let complete: HostGlobSegmentOutcome =
+        SourcePreparationOutcome::Complete(Arc::new(Ok(HostGlobSegmentCandidates::empty())));
+    let separately_allocated_equal: HostGlobSegmentOutcome =
+        SourcePreparationOutcome::Complete(Arc::new(Ok(HostGlobSegmentCandidates::empty())));
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        path("/missing"),
+        PathObservationOperation::Lstat,
+    );
+    let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+        NeedPathObservations::singleton(demand),
+    ));
+    assert!(HostGlobSegmentCandidatesKey::validity(&complete));
+    assert!(HostGlobSegmentCandidatesKey::equality(
+        &complete,
+        &separately_allocated_equal
+    ));
+    assert!(!HostGlobSegmentCandidatesKey::validity(&need));
+    assert!(!HostGlobSegmentCandidatesKey::equality(&need, &need));
+    assert!(!HostGlobSegmentCandidatesKey::equality(&complete, &need));
+}
+
+#[test]
+fn semantic_error_equality_strips_operational_routes_and_namespaces() {
+    let error = PathObservationError::Io {
+        kind: PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    let first = PathResolutionError::Observation {
+        namespace: PathObservationNamespace::Host,
+        requested_path: path("/requested-one"),
+        demand: PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/physical-one"),
+            PathObservationOperation::Lstat,
+        ),
+        error,
+    };
+    let second = PathResolutionError::Observation {
+        namespace: PathObservationNamespace::Materialization(PathObservationInstanceId::new(7)),
+        requested_path: path("/requested-two"),
+        demand: PathObservationDemand::new(
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(8)),
+            path("/physical-two"),
+            PathObservationOperation::Lstat,
+        ),
+        error,
+    };
+
+    assert_eq!(
+        resolution_error(&path("/pkg"), Arc::from(&b"entry"[..]), first),
+        resolution_error(&path("/pkg"), Arc::from(&b"entry"[..]), second)
+    );
+}
+
+type ScriptEntry = (PathObservationDemand, PathObservationResult);
+
+fn lstat(kind: PathNodeKind) -> PathLstat {
+    PathLstat::new(kind, 1, 2, 3, 4, 0o755)
+}
+
+fn demand(
+    path: NormalizedAbsolutePath,
+    operation: PathObservationOperation,
+) -> PathObservationDemand {
+    PathObservationDemand::new(PathObservationNamespace::Host, path, operation)
+}
+
+fn lstat_result(
+    value: NormalizedAbsolutePath,
+    result: PathOperationResult<PathLstat>,
+) -> ScriptEntry {
+    (
+        demand(value, PathObservationOperation::Lstat),
+        PathObservationResult::Lstat(result),
+    )
+}
+
+fn present(value: &str, kind: PathNodeKind) -> ScriptEntry {
+    lstat_result(path(value), PathOperationResult::Present(lstat(kind)))
+}
+
+fn missing(value: &str) -> ScriptEntry {
+    lstat_result(path(value), PathOperationResult::Missing)
+}
+
+fn directory_entries(entries: Vec<(OsString, PathDirectoryEntryKind)>) -> ScriptEntry {
+    directory_entries_at("/pkg", entries)
+}
+
+fn directory_entries_at(
+    value: &str,
+    entries: Vec<(OsString, PathDirectoryEntryKind)>,
+) -> ScriptEntry {
+    let entries =
+        PathDirectoryEntries::new(entries.into_iter().map(|(name, kind)| {
+            PathDirectoryEntry::new(PathDirectoryName::new(name).unwrap(), kind)
+        }));
+    (
+        demand(path(value), PathObservationOperation::DirectoryEntries),
+        PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries)),
+    )
+}
+
+fn read_link(value: &str, target: &str) -> ScriptEntry {
+    (
+        demand(path(value), PathObservationOperation::ReadLink),
+        PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(PathBuf::from(
+            target,
+        )))),
+    )
+}
+
+async fn compute(
+    pattern_bytes: &[u8],
+    script: impl IntoIterator<Item = ScriptEntry>,
+) -> HostGlobSegmentOutcome {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::new(script).unwrap(),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    transaction
+        .compute(&HostGlobSegmentCandidatesKey::new(
+            path("/pkg"),
+            pattern(pattern_bytes),
+        ))
+        .await
+        .unwrap()
+}
+
+fn base_listing(entries: Vec<(OsString, PathDirectoryEntryKind)>) -> Vec<ScriptEntry> {
+    vec![
+        present("/", PathNodeKind::Directory),
+        present("/pkg", PathNodeKind::Directory),
+        directory_entries(entries),
+    ]
+}
+
+fn unwrap_ok(outcome: HostGlobSegmentOutcome) -> HostGlobSegmentCandidates {
+    let SourcePreparationOutcome::Complete(value) = outcome else {
+        panic!("expected complete outcome")
+    };
+    value.as_ref().as_ref().unwrap().dupe()
+}
+
+static CONSUMER_EVALUATIONS: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+struct HostGlobConsumerKey {
+    host: HostGlobSegmentCandidatesKey,
+}
+
+impl fmt::Display for HostGlobConsumerKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "test-host-glob-consumer:{}", self.host)
+    }
+}
+
+#[async_trait]
+impl Key for HostGlobConsumerKey {
+    type Value = HostGlobSegmentOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let value = ctx.compute(&self.host).await.unwrap();
+        CONSUMER_EVALUATIONS.fetch_add(1, Ordering::SeqCst);
+        value
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Default)]
+struct HostGlobTracker {
+    evaluated: AtomicUsize,
+    evaluated_with_data: AtomicUsize,
+}
+
+impl ActivationTracker for HostGlobTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        _dependencies: &mut dyn Iterator<Item = &DynKey>,
+        activation: ActivationData,
+    ) {
+        if key.downcast_ref::<HostGlobSegmentCandidatesKey>().is_none() {
+            return;
+        }
+        if let ActivationData::Evaluated(data) = activation {
+            self.evaluated.fetch_add(1, Ordering::SeqCst);
+            if data.is_some() {
+                self.evaluated_with_data.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn wildcard_uses_raw_typed_listing_and_ignores_unmatched_symlinks() {
+    let entries = vec![
+        (
+            OsString::from_vec(b"\xe9.txt".to_vec()),
+            PathDirectoryEntryKind::File,
+        ),
+        (
+            OsString::from_vec(b"\xc3\xa9.txt".to_vec()),
+            PathDirectoryEntryKind::Directory,
+        ),
+        (
+            OsString::from("unknown.txt"),
+            PathDirectoryEntryKind::Unknown,
+        ),
+        (
+            OsString::from("unmatched-cycle"),
+            PathDirectoryEntryKind::Symlink,
+        ),
+    ];
+    let value = unwrap_ok(compute(b"*.txt", base_listing(entries)).await);
+    let projected = value
+        .candidates()
+        .iter()
+        .map(|candidate| (candidate.component.as_ref(), candidate.kind))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        projected,
+        vec![
+            (
+                b"\xc3\xa9.txt".as_slice(),
+                HostGlobSegmentCandidateKind::Directory
+            ),
+            (
+                b"\xe9.txt".as_slice(),
+                HostGlobSegmentCandidateKind::NonDirectory
+            ),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn wildcard_propagates_stable_duplicate_names() {
+    let value = unwrap_ok(
+        compute(
+            b"*",
+            base_listing(vec![
+                (OsString::from("same"), PathDirectoryEntryKind::Directory),
+                (OsString::from("same"), PathDirectoryEntryKind::File),
+            ]),
+        )
+        .await,
+    );
+    assert_eq!(
+        value
+            .candidates()
+            .iter()
+            .map(|candidate| candidate.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            HostGlobSegmentCandidateKind::Directory,
+            HostGlobSegmentCandidateKind::NonDirectory,
+        ]
+    );
+}
+
+#[tokio::test]
+async fn literal_bypasses_listing_and_classifies_special_directory_and_missing() {
+    for (kind, expected) in [
+        (
+            PathNodeKind::SpecialFile,
+            Some(HostGlobSegmentCandidateKind::NonDirectory),
+        ),
+        (
+            PathNodeKind::Directory,
+            Some(HostGlobSegmentCandidateKind::Directory),
+        ),
+    ] {
+        let value = unwrap_ok(
+            compute(
+                b"literal",
+                [
+                    present("/", PathNodeKind::Directory),
+                    present("/pkg", PathNodeKind::Directory),
+                    present("/pkg/literal", kind),
+                ],
+            )
+            .await,
+        );
+        assert_eq!(
+            value.candidates().first().map(|candidate| candidate.kind),
+            expected
+        );
+    }
+    let missing = unwrap_ok(
+        compute(
+            b"literal",
+            [
+                present("/", PathNodeKind::Directory),
+                present("/pkg", PathNodeKind::Directory),
+                missing("/pkg/literal"),
+            ],
+        )
+        .await,
+    );
+    assert!(missing.candidates().is_empty());
+}
+
+#[tokio::test]
+async fn matched_symlink_needs_are_unioned_and_complete_error_wins() {
+    let entries = vec![
+        (OsString::from("a-link"), PathDirectoryEntryKind::Symlink),
+        (OsString::from("b-link"), PathDirectoryEntryKind::Symlink),
+    ];
+    let outcome = compute(b"*-link", base_listing(entries.clone())).await;
+    let SourcePreparationOutcome::Need(needs) = outcome else {
+        panic!("expected matched symlink needs")
+    };
+    let demands = needs.path_observations().unwrap().demands();
+    assert_eq!(demands.len(), 2);
+    assert_eq!(
+        demands[0].path().as_path().as_os_str().as_bytes(),
+        b"/pkg/a-link"
+    );
+    assert_eq!(
+        demands[1].path().as_path().as_os_str().as_bytes(),
+        b"/pkg/b-link"
+    );
+
+    let mut script = base_listing(entries);
+    script.push(lstat_result(
+        path("/pkg/a-link"),
+        PathOperationResult::Error(PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        }),
+    ));
+    let outcome = compute(b"*-link", script).await;
+    let SourcePreparationOutcome::Complete(value) = outcome else {
+        panic!("complete error must win over sibling Need")
+    };
+    assert!(matches!(
+        value.as_ref(),
+        Err(HostGlobSegmentError::Observation {
+            component,
+            operation: PathObservationOperation::Lstat,
+            ..
+        }) if component.as_ref() == b"a-link"
+    ));
+}
+
+#[tokio::test]
+async fn matched_symlink_classifies_file_directory_and_dangling() {
+    async fn resolve(target: &str, target_kind: Option<PathNodeKind>) -> HostGlobSegmentCandidates {
+        let entries = vec![(OsString::from("match"), PathDirectoryEntryKind::Symlink)];
+        let mut script = base_listing(entries);
+        script.push(present("/pkg/match", PathNodeKind::Symlink));
+        script.push(read_link("/pkg/match", target));
+        script.push(match target_kind {
+            Some(kind) => present(target, kind),
+            None => missing(target),
+        });
+        unwrap_ok(compute(b"m*tch", script).await)
+    }
+
+    let file = resolve("/file", Some(PathNodeKind::RegularFile)).await;
+    assert_eq!(
+        file.candidates()[0].kind,
+        HostGlobSegmentCandidateKind::NonDirectory
+    );
+    let directory = resolve("/directory", Some(PathNodeKind::Directory)).await;
+    assert_eq!(
+        directory.candidates()[0].kind,
+        HostGlobSegmentCandidateKind::Directory
+    );
+    assert!(resolve("/missing", None).await.candidates().is_empty());
+}
+
+#[tokio::test]
+async fn matched_child_symlink_under_symlinked_directory_uses_physical_identity() {
+    let value = unwrap_ok(
+        compute(
+            b"m*tch",
+            [
+                present("/", PathNodeKind::Directory),
+                present("/pkg", PathNodeKind::Symlink),
+                read_link("/pkg", "/real"),
+                present("/real", PathNodeKind::Directory),
+                directory_entries_at(
+                    "/real",
+                    vec![(OsString::from("match"), PathDirectoryEntryKind::Symlink)],
+                ),
+                present("/real/match", PathNodeKind::Symlink),
+                read_link("/real/match", "/file"),
+                present("/file", PathNodeKind::RegularFile),
+            ],
+        )
+        .await,
+    );
+    assert_eq!(
+        value.candidates(),
+        &[HostGlobSegmentCandidate {
+            component: Arc::from(&b"match"[..]),
+            kind: HostGlobSegmentCandidateKind::NonDirectory,
+        }]
+    );
+}
+
+#[tokio::test]
+async fn matched_symlink_cycle_is_a_semantic_error() {
+    let mut script = base_listing(vec![(
+        OsString::from("match"),
+        PathDirectoryEntryKind::Symlink,
+    )]);
+    script.extend([
+        present("/pkg/match", PathNodeKind::Symlink),
+        read_link("/pkg/match", "match"),
+    ]);
+
+    let SourcePreparationOutcome::Complete(value) = compute(b"m*tch", script).await else {
+        panic!("cycle must be complete")
+    };
+    assert!(matches!(
+        value.as_ref(),
+        Err(HostGlobSegmentError::Cycle {
+            logical_directory,
+            component,
+        }) if logical_directory == &path("/pkg") && component.as_ref() == b"match"
+    ));
+}
+
+#[tokio::test]
+async fn matched_directory_with_ancestor_expansion_is_a_semantic_error() {
+    let mut script = base_listing(vec![(
+        OsString::from("match"),
+        PathDirectoryEntryKind::Symlink,
+    )]);
+    script.extend([
+        present("/pkg/match", PathNodeKind::Symlink),
+        read_link("/pkg/match", "/a/a"),
+        present("/a", PathNodeKind::Directory),
+        present("/a/a", PathNodeKind::Symlink),
+        read_link("/a/a", "../a"),
+    ]);
+
+    let SourcePreparationOutcome::Complete(value) = compute(b"m*tch", script).await else {
+        panic!("completed ancestor expansion must be complete")
+    };
+    assert!(matches!(
+        value.as_ref(),
+        Err(HostGlobSegmentError::InfiniteExpansion {
+            logical_directory,
+            component,
+        }) if logical_directory == &path("/pkg") && component.as_ref() == b"match"
+    ));
+}
+
+#[tokio::test]
+async fn ancestor_expansion_accepts_wildcard_files_and_literal_directories() {
+    let expansion_script = |listing| {
+        let mut script = base_listing(listing);
+        script.extend([
+            present("/pkg/match", PathNodeKind::Symlink),
+            read_link("/pkg/match", "/a/a/leaf"),
+            present("/a", PathNodeKind::Directory),
+            present("/a/a", PathNodeKind::Symlink),
+            read_link("/a/a", "../a"),
+            present("/a/leaf", PathNodeKind::RegularFile),
+        ]);
+        script
+    };
+    let wildcard = unwrap_ok(
+        compute(
+            b"m*tch",
+            expansion_script(vec![(
+                OsString::from("match"),
+                PathDirectoryEntryKind::Symlink,
+            )]),
+        )
+        .await,
+    );
+    assert_eq!(
+        wildcard.candidates()[0].kind,
+        HostGlobSegmentCandidateKind::NonDirectory
+    );
+
+    let literal = unwrap_ok(
+        compute(
+            b"match",
+            [
+                present("/", PathNodeKind::Directory),
+                present("/pkg", PathNodeKind::Directory),
+                present("/pkg/match", PathNodeKind::Symlink),
+                read_link("/pkg/match", "/a/a"),
+                present("/a", PathNodeKind::Directory),
+                present("/a/a", PathNodeKind::Symlink),
+                read_link("/a/a", "../a"),
+            ],
+        )
+        .await,
+    );
+    assert_eq!(
+        literal.candidates()[0].kind,
+        HostGlobSegmentCandidateKind::Directory
+    );
+}
+
+#[tokio::test]
+async fn listing_symlink_resolution_disagreement_is_a_semantic_error() {
+    let mut script = base_listing(vec![(
+        OsString::from("match"),
+        PathDirectoryEntryKind::Symlink,
+    )]);
+    script.push(present("/pkg/match", PathNodeKind::RegularFile));
+
+    let SourcePreparationOutcome::Complete(value) = compute(b"m*tch", script).await else {
+        panic!("listing mismatch must be complete")
+    };
+    assert!(matches!(
+        value.as_ref(),
+        Err(HostGlobSegmentError::ListingSymlinkResolutionMismatch {
+            logical_directory,
+            component,
+        }) if logical_directory == &path("/pkg") && component.as_ref() == b"match"
+    ));
+}
+
+#[tokio::test]
+async fn same_dice_create_delete_recreate_and_kind_changes_restore_values() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern(b"*"));
+    let scripts = [
+        (
+            base_listing(vec![(
+                OsString::from("entry"),
+                PathDirectoryEntryKind::File,
+            )]),
+            Some(HostGlobSegmentCandidateKind::NonDirectory),
+        ),
+        (
+            base_listing(vec![(
+                OsString::from("entry"),
+                PathDirectoryEntryKind::Directory,
+            )]),
+            Some(HostGlobSegmentCandidateKind::Directory),
+        ),
+        (base_listing(Vec::new()), None),
+        (
+            base_listing(vec![(
+                OsString::from("entry"),
+                PathDirectoryEntryKind::File,
+            )]),
+            Some(HostGlobSegmentCandidateKind::NonDirectory),
+        ),
+    ];
+    let mut transaction = dice.updater().commit().await;
+
+    for (script, expected) in scripts {
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::new(script).unwrap(),
+            )])
+            .unwrap();
+        transaction = updater.commit().await;
+
+        let value = unwrap_ok(transaction.compute(&key).await.unwrap());
+        assert_eq!(
+            value.candidates().first().map(|candidate| candidate.kind),
+            expected
+        );
+    }
+}
+
+#[tokio::test]
+async fn same_dice_symlink_retarget_error_recovery_and_restoration() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern(b"*"));
+    let listing = || {
+        base_listing(vec![(
+            OsString::from("entry"),
+            PathDirectoryEntryKind::Symlink,
+        )])
+    };
+    let resolved = |target: &'static str, kind| {
+        let mut script = listing();
+        script.extend([
+            present("/pkg/entry", PathNodeKind::Symlink),
+            read_link("/pkg/entry", target),
+            present(target, kind),
+        ]);
+        script
+    };
+    let mut denied = listing();
+    denied.push(lstat_result(
+        path("/pkg/entry"),
+        PathOperationResult::Error(PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        }),
+    ));
+    let scripts = [
+        (
+            resolved("/first", PathNodeKind::RegularFile),
+            Ok(HostGlobSegmentCandidateKind::NonDirectory),
+        ),
+        (
+            resolved("/second", PathNodeKind::Directory),
+            Ok(HostGlobSegmentCandidateKind::Directory),
+        ),
+        (denied, Err(PathObservationOperation::Lstat)),
+        (
+            resolved("/first", PathNodeKind::RegularFile),
+            Ok(HostGlobSegmentCandidateKind::NonDirectory),
+        ),
+    ];
+    let mut transaction = dice.updater().commit().await;
+
+    for (script, expected) in scripts {
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::new(script).unwrap(),
+            )])
+            .unwrap();
+        transaction = updater.commit().await;
+
+        let outcome = transaction.compute(&key).await.unwrap();
+        match expected {
+            Ok(kind) => assert_eq!(unwrap_ok(outcome).candidates()[0].kind, kind),
+            Err(operation) => {
+                let SourcePreparationOutcome::Complete(value) = outcome else {
+                    panic!("observation error must be complete")
+                };
+                assert!(matches!(
+                    value.as_ref(),
+                    Err(HostGlobSegmentError::Observation {
+                        operation: actual,
+                        ..
+                    }) if actual == &operation
+                ));
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn equal_complete_prunes_consumer_and_host_key_stores_no_evaluation_data() {
+    fn script(target: &str) -> Vec<ScriptEntry> {
+        let mut script = base_listing(vec![(
+            OsString::from("entry"),
+            PathDirectoryEntryKind::Symlink,
+        )]);
+        script.extend([
+            present("/pkg/entry", PathNodeKind::Symlink),
+            read_link("/pkg/entry", target),
+            present(target, PathNodeKind::RegularFile),
+        ]);
+        script
+    }
+
+    CONSUMER_EVALUATIONS.store(0, Ordering::SeqCst);
+    let tracker = Arc::new(HostGlobTracker::default());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let consumer = HostGlobConsumerKey {
+        host: HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern(b"*")),
+    };
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+        ..Default::default()
+    });
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::new(script("/first")).unwrap(),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    assert_eq!(
+        unwrap_ok(transaction.compute(&consumer).await.unwrap()).candidates()[0].kind,
+        HostGlobSegmentCandidateKind::NonDirectory
+    );
+    assert_eq!(CONSUMER_EVALUATIONS.load(Ordering::SeqCst), 1);
+
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::new(script("/second")).unwrap(),
+        )])
+        .unwrap();
+    transaction = updater.commit().await;
+    assert_eq!(
+        unwrap_ok(transaction.compute(&consumer).await.unwrap()).candidates()[0].kind,
+        HostGlobSegmentCandidateKind::NonDirectory
+    );
+    assert_eq!(CONSUMER_EVALUATIONS.load(Ordering::SeqCst), 1);
+    assert!(tracker.evaluated.load(Ordering::SeqCst) >= 2);
+    assert_eq!(tracker.evaluated_with_data.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn wildcard_missing_directory_is_a_semantic_error() {
+    let outcome = compute(
+        b"*",
+        [present("/", PathNodeKind::Directory), missing("/pkg")],
+    )
+    .await;
+    let SourcePreparationOutcome::Complete(value) = outcome else {
+        panic!("missing reached directory is complete")
+    };
+    assert!(matches!(
+        value.as_ref(),
+        Err(HostGlobSegmentError::DirectoryDisappeared { logical_directory })
+            if logical_directory == &path("/pkg")
+    ));
+}
