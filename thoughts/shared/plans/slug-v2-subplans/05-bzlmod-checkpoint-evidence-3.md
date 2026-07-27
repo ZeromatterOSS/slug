@@ -7063,3 +7063,256 @@ Next packet: run only `WP-5-m1-host-registry-inputs-design`; it is
 design-only. Freeze small serial private owners for raw registry/mirror input
 normalization, a vendor-only package-policy projection, and a dedicated
 Refresh invalidation token before any Rust.
+
+### Stage 5 Host registry-input owners design
+
+`WP-5-m1-host-registry-inputs-design` freezes only three dormant private
+prerequisites for the later pure `HostRegistryFunctionKey`. It adds no Rust
+in this packet and does not revise the accepted RegistryFunction construction
+order.
+
+#### Pinned Bazel input semantics
+
+At Bazel 9.2 commit `8220c619…`,
+`RepositoryOptions.java:99-132,344-370` defines repeatable registry and
+module-mirror inputs, lockfile mode, and vendor directory.
+`Converters.java:525-574,577-597` parses each module-mirror occurrence at the
+first `=`, represents no key as `""`, turns the sole empty value into an empty
+list, and rejects an empty member in a multi-value list. That converter
+remains later CLI/parser work: this packet consumes its structured
+`(registry key, ordered mirror values)` result and does not parse raw flag
+text.
+
+`BazelRepositoryModule.java:130-133,612-646,677-684` supplies the exact
+slash-retaining implicit default `https://bcr.bazel.build/`; explicitly
+supplied registries, mirror keys, and mirror bases instead lose every trailing
+`/`. Explicit registries and mirror values deduplicate while preserving first
+iteration order, a later normalized mirror-key occurrence wins, unknown
+nonempty mirror keys fail, `""` is the default mirror key, and an explicit
+per-registry entry including an empty entry overrides that default. If there
+is at least one mirror occurrence, Bazel materializes one selected mirror-set
+entry for every command registry; no mirror occurrence instead injects the
+distinct empty map.
+
+The injected registry list and mirror map are immutable set/map values.
+`PrecomputedValue.java:45-76,110-133` and
+`AbstractInMemoryMemoizingEvaluator.java:141-151,432-448` therefore give them
+order-insensitive equality and prune an equal replacement even though their
+iteration order is retained. Slug must reproduce that surprising injected
+edge. A freshly normalized registry or mirror value iterates in its current
+occurrence order. A reorder-only value compares equal at injection, so the
+retained graph does not replace its previously stored value: retained
+consumers keep the old iteration order and do not recompute. This packet makes
+no claim about a broader command-option invalidation edge and does not
+activate the values.
+
+`ModuleFileFunction.java:748-765`, `RegistryKey.java:25-47`, and
+`RegistryFunction.java:77-85` show that a registry key contains the
+post-option-normalization or override spelling, mirror lookup uses that exact
+unsubstituted spelling, and `%workspace%` replacement occurs only afterward.
+The implicit default consequently keeps its trailing slash, an explicit BCR
+registry loses it, and a mirror key normalized to
+`https://bcr.bazel.build` is unknown when registries were omitted. A
+nonempty root override bypasses command-registry normalization entirely.
+
+`RegistryFunction.java:37-51,65-72`,
+`BazelRepositoryModule.java:152,660-669,738-768`, and
+`RepositoryDirectoryValue.java:42-48` keep registry list, mirrors, vendor
+directory, and the registry-cache invalidation instant as separate inputs.
+The invalidation instant is read only in Refresh. Bazel recovers it from the
+retained evaluator, starts from the epoch when absent, and advances it only
+when `now` is strictly later than the previous instant plus one hour.
+`IndexRegistry.java:166-242` and `VendorManager.java:146-190` keep vendor
+consumption later: it is eligible only when a vendor directory is configured,
+the registry file has a checksum, the registry scheme is not `file`, and the
+mapped vendor path is a file. A missing or wrong-kind path falls through to
+the downloader, but once a file is selected, a read or checksum failure is
+fatal and never falls back to network.
+
+#### Exact three-file implementation boundary
+
+The later implementation may edit exactly:
+
+1. a new private
+   `app/slug_bzlmod_v2/src/host_registry_inputs.rs`;
+2. `app/slug_bzlmod_v2/src/package_policy.rs`; and
+3. `app/slug_bzlmod_v2/src/lib.rs` for only the private module declaration.
+
+The final diff adds at most 900 lines. It adds no public re-export, Cargo or
+dependency change, fixture, command/server/core/loading/analysis/query edit,
+production injector, consumer, activation, clock, cache, interner, lock,
+filesystem or registry IO, path observation, lockfile access, repository
+mapping, source preparation, or RegistryFunction implementation. Use
+Buck2-derived `SmallSet`/`SmallMap`, compact or shared strings and slices,
+`Dupe`, and `Allocative`; do not introduce standard maps/sets or repeated
+owned-string/vector churn.
+
+Implement the owners serially inside that allowlist: registry/mirror
+normalization plus the private module declaration first, the vendor
+projection second, and the Refresh token third. Test-only direct DICE
+injection is allowed; production injection is deferred to the later atomic
+command-input activation packet.
+
+#### Registry and mirror inputs
+
+The new module owns a pure normalizer whose registry argument is the ordered
+primitive command-registry occurrences and whose mirror argument is the
+ordered structured post-converter occurrences. It returns separate private
+semantic values for:
+
+- the normalized command-registry ordered set; and
+- the complete normalized command-registry-to-selected-mirror-set map.
+
+An empty registry occurrence list produces exactly the slash-retaining
+implicit BCR default and does not pass through explicit normalization. A
+nonempty list trims every trailing slash, deduplicates normalized spellings,
+and retains first iteration order. It preserves `%workspace%`, empty,
+malformed, unsupported-scheme, and otherwise invalid URI spellings for the
+later RegistryFunction validator. It performs no workspace substitution or
+URI/scheme/path validation.
+
+For mirror occurrences, normalize keys and values by trimming all trailing
+slashes. Deduplicate each replacement value-set with first iteration order;
+a later occurrence of the same normalized key replaces the earlier set,
+including with the empty set. After all replacements, report one typed
+normalization error containing every unknown nonempty normalized key in its
+first-key iteration order. If no occurrence exists, the complete map is
+empty. Otherwise, materialize each normalized command registry in registry
+iteration order, selecting its explicit set when present and the `""`
+default otherwise. Preserve the distinction between an absent map and a map
+whose selected sets are empty. Do not retain `""` as a materialized registry
+entry unless `""` itself is a command registry.
+
+Expose exact-spelling lookup on the mirror value for the future private
+RegistryFunction owner. It does not trim, substitute, or validate its lookup
+argument. Thus the later key selects by its post-option-normalization or raw
+override spelling, and an override spelling that is not an exact materialized
+command-registry key receives no command mirrors.
+
+Use three separate workspace-scoped private injected keys:
+
+- `HostRegistryUrlsInputKey`, whose value is the normalized ordered registry
+  set;
+- `HostModuleMirrorsInputKey`, whose value is the complete mirror map; and
+- `HostRegistryRefreshTokenKey`, whose value is the token below.
+
+Their identity contains only the normalized workspace. Registry-list,
+mirror-map, and token replacement must invalidate independently; the mirror
+key must not compute from or depend on the registry-list key. Registry and
+mirror values retain iteration order but implement literal Bazel
+set/map-of-set equality: top-level and nested reorder-only replacements are
+equal and prune without replacing the previously stored value; membership,
+selected value, explicit-empty versus absent map, or normalized spelling
+changes are unequal and install the new value with its current normalized
+order. Do not use order-sensitive slice-derived equality for these injected
+values.
+
+The pure normalizer is the only atomic bundle at this stage: an unknown-key
+error returns neither value. Test helpers may inject its two successful
+values on the same updater, but separate typed injected keys remain visible
+to future consumers. Missing injected values fail closed at DICE and will be
+mapped to distinct typed input errors by the later RegistryFunction. No input
+owner returns `PathOutcome::Need`.
+
+#### Vendor-only projection
+
+In `package_policy.rs`, add one private
+`RootVendorDirectoryProjection` over the existing
+`RootPackagePolicyInputsKey` and its private workspace-keyed
+`RootVendorDirectoryProjectionKey`. Its complete value is exactly
+`Result<Option<NormalizedAbsolutePath>,
+RootPackagePolicyProjectionError>`. Projection equality compares only the
+optional normalized vendor directory, so package-root, deleted-package, and
+REPO UTF-8-policy changes recompute the projection but prune every equal
+downstream consumer.
+
+This projection adds no input authority and no path Need. It does not test
+existence or kind, resolve symlinks, form `_registries` paths, read vendor
+bytes, inspect URLs/checksums, or fall back to network. Those are later
+registry-file responsibilities under the exact pinned boundary above:
+missing/wrong-kind may fall through, while a selected vendor file's read or
+checksum failure is fatal without downloader fallback. A missing aggregate
+package-policy input is the existing typed projection error, not a Need.
+
+#### Dedicated Refresh token
+
+`HostRegistryRefreshToken` is a private opaque `u64` newtype with exact
+equality and no ordering, clock, duration, request-generation, or IO meaning.
+Its separate injected key is present independently of mode but the future
+RegistryFunction may compute it only in Refresh. It neither reuses nor
+depends on `RegistryRequestGenerationKey`.
+
+The later production activation packet alone owns retained wall-clock
+threshold state and atomic request injection. It must inject the token every
+command, preserve it while `now <= previous + 1h`, advance it only for strict
+`now > previous + 1h`, and advance the initial epoch state on the first real
+server request. The opaque counter changes only when that threshold state
+advances. No clock read, sleep, interval calculation, mode dependency, or
+production injection belongs in this prerequisite implementation.
+
+#### Focused retained-DICE evidence
+
+The three-file implementation must prove:
+
+- the exact implicit-default slash and the adversarial unknown mirror key
+  `https://bcr.bazel.build` when registries are omitted;
+- explicit registry all-slash trimming, normalized deduplication, current
+  first iteration order, and preservation of `%workspace%`, empty, malformed,
+  and unsupported spellings;
+- mirror key/value trimming, normalized deduplication and current order,
+  later-wins replacement, default fallback, per-registry and explicit-empty
+  override, multiple ordered unknowns, and absent-map versus materialized
+  empty-map shape;
+- separately allocated equal values, normalized-equivalent inputs, and
+  fresh top-level registry plus nested mirror reorder values that iterate in
+  their own current orders but compare equal, followed by equal reinjection
+  that preserves the old stored order and does not recompute the consumer;
+- workspace isolation, fail-closed missing input, registry-only versus
+  mirror-only replacement, and equal/A→B→A downstream counter behavior for
+  both injected collection keys;
+- vendor `None` and A→B→A, separately allocated equal paths, and downstream
+  pruning for independent package-root, deleted-package, and UTF-8-policy
+  changes, plus the existing typed missing-input error;
+- Refresh-token equal and A→B→A behavior, workspace isolation, fail-closed
+  absence, and no invalidation when only
+  `RegistryRequestGenerationKey` changes; and
+- activation/dependency evidence that these test consumers acquire only their
+  named input or projection and no root evaluation, visible lockfile,
+  filesystem/path observation, IO, repository mapping, source preparation,
+  write, clock, or activation edge.
+
+Run formatting, the focused new owner tests, the complete
+`slug_bzlmod_v2` unit/integration/doctest surface, and GNU-Windows test-target
+compilation serially. Enforce the exact three-file/900-line scope,
+`git diff --check`, archive status, and a credential scan. Stop and replan on
+raw flag-text parsing; normalization of the implicit default; order-sensitive
+injected collection equality; workspace substitution or URI validation;
+mirror DICE dependence on the registry-list key; a public re-export or
+production injector; a Need from any owner; direct IO; clock/request-generation
+reuse; any fourth file; or any deferred owner, consumer, or activation.
+
+#### Host registry-input owners design status
+
+**Status:** Accepted after terminal latest-text review on 2026-07-26.
+
+The exact three-file, 900-added-line implementation boundary is frozen for a
+new private input-owner module, the existing package-policy owner, and only
+the private module declaration. Separate dormant registry-list, complete
+mirror-map, vendor-directory projection, and Refresh-token identities retain
+Bazel's implicit BCR slash, structured post-converter normalization, explicit
+empty-map distinction, exact lookup spelling, and independent invalidation.
+
+Pinned-source review corrected two non-obvious identities before acceptance:
+set/map equality ignores reorder-only changes, and equal reinjection preserves
+the old stored value and iteration order. It also pinned the deferred
+vendor-file fatal-read boundary. Implementation/evidence review confirmed
+`SmallSet`/`SmallMap` and the existing projection pattern can satisfy the
+contract within scope; architecture/orchestration review froze structured
+inputs, separate DICE keys, the opaque token lifecycle, and all deferrals.
+After the corrections, all three exact-latest-text verdicts returned
+`ACCEPT`. No Rust, Cargo, fixture, dependency, API, consumer, IO, clock, or
+activation changed.
+
+Next packet: implement only the accepted
+`WP-5-m1-host-registry-inputs` three-file prerequisite, serially and within
+the exact evidence and stop gates above.
