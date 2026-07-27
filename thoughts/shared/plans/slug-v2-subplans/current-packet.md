@@ -1,40 +1,37 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-analysis-typed-propagation`
+Packet: `WP-5-m1-query-typed-command-root-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted root configured-analysis typed-propagation design; accepted
-public typed root-loading boundary; existing configured analysis evaluator
-Validation tier: public cross-crate DICE identity, Need union, and events
+Evidence: accepted public typed root-loading and root-analysis boundaries;
+existing loading-query evaluator, graph keys, order, and lazy traversal tests
+Validation tier: reserved public cross-crate DICE command-root design
 
-Implementation files:
+Design inspection surfaces:
 
-- `app/slug_analysis_v2/Cargo.toml`
-- `app/slug_analysis_v2/src/dice.rs`
-- `app/slug_analysis_v2/src/lib.rs`
-- new `app/slug_analysis_v2/tests/root_analysis.rs`
+- `app/slug_query_v2/Cargo.toml`
+- `app/slug_query_v2/src/graph.rs`
+- `app/slug_query_v2/src/loading_environment.rs`
+- `app/slug_query_v2/src/generic.rs`
+- `app/slug_query_v2/src/evaluator.rs`
+- `app/slug_query_v2/src/lib.rs`
+- `app/slug_query_v2/tests/loading_query.rs`
+- `app/slug_query_v2/tests/query.rs`
 
-Terminal scheduling updates may also change this manifest, the owner plan, and
-canonical Live Status.
+Design result: freeze one dormant always-rooted typed query command key and its
+exact implementation allowlist. It must consume the accepted preparation
+envelope without converting Need to `QueryError`, preserve current result
+ordering and lazy traversal, and make even a valid empty query seal a
+nonempty exact dependency closure. Decide whether the production bzlmod
+dependency is direct or provided through an accepted loading-crate reexport.
 
-Result: add dormant public `RootConfiguredTargetAnalysisKey` over normalized
-workspace plus existing configured-target identity. Consume
-`RootPackageLoadKey`, recursively compute the same root-analysis family, union
-all child Needs before errors, and share only pure post-loading analysis
-helpers with the unchanged legacy key. Root-export the shared preparation
-aliases through analysis.
+Add no Rust, Cargo, fixture, oracle, Host migration, existing-key replacement,
+core/CLI/server caller, runtime activation, external-repository breadth, JVM,
+Java bytecode, or Bazel delegation. Reuse current query tests and accepted
+loading/analysis evidence. Stop if the design requires eager whole-workspace
+loading, exposes Need as an error, changes an existing query key identity, or
+mixes the later Host-migration packet into this boundary.
 
-Move only `slug_workspace_v2` from dev to production dependencies. Add no
-existing-key replacement, core/query/CLI/server caller, runtime activation,
-external repository, configuration/toolchain/platform breadth, discovery,
-execution/materialization, fixture/oracle, JVM, Java bytecode, or Bazel
-delegation. Stop on a fifth file, a legacy identity/value change, package
-borrow across a DICE await, duplicate package compute, or Need-to-error
-conversion.
-
-Validate focused root-analysis identity/loading/recursive-order/two-child-Need/
-equality/event/lifecycle tests, full `slug_analysis_v2`, direct
-`slug_core_v2` compile coverage, GNU-Windows no-run linkage, formatting,
-`git diff --check`, archive status, and exact scope/export/no-caller/Cargo/
-dependency/legacy/IO/lock/blocking/JVM guards. Obtain one terminal independent
-implementation review.
+Validate targeted source/caller/dependency/forbidden-path scans,
+`git diff --check`, and exact scheduling-doc scope. Obtain one independent
+reserved-boundary design review.

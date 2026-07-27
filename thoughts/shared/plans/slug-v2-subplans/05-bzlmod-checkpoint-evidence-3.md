@@ -12908,3 +12908,26 @@ directory discovery, execution/materialization, fixture/oracle, JVM, Java
 bytecode, or Bazel delegation. Stop if Rust requires changing the legacy key
 value/identity, holding evaluator state across an await, adding a fifth file,
 or converting Need to `AnalysisError`.
+
+#### Root configured-analysis typed-propagation implementation status
+
+Status: **ACCEPT** for `WP-5-m1-analysis-typed-propagation` on 2026-07-27
+after one terminal independent implementation review.
+
+The exact four-file patch adds the dormant public
+`RootConfiguredTargetAnalysisKey` and analysis preparation aliases while
+leaving the legacy key identity, value, callers, diagnostics, dependency
+family, and event behavior unchanged. Only the owned immutable completed
+package value crosses child DICE awaits. The root family preserves
+first-seen dependency order, unions all child Needs before selecting an error,
+stores local events only for Complete results, and uses Complete-only
+structural equality and validity.
+
+The focused root-analysis regression passes 1/1 and the full analysis crate
+passes its 4/1/4/4 integration groups. Direct `slug_core_v2` compile coverage,
+analysis/core GNU-Windows no-run linkage, formatting, diff/archive, exact
+scope/export/no-caller/Cargo/dependency/legacy/IO/lock/blocking/JVM guards all
+pass.
+
+Next design only `WP-5-m1-query-typed-command-root-design`, prioritizing the
+smallest observable query path without runtime activation or Host migration.
