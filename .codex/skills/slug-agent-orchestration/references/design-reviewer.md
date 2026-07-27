@@ -14,6 +14,9 @@ Read:
 Do not implement, edit files, or broaden the packet.
 For a correction rereview, read only the correction diff, affected evidence,
 and the prior blocker. Do not reconstruct the full packet.
+Treat tests-only or evidence-only correction as non-material unless it changes
+the accepted contract or architecture. Inspect recorded validation output;
+rerun commands only when evidence is missing, stale, or suspect.
 
 Check the applicable risks:
 1. Does the representation encode Bazel semantics rather than fixture output?

@@ -10,9 +10,12 @@ commits.
 
 ## Start
 
-1. Read `AGENTS.md`, canonical **Live Status**, and **Current packet**.
-2. Search the owner plan for that packet ID. Read only its active section and
-   matching Stage 9 rows; histories are not routine context.
+1. Read `AGENTS.md` and
+   `thoughts/shared/plans/slug-v2-current-packet.md`.
+2. Compare its packet ID with canonical **Current packet** using a targeted
+   search. If they differ, stop and report the mismatch to the root; only the
+   root may reconcile scheduling documents. Otherwise read only the owner
+   heading, evidence anchors, and Stage 9 row named by the manifest.
 3. Check `git status --short --branch` and overlapping dirty diffs.
 4. Continue one clearly owned packet. Check the oracle-harness growth
    checkpoint before adding fixture breadth.
@@ -38,6 +41,12 @@ audits only for distinct unresolved semantic questions; parallel writers must
 own disjoint files. Correction rereviews inspect only the correction diff and
 prior blocker. Never run parallel Cargo commands on one target directory.
 
+When the user identifies token pressure, default to root-only serial work and
+one terminal independent review. Do not run speculative audits, reconstruct
+accepted evidence, or delegate mechanical work. Prefer the next observable
+vertical slice over substrate breadth. Use a second worker only when disjoint
+parallel work is explicitly worth its additional context cost.
+
 ## Packet
 
 Use `references/implementation-worker.md`. Always name:
@@ -54,11 +63,12 @@ representation changes; downstream coverage for public interfaces; platform
 and lifecycle evidence for daemon/platform work.
 
 Reuse accepted discriminating evidence. Add an oracle only for an evidence
-gap. Use a separate design packet only for decisions reserved to the root:
-new DICE keys/locks, public or cross-crate APIs, identity/ownership models,
-formatter semantics, regex engines, stage boundaries, and destructive actions.
-Obtain one Sol pre-review for those decisions. Otherwise keep design,
-implementation, and evidence in one logical packet and one terminal rollup.
+gap. Keep design, source/oracle evidence, implementation, and tests in one
+logical packet when they cover one abstraction and behavior family under a
+small allowlist. Use a separate design packet only for a new shared public
+boundary, DICE key/lock or ownership model, cross-crate identity, destructive
+action, or a decision the canonical plan explicitly reserves. Obtain one Sol
+pre-review for those decisions.
 
 Workers edit named files and run focused tests. The root inspects the diff,
 adds a discriminating case for identity/equality/invalidation/order/formatting
@@ -77,7 +87,9 @@ Check only applicable risks:
 
 Use `references/design-reviewer.md` for reserved decisions or risky patches;
 ordinary packets receive one implementation review. Allow one focused
-correction after a concrete miss. A second material correction is `REPLAN`.
+correction after a concrete miss. Tests-only or evidence-only corrections do
+not count as material unless they change the accepted contract or architecture.
+A second material implementation/contract correction is `REPLAN`.
 
 For oracle growth, review fixtures before the sixth accepted packet or at
 +100 files/+10,000 text lines since the last checkpoint. Preserve provenance,
@@ -88,19 +100,23 @@ redundant or nondiscriminating.
 
 - Docs/instructions: source, structure, and diff checks.
 - Oracle-only: focused harness plus changed/protected fixtures.
-- Private Rust: owner tests and direct dependents.
-- Public/DICE/daemon/platform changes: affected downstream, daemon, and
-  cross-target gates.
+- Private/local Rust: focused owner tests plus one direct compile dependent.
+- Public/cross-crate Rust: focused owner tests plus named direct dependents.
+- DICE/daemon/platform: relevant lifecycle and cross-target gates.
 
-Run broad suites only when the interface or bug class requires them. Run Rust
-formatting when Rust changes and always run `git diff --check`.
+Run broad repository suites once at a milestone/integration checkpoint, not
+after each packet or correction. Reviewers inspect recorded output and rerun
+only missing, stale, or suspect evidence. Run Rust formatting when Rust changes
+and always run `git diff --check`.
 
 At terminal `ACCEPT`, `REPLAN`, or genuine stop:
 
 1. update the owner plan once with compact evidence;
-2. update canonical Live Status only for a scheduling change;
-3. add one bounded routing-log row, rotating history only when needed; and
+2. update the manifest and canonical Live Status only for a scheduling change;
+3. add a routing-log row only for `REPLAN`, an unusual route/parallel layout,
+   a model-route change, or a reusable routing lesson; and
 4. commit accepted work, folding status into it when practical.
 
-Do not publish per-audit/correction status commits or duplicate live routing
-rows into history.
+The owner-plan terminal entry retains packet ID, verdict, tests, and commit.
+Do not publish per-audit/correction status commits or duplicate ordinary
+acceptance evidence in routing history.

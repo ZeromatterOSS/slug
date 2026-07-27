@@ -32,6 +32,11 @@ Cite Bazel source of truth for parity decisions:
   `buck-out` exception unless a deliberate Slug extension plan says so.
 - Bazel 9 MODULE.bazel builds → slug builds, same result.
 - Bazel 9 fails → slug fails. Workarounds masking a Bazel 9 failure = bugs.
+- Reproduce Bazel's observable semantics in Rust; do not reproduce Bazel's
+  implementation machinery. JVM bytecode execution, an embedded JVM, and
+  delegation to Bazel/Java are for oracle generation only unless the user
+  explicitly approves them as Slug architecture. If exact behavior has no
+  bounded Rust implementation, record the unsupported boundary or `REPLAN`.
 
 ## Repo workflow for agents
 
@@ -40,10 +45,9 @@ Start from the live checkout, not from memory.
 - A request to follow or continue the implementation plan, including
   `/goal follow the implementation plan`, must use
   `.codex/skills/slug-agent-orchestration/SKILL.md`. Its compact startup path
-  and the canonical plan's **Live Status** are the scheduling authority.
-- Read only the current owner plan sections and matching Stage 9 rows named by
-  that startup path. Historical checkpoints and V1 plans are reference
-  material, not routine context.
+  and `thoughts/shared/plans/slug-v2-current-packet.md` are the compact
+  scheduling entrypoint. Canonical **Live Status** remains authoritative if
+  they disagree.
 - If the user names a prompt or plan, read that prompt/plan before editing.
   Prompts live in `thoughts/shared/prompts/`; subplans live in
   `thoughts/shared/plans/slug-v2-subplans/`. V1 plans are available through the
@@ -52,26 +56,8 @@ Start from the live checkout, not from memory.
   Buck2-derived data structures, interning, hashing, compact collections, or
   memory-accounting work, read
   `.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing.
-- Default to root-only work for small read-only or mechanical changes and one
-  worker plus one reviewer for ordinary bounded packets. Use multiple
-  independent audits only when the root names distinct unresolved semantic
-  questions; correction rereviews inspect only the correction diff.
 - Check `git status --short` and inspect dirty diffs before making changes.
   Treat dirty files as active user/agent state unless the user says otherwise.
-- Keep status documentation proportional to scheduling changes. During a work
-  packet, record evidence in the worker/reviewer handoff; do not make a plan or
-  routing-log commit for each audit, correction, or review round. At terminal
-  `ACCEPT`, `REPLAN`, or genuine stop, update the owning plan once with compact
-  evidence and add one routing-log rollup. Update canonical **Live Status** only
-  when its milestone state, blocker, or current packet changes. Do not copy
-  completed packet contracts or evidence histories into the canonical plan.
-- Prefer folding terminal status updates into the accepted implementation or
-  oracle commit. When separation materially helps review, use at most one
-  follow-up status commit for the whole packet. Routing history files are
-  rollover archives, not a second live log; do not update both the live log and
-  an archive for the same packet.
-- Prefer focused owning-abstraction tests before broad SDK or repo-wide smokes.
-  Use broad smokes only after the local bug class is understood.
 - Do not run multiple `cargo build` or `cargo test` commands in parallel when
   they share the same target directory; Cargo lock contention obscures signal.
 - If a Rust change affects the V2 `slug` binary path used by oracle tests,
@@ -111,27 +97,9 @@ computation.
   because an earlier fixture did. Remove unused modules, copied registries,
   mutations, manifests, expected fields, and negative assertions that do not
   affect the behavior being proved.
-- Run a focused fixture-growth review after every five accepted oracle packets,
-  or when fixtures have grown by at least 100 files or 10,000 text lines since
-  the last review, whichever comes first. Record the exact accepted packet IDs,
-  fixture scope, and aggregate before/after file and line counts. If no prior
-  checkpoint exists, inventory the current accepted tree as the baseline and
-  review all identifiable accepted packets since the latest owner-plan
-  evidence. Inventory growth by fixture and repeated subtree, verify every
-  retained row remains discriminating, and record a compact baseline/result in
-  the oracle-harness owner plan. Pruning must preserve Bazel version/source
-  provenance, hermetic replay, failure isolation, and exact expected output;
-  never replace self-contained evidence with mutable shared state merely to
-  reduce line count.
-- Update the owning plan with compact evidence when a result changes the
-  project state. Do not use a passing real-world target as proof that structural
-  acceptance criteria are complete unless the plan says so.
 - Every parity implementation needs an accepted discriminating Bazel 9.2
   oracle or pinned-source regression. Reuse existing evidence when it already
   proves the behavior; add or strengthen an oracle only for an actual gap.
-  Require a separate design-only packet only for reserved architecture,
-  identity, ownership, public API, DICE, formatter, regex, or stage-boundary
-  decisions.
 
 ## NOT in scope
 

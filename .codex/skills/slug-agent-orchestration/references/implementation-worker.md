@@ -7,6 +7,7 @@ placeholder sections or `none with a reason`.
 Task: <one bounded observable result>
 Owner: <milestone, plan path, packet ID>
 Baseline: <branch, HEAD, dirty ownership>
+Validation tier: <docs | oracle | private/local | public/cross-crate | DICE/daemon/platform>
 
 Read:
 - AGENTS.md
@@ -62,4 +63,5 @@ Add only what the task uses:
 
 An accepted discriminating Bazel 9.2 oracle is sufficient; do not add another
 fixture unless the packet names a missing behavior. Workers run focused tests.
-The root owns broad validation, documentation, commits, and reserved decisions.
+The root runs only the named validation tier, owns documentation/commits, and
+reserves broad suites for milestone/integration checkpoints.

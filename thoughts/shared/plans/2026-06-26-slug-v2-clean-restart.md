@@ -17,14 +17,16 @@ implementation from the first architectural boundary.
 This table is the scheduling authority for a clean root agent. Historical
 checkpoint sections below are evidence only. A request such as
 `/goal follow the implementation plan` uses the repo orchestration skill and
-advances the **Current packet**, not an older `next` paragraph.
+advances the **Current packet**, not an older `next` paragraph. The compact
+[current-packet manifest](./slug-v2-current-packet.md) supplies startup details
+and must name the same packet.
 
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained runtime/loading spine; accepted Host root-module/loading-anchor owners, typed no-follow dirents, Bazel-internal string seam and exact oracles, Linux raw-name oracle through checkpoint `e2cc891d`, simple matcher oracle `9f42c3e5`, private Host segment-candidate owner `bd12c015`, exact six-state boundary oracle `85ba4975`, public Host boundary projection `ad6751ef`, exact private traversal design, and its nine-label traversal oracle; retained bzlmod lockfile/registry/policy/Host evidence remains authoritative | implement the private recursive traversal before consumer activation; nested `MODULE.bazel` without BUILD continues and no nested-repository detector is allowed; Host publication/retry, byte-aware ingress, native Windows/lone-surrogate ordering, regular-or-special BUILD/`.bzl` acquisition, remaining registry transports, and discovery composition remain | `WP-5-m1-loading-pure-host-glob-traversal-owner` |
+| M1: one semantic spine | partial | Host loading observations and private glob prerequisites through oracle `5abff72e`; full evidence is in the Stage 5 owner plan | implement private recursive traversal before consumer activation; Host publication/retry, byte-aware ingress, native Windows ordering, BUILD/`.bzl` acquisition, registry transports, and discovery composition remain | `WP-5-m1-loading-pure-host-glob-traversal-owner` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; text, graph, and `label_kind` output; accepted `tests`, `labels`, `executables`, and `visible` metadata/activation evidence | `attr`, `filter`, and `kind` require an exact Java-compatible `Pattern`; external repositories, pattern breadth, and remaining output formats remain | pause M3 while the M1 private traversal-owner packet is current |
+| M3: `query` | **active** | 13/16 default functions plus text, graph, and `label_kind` output through `72aece4d`; full evidence is in the Stage 8 owner plan | `attr`, `filter`, and `kind` share an exact Java-compatible `Pattern` blocker; external repositories, pattern breadth, and remaining formats remain | future proposal `WP-8-m3-query-java-pattern-functions` may bundle the Rust Pattern substrate with all three functions after the root freezes its owner, allowlist, evidence, and validation contract; no JVM execution/delegation or loading/glob overlap |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,18 +35,10 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Implement only
 `WP-5-m1-loading-pure-host-glob-traversal-owner`.
 
-Add the private `traversal.rs` and `traversal_tests.rs` owner plus only the
-bounded parent-module visibility/declaration changes under the exact
-three-file, +2,340/-45 contract in the accepted owner design. Compose the
-accepted segment-candidate and root-package-boundary keys with the checked
-package-root identity, FIFO state/error rank, standalone `**`, operation
-filtering, raw order/dedup, complete-error-before-Need, and same-graph
-invalidation/restoration tests. Keep the owner dormant with zero production
-callers. Do not activate parser, evaluator, callable, query, or consumer
-surfaces.
+Read its bounded contract from the
+[current-packet manifest](./slug-v2-current-packet.md).
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of
