@@ -31,6 +31,9 @@ pub use dice::evaluate_workspace_targets;
 pub use dice::evaluate_workspace_targets_with_bzlmod_inputs;
 pub use dice::observe_workspace;
 pub use dice::observe_workspace_files;
+pub use events::AcceptedCommand;
+pub use events::CommandOutput;
+pub use events::TerminalOutput;
 pub use slug_query_v2::QueryOutputCompletion;
 
 /// One-shot convenience that enters the identical retained-runtime query

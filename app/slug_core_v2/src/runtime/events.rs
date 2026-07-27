@@ -104,6 +104,29 @@ pub(super) struct CommandOutputBuffer {
     batches: Arc<[EventBatch]>,
 }
 
+/// An accepted semantic terminal inseparable from its selected command events.
+#[must_use = "an accepted command must remain intact until output publication"]
+pub struct AcceptedCommand<T> {
+    terminal: T,
+    events: CommandOutputBuffer,
+}
+
+/// Primitive terminal streams projected without consuming the accepted value.
+#[derive(Debug, Eq, PartialEq)]
+pub struct TerminalOutput {
+    exit_code: i32,
+    stdout: String,
+    stderr: String,
+}
+
+/// A projected command that still owns its accepted value and selected events.
+#[must_use = "projected command output must remain intact until publication"]
+pub struct CommandOutput<T> {
+    terminal: T,
+    events: CommandOutputBuffer,
+    output: TerminalOutput,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct SelectedCommandSidecars {
     events: SelectedEventBatches,
@@ -149,6 +172,68 @@ impl SelectedEventBatches {
 impl CommandOutputBuffer {
     pub(super) fn batches(&self) -> &[EventBatch] {
         &self.batches
+    }
+}
+
+impl<T> AcceptedCommand<T> {
+    pub(super) fn new(terminal: T, events: CommandOutputBuffer) -> Self {
+        Self { terminal, events }
+    }
+
+    pub fn project(self, projection: impl FnOnce(&T) -> TerminalOutput) -> CommandOutput<T> {
+        let output = projection(&self.terminal);
+        CommandOutput {
+            terminal: self.terminal,
+            events: self.events,
+            output,
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn terminal_for_test(&self) -> &T {
+        &self.terminal
+    }
+
+    #[cfg(test)]
+    pub(super) fn batches_for_test(&self) -> &[EventBatch] {
+        self.events.batches()
+    }
+}
+
+impl<T> fmt::Debug for AcceptedCommand<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("AcceptedCommand(..)")
+    }
+}
+
+impl TerminalOutput {
+    pub fn new(exit_code: i32, stdout: String, stderr: String) -> Self {
+        Self {
+            exit_code,
+            stdout,
+            stderr,
+        }
+    }
+}
+
+impl<T> fmt::Debug for CommandOutput<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("CommandOutput(..)")
+    }
+}
+
+#[cfg(test)]
+impl<T> CommandOutput<T> {
+    pub(super) fn terminal_for_test(&self) -> &T {
+        &self.terminal
+    }
+
+    pub(super) fn batches_for_test(&self) -> &[EventBatch] {
+        self.events.batches()
+    }
+
+    pub(super) fn output_for_test(&self) -> &TerminalOutput {
+        &self.output
     }
 }
 
@@ -550,10 +635,44 @@ mod tests {
     use slug_workspace_v2::NormalizedAbsolutePath;
     use tokio::sync::Notify;
 
+    use super::AcceptedCommand;
     use super::CommandEffectError;
     use super::CommandEffectOwner;
+    use super::CommandOutputBuffer;
     use super::SelectedEventBatches;
+    use super::TerminalOutput;
     use crate::runtime::demands::WorkspaceDemandOwner;
+
+    #[test]
+    fn opaque_projection_borrows_once_and_retains_exact_terminal_identity() {
+        let terminal: Arc<str> = Arc::from("terminal");
+        let identity = terminal.clone();
+        let accepted = AcceptedCommand::new(
+            terminal,
+            CommandOutputBuffer {
+                batches: Arc::from([EventBatch::from_events([EvaluationEvent::StarlarkPrint {
+                    text: CompactString::new("selected"),
+                }])]),
+            },
+        );
+        assert_eq!(format!("{accepted:?}"), "AcceptedCommand(..)");
+
+        let mut calls = 0;
+        let projected = accepted.project(|terminal| {
+            calls += 1;
+            assert!(Arc::ptr_eq(terminal, &identity));
+            TerminalOutput::new(2, "stdout".into(), "stderr".into())
+        });
+
+        assert_eq!(calls, 1);
+        assert!(Arc::ptr_eq(&projected.terminal, &identity));
+        assert_eq!(projected.events.batches().len(), 1);
+        assert_eq!(
+            projected.output,
+            TerminalOutput::new(2, "stdout".into(), "stderr".into())
+        );
+        assert_eq!(format!("{projected:?}"), "CommandOutput(..)");
+    }
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Allocative)]
     struct EventMode;

@@ -103,10 +103,10 @@ use starlark_map::small_map::SmallMap;
 use super::RuntimeMode;
 use super::demands::SelectedWorkspaceDemands;
 use super::demands::WorkspaceDemandOwner;
+use super::events::AcceptedCommand;
 use super::events::AttemptEffectTracker;
 use super::events::CommandEffectError;
 use super::events::CommandEffectOwner;
-use super::events::CommandOutputBuffer;
 use super::events::SealedCommandAttempt;
 use super::events::SelectedCommandSidecars;
 use super::starlark::evaluate_file;
@@ -653,8 +653,7 @@ struct SyntheticEventKey {
 #[allow(dead_code)]
 #[derive(Debug)]
 struct SyntheticCommandResult {
-    terminal: Result<SyntheticCommandValue, SyntheticCommandError>,
-    output: CommandOutputBuffer,
+    accepted: AcceptedCommand<Result<SyntheticCommandValue, SyntheticCommandError>>,
     attempts: usize,
     terminal_root_count: usize,
 }
@@ -1924,10 +1923,9 @@ impl WorkspaceRuntime {
                     }
                 }
                 SyntheticAttemptResult::Terminal(terminal, prepared, terminal_root_count) => {
-                    let output = guard.accept_prepared(prepared)?;
+                    let accepted = guard.accept_prepared(prepared, terminal)?;
                     return Ok(SyntheticCommandResult {
-                        terminal,
-                        output,
+                        accepted,
                         attempts,
                         terminal_root_count,
                     });
@@ -2922,7 +2920,7 @@ impl<'a> NativeDemandAbortGuard<'a> {
     fn accept_selected_for_test(
         &mut self,
         demands: SelectedWorkspaceDemands,
-    ) -> Result<CommandOutputBuffer, NativeDemandSessionError> {
+    ) -> Result<AcceptedCommand<()>, NativeDemandSessionError> {
         let selected = NativeDemandTerminalSelection {
             effects: self.command().effects.clone(),
             sidecars: SelectedCommandSidecars::for_test(demands),
@@ -2943,7 +2941,7 @@ impl<'a> NativeDemandAbortGuard<'a> {
             })
         };
         match prepared {
-            Ok(prepared) => self.accept_prepared(prepared),
+            Ok(prepared) => self.accept_prepared(prepared, ()),
             Err(error) => self.abort(error),
         }
     }
@@ -2967,10 +2965,11 @@ impl<'a> NativeDemandAbortGuard<'a> {
         })
     }
 
-    fn accept_prepared(
+    fn accept_prepared<T>(
         &mut self,
         prepared: NativeDemandPreparedAcceptance,
-    ) -> Result<CommandOutputBuffer, NativeDemandSessionError> {
+        terminal: T,
+    ) -> Result<AcceptedCommand<T>, NativeDemandSessionError> {
         let NativeDemandPreparedAcceptance {
             events,
             snapshot,
@@ -3031,7 +3030,7 @@ impl<'a> NativeDemandAbortGuard<'a> {
             .record_trace(NativeDemandTestTrace::LeaseClosed);
         self.phase = NativeDemandAbortPhase::Closed;
         self.command = None;
-        Ok(output)
+        Ok(AcceptedCommand::new(terminal, output))
     }
 }
 
@@ -3538,9 +3537,23 @@ mod tests {
         })
     }
 
-    fn output_text(output: &CommandOutputBuffer) -> Vec<&str> {
+    fn accepted_output_text<T>(accepted: &AcceptedCommand<T>) -> Vec<&str> {
+        accepted
+            .batches_for_test()
+            .iter()
+            .flat_map(EventBatch::events)
+            .map(|event| match event {
+                EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                EvaluationEvent::Diagnostic { .. } => {
+                    unreachable!("diagnostic events are not produced by this packet")
+                }
+            })
+            .collect()
+    }
+
+    fn projected_output_text<T>(output: &crate::runtime::CommandOutput<T>) -> Vec<&str> {
         output
-            .batches()
+            .batches_for_test()
             .iter()
             .flat_map(EventBatch::events)
             .map(|event| match event {
@@ -3694,12 +3707,12 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            first.terminal,
-            Ok(SyntheticCommandValue::Build("built".into()))
+            first.accepted.terminal_for_test(),
+            &Ok(SyntheticCommandValue::Build("built".into()))
         );
         assert_eq!(first.attempts, 4);
         assert_eq!(first.terminal_root_count, 1);
-        assert_eq!(output_text(&first.output), ["terminal-only"]);
+        assert_eq!(accepted_output_text(&first.accepted), ["terminal-only"]);
         assert_eq!(
             runtime.native_demand_sessions.take_trace(),
             [
@@ -3711,6 +3724,22 @@ mod tests {
                 NativeDemandTestTrace::LeaseClosed,
             ]
         );
+        let mut projections = 0;
+        let projected = first.accepted.project(|terminal| {
+            projections += 1;
+            assert_eq!(terminal, &Ok(SyntheticCommandValue::Build("built".into())));
+            crate::runtime::TerminalOutput::new(0, "stdout".into(), "stderr".into())
+        });
+        assert_eq!(projections, 1);
+        assert_eq!(
+            projected.terminal_for_test(),
+            &Ok(SyntheticCommandValue::Build("built".into()))
+        );
+        assert_eq!(
+            projected.output_for_test(),
+            &crate::runtime::TerminalOutput::new(0, "stdout".into(), "stderr".into())
+        );
+        assert_eq!(projected_output_text(&projected), ["terminal-only"]);
 
         let fresh = runtime
             .drive_synthetic_command(
@@ -3721,7 +3750,7 @@ mod tests {
         assert_eq!(fresh.attempts, 1);
         assert_eq!(fresh.terminal_root_count, 1);
         assert!(
-            fresh.output.batches().is_empty(),
+            fresh.accepted.batches_for_test().is_empty(),
             "a cached terminal child must not replay an earlier command's event"
         );
     }
@@ -3749,8 +3778,8 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            first.terminal,
-            Ok(SyntheticCommandValue::Build("first".into()))
+            first.accepted.terminal_for_test(),
+            &Ok(SyntheticCommandValue::Build("first".into()))
         );
         runtime.native_demand_sessions.take_trace();
 
@@ -3770,10 +3799,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            second.terminal,
-            Ok(SyntheticCommandValue::Build("second".into()))
+            second.accepted.terminal_for_test(),
+            &Ok(SyntheticCommandValue::Build("second".into()))
         );
-        assert_eq!(output_text(&second.output), ["second-event"]);
+        assert_eq!(accepted_output_text(&second.accepted), ["second-event"]);
         assert_eq!(
             accepted_native_snapshot(&runtime)
                 .selected
@@ -3808,7 +3837,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(long.attempts, 66);
-        assert_eq!(output_text(&long.output), ["terminal-only"]);
+        assert_eq!(accepted_output_text(&long.accepted), ["terminal-only"]);
 
         let error_plan = synthetic_plan(
             111,
@@ -3824,10 +3853,25 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            completed_error.terminal,
-            Err(SyntheticCommandError("terminal error".into()))
+            completed_error.accepted.terminal_for_test(),
+            &Err(SyntheticCommandError("terminal error".into()))
         );
-        assert_eq!(output_text(&completed_error.output), ["terminal-only"]);
+        assert_eq!(
+            accepted_output_text(&completed_error.accepted),
+            ["terminal-only"]
+        );
+        let completed_error = completed_error.accepted.project(|terminal| {
+            assert_eq!(
+                terminal,
+                &Err(SyntheticCommandError("terminal error".into()))
+            );
+            crate::runtime::TerminalOutput::new(2, String::new(), "semantic".into())
+        });
+        assert_eq!(
+            completed_error.terminal_for_test(),
+            &Err(SyntheticCommandError("terminal error".into()))
+        );
+        assert_eq!(projected_output_text(&completed_error), ["terminal-only"]);
 
         let mut query_plan = synthetic_plan(
             112,
@@ -3844,12 +3888,21 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            query.terminal,
-            Ok(SyntheticCommandValue::Query(Arc::from([])))
+            query.accepted.terminal_for_test(),
+            &Ok(SyntheticCommandValue::Query(Arc::from([])))
         );
         assert_eq!(query.attempts, 1);
         assert_eq!(query.terminal_root_count, 1);
-        assert!(query.output.batches().is_empty());
+        assert!(query.accepted.batches_for_test().is_empty());
+        let query = query.accepted.project(|terminal| {
+            assert_eq!(terminal, &Ok(SyntheticCommandValue::Query(Arc::from([]))));
+            crate::runtime::TerminalOutput::new(0, String::new(), String::new())
+        });
+        assert_eq!(
+            query.terminal_for_test(),
+            &Ok(SyntheticCommandValue::Query(Arc::from([])))
+        );
+        assert!(query.batches_for_test().is_empty());
 
         let mut reopened = NativeDemandAbortGuard::new(
             runtime
@@ -4402,8 +4455,9 @@ mod tests {
             drop(transaction);
             prepared
         });
-        let events = command.accept_prepared(prepared).unwrap();
-        assert!(events.batches().is_empty());
+        let accepted_terminal = command.accept_prepared(prepared, "complete").unwrap();
+        assert_eq!(accepted_terminal.terminal_for_test(), &"complete");
+        assert!(accepted_terminal.batches_for_test().is_empty());
 
         let accepted = runtime.begin_native_demand_command().unwrap();
         assert_ne!(
@@ -4573,12 +4627,13 @@ mod tests {
                 slug_workspace_v2::NeedPathObservations::singleton(path.clone()),
             ))
             .unwrap();
-        initial
+        let accepted = initial
             .accept_selected_for_test(SelectedWorkspaceDemands::for_test(
                 Arc::from([accepted_request.clone()]),
                 Arc::from([path.clone()]),
             ))
             .unwrap();
+        assert_eq!(accepted.terminal_for_test(), &());
 
         let mut failing = NativeDemandAbortGuard::new(
             runtime

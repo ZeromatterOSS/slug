@@ -13675,3 +13675,28 @@ confirmed that scheduling refinement is sound.
 
 The focused correction rereview returned `ACCEPT`. Implement next only
 `WP-5-m1-private-opaque-terminal-envelope`.
+
+### Private opaque terminal envelope implementation
+
+Status: **ACCEPT** for `WP-5-m1-private-opaque-terminal-envelope` on
+2026-07-27 after one terminal implementation review and focused correction.
+
+The exact three core runtime files now expose public `#[must_use]`
+`AcceptedCommand<T>`, `TerminalOutput`, and `CommandOutput<T>` with private
+construction and storage. Dormant terminal acceptance returns only the opaque
+envelope after successful lease close. Its consuming projection borrows
+`&T`, retains the exact original terminal and unrendered selected-event
+buffer, and exposes no getters, parts, clone, raw events, or renderer. Public
+debug formatting is fully redacted.
+
+Focused tests prove one borrowed projection, `Arc::ptr_eq` terminal identity,
+success, typed semantic error, valid empty query, retry-only event exclusion,
+terminal-event retention, redacted formatting, and no envelope across the
+accepted failure seams. Full core passes 119 unit and 13 integration tests;
+direct query/loading/analysis checks, GNU-Windows no-run linkage, formatting,
+diff, exact scope, and unchanged six activation-blocker matches pass. The
+focused correction rereview returned `ACCEPT`.
+
+Design next only `WP-5-m1-source-aware-command-event-design`. Freeze the
+smallest source-span event representation and publication boundary required to
+match Bazel 9.2 Starlark print diagnostics before query-first activation.
