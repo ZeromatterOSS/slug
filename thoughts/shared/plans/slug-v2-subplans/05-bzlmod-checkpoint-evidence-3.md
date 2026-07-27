@@ -8552,7 +8552,8 @@ The exact byte contract is not bounded by the accepted ASCII oracle, however.
 Pinned Bazel 9.2 source at `8220c619` in
 `src/main/cpp/blaze.cc:384,418-428,456` shows that the default launch sets
 `file.encoding=ISO-8859-1` and the root locale before appending any explicit
-user JVM options. OpenJDK 25.0.2 source at `405a5699`,
+user JVM options. OpenJDK 25.0.2 source at
+`openjdk/jdk25u@405a5699ebd097464ed3fc9345414b0774a2edc9`,
 `FileURLConnection.java:76-87,180-205`, follows a directory, obtains every
 direct child name through `File.list()`, stable-sorts the names with the
 root/default `RuleBasedCollator`, appends one newline per name, and encodes
@@ -8589,3 +8590,241 @@ contract and decide there whether explicit `--host_jvm_args` overrides are
 part of the supported semantic input. Do not edit fixtures, harnesses, Rust,
 Cargo, dependencies, the private Host registry-file owner, a consumer, or
 activation before terminal latest-text review.
+
+### Stage 5 local registry-directory collation/charset oracle design
+
+`WP-5-m1-host-registry-local-directory-collation-charset-oracle-design`
+strengthens only the accepted `nonroot-interim-module-graph` fixture. Preserve
+its first eleven rows byte-for-byte and reuse the existing `devonly@1.0.0`
+local-registry closure. Do not create another fixture, copy registry/module
+scaffolding, or change the oracle harness.
+
+Pinned Bazel 9.2 source at `8220c619`,
+`src/main/cpp/blaze.cc:384,418-428,456`, sets the default server locale to
+ROOT and `file.encoding` to ISO-8859-1; explicit user JVM options are appended
+later. Pinned OpenJDK 25.0.2 source at
+`openjdk/jdk25u@405a5699ebd097464ed3fc9345414b0774a2edc9` owns the default
+transport:
+
+- `FileURLConnection.java:76-87,180-205` snapshots all direct `File.list()`
+  names, stable-sorts them with `Collator.getInstance()`, appends LF after
+  every name, and calls `String.getBytes()`;
+- `File.java:1004-1058` distinguishes an empty array from an inaccessible
+  `null` listing, and `List.java:445-507` makes the comparator sort stable;
+- `Collator.java:223-340`, `CollatorProviderImpl.java:94-124`, and
+  `CollationRules.java:41+` own the default ROOT `RuleBasedCollator`;
+- `String.java:867-877,1025-1058,1871-1885` selects the default charset,
+  preserves ISO-8859-1 characters, and emits one `?` for each unmappable BMP
+  character or valid surrogate pair;
+- `UnixFileSystem_md.c:104-131,296-358`, `java_props_md.c:439-467`, and
+  `jni_util.c:699-835` own Unix symlink following, direct enumeration, and
+  JNU filename decoding; and
+- `WinNTFileSystem_md.c:219-263,406-428,695-813` owns Windows reparse-point
+  following and direct UTF-16 enumeration.
+
+Add a staged `MODULE.portable` directory whose seven live direct names are:
+
+- four ordinary files created by row mutation: `# a`, `# B`, `# Ã©`
+  (code points `U+0023 U+0020 U+00C3 U+00A9`), and `# Ā` (final code point
+  `U+0100`);
+- the tracked ordinary file
+  `module(name = 'devonly', version = '1.0.0')`;
+- the tracked real directory `# subdirectory`; and
+- the tracked relative file symlink `# file-symlink`, targeting the module
+  declaration filename.
+
+Every ordinary child and the file inside `# subdirectory` contains exactly
+`CHILD_CONTENT_IS_NOT_TRANSPORT\n`. Successful module evaluation and a
+negative content-sentinel assertion prove that `File.list()` transports
+direct names without reading child contents or inspecting the child kind.
+
+Under Bazel's default launch, the exact listing order and bytes are:
+
+```text
+# a
+# ?
+# é
+# B
+# file-symlink
+# subdirectory
+module(name = 'devonly', version = '1.0.0')
+```
+
+Every displayed line is LF-terminated. `# é` denotes bytes
+`23 20 c3 a9 0a`, obtained by ISO-8859-1 encoding of the Java characters
+`U+00C3 U+00A9`; `U+0100` becomes `?`. The result is 91 bytes, SHA-256
+`5ef3d24c7f0fd0c25515f81f6103cc4ac2c0bd21c6a76b88b6cebdd05387631e`,
+and SRI `sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=`. Rust
+lexical ordering would begin `# B`, `# a`, while UTF-8 output would preserve
+`Ā` and encode `Ã©` as four bytes, so the one digest independently rejects
+both shortcuts.
+
+Append exactly three semantic rows:
+
+1. `portable_directory_root_collation_and_latin1_bytes`. Park regular
+   `MODULE.bazel` as `MODULE.regular`, promote `MODULE.portable-link`, create
+   the four comment-named ordinary files, and advance root version `0.1.4` to
+   `0.1.8`. Run the accepted Update-mode `mod show_repo @@devonly+` command.
+   Require exit 0, the exact 91-byte SRI, no child-content sentinel or
+   directory-read diagnostic, and the accepted path-free visible-lockfile
+   manifest.
+2. `empty_followed_directory_is_found`. Park the portable link, delete its
+   four mutation-created files, delete tracked `MODULE.empty/placeholder`,
+   promote `MODULE.empty-link`, and advance root version to `0.1.9`. Run the
+   same `show_repo`. Require exit 37 and exact
+   `the MODULE.bazel file of devonly@1.0.0 declares a different name ()`,
+   excluding the registry `not found` chain and directory-read diagnostics.
+   This reuses the accepted omitted-`module()` diagnostic to distinguish a
+   zero-byte found value from absence; OpenJDK's exact empty digest is
+   `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+   and SRI `sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=`.
+3. `regular_file_restores_after_empty_directory`. Park the empty link,
+   recreate its placeholder, restore `MODULE.regular` to `MODULE.bazel`, and
+   restore root version `0.1.9` to `0.1.4`. Repeat the Update `show_repo`;
+   require the accepted ordinary SRI
+   `sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=`, no portable-child
+   or directory diagnostic, and the exact pre-packet visible-lockfile
+   manifest.
+
+All three rows use `compare = "semantic"` and
+`manifest_roots = ["MODULE.bazel.lock"]`. Because semantic comparison does
+not compare expected stdout implicitly, the two success rows must explicitly
+assert their exact SRIs. Generation owns the final expected JSON bytes and
+must confirm whether all three visible manifests remain equal after local
+registry hash filtering.
+
+The exact eight-path allowlist is `fixture.toml`, `expected/oracle.json`, and
+these six additions:
+
+- `workspace/registry/modules/devonly/1.0.0/MODULE.portable/`
+  `module(name = 'devonly', version = '1.0.0')`;
+- `workspace/registry/modules/devonly/1.0.0/MODULE.portable/`
+  `# subdirectory/CHILD_CONTENT_IS_NOT_TRANSPORT`;
+- `workspace/registry/modules/devonly/1.0.0/MODULE.portable/# file-symlink`;
+- `workspace/registry/modules/devonly/1.0.0/MODULE.portable-link`;
+- `workspace/registry/modules/devonly/1.0.0/MODULE.empty/placeholder`; and
+- `workspace/registry/modules/devonly/1.0.0/MODULE.empty-link`.
+
+All three symlinks are relative. The final fixture is at most 57 regular
+files, five symlinks, and 1,230 newline-counted lines: net exactly three
+regular files and three symlinks, with at most 450 lines from the accepted
+54/2/780 baseline. The full tracked fixture tree is at most 1,306 regular
+files, 19 symlinks, and 37,435 lines from the accepted
+1,303/16/36,985 baseline. This is oracle packet one after checkpoint
+`22de3631`; it neither reaches the +100-file/+10,000-line trigger nor resets
+that baseline.
+
+Add only `src/main/cpp/blaze.cc` to the fixture's Bazel `source_anchors`;
+`IndexRegistry.java` and the other registry projection anchors are already
+present. Record
+`openjdk/jdk25u@405a5699ebd097464ed3fc9345414b0774a2edc9` and the exact
+source matrix above in `translation_notes`, not as paths in the Bazel-source
+anchor list.
+
+The two activation links are exactly
+`MODULE.portable-link -> MODULE.portable` and
+`MODULE.empty-link -> MODULE.empty`. `MODULE.empty/placeholder` contains
+exactly `EMPTY_DIRECTORY_PLACEHOLDER\n`, and the restoration row recreates
+those exact bytes.
+
+Two read-only Bazel 9.2 `repository_ctx.download` probes independently pinned
+the same seven-name directory. The default launch produced the 91-byte digest
+above. `--host_jvm_args=-Dfile.encoding=UTF-8` preserved order but produced
+94 bytes, SHA-256
+`811bc9d8448f1687c3bc3a02330f4a735b31f1c24727da3d3d0104cfad870865`,
+and SRI `sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=`.
+Explicit `--host_jvm_args` is a supported Bazel semantic input: Bazel appends
+it last, accepts it, and it observably changes registry bytes. It is
+intentionally deferred from this default-launch oracle and immediate Registry
+IO bridge packet because Slug does not yet own typed startup-property
+identity. Record the named blocker
+`WP-5-m1-host-jvm-registry-byte-input-design`, which must freeze ordered
+last-wins charset/collator projection plus daemon identity, restart, and
+invalidation before the bridge can claim full parity or activate a consumer.
+The default bridge must remain parameterizable and must not silently accept,
+ignore, or infer the startup option.
+
+Do not add nondiscriminating locale rows. The pinned embedded JRE exposes
+only `und`, `en`, and `en-US` collator locales and no `jdk.localedata`;
+ROOT/en/sv/tr/da probes used identical rules, strength, decomposition, and
+listing bytes. A `user.extensions=u-ks-level1` override can instead change
+collator strength and expose filesystem-order-dependent stable ties, which is
+another reason startup overrides require a separate owner rather than a
+golden row.
+
+Keep nonportable behavior in the source/native matrix rather than widening
+the generic fixture DSL:
+
+- stable collator-equal names retain their native `File.list()` order; later
+  Rust unit evidence must inject and preserve both input orders rather than
+  commit a filesystem-order-dependent golden;
+- under UTF-8 JNU decoding, Unix filename suffix bytes `ED A0 80` become one
+  Java replacement character and then one ISO-8859-1 `?`, so
+  `# invalid-<ED A0 80>` yields exact bytes
+  `23 20 69 6e 76 61 6c 69 64 2d 3f 0a`; later Unix-native evidence must not
+  use Rust's three-replacement `from_utf8_lossy` result;
+- inaccessible directory listing raises
+  `<path> exists, but is not accessible`, which Bazel projects to the same
+  registry-not-found surface as absence, so no privilege-dependent retained
+  row can discriminate it;
+- `File.list()` source includes dangling/directory symlink and Unix
+  FIFO/socket names without reading their targets; the retained real
+  directory and file symlink are the smallest byte-discriminating kind set;
+  and
+- before the bridge implementation design can claim native Windows
+  completeness, require a real-directory Bazel/OpenJDK probe of the portable
+  seven-name and empty sets plus a `CreateFileW` lone-surrogate case. The
+  pinned WinNT source above is the current contract; GNU-Windows compilation
+  is not runtime evidence.
+
+Run one pinned Bazel 9.2 generation and two absolute distinct-root replays,
+then stop every used server. Validate the exact eight-path diff, three regular
+files and three relative symlinks, dynamic-name create/delete lifecycle,
+seven names/types/content sentinels, 91/80/44/zero-byte hashes and SRIs, exact
+fourteen-row order, exits `0/37/0`, arguments/mutations/diagnostics, explicit
+success SRIs, all three manifests and equality groups, metadata/source
+anchors, parser plus focused packet-validator tests, inventory/line caps,
+schema, normalization, archive status, credentials, host-path-free normalized
+fields, and server cleanup.
+
+Stop on a copied/new fixture, a harness change, tracked exotic or invalid-byte
+filename, filesystem-order-dependent golden, a fourth row, a ninth changed
+path, a fourth regular file or symlink, cap overflow, missing Windows source
+contract/future native gate, startup-override row or startup-owner
+implementation, locale golden, direct
+Rust/Cargo/dependency/API/DICE/Host-owner/consumer/activation edit, or changed
+first-eleven-row evidence. Terminal acceptance requires source/parity,
+implementation/evidence, and architecture/orchestration latest-text review.
+
+#### Local registry-directory collation/charset oracle design status
+
+Status: `ACCEPT` after terminal latest-text review on 2026-07-26.
+
+The accepted default-launch design reuses the eleven-row
+`nonroot-interim-module-graph` fixture and adds exactly three rows, three
+regular assets, and three relative symlinks. Its 91-byte successful listing
+jointly discriminates ROOT `RuleBasedCollator` order, ISO-8859-1
+preservation/replacement, direct real-directory and file-symlink names, and
+child-name rather than child-content transport. A followed empty directory
+then proves a found zero-byte value before exact ordinary-file restoration.
+
+Two distinct-output-base Bazel 9.2 probes pinned the 91-byte default and
+94-byte UTF-8-override digests. The override is supported Bazel semantic
+input but remains outside this default-only oracle behind named blocker
+`WP-5-m1-host-jvm-registry-byte-input-design`; no full-parity or consumer
+activation claim may bypass its ordered input and daemon lifecycle design.
+Stable ties, Unix malformed names, inaccessible listing, and extra special
+kinds remain pinned source/native or later injected-unit evidence rather than
+nondeterministic fixture goldens. Native Windows portable, empty, and
+lone-surrogate observations remain required before a bridge implementation
+design can claim Windows completeness.
+
+No fixture, harness, Rust, Cargo, dependency, API, DICE key, Host owner,
+consumer, or activation changed. Source/parity, implementation/evidence, and
+architecture/orchestration terminal latest-text reviews all returned
+`ACCEPT`.
+
+Next packet: implement only
+`WP-5-m1-host-registry-local-directory-collation-charset-oracle` inside the
+exact contract above. After its acceptance, design the named typed
+startup-property blocker before retrying the runtime bridge correction.
