@@ -19,6 +19,7 @@ COMPARE_MODES = {"exact", "message_shape", "semantic"}
 class Mutation:
     path: str
     op: str | None = None
+    name_bytes_hex: str | None = None
     destination: str | None = None
     find: str | None = None
     replace: str | None = None
@@ -148,13 +149,26 @@ def _parse_mutations(items: Any) -> tuple[Mutation, ...]:
         _validate_relative_path(path, "mutation.path")
         op = item.get("op")
         if op is not None and (
-            not isinstance(op, str) or op not in {"create", "delete", "fifo", "rename"}
+            not isinstance(op, str)
+            or op
+            not in {
+                "create",
+                "delete",
+                "fifo",
+                "rename",
+                "raw_create",
+                "raw_delete",
+            }
         ):
-            raise ValueError("mutation.op must be create, delete, fifo, or rename")
+            raise ValueError(
+                "mutation.op must be create, delete, fifo, rename, raw_create, "
+                "or raw_delete"
+            )
         find = item.get("find")
         replace = item.get("replace")
         content = item.get("content")
         destination = item.get("destination")
+        name_bytes_hex = item.get("name_bytes_hex")
         if find is not None and not isinstance(find, str):
             raise ValueError("mutation.find must be a string")
         if replace is not None and not isinstance(replace, str):
@@ -165,7 +179,28 @@ def _parse_mutations(items: Any) -> tuple[Mutation, ...]:
             raise ValueError("mutation.destination must be a non-empty string")
         if isinstance(destination, str):
             _validate_relative_path(destination, "mutation.destination")
-        if op == "create":
+        if op in {"raw_create", "raw_delete"}:
+            try:
+                path.encode("ascii")
+            except UnicodeEncodeError as error:
+                raise ValueError("raw mutation.path must be ASCII") from error
+            _validate_raw_name_bytes_hex(name_bytes_hex)
+            expected_fields = (
+                {"op", "path", "name_bytes_hex", "content"}
+                if op == "raw_create"
+                else {"op", "path", "name_bytes_hex"}
+            )
+            if set(item) != expected_fields:
+                if op == "raw_create" and content is None:
+                    raise ValueError(
+                        "raw_create mutation requires path, name_bytes_hex, and content"
+                    )
+                raise ValueError(
+                    f"{op} mutation permits only {', '.join(sorted(expected_fields))}"
+                )
+        elif name_bytes_hex is not None:
+            raise ValueError(f"{op or 'text'} mutation permits only its documented fields")
+        elif op == "create":
             if content is None or any(value is not None for value in (find, replace, destination)):
                 raise ValueError("create mutation requires content and no find, replace, or destination")
         elif op == "delete":
@@ -186,6 +221,7 @@ def _parse_mutations(items: Any) -> tuple[Mutation, ...]:
             Mutation(
                 path=path,
                 op=op,
+                name_bytes_hex=name_bytes_hex,
                 destination=destination,
                 find=find,
                 replace=replace,
@@ -193,6 +229,22 @@ def _parse_mutations(items: Any) -> tuple[Mutation, ...]:
             )
         )
     return tuple(mutations)
+
+
+def _validate_raw_name_bytes_hex(value: Any) -> None:
+    if not isinstance(value, str) or not value:
+        raise ValueError("mutation.name_bytes_hex must be nonempty")
+    if value != value.lower():
+        raise ValueError("mutation.name_bytes_hex must use canonical lowercase")
+    if len(value) % 2:
+        raise ValueError("mutation.name_bytes_hex must have even-length")
+    if any(character not in "0123456789abcdef" for character in value):
+        raise ValueError("mutation.name_bytes_hex must be hexadecimal")
+    decoded = bytes.fromhex(value)
+    if decoded in {b".", b".."} or b"\0" in decoded or b"/" in decoded:
+        raise ValueError(
+            "mutation.name_bytes_hex must encode one non-special final component"
+        )
 
 
 def _validate_relative_path(value: str, field_name: str) -> None:
@@ -296,8 +348,10 @@ def load_fixture(path: Path) -> Fixture:
         fixture_data.get("observe_server_epochs"), "fixture.observe_server_epochs"
     )
     required_host_os = fixture_data.get("required_host_os")
-    if required_host_os not in (None, "posix"):
-        raise ValueError("fixture.required_host_os must be absent or 'posix'")
+    if required_host_os not in (None, "posix", "linux"):
+        raise ValueError(
+            "fixture.required_host_os must be absent, 'posix', or 'linux'"
+        )
     if observe_server_epochs and not daemon:
         raise ValueError("fixture.observe_server_epochs requires fixture.daemon = true")
     if not observe_server_epochs and any(command.capture_server_epoch for command in commands):

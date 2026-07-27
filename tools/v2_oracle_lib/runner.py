@@ -233,6 +233,9 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
     applied: list[dict[str, str | None]] = []
     workspace_uri = _workspace_uri(workspace)
     for mutation in command.mutations:
+        if mutation.op in {"raw_create", "raw_delete"}:
+            applied.append(_apply_raw_file_mutation(workspace, mutation))
+            continue
         path = (
             _workspace_mutation_entry_path(workspace, mutation.path)
             if mutation.op in {"delete", "rename"}
@@ -317,6 +320,94 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
         path.write_text(old.replace(find, replace), encoding="utf-8", newline="")
         applied.append({"path": mutation.path, "find": mutation.find, "replace": mutation.replace, "old_digest_hint": str(len(old))})
     return applied
+
+
+def _apply_raw_file_mutation(
+    workspace: Path, mutation: Mutation
+) -> dict[str, str | None]:
+    if sys.platform != "linux":
+        raise RuntimeError("raw filename mutation requires a Linux host")
+    assert mutation.op in {"raw_create", "raw_delete"}
+    assert mutation.name_bytes_hex is not None
+    name = bytes.fromhex(mutation.name_bytes_hex)
+    parent_fd = _open_raw_mutation_parent(workspace, mutation.path)
+    try:
+        if mutation.op == "raw_create":
+            assert mutation.content is not None
+            try:
+                file_fd = os.open(
+                    name,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                    0o666,
+                    dir_fd=parent_fd,
+                )
+            except FileExistsError as error:
+                raise FileExistsError(
+                    "raw mutation create destination exists: "
+                    f"{mutation.path}/<{mutation.name_bytes_hex}>"
+                ) from error
+            try:
+                with os.fdopen(file_fd, "wb") as output:
+                    output.write(mutation.content.encode("utf-8"))
+            except BaseException:
+                try:
+                    os.unlink(name, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    pass
+                raise
+        else:
+            try:
+                mode = os.stat(name, dir_fd=parent_fd, follow_symlinks=False).st_mode
+            except FileNotFoundError as error:
+                raise FileNotFoundError(
+                    "raw mutation source does not exist: "
+                    f"{mutation.path}/<{mutation.name_bytes_hex}>"
+                ) from error
+            if not stat.S_ISREG(mode):
+                raise ValueError(
+                    "raw mutation source must be a regular file: "
+                    f"{mutation.path}/<{mutation.name_bytes_hex}>"
+                )
+            os.unlink(name, dir_fd=parent_fd)
+    finally:
+        os.close(parent_fd)
+    return {
+        "op": mutation.op,
+        "path": mutation.path,
+        "name_bytes_hex": mutation.name_bytes_hex,
+    }
+
+
+def _open_raw_mutation_parent(workspace: Path, path: str) -> int:
+    workspace_root = workspace.resolve()
+    candidate = workspace / path
+    resolved = candidate.resolve(strict=False)
+    if not resolved.is_relative_to(workspace_root):
+        raise ValueError(f"raw mutation parent escapes workspace: {path}")
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    current_fd = os.open(os.fsencode(workspace_root), directory_flags)
+    try:
+        for component in Path(path).parts:
+            if component == ".":
+                continue
+            try:
+                next_fd = os.open(
+                    component.encode("ascii"),
+                    directory_flags,
+                    dir_fd=current_fd,
+                )
+            except OSError as error:
+                raise FileNotFoundError(
+                    "raw mutation parent must be an existing real directory: "
+                    f"{path}"
+                ) from error
+            os.close(current_fd)
+            current_fd = next_fd
+    except BaseException:
+        os.close(current_fd)
+        raise
+    return current_fd
 
 
 def _workspace_mutation_path(workspace: Path, path: str) -> Path:
@@ -676,6 +767,10 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
     if fixture.required_host_os == "posix" and os.name != "posix":
         raise RuntimeError(
             f"fixture {fixture.name} requires a POSIX host"
+        )
+    if fixture.required_host_os == "linux" and sys.platform != "linux":
+        raise RuntimeError(
+            f"fixture {fixture.name} requires a Linux host"
         )
     if fixture.observe_server_epochs and tool.name != "bazel":
         raise RuntimeError(

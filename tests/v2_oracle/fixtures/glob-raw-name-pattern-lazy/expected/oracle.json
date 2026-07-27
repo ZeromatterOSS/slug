@@ -1,0 +1,146 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "--noshow_progress",
+        "//pkg:all"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--noshow_progress",
+        "//pkg:all"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "name_bytes_hex": "e92e747874",
+          "op": "raw_create",
+          "path": "pkg"
+        }
+      ],
+      "name": "raw_names_baseline",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>",
+      "normalized_stdout": "//pkg:all_txt_c3a9_before_e9\n//pkg:loaded_dynamic_c3a9_only\n//pkg:octal_e9_present_only\n//pkg:utf8_literal_c3a9_only",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 6c658c15-7ab0-4e39-a272-42e3a5d1ab19\n",
+      "stdout": "//pkg:all_txt_c3a9_before_e9\n//pkg:loaded_dynamic_c3a9_only\n//pkg:octal_e9_present_only\n//pkg:utf8_literal_c3a9_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--noshow_progress",
+        "//qmark:*"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--noshow_progress",
+        "//qmark:*"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "question_mark_is_forbidden",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/qmark/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"?.txt\"], allow_empty = True),\nError in glob: invalid glob pattern '?.txt': wildcard ? forbidden\nERROR: package contains errors: qmark: Traceback (most recent call last):\n\tFile \"<workspace>/qmark/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"?.txt\"], allow_empty = True),\nError in glob: invalid glob pattern '?.txt': wildcard ? forbidden\nERROR: Evaluation of query \"//qmark:*\" failed",
+      "normalized_stdout": "",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 61134a15-2378-4a93-9075-3e2005ab4594\nERROR: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-raw-name-pattern-lazy/20260727-065446-4101253-bazel/workspace/qmark/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"?.txt\"], allow_empty = True),\nError in glob: invalid glob pattern '?.txt': wildcard ? forbidden\nERROR: package contains errors: qmark: Traceback (most recent call last):\n\tFile \"/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-raw-name-pattern-lazy/20260727-065446-4101253-bazel/workspace/qmark/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob([\"?.txt\"], allow_empty = True),\nError in glob: invalid glob pattern '?.txt': wildcard ? forbidden\nERROR: Evaluation of query \"//qmark:*\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "--noshow_progress",
+        "//pkg:all"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--noshow_progress",
+        "//pkg:all"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "name_bytes_hex": "e92e747874",
+          "op": "raw_delete",
+          "path": "pkg"
+        }
+      ],
+      "name": "raw_e9_deleted",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "//pkg:all_txt_c3a9_only\n//pkg:loaded_dynamic_c3a9_only\n//pkg:octal_e9_absent\n//pkg:utf8_literal_c3a9_only",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 73820be0-1be1-4729-8b42-53b6f0a57950\n",
+      "stdout": "//pkg:all_txt_c3a9_only\n//pkg:loaded_dynamic_c3a9_only\n//pkg:octal_e9_absent\n//pkg:utf8_literal_c3a9_only\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--noshow_progress",
+        "//pkg:all"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--noshow_progress",
+        "//pkg:all"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "name_bytes_hex": "e92e747874",
+          "op": "raw_create",
+          "path": "pkg"
+        }
+      ],
+      "name": "raw_e9_recreated",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "//pkg:all_txt_c3a9_before_e9\n//pkg:loaded_dynamic_c3a9_only\n//pkg:octal_e9_present_only\n//pkg:utf8_literal_c3a9_only",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 1a4dc526-2d72-47eb-9b25-47edd845e15d\n",
+      "stdout": "//pkg:all_txt_c3a9_before_e9\n//pkg:loaded_dynamic_c3a9_only\n//pkg:octal_e9_present_only\n//pkg:utf8_literal_c3a9_only\n"
+    }
+  ],
+  "fixture": "glob-raw-name-pattern-lazy",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

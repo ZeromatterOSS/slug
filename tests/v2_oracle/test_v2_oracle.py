@@ -167,6 +167,49 @@ def test_fixture_parser_rejects_unsupported_required_host_os(value: str) -> None
         load_fixture(root)
 
 
+def test_fixture_parser_accepts_linux_raw_file_operations() -> None:
+    root = scratch_dir("linux-raw-mutation-parser")
+    (root / "workspace").mkdir()
+    (root / "expected").mkdir()
+    (root / "fixture.toml").write_text(
+        """
+[fixture]
+name = "linux-raw-mutation-parser"
+required_host_os = "linux"
+
+[[commands]]
+argv = ["query", "//pkg:all"]
+
+[[commands.mutations]]
+op = "raw_create"
+path = "pkg"
+name_bytes_hex = "e92e747874"
+content = "raw\\n"
+
+[[commands.mutations]]
+op = "raw_delete"
+path = "pkg"
+name_bytes_hex = "e92e747874"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    fixture = load_fixture(root)
+    assert fixture.required_host_os == "linux"
+    assert [
+        (
+            mutation.op,
+            mutation.path,
+            mutation.name_bytes_hex,
+            mutation.content,
+        )
+        for mutation in fixture.commands[0].mutations
+    ] == [
+        ("raw_create", "pkg", "e92e747874", "raw\n"),
+        ("raw_delete", "pkg", "e92e747874", None),
+    ]
+
+
 def test_startup_fixture_parser_and_argv_merge_are_strict() -> None:
     root = scratch_dir("startup-parser")
     (root / "workspace").mkdir()
@@ -387,13 +430,27 @@ def test_fixture_http_registry_bind_failure_is_bounded_and_reports_stderr() -> N
     [
         ('op = "create"\npath = "x.txt"', "create mutation requires content"),
         ('op = "delete"\npath = "x.txt"\ncontent = "x"', "delete mutation permits only path"),
-        ('op = "fifo"\npath = "x.txt"\ncontent = "x"', "fifo mutation permits only path"),
-        ('op = "fifo"\npath = "x.txt"\ndestination = "y.txt"', "fifo mutation permits only path"),
+        ('op = "fifo"\npath = "x.txt"\ncontent = "x"', "fifo mutation permits only op and path"),
+        ('op = "fifo"\npath = "x.txt"\ndestination = "y.txt"', "fifo mutation permits only op and path"),
         ('op = "fifo"\npath = "x.txt"\nextra = true', "fifo mutation permits only"),
         ('op = "rename"\npath = "x.txt"', "rename mutation requires destination"),
         ('op = "create"\npath = "../x.txt"\ncontent = "x"', "relative workspace path"),
         ('op = "rename"\npath = "x.txt"\ndestination = "/tmp/x.txt"', "relative workspace path"),
         ('path = "x.txt"\ncontent = "x"\nfind = "old"', "content mutation permits only"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "e92e747874"', "raw_create mutation requires"),
+        ('op = "raw_delete"\npath = "pkg"\nname_bytes_hex = "e92e747874"\ncontent = "x"', "raw_delete mutation permits only"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "E92e747874"\ncontent = "x"', "canonical lowercase"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "e9f"\ncontent = "x"', "even-length"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "e9zz"\ncontent = "x"', "hexadecimal"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = ""\ncontent = "x"', "nonempty"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "2f"\ncontent = "x"', "final component"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "00"\ncontent = "x"', "final component"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "2e"\ncontent = "x"', "final component"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "2e2e"\ncontent = "x"', "final component"),
+        ('op = "raw_create"\npath = "pkg"\nname_bytes_hex = "e92e747874"\ncontent = "x"\ndestination = "y"', "raw_create mutation permits only"),
+        ('op = "raw_delete"\npath = "pkg"\nname_bytes_hex = "e92e747874"\nextra = true', "raw_delete mutation permits only"),
+        ('op = "create"\npath = "x.txt"\nname_bytes_hex = "e9"\ncontent = "x"', "create mutation permits only"),
+        ('op = "raw_create"\npath = "pég"\nname_bytes_hex = "e9"\ncontent = "x"', "ASCII"),
     ],
 )
 def test_fixture_parser_rejects_illegal_file_operations(mutation: str, message: str) -> None:
@@ -579,6 +636,169 @@ path = "renamed.txt"
     assert (outside / "victim.txt").is_file()
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="raw filename mutations are Linux-only")
+def test_runner_raw_file_operations_are_byte_exact_and_bounded() -> None:
+    root = scratch_dir("raw-mutation-runner")
+    workspace = root / "workspace"
+    package = workspace / "pkg"
+    package.mkdir(parents=True)
+    outside = root / "outside"
+    outside.mkdir()
+
+    def mutation_command(mutation: Mutation) -> FixtureCommand:
+        return FixtureCommand(
+            name="raw-rejection",
+            argv=("-c", "pass"),
+            compare="semantic",
+            mutations=(mutation,),
+        )
+
+    raw_name_hex = "e92e747874"
+    create = Mutation(
+        path="pkg",
+        op="raw_create",
+        name_bytes_hex=raw_name_hex,
+        content="raw\n",
+    )
+    assert _apply_mutations(workspace, mutation_command(create)) == [
+        {
+            "op": "raw_create",
+            "path": "pkg",
+            "name_bytes_hex": raw_name_hex,
+        }
+    ]
+    raw_path = os.fsencode(package) + b"/" + bytes.fromhex(raw_name_hex)
+    assert os.path.isfile(raw_path)
+    with open(raw_path, "rb") as handle:
+        assert handle.read() == b"raw\n"
+
+    with pytest.raises(FileExistsError, match="destination exists"):
+        _apply_mutations(workspace, mutation_command(create))
+
+    delete = Mutation(
+        path="pkg",
+        op="raw_delete",
+        name_bytes_hex=raw_name_hex,
+    )
+    assert _apply_mutations(workspace, mutation_command(delete)) == [
+        {
+            "op": "raw_delete",
+            "path": "pkg",
+            "name_bytes_hex": raw_name_hex,
+        }
+    ]
+    assert not os.path.lexists(raw_path)
+    with pytest.raises(FileNotFoundError, match="source does not exist"):
+        _apply_mutations(workspace, mutation_command(delete))
+
+    (package / "directory").mkdir()
+    with pytest.raises(ValueError, match="regular file"):
+        _apply_mutations(
+            workspace,
+            mutation_command(
+                Mutation(
+                    path="pkg",
+                    op="raw_delete",
+                    name_bytes_hex=b"directory".hex(),
+                )
+            ),
+        )
+
+    target = package / "target"
+    target.write_text("target\n", encoding="utf-8")
+    (package / "target-link").symlink_to("target")
+    with pytest.raises(ValueError, match="regular file"):
+        _apply_mutations(
+            workspace,
+            mutation_command(
+                Mutation(
+                    path="pkg",
+                    op="raw_delete",
+                    name_bytes_hex=b"target-link".hex(),
+                )
+            ),
+        )
+    assert target.read_text(encoding="utf-8") == "target\n"
+
+    (workspace / "package-link").symlink_to("pkg", target_is_directory=True)
+    with pytest.raises(FileNotFoundError, match="existing real directory"):
+        _apply_mutations(
+            workspace,
+            mutation_command(
+                Mutation(
+                    path="package-link",
+                    op="raw_create",
+                    name_bytes_hex="e9",
+                    content="x",
+                )
+            ),
+        )
+
+    (workspace / "missing-parent-link").symlink_to("missing", target_is_directory=True)
+    with pytest.raises(FileNotFoundError, match="existing real directory"):
+        _apply_mutations(
+            workspace,
+            mutation_command(
+                Mutation(
+                    path="missing-parent",
+                    op="raw_create",
+                    name_bytes_hex="e9",
+                    content="x",
+                )
+            ),
+        )
+    with pytest.raises(FileNotFoundError, match="existing real directory"):
+        _apply_mutations(
+            workspace,
+            mutation_command(
+                Mutation(
+                    path="missing-parent-link",
+                    op="raw_create",
+                    name_bytes_hex="e9",
+                    content="x",
+                )
+            ),
+        )
+
+    (workspace / "escape").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="escapes workspace"):
+        _apply_mutations(
+            workspace,
+            mutation_command(
+                Mutation(
+                    path="escape",
+                    op="raw_create",
+                    name_bytes_hex="e9",
+                    content="x",
+                )
+            ),
+        )
+    assert list(outside.iterdir()) == []
+
+
+def test_runner_rejects_raw_file_operations_off_linux(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = scratch_dir("raw-mutation-non-linux") / "workspace"
+    (workspace / "pkg").mkdir(parents=True)
+    command = FixtureCommand(
+        name="raw-non-linux",
+        argv=("-c", "pass"),
+        compare="semantic",
+        mutations=(
+            Mutation(
+                path="pkg",
+                op="raw_create",
+                name_bytes_hex="e9",
+                content="x",
+            ),
+        ),
+    )
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.sys.platform", "darwin")
+    with pytest.raises(RuntimeError, match="requires a Linux host"):
+        _apply_mutations(workspace, command)
+
+
 def test_required_host_rejection_precedes_workspace_copy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -599,6 +819,29 @@ def test_required_host_rejection_precedes_workspace_copy(
             fixture,
             ToolConfig(name="bazel", executable=Path("/usr/bin/bazel")),
             RunOptions(run_root=scratch_dir("required-host-run")),
+        )
+
+
+def test_linux_required_host_rejection_precedes_workspace_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = Fixture(
+        name="linux-only",
+        root=Path("/fixture"),
+        workspace=Path("/fixture/workspace"),
+        expected=Path("/fixture/expected"),
+        required_host_os="linux",
+    )
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.sys.platform", "darwin")
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._copy_workspace",
+        lambda fixture, run_dir: pytest.fail("workspace copied"),
+    )
+    with pytest.raises(RuntimeError, match="requires a Linux host"):
+        run_fixture(
+            fixture,
+            ToolConfig(name="bazel", executable=Path("/usr/bin/bazel")),
+            RunOptions(run_root=scratch_dir("linux-required-host-run")),
         )
 
 

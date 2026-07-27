@@ -1,0 +1,4 @@
+filegroup(
+    name = "bad",
+    srcs = glob(["?.txt"], allow_empty = True),
+)

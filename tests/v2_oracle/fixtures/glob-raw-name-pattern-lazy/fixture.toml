@@ -1,0 +1,76 @@
+[fixture]
+name = "glob-raw-name-pattern-lazy"
+description = "Linux BUILD glob preserves raw directory-name bytes across a warm delete/recreate lifecycle and rejects the forbidden question-mark wildcard."
+comparison = "exact"
+daemon = true
+observe_server_epochs = true
+required_host_os = "linux"
+oracle_notes = "Bazel-only raw-name evidence. Output and mutation records remain ASCII; the accepted POSIX glob fixture separately owns special-file and symlink laziness."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/native/unix_jni.cc",
+  "src/main/native/latin1_jni_path.cc",
+  "src/main/java/com/google/devtools/build/lib/util/StringEncoding.java",
+  "src/main/java/com/google/devtools/build/lib/packages/StarlarkNativeModule.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/GlobValue.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/GlobsValue.java",
+  "src/main/java/com/google/devtools/build/lib/packages/GlobCache.java",
+  "src/main/java/com/google/devtools/build/lib/vfs/UnixGlob.java",
+  "src/main/java/com/google/devtools/build/lib/vfs/Dirent.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/DirectoryListingStateValue.java",
+  "src/main/java/com/google/devtools/build/lib/packages/producers/PatternWithWildcardProducer.java",
+  "src/main/java/com/google/devtools/build/lib/packages/producers/PatternWithoutWildcardProducer.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageFunctionWithMultipleGlobDeps.java",
+]
+translation_notes = "The checked UTF-8 filename has bytes c3 a9; raw_create adds e9. ASCII conditional labels expose internal Latin-1 matching and sort order without serializing either filename."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture glob-raw-name-pattern-lazy --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture glob-raw-name-pattern-lazy --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "raw_names_baseline"
+argv = ["query", "--noshow_progress", "//pkg:all"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:all_txt_c3a9_before_e9\\n//pkg:loaded_dynamic_c3a9_only\\n//pkg:octal_e9_present_only\\n//pkg:utf8_literal_c3a9_only\\Z"]
+
+[[commands.mutations]]
+op = "raw_create"
+path = "pkg"
+name_bytes_hex = "e92e747874"
+content = "raw e9\n"
+
+[[commands]]
+name = "question_mark_is_forbidden"
+argv = ["query", "--noshow_progress", "//qmark:*"]
+capture_server_epoch = true
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = ["Error in glob: invalid glob pattern '?.txt': wildcard ? forbidden"]
+
+[[commands]]
+name = "raw_e9_deleted"
+argv = ["query", "--noshow_progress", "//pkg:all"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:all_txt_c3a9_only\\n//pkg:loaded_dynamic_c3a9_only\\n//pkg:octal_e9_absent\\n//pkg:utf8_literal_c3a9_only\\Z"]
+
+[[commands.mutations]]
+op = "raw_delete"
+path = "pkg"
+name_bytes_hex = "e92e747874"
+
+[[commands]]
+name = "raw_e9_recreated"
+argv = ["query", "--noshow_progress", "//pkg:all"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:all_txt_c3a9_before_e9\\n//pkg:loaded_dynamic_c3a9_only\\n//pkg:octal_e9_present_only\\n//pkg:utf8_literal_c3a9_only\\Z"]
+
+[[commands.mutations]]
+op = "raw_create"
+path = "pkg"
+name_bytes_hex = "e92e747874"
+content = "raw e9\n"
