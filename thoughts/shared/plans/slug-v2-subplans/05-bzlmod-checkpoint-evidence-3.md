@@ -12206,3 +12206,37 @@ composition, `allow_empty`, callable diagnostics/sorting, package BUILD/`.bzl`
 acquisition, parser activation, evaluator transactions, event publication,
 external repositories, SUBPACKAGES, native Windows, and lone-surrogate parity
 remain explicitly out of scope.
+
+### Pure Host glob traversal oracle
+
+Status: **ACCEPT** for
+`WP-5-m1-loading-pure-host-glob-traversal-oracle` on 2026-07-27 after
+independent implementation review and correction rereview.
+
+The exact five-path extension is +55/-3, within every per-file and aggregate
+cap. The isolated 12-line traversal package and two one-line assets produce
+the exact nine labels above: indexed results prove literal/simple-star
+multi-segment traversal, zero-segment and terminal standalone `**`, FILES
+versus FILES_AND_DIRS membership and order, while `double_count_1` proves
+unique callable output from two standalone `**` fragments. Both generated
+records exit zero with empty manifests and mutations. The accepted first
+six-state command and its complete generated record remain exactly unchanged.
+
+One pinned Bazel 9.2 generation and three root-owned exact replays from
+distinct fresh absolute roots passed. The writer's same-output-base replay
+encountered only Bazel's known workspace-switch server warning and stopped
+without broadening expectations; every clean-root replay then matched. The
+explicit oracle suites passed 107 tests with one unrelated unknown
+`asyncio_mode` warning. Fixture parsing/listing, Python compilation, exact
+record/assets, source anchors, scope/caps, diff, credential, archive, and
+process-cleanup guards passed. Review found and corrected only a regenerated
+raw Invocation ID in the protected first record; structural comparison
+against its pre-packet form and correction rereview passed.
+
+The fixture is now exactly 18 regular files, zero links, two commands, and 140
+newline-counted lines, a measured delta of +3/+0/+52. The whole fixture tree
+is 1,325 regular files, 24 links, and 39,419 lines, or +11/+0/+115 from
+checkpoint `e2cc891d`. This is oracle packet three, below every growth-review
+threshold. No harness, Rust, Cargo, DICE, parser, consumer, other fixture, or
+Stage 9 row changed. Next implement only the accepted private three-file
+`WP-5-m1-loading-pure-host-glob-traversal-owner`.

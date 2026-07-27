@@ -1,14 +1,17 @@
 [fixture]
 name = "glob-package-boundaries"
-description = "Bazel 9.2 root-package glob projection continues ordinary, deleted, and nested-module directories while stopping ignored and actual subpackages."
+description = "Bazel 9.2 root-package glob projection continues ordinary, deleted, and nested-module directories while stopping ignored and actual subpackages; traversal state proves literal, recursive, operation, and duplicate behavior."
 comparison = "exact"
-oracle_notes = "One exact label_kind row projects the six package-boundary states without claiming allow_empty diagnostics."
+oracle_notes = "One exact label_kind row projects the six package-boundary states without claiming allow_empty diagnostics; one exact query row projects traversal state and FILES versus FILES_AND_DIRS."
 
 [provenance]
 bazel_release = "9.2.0"
 bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
-  "src/main/java/com/google/devtools/build/lib/packages/producers/DirectoryDirentProducer.java:76-116",
+  "src/main/java/com/google/devtools/build/lib/packages/producers/GlobComputationProducer.java:95-143",
+  "src/main/java/com/google/devtools/build/lib/packages/producers/FragmentProducer.java:107-160",
+  "src/main/java/com/google/devtools/build/lib/packages/producers/DirectoryDirentProducer.java:76-156",
+  "src/test/java/com/google/devtools/build/lib/skyframe/GlobTestBase.java:513-573",
   "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupFunction.java:91-122,157-180,253-325",
   "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupValue.java:49-68,220-389",
   "src/main/java/com/google/devtools/build/lib/skyframe/IgnoredSubdirectoriesFunction.java:75-102,127-199",
@@ -28,3 +31,10 @@ argv = ["query", "--noshow_progress", "--deleted_packages=pkg/deleted,pkg/ignore
 compare = "exact"
 expected_exit = 0
 stdout_patterns = ["\\Asource file //pkg:deleted/deleted\\.txt\\nsource file //pkg:nested_module/nested\\.txt\\nsource file //pkg:ordinary/ordinary\\.txt\\Z"]
+
+[[commands]]
+name = "traversal_state_and_operation"
+argv = ["query", "--noshow_progress", "//traversal:all"]
+compare = "exact"
+expected_exit = 0
+stdout_patterns = ["\\A//traversal:all_0_literal\\n//traversal:all_1_literal_deep\\n//traversal:all_2_literal_deep_deep\\.txt\\n//traversal:all_3_literal_leaf\\.txt\\n//traversal:double_count_1\\n//traversal:files_0_literal_deep_deep\\.txt\\n//traversal:files_1_literal_leaf\\.txt\\n//traversal:multi_0_literal_leaf\\.txt\\n//traversal:zero_0_literal_leaf\\.txt\\Z"]

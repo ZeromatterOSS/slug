@@ -1,0 +1,12 @@
+multi = glob(["literal/*.txt"])
+zero = glob(["**/literal/*.txt"])
+files = glob(["literal/**"])
+all_paths = glob(["literal/**"], exclude_directories = 0)
+double = glob(["**/**/leaf.txt"])
+
+[filegroup(name = "multi_%d_%s" % (i, multi[i].replace("/", "_")), srcs = [multi[i]]) for i in range(len(multi))]
+[filegroup(name = "zero_%d_%s" % (i, zero[i].replace("/", "_")), srcs = [zero[i]]) for i in range(len(zero))]
+[filegroup(name = "files_%d_%s" % (i, files[i].replace("/", "_")), srcs = [files[i]]) for i in range(len(files))]
+[filegroup(name = "all_%d_%s" % (i, all_paths[i].replace("/", "_")), srcs = [all_paths[i]]) for i in range(len(all_paths))]
+
+filegroup(name = "double_count_%d" % len(double), srcs = double)
