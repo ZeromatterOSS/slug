@@ -7980,3 +7980,320 @@ pure descriptor and Registry IO bridge, propagates visible/root/path Needs,
 retains the required redundant local root edge, keeps construction/root/local/
 remote/vendor/checksum failures typed and distinct, and adds no consumer or
 activation.
+
+### Stage 5 private Host registry-file owner design
+
+`WP-5-m1-host-registry-file-owner` changes exactly:
+
+- `app/slug_bzlmod_v2/src/host_registry.rs`; and
+- `app/slug_bzlmod_v2/src/registry_dice.rs`.
+
+The cap is 2,100 additions and 80 deletions. Keep all owner tests inline.
+Change no fixture, harness, `lib.rs`, other Rust file, Cargo manifest,
+lockfile, dependency, public item or reexport, legacy key/result/error,
+runtime implementation, IO trait, consumer, composition, or activation.
+Add no retained standard map, set, or vector, cache, interner, process
+global, or lock. Perform no direct filesystem IO in a DICE compute.
+
+This design supersedes the historical checksum-only and fatal vendor-path
+proposals. Pinned Bazel 9.2 uses one `IndexRegistry.grabFile` owner for both
+checksum-bearing immutable files and checksum-disabled mutable
+`metadata.json`; `useChecksum` changes lockfile lookup, vendor eligibility,
+download-event recording, and `ENFORCE` behavior. It is therefore semantic
+DICE identity, not a caller-side hint.
+
+Add private:
+
+```rust
+enum HostRegistryFileChecksumMode {
+    UseChecksum,
+    MutableNoChecksum,
+}
+
+struct HostRegistryFileKey {
+    registry: HostRegistryFunctionKey,
+    url: RegistryFileUrl,
+    checksum_mode: HostRegistryFileChecksumMode,
+}
+
+type HostRegistryFileOutcome =
+    SourcePreparationOutcome<
+        Arc<Result<RegistryFileValue, HostRegistryFileError>>
+    >;
+```
+
+The nested RegistryFunction key contributes the normalized workspace and
+exact original registry spelling; the file key additionally retains the
+exact file URL and checksum mode. Derive full hash/equality/`Allocative` for
+key and private semantic types, using `Arc`, `CompactString`, and existing
+compact path/URL/hash types. The value uses `complete_eq` and `is_complete`;
+every Need, including self-comparison, is invalid and unequal.
+
+Keep complete errors structurally distinct:
+
+```text
+Construction(HostRegistryFunctionError)
+Root(HostRootModuleFileError)
+Local(HostRegistryLocalFileError)
+MutableEnforceInvariant { url }
+Expectation { url, message }
+VendorPath(HostRegistryVendorPathError)
+VendorFile { url, logical_path, error: HostFileError }
+Remote(RegistryRemoteError)
+Checksum {
+  source: Remote | Vendor { logical_path },
+  url, expected, actual
+}
+```
+
+`HostRegistryLocalFileError` distinguishes invalid URI, strict percent/UTF-8
+decoding, unsupported nonlocal file authority, native-path normalization,
+`PathResolutionError`, and `RegistryLocalError`.
+`HostRegistryVendorPathError` is limited to pure URI, missing-host,
+second-pass Java decoding, and normalized path-construction failures. It must
+not contain operational lstat/readlink/stat errors. Intercept the bridge's
+remote checksum mismatch into the common top-level checksum error; retain
+every other remote bridge error unchanged. A Need never enters an error.
+
+#### Exact compute order and local branch
+
+Every compute first requests its `HostRegistryFunctionKey`. A descriptor
+path Need becomes the same path Need in `SourcePreparationNeeds`; a complete
+descriptor error becomes `Construction`. No root, URL conversion, expectation,
+path, generation, capability, vendor, or IO work may precede it.
+
+For a file descriptor:
+
+1. compute the redundant direct `HostRootModuleFileKey` before local URL/path
+   conversion or IO;
+2. propagate its root-bootstrap or path Need unchanged, map its complete
+   error to `Root`, and retain no successful root value;
+3. convert the exact `file:` URL using the platform-specific JDK file URL
+   handler reached by Bazel's `URI.toURL().openConnection()`, not
+   `URI.getPath()` or `Url::to_file_path`;
+4. normalize that logical absolute native path and compute
+   `ResolvedPathKey(PathObservationNamespace::Host, logical_path)`;
+5. propagate its path Need, map a complete resolution failure to `Local`, and
+   pass only `resolved.real_path().as_path()` to the accepted
+   `read_local_registry_file`; and
+6. map its typed bridge failure to `Local`.
+
+Do not inspect a lockfile expectation or vendor directory on this branch.
+Do not use `HostFileBytesKey` for local registry bytes. The accepted bridge
+preserves Found without generation and requests generation only after a
+NotFound or read failure; a missing capability still precedes IO and
+generation. Project a complete local value after the bridge exactly like
+`IndexRegistry.grabFile`'s download event: `UseChecksum` Found records
+`RecordedSha256(actual)` and `UseChecksum` NotFound records
+`RecordedAbsent`, while both `MutableNoChecksum` results retain
+`recordable_remote_expectation: None`. Neither local mode reads a lockfile
+expectation or uses vendor bytes. The direct root edge is safe only because
+the dormant `HostRootModuleFileKey` graph remains registry-free. Later
+production composition must still complete root before exposing construction
+or file requests.
+
+The local converter is platform-exact:
+
+- both platforms perform one strict JDK `ParseUtil.decode` pass: `%2520`
+  becomes literal `%20`, `+` remains `+`, malformed escape pairs and malformed
+  UTF-8 are distinct typed conversion errors, and no replacement character is
+  introduced;
+- Unix decodes `URL.getPath()`, so query and fragment are omitted; authority
+  must be absent/empty, exact `~`, or case-insensitive `localhost`, otherwise
+  return the wrapped unsupported-nonlocal local-access error before path
+  observation, generation, capability, or IO;
+- Windows decodes `URL.getFile()`, so the query is part of the filename while
+  the fragment is omitted, replaces `/` with `\` and `|` with `:`, and removes
+  leading slash(es) before a drive spec through native `File` normalization;
+  a nonlocal authority forms `\\host\path`, and a missing UNC candidate
+  returns the same disabled-FTP-fallback unsupported-nonlocal access error
+  instead of ordinary local absence.
+
+Freeze these pure/adversarial cases:
+
+```text
+Unix:
+file:///tmp/a+b%20c%2520d?ignored#frag -> /tmp/a+b c%20d
+file:///tmp/%FF -> strict UTF-8 conversion error
+
+Windows:
+file:///c%7C/a%20b?q=x#frag -> c:\a b?q=x
+file://bad/path -> \\bad\path only when that UNC candidate exists;
+                   otherwise unsupported nonlocal file URL
+```
+
+#### Remote checksum and mutable modes
+
+For `UseChecksum`, resolve the exact URL's descriptor expectation before URI
+or vendor-path construction. Expectation failure is typed and precedes all
+vendor, generation, capability, and IO work. Only
+`RecordedSha256(expected)` plus a present vendor directory is vendor-eligible;
+unrecorded and recorded-absence states bypass vendor and enter the accepted
+remote bridge unchanged.
+
+For `MutableNoChecksum`, do not inspect the expectation and do not construct
+or observe a vendor path. `ENFORCE` returns
+`MutableEnforceInvariant` before URI parsing, generation, capability, or IO;
+this is the private typed equivalent of Bazel's `Preconditions.checkState`,
+not `MissingChecksum`. Every non-Enforce remote mode performs an unverified
+fetch, obtains generation before capability/IO, and returns
+`recordable_remote_expectation: None` for both Found and NotFound because
+Bazel posts no `RegistryFileDownloadEvent`.
+
+Add only one crate-private dormant bridge entrypoint in `registry_dice.rs`
+for that non-recording mutable fetch. It reuses the existing closed
+`FetchUnverified` executor and exact generation-before-IO behavior, then
+clears the recordable expectation on complete Found/NotFound values. It adds
+no plan variant, public surface, trait method, capability, key, or legacy
+caller, and it must not change any existing Host or legacy result.
+
+The checksum-bearing bridge behavior remains:
+
+- unrecorded Update/Off and Refresh fetch unverified with generation before
+  capability/IO;
+- recorded absence Update/Off/Error replays without generation or IO;
+- recorded absence Refresh fetches unverified with generation first;
+- recorded SHA verifies through capability/IO first, returns success or
+  checksum mismatch without generation, and requests generation only after
+  404 or transport failure; and
+- `IGNORE` never reaches the remote branch.
+
+#### Exact vendor path and selection
+
+Port the pinned two-stage Java path derivation, not `Url::path`, a single
+percent decoder, or a plus-preserving decoder:
+
+```text
+<vendor>/_registries/
+  <URI.getHost().toLowerCase(Locale.ROOT)>/
+  <URLDecoder.decode(URI.getPath(), UTF-8) after removing one leading slash>
+```
+
+`URI.getPath()` first decodes escaped octets with Java UTF-8 replacement
+semantics. `URLDecoder` then decodes `%HH` a second time and maps `+` to a
+space. Omit port, query, and fragment. Remove exactly one leading slash
+before applying Bazel `Path.getRelative` behavior, including its
+absolute-second-path replacement. Missing host or illegal second-pass escape
+is a typed `VendorPath` error before observation.
+
+The mandatory adversarial pure case is:
+
+```text
+vendor: /V
+URL: https://EXAMPLE.test:8443/a%2520b+c?ignored=yes#frag
+path: /V/_registries/example.test/a b c
+```
+
+Also freeze `/%252Fescape`: two decodes produce `//escape`, the single strip
+leaves `/escape`, and the absolute relative operand replaces the vendor
+prefix exactly as Bazel does.
+
+Observe the candidate with `HostFileBytesKey` so resolution and byte
+observation remain DICE-owned. Classify its complete result by the operation
+that failed:
+
+- Missing, WrongKind, Cycle, InfiniteExpansion, and Observation or
+  InconsistentState errors whose operation is not `FileBytes` are
+  preselection failures and fall through to the checksum-verifying remote
+  bridge;
+- a regular or special file, including either behind followed symlinks, is
+  selected;
+- any path Need propagates unchanged;
+- a selected `FileBytes` observation/inconsistency is fatal `VendorFile`
+  without remote IO or generation;
+- selected bytes with the wrong SHA are fatal `Checksum::Vendor` without
+  fallback; and
+- selected bytes with the expected SHA return Found with that SHA and a
+  recordable recorded-SHA expectation, without remote IO or generation.
+
+This matches `Path.isFile`, whose followed `statNullable` converts every
+operational `IOException` to false while accepting regular and special files.
+Do not compute an explicit vendor `ResolvedPathKey` and then make its
+operational error fatal.
+
+#### Focused retained-DICE evidence and gates
+
+Inline focused tests must prove:
+
+1. key identity includes workspace, exact original registry, exact file URL,
+   and checksum mode; separately allocated complete values/errors compare
+   equal, while every Need is invalid/self-unequal;
+2. descriptor-first dependency prefixes, typed construction error, and
+   visible path Need exclude root, path, expectation, vendor, generation,
+   capability, and IO;
+3. local root bootstrap/path Need and root error precede URL/path/IO, while a
+   successful root is discarded and the exact resolved native path reaches
+   the bridge with no local `HostFileBytesKey`;
+4. strict platform file-URL conversion, local checksum-mode
+   Found/NotFound recordability without expectation/vendor work, Found
+   stickiness, NotFound/read-failure generation-after-IO, native symlink
+   retargeting including a Unix non-UTF-8 physical target, Windows
+   drive/query and UNC present/missing behavior, and a semantic root change
+   causing the required reread;
+5. the complete checksum-bearing mode/expectation/generation matrix, remote
+   error projection, and common remote checksum source;
+6. mutable non-Enforce skips expectation/vendor, generates before IO, and
+   records no expectation; mutable Enforce fails before all of them;
+7. exact two-pass vendor decoding, lowercase host, port/query/fragment
+   omission, single-strip absolute replacement, and typed malformed/missing
+   host cases;
+8. vendor missing/directory/broken-or-cyclic symlink and injected operational
+   selection failures fall remote, while regular, special,
+   symlink-to-regular, and symlink-to-special targets select;
+9. selected read/disappearance/checksum failure is fatal with no remote
+   request or generation; and
+10. vendor create/edit/delete/recreate, physical retarget, and A→B→A
+    restoration invalidate or prune for a demonstrated DICE edge.
+
+Prove structurally that the new owner is private and dormant, the local
+branch has exactly the direct root and resolved-path edges but no
+`HostFileBytesKey`, the remote branch has no root edge, `HostRootModuleFileKey`
+has no registry edge, and no loading/core/analysis/query consumer or
+activation appears. The accepted fourteen-command vendor oracle remains
+pinned source evidence only until a later activation packet; do not claim
+Slug command-path replay.
+
+Validate focused owner and mutable-bridge tests first, then full bzlmod unit,
+integration, and doctest suites, loading/core downstream suites, and all
+affected GNU-Windows no-run test executables. Run formatting, diff, archive,
+credential, dependency, public-API, exact two-file/growth, legacy-callsite,
+remote-plan, local-native-path, no-direct-IO, no-lock, and forbidden-edge
+gates.
+
+Stop and replan on checksum mode omitted from identity; mutable output that
+records an expectation; mutable Enforce performing ordinary fetch or
+returning MissingChecksum; expectation/vendor work on an inapplicable branch;
+vendor operational selection error made fatal; special-file rejection;
+selected-file fallback; local `HostFileBytesKey`; changed legacy/public
+behavior; a third file; cap overflow; consumer/composition/activation work;
+new dependency, cache, interner, or lock; or direct filesystem IO in DICE.
+Terminal acceptance requires source/parity, native DICE/evidence, and
+architecture/orchestration latest-text review before Rust.
+
+#### Private Host registry-file owner design status
+
+Status: `REPLAN` before Rust on 2026-07-26.
+
+The source and DICE audits corrected the stopped draft to include checksum
+mode in key identity, non-recording mutable remote fetch, checksum-enabled
+local recordability, platform JDK file-URL conversion, special-file vendor
+selection, and remote fallback for every operational vendor preselection
+failure. The native DICE reviewer accepted the bounded two-file closure, and
+the architecture rereviewer accepted the corrected ownership and scope.
+
+Terminal source review then found a second material prerequisite miss.
+OpenJDK `FileURLConnection` returns directory-listing bytes for a local
+`file:` directory, while the accepted production native-path bridge uses
+`tokio::fs::read` and returns a directory read error. The owner cannot repair
+or hide that transport mismatch without changing the accepted runtime bridge.
+Per the one-correction packet limit, the design ends in `REPLAN`; the draft
+above is preserved as evidence, not an implementation contract.
+
+No Rust, fixture, harness, Cargo, dependency, API, DICE key, consumer, or
+activation changed. Next packet: design only
+`WP-5-m1-host-registry-local-directory-oracle-design`. Freeze the smallest
+pinned Bazel 9.2 oracle that discriminates regular, absent, and directory
+local registry-file transport, exact listing bytes/order and diagnostic
+projection, checksum-enabled event/lockfile effects, mutable no-checksum
+effects, and relevant same-daemon transitions. Do not edit Rust or redesign
+the bridge until that oracle is accepted and implemented.

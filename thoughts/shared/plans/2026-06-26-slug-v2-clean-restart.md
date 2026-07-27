@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, Registry IO bridge with native local paths, and focused registry-file vendor oracle; detailed packet evidence remains in the Stage 5 owner plan and routing log | production retry/publication activation remains gated on Host migrations and typed production roots; the private Host registry-file owner is not yet redesigned; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | redesign only `WP-5-m1-host-registry-file-owner-design` |
+| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, Registry IO bridge with native local paths, and focused registry-file vendor oracle; detailed packet evidence remains in the Stage 5 owner plan and routing log | production retry/publication activation remains gated on Host migrations and typed production roots; the accepted native-path bridge errors on local directories where Bazel's JDK file handler returns listing bytes, so the private Host registry-file owner remains blocked; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | design only `WP-5-m1-host-registry-local-directory-oracle-design` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -134,13 +134,23 @@ loading 54, core 104+13, all doctests, all 20 GNU-Windows executables, and
 all auxiliary gates passed; all terminal latest-diff reviews returned
 `ACCEPT`.
 
+The private Host registry-file owner redesign ended in `REPLAN` before Rust.
+The corrected two-file draft captured checksum-mode identity, exact local
+recordability and JDK path conversion, DICE-owned vendor lifecycle, and
+`Path.isFile` fallback/selection semantics, but terminal source review found
+that Bazel serves local `file:` directories as listing bytes while the
+accepted native-path runtime bridge returns a directory read error. No Rust
+or fixture changed.
+
 ### Current packet
 
-Redesign only `WP-5-m1-host-registry-file-owner-design`.
+Design only `WP-5-m1-host-registry-local-directory-oracle-design`.
 
-Freeze the private Host registry-file owner against the corrected bridge,
-using the accepted pinned-source, DICE, vendor-oracle, and live-seam audit
-evidence. Do not edit Rust, fixtures, consumers, or activation.
+Freeze the smallest pinned Bazel 9.2 local registry-file oracle that
+discriminates regular, absent, and directory transport, exact directory
+listing bytes/order and diagnostics, checksum-enabled versus mutable
+no-checksum effects, and relevant same-daemon transitions. Do not edit Rust,
+the existing bridge, consumers, or activation.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
