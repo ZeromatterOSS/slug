@@ -10350,3 +10350,43 @@ coverage, or absorb the byte-string/parser seam.
 
 Next packet: implement only
 `WP-5-m1-loading-host-dirent-glob-oracle`.
+
+### Focused Host-dirent glob oracle implementation stop
+
+Status: `REPLAN` on 2026-07-27 from clean baseline `fba55864`. One pinned
+`/usr/bin/bazel` generation exercised the isolated self-cycle row. It exited
+7 with:
+
+`ERROR: no such package 'cycle_error': error globbing [matched-*] op=FILES:
+[unix_jni.cc:382] <workspace>/cycle_error/matched-cycle.txt (Too many levels
+of symbolic links)`
+
+This materially differs from the frozen
+`Symlink issue while evaluating globs: Symlink cycle:` diagnostic, so the
+accepted stop gate fired. Renaming the matched cycle to `.parked` and querying
+again recovered to exact `//cycle_error:probe` on the same nonzero server
+epoch. The same generation also confirmed that a helper `def` in a BUILD file
+is rejected; the eventual retry must use explicit or top-level comprehension
+declarations inside the already-allowed BUILD file.
+
+The failed generated expectation and every harness, fixture, BUILD, regular
+asset, and symlink draft were removed. Every non-plan implementation path
+returned byte-for-byte to `fba55864`; no implementation, fixture growth, Rust,
+Cargo, dependency, API, DICE key, consumer, or activation was accepted. The
+preserved ignored run artifact is
+`target/v2o/runs/glob-directory-invalidation/20260727-034143-3965037-bazel/comparison`.
+The stopped attempt does not count as post-checkpoint oracle packet three:
+accepted growth after `22de3631` remains the prior two packets at +4 regular,
++3 symlinks, and +1,065 lines.
+
+Next, design and terminally rereview only
+`WP-5-m1-loading-host-dirent-glob-oracle-cycle-diagnostic-correction`.
+Trace native `ELOOP` `FileSymlinkLoopException` packaging against Skyframe
+logical-chain `FileSymlinkCycleException` and decide whether the retained
+self-cycle pins the observed package-level form or needs a different bounded
+cycle topology. Preserve the non-cycle contract, eleven rows, same-daemon
+recovery, four-regular/six-link topology, existing harness/fixture allowlist,
+and caps unless pinned source or a confined probe requires an explicitly
+reviewed delta. Do not edit or regenerate the harness, fixture, expectation,
+assets, Rust, Cargo, APIs, owners, consumers, or activation, and do not retry
+implementation before terminal acceptance.
