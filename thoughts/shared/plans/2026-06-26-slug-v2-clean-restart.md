@@ -50,10 +50,13 @@ disabled contents cache for the three Off rows. Native Bazel 9.2 observation
 forces the exact `1,1,1,1`→`1,2,2,1` absence transition while preserving
 reason-a reuse and SHA-before-yanked evidence. Four `show_repo` rows still
 prove ordered default, per-registry/later-wins, explicit-empty, and exit-2
-unknown-registry mirror semantics without archive download. All three
-terminal latest-text reviews returned `ACCEPT`; stopped drafts are removed
-and no fixture, Rust, Cargo, dependency, API, consumer, or activation is
-retained.
+unknown-registry mirror semantics without subject archive download. A stopped
+transport generation exposed default mirrors leaking onto embedded BCR
+RepoSpecs; the accepted focused correction gives BCR an explicit empty list
+and requires exact comma-inclusive formatter assertions plus stderr-scoped
+download negatives. All three terminal latest-text reviews returned
+`ACCEPT`; stopped tracked drafts are removed and no fixture, Rust, Cargo,
+dependency, API, consumer, or activation is retained.
 
 ### Current packet
 
@@ -61,11 +64,11 @@ Implement only the corrected `WP-5-m1-host-registry-function-oracle`.
 
 Edit exactly the two accepted fixture TOML files and their generated expected
 JSON files. Replace the frozen Update reason-a row with the expunge row, add
-the corrected three Off and four `show_repo` rows, run one pinned Bazel 9.2
-generation and two distinct fresh-root replays for each fixture, then enforce
-the exact cache, row, request, digest restoration, URL-order, provenance,
-metadata, four-path, 29-file/zero-link, 1,800-line, archive, diff, and
-credential gates. Do not edit Rust or Cargo.
+the corrected three Off and four BCR-isolated `show_repo` rows, run one pinned
+Bazel 9.2 generation and two distinct fresh-root replays for each fixture,
+then enforce the exact cache, row, request, digest restoration, URL-order,
+comma, stderr-negative, provenance, metadata, four-path, 29-file/zero-link,
+1,800-line, archive, diff, and credential gates. Do not edit Rust or Cargo.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

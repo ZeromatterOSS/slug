@@ -6933,3 +6933,103 @@ Cargo, dependency, API, consumer, or activation is retained.
 
 Next evidence: Implement only the corrected
 `WP-5-m1-host-registry-function-oracle` in the original exact four-path scope.
+
+##### Host RegistryFunction oracle BCR-mirror correction
+
+**Status:** Corrected after stopped transport generation and native probe on
+2026-07-26.
+
+The corrected yanked generation passed its full nine-row cold-cache sequence,
+but the first transport generation stopped before replay. Although all three
+successful `show_repo` rows produced the intended yyy URL lists, their default
+command mirrors also applied to BCR's embedded modules and emitted archive
+download/unknown-host warnings. This violated the unclaimed-download stop
+gate. The formatter assertions also placed a comma inside the list before
+`]`; pinned `RepoOutputFormatter` instead emits `urls = [...],`, with the
+attribute comma after the closing bracket.
+
+The writer stopped before any replay, retained no partial expected output,
+and restored the exact four paths to clean `2976c63d` through `apply_patch`.
+The stopped generation does not advance fixture-growth accounting. No
+tracked fixture, expected-output, server/workspace/harness, Rust, Cargo,
+dependency, API, consumer, or activation change remains; ignored stopped-run
+artifacts and Bazel server processes are cleanup state, not accepted evidence.
+
+Correct only the three successful `show_repo` rows. After each row's existing
+mirror flags, append exactly
+`--module_mirrors=https://bcr.bazel.build=`. Bazel's last/per-registry
+selection gives BCR an explicit empty command-mirror list while preserving:
+
+- row 1's ordered default list for the fixture b registry;
+- row 2's later explicit b-registry list over its default and stale list; and
+- row 3's explicit empty b-registry list over its default.
+
+Keep the unknown-registry row unchanged because it terminates in command-input
+processing. Correct each exact formatter assertion to the one-line
+`urls = ["...", "..."],` form: no comma appears between the final URL and
+`]`, and the attribute comma follows `]`.
+
+An isolated pinned Bazel 9.2 generation of the BCR-empty flag correction,
+using inline-list assertions through the closing bracket, passed.
+Default produced default-one, default-two, then the original yyy URL;
+per-registry/later-wins produced specific-one, specific-two, then original;
+and explicit b-empty produced only original. All exited 0. Normalized stderr
+contained only invocation/no-action lines: no `WARNING: Download from`,
+`Unknown host`, or configured command-mirror archive domain. The 42-entry
+fixture HTTP log contained only registry `bazel_registry.json`, MODULE,
+metadata, and `source.json` paths. That logger intentionally filters to
+selected registry paths, so its exact manifest is not archive-attempt
+evidence. The isolated probe matched each inline URL list through its closing
+bracket; captured stdout additionally showed the formatter's attribute comma
+immediately after it. The final implementation assertion must end in
+`\],`.
+
+Replace the accepted design's overbroad archive stop/claim with this exact
+subject boundary. The rows prove yyy RepoSpec URL projection with no observed
+failed download attempt to the exact yyy original or configured
+command-mirror domains. Ordinary embedded BCR registry/original/cache activity
+with its command mirrors explicitly empty is scaffolding, not subject
+mirror-download evidence and is not excluded or claimed. Actual
+command-mirror, registry-mirror, original, and backup request fallback remains
+gated on the later mirror-fetch oracle.
+
+Rerun both pinned generations and two distinct fresh-root replays of each
+fixture from the clean checkout. Add stderr-scoped negative assertions for
+download/unknown-host diagnostics, every configured command-mirror domain,
+and the exact original
+`https://example.invalid/yyy-1.0.0.tar.gz`; do not exclude those domains from
+stdout. Enforce the exact inline URL list, BCR empty flag/order, exact
+registry-only fixture request log, and every prior scope, count, digest,
+provenance, inventory, growth, archive, diff, and credential gate.
+
+This is the single focused implementation correction allowed for the
+clean-cache packet. Stop and terminally replan on another generation mismatch,
+any observed failed-download/unknown-host warning or configured
+command-mirror/yyy-original domain in stderr, BCR mirror in yyy stdout,
+changed default/specific/empty/unknown behavior, an eighth net row, a fifth
+tracked path, a new file/link, line-cap breach, or any broader claim or
+implementation edit.
+
+###### Host RegistryFunction oracle BCR-mirror correction status
+
+**Status:** Accepted after terminal latest-text review on 2026-07-26.
+
+The stopped transport generation proved the intended URL projections but
+exposed default command mirrors leaking onto embedded BCR module RepoSpecs.
+The accepted focused correction appends an explicit empty BCR command-mirror
+entry to the three successful rows, corrects the formatter assertion to end
+in `\],`, and keeps the unknown-registry row unchanged. An isolated pinned
+probe produced the exact three URL lists, no observed failed download/host
+diagnostic for the configured mirrors or yyy original, and an exact
+registry-only request manifest.
+
+The HTTP logger is explicitly not archive-attempt evidence, ordinary embedded
+BCR registry/original/cache behavior remains scaffold-only, and actual mirror
+fallback stays deferred. Pinned-source/parity, native-observation, and
+architecture/orchestration terminal latest-text reviews all returned
+`ACCEPT`. The tracked worktree contains only this plan correction; stopped
+ignored run state is not evidence and no fixture change is accepted.
+
+Next evidence: Rerun only the complete corrected
+`WP-5-m1-host-registry-function-oracle` implementation from the clean
+four-path baseline.
