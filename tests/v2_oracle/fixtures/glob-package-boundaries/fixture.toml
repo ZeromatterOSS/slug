@@ -1,24 +1,30 @@
 [fixture]
 name = "glob-package-boundaries"
-description = "Bazel glob excludes explicit excludes and does not cross into subpackages."
-comparison = "message_shape"
-oracle_notes = "Generated with upstream Bazel 9.1.1 on the local Windows host."
+description = "Bazel 9.2 root-package glob projection continues ordinary, deleted, and nested-module directories while stopping ignored and actual subpackages."
+comparison = "exact"
+oracle_notes = "One exact label_kind row projects the six package-boundary states without claiming allow_empty diagnostics."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/packages/producers/DirectoryDirentProducer.java:76-116",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupFunction.java:91-122,157-180,253-325",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupValue.java:49-68,220-389",
+  "src/main/java/com/google/devtools/build/lib/skyframe/IgnoredSubdirectoriesFunction.java:75-102,127-199",
+  "src/main/java/com/google/devtools/build/lib/cmdline/IgnoredSubdirectories.java:169-185",
+  "src/main/java/com/google/devtools/build/lib/skyframe/GlobsFunction.java:113-139",
+  "src/main/java/com/google/devtools/build/lib/skyframe/LocalRepositoryLookupFunction.java:27-35",
+  "src/main/java/com/google/devtools/build/lib/skyframe/BazelSkyframeExecutorConstants.java:29-33",
+  "src/main/java/com/google/devtools/build/lib/pkgcache/PackageOptions.java:94-111",
+]
+translation_notes = "The three visible labels prove ordinary, deleted-BUILD, and nested-MODULE-without-BUILD continuation; absent witnesses prove actual-subpackage, ignored, and ignored-plus-deleted stops."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture glob-package-boundaries --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture glob-package-boundaries --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
-name = "query_exported_glob_files"
-argv = ["query", "--output=label_kind", "labels(srcs, //pkg:globbed)"]
-compare = "message_shape"
+name = "root_package_boundary_six_state_projection"
+argv = ["query", "--noshow_progress", "--deleted_packages=pkg/deleted,pkg/ignored_deleted", "--output=label_kind", "labels(srcs, //pkg:globbed)"]
+compare = "exact"
 expected_exit = 0
-stdout_patterns = ["\\Asource file //pkg:keep\\.txt\\nsource file //pkg:sub/child\\.txt\\n?\\Z"]
-
-[[commands]]
-name = "allow_empty_false_reports_subpackage_boundary_miss"
-argv = ["query", "--output=label_kind", "labels(srcs, //pkg:globbed)"]
-compare = "message_shape"
-expected_exit = 7
-stderr_patterns = ["glob pattern 'subpkg/\\*.txt' didn't match anything", "allow_empty is set to False"]
-
-[[commands.mutations]]
-path = "pkg/BUILD.bazel"
-find = "allow_empty = True"
-replace = "allow_empty = False"
+stdout_patterns = ["\\Asource file //pkg:deleted/deleted\\.txt\\nsource file //pkg:nested_module/nested\\.txt\\nsource file //pkg:ordinary/ordinary\\.txt\\Z"]

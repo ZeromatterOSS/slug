@@ -3,57 +3,34 @@
     {
       "argv": [
         "query",
+        "--noshow_progress",
+        "--deleted_packages=pkg/deleted,pkg/ignored_deleted",
         "--output=label_kind",
         "labels(srcs, //pkg:globbed)"
       ],
       "cwd": "<workspace>",
       "duration_ms": "<duration_ms>",
       "env_allowlist": {},
+      "env_overrides": {},
       "executed_argv": [
         "<tool_executable>",
         "query",
+        "--noshow_progress",
+        "--deleted_packages=pkg/deleted,pkg/ignored_deleted",
         "--output=label_kind",
         "labels(srcs, //pkg:globbed)"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
-      "name": "query_exported_glob_files",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:/dev/kuro/target/v2o/runs/glob-package-boundaries/20260626-213816-40120-bazel/workspace\n  - Only in new server: --workspace_directory=c:/dev/kuro/target/v2o/runs/glob-package-boundaries/20260626-213858-13936-bazel/workspace\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded",
-      "normalized_stdout": "source file //pkg:keep.txt\nsource file //pkg:sub/child.txt",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\glob-package-boundaries\\20260626-213816-40120-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\dev\\kuro\\target\\v2o\\runs\\glob-package-boundaries\\20260626-213858-13936-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
-      "stdout": "source file //pkg:keep.txt\nsource file //pkg:sub/child.txt\n"
-    },
-    {
-      "argv": [
-        "query",
-        "--output=label_kind",
-        "labels(srcs, //pkg:globbed)"
-      ],
-      "cwd": "<workspace>",
-      "duration_ms": "<duration_ms>",
-      "env_allowlist": {},
-      "executed_argv": [
-        "<tool_executable>",
-        "query",
-        "--output=label_kind",
-        "labels(srcs, //pkg:globbed)"
-      ],
-      "exit_code": 7,
-      "manifest": [],
-      "mutations": [
-        {
-          "find": "allow_empty = True",
-          "old_digest_hint": "176",
-          "path": "pkg/BUILD.bazel",
-          "replace": "allow_empty = False"
-        }
-      ],
-      "name": "allow_empty_false_reports_subpackage_boundary_miss",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"<workspace>/pkg/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob(\nError in glob: glob pattern 'subpkg/*.txt' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: no such target '//pkg:globbed': target 'globbed' not declared in package 'pkg' defined by <workspace>/pkg/BUILD.bazel",
-      "normalized_stdout": "",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nLoading: 0 packages loaded\nERROR: Traceback (most recent call last):\n\tFile \"C:/dev/kuro/target/v2o/runs/glob-package-boundaries/20260626-213858-13936-bazel/workspace/pkg/BUILD.bazel\", line 3, column 16, in <toplevel>\n\t\tsrcs = glob(\nError in glob: glob pattern 'subpkg/*.txt' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with --incompatible_disallow_empty_glob).\nERROR: no such target '//pkg:globbed': target 'globbed' not declared in package 'pkg' defined by C:/dev/kuro/target/v2o/runs/glob-package-boundaries/20260626-213858-13936-bazel/workspace/pkg/BUILD.bazel\n",
-      "stdout": ""
+      "name": "root_package_boundary_six_state_projection",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>",
+      "normalized_stdout": "source file //pkg:deleted/deleted.txt\nsource file //pkg:nested_module/nested.txt\nsource file //pkg:ordinary/ordinary.txt",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: b8a4df63-3cde-49d9-bf05-e376d560ae8e\n",
+      "stdout": "source file //pkg:deleted/deleted.txt\nsource file //pkg:nested_module/nested.txt\nsource file //pkg:ordinary/ordinary.txt\n"
     }
   ],
   "fixture": "glob-package-boundaries",

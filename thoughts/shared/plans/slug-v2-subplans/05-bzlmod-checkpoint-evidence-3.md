@@ -11889,3 +11889,28 @@ Cargo, edit DICE, Host owners, loading consumers, parser/evaluator, recursive
 traversal, native-Windows support, a new fixture, or Stage 9. The exact next
 implementation packet after this design accepts is
 `WP-5-m1-loading-host-package-boundary-oracle`.
+
+### Host package-boundary oracle
+
+Status: **ACCEPT** for
+`WP-5-m1-loading-host-package-boundary-oracle` on 2026-07-27 after
+independent implementation review. The stale Bazel 9.1.1 two-row fixture is
+replaced by the exact pinned Bazel 9.2 one-row contract above. Its three
+ordered `label_kind` lines prove ordinary, deleted-BUILD, and nested-MODULE
+continuation; the absent witnesses prove actual-subpackage, ignored, and
+ignored-plus-deleted stops. The generated record exits zero with exact
+comparison, empty manifest/environment/mutations, and no retained
+allow-empty or explicit-exclude evidence.
+
+One pinned generation, the worker replay, two root-owned distinct fresh-root
+replays, and the protected `glob-callable-contract` replay passed. The full
+oracle harness passed 107 tests through `uv` with one unrelated unknown
+`asyncio_mode` configuration warning; listing, schema parsing, Python source
+compilation, exact asset/record assertions, diff, and process guards passed.
+The fixture is exactly 15 regular files, zero links, and 88 newline-counted
+lines, a measured delta of +5/+0/-15 from its stale state. The whole fixture
+tree is 1,322 regular files, 24 links, and 39,367 lines, or +8/+0/+63 from
+checkpoint `e2cc891d`; this remains packet two and no growth review is due.
+No harness, other fixture, Rust, Cargo, DICE, Host/loading owner, parser,
+consumer, or Stage 9 changed. The next packet is exactly
+`WP-5-m1-loading-host-package-boundary-projection`.
