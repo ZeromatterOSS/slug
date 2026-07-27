@@ -33,10 +33,12 @@ use dice::Key;
 use dice::UserComputationData;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredTargetAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::RootConfiguredTargetAnalysisKey;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -53,6 +55,9 @@ use slug_bzlmod_v2::RootModuleCommandPolicyKey;
 use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
 use slug_bzlmod_v2::RootModuleGraph;
 use slug_bzlmod_v2::RootModuleGraphKey;
+use slug_bzlmod_v2::RootModuleLoadingAnchor;
+use slug_bzlmod_v2::RootModuleLoadingAnchorError;
+use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
 use slug_bzlmod_v2::RootModuleRegistryUrlsKey;
 use slug_bzlmod_v2::inject_registry_request_inputs;
@@ -60,9 +65,13 @@ use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::PackagePath;
+use slug_identity_v2::TargetName;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::LoadedPackage;
+use slug_loading_v2::RootPackageLoadError;
+use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
@@ -1229,6 +1238,343 @@ pub struct WorkspaceBuildEvaluation {
     pub root_module_graph: Arc<RootModuleGraph>,
     pub packages: Vec<RequestedPackageEvaluation>,
     pub revision: WorkspaceRevision,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+#[allow(dead_code)] // Activated by the later shared command driver.
+struct BuildCommandRootKey {
+    workspace: NormalizedAbsolutePath,
+    targets: Arc<[Arc<str>]>,
+    configuration: ConfigurationKey,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[allow(dead_code)] // Constructor diagnostics remain private until activation.
+enum BuildCommandRequestError {
+    ExternalRepository { pattern: Arc<str> },
+    RecursivePattern { pattern: Arc<str> },
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[allow(dead_code)]
+struct BuildCommandEvaluation {
+    anchor: RootModuleLoadingAnchor,
+    targets: Arc<[BuildRequestedTarget]>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[allow(dead_code)]
+struct BuildRequestedTarget {
+    pattern: Arc<str>,
+    package: LoadedPackage,
+    analysis: Option<AnalysisResult>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[allow(dead_code)]
+enum BuildCommandError {
+    RootAnchor(RootModuleLoadingAnchorError),
+    Package {
+        pattern: Arc<str>,
+        error: RootPackageLoadError,
+    },
+    TargetNotFound {
+        pattern: Arc<str>,
+        package: PackagePath,
+        target: TargetName,
+        build_file: PathBuf,
+    },
+    Analysis {
+        pattern: Arc<str>,
+        error: AnalysisError,
+    },
+}
+
+#[allow(dead_code)]
+type BuildCommandOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
+    Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
+>;
+
+#[allow(dead_code)]
+enum BuildBranchResult {
+    Outcome(
+        slug_bzlmod_v2::SourcePreparationOutcome<Result<BuildRequestedTarget, BuildCommandError>>,
+    ),
+    Infrastructure(Arc<str>),
+}
+
+impl BuildCommandRootKey {
+    #[allow(dead_code)]
+    fn new(
+        workspace: NormalizedAbsolutePath,
+        targets: &[TargetPattern],
+        configuration: ConfigurationKey,
+    ) -> Result<Self, BuildCommandRequestError> {
+        let mut canonical = Vec::with_capacity(targets.len());
+        for target in targets {
+            let pattern: Arc<str> = Arc::from(target.to_string());
+            let repo = match target {
+                TargetPattern::Single(label) => label.repo(),
+                TargetPattern::PackageAll { repo, .. } | TargetPattern::Recursive { repo, .. } => {
+                    repo
+                }
+            };
+            if !repo.is_root() {
+                return Err(BuildCommandRequestError::ExternalRepository { pattern });
+            }
+            if matches!(target, TargetPattern::Recursive { .. }) {
+                return Err(BuildCommandRequestError::RecursivePattern { pattern });
+            }
+            canonical.push(pattern);
+        }
+        Ok(Self {
+            workspace,
+            targets: canonical.into(),
+            configuration,
+        })
+    }
+}
+
+impl fmt::Display for BuildCommandRootKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "build-command-root:{}:{}",
+            self.workspace,
+            self.targets
+                .iter()
+                .map(|target| target.as_ref())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    }
+}
+
+#[allow(dead_code)]
+fn build_complete(
+    result: Result<BuildCommandEvaluation, BuildCommandError>,
+) -> BuildCommandOutcome {
+    slug_bzlmod_v2::SourcePreparationOutcome::Complete(Arc::new(result))
+}
+
+#[allow(dead_code)]
+fn collect_build_branches(
+    branches: Vec<BuildBranchResult>,
+) -> Result<
+    slug_bzlmod_v2::SourcePreparationOutcome<
+        Result<Arc<[BuildRequestedTarget]>, BuildCommandError>,
+    >,
+    Arc<str>,
+> {
+    let mut needs: Option<slug_bzlmod_v2::SourcePreparationNeeds> = None;
+    let mut first_error = None;
+    let mut targets = Vec::with_capacity(branches.len());
+    for branch in branches {
+        match branch {
+            BuildBranchResult::Infrastructure(error) => return Err(error),
+            BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
+                needs = Some(match needs {
+                    Some(current) => current
+                        .try_union(&need)
+                        .map_err(|error| Arc::from(format!("{error:?}")))?,
+                    None => need,
+                });
+            }
+            BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(
+                target,
+            ))) => targets.push(target),
+            BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                Err(error),
+            )) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+        }
+    }
+    if let Some(need) = needs {
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need))
+    } else if let Some(error) = first_error {
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+            error,
+        )))
+    } else {
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(
+            targets.into(),
+        )))
+    }
+}
+
+#[allow(dead_code)]
+async fn compute_build_branch(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    pattern: Arc<str>,
+    configuration: ConfigurationKey,
+) -> BuildBranchResult {
+    let parsed = TargetPattern::parse(&pattern)
+        .expect("BuildCommandRootKey stores validated canonical target patterns");
+    let package = match &parsed {
+        TargetPattern::Single(label) => label.package().clone(),
+        TargetPattern::PackageAll { package, .. } => package.clone(),
+        TargetPattern::Recursive { .. } => {
+            unreachable!("BuildCommandRootKey rejects recursive patterns")
+        }
+    };
+    let package_value = match ctx
+        .compute(&RootPackageLoadKey::new(workspace.clone(), package.clone()))
+        .await
+    {
+        Err(error) => return BuildBranchResult::Infrastructure(Arc::from(error.to_string())),
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
+            return BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                need,
+            ));
+        }
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+            Ok(package) => package.clone(),
+            Err(error) => {
+                return BuildBranchResult::Outcome(
+                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                        BuildCommandError::Package {
+                            pattern,
+                            error: error.clone(),
+                        },
+                    )),
+                );
+            }
+        },
+    };
+    let analysis = match parsed {
+        TargetPattern::PackageAll { .. } => None,
+        TargetPattern::Single(label) => {
+            let Some(target) = package_value
+                .targets
+                .iter()
+                .find(|candidate| candidate.name == label.target().as_str())
+            else {
+                return BuildBranchResult::Outcome(
+                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                        BuildCommandError::TargetNotFound {
+                            pattern,
+                            package,
+                            target: label.target().clone(),
+                            build_file: package_value.build_file.clone(),
+                        },
+                    )),
+                );
+            };
+            if matches!(
+                target.kind,
+                slug_loading_v2::PackageTargetKind::StarlarkRule(_)
+            ) {
+                let canonical =
+                    CanonicalLabel::parse(&format!("@@//{}:{}", label.package(), label.target()))
+                        .expect("validated root apparent label has a canonical projection");
+                let configured_target = ConfiguredTargetKey::new(canonical, configuration);
+                match ctx
+                    .compute(&RootConfiguredTargetAnalysisKey::new(
+                        workspace,
+                        configured_target,
+                    ))
+                    .await
+                {
+                    Err(error) => {
+                        return BuildBranchResult::Infrastructure(Arc::from(error.to_string()));
+                    }
+                    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
+                        return BuildBranchResult::Outcome(
+                            slug_bzlmod_v2::SourcePreparationOutcome::Need(need),
+                        );
+                    }
+                    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => {
+                        match value.as_ref() {
+                            Ok(analysis) => Some(analysis.clone()),
+                            Err(error) => {
+                                return BuildBranchResult::Outcome(
+                                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                                        BuildCommandError::Analysis {
+                                            pattern,
+                                            error: error.clone(),
+                                        },
+                                    )),
+                                );
+                            }
+                        }
+                    }
+                }
+            } else {
+                None
+            }
+        }
+        TargetPattern::Recursive { .. } => unreachable!(),
+    };
+    BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(
+        BuildRequestedTarget {
+            pattern,
+            package: package_value,
+            analysis,
+        },
+    )))
+}
+
+#[async_trait]
+impl Key for BuildCommandRootKey {
+    type Value = BuildCommandOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let anchor = match ctx
+            .compute(&RootModuleLoadingAnchorKey::new(self.workspace.clone()))
+            .await
+            .expect("build root-module anchor DICE invariant")
+        {
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                return slug_bzlmod_v2::SourcePreparationOutcome::Need(need);
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Ok(anchor) => anchor.clone(),
+                Err(error) => {
+                    return build_complete(Err(BuildCommandError::RootAnchor(error.clone())));
+                }
+            },
+        };
+        let workspace = &self.workspace;
+        let configuration = &self.configuration;
+        let branches = ctx
+            .compute_join(self.targets.iter().cloned(), |ctx, pattern| {
+                Box::pin(compute_build_branch(
+                    ctx,
+                    workspace.clone(),
+                    pattern,
+                    configuration.clone(),
+                ))
+            })
+            .await;
+        match collect_build_branches(branches) {
+            Err(error) => panic!("build command-root infrastructure invariant failed: {error}"),
+            Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(need)
+            }
+            Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error))) => {
+                build_complete(Err(error))
+            }
+            Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(targets))) => {
+                build_complete(Ok(BuildCommandEvaluation { anchor, targets }))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -2943,12 +3289,20 @@ mod tests {
     use std::io::Read;
     use std::io::Write;
     use std::net::TcpListener;
+    use std::sync::atomic::AtomicUsize;
     use std::thread;
 
+    use dice::ActivationData;
+    use dice::ActivationTracker;
+    use dice::DynKey;
     use slug_events_v2::CaptureEvaluationEvents;
+    use slug_workspace_v2::PathLstat;
+    use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationKey;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
     use slug_workspace_v2::PathOutcome;
 
     use super::*;
@@ -4835,6 +5189,807 @@ mod tests {
                 .map(|entry| entry.name.as_str())
                 .collect::<Vec<_>>(),
             expected
+        );
+    }
+
+    fn build_test_configuration(value: &str) -> ConfigurationKey {
+        ConfigurationKey::target(value).unwrap()
+    }
+
+    #[derive(Default)]
+    struct BuildRootEpoch {
+        entries: SmallMap<PathObservationDemand, PathObservationResult>,
+    }
+
+    impl BuildRootEpoch {
+        fn demand(path: &str, operation: PathObservationOperation) -> PathObservationDemand {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                operation,
+            )
+        }
+
+        fn node(&mut self, path: &str, kind: PathNodeKind, variant: i64) {
+            self.entries.insert(
+                Self::demand(path, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    kind, variant, variant, variant, variant, 0o755,
+                ))),
+            );
+        }
+
+        fn missing(&mut self, path: &str) {
+            self.entries.insert(
+                Self::demand(path, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            );
+        }
+
+        fn file(&mut self, path: &str, source: &str, variant: i64) {
+            self.node(path, PathNodeKind::RegularFile, variant);
+            self.entries.insert(
+                Self::demand(path, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                    source.as_bytes(),
+                ))),
+            );
+        }
+
+        fn base(variant: i64) -> Self {
+            let mut epoch = Self::default();
+            epoch.node("/", PathNodeKind::Directory, variant);
+            epoch.node("/workspace", PathNodeKind::Directory, variant);
+            epoch.file("/workspace/MODULE.bazel", "", variant);
+            epoch.missing("/workspace/REPO.bazel");
+            epoch.missing("/workspace/.bazelignore");
+            epoch
+        }
+
+        fn package(&mut self, name: &str, source: &str, variant: i64) {
+            let directory = format!("/workspace/{name}");
+            self.node(&directory, PathNodeKind::Directory, variant);
+            self.file(&format!("{directory}/BUILD.bazel"), source, variant);
+        }
+
+        fn deleted_package(&mut self, name: &str, variant: i64) {
+            let directory = format!("/workspace/{name}");
+            self.node(&directory, PathNodeKind::Directory, variant);
+            self.missing(&format!("{directory}/BUILD.bazel"));
+            self.missing(&format!("{directory}/BUILD"));
+        }
+
+        fn build(self) -> PathObservationEpoch {
+            PathObservationEpoch::new(self.entries).unwrap()
+        }
+    }
+
+    async fn build_root_transaction(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+    ) -> dice::DiceTransaction {
+        let user_data = UserComputationData {
+            cycle_detector: Some(bzl_load_cycle_detector()),
+            ..Default::default()
+        };
+        build_root_transaction_with_data(dice, epoch, user_data).await
+    }
+
+    async fn build_root_transaction_with_data(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        mut user_data: UserComputationData,
+    ) -> dice::DiceTransaction {
+        user_data.cycle_detector = Some(bzl_load_cycle_detector());
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        slug_bzlmod_v2::inject_root_package_policy_inputs(
+            &mut updater,
+            slug_bzlmod_v2::RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        updater.commit().await
+    }
+
+    #[derive(Default)]
+    struct LegacyBuildTracker {
+        activations: AtomicUsize,
+    }
+
+    impl ActivationTracker for LegacyBuildTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            _deps: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+            if key.downcast_ref::<RootModuleGraphKey>().is_some()
+                || key.downcast_ref::<WorkspaceEvaluationKey>().is_some()
+                || key
+                    .downcast_ref::<slug_loading_v2::keys::PackageLoadKey>()
+                    .is_some()
+                || key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some()
+            {
+                self.activations.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    fn build_test_error(pattern: &str) -> BuildCommandError {
+        BuildCommandError::TargetNotFound {
+            pattern: Arc::from(pattern),
+            package: PackagePath::parse("pkg").unwrap(),
+            target: TargetName::parse("missing").unwrap(),
+            build_file: PathBuf::from("/workspace/pkg/BUILD.bazel"),
+        }
+    }
+
+    fn build_test_need(path: &str) -> slug_bzlmod_v2::SourcePreparationNeeds {
+        slug_bzlmod_v2::SourcePreparationNeeds::path(
+            slug_workspace_v2::NeedPathObservations::singleton(PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                PathObservationOperation::Lstat,
+            )),
+        )
+    }
+
+    #[test]
+    fn build_command_root_identity_is_canonical_ordered_and_preflighted() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let configuration = build_test_configuration("target");
+        let shorthand = BuildCommandRootKey::new(
+            workspace.clone(),
+            &[TargetPattern::parse("//pkg").unwrap()],
+            configuration.clone(),
+        )
+        .unwrap();
+        let explicit = BuildCommandRootKey::new(
+            workspace.clone(),
+            &[TargetPattern::parse("//pkg:pkg").unwrap()],
+            configuration.clone(),
+        )
+        .unwrap();
+        assert_eq!(shorthand, explicit);
+        assert_eq!(shorthand.targets.as_ref(), [Arc::<str>::from("//pkg:pkg")]);
+
+        let duplicate = BuildCommandRootKey::new(
+            workspace.clone(),
+            &[
+                TargetPattern::parse("//pkg:pkg").unwrap(),
+                TargetPattern::parse("//pkg:pkg").unwrap(),
+            ],
+            configuration.clone(),
+        )
+        .unwrap();
+        let reversed = BuildCommandRootKey::new(
+            workspace.clone(),
+            &[
+                TargetPattern::parse("//other:t").unwrap(),
+                TargetPattern::parse("//pkg:pkg").unwrap(),
+            ],
+            configuration.clone(),
+        )
+        .unwrap();
+        assert_ne!(duplicate, explicit);
+        assert_ne!(reversed, explicit);
+        assert_ne!(
+            explicit,
+            BuildCommandRootKey::new(
+                workspace.clone(),
+                &[TargetPattern::parse("//pkg:pkg").unwrap()],
+                build_test_configuration("other"),
+            )
+            .unwrap()
+        );
+        assert_ne!(
+            explicit,
+            BuildCommandRootKey::new(
+                NormalizedAbsolutePath::new("/other").unwrap(),
+                &[TargetPattern::parse("//pkg:pkg").unwrap()],
+                configuration.clone(),
+            )
+            .unwrap()
+        );
+        assert!(matches!(
+            BuildCommandRootKey::new(
+                workspace.clone(),
+                &[TargetPattern::parse("@repo//pkg:t").unwrap()],
+                configuration.clone(),
+            ),
+            Err(BuildCommandRequestError::ExternalRepository { pattern })
+                if pattern.as_ref() == "@repo//pkg:t"
+        ));
+        assert!(matches!(
+            BuildCommandRootKey::new(
+                workspace,
+                &[TargetPattern::parse("//pkg/...").unwrap()],
+                configuration,
+            ),
+            Err(BuildCommandRequestError::RecursivePattern { pattern })
+                if pattern.as_ref() == "//pkg/..."
+        ));
+    }
+
+    #[tokio::test]
+    async fn build_command_root_anchors_empty_and_preserves_ordered_package_results() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let configuration = build_test_configuration("target");
+        let empty_key =
+            BuildCommandRootKey::new(workspace.clone(), &[], configuration.clone()).unwrap();
+        let mut empty = build_root_transaction(&dice, BuildRootEpoch::base(1).build()).await;
+        let empty_outcome = empty.compute(&empty_key).await.unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(empty_value) = &empty_outcome else {
+            panic!("complete root anchor returned Need");
+        };
+        assert!(empty_value.as_ref().as_ref().unwrap().targets.is_empty());
+        assert!(BuildCommandRootKey::validity(&empty_outcome));
+        assert!(BuildCommandRootKey::equality(
+            &empty_outcome,
+            &empty_outcome
+        ));
+
+        let targets = [
+            TargetPattern::parse("//second:all").unwrap(),
+            TargetPattern::parse("//first:t").unwrap(),
+            TargetPattern::parse("//first:t").unwrap(),
+        ];
+        let key = BuildCommandRootKey::new(workspace, &targets, configuration).unwrap();
+        let mut epoch = BuildRootEpoch::base(2);
+        epoch.package("first", "filegroup(name = \"t\")\n", 2);
+        epoch.package("second", "filegroup(name = \"other\")\n", 2);
+        let mut transaction = build_root_transaction(&dice, epoch.build()).await;
+        let value = transaction.compute(&key).await.unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = value else {
+            panic!("complete package bundle returned Need");
+        };
+        let targets = &value.as_ref().as_ref().unwrap().targets;
+        assert_eq!(
+            targets
+                .iter()
+                .map(|target| target.pattern.as_ref())
+                .collect::<Vec<_>>(),
+            ["//second:all", "//first:t", "//first:t"]
+        );
+        assert!(targets.iter().all(|target| target.analysis.is_none()));
+    }
+
+    #[tokio::test]
+    async fn build_command_root_selects_each_terminal_producer_once_for_duplicate_targets() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let effects = CommandEffectOwner::new();
+        let attempt = effects.begin_attempt().unwrap();
+        let demands = WorkspaceDemandOwner::new(&dice, workspace.clone());
+        let mut user_data = UserComputationData::default();
+        demands
+            .install(&dice, &mut user_data, Some(attempt.clone()))
+            .unwrap();
+
+        let definitions = r#"
+print("BZL")
+def _impl(ctx):
+    print("ANALYSIS")
+    return [DefaultInfo(files = depset([]))]
+probe = rule(implementation = _impl)
+"#;
+        let mut epoch = BuildRootEpoch::base(3);
+        epoch.file("/workspace/MODULE.bazel", "print(\"MODULE\")\n", 3);
+        epoch.package("rules", "", 3);
+        epoch.file("/workspace/rules/defs.bzl", definitions, 3);
+        epoch.package(
+            "app",
+            "print(\"BUILD\")\nload(\"//rules:defs.bzl\", \"probe\")\nprobe(name = \"t\")\n",
+            3,
+        );
+        let targets = [
+            TargetPattern::parse("//app:t").unwrap(),
+            TargetPattern::parse("//app:t").unwrap(),
+        ];
+        let key = BuildCommandRootKey::new(workspace, &targets, build_test_configuration("target"))
+            .unwrap();
+        let mut transaction =
+            build_root_transaction_with_data(&dice, epoch.build(), user_data).await;
+        let value = transaction.compute(&key).await.unwrap();
+        assert!(matches!(
+            value,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                if value.as_ref().as_ref().unwrap().targets.len() == 2
+        ));
+        let sealed = attempt.seal_terminal().unwrap();
+        assert_eq!(sealed.root_count(), 1);
+        let sidecars = sealed.select(&transaction).await.unwrap();
+        let texts = sidecars
+            .events()
+            .batches()
+            .iter()
+            .flat_map(EventBatch::events)
+            .map(|event| match event {
+                EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(texts, ["MODULE", "BZL", "BUILD", "ANALYSIS"]);
+    }
+
+    #[tokio::test]
+    async fn build_command_root_terminal_closure_retains_reused_and_clears_retry_only_batches() {
+        for (retain_prints, expected) in [
+            (true, vec!["MODULE", "BZL", "BUILD", "ANALYSIS"]),
+            (false, Vec::new()),
+        ] {
+            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+            let effects = CommandEffectOwner::new();
+            let demands = WorkspaceDemandOwner::new(&dice, workspace.clone());
+            let key = BuildCommandRootKey::new(
+                workspace,
+                &[
+                    TargetPattern::parse("//app:t").unwrap(),
+                    TargetPattern::parse("//later:all").unwrap(),
+                ],
+                build_test_configuration("target"),
+            )
+            .unwrap();
+            let epoch = |variant: i64, prints: bool, later: bool| {
+                let mut epoch = BuildRootEpoch::base(variant);
+                epoch.file(
+                    "/workspace/MODULE.bazel",
+                    if prints { "print(\"MODULE\")\n" } else { "" },
+                    variant,
+                );
+                epoch.package("rules", "", variant);
+                let definition_name = if prints { "old.bzl" } else { "new.bzl" };
+                epoch.file(
+                    &format!("/workspace/rules/{definition_name}"),
+                    if prints {
+                        "print(\"BZL\")\ndef _impl(ctx):\n    print(\"ANALYSIS\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n"
+                    } else {
+                        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n"
+                    },
+                    variant,
+                );
+                epoch.package(
+                    "app",
+                    if prints {
+                        "print(\"BUILD\")\nload(\"//rules:old.bzl\", \"probe\")\nprobe(name = \"t\")\n"
+                    } else {
+                        "load(\"//rules:new.bzl\", \"probe\")\nprobe(name = \"t\")\n"
+                    },
+                    variant,
+                );
+                if later {
+                    epoch.package("later", "filegroup(name = \"t\")\n", variant);
+                }
+                epoch.build()
+            };
+
+            let retry = effects.begin_attempt().unwrap();
+            let mut retry_data = UserComputationData::default();
+            demands
+                .install(&dice, &mut retry_data, Some(retry.clone()))
+                .unwrap();
+            let mut retry_transaction =
+                build_root_transaction_with_data(&dice, epoch(60, true, false), retry_data).await;
+            assert!(matches!(
+                retry_transaction.compute(&key).await.unwrap(),
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(_)
+            ));
+            retry.seal_retry().unwrap();
+
+            let terminal = effects.begin_attempt().unwrap();
+            let mut terminal_data = UserComputationData::default();
+            demands
+                .install(&dice, &mut terminal_data, Some(terminal.clone()))
+                .unwrap();
+            let terminal_variant = if retain_prints { 60 } else { 61 };
+            let mut terminal_transaction = build_root_transaction_with_data(
+                &dice,
+                epoch(terminal_variant, retain_prints, true),
+                terminal_data,
+            )
+            .await;
+            assert!(matches!(
+                terminal_transaction.compute(&key).await.unwrap(),
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                    if value.as_ref().is_ok()
+            ));
+            let selected = terminal
+                .seal_terminal()
+                .unwrap()
+                .select(&terminal_transaction)
+                .await
+                .unwrap();
+            if expected.is_empty() {
+                assert!(
+                    selected.events().batches().is_empty(),
+                    "empty terminal producers retained event batches"
+                );
+            }
+            let texts = selected
+                .events()
+                .batches()
+                .iter()
+                .flat_map(EventBatch::events)
+                .map(|event| match event {
+                    EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                    EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(texts, expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn build_command_root_unions_target_needs_and_replays_typed_analysis_lifecycle() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let union_key = BuildCommandRootKey::new(
+            workspace.clone(),
+            &[
+                TargetPattern::parse("//left:t").unwrap(),
+                TargetPattern::parse("//right:t").unwrap(),
+            ],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let mut need_transaction =
+            build_root_transaction(&dice, BuildRootEpoch::base(10).build()).await;
+        let need = need_transaction.compute(&union_key).await.unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) = &need else {
+            panic!("independent missing packages did not return Need");
+        };
+        let paths = needs
+            .path_observations()
+            .unwrap()
+            .demands()
+            .iter()
+            .map(|demand| demand.path().as_path())
+            .collect::<Vec<_>>();
+        assert!(paths.contains(&Path::new("/workspace/left")), "{paths:?}");
+        assert!(paths.contains(&Path::new("/workspace/right")), "{paths:?}");
+        assert!(!BuildCommandRootKey::validity(&need));
+        assert!(!BuildCommandRootKey::equality(&need, &need));
+
+        let key = BuildCommandRootKey::new(
+            workspace,
+            &[TargetPattern::parse("//app:t").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let epoch = |variant: i64, marker: &str, deleted: bool| {
+            let mut epoch = BuildRootEpoch::base(variant);
+            epoch.package("rules", "", variant);
+            epoch.file(
+                "/workspace/rules/defs.bzl",
+                &format!(
+                    "def _impl(ctx):\n    print(\"{marker}\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n"
+                ),
+                variant,
+            );
+            if deleted {
+                epoch.deleted_package("app", variant);
+            } else {
+                epoch.package(
+                    "app",
+                    "load(\"//rules:defs.bzl\", \"probe\")\nprobe(name = \"t\")\n",
+                    variant,
+                );
+            }
+            epoch.build()
+        };
+        let mut first_transaction = build_root_transaction(&dice, epoch(11, "V1", false)).await;
+        let first = first_transaction.compute(&key).await.unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(first_value) = &first else {
+            panic!("first typed analysis returned Need");
+        };
+        assert!(
+            first_value.as_ref().as_ref().unwrap().targets[0]
+                .analysis
+                .is_some()
+        );
+
+        let mut edited_transaction = build_root_transaction(&dice, epoch(12, "V2", false)).await;
+        let edited = edited_transaction.compute(&key).await.unwrap();
+        assert!(!BuildCommandRootKey::equality(&first, &edited));
+
+        let mut deleted_transaction = build_root_transaction(&dice, epoch(13, "V2", true)).await;
+        let deleted = deleted_transaction.compute(&key).await.unwrap();
+        assert!(matches!(
+            deleted,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Err(BuildCommandError::Package { .. }))
+        ));
+
+        let mut restored_transaction = build_root_transaction(&dice, epoch(14, "V1", false)).await;
+        let restored = restored_transaction.compute(&key).await.unwrap();
+        assert!(BuildCommandRootKey::equality(&first, &restored));
+    }
+
+    #[tokio::test]
+    async fn build_command_root_anchor_need_and_error_suppress_target_branches() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//app:t").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let mut missing_epoch = BuildRootEpoch::default();
+        missing_epoch.node("/", PathNodeKind::Directory, 19);
+        missing_epoch.node("/workspace", PathNodeKind::Directory, 19);
+        let mut missing_anchor = build_root_transaction(&dice, missing_epoch.build()).await;
+        let missing = missing_anchor.compute(&key).await.unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) = missing else {
+            panic!("missing anchor did not return Need");
+        };
+        let paths = needs
+            .path_observations()
+            .unwrap()
+            .demands()
+            .iter()
+            .map(|demand| demand.path().as_path())
+            .collect::<Vec<_>>();
+        assert!(
+            paths.contains(&Path::new("/workspace/MODULE.bazel")),
+            "{paths:?}"
+        );
+        assert!(!paths.contains(&Path::new("/workspace/app")), "{paths:?}");
+
+        let mut invalid_epoch = BuildRootEpoch::base(20);
+        invalid_epoch.file("/workspace/MODULE.bazel", "this is invalid (", 20);
+        let mut invalid_anchor = build_root_transaction(&dice, invalid_epoch.build()).await;
+        let invalid = invalid_anchor.compute(&key).await.unwrap();
+        assert!(matches!(
+            invalid,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Err(BuildCommandError::RootAnchor(_)))
+        ));
+    }
+
+    #[tokio::test]
+    async fn build_command_root_real_branches_use_no_legacy_keys_and_structure_missing_target() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(LegacyBuildTracker::default());
+        let user_data = UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        let mut epoch = BuildRootEpoch::base(30);
+        epoch.package("native", "filegroup(name = \"t\")\n", 30);
+        epoch.package("rules", "", 30);
+        epoch.file(
+            "/workspace/rules/defs.bzl",
+            "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+            30,
+        );
+        epoch.package(
+            "custom",
+            "load(\"//rules:defs.bzl\", \"probe\")\nprobe(name = \"t\")\n",
+            30,
+        );
+        let mut transaction =
+            build_root_transaction_with_data(&dice, epoch.build(), user_data).await;
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let configuration = build_test_configuration("target");
+        for pattern in ["//native:all", "//native:t", "//custom:t"] {
+            let key = BuildCommandRootKey::new(
+                workspace.clone(),
+                &[TargetPattern::parse(pattern).unwrap()],
+                configuration.clone(),
+            )
+            .unwrap();
+            let value = transaction.compute(&key).await.unwrap();
+            assert!(matches!(
+                value,
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                    if value.as_ref().is_ok()
+            ));
+        }
+        let missing_key = BuildCommandRootKey::new(
+            workspace,
+            &[TargetPattern::parse("//native:missing").unwrap()],
+            configuration,
+        )
+        .unwrap();
+        let missing = transaction.compute(&missing_key).await.unwrap();
+        assert!(matches!(
+            missing,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                if matches!(
+                    value.as_ref(),
+                    Err(BuildCommandError::TargetNotFound {
+                        pattern,
+                        package,
+                        target,
+                        build_file,
+                    }) if pattern.as_ref() == "//native:missing"
+                        && package.as_str() == "native"
+                        && target.as_str() == "missing"
+                        && build_file == Path::new("/workspace/native/BUILD.bazel")
+                )
+        ));
+        assert_eq!(tracker.activations.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn build_command_root_replays_root_module_and_build_create_edit_delete_restore() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let configuration = build_test_configuration("target");
+        let empty =
+            BuildCommandRootKey::new(workspace.clone(), &[], configuration.clone()).unwrap();
+        let module_epoch = |variant: i64, source: Option<&str>| {
+            let mut epoch = BuildRootEpoch::base(variant);
+            match source {
+                Some(source) => epoch.file("/workspace/MODULE.bazel", source, variant),
+                None => epoch.missing("/workspace/MODULE.bazel"),
+            }
+            epoch.build()
+        };
+        let mut missing_module = build_root_transaction(&dice, module_epoch(40, None)).await;
+        let module_missing = missing_module.compute(&empty).await.unwrap();
+        assert!(matches!(
+            module_missing,
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(_)
+        ));
+        assert!(!BuildCommandRootKey::validity(&module_missing));
+        let mut created_module =
+            build_root_transaction(&dice, module_epoch(41, Some("module(name = \"one\")\n"))).await;
+        let module_v1 = created_module.compute(&empty).await.unwrap();
+        let mut edited_module =
+            build_root_transaction(&dice, module_epoch(42, Some("module(name = \"two\")\n"))).await;
+        let module_v2 = edited_module.compute(&empty).await.unwrap();
+        assert!(!BuildCommandRootKey::equality(&module_v1, &module_v2));
+        let mut deleted_module = build_root_transaction(&dice, module_epoch(43, None)).await;
+        let module_deleted = deleted_module.compute(&empty).await.unwrap();
+        assert!(matches!(
+            module_deleted,
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(_)
+        ));
+        let mut restored_module =
+            build_root_transaction(&dice, module_epoch(44, Some("module(name = \"one\")\n"))).await;
+        let module_restored = restored_module.compute(&empty).await.unwrap();
+        assert!(BuildCommandRootKey::equality(&module_v1, &module_restored));
+
+        let package = BuildCommandRootKey::new(
+            workspace,
+            &[TargetPattern::parse("//app:all").unwrap()],
+            configuration,
+        )
+        .unwrap();
+        let build_epoch = |variant: i64, source: Option<&str>| {
+            let mut epoch = BuildRootEpoch::base(variant);
+            match source {
+                Some(source) => epoch.package("app", source, variant),
+                None => epoch.deleted_package("app", variant),
+            }
+            epoch.build()
+        };
+        let mut missing_build = build_root_transaction(&dice, build_epoch(45, None)).await;
+        assert!(matches!(
+            missing_build.compute(&package).await.unwrap(),
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Err(BuildCommandError::Package { .. }))
+        ));
+        let mut created_build =
+            build_root_transaction(&dice, build_epoch(46, Some("filegroup(name = \"v1\")\n")))
+                .await;
+        let build_v1 = created_build.compute(&package).await.unwrap();
+        let mut edited_build =
+            build_root_transaction(&dice, build_epoch(47, Some("filegroup(name = \"v2\")\n")))
+                .await;
+        let build_v2 = edited_build.compute(&package).await.unwrap();
+        assert!(!BuildCommandRootKey::equality(&build_v1, &build_v2));
+        let mut deleted_build = build_root_transaction(&dice, build_epoch(48, None)).await;
+        assert!(matches!(
+            deleted_build.compute(&package).await.unwrap(),
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Err(BuildCommandError::Package { .. }))
+        ));
+        let mut restored_build =
+            build_root_transaction(&dice, build_epoch(49, Some("filegroup(name = \"v1\")\n")))
+                .await;
+        let build_restored = restored_build.compute(&package).await.unwrap();
+        assert!(BuildCommandRootKey::equality(&build_v1, &build_restored));
+    }
+
+    #[test]
+    fn build_branch_collection_has_total_infrastructure_need_and_error_precedence() {
+        let first = build_test_error("//first:missing");
+        let second = build_test_error("//second:missing");
+        let complete_error = |error| {
+            BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                error,
+            )))
+        };
+
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(selected)) =
+            collect_build_branches(vec![
+                complete_error(first.clone()),
+                complete_error(second.clone()),
+            ])
+            .unwrap()
+        else {
+            panic!("Complete errors did not remain terminal");
+        };
+        assert_eq!(selected, first);
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(selected)) =
+            collect_build_branches(vec![
+                complete_error(second.clone()),
+                complete_error(first.clone()),
+            ])
+            .unwrap()
+        else {
+            panic!("reversed Complete errors did not remain terminal");
+        };
+        assert_eq!(selected, second);
+
+        let need_a = build_test_need("/workspace/a");
+        let need_b = build_test_need("/workspace/b");
+        let slug_bzlmod_v2::SourcePreparationOutcome::Need(combined) =
+            collect_build_branches(vec![
+                complete_error(first),
+                BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(need_a)),
+                BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(need_b)),
+            ])
+            .unwrap()
+        else {
+            panic!("reached Needs did not dominate a Complete error");
+        };
+        let paths = combined.path_observations().unwrap().demands();
+        assert_eq!(paths.len(), 2);
+
+        let infrastructure: Arc<str> = Arc::from("cancelled");
+        assert_eq!(
+            collect_build_branches(vec![
+                BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                    build_test_need("/workspace/need"),
+                )),
+                BuildBranchResult::Infrastructure(infrastructure.clone()),
+            ])
+            .unwrap_err(),
+            infrastructure
+        );
+
+        let conflicting_a = slug_bzlmod_v2::SourcePreparationNeeds::root_module_bootstrap(
+            slug_bzlmod_v2::RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+        );
+        let conflicting_b = slug_bzlmod_v2::SourcePreparationNeeds::root_module_bootstrap(
+            slug_bzlmod_v2::RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/other").unwrap(),
+            },
+        );
+        assert!(
+            collect_build_branches(vec![
+                BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                    conflicting_a,
+                )),
+                BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                    conflicting_b,
+                )),
+            ])
+            .is_err()
         );
     }
 }

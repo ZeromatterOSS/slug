@@ -1,35 +1,32 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-build-typed-command-root`
+Packet: `WP-5-m1-preactivation-host-gate-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted build typed command-root design; accepted root
-loading/analysis prerequisites and private retry/event ownership
-Validation tier: private DICE root identity, Need precedence, and event closure
+Evidence: accepted dormant typed build/query roots and accepted root, loading,
+analysis, and query Host migrations
+Validation tier: design-only transitive production-call-graph audit
 
-Implementation file:
+Design inputs:
 
-- `app/slug_core_v2/src/runtime/dice.rs`, including its private tests.
+- dormant build and query command-root closures;
+- production one-shot and daemon build/query entrypoints; and
+- every eager workspace snapshot/projection API named by Stage 9.
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Result: add the dormant private build command root exactly as accepted. Retain
-canonical ordered target identity plus explicit configuration, an opaque
-always-present root anchor, ordered package/optional-analysis records,
-deterministic cumulative Needs, typed semantic errors, Complete-only DICE
-state, and exact descendant event ownership.
+Result: freeze exact build/query transitive forbidden scans, audit roots, and
+stop conditions proving whether either typed command root can activate without
+reaching an eager semantic workspace snapshot, projection, observation
+injection, or event/Need-producing compute above or beside the root.
 
-Use only `RootModuleLoadingAnchorKey`, `RootPackageLoadKey`, and
-`RootConfiguredTargetAnalysisKey`. Preserve duplicate request records and
-input order. Infrastructure/cancellation and Need-union conflicts dominate and
-publish nothing; otherwise all reached Needs dominate the first input-order
-Complete error.
+This is design/audit only. Name exact prerequisite commits, scan commands,
+allowed nonsemantic metric exceptions, transitive call-graph evidence, and the
+smallest next implementation packet. A failed forbidden scan is a stop or
+replan result, not permission to mask the eager edge.
 
-Add no second file, Cargo/dependency/public export, caller, activation,
-external repository, recursive-pattern support, eager snapshot/legacy key,
-blocking IO, fixture/oracle, execution, JVM, Java bytecode, or Bazel
-delegation. Validate focused identity/precedence/anchor/lifecycle/positive
-event-closure cases, full core, direct downstream compile coverage,
-GNU-Windows no-run linkage, formatting, diff, and exact scope. Obtain one
-terminal independent implementation review.
+Make no Rust, Cargo, fixture, oracle, public API, CLI/server behavior,
+activation, envelope, execution, JVM, Java-bytecode, or Bazel-delegation
+change. Obtain at most one terminal independent review only if the audit
+changes a risky DICE or activation boundary.

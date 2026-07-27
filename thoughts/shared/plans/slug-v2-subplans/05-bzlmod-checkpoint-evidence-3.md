@@ -13367,3 +13367,30 @@ rereview returned `ACCEPT` and confirmed the one-file boundary is feasible
 with current dependencies and public typed-root prerequisites.
 
 Implement next only `WP-5-m1-build-typed-command-root`.
+
+### Build typed command-root implementation
+
+Status: **ACCEPT** for `WP-5-m1-build-typed-command-root` on 2026-07-27 after
+one terminal implementation review and focused discriminator corrections.
+
+Exactly `app/slug_core_v2/src/runtime/dice.rs` now contains the dormant private
+build command root, canonical ordered target/configuration identity, opaque
+always-present root anchor, ordered package/optional-analysis bundle, typed
+semantic errors, and total infrastructure/Need/Complete-error precedence. It
+uses only the accepted root anchor, root package-load, and root analysis keys;
+there is no public export, caller, activation, Cargo change, legacy-key edge,
+eager snapshot edge, execution, JVM, or Bazel delegation.
+
+Eight focused tests prove canonical identity and preflight, empty anchoring,
+ordered duplicates, cumulative target Needs and union-conflict failure,
+anchor branch suppression, root-MODULE/BUILD/`.bzl`/analysis lifecycle,
+structured missing-target fields, zero legacy-key activation, exact one-time
+terminal event selection, explicit empty-batch clearing, and retained versus
+retry-only producer selection. The full core suite passes 118 unit and 13
+integration tests; downstream loading/analysis/query checks, GNU-Windows
+linkage, formatting, and diff checks pass. The final independent rereview
+returned `ACCEPT`.
+
+Design next only `WP-5-m1-preactivation-host-gate-design`. Freeze the exact
+build/query transitive forbidden scans and stop conditions before any opaque
+envelope or production activation work.
