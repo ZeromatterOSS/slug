@@ -10390,3 +10390,67 @@ and caps unless pinned source or a confined probe requires an explicitly
 reviewed delta. Do not edit or regenerate the harness, fixture, expectation,
 assets, Rust, Cargo, APIs, owners, consumers, or activation, and do not retry
 implementation before terminal acceptance.
+
+### Host-dirent glob cycle-diagnostic correction
+
+Status: `ACCEPT` on 2026-07-27 after pinned Bazel 9.2 source tracing,
+inspection of the isolated stopped-generation artifact, and independent
+source/behavior, fixture/implementation, and architecture/orchestration
+terminal latest-text reviews. No harness, fixture, expectation, asset, Rust,
+Cargo, dependency, API, owner, consumer, or activation changed.
+
+Keep the existing self-cycle topology and all eleven commands. Do not attempt
+to force the friendlier Skyframe logical-chain diagnostic by changing the
+topology or command mode. On a cold missing glob value,
+`PackageFunctionWithMultipleGlobDeps.SkyframeHybridGlobber` delegates the
+immediate missing result to `NonSkyframeGlobber`. `UnixGlob` follows the
+wildcard-matched symlink through `statIfFound`; native `ELOOP` becomes
+`FileSymlinkLoopException`, and `StarlarkNativeModule` packages that IOException
+before a Skyframe restart can yield `FileSymlinkCycleException`. Upstream
+friendly-cycle evidence uses keep-going evaluation, which is outside this
+fixture's command contract.
+
+Override only the accepted matched-cycle failure assertion. It remains exit 7
+with empty stdout, empty manifest, and the same captured server epoch, but
+stderr must contain these three stable semantic fragments:
+
+- `error globbing [matched-*] op=FILES:`;
+- `cycle_error/matched-cycle.txt`; and
+- `Too many levels of symbolic links`.
+
+Do not pin `[unix_jni.cc:382]`, an absolute path prefix, or
+`Symlink issue while evaluating globs:`. Preserve the existing recovery rename
+and exact `//cycle_error:probe` success on the same server. The unrelated
+self-cycle remains unmatched and must not fail; the retained row therefore
+still discriminates matched from unmatched resolution.
+
+The source authority added to the fixture provenance is:
+
+- `PackageFunctionWithMultipleGlobDeps.java:238-285,340-368`;
+- `UnixGlob.java:824-870`;
+- `StarlarkNativeModule.java:848-868`;
+- `PackageFunction.java:536-588`;
+- `FileFunction.java:309-389`;
+- `unix/NativePosixFiles.java:72-118`;
+- `unix/UnixFileSystem.java:158-175`;
+- `vfs/FileSymlinkLoopException.java:19-31`;
+- `src/main/native/unix_jni.cc:75-140,356-403`; and
+- `PackageFunctionTest.java:1821-1905` plus
+  `AnalysisFailureReportingTest.java:152-187` for the keep-going distinction.
+
+The stopped BUILD helper was independently invalid: Bazel 9.2 forbids `def`
+inside BUILD files. Replace it in the already-allowed `workspace/pkg/BUILD.bazel`
+with exactly five top-level list comprehensions that call `filegroup`, following
+the retained `glob-callable-contract` shape. Add no `.bzl` file or asset. The
+first-four projection guard compares against the prepacket accepted oracle,
+never the contaminated stopped-generation output.
+
+Every other accepted design term remains exact: required POSIX/FIFO harness
+surface, four regular and six exact relative symlink assets, eleven commands,
+same-daemon kind transitions and recovery, empty manifests, epoch capture,
+first-four pre-existing-field projection, source/growth/replay/cleanup guards,
+allowlist, +900/-100 cap, and at most 550 fixture lines. The retry becomes
+post-checkpoint oracle packet three only after terminal acceptance.
+
+Next packet: retry only
+`WP-5-m1-loading-host-dirent-glob-oracle`.
