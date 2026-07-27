@@ -12701,3 +12701,83 @@ Next design only
 typed loading boundary needed by later simple query work; keep external
 repositories, analysis, command/runtime activation, and broader discovery out
 of scope.
+
+### Root loading typed-propagation design
+
+Status: **ACCEPT** for
+`WP-5-m1-loading-typed-propagation-design` on 2026-07-27 after one independent
+reserved-boundary review.
+
+The accepted `HostPackageLoadKey` is already the complete root-repository
+loading owner: normalized workspace plus `PackagePath` identity, root anchor
+before package input, Host BUILD/`.bzl`/glob dependencies, typed transient
+Need, complete-only equality/validity, and one local final-attempt event batch.
+Adding a wrapper DICE key would duplicate identity and event ownership without
+adding a semantic dependency. This packet therefore exposes that owner rather
+than copying or adapting it.
+
+The live query seam demonstrates why the typed boundary is needed.
+`slug_query_v2::graph::UnconfiguredPackageGraphKey` computes legacy
+`PackageLoadKey` and immediately converts infrastructure or loading failures
+to `QueryError`. `LoadingQueryEnvironment::loading_files` repeats that legacy
+compute and calls the legacy `discover_build_file_companion` path. Those call
+sites cannot accept Host Need. `slug_query_v2` has only a development
+dependency on `slug_bzlmod_v2`, so making it depend directly on the bzlmod
+preparation envelope merely to consume loading would also invert the intended
+crate boundary.
+
+Implement the public loading boundary with four root exports:
+
+- rename the private `HostPackageLoadKey` to public `RootPackageLoadKey`;
+  retain private fields, a typed public constructor taking
+  `NormalizedAbsolutePath` and root `PackagePath`, the existing
+  `host-package-load:` display prefix, and the exact accepted DICE identity;
+- expose terminal errors as an opaque `RootPackageLoadError` struct over a
+  private
+  `RootPackageLoadErrorInner`; preserve structural equality, cloning,
+  allocation accounting, messages, and the existing terminal variants;
+- reexport `slug_bzlmod_v2::SourcePreparationOutcome` as
+  `LoadingPreparationOutcome`; and
+- reexport `slug_bzlmod_v2::SourcePreparationNeeds` as
+  `LoadingPreparationNeeds`.
+
+The key value is exactly
+`LoadingPreparationOutcome<Arc<Result<LoadedPackage,
+RootPackageLoadError>>>`. The aliases preserve one shared root/bootstrap/path/
+repository Need representation through loading while keeping downstream query
+dependent only on `slug_loading_v2`. Do not export `HostBzlModuleEvalKey`,
+`HostRootBzlLabel`, Host source/load errors, the transactional attempt owner,
+or any bzlmod private package/file owner. Do not add a second loading outcome,
+convert Need to an error, or add a helper that computes in a fresh graph.
+
+This visibility packet changes no compute body, dependency edge, equality,
+validity, event batch, cycle family, parser mode, diagnostic text, or legacy
+key. The existing `Arc<Result<...>>`, private enum, immutable slices,
+`SmallMap`, and clone behavior remain the retained representation; add no
+interner, cache, retained standard collection, or additional allocation layer.
+No public caller is added yet. The following query Host-migration/typed-root
+work must construct `RootPackageLoadKey` directly inside its caller-owned
+`DiceComputations`, return `LoadingPreparationOutcome::Need` unchanged, and
+format `RootPackageLoadError` only after Complete.
+
+Implement next only
+`WP-5-m1-loading-typed-propagation` in:
+
+- `app/slug_loading_v2/src/bzl_module.rs`;
+- `app/slug_loading_v2/src/lib.rs`; and
+- `app/slug_loading_v2/src/host_package_load_tests.rs`.
+
+The focused tests must consume the root exports rather than private `super`
+names and preserve constructor identity, Complete structural equality, Need
+self-inequality/invalidity, local event ownership, and the retained lifecycle
+regression. Run those tests, the full loading crate only if production logic
+changes, direct `slug_query_v2` compile coverage, GNU-Windows no-run linkage,
+formatting, diff/archive status, and exact three-file/public-export/no-caller/
+Cargo/dependency/legacy/IO/blocking/JVM guards.
+
+Add no Cargo change, wrapper key, new DICE value, query/analysis/core/CLI/server
+caller, external repository support, directory-discovery migration, fixture,
+oracle, materialization, runtime driver, JVM, Java bytecode, or Bazel
+delegation. Stop if Rust requires changing the accepted key identity/value,
+exposing a nested private error, adding a fourth implementation file, or
+converting Need to an error.
