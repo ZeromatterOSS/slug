@@ -9524,3 +9524,26 @@ After acceptance, run only design packet
 `WP-5-m1-host-jvm-registry-byte-execution-feasibility`; no parser, transport,
 helper, DICE, directory IO, Host consumer, or activation follows directly from
 this oracle.
+
+### Host JVM startup/reuse oracle implementation
+
+Status: `ACCEPT` in `c67dc3a5` on 2026-07-27 after terminal latest-diff source
+and architecture reviews. The exact seven-path packet generated 22 Bazel 9.2
+rows with epochs `2/2/2/2/2/2/3/4`, the frozen CLI/RC diagnostics, exact raw
+query stdout, 94/91-byte SRIs, and five unchanged 1,228-byte lock manifests.
+Strict parsing, endpoint identity, Bazel-only cleanup, primary-error chaining,
+checked raw-BEP purge, and missing capture fields are covered by 82 focused
+harness tests.
+
+One pinned generation, two worker replays, and four root review replays passed
+from distinct absolute roots; the expected oracle remained
+`0583b4743eb8ffd3d8ca1fe1dc0a503f3942ae3035d3d55186a743b9d4bd5e21`.
+All three query shapes retained whole-workspace regular-file digest
+`ee968db4322ee3033a2127db0e3df2339d84aeb83d7fdac1c5785e7582f36849`.
+The packet is exactly +1,800 net lines including one two-line RC file, with
+fixture inventory 58 regular files, five links, and 1,845 lines; archive,
+credential, diff, and process gates passed. This is post-checkpoint oracle
+packet two after `22de3631`.
+
+Next packet: design only
+`WP-5-m1-host-jvm-registry-byte-execution-feasibility`.
