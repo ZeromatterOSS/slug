@@ -3055,3 +3055,29 @@ fn label_kind_matches_the_accepted_rule_capability_and_generated_file_rows() {
         );
     }
 }
+
+#[test]
+fn package_output_matches_the_three_accepted_bazel_rows() {
+    let workspace = fixture_workspace("query-loading-thin-vertical");
+    for (expression, expected) in [
+        (
+            "set(//nested/child:child //:root //app:app //nested:branch //app:via_alias)",
+            "\napp\nnested\nnested/child\n",
+        ),
+        ("deps(//app:app)", "app\nlib\nnested\nnested/child\n"),
+        ("loadfiles(//app:app)", "rules\n"),
+    ] {
+        let output = slug()
+            .current_dir(&workspace)
+            .args(["query", "--output=package", expression])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{expression}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(output.stderr.is_empty(), "{expression}: {output:?}");
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+    }
+}

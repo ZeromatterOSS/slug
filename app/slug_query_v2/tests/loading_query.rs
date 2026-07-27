@@ -3,6 +3,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 
 use dice::ActivationData;
@@ -40,11 +42,16 @@ use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
 
 fn scratch() -> PathBuf {
+    static NEXT_SCRATCH: AtomicU64 = AtomicU64::new(0);
     let nanos = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let root = std::env::temp_dir().join(format!("slug-query-v2-{nanos}"));
+    let serial = NEXT_SCRATCH.fetch_add(1, Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!(
+        "slug-query-v2-{}-{nanos}-{serial}",
+        std::process::id()
+    ));
     fs::create_dir_all(&root).unwrap();
     root
 }
@@ -1616,6 +1623,34 @@ async fn label_kind_formats_retained_structural_kinds_in_text_order() {
                 "{expression}, {order}"
             );
         }
+    }
+}
+
+#[tokio::test]
+async fn package_output_sorts_deduplicates_and_keeps_main_root_empty() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("BUILD.bazel"),
+        "filegroup(name = \"root\", srcs = [])\n",
+    );
+    write(
+        workspace.join("app/BUILD.bazel"),
+        "filegroup(name = \"one\", srcs = [])\nfilegroup(name = \"two\", srcs = [])\n",
+    );
+    write(
+        workspace.join("nested/BUILD.bazel"),
+        "filegroup(name = \"leaf\", srcs = [])\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+    let expression = "set(//nested:leaf //:root //app:two //app:one)";
+
+    for order in [QueryOrder::Auto, QueryOrder::Full] {
+        let output = evaluate_loading_query(&mut transaction, workspace.clone(), expression, order)
+            .await
+            .unwrap();
+        assert_eq!(output.package_stdout(), "\napp\nnested\n", "{order}");
     }
 }
 

@@ -66,6 +66,7 @@ pub fn run(argv: Vec<String>) -> i32 {
                     output.graph_stdout(request.graph_factored, request.order.is_full())
                 }
                 QueryOutputFormat::LabelKind => output.label_kind_stdout(),
+                QueryOutputFormat::Package => output.package_stdout(),
                 _ => unreachable!("query parser rejects deferred output formats"),
             };
             print!("{stdout}");

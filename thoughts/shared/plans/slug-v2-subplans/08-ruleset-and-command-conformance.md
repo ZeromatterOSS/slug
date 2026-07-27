@@ -2284,6 +2284,14 @@ suite, formatting, diff, archive, and daemon cleanup. Stop if formatting needs
 new graph state, external-repository loading, a DICE key, or any behavior
 beyond Bazel 9.2 `PackageOutputFormatter`.
 
+The package-output packet is accepted. Three generated Bazel rows, two
+fresh-root Bazel replays, and exact Slug replay prove root-package blank
+spelling, sorting/deduplication, dependency projection, and fake load-file
+packages. The direct four-crate suite passed 136 tests; formatting, diff,
+archive, daemon cleanup, exact allowlist, and preservation of all 12 prior
+rows passed. Independent review returned `ACCEPT`; external repositories remain
+outside this root-repository slice.
+
 ## `tests` / `visible` feasibility ranking accepted (2026-07-23)
 
 Bazel 9.2.0 `TestsFunction` is the smaller truthful residual query vertical.

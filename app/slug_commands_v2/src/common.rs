@@ -46,6 +46,7 @@ pub enum QueryOutputFormat {
     Graph,
     StreamedJsonProto,
     LabelKind,
+    Package,
     Build,
     Other(String),
 }
@@ -132,6 +133,7 @@ impl fmt::Display for QueryOutputFormat {
             Self::Graph => f.write_str("graph"),
             Self::StreamedJsonProto => f.write_str("streamed_jsonproto"),
             Self::LabelKind => f.write_str("label_kind"),
+            Self::Package => f.write_str("package"),
             Self::Build => f.write_str("build"),
             Self::Other(value) => f.write_str(value),
         }
@@ -334,6 +336,7 @@ pub(crate) fn output_format(flags: &[ParsedFlag]) -> QueryOutputFormat {
         "graph" => QueryOutputFormat::Graph,
         "streamed_jsonproto" => QueryOutputFormat::StreamedJsonProto,
         "label_kind" => QueryOutputFormat::LabelKind,
+        "package" => QueryOutputFormat::Package,
         "build" => QueryOutputFormat::Build,
         other => QueryOutputFormat::Other(other.to_owned()),
     }

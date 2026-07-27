@@ -94,6 +94,31 @@ impl QueryOutput {
         output
     }
 
+    /// Render Bazel's package output from the selected labels without
+    /// re-entering DICE. Main-repository package identifiers omit their `//`
+    /// prefix for backwards compatibility.
+    pub fn package_stdout(&self) -> String {
+        let mut packages = self
+            .labels
+            .iter()
+            .map(|label| {
+                let package = label
+                    .rsplit_once(':')
+                    .map_or(label.as_str(), |(package, _)| package);
+                package.strip_prefix("//").unwrap_or(package)
+            })
+            .collect::<Vec<_>>();
+        packages.sort_unstable();
+        packages.dedup();
+
+        let mut output = String::new();
+        for package in packages {
+            output.push_str(package);
+            output.push('\n');
+        }
+        output
+    }
+
     /// Render the selected graph retained by the evaluation that produced this
     /// output. Formatting never re-enters DICE or query evaluation.
     pub fn graph_stdout(&self, factored: bool, sort_labels: bool) -> String {

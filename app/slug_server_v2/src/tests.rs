@@ -373,6 +373,31 @@ fn retained_daemon_formats_graph_from_the_same_query_result_path() {
 }
 
 #[test]
+fn retained_daemon_matches_the_three_accepted_package_rows() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-loading-thin-vertical/workspace");
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    for (expression, expected) in [
+        (
+            "set(//nested/child:child //:root //app:app //nested:branch //app:via_alias)",
+            "\napp\nnested\nnested/child\n",
+        ),
+        ("deps(//app:app)", "app\nlib\nnested\nnested/child\n"),
+        ("loadfiles(//app:app)", "rules\n"),
+    ] {
+        for order in [QueryOrder::Auto, QueryOrder::Full] {
+            let result = daemon.query_with_output(expression, order, "package", true);
+            assert_eq!(result.exit_code, 0, "{expression}, {order}: {result:?}");
+            assert!(
+                result.stderr.is_empty(),
+                "{expression}, {order}: {result:?}"
+            );
+            assert_eq!(result.stdout, expected, "{expression}, {order}");
+        }
+    }
+}
+
+#[test]
 fn retained_daemon_matches_the_ten_accepted_label_kind_rows() {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/v2_oracle/fixtures");
     let rule_workspace = fixtures.join("query-executables-rule-capability/workspace");

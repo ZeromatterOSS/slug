@@ -314,14 +314,16 @@ fn query_request_parses_strict_test_suite_booleans_and_last_occurrence_wins() {
 }
 
 #[test]
-fn query_request_accepts_label_kind_and_rejects_other_deferred_output_modes_before_runtime() {
+fn query_request_accepts_label_kind_and_package_and_rejects_other_deferred_output_modes() {
     let label_kind = QueryRequest::parse(&["--output=label_kind", "//pkg:bin"]).unwrap();
     assert_eq!(label_kind.output, QueryOutputFormat::LabelKind);
+    let package = QueryRequest::parse(&["--output=package", "//pkg:bin"]).unwrap();
+    assert_eq!(package.output, QueryOutputFormat::Package);
 
     let output = QueryRequest::parse(&["--output=build", "//pkg:bin"])
         .unwrap_err()
         .to_string();
-    assert!(output.contains("only text, graph, and label_kind are implemented"));
+    assert!(output.contains("only text, graph, label_kind, and package are implemented"));
 
     for order in ["deps", "no"] {
         let error =
@@ -335,8 +337,8 @@ fn query_request_accepts_label_kind_and_rejects_other_deferred_output_modes_befo
 #[test]
 fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
     for (flag, expected) in [
-        ("--output", "expected text or graph"),
-        ("--output=", "expected text or graph"),
+        ("--output", "expected text, graph, label_kind, or package"),
+        ("--output=", "expected text, graph, label_kind, or package"),
         ("--order_output", "expected auto or full"),
         ("--order_output=", "expected auto or full"),
         ("--output_base", "expected a non-empty path"),

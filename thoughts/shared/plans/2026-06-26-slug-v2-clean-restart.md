@@ -26,7 +26,7 @@ and must name the same packet.
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | partial | Host loading observations and private glob traversal owner through this commit; full evidence is in the Stage 5 owner plan | private loading adapter and later callable activation; Host publication/retry, byte-aware ingress, native Windows ordering, BUILD/`.bzl` acquisition, registry transports, and discovery composition remain | pause while the bounded M3 Pattern contract is current |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
-| M3: `query` | **active** | 13/16 default functions plus text, graph, and `label_kind` output through `72aece4d`; full evidence is in the Stage 8 owner plan | bundled Pattern-functions contract `REPLAN`: filter/kind need a future exact Rust UTF-16 engine and attr also needs complete value-string projection; external repositories, pattern breadth, and remaining formats remain | `WP-8-m3-query-package-output` |
+| M3: `query` | **active** | 13/16 default functions plus text, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | bundled Pattern-functions contract `REPLAN`: filter/kind need a future exact Rust UTF-16 engine and attr also needs complete value-string projection; external repositories, pattern breadth, and remaining formats remain | `WP-8-m3-query-rank-output` |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-8-m3-query-package-output`.
+`WP-8-m3-query-rank-output`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

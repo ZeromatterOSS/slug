@@ -283,6 +283,7 @@ impl Daemon {
                     "text" => output.stdout(),
                     "graph" => output.graph_stdout(graph_factored, order.is_full()),
                     "label_kind" => output.label_kind_stdout(),
+                    "package" => output.package_stdout(),
                     other => {
                         return QueryResult::error(
                             2,

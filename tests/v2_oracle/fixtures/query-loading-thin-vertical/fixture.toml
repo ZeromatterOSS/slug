@@ -1,8 +1,8 @@
 [fixture]
 name = "query-loading-thin-vertical"
-description = "Bazel 9.2 root-repository unconfigured query oracle over filegroups, aliases, source files, custom-rule label deps, nested packages, and a dependency cycle."
+description = "Bazel 9.2 root-repository unconfigured query oracle over filegroups, aliases, source files, custom-rule label deps, nested packages, a dependency cycle, and package output."
 comparison = "message_shape"
-oracle_notes = "Root-only loading-query slice. The cycle is queried structurally, not built or analyzed. lib/missing_input.txt is intentionally absent but is addressable because filegroup.srcs names it. The fixture establishes Bazel's literal, :all, recursive-pattern, alias, source-file, custom-rule-dependency, set-operation, and missing-target/package behavior before Slug wiring."
+oracle_notes = "Root-only loading-query slice. The cycle is queried structurally, not built or analyzed. lib/missing_input.txt is intentionally absent but is addressable because filegroup.srcs names it. The fixture establishes Bazel's literal, :all, recursive-pattern, alias, source-file, custom-rule-dependency, set-operation, missing-target/package, and package-output behavior. Package rows prove main-root empty spelling, sorted deduplication, dependency projection, and fake load-file package identity."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -11,6 +11,7 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryEnvironment.java",
   "src/main/java/com/google/devtools/build/lib/query2/query/GraphlessBlazeQueryEnvironment.java",
   "src/main/java/com/google/devtools/build/lib/query2/engine/QueryEnvironment.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/PackageOutputFormatter.java",
   "src/main/java/com/google/devtools/build/lib/cmdline/TargetPattern.java",
   "src/main/java/com/google/devtools/build/lib/skyframe/TargetPatternFunction.java",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java",
@@ -78,6 +79,24 @@ name = "set_operations"
 argv = ["query", "deps(//app:app) except //lib:explicit.txt intersect //..."]
 expected_exit = 0
 stdout_patterns = ["\\A//app:app\\n//app:via_alias\\n//lib:leaf\\n//nested:branch\\Z"]
+
+[[commands]]
+name = "package_root_sorted_dedup"
+argv = ["query", "--output=package", "set(//nested/child:child //:root //app:app //nested:branch //app:via_alias)"]
+expected_exit = 0
+stdout_patterns = ["\\Aapp\\nnested\\nnested/child\\Z"]
+
+[[commands]]
+name = "package_deps"
+argv = ["query", "--output=package", "deps(//app:app)"]
+expected_exit = 0
+stdout_patterns = ["\\Aapp\\nlib\\nnested\\nnested/child\\Z"]
+
+[[commands]]
+name = "package_fake_load"
+argv = ["query", "--output=package", "loadfiles(//app:app)"]
+expected_exit = 0
+stdout_patterns = ["\\Arules\\Z"]
 
 [[commands]]
 name = "missing_target"

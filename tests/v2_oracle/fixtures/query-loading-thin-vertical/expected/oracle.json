@@ -233,6 +233,90 @@
     {
       "argv": [
         "query",
+        "--output=package",
+        "set(//nested/child:child //:root //app:app //nested:branch //app:via_alias)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=package",
+        "set(//nested/child:child //:root //app:app //nested:branch //app:via_alias)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "package_root_sorted_dedup",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "app\nnested\nnested/child",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: fd6b7886-3854-4e93-911d-45dbb025deba\nLoading: 0 packages loaded\n",
+      "stdout": "\napp\nnested\nnested/child\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=package",
+        "deps(//app:app)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=package",
+        "deps(//app:app)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "package_deps",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "app\nlib\nnested\nnested/child",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 901aa70b-ed03-4cd9-8454-545466537756\nLoading: 0 packages loaded\n",
+      "stdout": "app\nlib\nnested\nnested/child\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=package",
+        "loadfiles(//app:app)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=package",
+        "loadfiles(//app:app)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "package_fake_load",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "rules",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 2e9ff8bf-eef9-42fd-bcf2-ffc278d0ee64\nLoading: 0 packages loaded\n",
+      "stdout": "rules\n"
+    },
+    {
+      "argv": [
+        "query",
         "//lib:missing"
       ],
       "cwd": "<workspace>",
