@@ -10501,3 +10501,101 @@ and confined temporary Bazel probes. Do not edit or regenerate the harness,
 fixture, expectation, assets, Rust, Cargo, APIs, owners, consumers, or
 activation, and do not retry either the oracle or typed observation before
 terminal acceptance.
+
+### Host-dirent glob oracle semantic redesign
+
+Status: `ACCEPT` on 2026-07-27 after pinned Bazel 9.2 source review, isolated
+cold and same-daemon controls, a full corrected-core probe, and independent
+source/behavior, fixture/implementation, and architecture/orchestration
+terminal latest-text reviews. No harness, fixture, expectation, checked asset,
+Rust, Cargo, dependency, API, owner, consumer, or activation changed.
+
+The matching semantics remain source-exact. `glob` maps default
+`exclude_directories != 0` to `Operation.FILES` and
+`exclude_directories = 0` to `FILES_AND_DIRS`. A direct directory participates
+only in files-and-directories; a direct native-special/FIFO `UNKNOWN` entry is
+skipped by wildcard matching; a direct literal special participates; and a
+matched symlink to an existing nondirectory participates in both operations.
+`CompactSortedDirents` and `DirectoryListingStateValue` retain direct kind in
+semantic equality.
+
+The failed atomic replacement is an incremental visibility result, not an
+alternate membership rule. Cold controls with explicit `allow_empty = True`
+returned:
+
+- regular `state`: `state_all_state` and `state_files_state`;
+- directory `state`: only `state_all_state`;
+- direct FIFO `state`: no state target; and
+- symlink `state` to a FIFO: both state targets.
+
+One-daemon controls reproduced stale regular membership after an atomic
+regular-to-directory replacement even though the parent inode was stable and
+its nanosecond mtime/ctime changed. Creating and deleting a nonmatching sibling
+did not correct it. Querying the absent state between removal and addition did.
+A one-absent 12-row control then exposed the same staleness for atomic
+directory-to-symlink replacement. The final full control kept one Bazel
+PID/starttime `3982243/110904713` and exited 0 throughout with exact state
+sequence `regular 5 -> absent 3 -> directory 4 -> absent 3 -> symlink 5 ->
+FIFO 3 -> restored regular 5`. Atomic symlink-to-FIFO and FIFO-to-regular
+therefore need no additional split. Every confined server and temporary
+workspace/output base was removed.
+
+Revise the implementation contract as follows. Set `allow_empty = True`
+explicitly on all five generated-target glob calls. Four calls require it in
+some retained state; applying it to the always-nonempty links call makes the
+contract uniform and changes no membership.
+
+Keep the first four retained rows. Replace the seven appended rows with nine,
+for exactly thirteen total:
+
+1. `kind_baseline`: create FIFOs `pkg/specials/direct` and
+   `staging/special`; expect the five baseline targets;
+2. `kind_absent_after_regular`: rename `pkg/state` to `staging/file`; expect
+   exactly the three non-state targets;
+3. `kind_directory`: rename `staging/dir` to `pkg/state`; expect the three
+   non-state targets plus `state_all_state`;
+4. `kind_absent_after_directory`: rename `pkg/state` to
+   `staging/dir-used`; expect exactly the three non-state targets;
+5. `kind_symlink_to_special`: rename `staging/link` to `pkg/state`; expect
+   the five baseline targets;
+6. `kind_direct_fifo`: atomically rename `pkg/state` to
+   `staging/link-used` and `staging/special` to `pkg/state`; expect exactly the
+   three non-state targets;
+7. `kind_regular_restored`: atomically rename `pkg/state` to
+   `staging/special-used` and `staging/file` to `pkg/state`; expect the five
+   baseline targets;
+8. the corrected matched-cycle exit-7 row with empty stdout/manifest and only
+   the three stable ELOOP fragments; and
+9. the `.parked` rename plus exact recovery `//cycle_error:probe`.
+
+All thirteen commands must capture one equal nonzero server epoch. The two
+absent rows deliberately prove a reached removal followed by fresh
+classification; do not claim that Bazel rechecks an atomic same-name
+kind-only replacement. The typed observation implementation remains required
+for snapshot classification, direct-special omission, symlink resolution,
+directory inclusion/exclusion, and semantic kind equality. Its unit-level
+Complete-value and repository-revalidation evidence may prove kind inequality
+once an observation is recomputed, but neither it nor this oracle may cite
+atomic same-name replacement as an automatic command-level invalidation
+trigger.
+
+Every other accepted term remains: one existing fixture, POSIX-only FIFO
+harness extension, top-level BUILD comprehensions, four regular/six exact
+relative symlink assets, empty manifests, first-four pre-existing-field
+projection, corrected source anchors and ELOOP fragments, two distinct
+fresh-root replays, exact cleanup/provenance/growth/credential/archive/diff
+guards, and no Slug. The file allowlist is unchanged. Raise only the
+newline-counted regular-file fixture cap from 550 to 750 for the two added
+records; retain the packet-wide +900/-100 cap and exact four-regular/six-link
+asset count. This becomes post-checkpoint oracle packet three only after
+terminal acceptance.
+
+Stop on any output or epoch difference from the confirmed 13-row matrix,
+empty-glob error, any state target in an absent row, unexpected
+atomic-transition staleness, cycle/recovery drift, cap or allowlist failure,
+or scope expansion. Do not substitute a sibling signal, BUILD edit between
+commands, restart, weakened expectation, or another row without a reviewed
+replan.
+
+Next packet: implement only
+`WP-5-m1-loading-host-dirent-glob-oracle`.
