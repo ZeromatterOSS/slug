@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained runtime/loading spine; accepted Host root-module/loading-anchor owners, typed no-follow dirents, Bazel-internal string seam and exact oracles, Linux raw-name oracle through checkpoint `e2cc891d`, simple matcher oracle `9f42c3e5`, private Host segment-candidate owner `bd12c015`, public Host root-package boundary projection design, and exact six-state boundary oracle; retained bzlmod lockfile/registry/policy/Host evidence remains authoritative | implement the accepted public boundary projection before recursive traversal; nested `MODULE.bazel` without BUILD continues and no nested-repository detector is allowed; Host publication/retry, byte-aware ingress, native Windows/lone-surrogate ordering, regular-or-special BUILD/`.bzl` acquisition, remaining registry transports, and discovery composition remain | `WP-5-m1-loading-host-package-boundary-projection` |
+| M1: one semantic spine | partial | retained runtime/loading spine; accepted Host root-module/loading-anchor owners, typed no-follow dirents, Bazel-internal string seam and exact oracles, Linux raw-name oracle through checkpoint `e2cc891d`, simple matcher oracle `9f42c3e5`, private Host segment-candidate owner `bd12c015`, exact six-state boundary oracle `85ba4975`, and public Host boundary projection `ad6751ef`; retained bzlmod lockfile/registry/policy/Host evidence remains authoritative | design recursive Host traversal before implementation or consumer activation; nested `MODULE.bazel` without BUILD continues and no nested-repository detector is allowed; Host publication/retry, byte-aware ingress, native Windows/lone-surrogate ordering, regular-or-special BUILD/`.bzl` acquisition, remaining registry transports, and discovery composition remain | `WP-5-m1-loading-pure-host-glob-traversal-design` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; text, graph, and `label_kind` output; accepted `tests`, `labels`, `executables`, and `visible` metadata/activation evidence | `attr`, `filter`, and `kind` require an exact Java-compatible `Pattern`; external repositories, pattern breadth, and remaining output formats remain | pause M3 while the M1 boundary-oracle packet is current |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; text, graph, and `label_kind` output; accepted `tests`, `labels`, `executables`, and `visible` metadata/activation evidence | `attr`, `filter`, and `kind` require an exact Java-compatible `Pattern`; external repositories, pattern breadth, and remaining output formats remain | pause M3 while the M1 traversal-design packet is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,20 +33,19 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Implement only
-`WP-5-m1-loading-host-package-boundary-projection`.
+Design only
+`WP-5-m1-loading-pure-host-glob-traversal-design`.
 
-Add only `host_package_boundary/{mod.rs,tests.rs}` and the exact `lib.rs`
-module/re-exports under the accepted owner-plan contract, capped at
-+1,450/-20. Implement the root/main-repository
-`HostRootPackageBoundaryKey`, ignore-first four-kind opaque projection,
-selected-root accessor, typed error/Need propagation, complete-only
-equality/validity, and retained-DICE pruning/invalidation evidence. Run
-focused tests first, then bzlmod/loading/workspace, doctests, and GNU-Windows
-no-run linkage. Do not change Cargo/dependencies, private package or ignore
-owners, fixtures, loading consumers, parser/evaluator, entrypoints, or add a
-caller. After acceptance, add the already-authorized Stage 4 landed
-subsection; recursive traversal remains a later design.
+Compose the accepted private Host segment-candidate owner and public
+root-package boundary projection into an exact private traversal contract.
+Freeze Bazel 9.2 ownership and any missing oracle for multiple literal/simple
+star segments, standalone `**`, boundary pruning, operation filtering, final
+unique results/order, Need/error precedence, DICE identity/equality,
+invalidation/restoration, files/caps, platform boundary, and later consumer
+handoff before Rust or fixture edits. Keep regular-or-special BUILD/`.bzl`
+acquisition, parser byte ingress, transactional evaluator retry,
+include/exclude and `allow_empty` composition, callable diagnostics, public
+activation, and native-Windows/lone-surrogate parity separate.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of

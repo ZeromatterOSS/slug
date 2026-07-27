@@ -613,6 +613,46 @@ is unreachable, so no nested-repository state is required. Multi-segment and
 BUILD/`.bzl` acquisition, parser/evaluator retry, and consumer publication
 remain later packets.
 
+### Stage 4 public Host root-package boundary projection
+
+Status: Landed, public and dormant
+Source ref/commit(s): Bazel
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+`DirectoryDirentProducer`, `PackageLookupFunction`, `PackageLookupValue`,
+`IgnoredSubdirectoriesFunction`, and `LocalRepositoryLookupFunction`; Buck2
+baseline `088c75c7e36805df99c3de29062baa95db700b8b` only for the already
+approved shared immutable, `Dupe`, `Allocative`, and complete-only DICE
+patterns; V1 `e218054d4c796655939b968d90208b185decb352` loading/glob code
+rejected and retained as reference only
+V2 commit(s): boundary oracle `85ba4975`; implementation/evidence `ad6751ef`
+Source class: V2-owned Bazel-parity projection over retained private Host
+ignore and package-lookup owners; no Buck or V1 lookup, traversal, identity,
+consumer, or representation code imported
+Reusable primitive or lesson: one semantic workspace/package key,
+`PathOutcome<Arc<Result<...>>>`, opaque complete values, cheap shared clones,
+and key-specific activation/dependency evidence
+V2 wrapper/boundary: public dormant `HostRootPackageBoundaryKey` computes
+repository ignore first and exposes only ordinary/deleted continue,
+ignored/package stop, selected package-path root, and typed error/Need
+propagation. Marker basename, ignore match, invalid-name details, physical
+path, and private state remain opaque.
+Bazel oracle: exact pinned Bazel 9.2 six-state `glob-package-boundaries`
+fixture proves ordinary, deleted-BUILD, and nested-MODULE continuation plus
+actual-subpackage, ignored, and ignored-plus-deleted stops
+Validation: focused 7 twice; full bzlmod 210 units plus integrations, loading
+73, workspace 36, and all doctests; 20 GNU-Windows no-run executables; exact
+three-file +1,133/-0 scope/caps; formatting, archive, public-surface,
+dependency/caller, event, credential, process, and forbidden-surface guards;
+independent correction rereview `ACCEPT`
+Decision: retain only the approved compact value and DICE utility patterns
+from the Buck baseline. Reject V1 behavior/ownership. Keep the projection
+dormant until a separately reviewed private Host traversal composes it.
+Residual risk: multi-segment and standalone-`**` traversal, operation
+filtering, final deduplication, native-Windows byte ordering,
+regular-or-special BUILD/`.bzl` acquisition, parser/evaluator retry, and
+consumer publication remain later packets. Nested `MODULE.bazel` without
+BUILD continues and no incorrect-repository detector is authorized.
+
 ### Stage 6 depset/provider/rule context tests
 
 Status: Partially landed

@@ -11914,3 +11914,33 @@ checkpoint `e2cc891d`; this remains packet two and no growth review is due.
 No harness, other fixture, Rust, Cargo, DICE, Host/loading owner, parser,
 consumer, or Stage 9 changed. The next packet is exactly
 `WP-5-m1-loading-host-package-boundary-projection`.
+
+### Public Host root-package boundary projection implementation
+
+Status: **ACCEPT** in `ad6751ef` on 2026-07-27 after independent
+implementation review and focused correction rereview. The exact three-file
+implementation is +1,133/-0: `host_package_boundary/mod.rs` +278,
+`tests.rs` +850, and `lib.rs` +5. The public root/main-repository key retains
+only normalized workspace plus `PackagePath`, computes repository ignore
+first, exposes the four opaque boundary kinds and selected package root only,
+delegates typed private errors, and uses exact
+`PathOutcome<Arc<Result<...>>>` complete-only equality and validity. It has
+zero production callers, event data, direct IO, locks, new dependencies, or
+private-owner changes.
+
+Focused tests passed 7/7 in worker and root runs. The full Linux matrix passed
+210 bzlmod unit tests plus every integration binary, 73 loading tests, 36
+workspace tests, and all three zero-test doctest suites. Final GNU-Windows
+no-run linkage produced all 20 executables. Formatting, exact public surface,
+scope/per-file/aggregate caps, dependency/caller, archive, credential,
+process, and forbidden-surface guards passed.
+
+Review required one tests-only correction: exact activation evidence now
+proves ignored deleted, invalid, and marker-bearing candidates never activate
+the private package key or marker dependencies; the retained graph changes a
+marker-bearing package through deleted policy and restoration; and exact Need
+plus both opaque typed-error branches are discriminating. The accepted Buck2
+utility disposition retains only existing `Arc`, `Dupe`, `Allocative`,
+compact path, and DICE patterns; no Buck/V1 code or representation was
+extracted. Recursive composition remains unimplemented. The next packet is
+design only `WP-5-m1-loading-pure-host-glob-traversal-design`.
