@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, one-file Registry IO bridge owners, and focused registry-file vendor oracle; detailed packet evidence remains in the Stage 5 owner plan and routing log | production retry/publication activation remains gated on Host migrations and typed production roots; the private Host registry-file owner is not yet designed; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | design only `WP-5-m1-host-registry-file-owner-design` |
+| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, one-file Registry IO bridge owners, and focused registry-file vendor oracle; detailed packet evidence remains in the Stage 5 owner plan and routing log | production retry/publication activation remains gated on Host migrations and typed production roots; the private Host registry-file owner is blocked on a native-path local IO bridge correction; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | design only `WP-5-m1-host-registry-local-native-io-bridge-correction` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -117,18 +117,22 @@ The fixture is 22 files, zero links, and 1,340 lines; the full fixture tree is
 credential, host-path, scope, growth, and diff gates passed, and all three
 terminal latest-diff reviews returned `ACCEPT`.
 
+The Host registry-file owner pre-implementation audit ended in `REPLAN`
+before Rust. The accepted local bridge ignores its native path argument and
+the runtime URL-only capability re-derives local paths without exact decoding,
+so Host resolution cannot yet control encoded, non-UTF-8, or Windows local
+registry reads. No Rust or fixture changed.
+
 ### Current packet
 
-Design only `WP-5-m1-host-registry-file-owner-design`.
+Design only `WP-5-m1-host-registry-local-native-io-bridge-correction`.
 
-Freeze only the separate private Host registry-file owner from Stage 5 step
-7. It consumes the accepted pure descriptor then the Registry IO bridge,
-propagates visible and local root/path Needs without turning them into errors,
-retains the required redundant local root edge, and keeps construction, root,
-local, remote, vendor-path, vendor-file, and checksum failures typed and
-distinct. Design exact retained-DICE evidence and a bounded private file/test
-allowlist. Do not edit Rust, fixtures, Cargo, dependencies, public APIs,
-consumers, or activation during this packet.
+Freeze only the smallest native-path addition to the registry IO capability
+and its exact implementation/test closure. Preserve the existing remote URL
+method, all legacy callers and results, exact local success versus
+absence/read-failure generation ordering, and every production consumer.
+Do not implement the correction, owner, consumer, or activation during this
+design packet.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

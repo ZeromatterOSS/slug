@@ -7800,6 +7800,39 @@ terminal latest-diff review. Do not edit the server, harness, existing
 registry bytes, Rust, Cargo, dependencies, APIs, DICE, consumers, or
 activation.
 
+### Stage 5 Host registry-file owner pre-implementation audit
+
+Status: `REPLAN` before Rust on 2026-07-26.
+
+Pinned Bazel 9.2 and the live accepted seams confirm that the private owner
+must compute `HostRegistryFunctionKey` first, preserve every descriptor/root/
+path Need, keep the redundant local `HostRootModuleFileKey` edge, resolve a
+checksum expectation before vendor work, select vendor bytes only for a
+recorded SHA, fall back for missing/wrong-kind vendor candidates, and keep a
+selected vendor read/checksum failure fatal. The owner remains DICE-owned;
+a proposed non-DICE vendor capability was rejected because it would hide
+create/edit/delete/restoration transitions and could not propagate path
+Needs.
+
+The live bridge exposes a prerequisite blocker. `read_local_registry_file`
+accepts a native `path` but uses it only in diagnostics; the required
+`RegistryIo` capability remains URL-only, and the production implementation
+re-derives a path by stripping `file://` without Java-compatible decoding.
+Consequently Host resolution cannot control the bytes read, and exact encoded,
+non-UTF-8, or Windows native paths cannot be claimed. The honest implementation
+closure would otherwise force the file owner to change the bridge trait,
+runtime implementation, and two external test implementations in the same
+packet.
+
+No Rust, fixture, Cargo, dependency, API, DICE, consumer, or activation
+changed. Next packet: design only
+`WP-5-m1-host-registry-local-native-io-bridge-correction`. Freeze the smallest
+native-path capability addition and exact closure while preserving the remote
+URL method, every legacy caller/result/error, local generation ordering, and
+public API shape as far as the required trait method permits. Only after that
+correction is accepted and implemented may the five-file private Host
+registry-file owner be redesigned.
+
 #### Host registry-file vendor oracle implementation status
 
 Status: `ACCEPT` after terminal latest-diff review on 2026-07-26.
