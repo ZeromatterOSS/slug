@@ -30,8 +30,10 @@ use crate::codemap::FileSpan;
 use crate::codemap::Pos;
 use crate::codemap::Span;
 use crate::codemap::Spanned;
+use crate::dialect::StringEncoding;
 use crate::eval_exception::EvalException;
 use crate::lexer::Lexer;
+use crate::lexer::LexerStringEncoding;
 use crate::lexer::Token;
 use crate::syntax::AstLoad;
 use crate::syntax::Dialect;
@@ -226,6 +228,74 @@ impl AstModule {
             },
             lexer.filter(|token| match token {
                 // Filter out comment tokens and accumulate lint suppressions
+                Ok((start, Token::Comment(comment), end)) => {
+                    lint_suppressions_builder.parse_comment(&codemap, comment, *start, *end);
+                    in_comment_block = true;
+                    false
+                }
+                _ => {
+                    if in_comment_block {
+                        lint_suppressions_builder.end_of_comment_block(&codemap);
+                        in_comment_block = false;
+                    }
+                    true
+                }
+            }),
+        ) {
+            Ok(v) => {
+                if let Some(err) = errors.into_iter().next() {
+                    return Err(err.into_error());
+                }
+                Ok(AstModule::create(
+                    codemap,
+                    v,
+                    dialect,
+                    typecheck,
+                    lint_suppressions_builder.build(),
+                )?)
+            }
+            Err(p) => Err(parse_error_add_span(p, codemap.source().len(), &codemap)),
+        }
+    }
+
+    /// Parse a module with an explicit representation for ordinary string literals.
+    ///
+    /// [`StringEncoding::BazelInternal`] is a dormant compatibility seam for callers
+    /// that need Bazel's byte carrier. The default [`parse`](AstModule::parse) behavior
+    /// remains Unicode.
+    pub fn parse_with_string_encoding(
+        filename: &str,
+        content: String,
+        dialect: &Dialect,
+        string_encoding: StringEncoding,
+    ) -> crate::Result<Self> {
+        let typecheck = content.contains("@starlark-rust: typecheck");
+        let (codemap, lexer_string_encoding) = match string_encoding {
+            StringEncoding::Unicode => (
+                CodeMap::new(filename.to_owned(), content),
+                LexerStringEncoding::Unicode,
+            ),
+            StringEncoding::BazelInternal => (
+                CodeMap::new_with_byte_column_reporting(filename.to_owned(), content),
+                LexerStringEncoding::BazelInternal,
+            ),
+        };
+        let lexer = Lexer::new_with_string_encoding(
+            codemap.source(),
+            dialect,
+            codemap.dupe(),
+            lexer_string_encoding,
+        );
+        let mut lint_suppressions_builder = LintSuppressionsBuilder::new();
+        let mut in_comment_block = false;
+        let mut errors = Vec::new();
+        match StarlarkParser::new().parse(
+            &mut ParserState {
+                codemap: &codemap,
+                dialect,
+                errors: &mut errors,
+            },
+            lexer.filter(|token| match token {
                 Ok((start, Token::Comment(comment), end)) => {
                     lint_suppressions_builder.parse_comment(&codemap, comment, *start, *end);
                     in_comment_block = true;

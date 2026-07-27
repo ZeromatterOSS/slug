@@ -19,6 +19,7 @@
 
 pub use starlark_syntax::dialect::Dialect;
 pub use starlark_syntax::dialect::DialectTypes;
+pub use starlark_syntax::dialect::StringEncoding;
 pub use starlark_syntax::syntax::AstLoad;
 pub use starlark_syntax::syntax::AstModule;
 pub use starlark_syntax::syntax::ast;

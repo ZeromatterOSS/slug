@@ -275,6 +275,111 @@ fn test_string_escape() {
     );
 }
 
+fn string_tokens(
+    program: &str,
+    string_encoding: crate::lexer::LexerStringEncoding,
+) -> Result<Vec<String>, crate::Error> {
+    let codemap = match string_encoding {
+        crate::lexer::LexerStringEncoding::Unicode => {
+            CodeMap::new("strings.bzl".to_owned(), program.to_owned())
+        }
+        crate::lexer::LexerStringEncoding::BazelInternal => {
+            CodeMap::new_with_byte_column_reporting("strings.bzl".to_owned(), program.to_owned())
+        }
+    };
+    Lexer::new_with_string_encoding(program, &Dialect::Standard, codemap, string_encoding)
+        .filter_map(|token| match token {
+            Ok((_, Token::String(value), _)) => Some(Ok(value)),
+            Ok(_) => None,
+            Err(error) => Some(Err(error.into_error())),
+        })
+        .collect()
+}
+
+#[test]
+fn test_bazel_internal_string_literals() {
+    let program = r#""é" '\303\251' r"\303\251" """😀""" "\0" "\377" "\3777" "\378""#;
+
+    assert_eq!(
+        string_tokens(program, crate::lexer::LexerStringEncoding::BazelInternal).unwrap(),
+        [
+            "\u{c3}\u{a9}",
+            "\u{c3}\u{a9}",
+            "\\303\\251",
+            "\u{f0}\u{9f}\u{98}\u{80}",
+            "\0",
+            "\u{ff}",
+            "\u{ff}7",
+            "\u{1f}8",
+        ]
+    );
+    assert_eq!(
+        string_tokens(
+            r#""é" "\351" "\x41" "\u00e9" "\U0001f600" "\q""#,
+            crate::lexer::LexerStringEncoding::Unicode,
+        )
+        .unwrap(),
+        ["é", "é", "A", "é", "😀", "\\q"]
+    );
+}
+
+#[test]
+fn test_bazel_internal_string_escape_errors() {
+    let cases = [
+        (
+            r#"filegroup(
+    name = "bad",
+    tags = ["\400"],
+)"#,
+            "octal escape sequence out of range (maximum is \\377)",
+            "3:17",
+        ),
+        (
+            r#"filegroup(
+    name = "bad",
+    tags = ["\x41"],
+)"#,
+            "invalid escape sequence: \\x. Use '\\\\' to insert '\\'.",
+            "3:15",
+        ),
+        (
+            r#"filegroup(
+    name = "bad",
+    tags = ["\u00e9"],
+)"#,
+            "invalid escape sequence: \\u. Use '\\\\' to insert '\\'.",
+            "3:15",
+        ),
+        (
+            r#"filegroup(
+    name = "bad",
+    tags = ["\U0001f600"],
+)"#,
+            "invalid escape sequence: \\U. Use '\\\\' to insert '\\'.",
+            "3:15",
+        ),
+        (
+            r#"filegroup(
+    name = "bad",
+    tags = ["\q"],
+)"#,
+            "invalid escape sequence: \\q. Use '\\\\' to insert '\\'.",
+            "3:15",
+        ),
+    ];
+
+    for (program, message, location) in cases {
+        let error =
+            string_tokens(program, crate::lexer::LexerStringEncoding::BazelInternal).unwrap_err();
+        assert_eq!(error.without_diagnostic().to_string(), message);
+        let span = error.span().unwrap();
+        assert_eq!(
+            span.file.resolve_span_for_reporting(span.span).to_string(),
+            location
+        );
+    }
+}
+
 #[test]
 fn test_simple_example() {
     lexer_golden_test(

@@ -68,6 +68,12 @@ impl From<LexemeError> for crate::error::Error {
 type LexemeT<T> = Result<(usize, T, usize), EvalException>;
 type Lexeme = LexemeT<Token>;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum LexerStringEncoding {
+    Unicode,
+    BazelInternal,
+}
+
 fn map_lexeme_t<T1, T2>(lexeme: LexemeT<T1>, f: impl FnOnce(T1) -> T2) -> LexemeT<T2> {
     lexeme.map(|(l, t, r)| (l, f(t), r))
 }
@@ -81,6 +87,7 @@ pub struct Lexer<'a> {
     buffer: VecDeque<Lexeme>,
     parens: isize, // Number of parens we have seen
     lexer: logos::Lexer<'a, Token>,
+    string_encoding: LexerStringEncoding,
     done: bool,
 }
 
@@ -94,6 +101,7 @@ impl<'a> Lexer<'a> {
             buffer: VecDeque::with_capacity(10),
             lexer,
             parens: 0,
+            string_encoding: LexerStringEncoding::Unicode,
             done: false,
         };
         if let Err(e) = lexer2.calculate_indent() {
@@ -102,8 +110,31 @@ impl<'a> Lexer<'a> {
         lexer2
     }
 
+    pub(crate) fn new_with_string_encoding(
+        input: &'a str,
+        dialect: &Dialect,
+        codemap: CodeMap,
+        string_encoding: LexerStringEncoding,
+    ) -> Self {
+        let mut lexer = Self::new(input, dialect, codemap);
+        lexer.string_encoding = string_encoding;
+        lexer
+    }
+
     fn err_pos<T>(&self, msg: LexemeError, pos: usize) -> Result<T, EvalException> {
         self.err_span(msg, pos, pos)
+    }
+
+    fn bazel_string_err_pos<T>(
+        &self,
+        message: impl Display,
+        pos: usize,
+    ) -> Result<T, EvalException> {
+        Err(EvalException::parser_error(
+            message,
+            Span::new(Pos::new(pos as u32), Pos::new(pos as u32)),
+            &self.codemap,
+        ))
     }
 
     fn err_span<T>(&self, msg: LexemeError, start: usize, end: usize) -> Result<T, EvalException> {
@@ -432,6 +463,121 @@ impl<'a> Lexer<'a> {
         )
     }
 
+    /// Parse a string into Bazel's internal byte carrier.
+    ///
+    /// This loop is deliberately byte-indexed: each UTF-8 source byte becomes
+    /// one scalar in U+0000..=U+00ff, while token spans continue to address the
+    /// original source.
+    fn string_bazel(&mut self, quote: u8, raw: bool) -> LexemeT<(String, usize)> {
+        let string_start = self.lexer.span().start;
+        let string_end = self.lexer.span().end;
+        let bytes = self.lexer.remainder().as_bytes();
+        let triple = bytes.starts_with(&[quote, quote]);
+        let contents_start = if triple { 2 } else { 0 };
+        let mut pos = contents_start;
+        let mut res = String::with_capacity(bytes.len());
+
+        while pos < bytes.len() {
+            let byte = bytes[pos];
+
+            if byte == quote {
+                if !triple {
+                    pos += 1;
+                    self.lexer.bump(pos);
+                    return Ok((string_start, (res, contents_start), string_end + pos));
+                }
+                if bytes[pos..].starts_with(&[quote, quote, quote]) {
+                    pos += 3;
+                    self.lexer.bump(pos);
+                    return Ok((string_start, (res, contents_start), string_end + pos));
+                }
+                res.push(char::from(byte));
+                pos += 1;
+                continue;
+            }
+
+            if byte == b'\n' && !triple {
+                return self.err_span(
+                    LexemeError::UnfinishedStringLiteral,
+                    string_start,
+                    string_end + pos,
+                );
+            }
+
+            if byte != b'\\' {
+                res.push(char::from(byte));
+                pos += 1;
+                continue;
+            }
+
+            if pos + 1 == bytes.len() {
+                break;
+            }
+
+            if raw {
+                res.push('\\');
+                res.push(char::from(bytes[pos + 1]));
+                pos += 2;
+                continue;
+            }
+
+            let escaped_pos = pos + 1;
+            let escaped = bytes[escaped_pos];
+            match escaped {
+                b'n' => res.push('\n'),
+                b'r' => res.push('\r'),
+                b't' => res.push('\t'),
+                b'a' => res.push('\x07'),
+                b'b' => res.push('\x08'),
+                b'f' => res.push('\x0c'),
+                b'v' => res.push('\x0b'),
+                b'\n' => {}
+                b'\r' if bytes.get(escaped_pos + 1) == Some(&b'\n') => {
+                    pos += 1;
+                }
+                b'0'..=b'7' => {
+                    let mut value = 0u16;
+                    let mut digits = 0;
+                    while digits < 3 {
+                        let Some(digit) = bytes.get(escaped_pos + digits).copied() else {
+                            break;
+                        };
+                        if !(b'0'..=b'7').contains(&digit) {
+                            break;
+                        }
+                        value = value * 8 + u16::from(digit - b'0');
+                        digits += 1;
+                    }
+                    if value > u16::from(u8::MAX) {
+                        return self.bazel_string_err_pos(
+                            "octal escape sequence out of range (maximum is \\377)",
+                            string_end + escaped_pos + digits - 1,
+                        );
+                    }
+                    res.push(char::from(value as u8));
+                    pos += digits - 1;
+                }
+                b'"' | b'\'' | b'\\' => res.push(char::from(escaped)),
+                _ => {
+                    return self.bazel_string_err_pos(
+                        format_args!(
+                            "invalid escape sequence: \\{}. Use '\\\\' to insert '\\'.",
+                            char::from(escaped)
+                        ),
+                        string_end + escaped_pos,
+                    );
+                }
+            }
+            pos += 2;
+        }
+
+        self.err_span(
+            LexemeError::UnfinishedStringLiteral,
+            string_start,
+            string_end + pos,
+        )
+    }
+
     fn int(&self, s: &str, radix: u32) -> Lexeme {
         let span = self.lexer.span();
         match TokenInt::from_str_radix(s, radix) {
@@ -507,13 +653,29 @@ impl<'a> Lexer<'a> {
                                 Token::Int(..) => unreachable!("Lexer does not produce Int tokens"),
                                 Token::RawDoubleQuote => {
                                     let raw = self.lexer.span().len() == 2;
-                                    self.parse_double_quoted_string(raw).map(|lex| {
+                                    let lex = match self.string_encoding {
+                                        LexerStringEncoding::Unicode => {
+                                            self.parse_double_quoted_string(raw)
+                                        }
+                                        LexerStringEncoding::BazelInternal => {
+                                            Some(self.string_bazel(b'"', raw))
+                                        }
+                                    };
+                                    lex.map(|lex| {
                                         map_lexeme_t(lex, |(s, _offset)| Token::String(s))
                                     })
                                 }
                                 Token::RawSingleQuote => {
                                     let raw = self.lexer.span().len() == 2;
-                                    self.parse_single_quoted_string(raw).map(|lex| {
+                                    let lex = match self.string_encoding {
+                                        LexerStringEncoding::Unicode => {
+                                            self.parse_single_quoted_string(raw)
+                                        }
+                                        LexerStringEncoding::BazelInternal => {
+                                            Some(self.string_bazel(b'\'', raw))
+                                        }
+                                    };
+                                    lex.map(|lex| {
                                         map_lexeme_t(lex, |(s, _offset)| Token::String(s))
                                     })
                                 }

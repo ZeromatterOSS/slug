@@ -17,6 +17,18 @@
 
 use dupe::Dupe;
 
+/// How ordinary string literals are represented by the parser.
+#[derive(Debug, Clone, Copy, Dupe, Eq, PartialEq, Hash)]
+pub enum StringEncoding {
+    /// Preserve starlark-rust's standard Unicode string behavior.
+    Unicode,
+    /// Represent each source UTF-8 byte and octal escape as one U+0000..U+00ff scalar.
+    ///
+    /// This matches Bazel's internal ordinary BUILD and `.bzl` string carrier. It does not
+    /// provide non-UTF-8 source-file ingestion or adapt strings entering from native values.
+    BazelInternal,
+}
+
 /// How to handle type annotations in Starlark.
 ///
 /// If you are enabling types, you will often want to use

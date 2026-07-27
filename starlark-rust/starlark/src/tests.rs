@@ -16,6 +16,7 @@
  */
 
 mod basic;
+mod bazel_internal_string;
 mod bc;
 mod before_stmt;
 mod call;

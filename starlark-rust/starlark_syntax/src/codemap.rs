@@ -251,6 +251,8 @@ struct CodeMapData {
     source: String,
     /// Byte positions of line beginnings.
     lines: Vec<Pos>,
+    /// Column convention used only by the explicit reporting resolver.
+    byte_column_reporting: bool,
 }
 
 /// "Codemap" for `.rs` files.
@@ -319,6 +321,19 @@ impl CodeMap {
             filename,
             source,
             lines,
+            byte_column_reporting: false,
+        })))
+    }
+
+    pub(crate) fn new_with_byte_column_reporting(filename: String, source: String) -> CodeMap {
+        let mut lines = vec![Pos(0)];
+        lines.extend(source.match_indices('\n').map(|(p, _)| Pos(p as u32 + 1)));
+
+        CodeMap(CodeMapImpl::Real(Arc::new(CodeMapData {
+            filename,
+            source,
+            lines,
+            byte_column_reporting: true,
         })))
     }
 
@@ -460,6 +475,25 @@ impl CodeMap {
         ResolvedSpan::from_span(begin, end)
     }
 
+    /// Resolve a span using this file's explicit reporting convention.
+    ///
+    /// Ordinary codemaps use Unicode-scalar columns, exactly like [`resolve_span`](Self::resolve_span).
+    /// Opt-in Bazel-internal codemaps use byte columns. Diagnostic and caret rendering deliberately
+    /// continue to call `resolve_span`, so byte columns cannot be mistaken for character indexes.
+    pub fn resolve_span_for_reporting(&self, span: Span) -> ResolvedSpan {
+        let resolve = |pos| match &self.0 {
+            CodeMapImpl::Real(data) if data.byte_column_reporting => {
+                let line = self.find_line(pos);
+                ResolvedPos {
+                    line,
+                    column: (pos.0 - data.lines[line].0) as usize,
+                }
+            }
+            _ => self.find_line_col(pos),
+        };
+        ResolvedSpan::from_span(resolve(span.begin), resolve(span.end))
+    }
+
     /// Gets the source text of a line.
     ///
     /// The string returned does not include the terminating \r or \n characters.
@@ -567,6 +601,11 @@ impl<'a> FileSpanRef<'a> {
         self.file.resolve_span(self.span)
     }
 
+    /// Resolve using the file's explicit reporting convention.
+    pub fn resolve_span_for_reporting(&self) -> ResolvedSpan {
+        self.file.resolve_span_for_reporting(self.span)
+    }
+
     /// Resolve the span.
     pub fn source_span(self) -> &'a str {
         self.file.source_span(self.span)
@@ -602,6 +641,11 @@ impl FileSpan {
     /// Resolve the span to lines and columns.
     pub fn resolve_span(&self) -> ResolvedSpan {
         self.as_ref().resolve_span()
+    }
+
+    /// Resolve using the file's explicit reporting convention.
+    pub fn resolve_span_for_reporting(&self) -> ResolvedSpan {
+        self.as_ref().resolve_span_for_reporting()
     }
 
     /// Resolve the span to lines and columns.
