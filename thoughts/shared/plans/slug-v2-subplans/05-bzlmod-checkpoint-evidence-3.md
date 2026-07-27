@@ -9547,3 +9547,96 @@ packet two after `22de3631`.
 
 Next packet: design only
 `WP-5-m1-host-jvm-registry-byte-execution-feasibility`.
+
+### Host JVM registry-byte execution feasibility
+
+Status: `REPLAN` on 2026-07-27 after independent pinned-source,
+native-observation/live-seam, and architecture reviews. No non-plan repository
+file, fixture, parser, helper, transport, Rust, Cargo, dependency, API, DICE
+key, directory bridge, Host consumer, or activation changed during the audit.
+`/tmp/slug-jvm-feasibility` retains probe sources, compiled classes/JARs,
+observations, and Bazel output-base artifacts; terminal scan found no Bazel,
+slugd, helper, or charset-probe process.
+
+No bounded Slug-owned standalone executor found can reproduce local-registry
+directory bytes over Bazel 9.2's complete accepted JVM surface. The decisive
+counterexample is an explicit `--server_javabase`: pinned
+`startup_options.cc:458-505,538-595` gives that path first priority, accepts an
+executable/readable `bin/java`, and Bazel's own
+`src/test/shell/integration/bazel_java_test.sh:28-49` uses a shell launcher. A
+compatible wrapper can branch on the exact Bazel JAR/main argv, alter the
+registry directory only for that invocation, and then exec Java. Bazel
+succeeds with changed bytes while a helper-main invocation differs. Supplying
+the exact suffix launches the original Bazel command, which is delegation
+rather than a Slug-owned byte executor.
+
+Arbitrary `host_jvm_args` independently close the boundary.
+`blaze.cc:360-465` appends user JVM options after fixed defaults; pinned
+OpenJDK
+`arguments.cpp:2136-2344`,
+`InvocationAdapter.c:134-289,359-365,600-617`, and
+`libjli/java.c:319-330,1789-1840` load Java/native agents, run `premain`, add
+agent JARs to the system classpath, and expose launcher-selected
+`sun.java.command`. A live Bazel-valid agent observed the Bazel server JAR,
+main, classpath, and Bazel classes, while the same JDK/agent under a helper
+observed the helper main/classpath and no Bazel class. Such an agent can then
+transform `FileURLConnection` or collation. `--extra_classpath` and SPI
+providers, argument files, native agents, patched/minimized or explicit JDKs,
+and same-path artifact mutation are executable process state, not a finite
+property projection.
+
+The full parity predicate includes exact launch success/failure stage and
+diagnostics; ordered launch argv and sanitized environment; main, JAR,
+classpath, modules, resources, agents, native loader, working directory, and
+lifetime; registry bytes/errors across launch, reuse, mutation, and restart;
+and both Bazel-valid acceptance and Bazel-invalid rejection. A single
+Bazel-success/candidate difference is terminal `REPLAN`. Canonical reuse in
+`blaze.cc:978-1122` compares nonvolatile argv strings as an
+occurrence-counted, order-insensitive multiset; it does not hash wrapper,
+agent, provider, argfile, or JDK contents, so same-path mutation does not
+itself restart or replace the executor. Its effects depend on when that
+executor reads the path; another canonical mismatch kills it.
+
+Live Slug cannot host such an executor today. Its CLI retains only
+`--output_base`; daemon discovery trusts Unix-socket reachability; startup
+unlinks the socket and writes an unauthenticated PID before readiness; the
+protocol has no output-base lock, Status, cookie, nonce, start token, or
+shutdown completion; one `WorkspaceRuntime`/DICE graph and Registry IO
+capability live for the daemon; local Registry IO calls `tokio::fs::read` and
+errors on directories; and the dormant Host file owner rejects a directory.
+The Linux host has only GNU-Windows cross artifacts, not native Windows/Wine
+execution. Direct JDK 25 probes confirmed `COMPAT`, invalid-file-encoding
+fallback, and platform-owned native/JNU encoding, but native Windows
+portable/empty/lone-surrogate evidence remains unavailable and cannot repair
+the process-identity contradiction.
+
+Explicit javabases plus Java and native agents are trusted local
+arbitrary-code inputs. Any future authenticated transport must prevent their
+remote injection, and the executor may receive neither extra Slug
+credentials/capabilities nor a restrictive sandbox that changes behavior
+Bazel permits. The former is a security superset and the latter a parity
+subset.
+
+Any future feasibility retry must present one Slug-owned mechanism that
+defeats the explicit-javabase and agent counterexamples across the entire
+success/failure domain without filtering, fallback, sandbox subset, or hidden
+Bazel delegation. Only then may the sequence proceed through real-Windows
+byte/transport evidence; a dormant full startup parser retaining request
+diagnostics, ordered launch state, last-wins scalars, canonical reuse identity,
+and sanitized environment; authenticated locked output-base lifecycle;
+daemon-lifetime executor plus graph-construction semantic input; DICE-owned
+external-directory observation; dormant Host ownership; and one atomic
+daemon/one-shot/Host-consumer activation. None of those implementation
+packets is authorized under this `REPLAN`.
+
+Next packet: design only `WP-5-m1-loading-typed-propagation-design`. It is
+independent of registry-directory JVM execution: preserve typed root
+`SourcePreparationOutcome` and Host `PathOutcome` through `slug_loading_v2`,
+migrate root file/listing reads from eager snapshots, retain current
+external-repository guards, and freeze the exact allowlist plus lifecycle,
+equal-Need, and event-suppression tests before Rust. No fixture-growth
+checkpoint is due: accepted post-`22de3631` packets
+`WP-5-m1-host-registry-local-directory-collation-charset-oracle` and
+`WP-5-m1-host-jvm-registry-startup-reuse-oracle` total +4 regular files, +3
+links, and +1,065 text lines, below all five-packet/+100-file/+10,000-line
+triggers, and the selected loading design adds no fixture.
