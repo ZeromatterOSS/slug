@@ -13,7 +13,8 @@ use slug_commands_v2::QueryOutputFormat;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::query::QueryRequest;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::evaluate_workspace_query_with_policy_and_bzlmod_inputs;
+use slug_core_v2::runtime::QueryOutputCompletion;
+use slug_core_v2::runtime::evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion;
 
 pub fn run(argv: Vec<String>) -> i32 {
     let request = match QueryRequest::parse(&argv) {
@@ -42,7 +43,12 @@ pub fn run(argv: Vec<String>) -> i32 {
         Ok(workspace) => workspace,
         Err(error) => return emit_error(7, &error.to_string(), "one-shot"),
     };
-    match evaluate_workspace_query_with_policy_and_bzlmod_inputs(
+    let completion = if request.output == QueryOutputFormat::LabelKind {
+        QueryOutputCompletion::LabelKind
+    } else {
+        QueryOutputCompletion::Standard
+    };
+    match evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion(
         &workspace,
         &request.expression,
         request.order,
@@ -51,6 +57,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         environment_policy,
         request.lockfile_mode,
         &request.registry_urls,
+        completion,
     ) {
         Ok(output) => {
             let stdout = match request.output {
@@ -58,6 +65,7 @@ pub fn run(argv: Vec<String>) -> i32 {
                 QueryOutputFormat::Graph => {
                     output.graph_stdout(request.graph_factored, request.order.is_full())
                 }
+                QueryOutputFormat::LabelKind => output.label_kind_stdout(),
                 _ => unreachable!("query parser rejects deferred output formats"),
             };
             print!("{stdout}");

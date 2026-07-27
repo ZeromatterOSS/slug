@@ -31,6 +31,7 @@ pub use dice::evaluate_workspace_targets;
 pub use dice::evaluate_workspace_targets_with_bzlmod_inputs;
 pub use dice::observe_workspace;
 pub use dice::observe_workspace_files;
+pub use slug_query_v2::QueryOutputCompletion;
 
 /// One-shot convenience that enters the identical retained-runtime query
 /// method used by the daemon.
@@ -77,11 +78,35 @@ pub fn evaluate_workspace_query_with_policy_and_bzlmod_inputs(
     lockfile_mode: slug_bzlmod_v2::LockfileMode,
     registry_urls: &[String],
 ) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
+    evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion(
+        workspace,
+        expression,
+        order,
+        policy,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+        slug_query_v2::QueryOutputCompletion::Standard,
+    )
+}
+
+pub fn evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion(
+    workspace: &std::path::Path,
+    expression: &str,
+    order: slug_query_v2::QueryOrder,
+    policy: slug_query_v2::QueryPolicy,
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+    completion: slug_query_v2::QueryOutputCompletion,
+) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
     let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
     let observations = observe_workspace(workspace)
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
-    runtime.query_observations_with_policy_and_bzlmod_inputs(
+    runtime.query_observations_with_policy_and_bzlmod_inputs_and_output_completion(
         observations,
         expression,
         order,
@@ -90,6 +115,7 @@ pub fn evaluate_workspace_query_with_policy_and_bzlmod_inputs(
         environment_policy,
         lockfile_mode,
         registry_urls,
+        completion,
     )
 }
 

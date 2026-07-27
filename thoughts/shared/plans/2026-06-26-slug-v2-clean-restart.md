@@ -22,9 +22,9 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained runtime/loading spine; accepted Host root-module/loading-anchor owners, typed no-follow dirents, Bazel-internal string seam and exact oracles, Linux raw-name oracle through checkpoint `e2cc891d`, simple matcher oracle `9f42c3e5`, private Host segment-candidate owner `bd12c015`, and public Host root-package boundary projection design; retained bzlmod lockfile/registry/policy/Host evidence remains authoritative | pin the boundary oracle and implement the accepted projection before recursive traversal; nested `MODULE.bazel` without BUILD continues and no nested-repository detector is allowed; Host publication/retry, byte-aware ingress, native Windows/lone-surrogate ordering, regular-or-special BUILD/`.bzl` acquisition, remaining registry transports, and discovery composition remain | paused for one bounded M3 formatter packet; then resume `WP-5-m1-loading-host-package-boundary-oracle-design` |
+| M1: one semantic spine | partial | retained runtime/loading spine; accepted Host root-module/loading-anchor owners, typed no-follow dirents, Bazel-internal string seam and exact oracles, Linux raw-name oracle through checkpoint `e2cc891d`, simple matcher oracle `9f42c3e5`, private Host segment-candidate owner `bd12c015`, and public Host root-package boundary projection design; retained bzlmod lockfile/registry/policy/Host evidence remains authoritative | pin the boundary oracle and implement the accepted projection before recursive traversal; nested `MODULE.bazel` without BUILD continues and no nested-repository detector is allowed; Host publication/retry, byte-aware ingress, native Windows/lone-surrogate ordering, regular-or-special BUILD/`.bzl` acquisition, remaining registry transports, and discovery composition remain | `WP-5-m1-loading-host-package-boundary-oracle-design` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
-| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; text and graph output; accepted `tests`, `labels`, `executables`, and `visible` metadata/activation evidence | `attr`, `filter`, and `kind` require an exact Java-compatible `Pattern`; external repositories, pattern breadth, and remaining output formats remain | `WP-8-m3-query-label-kind-output`, then resume the paused M1 boundary oracle design |
+| M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; text, graph, and `label_kind` output; accepted `tests`, `labels`, `executables`, and `visible` metadata/activation evidence | `attr`, `filter`, and `kind` require an exact Java-compatible `Pattern`; external repositories, pattern breadth, and remaining output formats remain | pause M3 while the M1 boundary-oracle packet is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -33,16 +33,19 @@ advances the **Current packet**, not an older `next` paragraph.
 
 ### Current packet
 
-Implement one bounded logical packet:
-`WP-8-m3-query-label-kind-output`.
+Design only
+`WP-5-m1-loading-host-package-boundary-oracle-design`.
 
-Reuse the accepted Bazel 9.2 rule-capability and generated-file rows. Review
-the formatter representation once, then project existing structural query
-node kinds through one-shot and daemon `--output=label_kind`. Add no query
-function, DICE key, traversal, regex engine, or fixture unless review finds a
-specific missing representation. Run focused query/command/CLI tests and
-affected exact rows; broad M1, cross-target, and unrelated oracle suites are
-out of scope. Resume the paused M1 boundary-oracle design after acceptance.
+Freeze an exact pinned Bazel 9.2 replacement for the stale
+`glob-package-boundaries` fixture. Inventory and prune its old duplicate
+membership/exclude/allow-empty evidence, then retain one exact `**/*.txt` row
+that proves ordinary-directory continue, actual-subpackage stop,
+deleted-package continue, ignored-directory stop, ignored-over-deleted
+precedence, and nested-`MODULE.bazel`-without-BUILD continue. Freeze exact
+assets, command/expected output, source anchors, caps, fresh-root replays,
+cleanup, and packet-two growth accounting before fixture edits. Keep Rust,
+Cargo, Slug owners, recursive traversal, parser/evaluator activation, native
+Windows parity, and every consumer separate.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of

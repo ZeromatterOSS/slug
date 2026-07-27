@@ -33,6 +33,13 @@ fn write(path: impl AsRef<std::path::Path>, content: &str) {
     std::fs::write(path, content).unwrap();
 }
 
+fn fixture_workspace(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures")
+        .join(name)
+        .join("workspace")
+}
+
 #[derive(Clone, Copy)]
 struct QueryOracleCase {
     args: &'static [&'static str],
@@ -2969,4 +2976,82 @@ fn output_base_labels_reuses_one_daemon_across_metadata_semantic_transitions() {
         std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
         pid
     );
+}
+
+#[test]
+fn label_kind_matches_the_accepted_rule_capability_and_generated_file_rows() {
+    let cases = [
+        (
+            "query-executables-rule-capability",
+            "//pkg:arbitrary_target",
+            "exec_arbitrary rule //pkg:arbitrary_target\n",
+        ),
+        (
+            "query-executables-rule-capability",
+            "//pkg:ordinary_target",
+            "implicit_test_test rule //pkg:ordinary_target\n",
+        ),
+        (
+            "query-executables-rule-capability",
+            "//pkg:explicit_test_target",
+            "explicit_test_test rule //pkg:explicit_test_target\n",
+        ),
+        (
+            "query-executables-rule-capability",
+            "//pkg:plain",
+            "plain_rule rule //pkg:plain\n",
+        ),
+        (
+            "query-executables-rule-capability",
+            "//pkg:generated_owner",
+            "output_rule rule //pkg:generated_owner\n",
+        ),
+        (
+            "query-executables-rule-capability",
+            "//pkg:files",
+            "filegroup rule //pkg:files\n",
+        ),
+        (
+            "query-executables-rule-capability",
+            "//pkg:alias_exec",
+            "alias rule //pkg:alias_exec\n",
+        ),
+        (
+            "query-executables-rule-capability",
+            "//pkg:setting",
+            "config_setting rule //pkg:setting\n",
+        ),
+        (
+            "query-labels-attribute-metadata",
+            "labels(out, //pkg:outputs)",
+            "generated file //pkg:one.out\n",
+        ),
+        (
+            "query-labels-attribute-metadata",
+            "labels(outs, //pkg:outputs)",
+            "generated file //pkg:three.out\ngenerated file //pkg:two.out\n",
+        ),
+    ];
+
+    for (fixture, expression, expected) in cases {
+        let output = slug()
+            .current_dir(fixture_workspace(fixture))
+            .args(["query", "--output=label_kind", expression])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{fixture} {expression}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "{fixture} {expression}: {output:?}"
+        );
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            expected,
+            "{fixture} {expression}"
+        );
+    }
 }

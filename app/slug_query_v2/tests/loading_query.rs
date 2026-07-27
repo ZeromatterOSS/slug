@@ -28,11 +28,13 @@ use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_query_v2::QueryEdgeKind;
 use slug_query_v2::QueryNodeKind;
 use slug_query_v2::QueryOrder;
+use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
 use slug_query_v2::SubtreePackageSetKey;
 use slug_query_v2::UnconfiguredPackageGraphKey;
 use slug_query_v2::evaluate_loading_query;
 use slug_query_v2::evaluate_loading_query_with_policy;
+use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
@@ -1548,6 +1550,72 @@ async fn output_targets_are_generated_files_with_only_generator_edges() {
                 .collect::<Vec<_>>(),
             ["//pkg:rule"]
         );
+    }
+}
+
+#[tokio::test]
+async fn label_kind_formats_retained_structural_kinds_in_text_order() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\ncustom = rule(implementation = _impl, attrs = {\"out\": attr.output(mandatory = True)})\n",
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"custom\")\nexports_files([\"source.txt\"])\npackage_group(name = \"group\", packages = [\"//...\"])\nfilegroup(name = \"native\", srcs = [\":source.txt\"])\ncustom(name = \"starlark\", out = \"generated.out\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, expected) in [
+        ("//pkg:native", "filegroup rule //pkg:native\n"),
+        ("//pkg:starlark", "custom rule //pkg:starlark\n"),
+        ("//pkg:group", "package group //pkg:group\n"),
+        ("//pkg:source.txt", "source file //pkg:source.txt\n"),
+        ("//pkg:BUILD.bazel", "source file //pkg:BUILD.bazel\n"),
+        (
+            "labels(out, //pkg:starlark)",
+            "generated file //pkg:generated.out\n",
+        ),
+        ("loadfiles(//pkg:native)", "source file //pkg:defs.bzl\n"),
+        (
+            "buildfiles(//pkg:native)",
+            "source file //pkg:BUILD.bazel\nsource file //pkg:defs.bzl\n",
+        ),
+    ] {
+        let output = evaluate_loading_query_with_policy_and_output_completion(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+            QueryPolicy::default(),
+            QueryOutputCompletion::LabelKind,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.label_kind_stdout(), expected, "{expression}, auto");
+        for order in [QueryOrder::Auto, QueryOrder::Full] {
+            let output = evaluate_loading_query_with_policy_and_output_completion(
+                &mut transaction,
+                workspace.clone(),
+                expression,
+                order,
+                QueryPolicy::default(),
+                QueryOutputCompletion::LabelKind,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                output
+                    .label_kind_stdout()
+                    .lines()
+                    .map(|line| line.rsplit_once(' ').unwrap().1)
+                    .collect::<Vec<_>>(),
+                output.stdout().lines().collect::<Vec<_>>(),
+                "{expression}, {order}"
+            );
+        }
     }
 }
 

@@ -27,6 +27,7 @@ use slug_core_v2::runtime::observe_workspace;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_query_v2::QueryOrder;
+use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
@@ -262,7 +263,7 @@ impl Daemon {
         );
         match self
             .runtime
-            .query_observations_with_policy_and_bzlmod_inputs(
+            .query_observations_with_policy_and_bzlmod_inputs_and_output_completion(
                 observations,
                 expression,
                 order,
@@ -271,11 +272,17 @@ impl Daemon {
                 environment_policy,
                 lockfile_mode,
                 &registry_urls,
+                if output_format == "label_kind" {
+                    QueryOutputCompletion::LabelKind
+                } else {
+                    QueryOutputCompletion::Standard
+                },
             ) {
             Ok(output) => {
                 let stdout = match output_format {
                     "text" => output.stdout(),
                     "graph" => output.graph_stdout(graph_factored, order.is_full()),
+                    "label_kind" => output.label_kind_stdout(),
                     other => {
                         return QueryResult::error(
                             2,

@@ -94,12 +94,12 @@ fn validate_query_flags(
     for flag in flags {
         match flag.name.as_str() {
             "output" => {
-                let value = required_query_flag_value(flag, "text or graph")?;
-                if value != "text" && value != "graph" {
+                let value = required_query_flag_value(flag, "text, graph, or label_kind")?;
+                if value != "text" && value != "graph" && value != "label_kind" {
                     return Err(CommandParseError::InvalidFlagValue {
                         flag: flag.raw.clone(),
                         message: format!(
-                            "output format '{value}' is recognized but deferred; only text and graph are implemented"
+                            "output format '{value}' is recognized but deferred; only text, graph, and label_kind are implemented"
                         ),
                     });
                 }

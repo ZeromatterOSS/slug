@@ -365,6 +365,144 @@ fn retained_daemon_formats_graph_from_the_same_query_result_path() {
             "}\n",
         )
     );
+
+    let label_kind = daemon.query_with_output("//pkg:probe", QueryOrder::Full, "label_kind", true);
+    assert_eq!(label_kind.exit_code, 0, "{label_kind:?}");
+    assert!(label_kind.stderr.is_empty(), "{label_kind:?}");
+    assert_eq!(label_kind.stdout, "filegroup rule //pkg:probe\n");
+}
+
+#[test]
+fn retained_daemon_matches_the_ten_accepted_label_kind_rows() {
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/v2_oracle/fixtures");
+    let rule_workspace = fixtures.join("query-executables-rule-capability/workspace");
+    let mut rules = Daemon::new(&rule_workspace).unwrap();
+    for (expression, expected) in [
+        (
+            "//pkg:arbitrary_target",
+            "exec_arbitrary rule //pkg:arbitrary_target\n",
+        ),
+        (
+            "//pkg:ordinary_target",
+            "implicit_test_test rule //pkg:ordinary_target\n",
+        ),
+        (
+            "//pkg:explicit_test_target",
+            "explicit_test_test rule //pkg:explicit_test_target\n",
+        ),
+        ("//pkg:plain", "plain_rule rule //pkg:plain\n"),
+        (
+            "//pkg:generated_owner",
+            "output_rule rule //pkg:generated_owner\n",
+        ),
+        ("//pkg:files", "filegroup rule //pkg:files\n"),
+        ("//pkg:alias_exec", "alias rule //pkg:alias_exec\n"),
+        ("//pkg:setting", "config_setting rule //pkg:setting\n"),
+    ] {
+        let result = rules.query_with_output(expression, QueryOrder::Auto, "label_kind", true);
+        assert_eq!(result.exit_code, 0, "{expression}: {result:?}");
+        assert!(result.stderr.is_empty(), "{expression}: {result:?}");
+        assert_eq!(result.stdout, expected, "{expression}");
+    }
+
+    let generated_workspace = fixtures.join("query-labels-attribute-metadata/workspace");
+    let mut generated = Daemon::new(&generated_workspace).unwrap();
+    for (expression, expected) in [
+        (
+            "labels(out, //pkg:outputs)",
+            "generated file //pkg:one.out\n",
+        ),
+        (
+            "labels(outs, //pkg:outputs)",
+            "generated file //pkg:three.out\ngenerated file //pkg:two.out\n",
+        ),
+    ] {
+        let result = generated.query_with_output(expression, QueryOrder::Auto, "label_kind", true);
+        assert_eq!(result.exit_code, 0, "{expression}: {result:?}");
+        assert!(result.stderr.is_empty(), "{expression}: {result:?}");
+        assert_eq!(result.stdout, expected, "{expression}");
+    }
+}
+
+#[test]
+fn label_kind_completes_cross_package_depth_boundaries_without_changing_standard_queries() {
+    let workspace = scratch("query-label-kind-depth-boundary");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let producer_defs = workspace.join("producer/defs.bzl");
+    let producer_build = workspace.join("producer/BUILD.bazel");
+    write(
+        &producer_defs,
+        "def _impl(ctx):\n    return [DefaultInfo()]\nfirst_rule = rule(implementation = _impl)\n",
+    );
+    write(
+        &producer_build,
+        "load(\":defs.bzl\", \"first_rule\")\nfirst_rule(name = \"rule\")\n",
+    );
+    write(
+        &workspace.join("consumer/BUILD.bazel"),
+        "filegroup(name = \"consumer\", srcs = [\"//producer:rule\"])\n",
+    );
+    let expression = "deps(//consumer:consumer, 1)";
+    let mut daemon = Daemon::new(&workspace).unwrap();
+
+    let standard = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(standard.exit_code, 0, "{standard:?}");
+    assert_eq!(standard.stdout, "//consumer:consumer\n//producer:rule\n");
+    let graph = daemon.query_with_output(expression, QueryOrder::Full, "graph", true);
+    assert_eq!(graph.exit_code, 0, "{graph:?}");
+    assert_eq!(
+        graph.stdout,
+        concat!(
+            "digraph mygraph {\n",
+            "  node [shape=box];\n",
+            "  \"//consumer:consumer\"\n",
+            "  \"//consumer:consumer\" -> \"//producer:rule\"\n",
+            "  \"//producer:rule\"\n",
+            "}\n",
+        )
+    );
+
+    let first = daemon.query_with_output(expression, QueryOrder::Auto, "label_kind", true);
+    assert_eq!(first.exit_code, 0, "{first:?}");
+    assert_eq!(
+        first.stdout,
+        "filegroup rule //consumer:consumer\nfirst_rule rule //producer:rule\n"
+    );
+
+    write(&producer_build, "this is not valid Starlark\n");
+    let standard_after_producer_break = daemon.query(expression, QueryOrder::Auto);
+    assert_eq!(
+        standard_after_producer_break.exit_code, 0,
+        "{standard_after_producer_break:?}"
+    );
+    assert_eq!(
+        standard_after_producer_break.stdout,
+        "//consumer:consumer\n//producer:rule\n"
+    );
+    let broken = daemon.query_with_output(expression, QueryOrder::Auto, "label_kind", true);
+    assert_eq!(broken.exit_code, 7, "{broken:?}");
+    assert!(broken.stdout.is_empty(), "{broken:?}");
+    assert!(
+        broken.stderr.contains("\"error\":\"query_error\"")
+            && broken.stderr.contains("this is not valid Starlark")
+            && broken.stderr.contains("Evaluation of query"),
+        "{broken:?}"
+    );
+
+    write(
+        &producer_defs,
+        "def _impl(ctx):\n    return [DefaultInfo()]\nsecond_rule = rule(implementation = _impl)\n",
+    );
+    write(
+        &producer_build,
+        "load(\":defs.bzl\", \"second_rule\")\nsecond_rule(name = \"rule\")\n",
+    );
+    let second = daemon.query_with_output(expression, QueryOrder::Auto, "label_kind", true);
+    assert_eq!(second.exit_code, 0, "{second:?}");
+    assert_eq!(
+        second.stdout,
+        "filegroup rule //consumer:consumer\nsecond_rule rule //producer:rule\n"
+    );
 }
 
 #[test]

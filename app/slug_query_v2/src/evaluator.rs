@@ -24,6 +24,13 @@ pub use crate::output::QueryOutput;
 use crate::parse_query_expression;
 use crate::validate_loading_query;
 
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
+pub enum QueryOutputCompletion {
+    #[default]
+    Standard,
+    LabelKind,
+}
+
 pub async fn evaluate_loading_query(
     ctx: &mut DiceComputations<'_>,
     workspace: PathBuf,
@@ -40,12 +47,34 @@ pub async fn evaluate_loading_query_with_policy(
     order: QueryOrder,
     policy: QueryPolicy,
 ) -> Result<QueryOutput, QueryError> {
+    evaluate_loading_query_with_policy_and_output_completion(
+        ctx,
+        workspace,
+        source,
+        order,
+        policy,
+        QueryOutputCompletion::Standard,
+    )
+    .await
+}
+
+pub async fn evaluate_loading_query_with_policy_and_output_completion(
+    ctx: &mut DiceComputations<'_>,
+    workspace: PathBuf,
+    source: &str,
+    order: QueryOrder,
+    policy: QueryPolicy,
+    completion: QueryOutputCompletion,
+) -> Result<QueryOutput, QueryError> {
     let expression =
         parse_query_expression(source).map_err(|error| QueryError::syntax(error.to_string()))?;
     validate_loading_query(&expression).map_err(|error| QueryError::syntax(error.to_string()))?;
     let mut evaluator = QueryEvaluator::new(LoadingQueryEnvironment::new(ctx, workspace, policy));
     let targets = evaluator.evaluate(&expression).await?;
-    let graph = evaluator.environment.selected_graph(&targets);
+    if completion == QueryOutputCompletion::LabelKind {
+        evaluator.environment.complete_label_kinds(&targets).await?;
+    }
+    let graph = evaluator.environment.selected_graph(&targets, completion);
     let labels: Vec<CompactString> = if order == QueryOrder::Full {
         evaluator
             .environment

@@ -27,6 +27,7 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::QueryPolicy;
+use crate::evaluator::QueryOutputCompletion;
 use crate::generic::QueryEnvironment;
 use crate::generic::TargetSet;
 use crate::generic::TestSuiteAttribute;
@@ -51,6 +52,7 @@ pub(crate) struct LoadingQueryEnvironment<'a, 'd> {
     workspace: PathBuf,
     policy: QueryPolicy,
     evaluation_graph: ResolvedGraph<QueryLabel>,
+    node_kinds: SmallMap<QueryLabel, CompactString>,
     generated_file_labels: SmallSet<QueryLabel>,
     pub(crate) candidates: QueryCandidateArena,
 }
@@ -66,6 +68,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             workspace,
             policy,
             evaluation_graph: ResolvedGraph::new(),
+            node_kinds: SmallMap::new(),
             generated_file_labels: SmallSet::new(),
             candidates: QueryCandidateArena::new(),
         }
@@ -120,8 +123,14 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         if matches!(node.kind, crate::QueryNodeKind::GeneratedFile) {
             self.generated_file_labels.insert(label.dupe());
         }
-        self.evaluation_graph.record_node(label);
+        self.record_node(&node);
         Ok(node)
+    }
+
+    fn record_node(&mut self, node: &QueryNode) {
+        self.node_kinds
+            .insert(node.label.clone(), selected_node_kind(node));
+        self.evaluation_graph.record_node(node.label.clone());
     }
 
     async fn visible_in_package_group(
@@ -230,7 +239,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             if !selected.contains(&node.label) {
                 continue;
             }
-            self.evaluation_graph.record_node(node.label.clone());
+            self.record_node(node);
             for edge in node
                 .edges
                 .iter()
@@ -287,13 +296,20 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         )
     }
 
-    pub(crate) fn selected_graph(&self, targets: &QueryCandidateBatches) -> SelectedQueryGraph {
+    pub(crate) fn selected_graph(
+        &self,
+        targets: &QueryCandidateBatches,
+        completion: QueryOutputCompletion,
+    ) -> SelectedQueryGraph {
         let materialized = targets.materialized_by_label(&self.candidates);
         let mut included = SmallMap::<QueryLabel, bool>::new();
         for (label, id) in materialized {
             let candidate = self.candidates.get(id);
             let real = candidate.evaluation_graph_label().is_some();
-            if !real || self.evaluation_graph.contains(&label) {
+            if !real
+                || self.evaluation_graph.contains(&label)
+                || completion == QueryOutputCompletion::LabelKind
+            {
                 included.insert(label, real);
             }
         }
@@ -320,8 +336,16 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             if self.generated_file_labels.contains(&label) {
                 generated_file_labels.insert(CompactString::new(label.to_string()));
             }
+            let kind = if included.get(&label).copied() == Some(true) {
+                self.node_kinds.get(&label).cloned()
+            } else {
+                // Load/build provenance candidates have no loadable query
+                // node, but Bazel reports them as input files.
+                Some(CompactString::const_new("source file"))
+            };
             nodes.push(SelectedQueryGraphNode {
                 label: CompactString::new(label.to_string()),
+                kind,
                 successors: Vec::new(),
             });
         }
@@ -356,6 +380,23 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             nodes,
             generated_file_labels,
         }
+    }
+
+    pub(crate) async fn complete_label_kinds(
+        &mut self,
+        targets: &QueryCandidateBatches,
+    ) -> Result<(), QueryError> {
+        for (label, id) in targets.materialized_by_label(&self.candidates) {
+            if self.candidates.get(id).evaluation_graph_label().is_none()
+                || self.node_kinds.contains_key(&label)
+            {
+                continue;
+            }
+            let node = self.lookup_single(label).await?;
+            self.node_kinds
+                .insert(node.label.clone(), selected_node_kind(&node));
+        }
+        Ok(())
     }
 
     // Text FULL is an existing public ordering contract. Keep its reverse
@@ -397,6 +438,23 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             }
         }
         renderer.deterministic_topological_order()
+    }
+}
+
+fn selected_node_kind(node: &QueryNode) -> CompactString {
+    match &node.kind {
+        crate::QueryNodeKind::BuildFile | crate::QueryNodeKind::SourceFile => {
+            CompactString::const_new("source file")
+        }
+        crate::QueryNodeKind::GeneratedFile => CompactString::const_new("generated file"),
+        crate::QueryNodeKind::PackageGroup => CompactString::const_new("package group"),
+        crate::QueryNodeKind::Rule(_) => {
+            let capability = node
+                .rule_capability
+                .as_ref()
+                .expect("query rule node must retain a RuleCapability");
+            CompactString::new(format!("{} rule", capability.rule_class))
+        }
     }
 }
 
@@ -529,7 +587,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         for (package, package_targets) in by_package {
             let graph = self.package_graph(&package).await?;
             for node in graph.nodes.values() {
-                self.evaluation_graph.record_node(node.label.clone());
+                self.record_node(node);
                 for edge in node.edges.iter() {
                     self.evaluation_graph
                         .record_edge(node.label.clone(), edge.target.clone());
@@ -555,9 +613,9 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         for package in packages.iter() {
             let graph = self.package_graph(package).await?;
             let mut labels = Vec::with_capacity(graph.nodes.len());
-            for label in graph.nodes.keys() {
-                self.evaluation_graph.record_node(label.clone());
-                labels.push(label.clone());
+            for node in graph.nodes.values() {
+                self.record_node(node);
+                labels.push(node.label.clone());
             }
             result = result.union(self.real_delivery(labels));
         }

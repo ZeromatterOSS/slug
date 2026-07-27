@@ -41,18 +41,19 @@ execution/cache breadth becomes the project priority.
 ### Current M3 status
 
 Live Status in the canonical plan owns scheduling. The root-repository query
-command is user-visible with text and graph output and 13 of Bazel 9.2's 16
-default functions. `attr`, `filter`, and `kind` remain blocked on an exact
-Java-compatible `Pattern` substrate. The old tests-metadata Gate A and all
-subsequent `tests()`, `labels()`, `executables()`, and `visible()` activation
-packets are accepted history, not live instructions.
+command is user-visible with text, graph, and `label_kind` output and 13 of
+Bazel 9.2's 16 default functions. `WP-8-m3-query-label-kind-output` reuses the
+accepted eight rule-capability and two generated-file rows through one-shot
+and retained-daemon paths. Output-specific completion loads only otherwise
+unresolved selected kinds; standard text/graph dependencies and ordering stay
+unchanged. Focused cross-package failure/edit/recovery proves that boundary.
 
-When M3 resumes, select one bounded user-visible query gap and reuse accepted
-Bazel 9.2 evidence. The smallest identified candidate is
-`WP-8-m3-query-label-kind-output`: project existing structural node kinds
-through CLI and daemon `--output=label_kind` without a new function, DICE key,
-traversal, regex engine, or fixture unless review finds a missing
-representation row.
+`attr`, `filter`, and `kind` remain blocked on an exact Java-compatible
+`Pattern` substrate. External repositories, pattern breadth, and other output
+formats also remain. The old tests-metadata Gate A and subsequent `tests()`,
+`labels()`, `executables()`, and `visible()` packets are accepted history, not
+live instructions. When M3 resumes, select one bounded user-visible gap and
+reuse accepted Bazel 9.2 evidence.
 
 ### Query engine reuse policy
 
@@ -2026,10 +2027,11 @@ configuration evaluation; unsupported attrs fail closed. Sol `ACCEPT`.
 Define/flag/constraint/common attrs and matching remain deferred. Resume
 Stage 8 labels at the unchanged 29 CLI plus two generated-kind boundary.
 
-`8fec2696` activates exactly `labels`; six ordinary functions remain deferred.
-29 rows (two complete graph stdout rows included) are exact; two label-kind rows
-remain formatter-deferred GeneratedFile constraints. Package-load QueryError
-alone gets Bazel framing; syntax/unrelated eval diagnostics remain unchanged.
+`8fec2696` activates exactly `labels`; six ordinary functions remained deferred
+at acceptance. Its 29 rows (two complete graph stdout rows included) are exact;
+the two then-formatter-deferred GeneratedFile constraints are now activated by
+`WP-8-m3-query-label-kind-output`. Package-load QueryError alone gets Bazel
+framing; syntax/unrelated eval diagnostics remain unchanged.
 Same-DICE semantic/reuse and retained-daemon schema/value/select/default/output
 transitions pass. Root validation: loading 37, query 42, CLI 21
 (1 unit/17 CLI/3 graph), server 15, analysis 11, plus fmt/diff. Sol corrected
@@ -2081,8 +2083,9 @@ with the retained `executable && !rule_class.ends_with("_test")` capability.
 It preserves candidate IDs, order, and nonempty delivery boundaries, skips
 fake/non-rule candidates, and creates no query edges or new DICE ownership
 surface. Exact acceptance is all 32 semantic oracle rows; the eight
-`label_kind` rows remain formatter-deferred. DICE and retained-daemon evidence
-covers capability, exported-class, target-name, formatting, and
+then-formatter-deferred `label_kind` rows are now activated by
+`WP-8-m3-query-label-kind-output`. DICE and retained-daemon evidence covers
+capability, exported-class, target-name, formatting, and
 delete/recreate transitions. Root validation passed 45 query tests, 50
 downstream CLI/commands/server tests, formatting/diff checks, and a clean CLI
 build; Sol-low returned final `ACCEPT`. Five ordinary functions remain

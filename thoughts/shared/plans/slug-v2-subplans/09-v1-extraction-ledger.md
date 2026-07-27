@@ -1299,18 +1299,17 @@ after implementation with source/mode, oracle, validation, and residual risk.
 
 `8dfae99c` is accepted immutable 31-row Bazel evidence: seven public default
 label-bearing constructors, dormant exclusion, selector-key false, valid dedup,
-distinct output generators, generated kind, and fail-fast errors. 29 rows are
-eventual Slug CLI evidence; two `label_kind` rows remain Bazel-only until
-focused `QueryNodeKind::GeneratedFile` assertions. No extraction decision
-changes.
+distinct output generators, generated kind, and fail-fast errors. All 31 rows
+now have Slug CLI evidence: the final two `label_kind` rows are activated by
+`WP-8-m3-query-label-kind-output`. No extraction decision changes.
 
 Gate A `1b7c179c` is accepted and V2-owned: ordered immutable `Allocative`
 seven-label-kind-plus-String schemas/values, defaults/configurability,
 provenance/select structure, canonical generated owner, outputs outside deps,
 equality, same-DICE tracker, and preactivation guard. No V1/Buck semantics
 entered. Root passed fmt/diff, loading 35/query 39/analysis 11; Sol corrected
-six blockers then `ACCEPT`. Next is Stage 8's 29 CLI rows plus two
-generated-kind assertions.
+six blockers then `ACCEPT`. Its later Stage 8 29-row function gate and two
+generated-kind formatter rows are now accepted.
 
 `f3e8ad48` is accepted V2-owned prerequisite evidence: sorted compact native
 `config_setting` values, zero-edge rule kind, semantic reorder/change tests,
@@ -1320,9 +1319,10 @@ common attrs and matching remain deferred; Stage 8 remains 29+2.
 
 `8fec2696` is accepted V2-owned labels-only activation: immutable Allocative
 query attrs separate from deps, selectors exclude keys, generated files only
-output→own-generator edges, exact 29 rows, two formatter-deferred label-kind
-rows. Sol `ACCEPT` after graph/order corrections. Six functions/M3 remain open;
-no V1/Buck import or 31/31 claim.
+output→own-generator edges, and exact 29 function rows. The two formerly
+formatter-deferred label-kind rows are now accepted separately through
+`WP-8-m3-query-label-kind-output`. Sol `ACCEPT` after graph/order corrections;
+no V1/Buck import.
 
 ### WP-4-8-m3-executables-rule-capability — landed Gate A/B extraction decision
 
@@ -1352,8 +1352,27 @@ Gate B reused the current V2 generic evaluator/candidate algebra and compact
 capability projection rather than importing V1 evaluation or Buck2 rule
 classification. It filters retained delivery IDs in place, adds no edges or
 DICE key, and passes all 32 semantic oracle rows plus same-DICE and
-same-daemon lifecycle evidence. The eight `label_kind` rows remain
-representation-only; five ordinary query functions and M3 remain open.
+same-daemon lifecycle evidence. The eight representation-only `label_kind`
+rows are now activated separately; five ordinary query functions and M3
+remain open.
+
+### WP-8-m3-query-label-kind-output — landed formatter activation
+
+V2 owns the implementation; no V1/Buck query formatter was imported.
+Bazel 9.2 `LabelOutputFormatter`, `AbstractUnorderedFormatter`, and target-kind
+methods are the source, while accepted oracles `c8e469f5` and `8dfae99c`
+supply eight rule-class and two generated-file rows. A compact request-local
+`SmallMap` and optional selected-node kind retain loaded identities.
+`LabelKind` alone completes missing cross-package selected kinds through the
+existing package-graph key; Standard wrappers preserve text/graph dependency
+and ordering behavior.
+
+Focused validation passed 17 query units, 39 loading-query integrations, six
+parser tests, the exact one-shot and retained-daemon 8+2 rows, 13 core-runtime
+tests, cross-package failure/edit/recovery, Rust formatting, archive status,
+and diff checks. Independent correction review returned `ACCEPT`. No query
+function, new DICE key, traversal, regex engine, fixture, or new utility was
+added. External repositories and other output formats remain deferred.
 
 ### Stage 8 `tests` / `visible` feasibility ranking
 

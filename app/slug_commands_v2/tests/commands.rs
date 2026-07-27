@@ -314,11 +314,14 @@ fn query_request_parses_strict_test_suite_booleans_and_last_occurrence_wins() {
 }
 
 #[test]
-fn query_request_rejects_deferred_output_and_order_modes_before_runtime() {
-    let output = QueryRequest::parse(&["--output=label_kind", "//pkg:bin"])
+fn query_request_accepts_label_kind_and_rejects_other_deferred_output_modes_before_runtime() {
+    let label_kind = QueryRequest::parse(&["--output=label_kind", "//pkg:bin"]).unwrap();
+    assert_eq!(label_kind.output, QueryOutputFormat::LabelKind);
+
+    let output = QueryRequest::parse(&["--output=build", "//pkg:bin"])
         .unwrap_err()
         .to_string();
-    assert!(output.contains("only text and graph are implemented"));
+    assert!(output.contains("only text, graph, and label_kind are implemented"));
 
     for order in ["deps", "no"] {
         let error =

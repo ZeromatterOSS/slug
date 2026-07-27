@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::graph::QueryError;
@@ -69,6 +70,30 @@ impl QueryOutput {
         output
     }
 
+    /// Render Bazel's `label_kind` output from the selected nodes retained by
+    /// evaluation. This preserves text output order without re-entering DICE
+    /// or query evaluation.
+    pub fn label_kind_stdout(&self) -> String {
+        let mut output = String::new();
+        let mut kinds = SmallMap::with_capacity(self.graph.nodes.len());
+        for node in &self.graph.nodes {
+            if let Some(kind) = node.kind.as_deref() {
+                kinds.insert(&node.label, kind);
+            }
+        }
+        for label in self.labels.iter() {
+            let kind = kinds
+                .get(label)
+                .copied()
+                .expect("label_kind output requires a completed selected-node kind");
+            output.push_str(kind);
+            output.push(' ');
+            output.push_str(label);
+            output.push('\n');
+        }
+        output
+    }
+
     /// Render the selected graph retained by the evaluation that produced this
     /// output. Formatting never re-enters DICE or query evaluation.
     pub fn graph_stdout(&self, factored: bool, sort_labels: bool) -> String {
@@ -87,6 +112,7 @@ pub(crate) struct SelectedQueryGraph {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub(crate) struct SelectedQueryGraphNode {
     pub(crate) label: CompactString,
+    pub(crate) kind: Option<CompactString>,
     pub(crate) successors: Vec<u32>,
 }
 
@@ -302,6 +328,7 @@ mod graph_output_tests {
                 .iter()
                 .map(|(label, successors)| SelectedQueryGraphNode {
                     label: CompactString::new(*label),
+                    kind: Some(CompactString::const_new("source file")),
                     successors: successors.to_vec(),
                 })
                 .collect(),
