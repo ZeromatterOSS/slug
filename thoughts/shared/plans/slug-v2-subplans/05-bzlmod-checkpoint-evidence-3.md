@@ -7833,6 +7833,105 @@ public API shape as far as the required trait method permits. Only after that
 correction is accepted and implemented may the five-file private Host
 registry-file owner be redesigned.
 
+### Stage 5 local native-path Registry IO bridge correction design
+
+`WP-5-m1-host-registry-local-native-io-bridge-correction` changes exactly:
+
+- `app/slug_bzlmod_v2/src/registry_dice.rs`; and
+- `app/slug_core_v2/src/runtime/registry_io.rs`.
+
+The cap is 220 additions and 80 deletions. Change no fixture, harness, Cargo
+manifest, lockfile, dependency, Host owner, DICE key, consumer, activation,
+loading, analysis, query, or other runtime file. Add no map, set, vector-backed
+retained value, cache, interner, lock, or direct filesystem IO inside a DICE
+compute.
+
+Extend the existing public `RegistryIo` capability with one defaulted async
+method:
+
+```rust
+async fn read_local_exact(
+    &self,
+    url: &RegistryFileUrl,
+    path: &Path,
+) -> Result<RegistryIoOutcome, RegistryTransportError> {
+    let _ = path;
+    self.read_exact(url).await
+}
+```
+
+The default is mandatory: every existing external scripted implementation
+continues to compile and preserves its URL-only behavior without closure
+edits. This is the sole unavoidable additive public-trait change; add no
+public type, function, installer, reexport, or dependency. Keep
+`read_exact(&RegistryFileUrl)` and every remote call byte-for-byte.
+
+Change only the accepted typed local executor to call
+`read_local_exact(url, path)`. Preserve its exact behavior: Found returns
+without request generation; NotFound requests generation after IO and returns
+`LocalAbsence`; transport failure requests generation after IO and returns
+the original URL, supplied native path, and message as `RegistryLocalError`.
+Missing capability still fails before IO or generation. The legacy
+`RegistryFileKey` continues deriving the same undecoded native path before
+calling this executor, so this prerequisite does not claim or change legacy
+URL decoding. The later Host owner will supply its separately source-matched
+decoded/resolved path.
+
+`HyperRegistryIo` must override `read_local_exact` and pass the supplied
+`&Path` directly to `tokio::fs::read`. Preserve `read_exact`'s existing
+`file:` dispatch, URL validation, messages, and HTTP behavior by routing its
+validated legacy path through the same private native-path helper. A native
+NotFound remains `RegistryIoOutcome::NotFound`; every other IO failure
+retains the existing `reading local registry file <url>: ...` message.
+This boundary must accept Unix non-UTF-8 paths and Windows native paths
+without formatting and reparsing them.
+
+Inline `registry_dice.rs` tests must install a scripted IO override whose URL
+names an absent decoy while the supplied native path names the intended file
+identity. Prove the local executor passes the path verbatim and preserves
+Found/no-generation, NotFound/IO-before-generation, and error/IO-before-
+generation ordering. Existing default-only scripted implementations and all
+legacy bridge tests must compile and remain unchanged. Inline core runtime
+tests must prove the production override reads the supplied path rather than
+the decoy URL, preserves absence/directory error behavior and URL-based
+diagnostics, and on Unix accepts a non-UTF-8 native filename.
+
+Validate focused bridge and core runtime tests, then the full bzlmod unit,
+integration, and doctest surface, focused core runtime tests, loading and core
+downstream suites, and GNU-Windows no-run compilation for affected crates.
+Run formatting, `git diff --check`, exact two-file/growth, archive, credential,
+dependency, public-API, call-site, and forbidden-edge scans. Confirm no
+`RegistryIo` implementation outside the two allowed files changed, no remote
+call uses `read_local_exact`, and no Host file-owner symbol or activation
+appears.
+
+Stop and replan on a required external implementation edit; a nondefaulted
+trait method; changed remote IO or legacy local result/error/generation
+semantics; path formatting/reparsing in the production override; direct IO in
+`registry_dice.rs`; a third file; a manifest/dependency/public-type change;
+Host owner/consumer/activation work; or cap overflow. Terminal acceptance
+requires source/contract, implementation-feasibility, and
+architecture/orchestration latest-text review.
+
+#### Local native-path Registry IO bridge correction design status
+
+Status: `ACCEPT` after terminal latest-text review on 2026-07-26.
+
+The exact two-file design adds one defaulted native-path method to the
+existing capability, routes only the typed local executor through it, and
+requires the production runtime override to read the supplied `&Path`
+directly. Existing scripted implementations, remote IO, legacy URL parsing,
+results, diagnostics, and generation ordering remain unchanged. Focused tests
+freeze path-versus-decoy selection, all local terminal orders, Unix non-UTF-8
+support, Windows-native compilation, and the absence of Host owner scope.
+Source/contract, implementation-feasibility, and architecture/orchestration
+terminal latest-text reviews all returned `ACCEPT`.
+
+Next packet: implement only
+`WP-5-m1-host-registry-local-native-io-bridge-correction` in
+`registry_dice.rs` and core runtime `registry_io.rs` under the exact
+220-addition/80-deletion cap.
+
 #### Host registry-file vendor oracle implementation status
 
 Status: `ACCEPT` after terminal latest-diff review on 2026-07-26.
