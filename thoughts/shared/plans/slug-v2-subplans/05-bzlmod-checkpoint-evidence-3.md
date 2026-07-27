@@ -7799,3 +7799,36 @@ Run one pinned Bazel 9.2 generation and two distinct fresh-root replays before
 terminal latest-diff review. Do not edit the server, harness, existing
 registry bytes, Rust, Cargo, dependencies, APIs, DICE, consumers, or
 activation.
+
+#### Host registry-file vendor oracle implementation status
+
+Status: `ACCEPT` after terminal latest-diff review on 2026-07-26.
+
+The exact six-path implementation adds four immutable vendor assets and five
+Off rows to the accepted fixture. Pinned Bazel 9.2 generation and two
+absolute, distinct fresh-root replays passed with all output-base servers
+shut down. The new-row yyy MODULE counts are 2/2/3/4/4; yyy `source.json` and
+first `bazel_registry.json` are 3/3/4/5/6; the fatal row exits 37 without a
+request change; downstream yyy MODULE counts are 4/5/5/5/6; and Refresh
+requests first aaa, selects `newdep`, excludes `olddep`, and keeps yyy MODULE
+at 5. All five new Off rows preserve the normalized 77,574-byte lockfile.
+
+The fixture is exactly 22 regular files, zero links, and 1,340 lines, for net
+growth of four files and 496 lines. The full tracked fixture tree is 1,301
+regular files, 14 links, and 36,603 lines. Direct fixture parsing, all ten
+packet-validator tests, exact asset hashes, six-path scope, source anchors,
+schema, archive, credential, normalized host-path, and diff gates passed.
+`pytest` is unavailable; the direct parser and unittest validator provide the
+available focused harness evidence. One generation-time assertion correction
+matched the existing normalizer's collapsed fatal file-URL/workspace seam;
+the fixture contract and production code did not change. Source/parity,
+implementation/evidence, and architecture/orchestration terminal latest-diff
+reviews all returned `ACCEPT`.
+
+Next packet: design only
+`WP-5-m1-host-registry-file-owner-design`. Freeze the separate private Host
+registry-file owner described by Stage 5 step 7: it consumes the accepted
+pure descriptor and Registry IO bridge, propagates visible/root/path Needs,
+retains the required redundant local root edge, keeps construction/root/local/
+remote/vendor/checksum failures typed and distinct, and adds no consumer or
+activation.
