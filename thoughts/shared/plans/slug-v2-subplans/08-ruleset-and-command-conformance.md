@@ -2195,6 +2195,95 @@ comparison probe entered the repository.
 engine is an unapproved future architecture proposal, not the next packet. The
 completed read-only ranking is recorded below.
 
+## Bundled Java `Pattern` query-functions contract replanned (2026-07-27)
+
+`WP-8-m3-query-java-pattern-functions-contract` ends in **REPLAN**. The
+requested all-three implementation packet is not one bounded abstraction, and
+no exact Rust matching substrate is currently accepted. No Rust, Cargo,
+dependency, fixture, generated oracle, query registry, evaluator, graph,
+loading, glob, or routing-log file changed in this contract audit.
+
+Bazel 9.2
+`query2/engine/{RegexFilterExpression,FilterFunction,KindFunction,AttrFunction}.java`
+compiles arbitrary user patterns with `java.util.regex.Pattern` and calls
+`Matcher.find`. `filter` supplies the printed label and `kind` supplies the
+target-kind string. `attr` is a separate representation problem:
+`TargetUtils.getAttrAsString` visits every configurable value and performs
+type-specific formatting, including boolean/tristate integer compatibility,
+ordinary object/list formatting, fully qualified labels, and null
+suppression.
+
+The current V2 `QueryNode` already retains exact label and target-kind strings,
+so `filter` and `kind` need no loading representation change. Its
+`QueryAttribute`, however, retains only name, dependency labels, and explicit
+provenance. That is sufficient for accepted `labels()` behavior but cannot
+represent Bazel's string, string-list, dict, boolean/tristate, output, null, or
+all-selector-branch `attr()` match universe. Extending it is a distinct
+Stage 4/public-cross-crate identity and equality packet, not a regex-function
+implementation detail.
+
+The immutable `java_regex` 0.1.0 candidate remains rejected. Its 5,421-line
+Rust engine is useful reference material, but the pinned source still lowers
+lone `\uD800`/`\uDC00` pattern units with
+`char::from_u32(...).unwrap_or('\0')`; oracle `5e78abc1` proves that changes a
+boolean `find` result. It also copies subjects into scalar vectors, allocates
+match/group state, reports scalar rather than Java UTF-16 diagnostic
+positions, and converts fixed step/depth exhaustion to ordinary non-match.
+Rust `regex`, `fancy-regex`, PCRE, and Onig remain dialect/behavior
+substitutions. Executing JVM bytecode, embedding a JVM, or delegating
+production behavior to Bazel/Java is forbidden by `AGENTS.md` and is not an
+implementation option.
+
+A future Pattern substrate proposal must therefore supply an independently
+qualified Rust-owned UTF-16 compile/boolean-find boundary for arbitrary Java
+patterns, exact syntax diagnostics, no lone-surrogate aliasing, and explicit
+resource/error semantics. It may then enable `filter` and `kind` together.
+`attr` follows only after a separate source-backed Stage 4 attribute-string
+projection owns every value alternative and participates in package/query
+equality. Do not describe a common-pattern happy-path oracle as proof of either
+full engine or `attr` parity.
+
+Next M3 work should select a bounded user-visible query gap that does not
+depend on Java `Pattern`. Prefer one existing-graph output mode with an exact
+Bazel 9.2 oracle and one-shot/retained-daemon coverage, keeping the accepted
+13-function registry unchanged.
+
+Independent terminal review returned `ACCEPT`: the all-three bundle is
+source-invalid, the filter/kind versus attr split is exact, and no already
+bounded Rust path was overlooked.
+
+The next packet is
+`WP-8-m3-query-package-output`, one logical oracle-plus-implementation packet.
+Extend only `query-loading-thin-vertical/{fixture.toml,expected/oracle.json}`
+with three `--output=package` rows proving main-root empty spelling,
+lexicographic package sorting/deduplication across repeated rule/source
+results, nested packages, dependency results, and a fake load-file target.
+Protect every existing row and workspace asset; this is oracle packet four
+after checkpoint `e2cc891d`, so no growth review is due.
+
+Implementation may change only
+`slug_commands_v2/src/{common,query}.rs`,
+`slug_commands_v2/tests/commands.rs`,
+`slug_query_v2/src/output.rs`,
+`slug_query_v2/tests/loading_query.rs`,
+`slug_cli_v2/src/commands/query.rs`,
+`slug_cli_v2/tests/cli.rs`,
+and `slug_server_v2/src/{lib,tests}.rs`. Add an explicit `Package` output
+format and render from the already-selected labels without DICE re-entry:
+derive each package identifier, strip leading `//` only for the main
+repository, sort lexicographically, deduplicate, and emit one line each.
+`--order_output` must not change package order. One-shot and retained-daemon
+outputs must be exact.
+
+Do not change Cargo/dependencies, query functions/registry, parser grammar,
+graph identity/equality, loading metadata, evaluator traversal, target-pattern
+breadth, cquery/aquery behavior, JVM/regex code, other fixtures, or workspace
+assets. Validate the three exact Bazel rows from two fresh roots, protected
+fixture rows, focused command/query/CLI/server tests, the direct four-crate
+suite, formatting, diff, archive, and daemon cleanup. Stop if formatting needs
+new graph state, external-repository loading, a DICE key, or any behavior
+beyond Bazel 9.2 `PackageOutputFormatter`.
+
 ## `tests` / `visible` feasibility ranking accepted (2026-07-23)
 
 Bazel 9.2.0 `TestsFunction` is the smaller truthful residual query vertical.
