@@ -19,22 +19,26 @@ use dice::Dice;
 use dice::DiceTransaction;
 use dice::DynKey;
 use dice::Key;
+use dice::RootActivation;
 use dice::UserComputationData;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
-use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
+use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::VisibilitySource;
 use slug_loading_v2::bzl_load_cycle_detector;
+use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
+use slug_loading_v2::keys::WorkspaceDirectoryKey;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
+use slug_loading_v2::keys::WorkspaceFileKey;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
@@ -68,6 +72,7 @@ use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
+use slug_workspace_v2::WorkspaceRawFileKey;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
@@ -3752,24 +3757,54 @@ fn root_query_workspace() -> NormalizedAbsolutePath {
 
 #[derive(Default)]
 struct RootAnchorTracker {
-    activations: AtomicUsize,
-    legacy_subtrees: AtomicUsize,
+    typed_roots: AtomicUsize,
+    forbidden: AtomicUsize,
 }
 
 impl ActivationTracker for RootAnchorTracker {
+    fn root_activated(&self, key: &DynKey, _activation: RootActivation) {
+        if key.downcast_ref::<RootQueryCommandKey>().is_some() {
+            self.typed_roots.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
     fn key_activated(
         &self,
         key: &DynKey,
         _deps: &mut dyn Iterator<Item = &DynKey>,
         _activation: ActivationData,
     ) {
-        if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
-            self.activations.fetch_add(1, Ordering::Relaxed);
-        }
-        if key.downcast_ref::<SubtreePackageSetKey>().is_some() {
-            self.legacy_subtrees.fetch_add(1, Ordering::Relaxed);
+        if key.downcast_ref::<RootModuleGraphKey>().is_some()
+            || key.downcast_ref::<PackageLoadKey>().is_some()
+            || key.downcast_ref::<SubtreePackageSetKey>().is_some()
+            || key.downcast_ref::<WorkspaceSnapshotKey>().is_some()
+            || key.downcast_ref::<WorkspaceRawSnapshotKey>().is_some()
+            || key
+                .downcast_ref::<WorkspaceDirectorySnapshotKey>()
+                .is_some()
+            || key.downcast_ref::<WorkspaceFileKey>().is_some()
+            || key.downcast_ref::<WorkspaceRawFileKey>().is_some()
+            || key.downcast_ref::<WorkspaceDirectoryKey>().is_some()
+        {
+            self.forbidden.fetch_add(1, Ordering::Relaxed);
         }
     }
+}
+
+async fn compute_root_query(
+    transaction: &mut DiceTransaction,
+    key: &RootQueryCommandKey,
+    tracker: &RootAnchorTracker,
+) -> <RootQueryCommandKey as Key>::Value {
+    let before = tracker.typed_roots.load(Ordering::Relaxed);
+    let value = transaction.compute(key).await.unwrap();
+    assert_eq!(
+        tracker.typed_roots.load(Ordering::Relaxed),
+        before + 1,
+        "each command compute must activate exactly one typed query root"
+    );
+    assert_eq!(tracker.forbidden.load(Ordering::Relaxed), 0);
+    value
 }
 
 async fn root_query_transaction(
@@ -3908,7 +3943,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         tracker.clone(),
     )
     .await;
-    let empty_need = no_anchor.compute(&empty_key).await.unwrap();
+    let empty_need = compute_root_query(&mut no_anchor, &empty_key, &tracker).await;
     assert!(matches!(empty_need, QueryPreparationOutcome::Need(_)));
     assert!(!RootQueryCommandKey::validity(&empty_need));
     assert!(!RootQueryCommandKey::equality(&empty_need, &empty_need));
@@ -3919,17 +3954,16 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         tracker.clone(),
     )
     .await;
-    let empty = base.compute(&empty_key).await.unwrap();
+    let empty = compute_root_query(&mut base, &empty_key, &tracker).await;
     let QueryPreparationOutcome::Complete(empty_result) = &empty else {
         panic!("valid empty query did not complete after its root anchor");
     };
     assert!(empty_result.as_ref().as_ref().unwrap().labels.is_empty());
     assert!(RootQueryCommandKey::validity(&empty));
     assert!(RootQueryCommandKey::equality(&empty, &empty));
-    assert!(tracker.activations.load(Ordering::Relaxed) >= 2);
 
     let lazy_key = root_query_key("//first:t union //later:t");
-    let lazy_need = base.compute(&lazy_key).await.unwrap();
+    let lazy_need = compute_root_query(&mut base, &lazy_key, &tracker).await;
     let QueryPreparationOutcome::Need(needs) = &lazy_need else {
         panic!("missing first package escaped as a semantic QueryError");
     };
@@ -3952,7 +3986,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
     );
     complete_epoch.package("later", "filegroup(name = \"t\")\n", 2);
     let mut complete = root_query_transaction(&dice, complete_epoch.build(), tracker.clone()).await;
-    let result = complete.compute(&lazy_key).await.unwrap();
+    let result = compute_root_query(&mut complete, &lazy_key, &tracker).await;
     let QueryPreparationOutcome::Complete(query_result) = &result else {
         panic!("complete typed root query returned Need");
     };
@@ -3970,7 +4004,9 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         QueryOutputCompletion::Standard,
     )
     .unwrap();
-    let QueryPreparationOutcome::Complete(full) = complete.compute(&full_key).await.unwrap() else {
+    let QueryPreparationOutcome::Complete(full) =
+        compute_root_query(&mut complete, &full_key, &tracker).await
+    else {
         panic!("Full order returned Need")
     };
     assert_eq!(
@@ -3978,10 +4014,9 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         ["//later:t", "//first:t"]
     );
 
-    let QueryPreparationOutcome::Complete(loadfiles) = complete
-        .compute(&root_query_key("loadfiles(//first:t)"))
-        .await
-        .unwrap()
+    let loadfiles_key = root_query_key("loadfiles(//first:t)");
+    let QueryPreparationOutcome::Complete(loadfiles) =
+        compute_root_query(&mut complete, &loadfiles_key, &tracker).await
     else {
         panic!("loadfiles returned Need")
     };
@@ -3991,7 +4026,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
     );
     let buildfiles_key = root_query_key("buildfiles(//first:t)");
     let QueryPreparationOutcome::Complete(buildfiles) =
-        complete.compute(&buildfiles_key).await.unwrap()
+        compute_root_query(&mut complete, &buildfiles_key, &tracker).await
     else {
         panic!("buildfiles returned Need")
     };
@@ -4019,7 +4054,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
     let mut broken_companion =
         root_query_transaction(&dice, broken_companion_epoch.build(), tracker.clone()).await;
     let QueryPreparationOutcome::Complete(broken_companion) =
-        broken_companion.compute(&buildfiles_key).await.unwrap()
+        compute_root_query(&mut broken_companion, &buildfiles_key, &tracker).await
     else {
         panic!("broken companion BUILD returned Need")
     };
@@ -4040,7 +4075,9 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         QueryOutputCompletion::LabelKind,
     )
     .unwrap();
-    let QueryPreparationOutcome::Complete(v1) = complete.compute(&kind_key).await.unwrap() else {
+    let QueryPreparationOutcome::Complete(v1) =
+        compute_root_query(&mut complete, &kind_key, &tracker).await
+    else {
         panic!("kind returned Need")
     };
     assert_eq!(
@@ -4056,7 +4093,9 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         3,
     );
     let mut edited = root_query_transaction(&dice, edited_epoch.build(), tracker.clone()).await;
-    let QueryPreparationOutcome::Complete(v2) = edited.compute(&kind_key).await.unwrap() else {
+    let QueryPreparationOutcome::Complete(v2) =
+        compute_root_query(&mut edited, &kind_key, &tracker).await
+    else {
         panic!("edit returned Need")
     };
     assert_eq!(
@@ -4064,7 +4103,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         "test_suite rule //first:t\n"
     );
     let QueryPreparationOutcome::Complete(fallback) =
-        edited.compute(&buildfiles_key).await.unwrap()
+        compute_root_query(&mut edited, &buildfiles_key, &tracker).await
     else {
         panic!("fallback companion returned Need")
     };
@@ -4082,7 +4121,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
     );
     let mut special = root_query_transaction(&dice, special_epoch.build(), tracker.clone()).await;
     let QueryPreparationOutcome::Complete(special) =
-        special.compute(&buildfiles_key).await.unwrap()
+        compute_root_query(&mut special, &buildfiles_key, &tracker).await
     else {
         panic!("special-file companion returned Need")
     };
@@ -4104,7 +4143,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
     );
     let mut symlink = root_query_transaction(&dice, symlink_epoch.build(), tracker.clone()).await;
     let QueryPreparationOutcome::Complete(symlink) =
-        symlink.compute(&buildfiles_key).await.unwrap()
+        compute_root_query(&mut symlink, &buildfiles_key, &tracker).await
     else {
         panic!("symlink companion returned Need")
     };
@@ -4126,7 +4165,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
     );
     let mut deleted = root_query_transaction(&dice, deleted_epoch.build(), tracker.clone()).await;
     let QueryPreparationOutcome::Complete(deleted) =
-        deleted.compute(&buildfiles_key).await.unwrap()
+        compute_root_query(&mut deleted, &buildfiles_key, &tracker).await
     else {
         panic!("missing companion marker returned Need")
     };
@@ -4139,9 +4178,9 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
         5,
     );
-    let mut restored = root_query_transaction(&dice, restored_epoch.build(), tracker).await;
+    let mut restored = root_query_transaction(&dice, restored_epoch.build(), tracker.clone()).await;
     let QueryPreparationOutcome::Complete(restored) =
-        restored.compute(&buildfiles_key).await.unwrap()
+        compute_root_query(&mut restored, &buildfiles_key, &tracker).await
     else {
         panic!("restored companion marker returned Need")
     };
@@ -4182,7 +4221,8 @@ async fn typed_recursive_query_unions_package_roots_and_replays_package_lifecycl
     let mut need =
         root_query_transaction_with_roots(&dice, need_epoch.build(), tracker.clone(), roots())
             .await;
-    let QueryPreparationOutcome::Need(needs) = need.compute(&key).await.unwrap() else {
+    let QueryPreparationOutcome::Need(needs) = compute_root_query(&mut need, &key, &tracker).await
+    else {
         panic!("missing root listings escaped as QueryError");
     };
     let paths = needs
@@ -4245,14 +4285,16 @@ async fn typed_recursive_query_unions_package_roots_and_replays_package_lifecycl
         roots(),
     )
     .await;
-    let QueryPreparationOutcome::Complete(result) = complete.compute(&key).await.unwrap() else {
+    let QueryPreparationOutcome::Complete(result) =
+        compute_root_query(&mut complete, &key, &tracker).await
+    else {
         panic!("complete recursive query returned Need");
     };
     assert_eq!(
         result.as_ref().as_ref().unwrap().labels.as_ref(),
         ["//alpha:t", "//beta:t", "//shared:root_a"]
     );
-    assert_eq!(tracker.legacy_subtrees.load(Ordering::Relaxed), 0);
+    assert_eq!(tracker.forbidden.load(Ordering::Relaxed), 0);
 
     let mut policy_deleted = root_query_transaction_with_policy(
         &dice,
@@ -4263,7 +4305,7 @@ async fn typed_recursive_query_unions_package_roots_and_replays_package_lifecycl
     )
     .await;
     let QueryPreparationOutcome::Complete(policy_deleted) =
-        policy_deleted.compute(&key).await.unwrap()
+        compute_root_query(&mut policy_deleted, &key, &tracker).await
     else {
         panic!("deleted-package policy returned Need");
     };
@@ -4277,7 +4319,9 @@ async fn typed_recursive_query_unions_package_roots_and_replays_package_lifecycl
     let mut ignored =
         root_query_transaction_with_roots(&dice, ignored_epoch.build(), tracker.clone(), roots())
             .await;
-    let QueryPreparationOutcome::Complete(ignored) = ignored.compute(&key).await.unwrap() else {
+    let QueryPreparationOutcome::Complete(ignored) =
+        compute_root_query(&mut ignored, &key, &tracker).await
+    else {
         panic!("ignored-package transition returned Need");
     };
     assert_eq!(
@@ -4292,7 +4336,9 @@ async fn typed_recursive_query_unions_package_roots_and_replays_package_lifecycl
         roots(),
     )
     .await;
-    let QueryPreparationOutcome::Complete(edited) = edited.compute(&key).await.unwrap() else {
+    let QueryPreparationOutcome::Complete(edited) =
+        compute_root_query(&mut edited, &key, &tracker).await
+    else {
         panic!("recursive edit returned Need");
     };
     assert_eq!(
@@ -4307,7 +4353,9 @@ async fn typed_recursive_query_unions_package_roots_and_replays_package_lifecycl
         roots(),
     )
     .await;
-    let QueryPreparationOutcome::Complete(deleted) = deleted.compute(&key).await.unwrap() else {
+    let QueryPreparationOutcome::Complete(deleted) =
+        compute_root_query(&mut deleted, &key, &tracker).await
+    else {
         panic!("recursive deletion returned Need");
     };
     assert_eq!(
@@ -4318,11 +4366,13 @@ async fn typed_recursive_query_unions_package_roots_and_replays_package_lifecycl
     let mut restored = root_query_transaction_with_roots(
         &dice,
         complete_epoch(14, "t", true).build(),
-        tracker,
+        tracker.clone(),
         roots(),
     )
     .await;
-    let QueryPreparationOutcome::Complete(restored) = restored.compute(&key).await.unwrap() else {
+    let QueryPreparationOutcome::Complete(restored) =
+        compute_root_query(&mut restored, &key, &tracker).await
+    else {
         panic!("recursive restore returned Need");
     };
     assert_eq!(
@@ -4424,7 +4474,7 @@ async fn typed_recursive_query_preserves_non_utf8_directory_identity_until_a_mar
     let mut without_marker =
         root_query_transaction_with_roots(&dice, epoch(20, false), tracker.clone(), roots()).await;
     let QueryPreparationOutcome::Complete(without_marker) =
-        without_marker.compute(&key).await.unwrap()
+        compute_root_query(&mut without_marker, &key, &tracker).await
     else {
         panic!("non-UTF8 non-package returned Need");
     };
@@ -4438,8 +4488,9 @@ async fn typed_recursive_query_preserves_non_utf8_directory_identity_until_a_mar
     );
 
     let mut with_marker =
-        root_query_transaction_with_roots(&dice, epoch(21, true), tracker, roots()).await;
-    let QueryPreparationOutcome::Complete(with_marker) = with_marker.compute(&key).await.unwrap()
+        root_query_transaction_with_roots(&dice, epoch(21, true), tracker.clone(), roots()).await;
+    let QueryPreparationOutcome::Complete(with_marker) =
+        compute_root_query(&mut with_marker, &key, &tracker).await
     else {
         panic!("non-UTF8 package marker returned Need");
     };

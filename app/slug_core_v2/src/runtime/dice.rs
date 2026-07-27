@@ -3295,6 +3295,7 @@ mod tests {
     use dice::ActivationData;
     use dice::ActivationTracker;
     use dice::DynKey;
+    use dice::RootActivation;
     use slug_events_v2::CaptureEvaluationEvents;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
@@ -5310,10 +5311,17 @@ mod tests {
 
     #[derive(Default)]
     struct LegacyBuildTracker {
-        activations: AtomicUsize,
+        typed_roots: AtomicUsize,
+        forbidden: AtomicUsize,
     }
 
     impl ActivationTracker for LegacyBuildTracker {
+        fn root_activated(&self, key: &DynKey, _activation: RootActivation) {
+            if key.downcast_ref::<BuildCommandRootKey>().is_some() {
+                self.typed_roots.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
         fn key_activated(
             &self,
             key: &DynKey,
@@ -5326,10 +5334,44 @@ mod tests {
                     .downcast_ref::<slug_loading_v2::keys::PackageLoadKey>()
                     .is_some()
                 || key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some()
+                || key
+                    .downcast_ref::<slug_workspace_v2::WorkspaceSnapshotKey>()
+                    .is_some()
+                || key
+                    .downcast_ref::<slug_workspace_v2::WorkspaceRawSnapshotKey>()
+                    .is_some()
+                || key
+                    .downcast_ref::<slug_loading_v2::keys::WorkspaceDirectorySnapshotKey>()
+                    .is_some()
+                || key
+                    .downcast_ref::<slug_workspace_v2::WorkspaceFileKey>()
+                    .is_some()
+                || key
+                    .downcast_ref::<slug_workspace_v2::WorkspaceRawFileKey>()
+                    .is_some()
+                || key
+                    .downcast_ref::<slug_workspace_v2::WorkspaceDirectoryKey>()
+                    .is_some()
             {
-                self.activations.fetch_add(1, Ordering::Relaxed);
+                self.forbidden.fetch_add(1, Ordering::Relaxed);
             }
         }
+    }
+
+    async fn compute_build_root(
+        transaction: &mut dice::DiceTransaction,
+        key: &BuildCommandRootKey,
+        tracker: &LegacyBuildTracker,
+    ) -> BuildCommandOutcome {
+        let before = tracker.typed_roots.load(Ordering::Relaxed);
+        let value = transaction.compute(key).await.unwrap();
+        assert_eq!(
+            tracker.typed_roots.load(Ordering::Relaxed),
+            before + 1,
+            "each command compute must activate exactly one typed build root"
+        );
+        assert_eq!(tracker.forbidden.load(Ordering::Relaxed), 0);
+        value
     }
 
     fn build_test_error(pattern: &str) -> BuildCommandError {
@@ -5431,12 +5473,19 @@ mod tests {
     #[tokio::test]
     async fn build_command_root_anchors_empty_and_preserves_ordered_package_results() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(LegacyBuildTracker::default());
+        let user_data = UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
         let configuration = build_test_configuration("target");
         let empty_key =
             BuildCommandRootKey::new(workspace.clone(), &[], configuration.clone()).unwrap();
-        let mut empty = build_root_transaction(&dice, BuildRootEpoch::base(1).build()).await;
-        let empty_outcome = empty.compute(&empty_key).await.unwrap();
+        let mut empty =
+            build_root_transaction_with_data(&dice, BuildRootEpoch::base(1).build(), user_data)
+                .await;
+        let empty_outcome = compute_build_root(&mut empty, &empty_key, &tracker).await;
         let slug_bzlmod_v2::SourcePreparationOutcome::Complete(empty_value) = &empty_outcome else {
             panic!("complete root anchor returned Need");
         };
@@ -5456,8 +5505,13 @@ mod tests {
         let mut epoch = BuildRootEpoch::base(2);
         epoch.package("first", "filegroup(name = \"t\")\n", 2);
         epoch.package("second", "filegroup(name = \"other\")\n", 2);
-        let mut transaction = build_root_transaction(&dice, epoch.build()).await;
-        let value = transaction.compute(&key).await.unwrap();
+        let user_data = UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        let mut transaction =
+            build_root_transaction_with_data(&dice, epoch.build(), user_data).await;
+        let value = compute_build_root(&mut transaction, &key, &tracker).await;
         let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = value else {
             panic!("complete package bundle returned Need");
         };
@@ -5797,7 +5851,7 @@ probe = rule(implementation = _impl)
                 configuration.clone(),
             )
             .unwrap();
-            let value = transaction.compute(&key).await.unwrap();
+            let value = compute_build_root(&mut transaction, &key, &tracker).await;
             assert!(matches!(
                 value,
                 slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
@@ -5810,7 +5864,7 @@ probe = rule(implementation = _impl)
             configuration,
         )
         .unwrap();
-        let missing = transaction.compute(&missing_key).await.unwrap();
+        let missing = compute_build_root(&mut transaction, &missing_key, &tracker).await;
         assert!(matches!(
             missing,
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
@@ -5827,7 +5881,7 @@ probe = rule(implementation = _impl)
                         && build_file == Path::new("/workspace/native/BUILD.bazel")
                 )
         ));
-        assert_eq!(tracker.activations.load(Ordering::Relaxed), 0);
+        assert_eq!(tracker.forbidden.load(Ordering::Relaxed), 0);
     }
 
     #[tokio::test]

@@ -13482,3 +13482,31 @@ multi-compute case and assert a one-root activation delta, not rely on a
 cumulative root count.
 
 Implement next only `WP-5-m1-preactivation-host-gate`.
+
+### Preactivation Host gate implementation
+
+Status: **ACCEPT** for `WP-5-m1-preactivation-host-gate` on 2026-07-27 after
+one terminal independent implementation review.
+
+The exact two-file test-only gate now wraps every accepted typed build/query
+compute with an exact one-command-root activation delta and rejects every
+named eager snapshot owner/projection and legacy semantic key. The combined
+trackers cover workspace snapshot/raw/directory snapshots, file/raw/directory
+projections, the legacy root module graph, workspace evaluation, package load,
+configured analysis, and query subtree owner. They exercise the accepted
+empty, package-wide, native, missing-target, Starlark-analysis, direct/lazy,
+recursive multi-root, `loadfiles()`, and `buildfiles()` lifecycle cases.
+
+Focused core 8 and query 3 tests pass. Full core passes 118 unit plus 13
+integration tests; full query passes 17 unit, 43 loading-query, and 6
+integration tests. Direct loading/analysis checks, GNU-Windows no-run linkage,
+formatting, diff, exact two-file, and no-Cargo guards pass. The activated
+CLI/server scan retains six expected legacy adapter matches as explicit
+blockers, and the daemon observation scan confirms the existing observation
+flow remains unactivated while `invalidated_files` ownership is unchanged.
+The terminal independent review returned `ACCEPT`.
+
+Design next only `WP-5-m1-private-opaque-terminal-envelope-design`. Freeze the
+private terminal result/output boundary required for an atomic typed query
+activation; add no production caller, CLI/server behavior, execution, JVM,
+Java-bytecode, or Bazel delegation.

@@ -1,33 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-preactivation-host-gate`
+Packet: `WP-5-m1-private-opaque-terminal-envelope-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted preactivation Host-gate design over dormant typed
-build/query roots and all accepted Host migrations
-Validation tier: test-only type-downcast transitive closure gate
+Evidence: accepted dormant typed build/query roots and executable
+preactivation Host transitive-closure gate
+Validation tier: design/source/ownership audit
 
-Implementation files:
+Design files:
 
-- `app/slug_core_v2/src/runtime/dice.rs`
-- `app/slug_query_v2/tests/loading_query.rs`
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Result: extend the real build/query activation trackers to reject every named
-eager snapshot owner/projection and legacy semantic spine while exercising the
-accepted empty/direct/lazy/recursive/buildfiles/loadfiles/package/native/
-missing/Starlark cases.
+Result: freeze the smallest private opaque terminal result/output envelope
+needed between the accepted typed query command root, the retry/effect owner,
+and a future atomic CLI/server activation packet. Specify ownership, exact
+success/Need/semantic/infrastructure states, output-completion projection,
+terminal closure/effect selection, retry rules, and invalidation boundaries.
 
-Assert one typed-command-root activation delta around every reused
-multi-compute case and zero forbidden activations. Run the accepted activated
-CLI/server call-site scan and retain its current matches as blockers;
-`FilesystemObservationAdapter` remains permitted only for metric-only
-`invalidated_files`.
+Audit current query/build result adapters and typed-root value shapes from the
+live checkout. Prefer a query-first activation route that gets simple query
+operations working without coupling execution or build output publication.
+Name exact future implementation files, tests, call-site removals, validation,
+and stop conditions.
 
-Add no third file, production code, Cargo/dependency/public API, CLI/server
-behavior, activation, envelope, execution, JVM, Java-bytecode, or Bazel
-delegation. Forbidden activation is `REPLAN`. Validate focused and full
-core/query, direct loading/analysis, GNU-Windows linkage, formatting, diff,
-scope, and call-site/metric scans. Obtain one terminal implementation review.
+Add no Rust, production caller, public API, Cargo/dependency change,
+CLI/server behavior, activation, snapshot retirement, execution, JVM,
+Java-bytecode, or Bazel delegation. Obtain one terminal design review.
