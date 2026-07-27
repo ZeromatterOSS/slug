@@ -11338,3 +11338,121 @@ baseline `088c75…` only for already-approved compact utility patterns, V1
 `e218054…` as rejected/reference-only, and the V2 implementation/evidence
 commits. That record authorizes no new Buck/V1 extraction and does not claim
 consumer activation.
+
+### Simple Host glob segment matcher oracle design
+
+Status: `ACCEPT` on 2026-07-27 after terminal pinned-source/behavior,
+fixture/implementation, and architecture/orchestration latest-text reviews.
+No fixture, generated expectation, Bazel process, harness, Rust, Cargo, DICE
+key, parser, Host owner, loading consumer, event owner, or Stage 9 row changed.
+
+Implement only
+`WP-5-m1-loading-host-glob-segment-matcher-oracle` by extending the existing
+pinned Bazel 9.2 `glob-callable-contract` fixture. Add one isolated
+`//segment_matcher` package and one fifth query command. Do not create a new
+fixture or change `glob-directory-invalidation`,
+`glob-raw-name-pattern-lazy`, or `glob-package-boundaries`.
+
+The exact implementation allowlist is:
+
+- `tests/v2_oracle/fixtures/glob-callable-contract/fixture.toml`, at most
+  +20/-8;
+- `tests/v2_oracle/fixtures/glob-callable-contract/expected/oracle.json`,
+  generated only, at most +45/-12;
+- new
+  `tests/v2_oracle/fixtures/glob-callable-contract/workspace/segment_matcher/BUILD.bazel`,
+  at most 30 lines;
+- new
+  `tests/v2_oracle/fixtures/glob-callable-contract/workspace/segment_matcher/.hidden.txt`,
+  exactly one newline-terminated line; and
+- new
+  `tests/v2_oracle/fixtures/glob-callable-contract/workspace/segment_matcher/m-left-id-right-end.txt`,
+  exactly one newline-terminated line.
+
+The hard aggregate cap is +100/-25. This adds exactly three regular files, no
+symlinks, and one command. No MODULE, `.bzl`, Python, mutation, manifest
+capture, server-epoch capture, Rust, Cargo, parser, workspace observation,
+package boundary, Host owner, consumer, or other fixture path may change.
+
+Update the fixture description and notes only enough to include simple
+terminal-segment matcher membership while retaining broader pattern syntax,
+ordering, raw names, symlinks, invalidation, package boundaries, and query
+semantics as out of scope. Add pinned commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` anchors for:
+
+- `src/main/java/com/google/devtools/build/lib/vfs/UnixGlob.java:212-248`,
+  where exact `*` returns before the leading-dot guard, `*.suffix` runs after
+  it, and other wildcard patterns use the general matcher;
+- `UnixGlob.java:257-312`, where each non-adjacent `*` becomes `.*`;
+- `src/test/java/com/google/devtools/build/lib/skyframe/GlobTestBase.java:248-285`,
+  covering middle and multiple non-adjacent stars; and
+- `GlobTestBase.java:499-511`, where bare `*` includes hidden names and
+  `BUILD` while a non-dot-prefixed suffix pattern excludes leading-dot names.
+
+The new BUILD file uses four top-level list comprehensions and no local
+`def`. For every result, declare a `filegroup` whose name is the prefix plus
+the returned path and whose `srcs` contains that path:
+
+- `glob(["*"])` with prefix `bare_`;
+- `glob(["*.txt"])` with prefix `txt_`;
+- `glob([".*.txt"])` with prefix `dot_`; and
+- `glob(["m*id*end.txt"])` with prefix `multi_`.
+
+Do not use `exclude` or `allow_empty`; every intended positive disappears
+loudly if its asset or matcher behavior is wrong. The visible filename forces
+both non-adjacent stars to consume nonempty spans. The earlier raw-name oracle
+already proves a single star consuming an empty span. Query sorting owns only
+the stable evidence projection; this packet claims matcher membership, not
+the order returned by `glob()`.
+
+Append exactly:
+
+```toml
+[[commands]]
+name = "simple_segment_matcher"
+argv = ["query", "//segment_matcher:all"]
+expected_exit = 0
+stdout_patterns = ["\\A//segment_matcher:bare_\\.hidden\\.txt\\n//segment_matcher:bare_BUILD\\.bazel\\n//segment_matcher:bare_m-left-id-right-end\\.txt\\n//segment_matcher:dot_\\.hidden\\.txt\\n//segment_matcher:multi_m-left-id-right-end\\.txt\\n//segment_matcher:txt_m-left-id-right-end\\.txt\\Z"]
+```
+
+The six exact labels jointly prove that bare `*` includes the leading-dot
+file and the package BUILD file; `*.txt` includes the visible file but excludes
+the leading-dot file; the explicit-dot wildcard includes it; and the
+multiple-non-adjacent-star pattern matches with both spans nonempty. Retain
+the fixture's `message_shape` comparison. The new record must exit zero, have
+the exact normalized stdout, no mutation, and an empty manifest. The existing
+four command definitions remain byte-for-byte unchanged; regenerated raw
+run fields may vary, but their names, argv, exits, normalized stdout,
+diagnostic claims, and manifests must retain the accepted semantic
+projection.
+
+Generate once with pinned `/usr/bin/bazel`, then replay the complete five-row
+fixture from two distinct fresh absolute roots. Validate the exact fifth
+record and the protected first-four projection; run the focused and full
+oracle harness tests, Python compilation, fixture/schema/listing, exact
+allowlist and per-file/aggregate caps, archive inventory, diff, credential,
+process/daemon-cleanup, unchanged-protected-fixture, no-Slug, and
+forbidden-surface guards. Do not read or record the user's Bazel RC.
+
+At implementation closeout, record the measured line delta rather than an
+estimate in the oracle-harness owner plan. The accepted fixture currently has
+17 regular files, zero symlinks, 228 newline-counted lines, and four rows; the
+whole fixture tree at checkpoint `e2cc891d` has 1,314 regular files, 24
+symlinks, and 39,304 lines. This implementation is oracle packet one after
+that checkpoint and adds three regular files, zero symlinks, and one row. It
+remains below five packets, roughly 100 files, and 10,000 lines, so no
+fixture-growth review is due.
+
+Stop on any source contradiction, unexpected label, nonempty manifest,
+fixture-command mutation, cap or allowlist expansion, protected-fixture
+change, harness/Rust/Slug scope, broader matcher syntax, raw-name or
+Windows claim, package-boundary or invalidation claim, new dependency, or
+credential/process leak.
+
+After terminal oracle acceptance, implement only the already-accepted private
+three-file
+`WP-5-m1-loading-pure-host-glob-segment-candidates-owner`. Package-boundary
+projection, multi-segment and `**` traversal, regular-or-special BUILD/`.bzl`
+acquisition, parser activation, transactional evaluator retry, and every
+consumer remain later and separate. No Stage 9 edit is due for this design or
+oracle-only implementation.
