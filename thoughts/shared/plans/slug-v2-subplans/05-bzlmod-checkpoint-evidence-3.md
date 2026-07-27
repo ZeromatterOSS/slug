@@ -10599,3 +10599,44 @@ replan.
 
 Next packet: implement only
 `WP-5-m1-loading-host-dirent-glob-oracle`.
+
+### Focused Host-dirent glob oracle implementation
+
+Status: `ACCEPT` on 2026-07-27 in `0a4aa0af` after one pinned Bazel 9.2
+generation, two distinct absolute fresh-root replays, and source/parity,
+native implementation/evidence, plus architecture/orchestration terminal
+latest-diff reviews.
+
+The existing fixture now has exactly thirteen commands on server epoch 1.
+The state rows preserve the exact `5/3/4/3/5/3/5` matrix across the two
+required absent observations, followed by the matched-cycle exit-7 row with
+the three stable ELOOP fragments and exact same-daemon recovery. All manifests
+are empty. The first four records preserve every prepacket field and value,
+adding only `server_epoch`; their canonical projection SHA-256 is
+`8b071ed78fd40d7046f2b7e4e96461b53ee85346e37d41006e22a53d4137b393`.
+The checked expectation SHA-256 is
+`05caae64afeca0364a5c127a5a7de46c48e67e10990384462e69d8be2c93f7b6`.
+
+The POSIX-only harness adds strict FIFO parsing and creation plus no-follow
+directory/FIFO rename support. Creation rejects collisions, escaping paths,
+and missing or symlink parents, forces and verifies FIFO mode 0600, and rolls
+back a failed post-create verification. The exact fixture inventory is ten
+regular files, six relative symlinks, and 667 newline-counted regular-file
+lines. Accepted packet growth is +669/-10 under the +900/-100 cap, with the
+exact sixteen-path allowlist, four new regular assets, six new symlinks, and
+twenty unique source anchors resolving at pinned Bazel commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`.
+
+Generation and both fresh-root replays passed with path-free stable records;
+review replays produced identical output hashes and left no Bazel, Slug,
+FIFO, socket, or runner state. Focused direct assertions, Python bytecode
+compilation, first-four projection, source/archive/credential/scope/growth/
+symlink guards, and `git diff --check` passed. `pytest` was unavailable in
+the environment (`No module named pytest`), so the focused assertions were
+executed directly. All three terminal reviewers returned `ACCEPT`.
+
+This is post-checkpoint oracle packet three after accepted checkpoint
+`22de3631`; no fixture-growth checkpoint is due.
+
+Next packet: implement only
+`WP-5-m1-loading-host-dirent-observation`.
