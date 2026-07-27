@@ -10868,3 +10868,38 @@ alone implements Bazel path strings.
 
 Next packet after terminal acceptance of this design: implement only
 `WP-5-m1-loading-bazel-internal-string-oracle`.
+
+### Bazel-internal string oracle implementation
+
+Status: `ACCEPT` on 2026-07-27 in `98b8b0e1` after one corrected pinned
+generation, two distinct absolute fresh-root replays, root validation, and
+three terminal source/parity, implementation/evidence, and
+architecture/orchestration latest-diff reviews.
+
+The exact six-file Bazel-only fixture adds eight rows on one retained server.
+Two ASCII query projections prove the accepted BUILD/`.bzl` literal and
+dynamic byte-string matrix. Six cumulative unique full-line replacements then
+pin the generated `\400`, `\x41`, `\u00e9`, `\U0001f600`, and `\q` failures
+plus the multibyte/triple-string undefined-name diagnostic. Exact locations
+are `3:17`, `3:15` four times, and the discriminating Bazel byte column
+`3:24`; all exits are `0,0,7,7,7,7,7,7`, all epochs are 1, stdout is ASCII,
+and every manifest is empty.
+
+Generation and both fresh-root replays produced byte-identical normalized
+projections and complete Bazel/runner cleanup. The first stopped generation
+exposed only the harness's documented backslash-to-slash normalization; the
+five message needles were corrected to the observed normalized forms without
+changing Bazel semantics, locations, row order, or scope. The final inventory
+is six regular files, zero links, and 519 added lines: 140/260 in
+`fixture.toml`, 286/750 in the generated oracle, 14/70 in the root BUILD,
+74/90 in `defs.bzl`, 4/25 in the bad BUILD, and 1/1 in `MODULE.bazel`.
+No harness, Slug, parser, Cargo, dependency, Host, loading, DICE, consumer,
+raw-name, or `glob()` surface changed. All terminal reviews returned
+`ACCEPT`.
+
+This is post-checkpoint oracle packet four after `22de3631`; no fixture-growth
+review is due for this packet. Whichever oracle next reaches `ACCEPT` is
+packet five and must perform and record the focused fixture-growth review.
+
+Next packet: implement only
+`WP-5-m1-starlark-bazel-internal-string-seam`.
