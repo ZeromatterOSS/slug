@@ -3,6 +3,9 @@ name = "nonroot-interim-module-graph"
 description = "Bazel 9.2 registry nonroot InterimModule graph semantics and exact local directory collation/charset transport."
 comparison = "message_shape"
 daemon = true
+startup_argv = ["--nosystem_rc", "--noworkspace_rc", "--nohome_rc"]
+env = { BAZELRC = "" }
+observe_server_epochs = true
 oracle_notes = "A retained local registry isolates nonroot graph semantics. subject's nodep shared@2 request upgrades root-introduced shared@1 without becoming a subject edge; the subject's dev dependency and single_version_override are ignored. Nonzero compatibility_level and max_compatibility_level are Bazel 9 no-op source inputs only. Eight appended semantic rows select the previously ignored devonly module and move its local-registry MODULE.bazel through ordinary, ASCII directory-listing, mutable-metadata fail-open, absent, exact restoration, ROOT-collated ISO-8859-1 directory-listing, empty followed-directory, and final ordinary-restoration states while comparing the visible lockfile."
 
 [provenance]
@@ -20,9 +23,19 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ArchiveRepoSpecBuilder.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java",
+  "src/main/java/com/google/devtools/build/lib/buildeventservice/BuildEventServiceModule.java",
+  "src/main/java/com/google/devtools/build/lib/buildeventservice/BazelBuildEventServiceModule.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/commands/QueryEnvironmentBasedCommand.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/CommandLineEvent.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/BlazeCommandDispatcher.java",
+  "src/main/java/com/google/devtools/build/lib/server/CommandServer.java",
   "src/main/cpp/blaze.cc",
+  "src/main/cpp/option_processor.cc",
+  "src/main/cpp/startup_options.cc",
+  "src/main/cpp/blaze_util.cc",
+  "src/main/cpp/blaze_util_linux.cc",
 ]
-translation_notes = "Bazel 9.2 ModuleFileGlobals stores compatibility_level as 0 and max_compatibility_level as -1; this fixture does not infer those internal values from command output. Nonroot execution ignores dev dependencies and module overrides. Bazel's default server launch selects ROOT locale and ISO-8859-1. OpenJDK 25.0.2 source openjdk/jdk25u@405a5699ebd097464ed3fc9345414b0774a2edc9 owns the exact transport matrix: src/java.base/share/classes/sun/net/www/protocol/file/FileURLConnection.java:76-87,180-205; src/java.base/share/classes/java/io/File.java:1004-1058; src/java.base/share/classes/java/util/List.java:445-507; src/java.base/share/classes/java/text/Collator.java:223-340; src/java.base/share/classes/sun/util/locale/provider/CollatorProviderImpl.java:94-124; src/java.base/share/classes/sun/util/locale/provider/CollationRules.java:41+; src/java.base/share/classes/java/lang/String.java:867-877,1025-1058,1871-1885; src/java.base/unix/native/libjava/UnixFileSystem_md.c:104-131,296-358; src/java.base/unix/native/libjava/java_props_md.c:439-467; src/java.base/share/native/libjava/jni_util.c:699-835; and src/java.base/windows/native/libjava/WinNTFileSystem_md.c:219-263,406-428,695-813. These sources pin FileURLConnection direct-name enumeration, stable ROOT RuleBasedCollator sorting, LF termination, ISO-8859-1 replacement, Unix JNU decoding, and Windows UTF-16 enumeration. The portable seven-name directory produces exact 91-byte SRI sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=; the followed empty directory produces a found zero-byte MODULE value. Explicit host_jvm_args charset/collator input remains supported Bazel behavior but is deferred behind WP-5-m1-host-jvm-registry-byte-input-design. IndexRegistry checksums MODULE.bazel bytes for remote_module_file_integrity but fetches mutable metadata.json without a checksum; YankedVersionsFunction warns and fails open on metadata parse failure. BazelLockFileModule filters file: registry hashes from the visible lockfile, permitting exact distinct-root replay."
+translation_notes = "Bazel 9.2 ModuleFileGlobals stores compatibility_level as 0 and max_compatibility_level as -1; this fixture does not infer those internal values from command output. Nonroot execution ignores dev dependencies and module overrides. Bazel's default server launch selects ROOT locale and ISO-8859-1. OpenJDK 25.0.2 source openjdk/jdk25u@405a5699ebd097464ed3fc9345414b0774a2edc9 owns the exact transport matrix: src/java.base/share/classes/sun/net/www/protocol/file/FileURLConnection.java:76-87,180-205; src/java.base/share/classes/java/io/File.java:1004-1058; src/java.base/share/classes/java/util/List.java:445-507; src/java.base/share/classes/java/text/Collator.java:223-340; src/java.base/share/classes/sun/util/locale/provider/CollatorProviderImpl.java:94-124; src/java.base/share/classes/sun/util/locale/provider/CollationRules.java:41+; src/java.base/share/classes/java/lang/String.java:867-877,1025-1058,1871-1885; src/java.base/unix/native/libjava/UnixFileSystem_md.c:104-131,296-358; src/java.base/unix/native/libjava/java_props_md.c:439-467; src/java.base/share/native/libjava/jni_util.c:699-835; and src/java.base/windows/native/libjava/WinNTFileSystem_md.c:219-263,406-428,695-813. These sources pin FileURLConnection direct-name enumeration, stable ROOT RuleBasedCollator sorting, LF termination, ISO-8859-1 replacement, Unix JNU decoding, and Windows UTF-16 enumeration. The portable seven-name directory produces exact 91-byte SRI sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=; the followed empty directory produces a found zero-byte MODULE value. This fixture accepts exact explicit host_jvm_args occurrence, source, ordering, and daemon-reuse behavior; standalone JVM byte-execution semantics remain deferred behind WP-5-m1-host-jvm-registry-byte-execution-feasibility. IndexRegistry checksums MODULE.bazel bytes for remote_module_file_integrity but fetches mutable metadata.json without a checksum; YankedVersionsFunction warns and fails open on metadata parse failure. BazelLockFileModule filters file: registry hashes from the visible lockfile, permitting exact distinct-root replay."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-interim-module-graph --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-interim-module-graph --tool bazel --bazel /usr/bin/bazel"
 
@@ -326,3 +339,127 @@ manifest_roots = ["MODULE.bazel.lock"]
   path = "MODULE.bazel"
   find = "version = \"0.1.9\""
   replace = "version = \"0.1.4\""
+
+[[commands]]
+name = "fresh_conflicting_last_wins_utf8"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+startup_argv = ["--host_jvm_args=-Dfile.encoding=ISO-8859-1", "--host_jvm_args=-Dfile.encoding=UTF-8"]
+compare = "semantic"
+capture_server_epoch = true
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\""]
+stdout_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT).*"]
+stderr_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT)(?!.*Is a directory)(?!.*MODULE\\.bazel: not found).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.bazel"
+  destination = "registry/modules/devonly/1.0.0/MODULE.regular"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable-link"
+  destination = "registry/modules/devonly/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# a"
+  content = "CHILD_CONTENT_IS_NOT_TRANSPORT\n"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# B"
+  content = "CHILD_CONTENT_IS_NOT_TRANSPORT\n"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# Ã©"
+  content = "CHILD_CONTENT_IS_NOT_TRANSPORT\n"
+
+  [[commands.mutations]]
+  op = "create"
+  path = "registry/modules/devonly/1.0.0/MODULE.portable/# Ā"
+  content = "CHILD_CONTENT_IS_NOT_TRANSPORT\n"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.4\""
+  replace = "version = \"0.1.8\""
+
+[[commands]]
+name = "fresh_conflicting_cli_startup_diagnostics"
+argv = ["query", "//:BUILD.bazel", "--lockfile_mode=off", "--registry=file://%workspace%/registry", "--output=label", "--noshow_progress"]
+startup_argv = ["--host_jvm_args=-Dfile.encoding=ISO-8859-1", "--host_jvm_args=-Dfile.encoding=UTF-8"]
+compare = "semantic"
+capture_server_epoch = true
+capture_startup_diagnostics = true
+expected_exit = 0
+stdout_patterns = ["\\A//:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "reordered_same_multiset_retains_utf8"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+startup_argv = ["--host_jvm_args=-Dfile.encoding=UTF-8", "--host_jvm_args=-Dfile.encoding=ISO-8859-1"]
+compare = "semantic"
+capture_server_epoch = true
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\""]
+stdout_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT).*"]
+stderr_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT)(?!.*Is a directory)(?!.*MODULE\\.bazel: not found).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[[commands]]
+name = "reordered_cli_startup_diagnostics"
+argv = ["query", "//:BUILD.bazel", "--lockfile_mode=off", "--registry=file://%workspace%/registry", "--output=label", "--noshow_progress"]
+startup_argv = ["--host_jvm_args=-Dfile.encoding=UTF-8", "--host_jvm_args=-Dfile.encoding=ISO-8859-1"]
+compare = "semantic"
+capture_server_epoch = true
+capture_startup_diagnostics = true
+expected_exit = 0
+stdout_patterns = ["\\A//:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "rc_source_change_same_multiset_reuses"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+startup_argv = ["--bazelrc=startup-diagnostics.bazelrc"]
+compare = "semantic"
+capture_server_epoch = true
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\""]
+stdout_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT).*"]
+stderr_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT)(?!.*Is a directory)(?!.*MODULE\\.bazel: not found).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[[commands]]
+name = "rc_source_startup_diagnostics"
+argv = ["query", "//:BUILD.bazel", "--lockfile_mode=off", "--registry=file://%workspace%/registry", "--output=label", "--noshow_progress", "--announce_rc"]
+startup_argv = ["--bazelrc=startup-diagnostics.bazelrc"]
+compare = "semantic"
+capture_server_epoch = true
+capture_startup_diagnostics = true
+expected_exit = 0
+stdout_patterns = ["\\A//:BUILD\\.bazel\\Z"]
+
+[[commands]]
+name = "occurrence_change_restarts_latin1"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+startup_argv = ["--host_jvm_args=-Dfile.encoding=ISO-8859-1"]
+compare = "semantic"
+capture_server_epoch = true
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\""]
+stdout_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT).*"]
+stderr_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT)(?!.*Is a directory)(?!.*MODULE\\.bazel: not found).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+[[commands]]
+name = "zero_occurrences_restores_default"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+capture_server_epoch = true
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\""]
+stdout_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT).*"]
+stderr_patterns = ["(?s)\\A(?!.*CHILD_CONTENT_IS_NOT_TRANSPORT)(?!.*Is a directory)(?!.*MODULE\\.bazel: not found).*"]
+manifest_roots = ["MODULE.bazel.lock"]

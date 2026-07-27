@@ -1,0 +1,2 @@
+startup --host_jvm_args=-Dfile.encoding=ISO-8859-1
+startup:linux --host_jvm_args=-Dfile.encoding=UTF-8

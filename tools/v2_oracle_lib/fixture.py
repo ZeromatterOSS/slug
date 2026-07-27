@@ -30,6 +30,9 @@ class FixtureCommand:
     name: str
     argv: tuple[str, ...]
     compare: str
+    startup_argv: tuple[str, ...] = ()
+    capture_server_epoch: bool = False
+    capture_startup_diagnostics: bool = False
     expected_exit: int | None = None
     env_allowlist: tuple[str, ...] = ()
     env: tuple[tuple[str, str], ...] = ()
@@ -72,6 +75,9 @@ class Fixture:
     reapi: ReapiConfig = field(default_factory=ReapiConfig)
     provenance: FixtureProvenance = field(default_factory=FixtureProvenance)
     daemon: bool = False
+    startup_argv: tuple[str, ...] = ()
+    env: tuple[tuple[str, str], ...] = ()
+    observe_server_epochs: bool = False
     http_registry: bool = False
     http_registry_port: int | None = None
 
@@ -108,6 +114,14 @@ def _as_optional_int(value: Any, field_name: str) -> int | None:
         return None
     if not isinstance(value, int):
         raise ValueError(f"{field_name} must be an integer")
+    return value
+
+
+def _as_bool(value: Any, field_name: str, *, fallback: bool = False) -> bool:
+    if value is None:
+        return fallback
+    if not isinstance(value, bool):
+        raise ValueError(f"{field_name} must be a boolean")
     return value
 
 
@@ -239,6 +253,17 @@ def load_fixture(path: Path) -> Fixture:
                 name=command_name,
                 argv=argv,
                 compare=_compare_mode(command.get("compare"), compare),
+                startup_argv=_as_str_list(
+                    command.get("startup_argv"), "commands.startup_argv"
+                ),
+                capture_server_epoch=_as_bool(
+                    command.get("capture_server_epoch"),
+                    "commands.capture_server_epoch",
+                ),
+                capture_startup_diagnostics=_as_bool(
+                    command.get("capture_startup_diagnostics"),
+                    "commands.capture_startup_diagnostics",
+                ),
                 expected_exit=_as_optional_int(command.get("expected_exit"), "commands.expected_exit"),
                 env_allowlist=_as_str_list(command.get("env_allowlist"), "commands.env_allowlist"),
                 env=_as_str_map(command.get("env"), "commands.env"),
@@ -260,6 +285,15 @@ def load_fixture(path: Path) -> Fixture:
     if http_registry_port is not None and not http_registry:
         raise ValueError("fixture.http_registry_port requires fixture.http_registry = true")
 
+    daemon = _as_bool(fixture_data.get("daemon"), "fixture.daemon")
+    observe_server_epochs = _as_bool(
+        fixture_data.get("observe_server_epochs"), "fixture.observe_server_epochs"
+    )
+    if observe_server_epochs and not daemon:
+        raise ValueError("fixture.observe_server_epochs requires fixture.daemon = true")
+    if not observe_server_epochs and any(command.capture_server_epoch for command in commands):
+        raise ValueError("commands.capture_server_epoch requires fixture.observe_server_epochs = true")
+
     return Fixture(
         name=name,
         root=path,
@@ -272,7 +306,12 @@ def load_fixture(path: Path) -> Fixture:
         oracle_notes=str(fixture_data.get("oracle_notes", "")),
         reapi=_parse_reapi(raw.get("reapi")),
         provenance=_parse_provenance(raw.get("provenance")),
-        daemon=bool(fixture_data.get("daemon", False)),
+        daemon=daemon,
+        startup_argv=_as_str_list(
+            fixture_data.get("startup_argv"), "fixture.startup_argv"
+        ),
+        env=_as_str_map(fixture_data.get("env"), "fixture.env"),
+        observe_server_epochs=observe_server_epochs,
         http_registry=http_registry,
         http_registry_port=http_registry_port,
     )

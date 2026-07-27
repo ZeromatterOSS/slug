@@ -19,12 +19,21 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [],
       "mutations": [],
       "name": "nonroot_graph_keeps_ordinary_edge_suppresses_dev_and_nodep_edge",
-      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off",
       "normalized_stdout": "<root> (nonroot_interim_module_graph@0.1.0)\n\u251c\u2500\u2500\u2500shared@2.0.0 \n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0",
-      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 1b1661d0-6491-42e1-8e62-6bf231c2c5a6\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\n",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\n",
       "stdout": "<root> (nonroot_interim_module_graph@0.1.0)\n\u251c\u2500\u2500\u2500shared@2.0.0 \n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0 \n\n"
     },
     {
@@ -48,12 +57,21 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [],
       "mutations": [],
       "name": "nodep_upgrades_root_shared_but_is_not_subject_dependency",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc",
       "normalized_stdout": "<root> (nonroot_interim_module_graph@0.1.0)\n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0",
-      "stderr": "INFO: Invocation ID: d01ae7a4-b62e-49e4-95be-34759b03d4bd\n",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n",
       "stdout": "<root> (nonroot_interim_module_graph@0.1.0)\n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0 \n\n"
     },
     {
@@ -79,12 +97,21 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [],
       "mutations": [],
       "name": "subject_apparent_dependency_alias_maps_to_canonical_repo",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc",
       "normalized_stdout": "{\"subject_self\":\"subject+\",\"dep_alias\":\"dep+\",\"bazel_tools\":\"bazel_tools\"}",
-      "stderr": "INFO: Invocation ID: 52ed15e6-f184-4fa7-a717-5d8d0446d539\n",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n",
       "stdout": "{\"subject_self\":\"subject+\",\"dep_alias\":\"dep+\",\"bazel_tools\":\"bazel_tools\"}\n"
     },
     {
@@ -106,6 +133,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 37,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [],
       "mutations": [
         {
@@ -122,9 +157,10 @@
         }
       ],
       "name": "incompatible_nonroot_bazel_compatibility_fails_after_root_invalidation",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\nERROR: Bazel version 9.2.0 is not compatible with module \"subject@1.0.0\" (bazel_compatibility: [<=9.1.0])\nERROR: Bazel compatibility check failed",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\nERROR: Bazel version 9.2.0 is not compatible with module \"subject@1.0.0\" (bazel_compatibility: [<=9.1.0])\nERROR: Bazel compatibility check failed",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: f93f53ca-b094-4939-9e6c-a5cde86696e9\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\nERROR: Bazel version 9.2.0 is not compatible with module \"subject@1.0.0\" (bazel_compatibility: [<=9.1.0])\nERROR: Bazel compatibility check failed\n",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\nERROR: Bazel version 9.2.0 is not compatible with module \"subject@1.0.0\" (bazel_compatibility: [<=9.1.0])\nERROR: Bazel compatibility check failed\n",
       "stdout": ""
     },
     {
@@ -146,6 +182,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [],
       "mutations": [
         {
@@ -162,9 +206,10 @@
         }
       ],
       "name": "compatible_nonroot_bazel_compatibility_recovers_after_root_invalidation",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off",
       "normalized_stdout": "<root> (nonroot_interim_module_graph@0.1.2)\n\u251c\u2500\u2500\u2500shared@2.0.0 \n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0",
-      "stderr": "INFO: Invocation ID: aa9837bb-8177-434e-bf56-24c97515c37a\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\n",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\n",
       "stdout": "<root> (nonroot_interim_module_graph@0.1.2)\n\u251c\u2500\u2500\u2500shared@2.0.0 \n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0 \n\n"
     },
     {
@@ -186,6 +231,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 37,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [],
       "mutations": [
         {
@@ -202,9 +255,10 @@
         }
       ],
       "name": "nonroot_builtin_apparent_name_collision_is_fatal",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: The repo name 'bazel_tools' cannot be defined as a built-in dependency at <builtin> as it is already defined by a bazel_dep at fil<workspace>/registry/modules/subject/1.0.0/MODULE.bazel:12:10, 'bazel_tools' is a built-in dependency and cannot be used by any 'bazel_dep' or 'use_repo' directive\nERROR: in module dependency chain <root> -> subject@1.0.0: error executing MODULE.bazel file for subject@1.0.0",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nERROR: The repo name 'bazel_tools' cannot be defined as a built-in dependency at <builtin> as it is already defined by a bazel_dep at fil<workspace>/registry/modules/subject/1.0.0/MODULE.bazel:12:10, 'bazel_tools' is a built-in dependency and cannot be used by any 'bazel_dep' or 'use_repo' directive\nERROR: in module dependency chain <root> -> subject@1.0.0: error executing MODULE.bazel file for subject@1.0.0",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 17006a5c-9e00-4320-89ab-630f6ca8b3af\n no actions running\nERROR: The repo name 'bazel_tools' cannot be defined as a built-in dependency at <builtin> as it is already defined by a bazel_dep at file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/subject/1.0.0/MODULE.bazel:12:10, 'bazel_tools' is a built-in dependency and cannot be used by any 'bazel_dep' or 'use_repo' directive\nERROR: in module dependency chain <root> -> subject@1.0.0: error executing MODULE.bazel file for subject@1.0.0\n",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nERROR: The repo name 'bazel_tools' cannot be defined as a built-in dependency at <builtin> as it is already defined by a bazel_dep at file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/subject/1.0.0/MODULE.bazel:12:10, 'bazel_tools' is a built-in dependency and cannot be used by any 'bazel_dep' or 'use_repo' directive\nERROR: in module dependency chain <root> -> subject@1.0.0: error executing MODULE.bazel file for subject@1.0.0\n",
       "stdout": ""
     },
     {
@@ -228,6 +282,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [
         {
           "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
@@ -254,10 +316,11 @@
         }
       ],
       "name": "regular_local_registry_file_baseline",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running",
       "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
-      "stderr": "INFO: Invocation ID: ce5bdb98-b5e9-4a05-a985-462427fbad78\n no actions running\n",
-      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
     },
     {
       "argv": [
@@ -280,6 +343,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [
         {
           "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
@@ -310,10 +381,11 @@
         }
       ],
       "name": "directory_module_listing_bytes_and_checksum",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running",
       "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)",
-      "stderr": "INFO: Invocation ID: c099646b-262a-4af9-af5e-23414fe8b8ec\n no actions running\n",
-      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)\n\n"
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)\n\n"
     },
     {
       "argv": [
@@ -336,6 +408,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [
         {
           "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
@@ -361,10 +441,11 @@
         }
       ],
       "name": "mutable_metadata_directory_lists_then_fails_open",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nWARNING: Could not read metadata file for module devonly from registry fil<workspace>/registry: Unable to parse json at url fil<workspace>/registry/modules/devonly/metadata.json: java.lang.IllegalStateException: Expected BEGIN_OBJECT but was STRING at line 1 column 1 path $\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#unexpected-json-structure",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nWARNING: Could not read metadata file for module devonly from registry fil<workspace>/registry: Unable to parse json at url fil<workspace>/registry/modules/devonly/metadata.json: java.lang.IllegalStateException: Expected BEGIN_OBJECT but was STRING at line 1 column 1 path $\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#unexpected-json-structure",
       "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)",
-      "stderr": "INFO: Invocation ID: 6f79dd7c-e9ba-4a41-81dc-bae1d7031f6d\n no actions running\nWARNING: Could not read metadata file for module devonly from registry file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry: Unable to parse json at url file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/metadata.json: java.lang.IllegalStateException: Expected BEGIN_OBJECT but was STRING at line 1 column 1 path $\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#unexpected-json-structure\n",
-      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)\n\n"
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nWARNING: Could not read metadata file for module devonly from registry file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry: Unable to parse json at url file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/metadata.json: java.lang.IllegalStateException: Expected BEGIN_OBJECT but was STRING at line 1 column 1 path $\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#unexpected-json-structure\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)\n\n"
     },
     {
       "argv": [
@@ -385,6 +466,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 37,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [
         {
           "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
@@ -415,9 +504,10 @@
         }
       ],
       "name": "parked_directory_links_are_absent",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: in module dependency chain <root> -> devonly@1.0.0: module devonly@1.0.0 not found in registries:\n* fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel: not found",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nERROR: in module dependency chain <root> -> devonly@1.0.0: module devonly@1.0.0 not found in registries:\n* fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel: not found",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 82e13549-0b50-4880-9419-43f893ec50bd\nERROR: in module dependency chain <root> -> devonly@1.0.0: module devonly@1.0.0 not found in registries:\n* file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel: not found\n",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nERROR: in module dependency chain <root> -> devonly@1.0.0: module devonly@1.0.0 not found in registries:\n* file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel: not found\n",
       "stdout": ""
     },
     {
@@ -441,6 +531,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [
         {
           "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
@@ -466,10 +564,11 @@
         }
       ],
       "name": "regular_local_registry_file_restores_exactly",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running",
       "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
-      "stderr": "INFO: Invocation ID: 669dcaf4-53fa-4053-b251-5100f5d1d569\n no actions running\n",
-      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
     },
     {
       "argv": [
@@ -492,6 +591,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [
         {
           "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
@@ -538,10 +645,11 @@
         }
       ],
       "name": "portable_directory_root_collation_and_latin1_bytes",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
-      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file://<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)",
-      "stderr": "INFO: Invocation ID: b37cbd6e-b5e2-4899-858b-becd196c8cb1\n no actions running\n",
-      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///tmp/slug-collation-gen.o4m8JE/runs/nonroot-interim-module-graph/20260726-233707-3829040-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)\n\n"
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)\n\n"
     },
     {
       "argv": [
@@ -564,6 +672,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 37,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [
         {
           "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
@@ -614,9 +730,10 @@
         }
       ],
       "name": "empty_followed_directory_is_found",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 118f59f8-2384-495c-b434-2f59e37e065e\n no actions running\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()\n",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()\n",
       "stdout": ""
     },
     {
@@ -640,6 +757,14 @@
         "--registry=file://%workspace%/registry"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
       "manifest": [
         {
           "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
@@ -674,10 +799,479 @@
         }
       ],
       "name": "regular_file_restores_after_empty_directory",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
-      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file://<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
-      "stderr": "INFO: Invocation ID: 42ec8c9b-4848-4afd-8a2f-4bc9e9eecb7b\n no actions running\n",
-      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///tmp/slug-collation-gen.o4m8JE/runs/nonroot-interim-module-graph/20260726-233707-3829040-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.regular",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.bazel"
+        },
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.bazel",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable-link"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# a"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# B"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# \u00c3\u00a9"
+        },
+        {
+          "op": "create",
+          "path": "registry/modules/devonly/1.0.0/MODULE.portable/# \u0100"
+        },
+        {
+          "find": "version = \"0.1.4\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.8\""
+        }
+      ],
+      "name": "fresh_conflicting_last_wins_utf8",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: \n  - Only in new server: --host_jvm_args=-Dfile.encoding=UTF-8 --host_jvm_args=-Dfile.encoding=ISO-8859-1 -Dfile.encoding=UTF-8 -Dfile.encoding=ISO-8859-1\nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\",\n  remote_patch_strip = 0,\n)",
+      "server_epoch": 2,
+      "startup_argv": [
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1",
+        "--host_jvm_args=-Dfile.encoding=UTF-8"
+      ],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: \n  - Only in new server: --host_jvm_args=-Dfile.encoding=UTF-8 --host_jvm_args=-Dfile.encoding=ISO-8859-1 -Dfile.encoding=UTF-8 -Dfile.encoding=ISO-8859-1\nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:BUILD.bazel",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:BUILD.bazel",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "fresh_conflicting_cli_startup_diagnostics",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nINFO: Build Event Protocol files produced successfully.",
+      "normalized_stdout": "//:BUILD.bazel",
+      "server_epoch": 2,
+      "startup_announcements": [],
+      "startup_argv": [
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1",
+        "--host_jvm_args=-Dfile.encoding=UTF-8"
+      ],
+      "startup_combined_forms": [
+        "--output_base=<output_base>",
+        "",
+        "--nosystem_rc",
+        "",
+        "--noworkspace_rc",
+        "",
+        "--nohome_rc",
+        "",
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1",
+        "",
+        "--host_jvm_args=-Dfile.encoding=UTF-8",
+        ""
+      ],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nINFO: Build Event Protocol files produced successfully.\n",
+      "stdout": "//:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "reordered_same_multiset_retains_utf8",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\",\n  remote_patch_strip = 0,\n)",
+      "server_epoch": 2,
+      "startup_argv": [
+        "--host_jvm_args=-Dfile.encoding=UTF-8",
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1"
+      ],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:BUILD.bazel",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:BUILD.bazel",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry",
+        "--output=label",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "reordered_cli_startup_diagnostics",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nINFO: Build Event Protocol files produced successfully.",
+      "normalized_stdout": "//:BUILD.bazel",
+      "server_epoch": 2,
+      "startup_announcements": [],
+      "startup_argv": [
+        "--host_jvm_args=-Dfile.encoding=UTF-8",
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1"
+      ],
+      "startup_combined_forms": [
+        "--output_base=<output_base>",
+        "",
+        "--nosystem_rc",
+        "",
+        "--noworkspace_rc",
+        "",
+        "--nohome_rc",
+        "",
+        "--host_jvm_args=-Dfile.encoding=UTF-8",
+        "",
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1",
+        ""
+      ],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nINFO: Build Event Protocol files produced successfully.\n",
+      "stdout": "//:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "rc_source_change_same_multiset_reuses",
+      "normalized_stderr": "no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\",\n  remote_patch_strip = 0,\n)",
+      "server_epoch": 2,
+      "startup_argv": [
+        "--bazelrc=startup-diagnostics.bazelrc"
+      ],
+      "stderr": " no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:BUILD.bazel",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry",
+        "--output=label",
+        "--noshow_progress",
+        "--announce_rc"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:BUILD.bazel",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry",
+        "--output=label",
+        "--noshow_progress",
+        "--announce_rc"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
+      "manifest": [],
+      "mutations": [],
+      "name": "rc_source_startup_diagnostics",
+      "normalized_stderr": "INFO: Reading 'startup' options from <workspace>/startup-diagnostics.bazelrc: --host_jvm_args=-Dfile.encoding=ISO-8859-1, --host_jvm_args=-Dfile.encoding=UTF-8\nINFO: Options provided by the client:\n  Inherited 'common' options: --isatty=0 --terminal_columns=80\nINFO: Build Event Protocol files produced successfully.",
+      "normalized_stdout": "//:BUILD.bazel",
+      "server_epoch": 2,
+      "startup_announcements": [
+        "Reading 'startup' options from <workspace>/startup-diagnostics.bazelrc: --host_jvm_args=-Dfile.encoding=ISO-8859-1, --host_jvm_args=-Dfile.encoding=UTF-8"
+      ],
+      "startup_argv": [
+        "--bazelrc=startup-diagnostics.bazelrc"
+      ],
+      "startup_combined_forms": [
+        "",
+        "",
+        "--output_base=<output_base>",
+        "",
+        "--nosystem_rc",
+        "",
+        "--noworkspace_rc",
+        "",
+        "--nohome_rc",
+        "",
+        "--bazelrc=startup-diagnostics.bazelrc",
+        ""
+      ],
+      "stderr": "INFO: Reading 'startup' options from /run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/startup-diagnostics.bazelrc: --host_jvm_args=-Dfile.encoding=ISO-8859-1, --host_jvm_args=-Dfile.encoding=UTF-8\nINFO: Options provided by the client:\n  Inherited 'common' options: --isatty=0 --terminal_columns=80\nINFO: Build Event Protocol files produced successfully.\n",
+      "stdout": "//:BUILD.bazel\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "occurrence_change_restarts_latin1",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --host_jvm_args=-Dfile.encoding=UTF-8 -Dfile.encoding=UTF-8\n  - Only in new server: \nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)",
+      "server_epoch": 3,
+      "startup_argv": [
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1"
+      ],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --host_jvm_args=-Dfile.encoding=UTF-8 -Dfile.encoding=UTF-8\n  - Only in new server: \nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {
+        "BAZELRC": ""
+      },
+      "fixture_startup_argv": [
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc"
+      ],
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [],
+      "name": "zero_occurrences_restores_default",
+      "normalized_stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: -Dfile.encoding=ISO-8859-1 --host_jvm_args=-Dfile.encoding=ISO-8859-1\n  - Only in new server: \nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)",
+      "server_epoch": 4,
+      "startup_argv": [],
+      "stderr": "WARNING: The following rc files are no longer being read, please transfer their contents or import their path into one of the standard rc files:\n/run/media/system/Colossus/dev-home/.bazelrc\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: -Dfile.encoding=ISO-8859-1 --host_jvm_args=-Dfile.encoding=ISO-8859-1\n  - Only in new server: \nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260727-012301-3886722-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)\n\n"
     }
   ],
   "fixture": "nonroot-interim-module-graph",

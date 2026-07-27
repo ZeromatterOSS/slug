@@ -66,6 +66,18 @@ def _compare_expected_command(command: FixtureCommand, expected: dict[str, Any],
     elif command.compare == "semantic" and expected.get("manifest"):
         if expected.get("manifest") != actual.get("manifest"):
             failures.append(f"{command.name}: manifest differs from oracle")
+    capture_fields: list[str] = []
+    if command.capture_server_epoch:
+        capture_fields.append("server_epoch")
+    if command.capture_startup_diagnostics:
+        capture_fields.extend(("startup_combined_forms", "startup_announcements", "stdout"))
+    for field in capture_fields:
+        if field not in expected:
+            failures.append(f"{command.name}: {field} is missing from oracle")
+        elif field not in actual:
+            failures.append(f"{command.name}: {field} is missing from result")
+        elif expected[field] != actual[field]:
+            failures.append(f"{command.name}: {field} differs from oracle")
     return failures
 
 

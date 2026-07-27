@@ -29,11 +29,18 @@ from tools.v2_oracle_lib.fixture import (
 from tools.v2_oracle_lib.manifest import collect_manifest
 from tools.v2_oracle_lib.normalize import normalize_text, path_replacements
 from tools.v2_oracle_lib.runner import (
+    BazelServerIdentity,
     RunOptions,
+    ServerEpochs,
     ToolConfig,
     _argv,
     _apply_mutations,
+    _extract_startup_diagnostics,
     _extract_reapi_evidence,
+    _parse_loopback_endpoint,
+    _read_bazel_server_identity,
+    _shutdown_bazel_daemon,
+    _wait_for_bazel_shutdown,
     _slug_reapi_argv,
     run_fixture,
 )
@@ -103,6 +110,118 @@ def test_fixture_parser_reads_file_operations_and_provenance() -> None:
     assert fixture.provenance.bazel_release == "9.2.0"
     assert fixture.provenance.bazel_commit == "8220c6198837d5c13d53fea211cf3282aa12408a"
     assert len(fixture.provenance.source_anchors) == 3
+
+
+def test_startup_fixture_parser_and_argv_merge_are_strict() -> None:
+    root = scratch_dir("startup-parser")
+    (root / "workspace").mkdir()
+    (root / "expected").mkdir()
+    (root / "fixture.toml").write_text(
+        """
+[fixture]
+name = "startup-parser"
+daemon = true
+startup_argv = ["--nosystem_rc", "--noworkspace_rc"]
+observe_server_epochs = true
+
+[fixture.env]
+BAZELRC = ""
+PRECEDENCE = "fixture"
+
+[[commands]]
+name = "capture"
+startup_argv = ["--host_jvm_args=-Dfile.encoding=UTF-8"]
+argv = ["query", "//:BUILD.bazel"]
+capture_server_epoch = true
+capture_startup_diagnostics = true
+
+[commands.env]
+PRECEDENCE = "command"
+""".strip(),
+        encoding="utf-8",
+    )
+    fixture = load_fixture(root)
+    command = fixture.commands[0]
+    assert fixture.startup_argv == ("--nosystem_rc", "--noworkspace_rc")
+    assert dict(fixture.env) == {"BAZELRC": "", "PRECEDENCE": "fixture"}
+    assert fixture.observe_server_epochs is True
+    assert command.startup_argv == ("--host_jvm_args=-Dfile.encoding=UTF-8",)
+    assert command.capture_server_epoch is True
+    assert command.capture_startup_diagnostics is True
+    assert _argv(
+        ToolConfig(name="bazel", executable=Path("/usr/bin/bazel")),
+        fixture,
+        command,
+        Path("/tmp/output-base"),
+    ) == [
+        "/usr/bin/bazel",
+        "--output_base=/tmp/output-base",
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--host_jvm_args=-Dfile.encoding=UTF-8",
+        "query",
+        "//:BUILD.bazel",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("fixture_field", "command_field", "value", "message"),
+    [
+        ("observe_server_epochs", None, '"yes"', "observe_server_epochs"),
+        (None, "capture_server_epoch", "1", "capture_server_epoch"),
+        (None, "capture_startup_diagnostics", '"yes"', "capture_startup_diagnostics"),
+        ("startup_argv", None, '"bad"', "fixture.startup_argv"), ("env", None, "{ BAD = 1 }", "fixture.env.BAD"),
+        (None, "startup_argv", '"bad"', "commands.startup_argv"),
+    ],
+)
+def test_startup_fixture_parser_rejects_invalid_fields(
+    fixture_field: str | None,
+    command_field: str | None,
+    value: str,
+    message: str,
+) -> None:
+    root = scratch_dir("startup-parser-bool")
+    (root / "workspace").mkdir()
+    (root / "expected").mkdir()
+    fixture_setting = f"{fixture_field} = {value}\n" if fixture_field is not None else ""
+    command_setting = f"{command_field} = {value}\n" if command_field is not None else ""
+    (root / "fixture.toml").write_text(
+        (
+            "[fixture]\n"
+            'name = "startup-parser-bool"\n'
+            "daemon = true\n"
+            f"{fixture_setting}\n"
+            "[[commands]]\n"
+            'argv = ["query", "//:BUILD.bazel"]\n'
+            f"{command_setting}"
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match=message):
+        load_fixture(root)
+
+
+def test_server_epoch_observation_requires_daemon_fixture() -> None:
+    root = scratch_dir("startup-parser-daemon")
+    (root / "workspace").mkdir()
+    (root / "expected").mkdir()
+    (root / "fixture.toml").write_text(
+        """
+[fixture]
+name = "startup-parser-daemon"
+observe_server_epochs = true
+
+[[commands]]
+argv = ["query", "//:BUILD.bazel"]
+""".strip(),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="requires fixture.daemon"):
+        load_fixture(root)
+    text = (root / "fixture.toml").read_text().replace("observe_server_epochs = true", "daemon = true")
+    (root / "fixture.toml").write_text(text.replace("[[commands]]", "[[commands]]\ncapture_server_epoch = true"))
+    with pytest.raises(ValueError, match="requires fixture.observe_server_epochs"):
+        load_fixture(root)
 
 
 def _http_registry_fixture(root: Path, name: str, port: int = 0) -> Fixture:
@@ -460,18 +579,573 @@ def test_mutations_expand_workspace_uri_operands_but_record_raw_templates() -> N
 
 def test_runner_preserves_registry_argv_and_conditional_http_registry_substitution() -> None:
     tool = ToolConfig(name="slug", executable=Path(sys.executable))
+    fixture = Fixture(
+        name="transport-tokens",
+        root=Path("/fixture"),
+        workspace=Path("/fixture/workspace"),
+        expected=Path("/fixture/expected"),
+    )
     command = FixtureCommand(
         name="transport-tokens",
         argv=("-c", "pass", "--registry=file://%workspace%/registry", "{{http_registry}}"),
         compare="semantic",
     )
-    assert _argv(tool, command, Path("/tmp/output-base")) == [
+    assert _argv(tool, fixture, command, Path("/tmp/output-base")) == [
         str(Path(sys.executable)),
         "-c",
         "pass",
         "--registry=file://%workspace%/registry",
         "{{http_registry}}",
     ]
+
+
+def _startup_bep(path: Path, combined_forms: list[object], payload_label: str = "original") -> None:
+    options = []
+    for value in combined_forms:
+        if value is None:
+            options.append({})
+        elif isinstance(value, dict):
+            options.append(value)
+        else:
+            options.append({"combinedForm": value})
+    path.write_text(
+        "\n".join(
+            [
+                json.dumps({"id": {"started": {}}, "started": {"uuid": "ignored"}}),
+                json.dumps(
+                    {
+                        "id": {
+                            "structuredCommandLine": {
+                                "commandLineLabel": "original"
+                            }
+                        },
+                        "structuredCommandLine": {
+                            "commandLineLabel": payload_label,
+                            "sections": [
+                                {
+                                    "sectionLabel": "startup options",
+                                    "optionList": {"option": options},
+                                },
+                                {"sectionLabel": "command", "chunkList": {}},
+                            ],
+                        },
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_startup_diagnostics_preserve_absent_duplicates_and_exact_rc_messages() -> None:
+    root = scratch_dir("startup-diagnostics")
+    workspace = root / "workspace"
+    run_dir = root / "run"
+    output_base = root / "output-base"
+    workspace.mkdir()
+    run_dir.mkdir()
+    output_base.mkdir()
+    bep = run_dir / "startup.json"
+    _startup_bep(
+        bep,
+        [
+            f"--output_base={output_base}",
+            None,
+            "--host_jvm_args=-Dduplicate",
+            "--host_jvm_args=-Dduplicate",
+        ],
+    )
+    stderr = (
+        "INFO: Reading 'startup' options from "
+        f"{workspace}/startup-diagnostics.bazelrc: "
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1, "
+        "--host_jvm_args=-Dfile.encoding=UTF-8\n"
+        "INFO: unrelated\n"
+        "Reading 'startup' options from partial\n"
+    )
+    combined, announcements = _extract_startup_diagnostics(
+        bep,
+        stderr,
+        path_replacements(
+            workspace=workspace, run_dir=run_dir, output_base=output_base
+        ),
+    )
+    assert combined == [
+        "--output_base=<output_base>",
+        "",
+        "--host_jvm_args=-Dduplicate",
+        "--host_jvm_args=-Dduplicate",
+    ]
+    assert announcements == [
+        "Reading 'startup' options from <workspace>/startup-diagnostics.bazelrc: "
+        "--host_jvm_args=-Dfile.encoding=ISO-8859-1, "
+        "--host_jvm_args=-Dfile.encoding=UTF-8"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        ("[]\n", "object"),
+        ("{}\n", "original"),
+        (
+            json.dumps(
+                {
+                    "id": {
+                        "structuredCommandLine": {"commandLineLabel": "original"}
+                    },
+                    "structuredCommandLine": {
+                        "commandLineLabel": "original",
+                        "sections": [],
+                    },
+                }
+            )
+            + "\n",
+            "startup options",
+        ),
+    ],
+)
+def test_startup_diagnostics_reject_schema_and_cardinality(
+    payload: str, message: str
+) -> None:
+    bep = scratch_dir("startup-schema") / "startup.json"
+    bep.write_text(payload, encoding="utf-8")
+    with pytest.raises(RuntimeError, match=message):
+        _extract_startup_diagnostics(bep, "", {})
+
+
+@pytest.mark.parametrize("value", [1, {"optionName": "synthetic"}])
+def test_startup_diagnostics_reject_nonstring_or_nonempty_missing_combined_form(value: object) -> None:
+    bep = scratch_dir("startup-schema-value") / "startup.json"
+    _startup_bep(bep, [value])
+    with pytest.raises(RuntimeError, match="combinedForm"):
+        _extract_startup_diagnostics(bep, "", {})
+    _startup_bep(bep, [], "not-original")
+    with pytest.raises(RuntimeError, match="payload label"):
+        _extract_startup_diagnostics(bep, "", {})
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("127.0.0.1:1234", ("127.0.0.1", 1234)),
+        ("[::1]:4321", ("::1", 4321)),
+    ],
+)
+def test_parse_loopback_endpoint(raw: str, expected: tuple[str, int]) -> None:
+    assert _parse_loopback_endpoint(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["example.com:1234", "127.0.0.1:0", "::1:1234", "[::1]", "garbage"],
+)
+def test_parse_loopback_endpoint_rejects_invalid_values(raw: str) -> None:
+    with pytest.raises(RuntimeError, match="endpoint"):
+        _parse_loopback_endpoint(raw)
+
+
+def test_server_epochs_are_stable_and_reject_endpoint_changes() -> None:
+    epochs = ServerEpochs()
+    first = BazelServerIdentity(101, "one", ("127.0.0.1", 1001))
+    second = BazelServerIdentity(102, "two", ("::1", 1002))
+    assert epochs.observe(first) == 1
+    assert epochs.observe(first) == 1
+    assert epochs.observe(second) == 2
+    with pytest.raises(RuntimeError, match="endpoint changed"):
+        epochs.observe(BazelServerIdentity(101, "one", ("127.0.0.1", 9999)))
+    assert epochs.identities == (first, second)
+
+
+def test_bazel_identity_rejects_missing_stale_and_unreachable_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_base = scratch_dir("bazel-identity")
+    server = output_base / "server"
+    server.mkdir()
+    with pytest.raises(RuntimeError, match="server.pid.txt"):
+        _read_bazel_server_identity(output_base)
+    (server / "server.pid.txt").write_text("4321\n", encoding="utf-8")
+    (server / "server.starttime").write_text("99\n", encoding="utf-8")
+    (server / "command_port").write_text("127.0.0.1:9876\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._process_identity_alive", lambda identity: False
+    )
+    with pytest.raises(RuntimeError, match="stale"):
+        _read_bazel_server_identity(output_base)
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._process_identity_alive", lambda identity: True
+    )
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._endpoint_reachable", lambda endpoint: False
+    )
+    with pytest.raises(RuntimeError, match="unreachable"):
+        _read_bazel_server_identity(output_base)
+
+
+def test_opted_runner_executes_one_process_per_row_and_observes_every_epoch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = scratch_dir("startup-runner")
+    workspace = root / "fixture" / "workspace"
+    workspace.mkdir(parents=True)
+    (workspace / "BUILD.bazel").write_text("", encoding="utf-8")
+    commands = (
+        FixtureCommand(
+            name="uncaptured-first",
+            argv=("query", "//:BUILD.bazel"),
+            compare="semantic",
+            startup_argv=("--host_jvm_args=-Done",),
+            env=(("ROW", "first"),),
+        ),
+        FixtureCommand(
+            name="captured-second",
+            argv=("query", "//:BUILD.bazel"),
+            compare="semantic",
+            capture_server_epoch=True,
+        ),
+        FixtureCommand(
+            name="diagnostic-third",
+            argv=("query", "//:BUILD.bazel"),
+            compare="semantic",
+            capture_server_epoch=True,
+            capture_startup_diagnostics=True,
+        ),
+    )
+    fixture = Fixture(
+        name="startup-runner",
+        root=workspace.parent,
+        workspace=workspace,
+        expected=workspace.parent / "expected",
+        daemon=True,
+        startup_argv=("--nosystem_rc",),
+        env=(("BASELINE", "fixture"), ("ROW", "fixture")),
+        observe_server_epochs=True,
+        commands=commands,
+    )
+    calls: list[tuple[list[str], dict[str, str]]] = []
+
+    def fake_run(
+        argv: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append((list(argv), dict(kwargs["env"])))  # type: ignore[arg-type]
+        bep_args = [
+            arg for arg in argv if arg.startswith("--build_event_json_file=")
+        ]
+        if bep_args:
+            assert len(bep_args) == 1
+            _startup_bep(Path(bep_args[0].split("=", 1)[1]), ["--nosystem_rc"])
+        return subprocess.CompletedProcess(argv, 0, "//:BUILD.bazel\n", "")
+
+    identities = iter(
+        [
+            BazelServerIdentity(101, "one", ("127.0.0.1", 1001)),
+            BazelServerIdentity(102, "two", ("127.0.0.1", 1002)),
+            BazelServerIdentity(102, "two", ("127.0.0.1", 1002)),
+        ]
+    )
+    shutdown: list[tuple[BazelServerIdentity, ...]] = []
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._read_bazel_server_identity",
+        lambda output_base: next(identities),
+    )
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._shutdown_bazel_daemon",
+        lambda *args: shutdown.append(args[5]),
+    )
+    tool = ToolConfig(name="bazel", executable=Path("/usr/bin/bazel"))
+    result = run_fixture(fixture, tool, RunOptions(run_root=root / "runs"))
+    assert len(calls) == len(commands)
+    assert [record["name"] for record in result["commands"]] == [command.name for command in commands]
+    assert calls[0][0][2:5] == ["--nosystem_rc", "--host_jvm_args=-Done", "query"]
+    assert calls[0][1]["BASELINE"] == "fixture"
+    assert calls[0][1]["ROW"] == "first"
+    assert "server_epoch" not in result["commands"][0]
+    assert result["commands"][1]["server_epoch"] == 2
+    assert result["commands"][2]["server_epoch"] == 2
+    bep_paths = [
+        arg
+        for argv, _ in calls
+        for arg in argv
+        if arg.startswith("--build_event_json_file=")
+    ]
+    assert len(bep_paths) == len(set(bep_paths)) == 1
+    assert bep_paths[0].endswith("/startup-bep/03.json")
+    assert calls[2][0][-1] == bep_paths[0]
+    assert not (Path(result["run_dir"]) / "startup-bep").exists()
+    assert shutdown == [
+        (
+            BazelServerIdentity(101, "one", ("127.0.0.1", 1001)),
+            BazelServerIdentity(102, "two", ("127.0.0.1", 1002)),
+        )
+    ]
+    monkeypatch.setattr("tools.v2_oracle_lib.runner._read_bazel_server_identity", lambda _: BazelServerIdentity(103, "three", ("127.0.0.1", 1003)))
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.shutil.rmtree", lambda _: (_ for _ in ()).throw(OSError("purge failed")))
+    with pytest.raises(OSError, match="purge failed"):
+        run_fixture(fixture, tool, RunOptions(run_root=root / "purge-runs"))
+
+
+def test_slug_epoch_observation_refuses_before_workspace_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = Fixture(
+        name="slug-refusal",
+        root=Path("/fixture"),
+        workspace=Path("/fixture/workspace"),
+        expected=Path("/fixture/expected"),
+        daemon=True,
+        observe_server_epochs=True,
+    )
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._copy_workspace",
+        lambda fixture, run_dir: pytest.fail("workspace copied"),
+    )
+    with pytest.raises(RuntimeError, match="authenticated Slug Status"):
+        run_fixture(
+            fixture,
+            ToolConfig(name="slug", executable=Path("/slug")),
+            RunOptions(run_root=scratch_dir("slug-refusal-run")),
+        )
+
+
+def test_bazel_shutdown_reuses_fixture_baseline_environment_cwd_and_waits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], Path, dict[str, str]]] = []
+    waited: list[tuple[BazelServerIdentity, ...]] = []
+
+    def fake_run(
+        argv: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(
+            (
+                argv,
+                Path(str(kwargs["cwd"])),
+                dict(kwargs["env"]),  # type: ignore[arg-type]
+            )
+        )
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._wait_for_bazel_shutdown",
+        lambda identities, timeout_seconds: waited.append(tuple(identities)),
+    )
+    identity = BazelServerIdentity(101, "one", ("127.0.0.1", 1001))
+    _shutdown_bazel_daemon(
+        ToolConfig(name="bazel", executable=Path("/usr/bin/bazel")),
+        Path("/tmp/output-base"),
+        Path("/tmp/workspace"),
+        ("--nosystem_rc", "--noworkspace_rc", "--nohome_rc"),
+        (("BAZELRC", ""),),
+        (identity,),
+        5,
+    )
+    assert calls[0][0] == [
+        "/usr/bin/bazel",
+        "--output_base=/tmp/output-base",
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc",
+        "shutdown",
+    ]
+    assert calls[0][1] == Path("/tmp/workspace")
+    assert calls[0][2]["BAZELRC"] == ""
+    assert all("--host_jvm_args" not in arg for arg in calls[0][0])
+    assert waited == [(identity,)]
+
+
+def test_bazel_shutdown_exit_and_death_timeout_are_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 2, "", "bad"),
+    )
+    with pytest.raises(RuntimeError, match="exit code 2"):
+        _shutdown_bazel_daemon(
+            ToolConfig(name="bazel", executable=Path("/usr/bin/bazel")),
+            Path("/tmp/output-base"),
+            Path("/tmp/workspace"),
+            (),
+            (),
+            (),
+            1,
+        )
+    identity = BazelServerIdentity(101, "one", ("127.0.0.1", 1001))
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._process_identity_alive", lambda identity: True
+    )
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._endpoint_reachable", lambda endpoint: False
+    )
+    with pytest.raises(RuntimeError, match="did not terminate"):
+        _wait_for_bazel_shutdown((identity,), 0)
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._process_identity_alive", lambda identity: False
+    )
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._endpoint_reachable", lambda endpoint: True
+    )
+    with pytest.raises(RuntimeError, match="reachable endpoints=1"):
+        _wait_for_bazel_shutdown((identity,), 0)
+
+
+def test_runner_preserves_primary_failure_when_bazel_cleanup_also_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = scratch_dir("startup-cleanup-chain")
+    workspace = root / "fixture" / "workspace"
+    workspace.mkdir(parents=True)
+    fixture = Fixture(
+        name="startup-cleanup-chain",
+        root=workspace.parent,
+        workspace=workspace,
+        expected=workspace.parent / "expected",
+        daemon=True,
+        observe_server_epochs=True,
+        commands=(
+            FixtureCommand(
+                name="execution-failure",
+                argv=("query", "//:BUILD.bazel"),
+                compare="semantic",
+                mutations=(
+                    Mutation(path="missing", find="old", replace="new"),
+                ),
+            ),
+        ),
+    )
+    cleanup_error = RuntimeError("cleanup failure")
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._shutdown_bazel_daemon",
+        lambda *args: (_ for _ in ()).throw(cleanup_error),
+    )
+    with pytest.raises(FileNotFoundError) as failure:
+        run_fixture(
+            fixture,
+            ToolConfig(name="bazel", executable=Path("/usr/bin/bazel")),
+            RunOptions(run_root=root / "runs"),
+        )
+    assert failure.value.__cause__ is cleanup_error
+
+
+def test_nonroot_startup_fixture_has_exact_22_command_contract() -> None:
+    fixture = load_fixture(FIXTURES / "nonroot-interim-module-graph")
+    assert fixture.startup_argv == (
+        "--nosystem_rc",
+        "--noworkspace_rc",
+        "--nohome_rc",
+    )
+    assert fixture.env == (("BAZELRC", ""),)
+    assert fixture.observe_server_epochs
+    appended = fixture.commands[14:]
+    assert [command.name for command in appended] == [
+        "fresh_conflicting_last_wins_utf8",
+        "fresh_conflicting_cli_startup_diagnostics",
+        "reordered_same_multiset_retains_utf8",
+        "reordered_cli_startup_diagnostics",
+        "rc_source_change_same_multiset_reuses",
+        "rc_source_startup_diagnostics",
+        "occurrence_change_restarts_latin1",
+        "zero_occurrences_restores_default",
+    ]
+    assert len(fixture.commands) == 22
+    query_argv = (
+        "query",
+        "//:BUILD.bazel",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry",
+        "--output=label",
+        "--noshow_progress",
+    )
+    assert [command.argv for command in appended if command.capture_startup_diagnostics] == [
+        query_argv,
+        query_argv,
+        (*query_argv, "--announce_rc"),
+    ]
+    assert [len(command.mutations) for command in appended] == [
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+    ]
+    assert all(
+        command.manifest_roots == ()
+        for command in appended
+        if command.capture_startup_diagnostics
+    )
+    assert all(command.stdout_patterns == (r"\A//:BUILD\.bazel\Z",) for command in appended if command.capture_startup_diagnostics)
+
+
+def test_compare_checks_only_declared_startup_capture_fields() -> None:
+    captured = FixtureCommand(
+        name="captured",
+        argv=("query", "//:BUILD.bazel"),
+        compare="semantic",
+        capture_server_epoch=True,
+        capture_startup_diagnostics=True,
+    )
+    uncaptured = FixtureCommand(
+        name="uncaptured", argv=("query", "//:BUILD.bazel"), compare="semantic"
+    )
+    fixture = Fixture(
+        name="startup-compare",
+        root=Path("/fixture"),
+        workspace=Path("/fixture/workspace"),
+        expected=Path("/fixture/expected"),
+        commands=(captured, uncaptured),
+    )
+    expected = {
+        "commands": [
+            {
+                "exit_code": 0,
+                "manifest": [],
+                "server_epoch": 2,
+                "startup_combined_forms": ["one", "", "two"],
+                "startup_announcements": ["announcement"], "stdout": "//:BUILD.bazel\n",
+            },
+            {"exit_code": 0, "manifest": [], "server_epoch": 99},
+        ]
+    }
+    actual = {
+        "tool": "bazel",
+        "commands": [
+            {
+                "exit_code": 0,
+                "normalized_stdout": "",
+                "normalized_stderr": "",
+                "manifest": [],
+                "server_epoch": 3,
+                "startup_combined_forms": ["one", "two"],
+                "startup_announcements": [], "stdout": "//:BUILD.bazel\n",
+            },
+            {
+                "exit_code": 0,
+                "normalized_stdout": "",
+                "normalized_stderr": "",
+                "manifest": [],
+                "server_epoch": 1,
+            },
+        ],
+    }
+    assert compare_result(fixture, actual, expected) == [
+        "captured: server_epoch differs from oracle",
+        "captured: startup_combined_forms differs from oracle",
+        "captured: startup_announcements differs from oracle",
+    ]
+    actual["commands"][0]["stdout"] = "//:BUILD.bazel"
+    assert "captured: stdout differs from oracle" in compare_result(fixture, actual, expected)
+    missing = {"commands": [{"exit_code": 0, "manifest": []}, expected["commands"][1]]}
+    failures = compare_result(fixture, actual, missing)
+    assert "captured: server_epoch is missing from oracle" in failures
+    assert "captured: startup_combined_forms is missing from oracle" in failures
+    assert "captured: startup_announcements is missing from oracle" in failures
 
 
 def test_normalize_text_strips_host_specific_noise() -> None:
