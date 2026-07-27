@@ -10057,3 +10057,135 @@ this stopped design adds no fixture.
 
 Next packet: design only
 `WP-5-m1-loading-host-dirent-observation-design`.
+
+### Host typed no-follow dirent observation design
+
+Status: `ACCEPT` on 2026-07-27 after independent pinned-source/API,
+live implementation-feasibility, and architecture/orchestration audits plus
+terminal latest-text review. No non-plan repository file, Rust, Cargo,
+dependency, fixture, DICE key, loading consumer, or entrypoint changed.
+
+The observation owner is `slug_workspace_v2`; the native producer is
+`slug_core_v2::runtime::path_observation`. Keep the one existing
+`PathObservationOperation::DirectoryEntries` demand. Native enumeration and
+all direct-child classification belong inside that one observation and never
+escape as separate DICE Lstat demands. `PathDirectoryListingKey` continues to
+forward the typed observation unchanged. Existing complete-only
+`PathObservationKey`/listing equality and self-unequal invalid Need remain;
+repository revalidation compares the complete typed payload, so a same-name
+kind transition invalidates.
+
+Break the names-only public API atomically. Add dedicated
+`PathDirectoryEntryKind::{File, Directory, Symlink, Unknown}` and
+`PathDirectoryEntry { name, kind }` rather than reuse the legacy eager
+UTF-8 `WorkspaceDirectoryEntryKind`. The kind is
+`Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe`.
+The entry has private fields, public `new`, `name`, and `kind`, and derives
+`Debug, Clone, PartialEq, Eq, Allocative`. `PathDirectoryEntries` retains
+exactly one shared `Arc<[PathDirectoryEntry]>`, performs a stable sort by raw
+OS-native name only, retains duplicate names and their input order, exposes
+only `entries()`, and includes kind in equality. Its constructor returns
+`Self`; remove the obsolete `DuplicatePathDirectoryName` error and re-export.
+This matches `Dirent.java:20-31,51-75`,
+`CompactSortedDirents.java:27-68,106-149`, and
+`DirectoryListingStateValue.java:35-45,84-106`: comparison is name-only,
+sorting is stable, duplicates remain, and value equality retains packed kind.
+Preserve `PathDirectoryName`,
+raw `OsString`, `Dupe`, and `Allocative`; a temporary construction `Vec` is
+permitted, but no retained standard map/vector/string, compact map/set,
+interner, or new hash wrapper is justified.
+
+Remove `PathDirectoryEntries::new(names)`, `.names()`, implicit
+`From<PathDirectoryName>`, and default-Unknown compatibility. Each would
+fabricate or discard required semantic kind. Migrate every constructor and
+accessor caller in the same implementation packet with explicit kinds; test
+helpers may not silently default all names to File.
+
+The eventual implementation allowlist is exactly five files:
+
+- `app/slug_workspace_v2/src/path_observation.rs` — at most 150 additions;
+- `app/slug_workspace_v2/src/lib.rs` — at most five additions;
+- `app/slug_workspace_v2/src/path_resolution.rs` — test/helper migration only,
+  at most 45 additions;
+- `app/slug_core_v2/src/runtime/path_observation.rs` — at most 520 additions;
+  and
+- `app/slug_core_v2/src/runtime/repository_io.rs` — validation-test migration
+  only, at most 30 additions.
+
+The total cap is 750 additions. No Cargo, dependency, fixture, loading,
+bzlmod, Starlark, new DICE key/operation, consumer, or activation change is
+permitted.
+
+On Unix, copy both `d_name` and `d_type` from each native readdir record.
+Preserve `DT_REG`, `DT_DIR`, and `DT_LNK` directly; map native
+character/block/FIFO/socket special types to `Unknown` without statting them.
+Only native `DT_UNKNOWN` or an unrecognized type receives a no-follow child
+stat after enumeration and directory-close handling. A present
+regular/directory/symlink refines to the matching kind; present special,
+ENOENT/FileNotFound, ENOTDIR, and ELOOP/Bazel-tolerated symlink-loop
+refinement become `Unknown`; other child-stat IO terminalizes the whole
+listing. Keep symlinks unresolved and preserve existing interrupted read,
+transient `EIO`, partial read, close, and primary-error precedence. This follows
+`src/main/native/unix_jni.cc:500-540,552-615`,
+`UnixFileSystem.java:54-63,88-120`, and `UnixFileStatus.java:41-56`, and keeps
+the enumeration/refinement race inside one observation.
+
+On Windows, retain raw UTF-16/`OsString` enumeration and close it before
+classification, then reproduce Bazel base `FileSystem.readdir`: no-follow
+status each enumerated child, mapping regular/directory/symlink directly and
+special or every null/IO child status to `Unknown`. Do not reuse the current
+full Lstat helper because its change-time query adds behavior not present in
+classification, and do not substitute `FindFirstFileW` attributes without
+native proof for reparse-point, race, and error behavior. The source authority
+is `WindowsFileSystem.java:36,135-176`,
+`JavaIoFileSystem.java:84-101`, and
+`FileSystem.java:469-492,594-627`. GNU-Windows compilation proves shape only;
+native Windows and lone-surrogate ordering remain an activation gate.
+
+Implement with pure/scripted classifier seams in
+`runtime/path_observation.rs`, preserving the existing production wrappers.
+Focused tests must prove:
+
+- raw non-UTF-8 name plus kind, raw-name sorting, stable duplicate-name
+  retention/order across equal/different kinds, separately allocated equality,
+  same-name File-to-Directory inequality, and Unknown restoration;
+- invalid/self-unequal Need, equal Complete pruning, and one retained
+  transaction through Need, File, Directory, Unknown, and restored equal File;
+- repository validation becomes dirty on kind-only change, stays clean on
+  equal reorder/restoration, and path listing forwards the typed value;
+- every Unix native type, no classification for known/special types,
+  `DT_UNKNOWN` present/missing/ENOTDIR/special/tolerated-loop/hard-error
+  behavior,
+  enumerate-and-close-before-refine, partial/read/close precedence, raw names,
+  and real file/directory/symlink/socket create/replace/delete/recreate;
+- Windows file/directory/symlink/special/null/error mapping, no-follow
+  symlink behavior, raw UTF-16, and name/stat ordering through the scripted
+  seam; and
+- existing base-directory missing/error/refinement recovery remains exact.
+
+After the oracle prerequisite lands, validate focused tests first, then full
+`slug_workspace_v2` and `slug_core_v2`, existing `slug_bzlmod_v2` and
+`slug_loading_v2` suites and doctests, and GNU-Windows no-run linkage for all
+four crates. Run formatting, diff, exact allowlist/caps, Cargo, archive,
+credential, process, public-API, constructor/accessor-removal, dependency, and
+forbidden-scope guards. Require independent source/API,
+implementation/evidence, and architecture/orchestration terminal latest-diff
+reviews.
+
+Stop if exact Windows behavior requires a new observation operation, any child
+classification escapes as a separate Need, implementation needs a production
+file outside the five-file allowlist, the cap cannot hold, or the prerequisite
+oracle expands into deferred raw non-ASCII strings, parser/evaluator,
+pattern-matcher breadth, Host glob ownership, or package-evaluation retry.
+Also stop if implementation deduplicates names, sorts equal names by kind,
+stats direct Unix kinds/specials, refines Unix unknown before listing close,
+terminalizes a Windows child-status error, resolves a symlink, or converts a
+raw name lossily.
+
+Oracle-first scheduling is mandatory. Next, design
+`WP-5-m1-loading-host-dirent-glob-oracle-design`, then implement and pin that
+focused ASCII oracle as post-checkpoint oracle packet three, then implement
+only `WP-5-m1-loading-host-dirent-observation`. Resume the byte-string
+oracle/feasibility design only after the typed observation is accepted. No
+fixture-growth checkpoint is due for this design-only packet; the oracle
+packet must record exact net growth against `22de3631`.
