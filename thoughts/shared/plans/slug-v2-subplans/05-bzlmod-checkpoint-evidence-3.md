@@ -11095,3 +11095,56 @@ Next packet after terminal acceptance of this design: implement only
 packet-five growth review accept, design only
 `WP-5-m1-loading-pure-host-glob-owner-design`; transactional evaluator retry
 remains later and separate.
+
+### Raw-name pattern-lazy glob oracle implementation
+
+Status: `ACCEPT` in `03684d84` with hygiene correction `e2cc891d` on
+2026-07-27 after the mandatory fifth-packet fixture-growth checkpoint and
+terminal source/parity, implementation/evidence, and
+architecture/orchestration latest-diff reviews.
+
+The exact ten implementation paths changed by +660/-7, within every per-file
+and hard cap. The harness adds only Linux `required_host_os` and
+final-component `raw_create`/`raw_delete`; byte-oriented no-follow directory
+traversal rejects non-ASCII, missing, symlinked, or escaping parents,
+noncanonical or special-component hex, collisions, and wrong-kind or
+symlink deletes. Existing mutation behavior and its FIFO diagnostic remain
+unchanged. Focused tests prove exact raw-byte creation/deletion, ASCII records,
+all validation boundaries, preserved symlink targets, and pre-copy Linux
+rejection.
+
+The new fixture contains exactly seven regular files, zero links, and 261
+newline-counted lines. Its four exact-comparison Bazel-only rows produce exits
+`0/7/0/0`, server epochs `1/1/1/1`, and empty manifests. ASCII conditional
+labels distinguish the checked `c3 a9` name from generated `e9`, the four
+accepted wildcard calls, deletion, and byte-for-byte restoration; the
+isolated package records the exact BUILD `?` rejection. Unit tests and the
+reviewed generated JSON prove exact ASCII parent/hex mutation records without
+serializing the raw filename.
+
+Pinned Bazel 9.2 generation, two distinct absolute fresh-root exact replays,
+an additional final exact replay, and the unchanged 13-row POSIX fixture
+replay passed with complete daemon cleanup. The normalized projection hash
+for the two independent implementation replays was
+`f3dc914229fee7bd6ab38c2ed78284ea25876f8737fe8896fe8555225e217f83`.
+The focused 32-test slice, full 97-test oracle harness, Python compilation,
+diff/archive, path/cap, ASCII-evidence, process, and unchanged-fixture gates
+passed; pytest emitted only the pre-existing unknown `asyncio_mode` warning.
+
+Implementation reviews corrected the first draft to the exact wildcard calls and dynamic
+helper, exact fixture comparison, the 30-line `defs.bzl` cap, unchanged FIFO
+diagnostic, both no-follow symlink cases, and explicit `UnixGlob.java`
+provenance. The required checkpoint from `22de3631` through implementation
+`03684d84` and hygiene correction `e2cc891d` is recorded in the oracle-harness
+owner plan: 1,303/16/36,985 grew to 1,314/24/39,304, or +11 regular files,
++8 symlinks, and +2,319 lines across 47 retained rows. The exact pruning
+allowlist removed nine unused registry package markers, the unaddressed POSIX
+root BUILD, and one redundant unmatched dangling link. All four affected
+fixtures replayed; the exact post-prune replay set was
+`nonroot-interim-module-graph` and `glob-directory-invalidation`.
+
+Next packet: design only
+`WP-5-m1-loading-pure-host-glob-owner-design`. Keep transactional package
+evaluation retry/suspension, regular-or-special BUILD/`.bzl` byte
+acquisition, parser activation, native Windows/lone-surrogate evidence, and
+all consumer activation separate.

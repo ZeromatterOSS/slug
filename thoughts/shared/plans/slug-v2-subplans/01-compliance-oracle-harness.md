@@ -1065,3 +1065,58 @@ distinct-root replays passed.
 This is packet one after accepted baseline `22de3631`. Growth remains below
 both the roughly 100-file and 10,000-line review triggers, so the checkpoint
 baseline is unchanged and no pruning review is due.
+
+### Fixture-growth hygiene checkpoint (2026-07-27, fifth review)
+
+The mandatory five-packet review compared tracked archives at baseline
+`22de3631`, implementation tree `03684d84`, and accepted pruned tree
+`e2cc891d`. The fixture tree grew from 1,303 regular files, 16 symlinks, and
+36,985 newline-counted regular-file lines to 1,314 regular files, 24
+symlinks, and 39,304 lines: 11 regular files, eight symlinks, and 2,319
+lines.
+
+The accepted packet endpoint deltas were local directory collation/charset
+`d262052d` (+3 regular files, +3 symlinks, +332 lines), host-JVM
+startup/reuse `c67dc3a5` (+1/+0/+733), Host-dirent glob semantics
+`0a4aa0af` (+4/+6/+484), Bazel-internal string bytes `98b8b0e1`
+(+6/+0/+519), and Linux raw-name pattern-lazy glob `03684d84`
+(+7/+0/+261). The terminal hygiene correction `e2cc891d` then removed ten
+nondiscriminating regular files, one redundant symlink, and ten lines.
+
+Per affected final fixture, `nonroot-interim-module-graph` is 49 regular
+files, five symlinks, 1,836 lines, and 22 rows, a baseline delta of
+-5/+3/+1,056; `glob-directory-invalidation` is 9/5/666 and 13 rows, a
+delta of +3/+5/+483; `starlark-internal-string-bytes` is 6/0/519 and eight
+rows; and `glob-raw-name-pattern-lazy` is 7/0/261 and four rows. The four
+fixtures retain 47 rows, 32 more than the baseline.
+
+Every retained row, asset, mutation, manifest root and expected field remains
+discriminating. The nonroot rows separately prove directory collation,
+found-empty and ordinary restoration, ordered/source-sensitive JVM startup
+diagnostics, equal-multiset reuse, occurrence restart, and default
+restoration. The POSIX glob rows require both absent observations, all kind
+transitions, matched-cycle failure and recovery, and their exact relative
+assets. The string rows independently prove static/dynamic carriers, five
+escape failures, and the byte column. The Linux raw rows isolate byte order,
+literal/octal/dynamic wildcard matching, exact `?` rejection, deletion, and
+restoration without copying the POSIX topology.
+
+Added-blob, reachability, and repeated-subtree inventory removed the exact
+pruning allowlist: nine unused `BUILD.bazel` markers beneath registry modules
+`apple_support`, `platforms`, `protobuf`, `rules_cc`, `rules_java`,
+`rules_license`, `rules_python`, `rules_shell`, and `zlib`; the unaddressed
+POSIX fixture root `BUILD.bazel`; and redundant unmatched dangling link
+`pkg/links/unrelated-dangling.bin`. Required registry extension payloads,
+nested package markers, directory-transport sentinels, the matched dangling
+link, and unmatched cycle remain discriminating and fixture-local. The
+affected replay set is exactly `nonroot-interim-module-graph` and
+`glob-directory-invalidation`; both full post-prune replays passed from fresh
+absolute roots with expected JSON unchanged. The string and raw fixtures also
+replayed during the checkpoint, and exact-output fixtures retained empty
+manifests.
+
+Tracked-archive synthesis, row/field/mutation/asset inventory, duplicate-blob
+inspection, focused and full harness validation, and source/evidence plus
+architecture/fixture-hygiene reviews returned `ACCEPT`. The next checkpoint
+starts from accepted tree `e2cc891d` and counts later accepted oracle packets
+only.
