@@ -11325,7 +11325,11 @@ After the candidate owner accepts, design only
 `WP-5-m1-loading-host-package-boundary-projection-design`. That prerequisite
 must separately preserve selected package root, ordinary no-package, deleted
 package (continue), ignored directory (stop), actual subpackage (stop),
-incorrect nested repository (stop), and operational error/Need propagation.
+and operational error/Need propagation. Pinned Bazel 9.2's
+`LocalRepositoryLookupFunction` always returns the main repository, so a
+nested `MODULE.bazel` is not a repository boundary and must continue;
+the retained incorrect-repository producer branch is unreachable and does
+not authorize a Slug detector.
 Only after it accepts may a later owner compose multiple segments,
 standalone `**`, package boundaries, operation filtering, and final unique
 results. Regular-or-special BUILD/`.bzl` acquisition, parser byte ingress,
@@ -11520,6 +11524,211 @@ restoration transitions.
 Next packet: design only
 `WP-5-m1-loading-host-package-boundary-projection-design`. It must preserve
 selected root, ordinary no-package, deleted-package continue,
-ignored-directory stop, actual-subpackage stop, incorrect nested-repository
-stop, and typed error/Need propagation before any recursive glob traversal or
-consumer activation.
+ignored-directory stop, actual-subpackage stop, and typed error/Need
+propagation before any recursive glob traversal or consumer activation. A
+nested `MODULE.bazel` without a BUILD marker continues under pinned Bazel 9.2;
+do not invent an incorrect-repository detector.
+
+### Public Host root-package boundary projection design
+
+Status: `ACCEPT` on 2026-07-27 after terminal pinned-source/behavior,
+public-API/evidence, and architecture/orchestration corrected latest-text
+reviews. No fixture, generated expectation, Bazel process, Rust, Cargo, DICE
+key, loading consumer, parser, event owner, or new Stage 9 landed subsection
+changed. The existing private Host glob owner's false nested-repository
+residual was corrected to the pinned Bazel 9.2 behavior.
+
+Pinned Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` corrects the prerequisite stated
+by the earlier pure-owner design. For one directory candidate,
+`DirectoryDirentProducer.java:76-116` tests the repository ignore matcher
+first and stops without requesting package lookup on a match. Otherwise it
+looks up the candidate `PackageIdentifier`, stops for a successful package,
+and continues for every unsuccessful lookup, including deleted,
+no-BUILD-file, invalid-name, and repository-not-found values. The unsuccessful
+taxonomy and `packageExists() == false` contract are in
+`PackageLookupValue.java:49-68,220-389`.
+
+`PackageLookupFunction.java:91-122,157-180,182-325` validates the package name,
+applies `--deleted_packages`, handles `//external`, loads repository-ignore
+policy, and then searches package-path roots in root-major and marker-minor
+order: within each root `BUILD.bazel` precedes `BUILD`, while an earlier-root
+`BUILD` precedes a later-root `BUILD.bazel`. A regular or special marker,
+including one reached through a final symlink, selects that root and marker;
+a missing or directory marker continues
+(`src/main/java/com/google/devtools/build/lib/actions/FileValue.java:49-82,
+113-120`). `GlobsFunction.java:113-139,210-216` loads ignore policy before
+traversal and gives a reached complete glob error precedence over restart.
+
+The incorrect-repository checks retained in
+`PackageLookupFunction.java:262-304` and
+`DirectoryDirentProducer.java:95-101` are latent in stock Bazel 9.2:
+`LocalRepositoryLookupFunction.java:27-35` unconditionally returns
+`mainRepository()` for every path, and
+`LocalRepositoryLookupFunctionTest.java:159-169` confirms this for an
+arbitrary nested path. Therefore a nested `MODULE.bazel` without a BUILD
+marker continues traversal. This packet removes incorrect-repository and
+nested-module detection from the live Slug contract; it does not expose a
+latent variant, scan for WORKSPACE/MODULE markers, or claim behavior Bazel
+9.2 cannot produce.
+
+The live Slug split otherwise has the right owners but not the right public
+composition. `HostRepositoryIgnoreKey` retains repository-scoped ignore
+policy independently. Private
+`HostRootPackageLookupKey { workspace, package: PackagePath }` retains
+ordinary no-BUILD, deleted, invalid-name, and selected
+`HostPackage { package_root, build_file_name }`, but intentionally collapses
+an ignore match to `Deleted`. Exporting it would make an ignored directory
+continue, while probing BUILD markers from loading would duplicate bzlmod
+policy and lose ordered package-root selection.
+
+The accepted projection is root/main-repository only and belongs to
+`slug_bzlmod_v2`, named `HostRootPackageBoundaryKey`. Its exact identity is one
+private normalized workspace and one `PackagePath`; the public constructor is
+`new(NormalizedAbsolutePath, PackagePath)`. This matches Bazel's
+package-identifier semantic key. The selected package-path root is a lookup
+result, not key identity. Do not add a selected physical root, candidate
+absolute Host path, repository mapping/name, BUILD basename, ignore entry, or
+raw-byte carrier to the public key.
+
+The later loading traversal must construct each candidate `PackagePath` in
+Bazel's internal-string domain: on Unix, lift each raw path byte to the
+same-valued Latin-1 scalar, preserving `e9` as U+00E9 and `c3 a9` as
+U+00C3/U+00A9 without UTF-8 decoding or lossy conversion. Both remain
+distinct identities, and both are invalid package names in the live Host
+lookup, so they continue before any marker path is joined. Ignore matching
+must still run first and sees those distinct internal strings. That adapter,
+native-Windows/lone-surrogate conversion, and multi-segment path assembly are
+later loading-owned gates; `PackagePath` comes from the lower identity crate
+already shared by loading and bzlmod, so this projection introduces no
+dependency inversion.
+
+Add one public
+`HostRootPackageBoundaryKind::{NoPackage, DeletedPackage, IgnoredDirectory,
+Package}` and opaque public `HostRootPackageBoundary` and
+`HostRootPackageBoundaryError` wrappers. The success wrapper privately
+retains:
+
+- ordinary no-package continue;
+- deleted-package continue;
+- ignored-directory stop; and
+- actual-package stop, retaining the selected package-path root.
+
+Only `HostRootPackageBoundary::kind()` and
+`selected_package_root() -> Option<&NormalizedAbsolutePath>` are public; the
+latter returns `Some` only for `Package`. The marker basename, ignore match,
+private state, and invalid-name diagnostic have no accessor, variant,
+conversion, serialization, or dereference surface. Invalid package name and
+ordinary no-BUILD lookup both project to `NoPackage`, because the glob
+producer observes only unsuccessful lookup and continues. Switching
+`BUILD.bazel` to `BUILD` within the same selected root is likewise
+semantically equal at this boundary and may prune a dependent consumer;
+changing the selected root is unequal. Success and error Debug are manually
+opaque. Error Display and source behavior delegate to the retained typed
+private error rather than stringify it into equality. The key value is
+exactly
+`PathOutcome<Arc<Result<HostRootPackageBoundary,
+HostRootPackageBoundaryError>>>`;
+equality is `complete_eq`, validity is `is_complete`, and every Need remains
+invalid and self-unequal.
+
+Computation has this exact order:
+
+1. Compute `HostRepositoryIgnoreKey::new(workspace)`. Need passes through
+   unchanged and a typed error becomes the opaque public error.
+2. If `matching_entry(package)` succeeds, return the retained
+   ignored-directory stop without computing `HostRootPackageLookupKey`.
+3. Otherwise compute the existing private
+   `HostRootPackageLookupKey::new(workspace, package)`. Need passes through
+   unchanged and a typed error becomes the opaque public error.
+4. Map `Package` to `Package` with its selected root, `Deleted` to
+   `DeletedPackage`, and both `NoBuildFile` and `InvalidPackageName` to
+   `NoPackage`.
+
+The private lookup's repeated nonmatching ignore dependency is already
+DICE-cached and changes no semantics. Do not refactor either private owner in
+this packet. The outer ignore check is required both for ignored-before-
+deleted/invalid/marker precedence and for proving that an ignored candidate
+does not request package lookup or BUILD-marker observations.
+
+Implementation is gated on a focused Bazel oracle. Next, design only
+`WP-5-m1-loading-host-package-boundary-oracle-design`; then implement and pin
+`WP-5-m1-loading-host-package-boundary-oracle`. Reuse the existing stale
+Bazel 9.1.1 `glob-package-boundaries` fixture rather than add another fixture.
+Inventory its two old commands and every asset. Fold the first row's unique
+ordinary-directory and actual-subpackage evidence into one pinned Bazel 9.2
+exact `**/*.txt` membership row; remove that old command and prune its
+duplicated `keep.txt`, `skip.txt`, explicit-exclude, and other scaffolding
+unless the oracle design documents a genuinely distinct retained boundary
+claim. Remove the duplicate allow-empty diagnostic, which
+`glob-callable-contract` already owns. The replacement row discriminates:
+
+- an ordinary directory continues;
+- an actual BUILD-bearing subpackage stops;
+- a BUILD-bearing directory named by `--deleted_packages` continues;
+- a `.bazelignore` directory stops;
+- a directory both ignored and deleted stops, proving ignore-first
+  precedence; and
+- a directory containing nested `MODULE.bazel` but no BUILD continues.
+
+The oracle-design packet must freeze the exact asset/command/expected
+allowlist, source anchors, caps, fresh-root replay, protected-fixture,
+cleanup, and growth accounting before any fixture changes. It is oracle
+packet two after checkpoint `e2cc891d`; no fixture-growth review is due unless
+measured growth unexpectedly reaches a repository threshold.
+
+After oracle acceptance, implement only
+`WP-5-m1-loading-host-package-boundary-projection` with this exact allowlist:
+
+- new `app/slug_bzlmod_v2/src/host_package_boundary/mod.rs`, at most 600
+  additions;
+- new `app/slug_bzlmod_v2/src/host_package_boundary/tests.rs`, at most 850
+  additions; and
+- `app/slug_bzlmod_v2/src/lib.rs`, at most eight additions for the private
+  module declaration and exact public re-exports.
+
+The hard aggregate cap is +1,450/-20. No Cargo, dependency, loading,
+workspace, identity, private package/ignore owner, fixture, parser, evaluator,
+consumer, or entrypoint file may change. No direct filesystem IO, blocking,
+lock across DICE, global cache, event batch, standard retained collection,
+new Buck2/V1 extraction, or copied lookup implementation is permitted.
+
+Focused tests must prove exact key identity/display; all four public semantic
+kinds and their continue/stop use; selected-root retention and accessor
+opacity; root-major/marker-minor selection;
+ordinary missing/directory marker continuation; regular, special, and
+symlink-to-file subpackage stops; deleted-plus-marker continuation;
+ignored-before-deleted, ignored-before-invalid, and ignored-before-marker
+precedence with zero package-lookup/marker demand; distinct Latin-1-lifted
+non-ASCII invalid-name continuation with zero marker demand; typed ignore and
+lookup error plus exact Need propagation; opaque Debug and delegated
+Display/source; complete-only equality and validity; BUILD-marker changes
+within one selected root compare equal and prune a downstream counter, while
+selected-root changes propagate; one retained DICE graph covering
+create/delete/recreate,
+ignore/delete/marker changes, error recovery, and A-to-B-to-A restoration;
+zero public/private wrapper event data; and zero non-test callers.
+
+Validate focused boundary tests first, then the full bzlmod, loading, and
+workspace suites and doctests, GNU-Windows no-run linkage for those crates,
+formatting, diff, exact scope/per-file/aggregate caps, public-surface,
+dependency/caller, implementation-block, archive, credential, process, and
+forbidden-surface guards. Stop on any pinned-source or oracle contradiction,
+incorrect-repository state, nested-module stop, lossy conversion, physical
+path key, ignore-after-lookup ordering, new dependency, direct IO, event
+owner, caller activation, cap/allowlist expansion, native-Windows claim, or
+need for a fourth implementation file.
+
+This design and its oracle packets require no new Stage 9 landed subsection.
+Correct the existing private Host glob owner's false nested-repository
+residual as source maintenance during this design closeout. After accepted
+projection implementation, add one Stage 4 landed subsection citing pinned
+Bazel `8220c619...`, the accepted boundary oracle and implementation commits,
+Buck baseline `088c75...` only for already-approved utility patterns, and V1
+`e218054...` as rejected/reference-only. That record authorizes no V1/Buck
+extraction and no recursive glob or consumer activation. Only after the
+projection accepts may a later design compose multi-segment and standalone
+`**` traversal, boundary pruning, operation filtering, and final unique
+results. Regular-or-special BUILD/`.bzl` acquisition, parser activation,
+transactional evaluator retry, include/exclude and `allow_empty` composition,
+callable diagnostics, and production publication remain separate.

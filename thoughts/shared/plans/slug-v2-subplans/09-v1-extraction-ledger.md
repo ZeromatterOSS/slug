@@ -605,10 +605,13 @@ Decision: retain only the approved compact value/worklist utility patterns
 from the Buck baseline. Reject V1 glob behavior and ownership. The private
 owner remains dormant until a separately reviewed Host package-boundary
 projection and later recursive composition exist.
-Residual risk: selected-root/no-package/deleted/ignored/subpackage/nested-
-repository states are not yet represented. Multi-segment and `**` traversal,
-native-Windows byte ordering, regular-or-special BUILD/`.bzl` acquisition,
-parser/evaluator retry, and consumer publication remain later packets.
+Residual risk: selected-root/no-package/deleted/ignored/subpackage states are
+not yet represented. Pinned Bazel 9.2 treats a nested `MODULE.bazel` without a
+BUILD marker as ordinary traversal; its retained incorrect-repository branch
+is unreachable, so no nested-repository state is required. Multi-segment and
+`**` traversal, native-Windows byte ordering, regular-or-special
+BUILD/`.bzl` acquisition, parser/evaluator retry, and consumer publication
+remain later packets.
 
 ### Stage 6 depset/provider/rule context tests
 
