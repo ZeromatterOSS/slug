@@ -1,32 +1,33 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-preactivation-host-gate-design`
+Packet: `WP-5-m1-preactivation-host-gate`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted dormant typed build/query roots and accepted root, loading,
-analysis, and query Host migrations
-Validation tier: design-only transitive production-call-graph audit
+Evidence: accepted preactivation Host-gate design over dormant typed
+build/query roots and all accepted Host migrations
+Validation tier: test-only type-downcast transitive closure gate
 
-Design inputs:
+Implementation files:
 
-- dormant build and query command-root closures;
-- production one-shot and daemon build/query entrypoints; and
-- every eager workspace snapshot/projection API named by Stage 9.
+- `app/slug_core_v2/src/runtime/dice.rs`
+- `app/slug_query_v2/tests/loading_query.rs`
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Result: freeze exact build/query transitive forbidden scans, audit roots, and
-stop conditions proving whether either typed command root can activate without
-reaching an eager semantic workspace snapshot, projection, observation
-injection, or event/Need-producing compute above or beside the root.
+Result: extend the real build/query activation trackers to reject every named
+eager snapshot owner/projection and legacy semantic spine while exercising the
+accepted empty/direct/lazy/recursive/buildfiles/loadfiles/package/native/
+missing/Starlark cases.
 
-This is design/audit only. Name exact prerequisite commits, scan commands,
-allowed nonsemantic metric exceptions, transitive call-graph evidence, and the
-smallest next implementation packet. A failed forbidden scan is a stop or
-replan result, not permission to mask the eager edge.
+Assert one typed-command-root activation delta around every reused
+multi-compute case and zero forbidden activations. Run the accepted activated
+CLI/server call-site scan and retain its current matches as blockers;
+`FilesystemObservationAdapter` remains permitted only for metric-only
+`invalidated_files`.
 
-Make no Rust, Cargo, fixture, oracle, public API, CLI/server behavior,
-activation, envelope, execution, JVM, Java-bytecode, or Bazel-delegation
-change. Obtain at most one terminal independent review only if the audit
-changes a risky DICE or activation boundary.
+Add no third file, production code, Cargo/dependency/public API, CLI/server
+behavior, activation, envelope, execution, JVM, Java-bytecode, or Bazel
+delegation. Forbidden activation is `REPLAN`. Validate focused and full
+core/query, direct loading/analysis, GNU-Windows linkage, formatting, diff,
+scope, and call-site/metric scans. Obtain one terminal implementation review.

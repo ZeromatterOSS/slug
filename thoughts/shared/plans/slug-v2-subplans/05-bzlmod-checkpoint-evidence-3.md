@@ -13394,3 +13394,91 @@ returned `ACCEPT`.
 Design next only `WP-5-m1-preactivation-host-gate-design`. Freeze the exact
 build/query transitive forbidden scans and stop conditions before any opaque
 envelope or production activation work.
+
+### Preactivation Host gate design
+
+Status: **ACCEPT** for `WP-5-m1-preactivation-host-gate-design` on 2026-07-27
+after one terminal activation-boundary review.
+
+The live audit separates dormant semantic closure from current production
+adapters. The accepted `BuildCommandRootKey` reaches only
+`RootModuleLoadingAnchorKey`, `RootPackageLoadKey`, and
+`RootConfiguredTargetAnalysisKey`; its focused tracker already reports zero
+legacy root-graph, workspace-evaluation, package-load, and analysis
+activations. The accepted `RootQueryCommandKey` reaches its Host anchor,
+root-package graph, Host recursive subtree owner, and Host BUILD-companion
+owner; its tracker reports zero legacy subtree activation. Legacy eager keys
+still coexist in the same source files but are not dependencies of either
+typed root.
+
+Production is deliberately not ready to activate. One-shot build still calls
+`evaluate_workspace_targets_with_bzlmod_inputs`; one-shot query calls
+`evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion`.
+The daemon calls `evaluate_observations_with_bzlmod_inputs` and
+`query_observations_with_policy_and_bzlmod_inputs_and_output_completion`.
+Those adapters accept `WorkspaceObservation`, inject `WorkspaceSnapshotKey`,
+`WorkspaceRawSnapshotKey`, and `WorkspaceDirectorySnapshotKey`, and compute
+legacy projections. The daemon's filesystem scan also owns the visible
+`invalidated_files` metric. These are activation blockers, not reasons to
+weaken the typed roots or remove the metric in this gate.
+
+Implement one test-only transitive closure gate in exactly:
+
+- `app/slug_core_v2/src/runtime/dice.rs`; and
+- `app/slug_query_v2/tests/loading_query.rs`.
+
+Extend the existing build and query activation trackers to reject every
+semantic activation of:
+
+- `WorkspaceSnapshotKey`, `WorkspaceRawSnapshotKey`, and
+  `WorkspaceDirectorySnapshotKey`;
+- `WorkspaceFileKey`, `WorkspaceRawFileKey`, and `WorkspaceDirectoryKey`;
+- legacy `RootModuleGraphKey`, `WorkspaceEvaluationKey`, `PackageLoadKey`,
+  `ConfiguredTargetAnalysisKey`, and query `SubtreePackageSetKey`.
+
+The build gate must reuse the accepted empty, package-wide, native,
+missing-target, and Starlark-analysis cases. The query gate must reuse valid
+empty, direct/lazy, recursive multi-root, `loadfiles()`, and `buildfiles()`
+primary/fallback/symlink/special/missing/restore cases. Both assert one typed
+command root and zero forbidden activations; do not add a synthetic facade or
+source-name allowlist that can pass without computing the real roots.
+
+Run this exact activated-surface call-site scan and retain every current match
+as an explicit activation blocker:
+
+```text
+rg -n 'evaluate_workspace_targets_with_bzlmod_inputs|evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion|evaluate_observations_with_bzlmod_inputs|query_observations_with_policy_and_bzlmod_inputs_and_output_completion' \
+  app/slug_cli_v2/src/commands/{build.rs,query.rs} \
+  app/slug_server_v2/src/lib.rs
+```
+
+Activation may proceed only when its atomic vertical packet removes those
+calls from the activated surface and a repeated scan has no activated
+call-site match. Definitions, exported legacy wrappers, and legacy-only tests
+in core may remain until the separate retirement packets and therefore are not
+part of this call-site scan. Separately run
+`rg -n 'observe_workspace|WorkspaceObservation' app/slug_server_v2/src/lib.rs`;
+those matches may remain only inside `FilesystemObservationAdapter::observe`
+and the metric-only call chain that computes `invalidated_files`. Its returned
+observations must not enter the typed command transaction or closure.
+
+The implementation gate passes only if focused build/query trackers, full
+core/query suites, direct loading/analysis checks, GNU-Windows no-run linkage,
+formatting, diff, exact two-file scope, and no-Cargo/no-production-change
+guards pass. A forbidden semantic activation is `REPLAN`; do not hide it with
+tracker filtering or convert it into a tolerated legacy edge.
+
+Add no production code, public API, caller, envelope, CLI/server behavior,
+snapshot retirement, metric change, activation, execution, JVM, Java
+bytecode, or Bazel delegation. After this test-only gate is accepted, design
+only the private opaque terminal result/output envelope required before either
+vertical activation.
+
+The terminal review returned `ACCEPT`. It confirmed the two-file type-downcast
+gate covers the full forbidden owner/projection/legacy set, the call-site scan
+excludes permitted core definitions, and `invalidated_files` remains
+metric-only. Implementation must snapshot tracker counts around each reused
+multi-compute case and assert a one-root activation delta, not rely on a
+cumulative root count.
+
+Implement next only `WP-5-m1-preactivation-host-gate`.
