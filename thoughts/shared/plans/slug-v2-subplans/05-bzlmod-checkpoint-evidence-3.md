@@ -14020,3 +14020,201 @@ Design next only `WP-5-m1-query-first-activation-design`. Freeze one atomic
 typed-query vertical slice across core, one-shot CLI, daemon, and focused
 equivalence tests; preserve metric-only filesystem observation and do not
 interpose build execution.
+
+### Query-first atomic activation design
+
+Status: **ACCEPT** for `WP-5-m1-query-first-activation-design` on 2026-07-27
+after one terminal independent design review.
+
+This packet is design-only. It adds no Rust and authorizes no build activation,
+execution, REAPI, JVM, Java-bytecode, or Bazel delegation.
+
+#### Existing accepted path
+
+`RootQueryCommandKey` already owns the complete loading-query semantic result
+as
+`SourcePreparationOutcome<Arc<Result<QueryOutput, QueryError>>>`. Its identity
+includes source, order, policy, and output completion. The preactivation gate
+proves that it reaches the Host anchor/loading graph without any eager
+workspace snapshot or legacy semantic key. The private retained retry owner
+already resolves typed Needs, selects one exact terminal closure, accepts the
+native/materializer snapshot, closes the lease, and returns an opaque
+`AcceptedCommand<T>`. `CommandOutput::publish` now renders the selected
+source-aware events before terminal stderr and exposes primitive streams only
+by consumption.
+
+The only live blockers are adapters. One-shot query still observes a complete
+legacy workspace and calls
+`evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion`.
+The daemon query still passes a complete `WorkspaceObservation` to
+`query_observations_with_policy_and_bzlmod_inputs_and_output_completion`.
+Both then format the returned `QueryOutput` without the accepted envelope.
+The daemon observation adapter also computes the public
+`invalidated_files` compatibility metric; its successful observation values
+must be discarded rather than injected into the typed command.
+
+#### Core command API and one retained loop
+
+Activate the existing retry owner; do not add a parallel query loop. Replace
+the synthetic-only dispatch with one private `NativeCommandRoot` abstraction
+having an associated cloneable terminal and one async compute operation.
+Implement it only for the existing synthetic root adapter and
+`RootQueryCommandKey`. Generalize the current concrete loop to
+`drive_command<R: NativeCommandRoot>` without an async closure, HRTB, boxed
+future, second guard, or second acceptance owner. Existing synthetic
+cancellation/failure seams and metadata remain test-only behavior of their
+concrete adapter.
+
+Add exactly these public entry points:
+
+```text
+WorkspaceRuntime::query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+    &self,
+    expression,
+    order,
+    policy,
+    command_policy,
+    environment_policy,
+    lockfile_mode,
+    registry_urls,
+    completion,
+) -> Result<
+    AcceptedCommand<Arc<Result<QueryOutput, QueryError>>>,
+    QueryError,
+>
+
+evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+    workspace,
+    expression,
+    order,
+    policy,
+    command_policy,
+    environment_policy,
+    lockfile_mode,
+    registry_urls,
+    completion,
+) -> Result<
+    AcceptedCommand<Arc<Result<QueryOutput, QueryError>>>,
+    QueryError,
+>
+```
+
+The one-shot wrapper constructs one retained runtime but performs no
+`observe_workspace` call. Both entry points validate the query key and
+registry URL set before acquiring a lease, build the fixed
+`NativeDemandRequestInputBundle`, and map private session/infrastructure
+failures once into a stable `QueryError::evaluation`. A terminal query
+`Ok` or `Err` remains inside the accepted `Arc`; no `QueryOutput` or
+`QueryError` clone is introduced. Parse/registry/preflight failures produce no
+envelope and therefore no selected output.
+
+Keep the legacy observation-based query wrappers and their legacy-only tests
+temporarily, but remove every activated CLI/server call to them. This packet
+does not retire workspace snapshots, old query functions, or build adapters.
+
+#### Adapter publication
+
+One-shot CLI imports only the new one-shot command entry point. Daemon query
+calls only the new retained-runtime command method. Each adapter immediately
+consumes the envelope through:
+
+```text
+accepted
+    .project(|terminal| TerminalOutput::new(exit_code, stdout, stderr))
+    .publish()
+    .into_parts()
+```
+
+The borrowed projection matches the retained `Arc<Result<...>>` and formats
+the already-computed output exactly once. Text/label, graph, label-kind, and
+package retain their current formatters and completion choice; formatting
+does not re-enter DICE. Query errors retain exit code, escaping, and the
+`Evaluation of query` suffix. One-shot and daemon retain their current
+`runtime_mode`; daemon errors also retain `invalidated_files`.
+
+Terminal JSON stderr ends in one `\n`. CLI writes published stdout and stderr
+as exact bytes rather than using an extra-line `eprintln!`. The daemon
+response retains the published bytes and its client likewise writes them
+without adding another newline. Selected DEBUG/diagnostic events therefore
+precede the terminal error, successful query prints are visible on stderr,
+and event-only success gains no blank line. Outer preflight/infrastructure
+errors use the same adapter formatter but have no selected event prefix.
+
+Daemon query still calls `FilesystemObservationAdapter::observe` before the
+typed command to preserve its existing invalidation count and observation
+failure behavior. Name and discard the returned observation value; only the
+count enters the response/projector. It must not be passed to core, stored as
+command input, or enter the selected closure. Build continues using its legacy
+observation value unchanged. Reject an unsupported daemon output string before
+metric observation or semantic query evaluation.
+
+#### Exact implementation scope
+
+Production files:
+
+- `app/slug_core_v2/src/runtime/{dice.rs,mod.rs}`;
+- `app/slug_cli_v2/src/commands/query.rs`; and
+- `app/slug_server_v2/src/lib.rs`.
+
+Focused tests may change only:
+
+- colocated tests in `app/slug_core_v2/src/runtime/dice.rs`;
+- `app/slug_cli_v2/tests/cli.rs`; and
+- `app/slug_server_v2/src/tests.rs`.
+
+No query-language, loading, analysis, Starlark, event, protocol-schema, Cargo,
+build-command, or execution file changes are permitted.
+
+#### Required evidence and guards
+
+Core evidence must run a real `RootQueryCommandKey` through the generalized
+driver and prove valid-empty plus direct-label success, typed missing-target
+error, retry progress, one accepted terminal, selected MODULE/`.bzl`/BUILD
+events once in dependency order, no retry-only event, and zero activation of
+every eager snapshot/legacy key from the preactivation gate. Existing
+synthetic cancellation, restoration, replacement, close, and publication
+tests remain green.
+
+One focused CLI integration must run the same small workspace one-shot and
+through the daemon and compare exit code/stdout plus semantic stderr after
+allowing only the frozen runtime-mode/metric JSON fields to differ. Cover
+empty output, one direct label, one dependency query, one missing target, one
+syntax error, and one source-aware print success/error row. Assert exact
+single newlines and no replayed print on a warm daemon query. A focused server
+test must prove the invalidation count remains correct while typed query
+results follow create/edit/delete/restore and no observation value reaches a
+forbidden key.
+
+Run only focused core driver/publication, CLI equivalence, and daemon metric
+tests; quiet direct checks for core, CLI, server, query, loading, and analysis;
+GNU-Windows no-run linkage for changed crates; formatting, diff, archive,
+exact-file/no-Cargo guards; and these activated-surface scans:
+
+```text
+rg -n 'evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion|query_observations_with_policy_and_bzlmod_inputs_and_output_completion' \
+  app/slug_cli_v2/src/commands/query.rs app/slug_server_v2/src/lib.rs
+
+rg -n 'evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output_completion|query_command_with_policy_and_bzlmod_inputs_and_output_completion' \
+  app/slug_cli_v2/src/commands/query.rs app/slug_server_v2/src/lib.rs
+
+rg -n 'observe_workspace|WorkspaceObservation' app/slug_server_v2/src/lib.rs
+```
+
+The first scan must be empty, the second must identify only the new one-shot
+and daemon calls, and the third may retain observation use only in build plus
+the adapter/metric query chain. The broader preactivation scan must fall from
+six matches to the three build-only matches.
+
+Stop on any eager snapshot injection, legacy semantic key activation, raw
+terminal/event access, terminal clone, second retry/accept/publication owner,
+retry publication, metric ownership/protocol change, query evaluation during
+formatting, build activation, execution, REAPI, JVM, Java bytecode, or Bazel
+delegation.
+
+The terminal review returned `ACCEPT`. It confirmed that the four-file
+production boundary can activate both query adapters through one retained
+retry/accept/publication owner while preserving opaque terminals, exact stream
+bytes, metric-only daemon observation, and the no-JVM/no-Bazel-delegation
+boundary.
+
+Implement next only `WP-5-m1-query-first-activation`.
