@@ -9920,3 +9920,140 @@ due.
 
 Next packet: design only
 `WP-5-m1-loading-byte-capable-pattern-lazy-glob-design`.
+
+### Byte-capable pattern-lazy loading/glob design
+
+Status: `REPLAN` on 2026-07-27 after independent pinned-source/API,
+implementation-feasibility, and architecture/orchestration audits. No
+non-plan repository file, Rust, Cargo, dependency, fixture, DICE key, loading
+consumer, or entrypoint changed.
+
+A single loading implementation boundary is not truthful. Pinned Bazel 9.2
+commit `8220c6198837d5c13d53fea211cf3282aa12408a` preserves internal
+strings as raw bytes. On Unix,
+`src/main/native/unix_jni.cc:507,552-615` and
+`src/main/native/latin1_jni_path.cc:26-44` map every name byte to one Java
+Latin-1 character; `StringEncoding.java:25-85,116-141` defines the internal
+representation and Windows/platform conversion; and
+`PathFragment.java:84-113` orders unsigned raw bytes. The eventual V2-owned
+`BazelInternalString` must therefore retain shared raw bytes with raw-byte
+equality, hashing, and ordering. `CompactString`, ordinary Rust `String`
+identity, lossy conversion, and a global interner are not exact.
+
+The parser/evaluator seam is separately blocking. Bazel
+`StarlarkUtil.java:43-66`, `ParserInput.java:82-95`, and
+`net/starlark/java/syntax/Lexer.java:274-425,443-495` preserve literal UTF-8
+`é` as internal bytes `c3 a9` and octal `\351` as `e9`. Live starlark-rust
+`starlark_syntax/src/lexer.rs:244-311,317-423` decodes both to Rust U+00E9,
+then `starlark/src/eval/compiler/expr.rs:1045-1055` allocates the collapsed
+`&str`. Loading cannot reconstruct origin after evaluation. A future opt-in
+Bazel string-token lexer seam must map each string literal's unescaped source
+bytes to Latin-1 scalars while the codemap retains the original source bytes
+and spans; it must preserve exact escape behavior and convert actual evaluated
+strings and returned glob results one internal scalar/byte at a time. It must
+prove dynamic concatenation, slicing, length, hashing, ordering, macro
+pass-through, raw/triple strings, Unicode/non-BMP platform behavior, and
+diagnostics while leaving standard starlark-rust mode unchanged. Do not claim
+lone-surrogate Windows parity without native Windows evidence.
+
+Bazel's directory value retains sorted no-follow
+`Dirent(name, FILE|DIRECTORY|SYMLINK|UNKNOWN)` under
+`DirectoryListingStateValue.java:84-90` and `Dirent.java:20-31`. Slug's
+`PathDirectoryEntries` already preserves sorted unique raw `OsString` names
+but omits direct kind. For a wildcard fragment, Bazel first byte-matches the
+name, skips direct `UNKNOWN`, handles direct file/directory inline, and
+resolves only a matched symlink
+(`PatternWithWildcardProducer.java:102-139,172-208`). A literal fragment
+bypasses listing and follows `FileValue` directly
+(`PatternWithoutWildcardProducer.java:68-97`): present regular, special, and
+symlink-to-nondirectory entries participate; directories recurse; missing or
+dangling paths are omitted. Unmatched dangling or cyclic symlinks cannot fail;
+matched cycles, infinite expansion, and reached inconsistencies remain typed
+errors. `UnixFileSystem.java:97-120` retains native no-follow `d_type` and
+refines only native unknown inside the directory observation; wildcard glob
+then stats only cached symlinks. A matching-only no-follow Lstat for every
+matched name adds observation/race/Need edges and can see a different kind
+after a listing race, so it is not an exact substitute. The next design must
+freeze typed name-plus-direct-kind observation. Unix must refine native
+`DT_UNKNOWN` inside the one listing observation while retaining special or
+failed-refinement entries as semantic `UNKNOWN`; Windows must reproduce its
+name-list plus no-follow-stat mapping under
+`WindowsFileSystem.java:36,135-176` and `FileSystem.java:594-627`, where
+special or null child status becomes `UNKNOWN`. Race/error ownership remains
+with that observation rather than a later matched-name dependency.
+
+The expected retained shape is a sorted unique shared slice of raw OS-native
+name plus direct kind, deduplicated by name with kind included in semantic
+equality; `Dupe` and `Allocative` remain required and no interner is justified.
+The next design must distinguish tolerated native unknown/special
+classification from child-classification errors that terminalize the whole
+listing, keep symlinks unresolved, preserve complete-only equality and
+self-unequal Need, and freeze same-name kind-only, unknown-versus-special,
+Windows no-follow, equal-restoration, and directory-error recovery evidence.
+
+The full matcher also exceeds the current reviewed subset. Pinned
+`UnixGlob.checkPatternForError` permits `?`, standalone `**`, and literal
+backslashes, braces, and brackets; it rejects empty/absolute patterns, empty
+or dot segments, and non-standalone `**`. Leading-dot names require an
+explicit dot, and the historical parenthesis behavior at
+`UnixGlob.java:297-305` must remain exact. Matching and sorting operate on
+internal raw bytes.
+
+Dynamic glob patterns are constructed and passed through loaded `.bzl` macros
+only during synchronous BUILD evaluation. Live starlark-rust exposes no async
+Evaluator/native-call suspension seam, while reached symlink resolution must
+await DICE. Direct IO or `block_on` in the builtin, eager unmatched
+resolution, and hidden process state are forbidden. Before activation, a
+separate reviewed design must choose either typed evaluator suspension/resume
+or an explicitly transactional attempt-local abort/await/restart loop. Such a
+loop may retain only compact request/result frontier state across awaits; it
+must discard targets, used globs, prints, and the entire incomplete evaluator
+attempt, publish no event batch on Need, and prove user code cannot catch or
+observe the control transfer. Host glob owns filesystem dependencies and no
+events; Host package loading owns only the final completed local batch.
+
+The corrected serial boundary is:
+
+1. design `WP-5-m1-loading-host-dirent-observation-design`, deciding exact
+   typed-dirent API and freezing the exact allowlist after choosing whether to
+   reuse the already-public `WorkspaceDirectoryEntryKind` or add and re-export
+   a new Host/no-follow kind; the latter requires at least
+   `app/slug_workspace_v2/src/{lib.rs,path_observation.rs}` and
+   `app/slug_core_v2/src/runtime/path_observation.rs` plus in-file tests;
+2. design a separate Bazel-internal byte-string oracle/feasibility and opt-in
+   parser/evaluator seam, with no legacy parse activation;
+3. design and implement a discriminating pinned Bazel oracle before the
+   corresponding Slug loading implementation;
+4. implement the accepted typed-dirent and byte-string prerequisites in
+   separate reviewed packets only after their oracle evidence;
+5. design and implement the pure pattern-keyed root-only Host glob owner
+   returning
+   `SourcePreparationOutcome<Arc<Result<HostGlobValue, HostGlobError>>>`; and
+6. separately design transactional dynamic-glob package evaluation before any
+   consumer activation.
+
+The eventual pure Host glob identity is normalized workspace/package, one
+exact internal pattern, and files-only versus files-and-directories operation.
+It traverses only reached pattern frontiers, joins and unions reached Needs,
+uses fail-fast DICE infrastructure handling plus complete-only
+equality/validity, owns no event batch, never resolves unmatched entries, and
+retains sorted shared internal paths with compact `SmallMap`/`SmallSet`
+frontier state. It uses no standard retained map/string/vector, regex
+dependency, direct IO, legacy Workspace key, consumer, or activation. The
+regular-or-special Host BUILD/`.bzl` byte projection remains a distinct
+prerequisite.
+
+The future oracle must discriminate raw Unix `c3 a9` and `e9` names,
+literal-UTF8 versus octal and dynamically constructed patterns/results,
+direct special wildcard-versus-literal behavior, matched and unrelated
+file/directory/dangling/cyclic symlinks, `?`, `**`, leading-dot and
+parenthesis behavior, subpackage boundaries, same-daemon
+create/rename/delete/recreate, and symlink retarget through
+file/directory/dangling/cycle/restored. Retained-DICE evidence must prove
+reached-Need union, absence of unmatched demands, invalid self-unequal Need,
+semantic-equal Complete pruning, typed error recovery, and speculative
+print-before-glob suppression. No fixture-growth checkpoint is due because
+this stopped design adds no fixture.
+
+Next packet: design only
+`WP-5-m1-loading-host-dirent-observation-design`.

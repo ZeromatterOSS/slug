@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module and public root-loading-anchor projection, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, Registry IO bridge with native local paths, focused registry-file vendor oracle, exact ASCII local-directory registry oracle, accepted default-launch collation/charset oracle, and exact host-JVM startup/reuse oracle; the required five-packet fixture-growth checkpoint is accepted through `22de3631`, with the latter two oracles recorded as post-checkpoint packets one and two; detailed evidence remains in the Stage 5 and oracle-harness owner plans plus routing log | production retry/publication activation remains gated on Host migrations and typed production roots; typed root loading next needs an exact byte-capable OS-native package/glob representation with pattern-lazy symlink resolution and a reusable regular-or-special Host byte projection; the full Bazel-valid JVM surface disproves every bounded standalone registry-byte executor found, so the private Host registry-file owner is separately blocked unless a genuinely original-process-equivalent Slug mechanism appears; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | design only `WP-5-m1-loading-byte-capable-pattern-lazy-glob-design` |
+| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module and public root-loading-anchor projection, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, Registry IO bridge with native local paths, focused registry-file vendor oracle, exact ASCII local-directory registry oracle, accepted default-launch collation/charset oracle, and exact host-JVM startup/reuse oracle; the required five-packet fixture-growth checkpoint is accepted through `22de3631`, with the latter two oracles recorded as post-checkpoint packets one and two; detailed evidence remains in the Stage 5 and oracle-harness owner plans plus routing log | production retry/publication activation remains gated on Host migrations and typed production roots; exact typed root globbing splits into a reviewed no-follow dirent observation boundary, a Bazel-internal byte-string parser/evaluator seam, a discriminating raw-name/pattern-lazy oracle, a pure Host glob owner, and a later transactional package-evaluation retry/suspension boundary; a reusable regular-or-special Host byte projection remains separate; the full Bazel-valid JVM surface disproves every bounded standalone registry-byte executor found, so the private Host registry-file owner is separately blocked unless a genuinely original-process-equivalent Slug mechanism appears; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | design only `WP-5-m1-loading-host-dirent-observation-design` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -145,18 +145,19 @@ or fixture changed.
 ### Current packet
 
 Run only design packet
-`WP-5-m1-loading-byte-capable-pattern-lazy-glob-design`.
+`WP-5-m1-loading-host-dirent-observation-design`.
 
-Freeze the Bazel-internal byte representation spanning OS-native directory
-components and evaluated Starlark glob patterns/results, plus the exact
-pattern-lazy no-follow classification and symlink/special resolution boundary
-required by the Stage 5 owner plan. Reuse compact Buck2-derived collections,
-shared storage, hashing, and interning where applicable; identify any
-parser/evaluator seam needed to keep literal UTF-8 bytes distinct from octal
-byte escapes. Freeze the exact production/test allowlist, typed
-Need/error/equality model, retained-DICE lifecycle, and Bazel-source/oracle
-evidence before Rust. Do not implement code, change Cargo, activate loading,
-or combine the separate regular-or-special Host file-byte projection.
+Freeze the exact Bazel 9 typed no-follow directory-entry observation over raw
+OS-native names. Pinned source shows that matching-only Host Lstat is not
+equivalent across dependencies and listing races. Decide whether to reuse the
+existing public workspace entry kind or introduce and re-export a dedicated
+`FILE`, `DIRECTORY`, `SYMLINK`, and `UNKNOWN` kind; freeze the exact
+workspace/core API, runtime producer, Unix unknown refinement, Windows
+mapping, equality, platform evidence, allowlist, caps, and focused lifecycle
+contract. Use a discriminating oracle design where source alone cannot decide.
+Do not implement Rust, change Cargo, edit loading or Starlark, design the
+byte-string seam, activate globbing, or combine the separate Host file-byte
+projection.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
