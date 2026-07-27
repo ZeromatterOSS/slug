@@ -1,35 +1,35 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-build-typed-command-root-design`
+Packet: `WP-5-m1-build-typed-command-root`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted typed root loading and analysis boundaries; dormant typed
-query root with accepted Host migration
-Validation tier: design-only core call-graph and DICE ownership audit
+Evidence: accepted build typed command-root design; accepted root
+loading/analysis prerequisites and private retry/event ownership
+Validation tier: private DICE root identity, Need precedence, and event closure
 
-Design inputs:
+Implementation file:
 
-- the current core build request, target-pattern, analysis, and event paths;
-- the accepted bzlmod/loading/analysis typed root owners; and
-- the exact core Cargo/source/test paths selected by the design audit.
+- `app/slug_core_v2/src/runtime/dice.rs`, including its private tests.
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Result: produce one implementation-ready design for a dormant typed build
-command root. Freeze its typed request identity, core analysis and package-root
-bundle, always-present anchor for an empty target set, deterministic union of
-all independently reached Needs, Complete-only equality/validity, exact event
-ownership, and an exact core/Cargo/test allowlist.
+Result: add the dormant private build command root exactly as accepted. Retain
+canonical ordered target identity plus explicit configuration, an opaque
+always-present root anchor, ordered package/optional-analysis records,
+deterministic cumulative Needs, typed semantic errors, Complete-only DICE
+state, and exact descendant event ownership.
 
-Make no Rust, Cargo, fixture, oracle, runtime, CLI, server, public API, JVM,
-Java-bytecode, or Bazel-delegation change in this packet. Do not activate build
-or query, broaden repository capability, or convert Need into an operational
-error.
+Use only `RootModuleLoadingAnchorKey`, `RootPackageLoadKey`, and
+`RootConfiguredTargetAnalysisKey`. Preserve duplicate request records and
+input order. Infrastructure/cancellation and Need-union conflicts dominate and
+publish nothing; otherwise all reached Needs dominate the first input-order
+Complete error.
 
-The design must identify every compute above or beside the proposed root,
-prove an empty valid build still seals a nonempty exact dependency closure,
-separate producer event ownership from later opaque-envelope consumption, and
-name focused Need/lifecycle/equality/event-suppression tests. Obtain at most one
-terminal independent review only if the final contract changes a risky public,
-DICE, or activation boundary.
+Add no second file, Cargo/dependency/public export, caller, activation,
+external repository, recursive-pattern support, eager snapshot/legacy key,
+blocking IO, fixture/oracle, execution, JVM, Java bytecode, or Bazel
+delegation. Validate focused identity/precedence/anchor/lifecycle/positive
+event-closure cases, full core, direct downstream compile coverage,
+GNU-Windows no-run linkage, formatting, diff, and exact scope. Obtain one
+terminal independent implementation review.

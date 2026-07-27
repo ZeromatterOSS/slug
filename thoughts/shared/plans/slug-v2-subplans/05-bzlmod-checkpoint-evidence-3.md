@@ -13234,3 +13234,136 @@ contract gap.
 Design next only `WP-5-m1-build-typed-command-root-design`. Freeze the core
 analysis/package-root bundle, always-present empty-target anchor, deterministic
 Need union, and exact core/Cargo/test implementation allowlist before Rust.
+
+### Build typed command-root design
+
+Status: **ACCEPT** for `WP-5-m1-build-typed-command-root-design` on 2026-07-27
+after one terminal DICE-boundary review and focused correction rereview.
+
+The current core build path is still a retained-runtime facade, not a command
+root. It separately computes legacy `RootModuleGraphKey` and
+`WorkspaceEvaluationKey`, calls `BzlModuleEvaluator::evaluate_package`, then
+conditionally computes legacy `ConfiguredTargetAnalysisKey`. An empty target
+list therefore has no exact typed loading/analysis root, transient Host Needs
+cannot reach the shared retry driver, and event-producing work remains above
+or beside any future terminal closure.
+
+Add one dormant private `BuildCommandRootKey` in
+`app/slug_core_v2/src/runtime/dice.rs`. Its semantic identity is:
+
+- normalized `NormalizedAbsolutePath` workspace;
+- the canonical ordered target-pattern spellings, stored as an immutable
+  string slice because `TargetPattern` is not a hashable DICE identity; and
+- an explicit `ConfigurationKey`.
+
+Its constructor accepts parsed `TargetPattern` values, retains their canonical
+display spellings including duplicates, and rejects recursive patterns and
+non-root repositories before DICE. Identity is semantic, not source-spelling
+identity: `//pkg` and `//pkg:pkg` both parse and display as `//pkg:pkg` and
+therefore name the same key; target order and duplicate count still differ.
+Those checks are pure request-shape work and cannot emit an event or Need. Do
+not change `slug_identity_v2` merely to derive key traits.
+
+The key value is exactly:
+
+```text
+SourcePreparationOutcome<
+    Arc<Result<BuildCommandEvaluation, BuildCommandError>>
+>
+```
+
+`BuildCommandEvaluation` privately retains the opaque
+`RootModuleLoadingAnchor` plus one ordered record per requested pattern. Each
+record retains its canonical pattern spelling, `LoadedPackage`, and optional
+`AnalysisResult`. It carries no workspace revision, eager workspace
+evaluation, resolved module graph, command output buffer, or execution state.
+`BuildCommandError` retains typed root-anchor, `RootPackageLoadError`, and
+`AnalysisError` causes plus a structured target-not-found case containing the
+canonical pattern spelling, typed `PackagePath`, typed `TargetName`, and BUILD
+path; it does not stringify transient control or DICE infrastructure failure.
+
+Compute `RootModuleLoadingAnchorKey` first on every request, including an empty
+target list. A Need returns unchanged; a Complete anchor error is terminal; a
+successful anchor is retained in the final value so an empty build has both a
+nonempty exact activation closure and equality sensitive to root-MODULE
+semantics.
+
+After a successful anchor, issue all requested-pattern branches together in
+input order. A package-wide pattern computes `RootPackageLoadKey`. A single
+target first computes the same package key, preserves the existing
+target-not-found diagnostic boundary, and computes
+`RootConfiguredTargetAnalysisKey` with the explicit configuration only when
+the selected target is a Starlark rule. Convert its accepted root apparent
+label to the canonical configured label `@@//<package>:<target>` with no
+repository-mapping provenance; no string other than that validated projection
+may enter `ConfiguredTargetKey`. Native/file targets retain `None` analysis
+exactly as the current facade does. Preserve duplicate request records and
+input order in the completed bundle.
+
+Collect every Need reached by those independent branches with
+`try_union` in input order before selecting the first input-order Complete
+error. Do not launch work past the initial anchor Need, but do not return the
+first target Need while another already-independent target branch can add path
+or repository work. Reversing target order reverses the selected Complete
+error when no Need exists. A raw subordinate DICE/cancellation failure has
+absolute precedence over accumulated Need and Complete semantic errors: fail
+the root compute as an infrastructure invariant and publish nothing. A
+`try_union` conflict is likewise an infrastructure invariant, never a
+first-Need fallback or terminal semantic error. Factor the branch collector so
+these total precedence rules can be tested directly without adding a test-only
+semantic field to the DICE key. Need is invalid and unequal even to itself;
+Complete successes and typed semantic errors use structural equality and
+validity.
+
+The command root stores no local event batch. Its exact dependency closure
+contains the always-present root anchor and every reached root package,
+`.bzl`, and root analysis producer; those accepted owners retain their own
+marker-conditional batches. No event- or Need-producing compute may remain
+above or beside this root when it is later activated. This packet does not
+connect the key to the private retry driver, retained runtime, CLI, server,
+REAPI, execution, or output publication.
+
+The exact future implementation allowlist is one file:
+
+- `app/slug_core_v2/src/runtime/dice.rs`, including its private unit-test
+  module.
+
+No Cargo or dependency change is needed, and no public reexport or integration
+test file is allowed. The focused tests in that file must prove:
+
+1. every identity field, constructor rejection, Complete-only
+   equality/validity, `//pkg`/`//pkg:pkg` canonical identity, and an empty
+   build's anchor/root activation;
+2. cumulative deterministic Needs across two independent target packages,
+   target order/duplicates, Need dominance over a Complete error, reversed
+   Complete-error order, raw-infrastructure dominance over Need, and
+   `try_union` conflict failure;
+3. package-wide, native, missing-target, and Starlark-analysis results through
+   only the typed root loading/analysis keys, with zero activation of the
+   legacy root graph, workspace evaluation, package-load, and analysis keys;
+4. same-DICE root-MODULE, BUILD, `.bzl`, and rule-implementation
+   create/edit/delete/restore behavior, including anchor Need/error suppression
+   of every target branch and equal-Complete pruning; and
+5. one positive command-effect closure containing root-MODULE, BUILD/`.bzl`,
+   and analysis producer batches exactly once in dependency order, even for
+   duplicate target patterns, plus explicit empty-batch suppression. No retry
+   attempt is terminally selected or published; a batch first evaluated on a
+   retry may appear only when its producer remains in the exact terminal
+   closure, while retry-only producers are excluded; and
+6. GNU-Windows compilation of the private key and tests.
+
+Run the focused tests, full `slug_core_v2`, direct query/analysis/loading
+compile coverage, core GNU-Windows no-run linkage, formatting,
+`git diff --check`, and exact one-file/no-Cargo/no-export/no-caller/
+no-legacy-key/no-eager-snapshot/no-blocking-IO/no-JVM guards. Stop if the
+implementation needs a second file, a public API, target-pattern identity
+changes, Need stringification, a caller, or any JVM, Java-bytecode, Bazel
+delegation, execution, or activation work.
+
+The review correction froze canonical target identity and configured-label
+projection, total infrastructure/Need/semantic-error precedence, anchor branch
+suppression, and positive exact terminal event-closure evidence. The focused
+rereview returned `ACCEPT` and confirmed the one-file boundary is feasible
+with current dependencies and public typed-root prerequisites.
+
+Implement next only `WP-5-m1-build-typed-command-root`.
