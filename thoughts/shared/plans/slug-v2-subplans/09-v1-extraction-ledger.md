@@ -568,6 +568,48 @@ symlink resolution, full Bazel glob syntax, ignored-path policy,
 repository-aware identity, query exposure, and configured analysis remain
 owned by later packets.
 
+### Stage 4 private Host glob segment-candidate owner
+
+Status: Landed, private and dormant
+Source ref/commit(s): Bazel
+`8220c6198837d5c13d53fea211cf3282aa12408a`
+`PatternWithoutWildcardProducer`, `PatternWithWildcardProducer`,
+`DirectoryListingFunction`, `GlobsFunction`, `GlobValue`, `GlobsValue`, and
+`UnixGlob`; Buck2 baseline
+`088c75c7e36805df99c3de29062baa95db700b8b` only for the already-approved
+shared immutable, `Dupe`, `Allocative`, and compact value patterns; V1
+`e218054d4c796655939b968d90208b185decb352` glob/loading code rejected and
+retained as reference only
+V2 commit(s): matcher oracle `9f42c3e5`; implementation/evidence `bd12c015`
+Source class: V2-owned Bazel-parity rewrite using retained DICE/path
+observation APIs; no Buck or V1 glob semantics, traversal, key ownership, or
+consumer code imported
+Reusable primitive or lesson: one shared raw-name-sorted candidate slice,
+temporary work vectors, complete-only equality, and a batched matched-symlink
+frontier; no retained standard map/set/string/vector or matcher dependency
+V2 wrapper/boundary: private Unix-dormant
+`HostGlobSegmentCandidatesKey` consumes one Host typed directory listing plus
+only reached base/literal/matched path resolutions. It owns one validated raw
+literal/simple-`*` segment and semantic candidate/error projection, but no
+package boundaries, recursive traversal, include/exclude composition, parser,
+evaluator retry, events, or callers.
+Bazel oracle: pinned Bazel 9.2 callable, POSIX dirent, and Linux raw-name glob
+evidence proves exact question-mark rejection, leading-dot behavior,
+non-adjacent stars, raw-byte identity/order, symlink/special classification,
+and warm restoration
+Validation: focused 19, full loading 73, workspace 36, and bzlmod 387 tests;
+all doctests; 20 GNU-Windows no-run executables; exact +1,605/-0 scope/caps;
+format, diff, archive, credential, forbidden-surface, event, caller, and
+process guards; three terminal corrected latest-diff reviews
+Decision: retain only the approved compact value/worklist utility patterns
+from the Buck baseline. Reject V1 glob behavior and ownership. The private
+owner remains dormant until a separately reviewed Host package-boundary
+projection and later recursive composition exist.
+Residual risk: selected-root/no-package/deleted/ignored/subpackage/nested-
+repository states are not yet represented. Multi-segment and `**` traversal,
+native-Windows byte ordering, regular-or-special BUILD/`.bzl` acquisition,
+parser/evaluator retry, and consumer publication remain later packets.
+
 ### Stage 6 depset/provider/rule context tests
 
 Status: Partially landed

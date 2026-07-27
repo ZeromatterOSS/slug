@@ -11485,5 +11485,41 @@ fixture tree is 1,317 regular files, 24 symlinks, and 39,382 lines. This is
 oracle packet one after checkpoint `e2cc891d`, below every review trigger, so
 no fixture-growth checkpoint is due.
 
-Next packet: implement only
-`WP-5-m1-loading-pure-host-glob-segment-candidates-owner`.
+### Private Host glob segment-candidate owner implementation
+
+Status: `ACCEPT` in `bd12c015` on 2026-07-27 after terminal source/parity,
+implementation/evidence, and architecture/orchestration corrected
+latest-diff reviews.
+
+The exact three implementation paths changed by +1,605/-0:
+`host_glob/mod.rs` +715, `host_glob/tests.rs` +889, and the private `lib.rs`
+module declaration +1. The Unix-dormant key retains a validated raw-byte
+literal/simple-`*` pattern, stable raw-name candidates and direct kinds,
+matched-only symlink resolution, wildcard-directory ancestor-expansion
+failure, semantic resolver errors, complete-error-before-Need precedence, and
+complete-only DICE equality. It has zero production callers, public exports,
+events, direct IO, locks, package-boundary logic, parser/evaluator activation,
+or new dependencies.
+
+Focused 19, full loading 73, workspace 36, and bzlmod 387 tests passed,
+including all doctests. GNU-Windows no-run linkage passed for all 20 loading,
+workspace, and bzlmod executables. Formatting, diff, exact scope/per-file/
+aggregate caps, archive, credential, forbidden-surface, zero-caller, and
+process guards passed.
+
+Reviews corrected physical matched-child identity beneath a symlinked base,
+made an unresolved terminal symlink an invariant failure, and added retained
+DICE evidence that equal Complete retargets prune a dependent consumer while
+the Host key stores no evaluation data. The final regression set additionally
+proves raw identity/order, syntax taxonomy, leading-dot and multi-star
+matching, direct and symlink kinds, dangling/cycle/expansion behavior,
+Need union and error precedence, semantic error equality, duplicate
+propagation, and create/delete/recreate, kind, retarget, error-recovery, and
+restoration transitions.
+
+Next packet: design only
+`WP-5-m1-loading-host-package-boundary-projection-design`. It must preserve
+selected root, ordinary no-package, deleted-package continue,
+ignored-directory stop, actual-subpackage stop, incorrect nested-repository
+stop, and typed error/Need propagation before any recursive glob traversal or
+consumer activation.
