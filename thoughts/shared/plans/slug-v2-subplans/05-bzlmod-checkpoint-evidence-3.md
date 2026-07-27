@@ -11148,3 +11148,193 @@ Next packet: design only
 evaluation retry/suspension, regular-or-special BUILD/`.bzl` byte
 acquisition, parser activation, native Windows/lone-surrogate evidence, and
 all consumer activation separate.
+
+### Pure Host glob owner design
+
+Status: `ACCEPT` on 2026-07-27 after terminal pinned-source/API,
+implementation/evidence, and architecture/orchestration latest-text reviews.
+No non-plan repository file, Rust, Cargo, dependency, fixture, DICE key,
+loading consumer, parser entrypoint, or event owner changed.
+
+The requested recursive package-aware owner is not yet a truthful
+implementation packet. Pinned Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` separates one-fragment
+classification from package-boundary ownership. Literal fragments resolve one
+exact `FileValue`; wildcard fragments consume one typed
+`DirectoryListingValue`, skip direct `UNKNOWN`, and resolve only matched
+symlinks
+(`packages/producers/PatternWithoutWildcardProducer.java:68-97` and
+`PatternWithWildcardProducer.java:89-216`). Only after a directory candidate
+is known does `DirectoryDirentProducer.java:76-168` apply ignored-directory
+and `PackageLookupValue` boundaries before accepting or descending.
+
+Slug does not yet expose an equivalent boundary. The private
+`HostRootPackageLookupKey` collapses repository-ignore and
+`--deleted_packages` into `Deleted`, although Bazel stops before lookup for an
+ignored directory and continues through a deleted package. It also has no
+equivalent of the nested `LocalRepositoryLookupValue` incorrect-repository
+stop. Exporting that key or probing `BUILD` markers from loading would
+therefore be wrong. Full multi-segment and standalone-`**` traversal remains
+blocked on a separate public opaque Host package-boundary projection.
+
+The accepted smallest pure owner is instead the exact fragment-candidate
+producer, named `HostGlobSegmentCandidatesKey`. Its identity is one normalized
+absolute logical Host directory and one validated raw-byte segment pattern.
+It contains no workspace/package identity, include or exclude list,
+`allow_empty`, files-only versus files-and-directories operation, evaluator
+attempt, event batch, or consumer state. Its value is
+`SourcePreparationOutcome<Arc<Result<HostGlobSegmentCandidates,
+HostGlobSegmentError>>>`; every Need is invalid and self-unequal, while only
+complete semantic values or errors compare equal.
+
+The private byte carrier retains `Arc<[u8]>` with raw-byte equality, hashing,
+and ordering. It is not constructed from ordinary Rust UTF-8 `.as_bytes()`:
+the later dormant parser adapter must project each Latin-1 scalar to one byte.
+The implementation packet is Unix-only for production behavior and uses
+`OsStrExt` without lossy conversion. On non-Unix it returns a typed dormant
+unsupported-host result before converting a name; GNU-Windows compilation
+proves shape only. Native Windows platform-to-internal conversion and
+lone-surrogate ordering remain activation gates.
+
+This first candidate owner accepts only the already-oracled simple segment
+language. A literal segment has no `*`. A simple wildcard segment contains one
+or more non-adjacent `*`; every other accepted byte is literal. Its constructor
+first performs Bazel's full-pattern validation, then classifies supported
+versus deferred syntax. `?` is rejected first; empty, leading `/`, empty path
+segments, `.`/`..` segments, and embedded `**` are Bazel-invalid. Standalone
+`**`, an otherwise valid multi-segment pattern, NUL, parentheses, brackets,
+braces, and backslash are Bazel-valid but deferred by this candidate owner.
+Thus `a/b` is deferred multi-segment syntax, while `/a`, `a//b`, `a/../b`,
+and `a/**x` retain their distinct Bazel-invalid classifications. This
+distinction is required:
+`GlobValue.java:41-57`, `GlobsValue.java:108-124`, and
+`UnixGlob.java:170-190,212-313` make `?` forbidden but permit several of the
+deferred characters and give parentheses historical wildcard behavior.
+Broader grammar needs a discriminating oracle before implementation. Within
+the simple language, matching is byte-native and exact: a bare `*` matches
+every nonempty name including a leading-dot name, any other wildcard pattern
+requires an explicit leading dot, and each permitted non-adjacent `*` has
+zero-or-more-byte meaning. This covers the accepted `*.txt`, raw-prefixed,
+`state*`, `specials/*`, and `*-match.txt` evidence without claiming
+multi-segment or `**` ownership. Before Rust, strengthen a pinned Bazel 9.2
+oracle to discriminate bare `*` including a leading-dot name, `*.txt`
+excluding it, an explicit-dot wildcard including it, and multiple
+non-adjacent stars in one segment.
+
+Literal computation bypasses a directory listing and computes only
+`ResolvedPathKey(PathObservationNamespace::Host, logical_child)`. Missing or
+dangling is omitted; a present directory becomes a `Directory` candidate;
+every present regular or special terminal becomes `NonDirectory`. Wildcard
+computation lists the logical directory exactly once through
+`PathDirectoryListingKey`, skips direct `Unknown`, byte-matches raw names,
+classifies direct file and directory entries inline, and computes
+`ResolvedPathKey` only for matched symlinks. A dangling matched symlink is
+omitted. A matched symlink to a directory becomes `Directory`; a matched
+symlink to a regular or special terminal becomes `NonDirectory`, except that
+wildcard resolution of a directory with
+`ResolvedPath::ancestor_expansion()` is immediately an infinite-expansion
+error even for a non-`**` pattern, matching
+`PatternWithWildcardProducer.java:181-197`. A wildcard non-directory with
+ancestor-expansion metadata remains `NonDirectory`; the literal producer has
+no equivalent check, so a literal directory remains a candidate. If the typed
+listing said symlink but the resolution route did not resolve that logical
+child as a symlink, return an inconsistent-state error.
+`PathDirectoryListing::Missing` is likewise a complete semantic
+directory-disappeared inconsistent-state error, not an empty match: Bazel's
+`DirectoryListingFunction.java:30-56` assumes the reached base is a directory
+and errors if it is no longer one. Unmatched dangling, cyclic, or infinitely
+expanding symlinks create no dependency and cannot fail.
+
+`HostGlobSegmentCandidate` retains the raw component and
+`HostGlobSegmentCandidateKind::{NonDirectory, Directory}`. The result is one
+shared `Arc<[HostGlobSegmentCandidate]>`, raw-name sorted and preserving the
+typed listing's stable same-name order; this intermediate projection does not
+claim final Bazel result-set deduplication or package-boundary acceptance.
+Construction may use a temporary `Vec`; no retained standard
+`HashMap`/`HashSet`/`String`/`Vec`, compact frontier map/set, interner, regex,
+or matcher dependency is justified for one segment.
+
+Convert operational resolver failures to exact semantic variants. Observation
+retains logical directory, raw component, operation, and
+`PathObservationError`. Inconsistent state retains logical directory, raw
+component, operation, and before/after `PathLstat`. Cycle and infinite
+expansion retain only logical directory plus raw component.
+`ListingSymlinkResolutionMismatch` retains exactly the logical directory and
+raw component; `DirectoryDisappeared` retains exactly the logical directory.
+Directory-listing errors may retain the existing semantic
+`PathDirectoryListingError`. No error retains namespace, physical root/path,
+materialization identity, route, symlink chain, or a lossy rendering. DICE
+infrastructure failures remain invariant panics. Every matched symlink in the
+reached horizon is batched and every reached path Need is unioned. If any
+complete error was reached, return the first one in stable raw-name and stable
+same-name order even when sibling Needs exist; this matches
+`GlobsFunction.java:210-215`, which handles a recorded glob error before an
+incomplete computation restarts. Return the invalid unioned Need only when no
+complete error exists.
+There is no direct filesystem IO, blocking, lock across a DICE computation,
+global cache, event, `PathObservationKey`, legacy `WorkspaceDirectoryKey`,
+eager `PackageListingKey`, package lookup, or speculative dependency beyond a
+Need horizon.
+
+The implementation allowlist is exactly:
+
+- `app/slug_loading_v2/src/host_glob/mod.rs`, at most 800 additions;
+- `app/slug_loading_v2/src/host_glob/tests.rs`, at most 900 additions; and
+- `app/slug_loading_v2/src/lib.rs`, at most two additions for a private module
+  declaration only.
+
+The hard packet cap is +1,750/-20. No Cargo, lockfile, public re-export,
+workspace, bzlmod, fixture, existing `glob.rs`, parser, evaluator, package,
+consumer, or entrypoint file may change.
+
+The named Rust packet is
+`WP-5-m1-loading-pure-host-glob-segment-candidates-owner`; its three-file
+allowlist is not authorized until the matcher oracle below accepts.
+
+Focused tests must prove all key dimensions; raw `c3 a9` versus `e9`
+identity, matching, and ordering; literal versus simple-wildcard dispatch;
+the exact invalid/deferred/supported constructor matrix including `a/b`,
+`/a`, `a//b`, `a/../b`, and `a/**x`; bare-star and leading-dot behavior;
+direct file/directory/unknown and
+literal-special classification; matched file, directory, dangling, cycle, and
+infinite symlinks; wildcard directory ancestor-expansion failure versus
+wildcard non-directory and literal-directory acceptance; no demand for
+unmatched dangling/cycle entries; union of all reached matched-symlink Needs;
+complete-error precedence over a mixed error-plus-Need horizon; semantic error
+equality; invalid and self-unequal Need; equal Complete pruning;
+create/delete/recreate, kind change/restoration, symlink retarget/error
+recovery, and equal restoration;
+stable duplicate-name propagation; zero event storage; and zero non-test
+callers. Validate focused loading tests, the full loading suite and doctests,
+workspace and bzlmod downstream suites, formatting/diff/allowlist/cap/archive/
+credential/process/forbidden-surface guards, and GNU-Windows no-run linkage.
+
+Stop if implementation needs a fourth file, a new dependency, direct IO,
+lossy conversion, unmatched resolution, package-boundary logic, multi-segment
+or `**` traversal, broader syntax, a public export, a loading consumer, parser
+activation, evaluator retry, native-Windows parity, or an event batch.
+
+Next packet: design only
+`WP-5-m1-loading-host-glob-segment-matcher-oracle-design`. Freeze the smallest
+oracle-only extension that proves bare-star/leading-dot, explicit-dot, and
+multiple-non-adjacent-star behavior without changing Rust. Implement and pin
+that oracle before
+`WP-5-m1-loading-pure-host-glob-segment-candidates-owner`.
+
+After the candidate owner accepts, design only
+`WP-5-m1-loading-host-package-boundary-projection-design`. That prerequisite
+must separately preserve selected package root, ordinary no-package, deleted
+package (continue), ignored directory (stop), actual subpackage (stop),
+incorrect nested repository (stop), and operational error/Need propagation.
+Only after it accepts may a later owner compose multiple segments,
+standalone `**`, package boundaries, operation filtering, and final unique
+results. Regular-or-special BUILD/`.bzl` acquisition, parser byte ingress,
+transactional evaluator retry/suspension, include/exclude and `allow_empty`
+composition, callable formatting, and consumer publication remain later.
+No fixture-growth checkpoint or Stage 9 edit is due for this design-only
+packet. After implementation acceptance, add one Stage 4 landed subsection
+for the private Host segment-candidate owner, citing Bazel `8220c619…`, Buck
+baseline `088c75…` only for already-approved compact utility patterns, V1
+`e218054…` as rejected/reference-only, and the V2 implementation/evidence
+commits. That record authorizes no new Buck/V1 extraction and does not claim
+consumer activation.
