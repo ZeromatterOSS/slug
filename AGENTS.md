@@ -2,41 +2,21 @@
 
 Project-wide instructions for AI agents on slug.
 
-## Bazel version target
+## Bazel target
 
-**Bazel 9 parity only.** No back-compat for older Bazel or slug's earlier prototype behaviour.
+**Bazel 9 parity only.** Slug matches Bazel 9 success, failure, diagnostics,
+outputs, and paths; it does not preserve Bazel 8 or prototype behavior.
 
-- Current canonical plan:
+- Canonical plan:
   `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`.
-  The January roadmap and numbered V1 subplans are archive/reference material
-  unless the V2 plan explicitly asks an agent to extract or compare them.
-- Bazel 9 removes symbol (`CcInfo`, `PyInfo`, `ProtoInfo` from globals) → slug removes too. No deprecation, no shim.
-- Bazel 9 changes lockfile/WORKSPACE/Starlark API → slug matches exact. Not superset, not subset.
-- Bazel 9 errors on pattern (native `cc_library` without `load("@rules_cc//...")`) → slug errors same message shape.
-- `@bazel_tools` content: port verbatim from upstream `src/<path>/BUILD.tools`. No invention, copy exact.
-
-## Rationale
-
-Prototype. No external users of slug's Starlark surface. Break any slug workspace for parity — fine. No migration guides, no deprecation flags, no compat shims unless user asks.
-
-Cite Bazel source of truth for parity decisions:
-
-- Symbol removal: `src/main/java/com/google/devtools/build/lib/analysis/BaseRuleClasses.java` (EmptyRule pattern) + relevant `rules-*.java` registry.
-- `@bazel_tools` content: `src/main/java/.../BUILD.tools` + `embedded_tools/` layout in installed Bazel.
-- Lockfile format: `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/` (version, digest encoding, repo spec schema).
-
-## "Parity" concretely
-
-- Bazel 9 errors → slug errors, same kind.
-- Bazel 9 output path → slug output path, same. V2 does not inherit the V1
-  `buck-out` exception unless a deliberate Slug extension plan says so.
-- Bazel 9 MODULE.bazel builds → slug builds, same result.
-- Bazel 9 fails → slug fails. Workarounds masking a Bazel 9 failure = bugs.
-- Reproduce Bazel's observable semantics in Rust; do not reproduce Bazel's
-  implementation machinery. JVM bytecode execution, an embedded JVM, and
-  delegation to Bazel/Java are for oracle generation only unless the user
-  explicitly approves them as Slug architecture. If exact behavior has no
-  bounded Rust implementation, record the unsupported boundary or `REPLAN`.
+  V1 plans are archive material unless the V2 plan requests them.
+- Reproduce observable semantics in Rust, not Bazel's machinery. JVM bytecode,
+  an embedded JVM, and delegation to Bazel/Java are oracle tools only unless
+  the user explicitly approves them as Slug architecture. Record an unsupported
+  boundary or `REPLAN` when no bounded exact Rust implementation exists.
+- Port `@bazel_tools` content verbatim from upstream; do not invent it.
+- This is a prototype with no compatibility surface. No shims, deprecations, or
+  migration support unless the user asks.
 
 ## Repo workflow for agents
 
@@ -44,10 +24,7 @@ Start from the live checkout, not from memory.
 
 - A request to follow or continue the implementation plan, including
   `/goal follow the implementation plan`, must use
-  `.codex/skills/slug-agent-orchestration/SKILL.md`. Its compact startup path
-  and `thoughts/shared/plans/slug-v2-subplans/current-packet.md` are the compact
-  scheduling entrypoint. Canonical **Live Status** remains authoritative if
-  they disagree.
+  `.codex/skills/slug-agent-orchestration/SKILL.md`.
 - If the user names a prompt or plan, read that prompt/plan before editing.
   Prompts live in `thoughts/shared/prompts/`; subplans live in
   `thoughts/shared/plans/slug-v2-subplans/`. V1 plans are available through the
@@ -80,26 +57,9 @@ computation.
 
 ## Validation expectations
 
-- Every parity fix needs either observed Bazel 9 behavior or a citation from a
-  local Bazel source checkout.
-- Ensure a narrow regression already proves the behavior before implementing
-  the fix. Reuse accepted evidence; add or strengthen it only for an actual
-  coverage gap.
-- Same-daemon behavior matters: create/edit/delete transitions, lockfile
-  changes, environment changes, repository mapping changes, and materialized
-  output changes should invalidate or replay for a clear reason.
-- Repository materialization tests should compare against the helper or manifest
-  format that writes the marker/output state; avoid hard-coding stale marker
-  formats in new tests.
-- Keep Bazel oracle fixtures discriminating and maintainable. Reuse deterministic
-  fixture-local generators or immutable checked assets when that preserves
-  isolation and provenance; do not duplicate registry/module scaffolding merely
-  because an earlier fixture did. Remove unused modules, copied registries,
-  mutations, manifests, expected fields, and negative assertions that do not
-  affect the behavior being proved.
-- Every parity implementation needs an accepted discriminating Bazel 9.2
-  oracle or pinned-source regression. Reuse existing evidence when it already
-  proves the behavior; add or strengthen an oracle only for an actual gap.
+- Every parity change needs accepted discriminating Bazel 9.2 oracle evidence
+  or a pinned-source regression. Reuse existing evidence; add coverage only for
+  a demonstrated gap.
 
 ## NOT in scope
 

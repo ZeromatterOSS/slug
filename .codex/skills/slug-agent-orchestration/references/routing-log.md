@@ -1,7 +1,7 @@
 # Recent Slug Packet Rollups
 
-Read this only when a recent analogous packet may affect routing. The normal
-summary is [routing-guide.md](./routing-guide.md).
+Read this only when a recent analogous packet may affect a route not decided by
+the skill.
 
 Keep at most 20 terminal packet rows or 250 lines, whichever comes first.
 Archive older rows by month as `routing-history-YYYY-MM.md`. Record one row

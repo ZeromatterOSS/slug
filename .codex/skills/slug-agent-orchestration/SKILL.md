@@ -14,17 +14,17 @@ commits.
    `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 2. Compare its packet ID with canonical **Current packet** using a targeted
    search. If they differ, stop and report the mismatch to the root; only the
-   root may reconcile scheduling documents. Otherwise read only the owner
-   heading, evidence anchors, and Stage 9 row named by the manifest.
+   root may reconcile scheduling documents.
 3. Check `git status --short --branch` and overlapping dirty diffs.
-4. Continue one clearly owned packet. Check the oracle-harness growth
-   checkpoint before adding fixture breadth.
+4. Continue the manifest's packet. Read owner-plan context only for a reserved
+   decision or unresolved contradiction, and Stage 9 only for retained
+   representation or reuse work. Read evidence files only as the task needs.
 5. Inspect agents/Cargo/`slugd` only before overlapping work, retries, or
    daemon-sensitive validation.
 
-Use the routing table below. Read `references/routing-guide.md` only when the
-route is unclear and `references/routing-log.md` only when a recent analogous
-packet may change it.
+Read `references/routing-log.md` only when a recent analogous packet may change
+an unclear route. Read `references/parity-source-anchors.md` only when the
+packet touches one of its listed surfaces.
 
 ## Route
 
@@ -41,15 +41,19 @@ audits only for distinct unresolved semantic questions; parallel writers must
 own disjoint files. Correction rereviews inspect only the correction diff and
 prior blocker. Never run parallel Cargo commands on one target directory.
 
+Spawn workers and reviewers with `fork_turns="none"` unless prior conversation
+is essential. Pass the packet path, diff base, compact validation summary, and
+specific question; agents read shared files from disk.
+
 When the user identifies token pressure, default to root-only serial work and
-one terminal independent review. Do not run speculative audits, reconstruct
+no implementation delegation. Do not run speculative audits, reconstruct
 accepted evidence, or delegate mechanical work. Prefer the next observable
-vertical slice over substrate breadth. Use a second worker only when disjoint
-parallel work is explicitly worth its additional context cost.
+vertical slice over substrate breadth.
 
 ## Packet
 
-Use `references/implementation-worker.md`. Always name:
+The manifest is the complete contract for a root-only packet. When delegating,
+use `references/implementation-worker.md` and name:
 
 - one owner and observable result;
 - exact allowed files and exclusions;
@@ -80,16 +84,25 @@ Check only applicable risks:
 
 - Bazel success/failure, diagnostics, order, and output;
 - structural identity, ownership, equality, and invalidation;
-- create/edit/delete/recreate for incremental state;
+- applicable create/edit/delete/recreate, environment, lockfile,
+  repository-mapping, and materialized-output transitions for incremental state;
 - DICE-owned discovery without direct filesystem/fresh-graph bypass;
 - named-surface-only activation and compact retained representation; and
 - downstream behavior for changed interfaces.
 
 Use `references/design-reviewer.md` for reserved decisions or risky patches;
-ordinary packets receive one implementation review. Allow one focused
-correction after a concrete miss. Tests-only or evidence-only corrections do
-not count as material unless they change the accepted contract or architecture.
-A second material implementation/contract correction is `REPLAN`.
+require independent review for reserved architecture, DICE/ownership/identity,
+retained representation, public wire/schema changes, lifecycle risk, `REPLAN`,
+and milestone close. Exact-oracle changes within an existing formatter/CLI
+boundary may use root review. Under token pressure, batch one independent
+review across two to four such slices. Allow one focused correction after a
+concrete miss; a second material implementation/contract correction is
+`REPLAN`.
+
+Every oracle packet reuses deterministic scaffolding and removes
+nondiscriminating copied assets, mutations, manifests, fields, and assertions.
+Repository/materialization tests compare the current writer helper or manifest
+rather than hard-coded marker formats.
 
 For oracle growth, review fixtures before the sixth accepted packet or at
 +100 files/+10,000 text lines since the last checkpoint. Preserve provenance,
@@ -106,17 +119,21 @@ redundant or nondiscriminating.
 
 Run broad repository suites once at a milestone/integration checkpoint, not
 after each packet or correction. Reviewers inspect recorded output and rerun
-only missing, stale, or suspect evidence. Run Rust formatting when Rust changes
-and always run `git diff --check`.
+only missing, stale, or suspect evidence. Use quiet validation where supported;
+review handoffs include command, exit status, test count, and relevant failure
+output, not passing logs. Multiple fresh-root Bazel replays are required only
+for repository, materialization, or non-hermetic behavior. Run Rust formatting
+when Rust changes and always run `git diff --check`.
 
 At terminal `ACCEPT`, `REPLAN`, or genuine stop:
 
-1. update the owner plan once with compact evidence;
+1. update the owner plan only when milestone/gate state, a blocker, a reusable
+   architecture decision, or `REPLAN` changes;
 2. update the manifest and canonical Live Status only for a scheduling change;
 3. add a routing-log row only for `REPLAN`, an unusual route/parallel layout,
    a model-route change, or a reusable routing lesson; and
 4. commit accepted work, folding status into it when practical.
 
-The owner-plan terminal entry retains packet ID, verdict, tests, and commit.
-Do not publish per-audit/correction status commits or duplicate ordinary
-acceptance evidence in routing history.
+Git history of the manifest and implementation commit records ordinary
+`ACCEPT` packets. Do not publish per-audit/correction status commits or
+duplicate ordinary acceptance evidence in routing history.

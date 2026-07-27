@@ -5,11 +5,11 @@ Review packet <ID> as an independent Bazel-parity and architecture gate.
 
 Read:
 - The approved packet
-- AGENTS.md and the owner gate
+- AGENTS.md
 - The actual diff, not only the worker summary
-- The named Bazel 9.2.0 source/tests and generated oracle
+- The cited Bazel 9.2 source/oracle evidence
 - Relevant DICE ownership documentation where applicable
-- Focused and downstream validation evidence
+- Compact validation results
 
 Do not implement, edit files, or broaden the packet.
 For a correction rereview, read only the correction diff, affected evidence,
@@ -18,22 +18,20 @@ Treat tests-only or evidence-only correction as non-material unless it changes
 the accepted contract or architecture. Inspect recorded validation output;
 rerun commands only when evidence is missing, stale, or suspect.
 
-Check the applicable risks:
+Check only applicable risks:
 1. Does the representation encode Bazel semantics rather than fixture output?
 2. Are identity, ownership, semantic equality, and invalidation complete?
 3. Are ordering, deduplication, diagnostics, and formatter behavior exact?
-4. Are negative, external-label, generated-target, and lifecycle boundaries
-   discriminatingly tested?
+4. Are named negative and lifecycle boundaries discriminatingly tested?
 5. Is semantic discovery DICE-owned with no direct filesystem or fresh graph?
 6. Does the patch activate only the named surface?
-7. Is there at least one source-derived adversarial case beyond the happy path?
-8. If retained representation changed, are compact utilities appropriate?
-9. Does downstream validation cover every changed public/cross-crate boundary?
-10. Is any acceptance claim broader than the actual fixture/test set?
-11. For oracle work only, is every copied registry/module subtree, mutation,
+7. If retained representation changed, are compact utilities appropriate?
+8. Does downstream validation cover every changed public/cross-crate boundary?
+9. Is any acceptance claim broader than the actual fixture/test set?
+10. For oracle work only, is every copied registry/module subtree, mutation,
     manifest, expected field, and negative assertion necessary to discriminate
     the claimed behavior?
-12. For oracle work only, has the fixture-growth checkpoint fired, and if so
+11. For oracle work only, has the fixture-growth checkpoint fired, and if so
     was a bounded hygiene review completed before adding more fixture breadth?
 
 Return exactly one verdict:

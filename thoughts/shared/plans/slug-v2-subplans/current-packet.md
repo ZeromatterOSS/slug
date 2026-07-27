@@ -3,9 +3,6 @@
 Packet: `WP-8-m3-query-package-output`
 Milestone: M3, ordinary loading query
 Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Heading: `Bundled Java Pattern query-functions contract replanned (2026-07-27)`
-Stage 9: `slug-v2-subplans/09-v1-extraction-ledger.md`,
-`Stage 8 loading-query thin vertical — approved extraction plan`
 Evidence: Bazel 9.2 `PackageOutputFormatter.java`; accepted
 `query-loading-thin-vertical` fixture and current V2 query graph through
 `72aece4d`
@@ -24,7 +21,7 @@ Allowed files:
 - `app/slug_cli_v2/tests/cli.rs`
 - `app/slug_server_v2/src/lib.rs`
 - `app/slug_server_v2/src/tests.rs`
-- terminal owner, Stage 9, canonical, manifest, and exceptional routing updates
+- terminal owner, canonical, manifest, and exceptional routing updates
 
 Result: add exact Bazel 9.2 `--output=package` over the already-selected query
 labels. Main-repository package names omit `//`; results sort

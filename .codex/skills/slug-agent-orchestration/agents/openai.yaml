@@ -1,4 +1,4 @@
 interface:
   display_name: "Slug Agent Orchestration"
   short_description: "Run the Slug V2 plan through reviewed work packets"
-  default_prompt: "Use $slug-agent-orchestration: read Live Status, select one bounded packet, reuse accepted evidence, match validation to risk, and request one Sol review only for a reserved decision."
+  default_prompt: "Use $slug-agent-orchestration to execute the current bounded packet, reuse accepted evidence, and match delegation, review, and validation to risk."

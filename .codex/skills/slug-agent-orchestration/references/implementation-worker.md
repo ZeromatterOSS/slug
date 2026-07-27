@@ -11,7 +11,7 @@ Validation tier: <docs | oracle | private/local | public/cross-crate | DICE/daem
 
 Read:
 - AGENTS.md
-- <active owner section>
+- <owner section only for a reserved decision or unresolved contradiction>
 - <accepted oracle or exact Bazel 9.2 source>
 - <production/test files in scope>
 - <matching Stage 9 row only when reuse/representation changes>
@@ -53,8 +53,13 @@ Add only what the task uses:
 - **Oracle/fixture:** exact rows, generated fields, reused scaffolding,
   per-fixture and aggregate growth, last checkpoint, duplication reason,
   hygiene/pruning, and affected replays.
+- **Repository/materialization:** compare the helper or manifest that writes
+  marker/output state; use fresh roots only when state or non-hermetic behavior
+  is under test.
 - **DICE/semantic key:** identity, ownership, equality, validity, Need/error
   behavior, invalidation/restoration, event storage, and dependent pruning.
+  Cover applicable create/edit/delete/recreate, environment, repository
+  mapping, lockfile, and materialized-output transitions.
 - **Reuse/representation:** matching Stage 9 row, Buck2/V1 candidates, selected
   utility boundary, memory/clone implications, and ledger disposition.
 - **Public/cross-crate:** downstream production wrapper and compile coverage.
@@ -64,4 +69,6 @@ Add only what the task uses:
 An accepted discriminating Bazel 9.2 oracle is sufficient; do not add another
 fixture unless the packet names a missing behavior. Workers run focused tests.
 The root runs only the named validation tier, owns documentation/commits, and
-reserves broad suites for milestone/integration checkpoints.
+reserves broad suites for milestone/integration checkpoints. Use quiet commands
+where supported and return command, exit status, test count, and only relevant
+failure output.
