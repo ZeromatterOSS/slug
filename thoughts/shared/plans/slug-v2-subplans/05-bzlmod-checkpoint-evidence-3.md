@@ -9346,3 +9346,181 @@ before terminal latest-text review. Stop on a hidden paired invocation,
 same-command BEP claim for `mod`, explicit-empty-only JSON parser, global
 daemon observation, PID-only Slug evidence, legacy Slug cleanup acceptance,
 lost primary failure, or any production work.
+
+### Host JVM startup/reuse oracle command-shape correction
+
+Status: `ACCEPT` after terminal latest-text review on 2026-07-26, before
+harness or fixture edits.
+
+Pinned Bazel 9.2 `build //...` is not an acceptable diagnostic companion in
+this fixture. It emits BEP but exits 1 while loading the intentionally minimal
+embedded `@@bazel_tools//tools` closure because `@@platforms//host` is absent;
+making it succeed would add unrelated registry scaffold. A live
+`query //:BUILD.bazel` companion is smaller and discriminating:
+
+- `BazelBuildEventServiceModule.java:209-223` allows `query`;
+- `QueryEnvironmentBasedCommand.java:75-101` posts its no-build events, and
+  `BuildEventServiceModule.java:388-450,839-945` creates the requested
+  transport and JSON file;
+- with `--lockfile_mode=off`,
+  `--registry=file://%workspace%/registry`, `--output=label`, and
+  `--noshow_progress`, it exits 0 with exact stdout `//:BUILD.bazel\n`;
+- it emits exactly one original structured-command-line event and one startup
+  section, retains the preceding PID/starttime epoch, and leaves a pre/post
+  digest of every regular workspace file unchanged.
+
+The corrected packet retains the same seven paths:
+
+- `tools/v2_oracle_lib/fixture.py`;
+- `tools/v2_oracle_lib/runner.py`;
+- `tools/v2_oracle_lib/compare.py`;
+- `tests/v2_oracle/test_v2_oracle.py`;
+- `tests/v2_oracle/fixtures/nonroot-interim-module-graph/fixture.toml`;
+- its generated `expected/oracle.json`; and
+- one nonregistry
+  `workspace/startup-diagnostics.bazelrc`.
+
+The exact caps remain seven paths, one added regular file, zero added links,
+and at most 1,800 net lines. The resulting fixture may not exceed 58 regular
+files, five links, or 2,250 lines from the verified 57/5/1,112 baseline. This
+remains post-checkpoint oracle packet two after `22de3631`.
+
+#### Harness contract
+
+Add strict optional fixture-wide ordered `startup_argv`, fixture-wide string
+environment overrides, and `observe_server_epochs`, permitted only for
+`daemon = true`. Add strict optional per-command ordered `startup_argv`,
+`capture_server_epoch`, and `capture_startup_diagnostics`. On the opted-in
+daemon path, emit exactly one subprocess per declared fixture row in this
+order:
+
+`<tool> --output_base=<path> <fixture startup> <command startup> <command argv>`.
+
+Apply fixture environment before command overrides. Record the fixture and
+command startup vectors and environment maps separately. The only runner
+injection is one unique absolute
+`--build_event_json_file=<run_dir>/startup-bep/<command-index>.json` for a
+command declaring diagnostic capture, appended after its declared command
+argv. Never infer startup options from command argv and never hide a companion
+subprocess inside another row.
+
+When `observe_server_epochs` is true, Bazel observes PID,
+`server/server.starttime`, and `server/command_port` after every command in
+the fixture. Parse the endpoint only as IPv4 `address:port` or bracketed IPv6
+`[address]:port`; require a loopback address, nonzero port, and one stable
+endpoint for each live PID/starttime identity. Validate the live identity and
+assign first-seen tuples stable run-local ordinals, retaining each epoch's
+endpoint internally for cleanup. Only rows declaring `capture_server_epoch`
+serialize and compare the ordinal. Do not enable observation for another
+daemon fixture. A Slug run of an opted-in fixture fails closed before
+workspace copy or process launch because authenticated Status does not exist;
+there is no PID fallback. `CommandServer.java:226-230,343-423` pins command
+port publication, formatting, and deletion.
+
+For each diagnostic row, require one JSON file, exactly one
+`structuredCommandLine` event whose label is `original`, and exactly one
+`startup options` section. Extract only ordered
+`optionList.option[].combinedForm`. Map an absent field in the observed empty
+JSON object to the semantic empty string; preserve explicit values, duplicates,
+and ordering. Reject nonobject entries, nonstring present fields, extra
+original events/sections, missing files, and all other cardinality/schema
+drift. Normalize only existing workspace, run, and output-base path
+replacements plus slash style; do not apply timing/UUID text normalization or
+store raw BEP, invocation IDs, timestamps, or unrelated events.
+
+Extract complete ordered RC messages in the exact normalized form
+`Reading 'startup' options from <source>: <comma-space-joined options>`.
+Do not treat the client prefix, unrelated INFO lines, or partial text as a
+record. The generated comparator checks declared server epoch,
+combined-form list, and announcement list in addition to existing semantic
+fields. The source chain is pinned by `option_processor.cc:479-531`,
+`startup_options.cc:414-445`,
+`blaze.cc:2069-2075`, `CommandLineEvent.java:280-300`, and
+`BlazeCommandDispatcher.java:588-620`.
+
+Exact cleanup is Bazel-only and only for the opted-in fixture. In `finally`,
+invoke `<bazel> --output_base=<path> <fixture RC-suppression startup> shutdown`
+under the fixture-wide empty `BAZELRC` environment and without any row
+host-JVM arguments, with `cwd=<workspace>`. Require exit zero; verify every
+observed PID/starttime identity dead and every retained loopback endpoint
+unreachable. Identity/death behavior is pinned at `blaze_util.cc:47` and
+`blaze_util_linux.cc:189-225`. If execution and cleanup both fail, re-raise the
+original execution exception as terminal with the cleanup failure chained and
+visible. Preserve the existing Slug cleanup path only for non-opted fixtures
+and make no acceptance claim about it.
+
+#### Exact 22-command sequence
+
+All twenty-two commands use fixture startup baseline
+`--nosystem_rc`, `--noworkspace_rc`, and `--nohome_rc` plus fixture environment
+`BAZELRC=""`. The existing first fourteen commands establish hermetic epoch 1.
+Append five semantic `mod show_repo` rows and exactly three visible `query`
+diagnostic companions:
+
+15. `fresh_conflicting_last_wins_utf8` reactivates the accepted portable
+    directory and four dynamic names, mutates root version `0.1.4` to `0.1.8`,
+    then requests CLI ISO-8859-1 followed by UTF-8. It produces 94-byte SRI
+    `sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=` at epoch 2.
+16. `fresh_conflicting_cli_startup_diagnostics` uses identical startup input
+    and literal argv
+    `["query", "//:BUILD.bazel", "--lockfile_mode=off",
+    "--registry=file://%workspace%/registry", "--output=label",
+    "--noshow_progress"]`. It exits 0 at epoch 2 and captures:
+    `["--output_base=<output_base>", "", "--nosystem_rc", "",
+    "--noworkspace_rc", "", "--nohome_rc", "",
+    "--host_jvm_args=-Dfile.encoding=ISO-8859-1", "",
+    "--host_jvm_args=-Dfile.encoding=UTF-8", ""]`.
+17. `reordered_same_multiset_retains_utf8` requests CLI UTF-8 followed by
+    ISO-8859-1. It retains epoch 2 and the 94-byte SRI.
+18. `reordered_cli_startup_diagnostics` uses that identical reordered input,
+    exits 0 at epoch 2, and captures the same prefix followed by populated /
+    empty UTF-8 and then ISO-8859-1 pairs.
+19. `rc_source_change_same_multiset_reuses` adds only explicit
+    `--bazelrc=startup-diagnostics.bazelrc`. The RC supplies generic
+    ISO-8859-1 then matching `startup:linux` UTF-8. It retains epoch 2 and the
+    94-byte SRI.
+20. `rc_source_startup_diagnostics` uses identical startup input and adds
+    command option `--announce_rc` to that literal query argv. It exits 0 at
+    epoch 2 and captures
+    `["", "", "--output_base=<output_base>", "", "--nosystem_rc", "",
+    "--noworkspace_rc", "", "--nohome_rc", "",
+    "--bazelrc=startup-diagnostics.bazelrc", ""]`.
+    The leading empties are the two synthetic records paired with filtered
+    populated RC options. It also captures exactly
+    `Reading 'startup' options from <workspace>/startup-diagnostics.bazelrc: --host_jvm_args=-Dfile.encoding=ISO-8859-1, --host_jvm_args=-Dfile.encoding=UTF-8`.
+21. `occurrence_change_restarts_latin1` returns to CLI-only ISO-8859-1,
+    restarts at epoch 3, and produces the accepted 91-byte SRI
+    `sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=`.
+22. `zero_occurrences_restores_default` supplies no row startup occurrence,
+    restarts at epoch 4, and preserves the exact 91-byte default SRI.
+
+Only row 15 mutates the workspace. All five semantic rows retain the exact
+existing `MODULE.bazel.lock` manifest: digest
+`0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7`,
+size 1,228, mode `0o644`. Query companions have no mutations or manifest roots,
+produce an empty manifest, and must retain raw stdout `//:BUILD.bazel\n`
+(normalized stdout `//:BUILD.bazel`). Rows 21 and 22 have no diagnostic
+acceptance; adding companions after them is nondiscriminating fixture growth.
+No registry/module/provider/agent/JVM/Java asset, BUILD change, symlink,
+hidden invocation, or production path enters the packet.
+
+Before generation, focused tests cover strict fixture/command field parsing,
+startup/environment merge and precedence, exactly one subprocess per row,
+22-record ordering, unique BEP paths, absent-`combinedForm` mapping and every
+schema/cardinality rejection, path-only normalization, exact RC extraction,
+fixture-opt-in epoch mapping over every command, missing/stale identities,
+missing/malformed/nonloopback/changed endpoints, Slug pre-execution refusal,
+Bazel cleanup success/exit/death/endpoint failures, cleanup workspace cwd, and
+primary-plus-cleanup exception chaining.
+
+Then run one pinned Bazel 9.2 generation, two absolute distinct-root replays,
+the focused harness/fixture suite, exact 91/94-byte hashes, all provenance
+anchors, parser/scope/growth/archive/credential checks, process scans, and
+terminal latest-diff reviews. Stop on a query output or digest difference,
+unexpected epoch, any missing/extra diagnostic value, cleanup uncertainty,
+scope/cap breach, or a Slug lifecycle claim.
+
+After acceptance, run only design packet
+`WP-5-m1-host-jvm-registry-byte-execution-feasibility`; no parser, transport,
+helper, DICE, directory IO, Host consumer, or activation follows directly from
+this oracle.
