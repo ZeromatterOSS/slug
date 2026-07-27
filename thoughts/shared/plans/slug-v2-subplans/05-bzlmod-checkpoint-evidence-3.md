@@ -7583,3 +7583,197 @@ network request, fatal vendored-read failure with no fallback, non-vendored
 or missing/wrong-kind vendor-path network fallback, and checksum-absent
 network behavior before designing or implementing the separate private Host
 registry-file owner.
+
+### Stage 5 Host registry-file vendor oracle design
+
+`WP-5-m1-host-registry-file-vendor-oracle` strengthens only the accepted
+`registry-yanked-lockfile-mode` fixture. Its exact six-path allowlist is:
+
+- `tests/v2_oracle/fixtures/registry-yanked-lockfile-mode/fixture.toml`;
+- `tests/v2_oracle/fixtures/registry-yanked-lockfile-mode/expected/oracle.json`;
+- `workspace/vendor-hit/_registries/127.0.0.1/first/modules/yyy/1.0.0/MODULE.bazel`;
+- `workspace/vendor-fatal/_registries/127.0.0.1/first/modules/yyy/1.0.0/MODULE.bazel`;
+- `workspace/vendor-missing/_registries/127.0.0.1/first/modules/aaa/1.0.0/MODULE.bazel`;
+  and
+- `workspace/vendor-wrong-kind/_registries/127.0.0.1/first/modules/yyy/1.0.0/MODULE.bazel/wrong-kind.txt`.
+
+The last four paths are new regular files. The wrong-kind sentinel retains a
+real directory at the computed `MODULE.bazel` path without a symlink or
+harness operation. Change no server, harness, existing registry byte, root
+BUILD file, second fixture, Rust, Cargo, dependency, API, DICE owner,
+consumer, or activation.
+
+Pinned Bazel 9.2 establishes the boundary:
+
+- `RegistryFunction.java:63-85` reads the vendor-directory input before
+  constructing the registry, and `RegistryFactoryImpl.java:38-82` forwards
+  it with the exact HTTP hash mode.
+- `IndexRegistry.java:166-242` resolves the lockfile expectation before
+  vendor or network IO. It selects vendor bytes only when the checksum is
+  present, the URL is not `file:`, and the computed path is a file. A selected
+  vendor read/checksum failure is wrapped and returned without network
+  fallback; a missing or wrong-kind path falls through to the downloader.
+- `VendorManager.java:41,146-190,213-235` uses
+  `<vendor>/_registries/<lowercase-host>/<percent-decoded-path>` and omits the
+  dynamic port. `isUrlVendored` is exactly `Path.isFile`, and selected bytes
+  are verified against the recorded checksum. The nearby `registry_cache`
+  prose is stale; `_registries` is the code constant.
+- `ModuleFileFunction.java:778-805` continues to a later registry only for
+  NotFound. A vendor IOException is immediately `ERROR_ACCESSING_REGISTRY`.
+  `ModCommand.java:292-308` projects graph errors to `MOD_COMMAND_UNKNOWN`,
+  whose `failure_details.proto` exit is 37.
+- `RepositoryOptions.java:39-70,359-370` and
+  `BazelRepositoryModule.java:316-330,557-586,704-721` source
+  workspace-relative vendor paths and apply explicit empty
+  download/content-cache disabling.
+
+Retain every current source anchor and add only `VendorManager.java`,
+`ModCommand.java`, and `failure_details.proto`.
+Update the fixture description, `oracle_notes`, and `translation_notes` in
+place. Preserve the accepted cold Off rows' absent relative repository cache;
+only the five new vendor rows and the strengthened Refresh row use explicit
+empty download and contents caches. Do not retain the now-false statement
+that every Off row uses an absent relative cache.
+
+Insert exactly five Off rows after
+`off_reuses_selected_yanked_reason_a` and before
+`off_enforces_recorded_sha_before_yanked`. Before the first row, replace the
+root module with version `0.1.1` and only `yyy@1.0.0`; advance the root version
+through `0.1.2`, `0.1.3`, `0.1.4`, and `0.1.5` in the following rows. Every
+row keeps the three existing registry arguments,
+`--allow_yanked_versions=yyy@1.0.0`, `--lockfile_mode=off`,
+`--repository_cache=`, and `--repo_contents_cache=`.
+
+1. `off_vendor_checksum_present_hit` uses `--vendor_dir=vendor-hit`.
+   The vendor file is byte-identical to the accepted yyy MODULE, SHA
+   `9114f034663d930400ebc5993990181e4a83dc5f4d5e0c80f8b7b570ebe86969`.
+   Expect exit 0 and yyy in the graph. First-registry yyy MODULE remains
+   exactly 2, while successful RepoSpec resolution adds exactly one request
+   apiece for first-registry yyy `source.json` and first-registry
+   `bazel_registry.json`. Generate the complete cumulative manifest.
+2. `off_vendor_checksum_present_read_failure_is_fatal` uses
+   `--vendor_dir=vendor-fatal`. Its parse-valid yyy bytes append
+   `# vendored-corrupt` and have SHA
+   `536562f16e2c06150bc110253312ec93acd3601d2ae0e9a519ed64794cc77d37`.
+   Expect exit 37 and the exact outer registry base, file URL, normalized
+   `_registries/.../MODULE.bazel` vendor path, actual/wanted hashes, and
+   rerun-vendor sentence. All request counts remain unchanged. Exclude
+   ordinary `Failed to fetch registry file`, module-not-found, successful
+   graph, and later-registry fallback claims.
+3. `off_vendor_missing_path_falls_back_to_network` uses
+   `--vendor_dir=vendor-missing`, whose yyy target is absent. Expect exit 0,
+   yyy in the graph, no vendored-read diagnostic, and exactly one added first
+   yyy MODULE request, taking its cumulative count from 2 to 3. Successful
+   RepoSpec resolution also adds exactly one first-registry yyy `source.json`
+   request and one first-registry `bazel_registry.json` request.
+4. `off_vendor_wrong_kind_path_falls_back_to_network` uses
+   `--vendor_dir=vendor-wrong-kind`, where the exact yyy MODULE target is the
+   sentinel-retained directory. Expect exit 0, yyy in the graph, no
+   vendored-read diagnostic, and exactly one further yyy MODULE request,
+   taking its cumulative count from 3 to 4. Successful RepoSpec resolution
+   again adds exactly one first-registry yyy `source.json` request and one
+   first-registry `bazel_registry.json` request.
+5. `off_vendor_checksum_present_hit_restored` returns to
+   `--vendor_dir=vendor-hit`. Expect exit 0 and yyy in the graph.
+   First-registry yyy MODULE remains exactly 4, while successful RepoSpec
+   resolution adds exactly one first-registry yyy `source.json` request and
+   one first-registry `bazel_registry.json` request. This is
+   A-to-B-to-C-to-D-to-A command-input restoration evidence, not a claim that
+   equal restored state rereads the vendor file.
+
+Freeze every new asset byte-for-byte. `vendor-missing`'s misleading aaa file
+is exactly
+`module(name = "aaa", version = "1.0.0")\nbazel_dep(name = "olddep", version = "1.0.0")\n`,
+SHA
+`03361572ed042feb527deec5fdaaa9f7eadd3bf1be441f573356fe0e0275e58e`.
+The wrong-kind sentinel is exactly `wrong kind\n`, SHA
+`3e8e23ed51f1f26f6c4749317ba34266bd085021c76da92b2e87bff4b79b29ff`.
+
+Changing the checked root and `--vendor_dir` together is mandatory.
+`RepositoryDirectoryValue.VENDOR_DIRECTORY` is a precomputed dependency of
+`RegistryFunction`, and rebuilt registries are non-comparable, so these
+same-daemon rows cannot be explained by a root edit or stale
+`ModuleFileValue`. Direct mutation of one unchanged vendor directory is not
+observed and is forbidden without a synchronous expunge redesign. Explicit
+empty cache flags prevent repository-cache or contents-cache hits from
+explaining zero network requests.
+
+Before the existing checksum-before-yanked row, restore the exact original
+root version and both original dependencies in the same mutation batch that
+changes the yyy lockfile digest to zero. Preserve that row and the rest of
+the accepted sequence, but regenerate its complete manifests with the
+shifted first-registry yyy MODULE counts: the preserved
+`off_enforces_recorded_sha_before_yanked` row adds 4 to 5; the Refresh row
+and `update_replays_selected_yanked_reason_b` retain 5; and the final
+`error_checksum_precedes_yanked_rejection` row adds 5 to 6. Do not retain the
+old 3/3/3/4 values. Strengthen the existing
+`refresh_refetches_metadata_and_recorded_absence` row with
+`--vendor_dir=vendor-missing`, `--repository_cache=`, and
+`--repo_contents_cache=`. The valid, semantically distinct first-registry aaa
+vendor file depends on `olddep`; the now-live HTTP aaa depends on `newdep`.
+Refresh turns the recorded absence into checksum-empty fetch, so the row must
+request first aaa once, select `newdep`, exclude `olddep`, and never use the
+present vendor file. State the claim narrowly as Refresh recorded-absence
+checksum-empty vendor bypass; the accepted hash-mode matrix owns the broader
+unrecorded policy.
+
+The five inserted rows make exactly fourteen commands. Every new Off row
+must preserve the normalized lockfile digest and size byte-for-byte. Require
+the complete cumulative request manifest for every row, exact root mutations
+and restoration, all positive and negative output/diagnostic assertions, and
+the vendor-tree kinds and asset hashes above. The final fixture may contain
+at most 22 regular files, zero links, and 1,444 newline-counted lines: net
+growth is at most four files and 600 lines. The full tracked fixture tree cap
+is 1,301 regular files, 14 links, and 36,707 lines, or +17 files, zero links,
+and +2,918 lines from checkpoint `df812c2c` / baseline `c039c347`.
+
+This is oracle packet four after the v28 schema, Host visible-lockfile, and
+Host RegistryFunction oracles. No fixture-growth review is due. The later
+module-mirror/archive-fetch oracle would be packet five; run the focused
+growth review immediately after that packet and before a sixth oracle unless
+the roughly 100-file/10,000-line threshold fires sooner.
+
+Run one pinned Bazel 9.2 generation and two distinct fresh-root replays, then
+shut down each Bazel output-base server. Run the focused oracle parser/harness
+test if its environment is available; an unavailable pytest environment is a
+recorded residual, not permission to weaken fixture acceptance. Validate
+exact row order, arguments, exits, mutations, restoration, cumulative
+manifests, lockfile bytes, normalized diagnostics, source anchors,
+provenance, six-path scope, inventory/growth, schema, archive status,
+credentials, host-path absence, and `git diff --check`. Terminal acceptance
+requires source/parity, implementation/evidence, and
+architecture/orchestration latest-diff review.
+
+Stop and replan on a yyy request in the hit or fatal rows; no yyy request in
+either fallback row; a fatal vendor read that reaches network or exits other
+than 37; Refresh using the misleading aaa vendor bytes or failing to request
+first aaa; any Off lockfile change; stale root or vendor bytes after
+restoration; a server/harness/registry-byte edit; symlink, fifth asset,
+seventh path, sixth row, fifteenth command, or cap overflow; permission,
+sleep, or mutable external-state tricks; a new fixture; or any vendor-command,
+file-registry, mirror, archive/source-download, Rust, Host owner, consumer, or
+activation claim.
+
+#### Host registry-file vendor oracle design status
+
+Status: `REPLAN` after terminal latest-text review on 2026-07-26.
+
+The stopped design retained a six-path, four-asset, fourteen-command fixture
+boundary and made no fixture, Rust, Cargo, dependency, API, DICE, consumer, or
+activation change. One focused correction added the cache-application source
+anchor, complete RepoSpec request deltas, exact asset bytes and hashes,
+shifted downstream yyy counts, and truthful fixture metadata requirements.
+The final source and implementation/evidence reviews then found a second
+material correction: Refresh with `vendor-missing` and disabled caches must
+fetch the checksum-present yyy MODULE, and the broad yyy-request stop gate
+also rejects the intended yyy `source.json` request. Per the orchestration
+correction limit, this packet ends in `REPLAN`.
+
+Next packet: design and terminally rereview only
+`WP-5-m1-host-registry-file-vendor-oracle-correction`. Move the misleading
+aaa asset into `vendor-hit`, use `vendor-hit` for Refresh so recorded-SHA yyy
+remains vendored while checksum-empty aaa bypasses the present vendor file,
+retain the intended downstream yyy MODULE counts 4→5/5/5/6, and narrow the
+stop gate to yyy MODULE requests in hit rows plus every request-count change
+in the fatal row. Preserve every other accepted boundary, asset byte, hash,
+row, cap, source anchor, and exclusion from the stopped draft.
