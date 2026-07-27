@@ -10689,3 +10689,182 @@ changed. All terminal reviews returned `ACCEPT`.
 
 Next packet: design only
 `WP-5-m1-loading-byte-string-oracle-feasibility-design`.
+
+### Bazel-internal string oracle/feasibility design
+
+Status: `ACCEPT` on 2026-07-27 after terminal pinned-source/API,
+implementation-feasibility, and architecture/orchestration latest-text
+reviews. No non-plan repository file, fixture, Rust, Cargo, dependency, DICE
+key, loading consumer, or entrypoint changed.
+
+Pinned Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` does not decode ordinary BUILD
+and `.bzl` source as Unicode before lexing. `ParserInput.fromLatin1` maps every
+raw source byte to one Java U+00xx character. The lexer therefore makes a
+literal UTF-8 `é` source sequence (`c3 a9`) equal to `"\303\251"` and
+different from `"\351"`. Ordinary and triple string octal escapes consume
+one through three octal digits greedily and reject values above `\377`.
+`\x`, `\u`, `\U`, and unknown escapes are invalid; raw strings preserve the
+backslash and digits. Dynamic concatenation, slicing, comparison, list/dict
+storage, and macro argument/return preserve these internal byte-shaped
+strings. Source authority is `StarlarkUtil.java:43-66`,
+`ParserInput.java:82-95`, `Lexer.java:274-425,443-495`, and
+`StringEncoding.java:25-85,116-141`, plus
+`FileLocations.java:21-23,38-40,69-72,95-120` and
+`Location.java:21-26` for byte-counted columns.
+`PackageFunction.java:1331-1366` and `BzlCompileFunction.java:177-215`
+establish BUILD and ordinary `.bzl` Latin-1 parser input;
+`Parser.java:666-675,1042-1054`, `Eval.java:588-597`,
+`EvalUtils.java:77-99,494-497`, and `Starlark.java:302-310,662-745`
+establish the claimed dynamic operations. Live-seam authority is
+`starlark_syntax/src/{lexer.rs:242-430,codemap.rs:247-253,309-320,382-416,
+syntax/module.rs:203-255}` and
+`starlark/src/eval/compiler/expr.rs:1044-1054`.
+
+Live starlark-rust currently decodes both literal UTF-8 `é` and `"\351"` to
+the same Rust U+00e9 scalar and also accepts the Bazel-invalid `\x`, `\u`, and
+`\U` forms. Whole-source Latin-1 transcoding is forbidden: `CodeMap` owns the
+original UTF-8 `String`, and expanding each non-ASCII byte into a different
+UTF-8 sequence would shift byte spans and corrupt source excerpts. The
+feasible seam is token-local and opt-in. It lifts every literal source UTF-8
+byte to one Rust U+0000..U+00ff scalar, while an octal escape contributes one
+such scalar byte. The original source and byte spans remain unchanged, while
+the codemap stores an explicit opt-in byte-column reporting mode because Bazel
+counts Latin-1 parser-input bytes and standard starlark-rust counts Unicode
+scalars. Existing `resolve_span` and formatted rendering remain byte-for-byte
+Unicode behavior; a separate opt-in reporting resolver returns Bazel byte
+columns without feeding them to the Unicode-character caret renderer.
+Existing AST strings and runtime strings can then preserve equality, order,
+length, indexing, slicing, concatenation, multiplication, list/dict keys, and
+function/macro pass-through for strings originating from opt-in literals and
+opt-in-parsed pass-through. The shared runtime type cannot distinguish carrier
+U+00e9 representing byte e9 from ordinary Unicode U+00e9 injected by a
+standard parser, native, or global. This packet adds no ingress adapter. It is
+a dormant parser carrier, not yet a filesystem-path value or Host glob owner;
+production activation remains gated on separately reviewed byte-aware adapters
+for every string ingress.
+
+Split the result into two serial implementation packets with a terminal
+review gate between them.
+
+First implement only
+`WP-5-m1-loading-bazel-internal-string-oracle`. Add the new Bazel-only fixture
+`starlark-internal-string-bytes` in exactly six regular files and no links:
+
+- `fixture.toml`;
+- `expected/oracle.json`;
+- `workspace/MODULE.bazel`;
+- `workspace/BUILD.bazel`;
+- `workspace/defs.bzl`; and
+- `workspace/bad/BUILD.bazel`.
+
+The fixture has exactly eight commands and no harness edit. Set fixture-level
+`daemon = true` and `observe_server_epochs = true`; set command-level
+`capture_server_epoch = true` on each of all eight commands. Two successful
+query rows emit only exact ASCII target labels while proving:
+
+- literal UTF-8 equals its two-octal-byte spelling and differs from one-octal
+  `\351`;
+- single, double, raw, triple, empty, NUL, boundary `\377`, greedy
+  `\3777`/`\378`, and non-BMP source forms have the pinned
+  length/equality/order behavior; and
+- `.bzl` function/macro argument and return, concatenation, multiplication,
+  slicing/indexing, list membership, dict-key equality, and a pattern-shaped
+  returned string remain byte-shaped.
+
+The remaining six rows repeatedly query only `//bad:*` on one Bazel server.
+Five ordered text replacements in the one bad BUILD file independently pin
+the failures for `\400`, `\x41`, `\u00e9`, `\U0001f600`, and `\q`; each row
+must retain the generated exact diagnostic and source position. A final
+replacement installs a multibyte literal plus triple-string prefix followed
+by a deliberate identifier error and pins the generated exact line,
+Bazel-byte-counted column, and message. The location must distinguish Bazel's
+raw-byte column from starlark-rust's default Unicode-scalar column; do not
+precompute a column for an AST span different from the generated diagnostic.
+Every mutation must replace exactly one known prior spelling. Stop if cached
+failure recovery requires a server restart or BUILD mutation outside this
+single file.
+
+Generate once with pinned `/usr/bin/bazel`, then replay the checked expectation
+from two distinct absolute fresh roots. Require byte-identical normalized
+records, exact ASCII stdout, empty manifests, no Slug execution, no host path,
+exact server epoch 1 for all eight rows, and complete Bazel/runner cleanup.
+Exact per-file addition caps are 260 for
+`fixture.toml`, 750 for `expected/oracle.json`, 70 for the root BUILD, 90 for
+`defs.bzl`, 25 for the bad BUILD, and one for `MODULE.bazel`; the hard packet
+cap is +1,200/-0. Retain exactly six regular files, zero links, and at most
+1,200 newline-counted fixture lines. This is post-checkpoint oracle packet
+four after `22de3631`. This bounded packet crosses neither the at-least-100-file
+nor 10,000-text-line threshold, so no fixture-growth review is due here.
+Whichever oracle next reaches `ACCEPT` is packet five and must perform and
+record the focused fixture-growth review.
+
+Only after that oracle reaches terminal `ACCEPT`, implement
+`WP-5-m1-starlark-bazel-internal-string-seam`. The exact future allowlist is:
+
+- `starlark-rust/starlark_syntax/src/dialect.rs` — at most 45 additions;
+- `starlark-rust/starlark_syntax/src/lexer.rs` — at most 300;
+- `starlark-rust/starlark_syntax/src/codemap.rs` — at most 180;
+- `starlark-rust/starlark_syntax/src/syntax/module.rs` — at most 120;
+- `starlark-rust/starlark_syntax/src/lexer_tests.rs` — at most 220;
+- `starlark-rust/starlark/src/syntax.rs` — at most five;
+- `starlark-rust/starlark/src/tests.rs` — at most three; and
+- new `starlark-rust/starlark/src/tests/bazel_internal_string.rs` — at most
+  300.
+
+The hard total cap is 1,200 additions and 100 deletions. Add one explicit
+public parse-encoding enum and `AstModule::parse_with_string_encoding`;
+ordinary `AstModule::parse`, `Lexer::new`, every `Dialect`, compiler/value
+representation, and every production call site remain byte-for-byte.
+The opt-in parser passes a crate-private lexer mode for string tokens and
+stores a codemap byte-column reporting mode while retaining the original
+source text, spans, existing `resolve_span`, and formatted rendering.
+In that mode, preserve the Bazel octal grammar/range and reject Bazel-invalid
+hex, Unicode, and unknown escapes with the oracle diagnostics. Do not add a
+Dialect field, global/static/thread-local/environment switch, whole-source
+pretransform, evaluator mode, or loading caller. Acceptance requires zero
+non-test callers of the new parse entrypoint.
+
+Focused seam tests compare standard and opt-in codemaps, original sources,
+byte spans, source slices, unchanged ordinary resolved locations, and the
+separate opt-in byte-column reporting locations, including the required
+one-column UTF-8-literal difference; prove standard lexer/evaluator outputs
+unchanged; and reproduce
+the accepted oracle matrix in opt-in parse/evaluation, including separately
+parsed equality and frozen/unfrozen function pass-through. Dict hashing is
+proved only through equal-key lookup, never an absolute hash number. `chr`,
+`codepoints`, numeric `hash`, canonical repr/print escaping, f-strings, and
+arbitrary non-UTF-8 source files are not claimed by this first seam. If the
+accepted oracle requires a compiler, runtime string, repr, numeric-hash, or
+source-storage edit, stop and `REPLAN` instead of expanding the allowlist.
+Formatted non-ASCII excerpt/caret parity is also excluded: mode-aware
+`span_display.rs` character indexing is a separate diagnostic-display
+boundary. Do not feed the opt-in byte column directly to a Unicode-character
+caret renderer or claim exact formatted snippets.
+
+Validate focused tests first, then full `starlark_syntax` and `starlark`
+suites/doctests, unchanged `slug_bzlmod_v2`, `slug_loading_v2`, and
+`slug_analysis_v2`, plus GNU-Windows no-run linkage for those five crates.
+Run formatting, diff, archive, Cargo/dependency, public-API/default-mode,
+exact allowlist/caps, credential, process, and forbidden-caller guards.
+
+Both packets exclude actual non-UTF-8 filesystem names, `glob()` matching,
+`?`/`**`/dot/subpackage/symlink/special breadth, typed-dirent edits, Host
+glob/key ownership, BUILD/`.bzl` regular-or-special byte acquisition,
+package-evaluation retry/suspension, DICE keys/Needs, direct filesystem IO,
+consumer activation, and native-Windows parity claims. Actual raw-name and
+pattern-lazy behavior remains the next oracle/design boundary after the
+dormant seam is accepted.
+
+Stop on a pinned Bazel contradiction, ordinary parser change, source/span
+rewrite or failure of exact opt-in byte-column resolution, runtime
+normalization of a covered dynamic operation, failure to
+recover through the ordered bad-file mutations on one server, a required
+compiler/value/hash/repr/source-storage edit, non-test adoption of the opt-in
+API, allowlist/cap expansion, new dependency/global/interner/retained standard
+collection, loading/Host/DICE scope, required mixed standard/native/global
+string ingress without a reviewed byte adapter, or any claim that the carrier
+alone implements Bazel path strings.
+
+Next packet after terminal acceptance of this design: implement only
+`WP-5-m1-loading-bazel-internal-string-oracle`.
