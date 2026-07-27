@@ -4979,6 +4979,8 @@ mod tests {
     #[test]
     fn retained_session_validation_dirtiness_matrix_is_exact() {
         use slug_workspace_v2::PathDirectoryEntries;
+        use slug_workspace_v2::PathDirectoryEntry;
+        use slug_workspace_v2::PathDirectoryEntryKind;
         use slug_workspace_v2::PathDirectoryName;
         use slug_workspace_v2::PathIoErrorKind;
         use slug_workspace_v2::PathObservationError;
@@ -5135,23 +5137,32 @@ mod tests {
         ));
 
         let entries_demand = validation_demand(PathObservationOperation::DirectoryEntries);
+        let entry =
+            |name, kind| PathDirectoryEntry::new(PathDirectoryName::new(name).unwrap(), kind);
         let entries = PathDirectoryEntries::new([
-            PathDirectoryName::new("a").unwrap(),
-            PathDirectoryName::new("b").unwrap(),
-        ])
-        .unwrap();
+            entry("a", PathDirectoryEntryKind::File),
+            entry("b", PathDirectoryEntryKind::Directory),
+        ]);
         let entries_result =
             PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries.clone()));
         assert!(!validation_is_dirty(
             &[(entries_demand.clone(), entries_result.clone())],
             &[],
-            |_, _| entries_result.clone()
+            |_, _| PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+                PathDirectoryEntries::new([
+                    entry("b", PathDirectoryEntryKind::Directory),
+                    entry("a", PathDirectoryEntryKind::File),
+                ])
+            ))
         ));
         assert!(validation_is_dirty(
-            &[(entries_demand, entries_result)],
+            &[(entries_demand.clone(), entries_result.clone())],
             &[],
             |_, _| PathObservationResult::DirectoryEntries(PathOperationResult::Present(
-                PathDirectoryEntries::new([PathDirectoryName::new("a").unwrap()]).unwrap()
+                PathDirectoryEntries::new([
+                    entry("a", PathDirectoryEntryKind::Directory),
+                    entry("b", PathDirectoryEntryKind::Directory),
+                ])
             ))
         ));
 

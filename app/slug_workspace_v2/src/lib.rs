@@ -24,12 +24,13 @@ use starlark_map::sorted_map::SortedMap;
 mod path_observation;
 mod path_resolution;
 
-pub use path_observation::DuplicatePathDirectoryName;
 pub use path_observation::EmptyPathObservationNeed;
 pub use path_observation::InvalidPathDirectoryName;
 pub use path_observation::NeedPathObservations;
 pub use path_observation::NormalizedAbsolutePath;
 pub use path_observation::PathDirectoryEntries;
+pub use path_observation::PathDirectoryEntry;
+pub use path_observation::PathDirectoryEntryKind;
 pub use path_observation::PathDirectoryName;
 pub use path_observation::PathIoErrorKind;
 pub use path_observation::PathLstat;

@@ -563,51 +563,53 @@ impl fmt::Display for InvalidPathDirectoryName {
 
 impl std::error::Error for InvalidPathDirectoryName {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DuplicatePathDirectoryName {
-    name: OsString,
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe
+)]
+pub enum PathDirectoryEntryKind {
+    File,
+    Directory,
+    Symlink,
+    Unknown,
 }
 
-impl DuplicatePathDirectoryName {
-    pub fn name(&self) -> &OsStr {
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct PathDirectoryEntry {
+    name: PathDirectoryName,
+    kind: PathDirectoryEntryKind,
+}
+
+impl PathDirectoryEntry {
+    pub fn new(name: PathDirectoryName, kind: PathDirectoryEntryKind) -> Self {
+        Self { name, kind }
+    }
+
+    pub fn name(&self) -> &PathDirectoryName {
         &self.name
     }
-}
 
-impl fmt::Display for DuplicatePathDirectoryName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "duplicate directory observation name: {:?}", self.name)
+    pub const fn kind(&self) -> PathDirectoryEntryKind {
+        self.kind
     }
 }
 
-impl std::error::Error for DuplicatePathDirectoryName {}
-
-/// Sorted, unique raw OS-native direct directory entry names.
+/// Raw OS-native direct directory entries, stably sorted by name only.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct PathDirectoryEntries {
-    names: Arc<[PathDirectoryName]>,
+    entries: Arc<[PathDirectoryEntry]>,
 }
 
 impl PathDirectoryEntries {
-    pub fn new(
-        names: impl IntoIterator<Item = PathDirectoryName>,
-    ) -> Result<Self, DuplicatePathDirectoryName> {
-        let mut names = names.into_iter().collect::<Vec<_>>();
-        names.sort_unstable();
-        if let Some(duplicate) = names
-            .windows(2)
-            .find(|pair| pair[0] == pair[1])
-            .map(|pair| pair[0].name.clone())
-        {
-            return Err(DuplicatePathDirectoryName { name: duplicate });
+    pub fn new(entries: impl IntoIterator<Item = PathDirectoryEntry>) -> Self {
+        let mut entries = entries.into_iter().collect::<Vec<_>>();
+        entries.sort_by(|left, right| left.name.cmp(&right.name));
+        Self {
+            entries: entries.into(),
         }
-        Ok(Self {
-            names: names.into(),
-        })
     }
 
-    pub fn names(&self) -> &[PathDirectoryName] {
-        &self.names
+    pub fn entries(&self) -> &[PathDirectoryEntry] {
+        &self.entries
     }
 }
 
@@ -798,8 +800,11 @@ impl Key for PathObservationKey {
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
+    #[cfg(unix)]
     use std::ffi::OsString;
     use std::path::Path;
+    #[cfg(unix)]
     use std::path::PathBuf;
     use std::sync::Arc;
 
@@ -813,6 +818,8 @@ mod tests {
     use super::NeedPathObservations;
     use super::NormalizedAbsolutePath;
     use super::PathDirectoryEntries;
+    use super::PathDirectoryEntry;
+    use super::PathDirectoryEntryKind;
     use super::PathDirectoryName;
     use super::PathIoErrorKind;
     use super::PathLstat;
@@ -903,11 +910,15 @@ mod tests {
         assert_eq!(actual.as_os_str().as_encoded_bytes(), &[b'.', b'/', 0xfe]);
 
         let name = PathDirectoryName::new(OsString::from_vec(vec![b'n', 0xfd])).unwrap();
-        let entries = PathDirectoryEntries::new([name]).unwrap();
+        let entries = PathDirectoryEntries::new([PathDirectoryEntry::new(
+            name,
+            PathDirectoryEntryKind::Unknown,
+        )]);
         assert_eq!(
-            entries.names()[0].as_os_str().as_encoded_bytes(),
+            entries.entries()[0].name().as_os_str().as_encoded_bytes(),
             &[b'n', 0xfd]
         );
+        assert_eq!(entries.entries()[0].kind(), PathDirectoryEntryKind::Unknown);
     }
 
     #[test]
@@ -1032,18 +1043,44 @@ mod tests {
     }
 
     #[test]
-    fn path_observation_directory_entries_sort_and_reject_duplicates() {
-        let a = PathDirectoryName::new("a").unwrap();
-        let b = PathDirectoryName::new("b").unwrap();
-        let entries = PathDirectoryEntries::new([b, a]).unwrap();
-        assert_eq!(entries.names()[0].as_os_str(), OsString::from("a"));
-        assert_eq!(entries.names()[1].as_os_str(), OsString::from("b"));
-        assert!(
+    fn path_observation_directory_entries_are_typed_stable_and_semantic() {
+        let entry =
+            |name, kind| PathDirectoryEntry::new(PathDirectoryName::new(name).unwrap(), kind);
+        let entries = PathDirectoryEntries::new([
+            entry("same", PathDirectoryEntryKind::Directory),
+            entry("z", PathDirectoryEntryKind::Unknown),
+            entry("same", PathDirectoryEntryKind::File),
+            entry("a", PathDirectoryEntryKind::Symlink),
+        ]);
+        assert_eq!(
+            entries
+                .entries()
+                .iter()
+                .map(|entry| (entry.name().as_os_str(), entry.kind()))
+                .collect::<Vec<_>>(),
+            [
+                (OsStr::new("a"), PathDirectoryEntryKind::Symlink),
+                (OsStr::new("same"), PathDirectoryEntryKind::Directory),
+                (OsStr::new("same"), PathDirectoryEntryKind::File),
+                (OsStr::new("z"), PathDirectoryEntryKind::Unknown),
+            ]
+        );
+        assert_eq!(
+            entries,
             PathDirectoryEntries::new([
-                PathDirectoryName::new("same").unwrap(),
-                PathDirectoryName::new("same").unwrap(),
+                entry("z", PathDirectoryEntryKind::Unknown),
+                entry("same", PathDirectoryEntryKind::Directory),
+                entry("a", PathDirectoryEntryKind::Symlink),
+                entry("same", PathDirectoryEntryKind::File),
             ])
-            .is_err()
+        );
+        assert_ne!(
+            PathDirectoryEntries::new([entry("same", PathDirectoryEntryKind::File)]),
+            PathDirectoryEntries::new([entry("same", PathDirectoryEntryKind::Directory)])
+        );
+        assert_ne!(
+            PathDirectoryEntries::new([entry("same", PathDirectoryEntryKind::Unknown)]),
+            PathDirectoryEntries::new([entry("same", PathDirectoryEntryKind::File)])
         );
         assert!(PathDirectoryName::new("../bad").is_err());
     }
@@ -1220,6 +1257,72 @@ mod tests {
                     ) if bytes.as_ref() == b"changed"
                 )
         ));
+    }
+
+    #[tokio::test]
+    async fn directory_kind_transitions_are_complete_semantic_state() {
+        let demand = demand(
+            PathObservationNamespace::Host,
+            "/workspace/directory",
+            PathObservationOperation::DirectoryEntries,
+        );
+        let value = |kind| {
+            PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+                PathDirectoryEntries::new([PathDirectoryEntry::new(
+                    PathDirectoryName::new("same").unwrap(),
+                    kind,
+                )]),
+            ))
+        };
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let needed = transaction
+            .compute(&PathObservationKey::new(demand.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(needed, PathOutcome::Need(_)));
+        assert!(!PathObservationKey::validity(&needed));
+        assert!(!PathObservationKey::equality(&needed, &needed));
+
+        for kind in [
+            PathDirectoryEntryKind::File,
+            PathDirectoryEntryKind::Directory,
+            PathDirectoryEntryKind::Unknown,
+            PathDirectoryEntryKind::File,
+        ] {
+            let mut updater = transaction.into_updater();
+            updater
+                .changed_to(vec![(
+                    PathObservationEpochKey,
+                    PathObservationEpoch::new([(demand.dupe(), value(kind))]).unwrap(),
+                )])
+                .unwrap();
+            transaction = updater.commit().await;
+            let observed = transaction
+                .compute(&PathObservationKey::new(demand.dupe()))
+                .await
+                .unwrap();
+            assert!(matches!(
+                observed,
+                PathOutcome::Complete(result)
+                    if matches!(
+                        result.as_ref(),
+                        PathObservationResult::DirectoryEntries(
+                            PathOperationResult::Present(entries)
+                        ) if entries.entries()[0].kind() == kind
+                    )
+            ));
+        }
+        let first = PathOutcome::Complete(Arc::new(value(PathDirectoryEntryKind::File)));
+        let restored = PathOutcome::Complete(Arc::new(value(PathDirectoryEntryKind::File)));
+        assert!(PathObservationKey::equality(&first, &restored));
     }
 
     #[tokio::test]

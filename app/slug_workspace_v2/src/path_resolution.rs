@@ -1320,6 +1320,8 @@ mod tests {
     use crate::NeedPathObservations;
     use crate::NormalizedAbsolutePath;
     use crate::PathDirectoryEntries;
+    use crate::PathDirectoryEntry;
+    use crate::PathDirectoryEntryKind;
     use crate::PathDirectoryName;
     use crate::PathIoErrorKind;
     use crate::PathLstat;
@@ -1642,14 +1644,11 @@ mod tests {
     fn directory_entries(
         namespace: PathObservationNamespace,
         value: &str,
-        names: &[&str],
+        entries: &[(&str, PathDirectoryEntryKind)],
     ) -> ScriptEntry {
-        let entries = PathDirectoryEntries::new(
-            names
-                .iter()
-                .map(|name| PathDirectoryName::new(*name).unwrap()),
-        )
-        .unwrap();
+        let entries = PathDirectoryEntries::new(entries.iter().map(|(name, kind)| {
+            PathDirectoryEntry::new(PathDirectoryName::new(*name).unwrap(), *kind)
+        }));
         directory_entries_result(namespace, value, PathOperationResult::Present(entries))
     }
 
@@ -3066,8 +3065,10 @@ mod tests {
             }
         );
 
-        let entries =
-            PathDirectoryEntries::new([PathDirectoryName::new("child").unwrap()]).unwrap();
+        let entries = PathDirectoryEntries::new([PathDirectoryEntry::new(
+            PathDirectoryName::new("child").unwrap(),
+            PathDirectoryEntryKind::File,
+        )]);
         let present = PathOutcome::Complete(Ok::<_, PathDirectoryListingError>(
             PathDirectoryListing::Present(entries),
         ));
@@ -3259,17 +3260,29 @@ mod tests {
     async fn path_directory_listing_cumulative_projection_is_total_and_exact() {
         let ns = PathObservationNamespace::Host;
         let present_entries = PathDirectoryEntries::new([
-            PathDirectoryName::new("z").unwrap(),
-            PathDirectoryName::new("a").unwrap(),
-        ])
-        .unwrap();
+            PathDirectoryEntry::new(
+                PathDirectoryName::new("z").unwrap(),
+                PathDirectoryEntryKind::Directory,
+            ),
+            PathDirectoryEntry::new(
+                PathDirectoryName::new("a").unwrap(),
+                PathDirectoryEntryKind::File,
+            ),
+        ]);
         let present_listing = resolve_directory_script(
             ns,
             "/directory",
             &[
                 present(ns, "/", PathNodeKind::Directory),
                 present(ns, "/directory", PathNodeKind::Directory),
-                directory_entries(ns, "/directory", &["z", "a"]),
+                directory_entries(
+                    ns,
+                    "/directory",
+                    &[
+                        ("z", PathDirectoryEntryKind::Directory),
+                        ("a", PathDirectoryEntryKind::File),
+                    ],
+                ),
             ],
         )
         .await
@@ -3343,7 +3356,7 @@ mod tests {
                 present(ns, "/link", PathNodeKind::Symlink),
                 read_link(ns, "/link", "/target"),
                 present(ns, "/target", PathNodeKind::Directory),
-                directory_entries(ns, "/target", &["child"]),
+                directory_entries(ns, "/target", &[("child", PathDirectoryEntryKind::Symlink)]),
             ],
         )
         .await

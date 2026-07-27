@@ -17,6 +17,10 @@ use std::sync::Arc;
 use allocative::Allocative;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathDirectoryEntries;
+use slug_workspace_v2::PathDirectoryEntry;
+use slug_workspace_v2::PathDirectoryEntryKind;
+#[cfg(unix)]
+use slug_workspace_v2::PathDirectoryName;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
@@ -407,7 +411,7 @@ fn unix_lstat(path: &NormalizedAbsolutePath) -> PathOperationResult<PathLstat> {
 
 #[cfg(unix)]
 enum UnixDirectoryRead {
-    Name(Vec<u8>),
+    Entry { name: Vec<u8>, native_type: u8 },
     Null(i32),
 }
 
@@ -492,7 +496,10 @@ impl UnixDirectoryApi for LibcUnixDirectoryApi {
                     .to_bytes()
                     .to_vec()
             };
-            UnixDirectoryRead::Name(name)
+            // SAFETY: `entry` is live until the next `readdir` call, and the
+            // scalar type is copied together with the name.
+            let native_type = unsafe { (*entry).d_type };
+            UnixDirectoryRead::Entry { name, native_type }
         }
     }
 
@@ -513,6 +520,97 @@ fn unix_directory_entries_with<A: UnixDirectoryApi>(
     path: &NormalizedAbsolutePath,
     api: &mut A,
 ) -> Result<PathDirectoryEntries, PrimaryFailure> {
+    unix_directory_entries_with_classifier(path, api, &mut NativeUnixDirectoryClassifier)
+}
+
+#[cfg(unix)]
+trait UnixDirectoryClassifier {
+    fn lstat_unknown(
+        &mut self,
+        parent: &NormalizedAbsolutePath,
+        name: &PathDirectoryName,
+    ) -> UnixChildStatus;
+}
+
+#[cfg(unix)]
+struct NativeUnixDirectoryClassifier;
+
+#[cfg(unix)]
+impl UnixDirectoryClassifier for NativeUnixDirectoryClassifier {
+    fn lstat_unknown(
+        &mut self,
+        parent: &NormalizedAbsolutePath,
+        name: &PathDirectoryName,
+    ) -> UnixChildStatus {
+        let child = parent.as_path().join(name.as_os_str());
+        match retry_interrupted(|| std::fs::symlink_metadata(&child)) {
+            Ok(metadata) => {
+                let file_type = metadata.file_type();
+                UnixChildStatus::Present(if file_type.is_symlink() {
+                    PathDirectoryEntryKind::Symlink
+                } else if file_type.is_dir() {
+                    PathDirectoryEntryKind::Directory
+                } else if file_type.is_file() {
+                    PathDirectoryEntryKind::File
+                } else {
+                    PathDirectoryEntryKind::Unknown
+                })
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => UnixChildStatus::Missing,
+            Err(error) if error.kind() == std::io::ErrorKind::NotADirectory => {
+                UnixChildStatus::NotDirectory
+            }
+            Err(error) if error.raw_os_error() == Some(nix::libc::ELOOP) => UnixChildStatus::Loop,
+            Err(error) => UnixChildStatus::Error(path_io_error(&error)),
+        }
+    }
+}
+
+#[cfg(unix)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnixChildStatus {
+    Present(PathDirectoryEntryKind),
+    Missing,
+    NotDirectory,
+    Loop,
+    Error(PathObservationError),
+}
+
+#[cfg(unix)]
+fn unix_unknown_kind(status: UnixChildStatus) -> Result<PathDirectoryEntryKind, PrimaryFailure> {
+    match status {
+        UnixChildStatus::Present(kind) => Ok(kind),
+        UnixChildStatus::Missing | UnixChildStatus::NotDirectory | UnixChildStatus::Loop => {
+            Ok(PathDirectoryEntryKind::Unknown)
+        }
+        UnixChildStatus::Error(error) => Err(PrimaryFailure::Final(error)),
+    }
+}
+
+#[cfg(unix)]
+fn unix_native_directory_kind(native_type: u8) -> Option<PathDirectoryEntryKind> {
+    match native_type {
+        value if value == nix::libc::DT_REG => Some(PathDirectoryEntryKind::File),
+        value if value == nix::libc::DT_DIR => Some(PathDirectoryEntryKind::Directory),
+        value if value == nix::libc::DT_LNK => Some(PathDirectoryEntryKind::Symlink),
+        value
+            if matches!(
+                value,
+                nix::libc::DT_CHR | nix::libc::DT_BLK | nix::libc::DT_FIFO | nix::libc::DT_SOCK
+            ) =>
+        {
+            Some(PathDirectoryEntryKind::Unknown)
+        }
+        _ => None,
+    }
+}
+
+#[cfg(unix)]
+fn unix_directory_entries_with_classifier<A: UnixDirectoryApi>(
+    path: &NormalizedAbsolutePath,
+    api: &mut A,
+    classifier: &mut impl UnixDirectoryClassifier,
+) -> Result<PathDirectoryEntries, PrimaryFailure> {
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::ffi::OsStringExt;
 
@@ -532,11 +630,11 @@ fn unix_directory_entries_with<A: UnixDirectoryApi>(
     };
 
     let mut owner = UnixDirectoryOwner::new(handle, api);
-    let mut names = Vec::new();
+    let mut entries = Vec::new();
     loop {
         owner.clear_errno();
         match owner.read_once() {
-            UnixDirectoryRead::Name(name) => {
+            UnixDirectoryRead::Entry { name, native_type } => {
                 if name == b"." || name == b".." {
                     continue;
                 }
@@ -548,20 +646,14 @@ fn unix_directory_entries_with<A: UnixDirectoryApi>(
                         return Err(invalid_directory_data());
                     }
                 };
-                names.push(name);
+                entries.push((name, native_type));
             }
             UnixDirectoryRead::Null(0) => {
-                let entries = match PathDirectoryEntries::new(names) {
-                    Ok(entries) => entries,
-                    Err(_) => {
-                        let _ = owner.close();
-                        return Err(invalid_directory_data());
-                    }
-                };
-                return match owner.close() {
-                    Ok(()) | Err(nix::libc::EINTR) => Ok(entries),
-                    Err(raw) => Err(classify_directory_error(raw)),
-                };
+                match owner.close() {
+                    Ok(()) | Err(nix::libc::EINTR) => {}
+                    Err(raw) => return Err(classify_directory_error(raw)),
+                }
+                break;
             }
             UnixDirectoryRead::Null(raw) if raw == nix::libc::EINTR || raw == nix::libc::EIO => {
                 continue;
@@ -573,6 +665,18 @@ fn unix_directory_entries_with<A: UnixDirectoryApi>(
             }
         }
     }
+
+    let entries = entries
+        .into_iter()
+        .map(|(name, native_type)| {
+            let kind = match unix_native_directory_kind(native_type) {
+                Some(kind) => kind,
+                None => unix_unknown_kind(classifier.lstat_unknown(path, &name))?,
+            };
+            Ok(PathDirectoryEntry::new(name, kind))
+        })
+        .collect::<Result<Vec<_>, PrimaryFailure>>()?;
+    Ok(PathDirectoryEntries::new(entries))
 }
 
 #[cfg(unix)]
@@ -1204,6 +1308,44 @@ mod windows_pure {
         fn close(&mut self, handle: Self::Handle) -> Result<(), u32>;
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub(super) enum WindowsChildStatus {
+        File,
+        Directory,
+        Symlink,
+        Special,
+        Null,
+        Error,
+    }
+
+    pub(super) trait WindowsDirectoryClassifier {
+        fn classify(&mut self, name: &[u16]) -> WindowsChildStatus;
+    }
+
+    pub(super) fn child_kind(status: WindowsChildStatus) -> PathDirectoryEntryKind {
+        match status {
+            WindowsChildStatus::File => PathDirectoryEntryKind::File,
+            WindowsChildStatus::Directory => PathDirectoryEntryKind::Directory,
+            WindowsChildStatus::Symlink => PathDirectoryEntryKind::Symlink,
+            WindowsChildStatus::Special | WindowsChildStatus::Null | WindowsChildStatus::Error => {
+                PathDirectoryEntryKind::Unknown
+            }
+        }
+    }
+
+    pub(super) fn classify_directory_names_with(
+        names: Vec<Vec<u16>>,
+        classifier: &mut impl WindowsDirectoryClassifier,
+    ) -> Vec<(Vec<u16>, PathDirectoryEntryKind)> {
+        names
+            .into_iter()
+            .map(|name| {
+                let kind = child_kind(classifier.classify(&name));
+                (name, kind)
+            })
+            .collect()
+    }
+
     struct FindOwner<'api, A: WindowsFindApi> {
         handle: Option<A::Handle>,
         api: &'api mut A,
@@ -1282,10 +1424,6 @@ mod windows_pure {
             record = None;
         }
         let _ = owner.close();
-        names.sort_unstable();
-        if names.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(invalid_data());
-        }
         Ok(names)
     }
 }
@@ -1564,6 +1702,29 @@ mod windows_native {
         }
     }
 
+    struct NativeWindowsDirectoryClassifier {
+        parent: PathBuf,
+    }
+
+    impl WindowsDirectoryClassifier for NativeWindowsDirectoryClassifier {
+        fn classify(&mut self, name: &[u16]) -> WindowsChildStatus {
+            let child = self.parent.join(OsString::from_wide(name));
+            let metadata = loop {
+                match std::fs::symlink_metadata(&child) {
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(_) => return WindowsChildStatus::Error,
+                    Ok(metadata) => break metadata,
+                }
+            };
+            match node_kind(metadata.file_attributes()) {
+                PathNodeKind::RegularFile => WindowsChildStatus::File,
+                PathNodeKind::Directory => WindowsChildStatus::Directory,
+                PathNodeKind::Symlink => WindowsChildStatus::Symlink,
+                PathNodeKind::SpecialFile => WindowsChildStatus::Special,
+            }
+        }
+    }
+
     pub(super) fn observe_windows(
         retained: &RetainedMaterializationRoots<'_>,
         demands: impl IntoIterator<Item = PathObservationDemand>,
@@ -1649,9 +1810,15 @@ mod windows_native {
             query.push(b'*' as u16);
             query.push(0);
             let raw_names = directory_names_with(&query, &mut KernelFindApi)?;
-            let names = raw_names
+            let mut classifier = NativeWindowsDirectoryClassifier {
+                parent: path.as_path().to_path_buf(),
+            };
+            let entries = classify_directory_names_with(raw_names, &mut classifier)
                 .into_iter()
-                .map(|name| PathDirectoryName::new(OsString::from_wide(&name)))
+                .map(|(name, kind)| {
+                    PathDirectoryName::new(OsString::from_wide(&name))
+                        .map(|name| PathDirectoryEntry::new(name, kind))
+                })
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|_| {
                     PrimaryFailure::Final(PathObservationError::Io {
@@ -1659,12 +1826,7 @@ mod windows_native {
                         raw_os_error: None,
                     })
                 })?;
-            PathDirectoryEntries::new(names).map_err(|_| {
-                PrimaryFailure::Final(PathObservationError::Io {
-                    kind: slug_workspace_v2::PathIoErrorKind::InvalidData,
-                    raw_os_error: None,
-                })
-            })
+            Ok(PathDirectoryEntries::new(entries))
         }
 
         fn windows_long_path(&mut self, input: &[u16]) -> Arc<[u16]> {
@@ -2490,7 +2652,7 @@ mod windows_tests {
     }
 
     #[test]
-    fn windows_find_uses_one_handle_skips_dots_finishes_then_sorts() {
+    fn windows_find_uses_one_handle_skips_dots_and_retains_raw_order() {
         let mut api = find_script(Ok((9, name(&[b'.' as u16]))));
         api.next = VecDeque::from([
             Ok(FindRead::Name(name(&[b'z' as u16]))),
@@ -2500,7 +2662,7 @@ mod windows_tests {
         ]);
         assert_eq!(
             directory_names_with(&[0], &mut api).unwrap(),
-            [vec![b'a' as u16], vec![b'z' as u16]]
+            [vec![b'z' as u16], vec![b'a' as u16]]
         );
         assert_eq!(
             api.calls,
@@ -2555,11 +2717,8 @@ mod windows_tests {
         duplicate.next =
             VecDeque::from([Ok(FindRead::Name(name(&[b'a' as u16]))), Ok(FindRead::End)]);
         assert_eq!(
-            directory_names_with(&[0], &mut duplicate),
-            Err(PrimaryFailure::Final(io(
-                PathIoErrorKind::InvalidData,
-                None
-            )))
+            directory_names_with(&[0], &mut duplicate).unwrap(),
+            [vec![b'a' as u16], vec![b'a' as u16]]
         );
         assert_eq!(
             duplicate.calls,
@@ -2584,6 +2743,54 @@ mod windows_tests {
         assert_eq!(
             api.calls,
             [FindCall::First, FindCall::Next(3), FindCall::Close(3)]
+        );
+    }
+
+    struct ScriptedWindowsClassifier {
+        statuses: VecDeque<WindowsChildStatus>,
+        names: Vec<Vec<u16>>,
+    }
+
+    impl WindowsDirectoryClassifier for ScriptedWindowsClassifier {
+        fn classify(&mut self, name: &[u16]) -> WindowsChildStatus {
+            self.names.push(name.to_vec());
+            self.statuses.pop_front().expect("scripted child status")
+        }
+    }
+
+    #[test]
+    fn windows_child_classification_preserves_order_raw_units_and_unknowns() {
+        let raw = vec![
+            vec![b'f' as u16],
+            vec![b'd' as u16],
+            vec![0xd800],
+            vec![b's' as u16],
+            vec![b'n' as u16],
+            vec![b'e' as u16],
+        ];
+        let mut classifier = ScriptedWindowsClassifier {
+            statuses: VecDeque::from([
+                WindowsChildStatus::File,
+                WindowsChildStatus::Directory,
+                WindowsChildStatus::Symlink,
+                WindowsChildStatus::Special,
+                WindowsChildStatus::Null,
+                WindowsChildStatus::Error,
+            ]),
+            names: Vec::new(),
+        };
+        let classified = classify_directory_names_with(raw.clone(), &mut classifier);
+        assert_eq!(classifier.names, raw);
+        assert_eq!(
+            classified.iter().map(|(_, kind)| *kind).collect::<Vec<_>>(),
+            [
+                PathDirectoryEntryKind::File,
+                PathDirectoryEntryKind::Directory,
+                PathDirectoryEntryKind::Symlink,
+                PathDirectoryEntryKind::Unknown,
+                PathDirectoryEntryKind::Unknown,
+                PathDirectoryEntryKind::Unknown,
+            ]
         );
     }
 }
@@ -2713,7 +2920,7 @@ mod tests {
     }
 
     fn empty_entries() -> PathDirectoryEntries {
-        PathDirectoryEntries::new([]).unwrap()
+        PathDirectoryEntries::new([])
     }
 
     fn roots<'a>(owner: &'a (), root: &NormalizedAbsolutePath) -> RetainedMaterializationRoots<'a> {
@@ -3390,27 +3597,32 @@ mod tests {
             path(temp.path(), "directory"),
             PathObservationOperation::DirectoryEntries,
         );
-        let entries =
-            PathDirectoryEntries::new([PathDirectoryName::new("entry").unwrap()]).unwrap();
+        let entries = PathDirectoryEntries::new([PathDirectoryEntry::new(
+            PathDirectoryName::new("entry").unwrap(),
+            PathDirectoryEntryKind::File,
+        )]);
         let mut operations = ScriptedOperations::supported();
         operations.directory_entries.push_back(Ok(entries));
         let epoch = observe_with(&retained, [demand.clone()], &mut operations).unwrap();
         assert!(matches!(
             epoch.get(&demand).unwrap().as_ref(),
             PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries))
-                if entries.names()[0].as_os_str() == "entry"
+                if entries.entries()[0].name().as_os_str() == "entry"
         ));
     }
 
     #[cfg(unix)]
     mod unix_tests {
+        use std::cell::Cell;
         use std::collections::VecDeque;
+        use std::ffi::OsStr;
         use std::ffi::OsString;
         use std::fs;
         use std::os::unix::ffi::OsStringExt;
         use std::os::unix::fs::MetadataExt;
         use std::os::unix::fs::symlink;
         use std::os::unix::net::UnixListener;
+        use std::rc::Rc;
 
         use super::*;
 
@@ -3427,6 +3639,7 @@ mod tests {
             reads: VecDeque<UnixDirectoryRead>,
             closes: VecDeque<Result<(), i32>>,
             events: Vec<DirectoryEvent>,
+            closed: Rc<Cell<bool>>,
         }
 
         impl ScriptedDirectoryApi {
@@ -3440,6 +3653,7 @@ mod tests {
                     reads: reads.into_iter().collect(),
                     closes: closes.into_iter().collect(),
                     events: Vec::new(),
+                    closed: Rc::new(Cell::new(false)),
                 }
             }
 
@@ -3448,6 +3662,10 @@ mod tests {
                     .iter()
                     .filter(|event| matches!(event, DirectoryEvent::Close(_)))
                     .count()
+            }
+
+            fn closed(&self) -> Rc<Cell<bool>> {
+                self.closed.clone()
             }
         }
 
@@ -3471,7 +3689,26 @@ mod tests {
 
             fn close_once(&mut self, handle: Self::Handle) -> Result<(), i32> {
                 self.events.push(DirectoryEvent::Close(handle));
+                self.closed.set(true);
                 self.closes.pop_front().expect("scripted close result")
+            }
+        }
+
+        struct ScriptedUnixClassifier {
+            closed: Rc<Cell<bool>>,
+            statuses: VecDeque<UnixChildStatus>,
+            names: Vec<OsString>,
+        }
+
+        impl UnixDirectoryClassifier for ScriptedUnixClassifier {
+            fn lstat_unknown(
+                &mut self,
+                _parent: &NormalizedAbsolutePath,
+                name: &PathDirectoryName,
+            ) -> UnixChildStatus {
+                assert!(self.closed.get(), "classification ran before close");
+                self.names.push(name.as_os_str().to_owned());
+                self.statuses.pop_front().expect("scripted classification")
             }
         }
 
@@ -3486,6 +3723,13 @@ mod tests {
                     raw_os_error
                 }
                 _ => None,
+            }
+        }
+
+        fn native_entry(name: impl Into<Vec<u8>>, native_type: u8) -> UnixDirectoryRead {
+            UnixDirectoryRead::Entry {
+                name: name.into(),
+                native_type,
             }
         }
 
@@ -3580,13 +3824,13 @@ mod tests {
             let mut api = ScriptedDirectoryApi::new(
                 [Ok(23)],
                 [
-                    UnixDirectoryRead::Name(b"z".to_vec()),
+                    native_entry(b"z".to_vec(), nix::libc::DT_REG),
                     UnixDirectoryRead::Null(nix::libc::EINTR),
-                    UnixDirectoryRead::Name(b".".to_vec()),
+                    native_entry(b".".to_vec(), nix::libc::DT_DIR),
                     UnixDirectoryRead::Null(nix::libc::EIO),
-                    UnixDirectoryRead::Name(vec![0xff]),
-                    UnixDirectoryRead::Name(b"..".to_vec()),
-                    UnixDirectoryRead::Name(b"a".to_vec()),
+                    native_entry(vec![0xff], nix::libc::DT_UNKNOWN),
+                    native_entry(b"..".to_vec(), nix::libc::DT_DIR),
+                    native_entry(b"a".to_vec(), nix::libc::DT_REG),
                     UnixDirectoryRead::Null(0),
                 ],
                 [Ok(())],
@@ -3594,11 +3838,20 @@ mod tests {
             let entries = unix_directory_entries_with(&observed, &mut api).unwrap();
             assert_eq!(
                 entries
-                    .names()
+                    .entries()
                     .iter()
-                    .map(|name| name.as_os_str().as_encoded_bytes().to_vec())
+                    .map(|entry| {
+                        (
+                            entry.name().as_os_str().as_encoded_bytes().to_vec(),
+                            entry.kind(),
+                        )
+                    })
                     .collect::<Vec<_>>(),
-                vec![b"a".to_vec(), b"z".to_vec(), vec![0xff]]
+                vec![
+                    (b"a".to_vec(), PathDirectoryEntryKind::File),
+                    (b"z".to_vec(), PathDirectoryEntryKind::File),
+                    (vec![0xff], PathDirectoryEntryKind::Unknown),
+                ]
             );
             assert_eq!(
                 api.events
@@ -3626,7 +3879,7 @@ mod tests {
             let mut api = ScriptedDirectoryApi::new(
                 [Ok(31)],
                 [
-                    UnixDirectoryRead::Name(b"partial".to_vec()),
+                    native_entry(b"partial".to_vec(), nix::libc::DT_REG),
                     UnixDirectoryRead::Null(nix::libc::EACCES),
                 ],
                 [Err(nix::libc::EIO)],
@@ -3639,7 +3892,7 @@ mod tests {
             let mut api = ScriptedDirectoryApi::new(
                 [Ok(32)],
                 [
-                    UnixDirectoryRead::Name(b"discarded".to_vec()),
+                    native_entry(b"discarded".to_vec(), nix::libc::DT_REG),
                     UnixDirectoryRead::Null(nix::libc::ENOENT),
                 ],
                 [Err(nix::libc::EIO)],
@@ -3683,27 +3936,22 @@ mod tests {
         }
 
         #[test]
-        fn invalid_duplicate_and_interior_nul_are_final_and_cleanup_once() {
+        fn invalid_name_and_interior_nul_are_final_and_cleanup_once() {
             let temp = tempfile::tempdir().unwrap();
             let observed = normalized(&temp, "directory");
-            for reads in [
-                vec![UnixDirectoryRead::Name(b"a/b".to_vec())],
-                vec![
-                    UnixDirectoryRead::Name(b"same".to_vec()),
-                    UnixDirectoryRead::Name(b"same".to_vec()),
-                    UnixDirectoryRead::Null(0),
-                ],
-            ] {
-                let mut api = ScriptedDirectoryApi::new([Ok(51)], reads, [Err(nix::libc::EIO)]);
-                assert!(matches!(
-                    unix_directory_entries_with(&observed, &mut api),
-                    Err(PrimaryFailure::Final(PathObservationError::Io {
-                        kind: PathIoErrorKind::InvalidData,
-                        ..
-                    }))
-                ));
-                assert_eq!(api.close_count(), 1);
-            }
+            let mut api = ScriptedDirectoryApi::new(
+                [Ok(51)],
+                [native_entry(b"a/b".to_vec(), nix::libc::DT_REG)],
+                [Err(nix::libc::EIO)],
+            );
+            assert!(matches!(
+                unix_directory_entries_with(&observed, &mut api),
+                Err(PrimaryFailure::Final(PathObservationError::Io {
+                    kind: PathIoErrorKind::InvalidData,
+                    ..
+                }))
+            ));
+            assert_eq!(api.close_count(), 1);
 
             let nul = NormalizedAbsolutePath::new(
                 temp.path().join(OsString::from_vec(b"nul\0name".to_vec())),
@@ -3718,6 +3966,174 @@ mod tests {
                 }))
             ));
             assert!(api.events.is_empty());
+        }
+
+        #[test]
+        fn native_types_and_unknown_refinement_are_exact_and_close_first() {
+            let temp = tempfile::tempdir().unwrap();
+            let observed = normalized(&temp, "directory");
+            let reads = [
+                native_entry(b"same".to_vec(), nix::libc::DT_DIR),
+                native_entry(b"same".to_vec(), nix::libc::DT_REG),
+                native_entry(b"link".to_vec(), nix::libc::DT_LNK),
+                native_entry(b"char".to_vec(), nix::libc::DT_CHR),
+                native_entry(b"block".to_vec(), nix::libc::DT_BLK),
+                native_entry(b"fifo".to_vec(), nix::libc::DT_FIFO),
+                native_entry(b"socket".to_vec(), nix::libc::DT_SOCK),
+                native_entry(b"unknown-file".to_vec(), nix::libc::DT_UNKNOWN),
+                native_entry(b"unknown-missing".to_vec(), 0xff),
+                UnixDirectoryRead::Null(0),
+            ];
+            let mut api = ScriptedDirectoryApi::new([Ok(61)], reads, [Ok(())]);
+            let mut classifier = ScriptedUnixClassifier {
+                closed: api.closed(),
+                statuses: VecDeque::from([
+                    UnixChildStatus::Present(PathDirectoryEntryKind::File),
+                    UnixChildStatus::Missing,
+                ]),
+                names: Vec::new(),
+            };
+            let entries =
+                unix_directory_entries_with_classifier(&observed, &mut api, &mut classifier)
+                    .unwrap();
+            assert_eq!(
+                classifier.names,
+                [
+                    OsString::from("unknown-file"),
+                    OsString::from("unknown-missing")
+                ]
+            );
+            assert_eq!(api.close_count(), 1);
+            assert_eq!(
+                entries
+                    .entries()
+                    .iter()
+                    .map(|entry| (entry.name().as_os_str(), entry.kind()))
+                    .collect::<Vec<_>>(),
+                [
+                    (OsStr::new("block"), PathDirectoryEntryKind::Unknown),
+                    (OsStr::new("char"), PathDirectoryEntryKind::Unknown),
+                    (OsStr::new("fifo"), PathDirectoryEntryKind::Unknown),
+                    (OsStr::new("link"), PathDirectoryEntryKind::Symlink),
+                    (OsStr::new("same"), PathDirectoryEntryKind::Directory),
+                    (OsStr::new("same"), PathDirectoryEntryKind::File),
+                    (OsStr::new("socket"), PathDirectoryEntryKind::Unknown),
+                    (OsStr::new("unknown-file"), PathDirectoryEntryKind::File),
+                    (
+                        OsStr::new("unknown-missing"),
+                        PathDirectoryEntryKind::Unknown
+                    ),
+                ]
+            );
+        }
+
+        #[test]
+        fn unknown_hard_error_terminalizes_after_close() {
+            let temp = tempfile::tempdir().unwrap();
+            let observed = normalized(&temp, "directory");
+            let mut api = ScriptedDirectoryApi::new(
+                [Ok(62)],
+                [
+                    native_entry(b"unknown".to_vec(), nix::libc::DT_UNKNOWN),
+                    UnixDirectoryRead::Null(0),
+                ],
+                [Ok(())],
+            );
+            let hard_error = io(PathIoErrorKind::PermissionDenied, Some(13));
+            let mut classifier = ScriptedUnixClassifier {
+                closed: api.closed(),
+                statuses: VecDeque::from([UnixChildStatus::Error(hard_error)]),
+                names: Vec::new(),
+            };
+            assert_eq!(
+                unix_directory_entries_with_classifier(&observed, &mut api, &mut classifier),
+                Err(PrimaryFailure::Final(hard_error))
+            );
+            assert_eq!(api.close_count(), 1);
+        }
+
+        #[test]
+        fn unknown_child_stat_mapping_is_exact() {
+            for (status, expected) in [
+                (
+                    UnixChildStatus::Present(PathDirectoryEntryKind::File),
+                    Ok(PathDirectoryEntryKind::File),
+                ),
+                (
+                    UnixChildStatus::Present(PathDirectoryEntryKind::Directory),
+                    Ok(PathDirectoryEntryKind::Directory),
+                ),
+                (
+                    UnixChildStatus::Present(PathDirectoryEntryKind::Symlink),
+                    Ok(PathDirectoryEntryKind::Symlink),
+                ),
+                (
+                    UnixChildStatus::Present(PathDirectoryEntryKind::Unknown),
+                    Ok(PathDirectoryEntryKind::Unknown),
+                ),
+                (
+                    UnixChildStatus::Missing,
+                    Ok(PathDirectoryEntryKind::Unknown),
+                ),
+                (
+                    UnixChildStatus::NotDirectory,
+                    Ok(PathDirectoryEntryKind::Unknown),
+                ),
+                (UnixChildStatus::Loop, Ok(PathDirectoryEntryKind::Unknown)),
+            ] {
+                assert_eq!(unix_unknown_kind(status), expected);
+            }
+            let error = io(PathIoErrorKind::PermissionDenied, Some(13));
+            assert_eq!(
+                unix_unknown_kind(UnixChildStatus::Error(error)),
+                Err(PrimaryFailure::Final(error))
+            );
+        }
+
+        #[test]
+        fn native_unknown_classifier_is_nofollow_and_tolerates_absence_shapes() {
+            let temp = tempfile::tempdir().unwrap();
+            let parent = normalized(&temp, "directory");
+            fs::create_dir(parent.as_path()).unwrap();
+            fs::write(parent.as_path().join("file"), b"").unwrap();
+            fs::create_dir(parent.as_path().join("dir")).unwrap();
+            symlink("file", parent.as_path().join("link")).unwrap();
+            let _socket = UnixListener::bind(parent.as_path().join("socket")).unwrap();
+            let mut classifier = NativeUnixDirectoryClassifier;
+            let status = |classifier: &mut NativeUnixDirectoryClassifier, name| {
+                classifier.lstat_unknown(&parent, &PathDirectoryName::new(name).unwrap())
+            };
+            assert_eq!(
+                [
+                    status(&mut classifier, "file"),
+                    status(&mut classifier, "dir"),
+                    status(&mut classifier, "link"),
+                    status(&mut classifier, "socket"),
+                    status(&mut classifier, "missing"),
+                ],
+                [
+                    UnixChildStatus::Present(PathDirectoryEntryKind::File),
+                    UnixChildStatus::Present(PathDirectoryEntryKind::Directory),
+                    UnixChildStatus::Present(PathDirectoryEntryKind::Symlink),
+                    UnixChildStatus::Present(PathDirectoryEntryKind::Unknown),
+                    UnixChildStatus::Missing,
+                ]
+            );
+            assert_eq!(
+                classifier.lstat_unknown(
+                    &NormalizedAbsolutePath::new(parent.as_path().join("file")).unwrap(),
+                    &PathDirectoryName::new("child").unwrap(),
+                ),
+                UnixChildStatus::NotDirectory
+            );
+            symlink("cycle", parent.as_path().join("cycle")).unwrap();
+            assert_eq!(
+                classifier.lstat_unknown(
+                    &NormalizedAbsolutePath::new(parent.as_path().join("cycle")).unwrap(),
+                    &PathDirectoryName::new("child").unwrap(),
+                ),
+                UnixChildStatus::Loop
+            );
         }
 
         #[test]
@@ -3869,8 +4285,13 @@ mod tests {
             assert!(matches!(
                 directory_epoch.get(&directory_demand).unwrap().as_ref(),
                 PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries))
-                    if entries.names().iter().map(|name| name.as_os_str()).collect::<Vec<_>>()
-                        == vec!["a", "z"]
+                    if entries.entries().iter().map(|entry| {
+                        (entry.name().as_os_str(), entry.kind())
+                    }).collect::<Vec<_>>()
+                        == vec![
+                            (OsStr::new("a"), PathDirectoryEntryKind::File),
+                            (OsStr::new("z"), PathDirectoryEntryKind::File),
+                        ]
             ));
             assert!(matches!(
                 observe_unix(&retained, [link_demand.clone()]).unwrap().get(&link_demand).unwrap().as_ref(),
@@ -3899,8 +4320,13 @@ mod tests {
                     .unwrap()
                     .as_ref(),
                 PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries))
-                    if entries.names().iter().map(|name| name.as_os_str()).collect::<Vec<_>>()
-                        == vec!["b", "z"]
+                    if entries.entries().iter().map(|entry| {
+                        (entry.name().as_os_str(), entry.kind())
+                    }).collect::<Vec<_>>()
+                        == vec![
+                            (OsStr::new("b"), PathDirectoryEntryKind::File),
+                            (OsStr::new("z"), PathDirectoryEntryKind::File),
+                        ]
             ));
 
             fs::remove_file(file.as_path()).unwrap();
@@ -3948,8 +4374,10 @@ mod tests {
             assert!(matches!(
                 recreated.get(&directory_demand).unwrap().as_ref(),
                 PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries))
-                    if entries.names().iter().map(|name| name.as_os_str()).collect::<Vec<_>>()
-                        == vec!["recreated"]
+                    if entries.entries().iter().map(|entry| {
+                        (entry.name().as_os_str(), entry.kind())
+                    }).collect::<Vec<_>>()
+                        == vec![(OsStr::new("recreated"), PathDirectoryEntryKind::File)]
             ));
             assert!(matches!(
                 recreated.get(&link_demand).unwrap().as_ref(),
@@ -4033,7 +4461,10 @@ mod tests {
             assert!(matches!(
                 directory_epoch.get(&directory).unwrap().as_ref(),
                 PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries))
-                    if entries.names().iter().any(|name| name.as_os_str().as_encoded_bytes() == [b'n', 0xff])
+                    if entries.entries().iter().any(|entry| {
+                        entry.name().as_os_str().as_encoded_bytes() == [b'n', 0xff]
+                            && entry.kind() == PathDirectoryEntryKind::File
+                    })
             ));
 
             let wrong_link = demand(
