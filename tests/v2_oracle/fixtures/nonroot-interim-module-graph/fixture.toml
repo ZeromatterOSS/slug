@@ -1,9 +1,9 @@
 [fixture]
 name = "nonroot-interim-module-graph"
-description = "Bazel 9.2 registry nonroot InterimModule graph semantics."
+description = "Bazel 9.2 registry nonroot InterimModule graph semantics and local directory transport."
 comparison = "message_shape"
 daemon = true
-oracle_notes = "A retained local registry isolates nonroot graph semantics. subject's nodep shared@2 request upgrades root-introduced shared@1 without becoming a subject edge; the subject's dev dependency and single_version_override are ignored. Nonzero compatibility_level and max_compatibility_level are Bazel 9 no-op source inputs only."
+oracle_notes = "A retained local registry isolates nonroot graph semantics. subject's nodep shared@2 request upgrades root-introduced shared@1 without becoming a subject edge; the subject's dev dependency and single_version_override are ignored. Nonzero compatibility_level and max_compatibility_level are Bazel 9 no-op source inputs only. Five appended semantic rows select the previously ignored devonly module and move its local-registry MODULE.bazel through ordinary, directory-listing, mutable-metadata fail-open, absent, and exact restoration states while comparing the visible lockfile."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -14,8 +14,14 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleThreadContext.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/InterimModule.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleBase.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/YankedVersionsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RepoSpecFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelModuleResolutionFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ArchiveRepoSpecBuilder.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileModule.java",
 ]
-translation_notes = "Bazel 9.2 ModuleFileGlobals stores compatibility_level as 0 and max_compatibility_level as -1; this fixture does not infer those internal values from command output. Nonroot execution ignores dev dependencies and module overrides."
+translation_notes = "Bazel 9.2 ModuleFileGlobals stores compatibility_level as 0 and max_compatibility_level as -1; this fixture does not infer those internal values from command output. Nonroot execution ignores dev dependencies and module overrides. The observed Azul OpenJDK 25.0.2 file URL handler sorts a directory's direct names and transports their newline-terminated listing. IndexRegistry checksums MODULE.bazel bytes for remote_module_file_integrity but fetches mutable metadata.json without a checksum; YankedVersionsFunction warns and fails open on metadata parse failure. BazelLockFileModule filters file: registry hashes from the visible lockfile, permitting exact distinct-root replay."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-interim-module-graph --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture nonroot-interim-module-graph --tool bazel --bazel /usr/bin/bazel"
 
@@ -89,3 +95,113 @@ stderr_patterns = ["(?s)\\A(?!.*dep@2\\.0\\.0).*bazel_tools.*built-in dependency
   path = "MODULE.bazel"
   find = "version = \"0.1.2\""
   replace = "version = \"0.1.3\""
+
+[[commands]]
+name = "regular_local_registry_file_baseline"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\""]
+stdout_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL).*"]
+stderr_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL)(?!.*Could not read metadata file).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "bazel_dep(name = \"subject\", version = \"1.0.0\")\nbazel_dep(name = \"shared\", version = \"1.0.0\")"
+  replace = "bazel_dep(name = \"devonly\", version = \"1.0.0\")"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.3\""
+  replace = "version = \"0.1.4\""
+
+[[commands]]
+name = "directory_module_listing_bytes_and_checksum"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\""]
+stdout_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL).*"]
+stderr_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL)(?!.*Could not read metadata file)(?!.*Is a directory).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.bazel"
+  destination = "registry/modules/devonly/1.0.0/MODULE.regular"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.directory-link"
+  destination = "registry/modules/devonly/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.4\""
+  replace = "version = \"0.1.5\""
+
+[[commands]]
+name = "mutable_metadata_directory_lists_then_fails_open"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=refresh", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["## @@devonly+:", "http_archive(", "remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\""]
+stdout_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL).*"]
+stderr_contains = ["Could not read metadata file for module devonly from registry", "registry/modules/devonly/metadata.json", "Expected BEGIN_OBJECT but was STRING at line 1 column 1 path $"]
+stderr_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL)(?!.*Is a directory)(?!.*Yanked version detected).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/metadata.directory-link"
+  destination = "registry/modules/devonly/metadata.json"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.5\""
+  replace = "version = \"0.1.6\""
+
+[[commands]]
+name = "parked_directory_links_are_absent"
+argv = ["mod", "graph", "--lockfile_mode=off", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+expected_exit = 37
+stderr_contains = ["module devonly@1.0.0 not found in registries:", "registry/modules/devonly/1.0.0/MODULE.bazel: not found"]
+stderr_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL)(?!.*declares a different name)(?!.*Could not read metadata file)(?!.*Is a directory).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.bazel"
+  destination = "registry/modules/devonly/1.0.0/MODULE.directory-link"
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/metadata.json"
+  destination = "registry/modules/devonly/metadata.directory-link"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.6\""
+  replace = "version = \"0.1.7\""
+
+[[commands]]
+name = "regular_local_registry_file_restores_exactly"
+argv = ["mod", "show_repo", "@@devonly+", "--lockfile_mode=update", "--registry=file://%workspace%/registry"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\""]
+stdout_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL).*"]
+stderr_patterns = ["(?s)\\A(?!.*DIRECTORY_LISTING_SENTINEL)(?!.*Could not read metadata file).*"]
+manifest_roots = ["MODULE.bazel.lock"]
+
+  [[commands.mutations]]
+  op = "rename"
+  path = "registry/modules/devonly/1.0.0/MODULE.regular"
+  destination = "registry/modules/devonly/1.0.0/MODULE.bazel"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "version = \"0.1.7\""
+  replace = "version = \"0.1.4\""

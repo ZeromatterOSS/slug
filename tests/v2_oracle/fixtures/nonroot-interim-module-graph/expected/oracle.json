@@ -22,9 +22,9 @@
       "manifest": [],
       "mutations": [],
       "name": "nonroot_graph_keeps_ordinary_edge_suppresses_dev_and_nodep_edge",
-      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off",
       "normalized_stdout": "<root> (nonroot_interim_module_graph@0.1.0)\n\u251c\u2500\u2500\u2500shared@2.0.0 \n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0",
-      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260724-021344-1653709-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260724-021408-1654566-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 5c50e09a-d7ce-45e4-a327-bb083288347d\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\n",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 1b1661d0-6491-42e1-8e62-6bf231c2c5a6\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\n",
       "stdout": "<root> (nonroot_interim_module_graph@0.1.0)\n\u251c\u2500\u2500\u2500shared@2.0.0 \n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0 \n\n"
     },
     {
@@ -53,7 +53,7 @@
       "name": "nodep_upgrades_root_shared_but_is_not_subject_dependency",
       "normalized_stderr": "INFO: Invocation ID: <uuid>",
       "normalized_stdout": "<root> (nonroot_interim_module_graph@0.1.0)\n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0",
-      "stderr": "INFO: Invocation ID: eb3c21e7-b8bb-440b-9181-8f0f5f3862a5\n",
+      "stderr": "INFO: Invocation ID: d01ae7a4-b62e-49e4-95be-34759b03d4bd\n",
       "stdout": "<root> (nonroot_interim_module_graph@0.1.0)\n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0 \n\n"
     },
     {
@@ -84,7 +84,7 @@
       "name": "subject_apparent_dependency_alias_maps_to_canonical_repo",
       "normalized_stderr": "INFO: Invocation ID: <uuid>",
       "normalized_stdout": "{\"subject_self\":\"subject+\",\"dep_alias\":\"dep+\",\"bazel_tools\":\"bazel_tools\"}",
-      "stderr": "INFO: Invocation ID: dcf016f7-c704-4e0e-8907-ed3cfeca6fa7\n",
+      "stderr": "INFO: Invocation ID: 52ed15e6-f184-4fa7-a717-5d8d0446d539\n",
       "stdout": "{\"subject_self\":\"subject+\",\"dep_alias\":\"dep+\",\"bazel_tools\":\"bazel_tools\"}\n"
     },
     {
@@ -124,7 +124,7 @@
       "name": "incompatible_nonroot_bazel_compatibility_fails_after_root_invalidation",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\nERROR: Bazel version 9.2.0 is not compatible with module \"subject@1.0.0\" (bazel_compatibility: [<=9.1.0])\nERROR: Bazel compatibility check failed",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 6f24f646-f351-4a72-9c00-8293e6014f0b\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\nERROR: Bazel version 9.2.0 is not compatible with module \"subject@1.0.0\" (bazel_compatibility: [<=9.1.0])\nERROR: Bazel compatibility check failed\n",
+      "stderr": "INFO: Invocation ID: f93f53ca-b094-4939-9e6c-a5cde86696e9\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\nERROR: Bazel version 9.2.0 is not compatible with module \"subject@1.0.0\" (bazel_compatibility: [<=9.1.0])\nERROR: Bazel compatibility check failed\n",
       "stdout": ""
     },
     {
@@ -164,7 +164,7 @@
       "name": "compatible_nonroot_bazel_compatibility_recovers_after_root_invalidation",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off",
       "normalized_stdout": "<root> (nonroot_interim_module_graph@0.1.2)\n\u251c\u2500\u2500\u2500shared@2.0.0 \n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0",
-      "stderr": "INFO: Invocation ID: c5431e27-24e9-4197-a1e0-233592c1a869\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\n",
+      "stderr": "INFO: Invocation ID: aa9837bb-8177-434e-bf56-24c97515c37a\n no actions running\nWARNING: For repository 'shared', the root module requires module version shared@1.0.0, but got shared@2.0.0 in the resolved dependency graph. Please update the version in your MODULE.bazel or set --check_direct_dependencies=off\n",
       "stdout": "<root> (nonroot_interim_module_graph@0.1.2)\n\u251c\u2500\u2500\u2500shared@2.0.0 \n\u2514\u2500\u2500\u2500subject@1.0.0 \n    \u2514\u2500\u2500\u2500dep@1.0.0 \n\n"
     },
     {
@@ -204,8 +204,272 @@
       "name": "nonroot_builtin_apparent_name_collision_is_fatal",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: The repo name 'bazel_tools' cannot be defined as a built-in dependency at <builtin> as it is already defined by a bazel_dep at fil<workspace>/registry/modules/subject/1.0.0/MODULE.bazel:12:10, 'bazel_tools' is a built-in dependency and cannot be used by any 'bazel_dep' or 'use_repo' directive\nERROR: in module dependency chain <root> -> subject@1.0.0: error executing MODULE.bazel file for subject@1.0.0",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: e17ab62f-91db-4296-b6d5-3514e61f8230\n no actions running\nERROR: The repo name 'bazel_tools' cannot be defined as a built-in dependency at <builtin> as it is already defined by a bazel_dep at file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260724-021408-1654566-bazel/workspace/registry/modules/subject/1.0.0/MODULE.bazel:12:10, 'bazel_tools' is a built-in dependency and cannot be used by any 'bazel_dep' or 'use_repo' directive\nERROR: in module dependency chain <root> -> subject@1.0.0: error executing MODULE.bazel file for subject@1.0.0\n",
+      "stderr": "INFO: Invocation ID: 17006a5c-9e00-4320-89ab-630f6ca8b3af\n no actions running\nERROR: The repo name 'bazel_tools' cannot be defined as a built-in dependency at <builtin> as it is already defined by a bazel_dep at file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/subject/1.0.0/MODULE.bazel:12:10, 'bazel_tools' is a built-in dependency and cannot be used by any 'bazel_dep' or 'use_repo' directive\nERROR: in module dependency chain <root> -> subject@1.0.0: error executing MODULE.bazel file for subject@1.0.0\n",
       "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "bazel_dep(name = \"subject\", version = \"1.0.0\")\nbazel_dep(name = \"shared\", version = \"1.0.0\")",
+          "old_digest_hint": "158",
+          "path": "MODULE.bazel",
+          "replace": "bazel_dep(name = \"devonly\", version = \"1.0.0\")"
+        },
+        {
+          "find": "version = \"0.1.3\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.4\""
+        }
+      ],
+      "name": "regular_local_registry_file_baseline",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
+      "stderr": "INFO: Invocation ID: ce5bdb98-b5e9-4a05-a985-462427fbad78\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.regular",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.bazel"
+        },
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.bazel",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.directory-link"
+        },
+        {
+          "find": "version = \"0.1.4\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.5\""
+        }
+      ],
+      "name": "directory_module_listing_bytes_and_checksum",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)",
+      "stderr": "INFO: Invocation ID: c099646b-262a-4af9-af5e-23414fe8b8ec\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=refresh",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=refresh",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "destination": "registry/modules/devonly/metadata.json",
+          "op": "rename",
+          "path": "registry/modules/devonly/metadata.directory-link"
+        },
+        {
+          "find": "version = \"0.1.5\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.6\""
+        }
+      ],
+      "name": "mutable_metadata_directory_lists_then_fails_open",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nWARNING: Could not read metadata file for module devonly from registry fil<workspace>/registry: Unable to parse json at url fil<workspace>/registry/modules/devonly/metadata.json: java.lang.IllegalStateException: Expected BEGIN_OBJECT but was STRING at line 1 column 1 path $\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#unexpected-json-structure",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)",
+      "stderr": "INFO: Invocation ID: 6f79dd7c-e9ba-4a41-81dc-bae1d7031f6d\n no actions running\nWARNING: Could not read metadata file for module devonly from registry file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry: Unable to parse json at url file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/metadata.json: java.lang.IllegalStateException: Expected BEGIN_OBJECT but was STRING at line 1 column 1 path $\nSee https://github.com/google/gson/blob/main/Troubleshooting.md#unexpected-json-structure\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=\",\n  remote_patch_strip = 0,\n)\n\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "graph",
+        "--lockfile_mode=off",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 37,
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.directory-link",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.bazel"
+        },
+        {
+          "destination": "registry/modules/devonly/metadata.directory-link",
+          "op": "rename",
+          "path": "registry/modules/devonly/metadata.json"
+        },
+        {
+          "find": "version = \"0.1.6\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.7\""
+        }
+      ],
+      "name": "parked_directory_links_are_absent",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: in module dependency chain <root> -> devonly@1.0.0: module devonly@1.0.0 not found in registries:\n* fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel: not found",
+      "normalized_stdout": "",
+      "stderr": "INFO: Invocation ID: 82e13549-0b50-4880-9419-43f893ec50bd\nERROR: in module dependency chain <root> -> devonly@1.0.0: module devonly@1.0.0 not found in registries:\n* file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel: not found\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "show_repo",
+        "@@devonly+",
+        "--lockfile_mode=update",
+        "--registry=file://%workspace%/registry"
+      ],
+      "exit_code": 0,
+      "manifest": [
+        {
+          "digest": "0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7",
+          "mode": "0o644",
+          "path": "MODULE.bazel.lock",
+          "root": "MODULE.bazel.lock",
+          "size": 1228,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "destination": "registry/modules/devonly/1.0.0/MODULE.bazel",
+          "op": "rename",
+          "path": "registry/modules/devonly/1.0.0/MODULE.regular"
+        },
+        {
+          "find": "version = \"0.1.7\"",
+          "old_digest_hint": "112",
+          "path": "MODULE.bazel",
+          "replace": "version = \"0.1.4\""
+        }
+      ],
+      "name": "regular_local_registry_file_restores_exactly",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
+      "stderr": "INFO: Invocation ID: 669dcaf4-53fa-4053-b251-5100f5d1d569\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///run/media/system/Colossus/dev/slug/target/v2o/runs/nonroot-interim-module-graph/20260726-222420-3731391-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
     }
   ],
   "fixture": "nonroot-interim-module-graph",
