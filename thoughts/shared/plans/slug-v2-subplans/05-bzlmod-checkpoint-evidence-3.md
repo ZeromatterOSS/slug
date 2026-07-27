@@ -11944,3 +11944,265 @@ utility disposition retains only existing `Arc`, `Dupe`, `Allocative`,
 compact path, and DICE patterns; no Buck/V1 code or representation was
 extracted. Recursive composition remains unimplemented. The next packet is
 design only `WP-5-m1-loading-pure-host-glob-traversal-design`.
+
+### Pure Host glob traversal design
+
+Status: `ACCEPT` on 2026-07-27 after one independent design review, bounded
+root correction, and independent correction rereview. This is a design-only
+reserved DICE/ownership decision. No Rust, fixture, oracle, Cargo, public API,
+consumer, or ledger file changed.
+
+Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a` makes the
+owner boundary clear. `GlobComputationProducer.java:95-122` splits one full
+pattern into slash fragments and creates a `(base, fragment-index)` work
+state; it allocates duplicate-work tracking only when more than one standalone
+`**` occurs (`:104-121`). `FragmentProducer.java:107-160` gives `**` both its
+zero-segment transition (advance at the same base) and its one-or-more
+transition (handle `**` as a fragment); `DirectoryDirentProducer.java:76-156`
+prunes ignored directories before package lookup, stops packages, advances a
+non-`**` index, retains the `**` index, and filters directories by operation.
+`PatternWithoutWildcardProducer.java:68-97` and
+`PatternWithWildcardProducer.java:89-215` respectively establish literal
+resolution and typed-listing/wildcard/symlink classification. Final producer
+matches are an unordered set (`GlobComputationProducer.java:139-144`), while
+the callable sorts its returned strings (`StarlarkNativeModule.java:119-131`);
+Slug's private owner must instead promise a deterministic raw-byte order.
+`GlobsFunction.java:79-102,210-216` retains the first reached error and checks
+it before restarting for missing values. `Globber.java:24-32` defines FILES,
+FILES_AND_DIRS, and SUBPACKAGES; only the first two are in this packet.
+
+The one private owner is `HostGlobTraversalKey`, not an include/exclude,
+callable, evaluator-attempt, or aggregation key. Its exact identity is:
+
+- `workspace: NormalizedAbsolutePath`;
+- `logical_package_root: NormalizedAbsolutePath`, the selected source root
+  containing the starting package;
+- `package: PackagePath` (the root/main-repository package containing that
+  traversal);
+- `pattern: HostGlobPattern`, retaining the complete validated raw-byte
+  pattern as `Arc<[u8]>` and its already-validated slash fragments; and
+- `operation: HostGlobTraversalOperation::{Files, FilesAndDirs}`.
+
+`HostGlobTraversalKey::new` is checked and returns a separate
+`HostGlobTraversalKeyError::NonLatin1PackagePathScalar { scalar }` before a
+DICE key exists. It maps every starting `PackagePath` scalar U+0000..=U+00FF
+to its same-valued byte and rejects every larger scalar. The key retains the
+selected package root rather than an independently supplied package
+directory; it derives the one logical starting directory by appending those
+validated package bytes to `logical_package_root`. Thus callers cannot
+traverse one physical package while applying another package namespace.
+This constructor error is not a compute result or a
+`HostGlobTraversalError` variant.
+
+`HostGlobPattern::new` is the separate checked pattern constructor. It
+performs the accepted full-pattern validation once, splits on `/`, and stores
+each fragment as either `RecursiveWildcard` for an exact standalone `**` or
+the existing literal/simple-star segment representation. Its error retains
+the full raw pattern, fragment index when applicable, and the accepted
+invalid-versus-deferred reason. The existing invalid matrix remains exact;
+valid unsupported parentheses, brackets, braces, backslash, NUL, or other
+deferred segment syntax remains deferred for the whole pattern. No compute
+path reparses or broadens the grammar.
+
+It has no include/exclude sequence, `allow_empty`, callable source location,
+boundary-selected candidate package root, event data, consumer state,
+parser/evaluator attempt, or result ordering mode. The exact value is
+`SourcePreparationOutcome<Arc<Result<HostGlobTraversal,
+HostGlobTraversalError>>>`; `HostGlobTraversal` privately retains one
+`Arc<[HostGlobTraversalMatch]>`, where each match is its package-relative raw
+byte path. A temporary standard `Vec`/frontier set is permitted during one
+compute, but no retained `HashMap`, `HashSet`, `String`, regex cache, global
+cache, or lock is. Success/error equality is structural after intentionally
+opaque diagnostic fields are omitted; `equality` is `complete_eq` and
+`validity` is `is_complete`, so every `Need` is invalid and self-unequal.
+
+The traversal starts at state `(derived logical package directory, package,
+fragment_index = 0)`. On Unix only, append each raw component to the logical
+path with `OsStringExt`, and append the same component to `PackagePath` by
+lifting every byte to the same-valued Latin-1 scalar: `e9` becomes U+00E9 and
+`c3 a9` becomes U+00C3/U+00A9. There is no UTF-8 decoding or lossy conversion.
+Thus the path presented to `HostRootPackageBoundaryKey::new(workspace,
+candidate_package)` is distinct in exactly the way its accepted projection
+requires. The starting package path is never rechecked as a boundary.
+
+For an ordinary literal or simple-star fragment, compute the existing private
+`HostGlobSegmentCandidatesKey` for the current directory and that fragment.
+For each candidate directory, construct its candidate `PackagePath`, then
+compute `HostRootPackageBoundaryKey`. `IgnoredDirectory` and `Package` prune
+it before matching/result insertion or descent; `NoPackage` and
+`DeletedPackage` continue. A non-directory is a terminal match only at the
+last fragment. A non-pruned directory is a terminal match only at the last
+fragment and `FilesAndDirs`, then advances to the next fragment if one exists.
+`Files` never emits a directory. `Subpackages` has no enum variant, key
+identity, implementation branch, or test claim.
+
+For standalone `**`, first take the zero-or-more transition: if it is not
+last, enqueue `(same directory, same package, index + 1)`; if last, emit the
+current directory only for `FilesAndDirs` and only when it is not the starting
+package directory. Then obtain `HostGlobSegmentCandidatesKey` with `*` at the
+same directory, apply the same boundary pruning to every directory candidate,
+and enqueue each survivor at the unchanged `**` index. Files under `**` are
+emitted only when that `**` is last. This is the exact Bazel `:116-136` /
+`DirectoryDirentProducer.java:125-155` state shape. With two or more
+standalone `**` fragments, a temporary raw `(relative-path-bytes,
+fragment-index)` visited set suppresses duplicate work; with zero or one it
+is absent. Final deduplication belongs solely to this full-pattern owner:
+sort retained package-relative raw byte paths lexicographically, then remove
+equal paths once. Candidate-owner same-name ordering is not an observable
+final tie-break because equal final paths collapse here.
+
+All candidate and boundary computations are DICE-owned. The traversal uses
+one FIFO state deque. Initial state has discovery ordinal zero. Popping a
+state computes its one segment-candidate dependency. For `**`, enqueue its
+zero-segment successor first; then inspect recursive candidates in their
+accepted raw-byte order. For an ordinary fragment, inspect candidates in that
+same order. Independent boundary keys for one materialized candidate list may
+compute concurrently, but their returned slots are scanned in original
+candidate order; newly discovered states are appended in that scan order and
+receive monotonically increasing discovery ordinals. The multiple-`**`
+visited check occurs before enqueue and does not renumber retained states.
+A state-level segment error ranks at that state's ordinal; boundary errors
+rank by state ordinal and candidate slot. A Need blocks expansion only of its
+own state or candidate, is unioned with every other reached Need, and does not
+prevent already queued or sibling slots from completing. After the deque is
+exhausted, return the lowest-ranked reached complete error before the unioned
+Need; return the Need only when no reached complete error exists. This is the
+entire first-error rank—completion timing and task scheduling never affect it,
+and a branch hidden behind a Need is not reached in that generation.
+
+No unmatched candidate is observed. A segment-owner error is wrapped as
+`HostGlobTraversalError::Segment { logical_directory, fragment_index, error }`;
+a boundary error is `::Boundary { candidate_package, error }`; both retain no
+physical root, route, symlink chain, namespace, selected marker, or lossy
+name. Its complete variant set is exactly `UnsupportedHost`, `Segment { .. }`,
+and `Boundary { .. }`; `UnsupportedHost` is the non-Unix dormant result before
+path conversion. Existing `HostGlobSegmentError` and opaque
+`HostRootPackageBoundaryError` remain their owners. DICE infrastructure
+errors are invariants. No direct filesystem IO, fresh graph, event batch,
+lock, or lock held across `ctx.compute(...).await` is allowed. Reached path
+observations, repository-ignore policy, package policy, marker changes, and
+directory changes invalidate through those two keys; equal restored complete
+values prune consumers, whereas every Need recomputes.
+
+#### Exact traversal oracle gate
+
+Implement
+`WP-5-m1-loading-pure-host-glob-traversal-oracle` before Rust by extending
+only the existing pinned `glob-package-boundaries` fixture. Its accepted
+`pkg` tree, six-state command definition, and first generated semantic record
+remain unchanged. Add one isolated `traversal` package and one exact command.
+The implementation allowlist is:
+
+- `tests/v2_oracle/fixtures/glob-package-boundaries/fixture.toml`, at most
+  +28/-4;
+- `tests/v2_oracle/fixtures/glob-package-boundaries/expected/oracle.json`,
+  generated only, at most +45/-4;
+- new
+  `tests/v2_oracle/fixtures/glob-package-boundaries/workspace/traversal/BUILD.bazel`,
+  at most 52 lines;
+- new
+  `tests/v2_oracle/fixtures/glob-package-boundaries/workspace/traversal/literal/leaf.txt`,
+  exactly `leaf\n`; and
+- new
+  `tests/v2_oracle/fixtures/glob-package-boundaries/workspace/traversal/literal/deep/deep.txt`,
+  exactly `deep\n`.
+
+The hard aggregate cap is +130/-8. Add exactly three regular files, no links,
+one package, and one command. In the new BUILD file, bind these five sorted
+lists:
+
+```starlark
+multi = glob(["literal/*.txt"])
+zero = glob(["**/literal/*.txt"])
+files = glob(["literal/**"])
+all_paths = glob(["literal/**"], exclude_directories = 0)
+double = glob(["**/**/leaf.txt"])
+```
+
+For `multi`, `zero`, `files`, and `all_paths`, use four top-level list
+comprehensions over `range(len(matches))`. Each declares a `filegroup` with
+one source and a name of
+`<prefix>_<zero-based-index>_<path-with-slashes-replaced-by-underscores>`,
+where the prefixes are respectively `multi`, `zero`, `files`, and `all`.
+Add one filegroup named `"double_count_%d" % len(double)` with `srcs = double`.
+No `def`, include/exclude composition, `allow_empty`, select, load, macro, or
+other target is allowed.
+
+Append exactly:
+
+```toml
+[[commands]]
+name = "traversal_state_and_operation"
+argv = ["query", "--noshow_progress", "//traversal:all"]
+compare = "exact"
+expected_exit = 0
+stdout_patterns = ["\\A//traversal:all_0_literal\\n//traversal:all_1_literal_deep\\n//traversal:all_2_literal_deep_deep\\.txt\\n//traversal:all_3_literal_leaf\\.txt\\n//traversal:double_count_1\\n//traversal:files_0_literal_deep_deep\\.txt\\n//traversal:files_1_literal_leaf\\.txt\\n//traversal:multi_0_literal_leaf\\.txt\\n//traversal:zero_0_literal_leaf\\.txt\\Z"]
+```
+
+The indices encode callable result order rather than relying on query order.
+Together the nine labels prove literal-plus-simple-star traversal, the
+zero-segment `**` branch, terminal-`**` FILES filtering, terminal-`**`
+FILES_AND_DIRS directory inclusion, and unique output from two standalone
+`**` fragments. The existing first row remains the sole six-state boundary
+proof. Add pinned source anchors for
+`GlobComputationProducer.java:95-143`,
+`FragmentProducer.java:107-160`,
+`DirectoryDirentProducer.java:76-156`, and
+`GlobTestBase.java:513-573`; update fixture description/notes only enough to
+name traversal state and operation evidence. Broader grammar, raw names,
+symlink lifecycle, callable include/exclude/allow-empty, SUBPACKAGES, and
+consumer/query semantics remain out of scope.
+
+Generate once with pinned `/usr/bin/bazel`, then replay both exact rows from
+two distinct fresh absolute roots. Validate the protected first semantic
+record byte-for-byte, the exact second record, empty manifests/mutations,
+fixture schema/listing, Python compilation, focused and full oracle harness,
+exact assets/allowlist/caps, archive/diff/credential/process/no-Slug guards,
+and clean Bazel/`slugd` state before and after. Do not inspect or record the
+user's Bazel RC. This is oracle packet three after checkpoint `e2cc891d`;
+the accepted tree is currently 1,322 regular files, 24 links, and 39,367
+lines, so the capped +3/+0/+130 result remains below every growth-review
+threshold. Stop on any output drift, first-row change, nonempty manifest,
+fixture/harness expansion, extra asset/target, cap breach, or broader claim.
+No separate oracle-design packet remains.
+
+`glob-callable-contract` continues to own callable filtering,
+`glob-directory-invalidation` owns lifecycle/symlinks, and
+`glob-raw-name-pattern-lazy` owns raw-byte ingress/lifecycle.
+
+After that oracle accepts, the future implementation packet is exactly
+`WP-5-m1-loading-pure-host-glob-traversal-owner`, with this allowlist:
+
+- `app/slug_loading_v2/src/host_glob/mod.rs`, at most +90/-45 for private
+  module declarations, parent visibility, and shared constructor reuse;
+- new `app/slug_loading_v2/src/host_glob/traversal.rs`, at most 950 lines;
+- new `app/slug_loading_v2/src/host_glob/traversal_tests.rs`, at most 1,300
+  lines.
+
+The hard cap is +2,340/-45. Existing `host_glob/tests.rs` and `lib.rs` may not
+change. No Cargo/dependency, bzlmod, identity, workspace, fixture, public
+re-export, existing public `glob.rs`, parser, evaluator, consumer, entrypoint,
+event, lockfile, or status file may change. Focused tests must cover checked
+key construction and exact key identity; raw-byte-to-`PackagePath`
+distinction; literal, simple-star, multi-segment, and standalone-`**`
+transitions including zero and one-or-more; FIFO rank independent of
+completion timing; visited-state duplicate suppression and final raw
+ordering; FILES versus FILES_AND_DIRS; boundary kinds/ignore-first pruning;
+complete segment/boundary error before mixed Needs; Need equality/validity;
+create, delete, package-marker/policy change and equal restoration in one
+DICE graph; and zero production callers. Run focused host-glob tests plus
+direct bzlmod boundary dependents, full loading tests/doctests, GNU-Windows
+no-run linkage, formatting, `git diff --check`, exact
+allowlist/cap/dependency/caller, archive/credential/process,
+no-direct-IO/no-lock, no-public-surface, and forbidden-SUBPACKAGES guards.
+Stop on a fourth file, a new dependency, any include/exclude/callable
+activation, regular-or-special BUILD/`.bzl` acquisition, parser byte ingress,
+evaluator retry, native-Windows or lone-surrogate behavior, or a
+consumer/public export.
+
+Consumer handoff is only a future private loading adapter accepting one full
+pattern plus operation and consuming its ordered raw matches. Include/exclude
+composition, `allow_empty`, callable diagnostics/sorting, package BUILD/`.bzl`
+acquisition, parser activation, evaluator transactions, event publication,
+external repositories, SUBPACKAGES, native Windows, and lone-surrogate parity
+remain explicitly out of scope.
