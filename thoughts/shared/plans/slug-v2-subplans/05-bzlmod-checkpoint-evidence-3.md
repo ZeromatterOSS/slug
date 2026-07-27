@@ -9025,3 +9025,253 @@ startup injection; capability-only semantic ownership; missing client
 serialization or shutdown completion; silent ignore or Slug-only rejection
 of a Bazel-valid JVM input; a claimed `sun.jnu.encoding` override; a copied
 fixture; or any bridge/completeness claim before native Windows evidence.
+
+### Host JVM registry byte-input oracle-boundary correction
+
+Status: `REPLAN` after terminal latest-text review on 2026-07-26, before
+harness or Rust. The independent startup/reuse oracle below is bounded, but no
+exact standalone JVM executor exists for the full Bazel-accepted surface
+frozen by the preceding packet.
+
+#### Corrected source and ownership boundary
+
+Pinned Bazel 9.2 preserves startup options only before the command. Both
+`--host_jvm_args=X` and its separated unary form become one append-only
+logical occurrence; a missing value is `BAD_ARGV`. RC discovery is system,
+workspace, home, comma-ordered `BAZELRC`, then occurrence-ordered explicit
+`--bazelrc`. Top-level discovered candidates are canonical-path deduplicated
+before parsing; imports expand in place, and a repeated import warns rather
+than entering a global deduplication set. Parsing concatenates every generic
+`startup` entry, every matching `startup:<platform>` entry, then explicit CLI
+occurrences.
+
+`host_jvm_args` remains ordered and append-only. `server_javabase` and
+`extra_classpath` are instead last-wins scalars, so removing an overwritten
+occurrence can change request diagnostics without changing the launched JVM
+or reuse identity. Bazel's fixed JVM option prefix and defaults precede every
+user argument; `host_jvm_debug` also precedes the user stream. The launcher
+main/JAR/classpath suffix follows the user stream. `extra_classpath` replaces
+the ordinary `-jar <server.jar>` suffix with Bazel's exact
+`-cp <server.jar>:<extra> ...Bazel` suffix.
+
+Daemon reuse is not a property projection. It first requires equal raw
+canonical server-argument lengths and then compares the complete nonvolatile
+canonical arguments as occurrence-counted, order-insensitive multisets.
+Binary/install compatibility is an earlier gate. File-backed
+arguments such as an agent JAR, argument file, provider/classpath JAR, native
+agent, or explicit JDK are identified by their canonical argument/path, not
+file content; modifying one in place does not itself force a restart.
+
+The implementation must retain five separate values:
+
+1. current request startup occurrences and diagnostic source strings;
+2. the exact ordered argv and sanitized environment that launched the daemon;
+3. the complete canonical reuse vector and exact comparator;
+4. the retained JVM executor and its effective byte semantics; and
+5. a graph-lifetime typed semantic DICE input paired to that executor instance.
+
+Request source provenance is nonsemantic. Equal canonical identity never
+replaces launched order, executor state, or the DICE input. A mismatch destroys
+the daemon, executor, and graph before constructing their replacements.
+`StrongHash` may authenticate a transport record but may not replace complete
+vector equality.
+
+On Linux Bazel selects the first installed locale among
+`en_US.ISO-8859-1`, `C.UTF-8`, and `en_US.UTF-8`, otherwise retaining the
+inherited locale. It removes `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, and
+`JAVA_TOOL_OPTIONS` with warnings. Failed JVM startup occurs before a
+`RunRequest`: RC startup provenance, the client crash header, and `jvm.out`
+form the diagnostic boundary. An invalid explicit `server_javabase` can fail
+earlier in the client sanity check.
+
+Pinned OpenJDK `jdk25u@405a5699` further fixes these boundaries:
+
+- `SystemProps.java:77-89` makes `native.encoding` and `sun.jnu.encoding`
+  non-overridable and expands `file.encoding=COMPAT` to native encoding;
+- `Charset.java:642-653` uses the standard provider for the default charset
+  and falls back to UTF-8 when the configured name is unrecognized;
+- `StaticProperty.java:95-124`, `Locale.java:1151-1186`, and
+  `BaseLocale.java:103-184` own categoryless locale, `user.region`
+  dominance, extensions, and old ISO-code behavior;
+- `LocaleProviderAdapter.java:116-164,235-289` and
+  `SPILocaleProviderAdapter.java:69-145,200-223` own locale-provider ordering
+  and system-classloader SPI behavior; and
+- every `-javaagent` initializes before the server main, enters the system
+  class path, and may transform classes or change process state.
+
+Successful request diagnostics remain nonsemantic primitive data. All
+populated and synthetic records reach Java. Original structured-command-line
+BEP emits only empty-source entries, while `--announce_rc` skips empty-source
+records and groups consecutive populated RC options by source. Neither
+surface can own launch order, reuse identity, executor state, or DICE.
+
+#### Accepted independent oracle sub-boundary
+
+Next packet: implement only
+`WP-5-m1-host-jvm-registry-startup-reuse-oracle`.
+
+The next implementation packet may change only:
+
+- `tools/v2_oracle_lib/fixture.py`;
+- `tools/v2_oracle_lib/runner.py`;
+- `tools/v2_oracle_lib/compare.py`;
+- `tests/v2_oracle/test_v2_oracle.py`;
+- `tests/v2_oracle/fixtures/nonroot-interim-module-graph/fixture.toml`;
+- its generated `expected/oracle.json`; and
+- one nonregistry
+  `workspace/startup-diagnostics.bazelrc`.
+
+Add no registry, module, provider, agent, JVM, or Java asset and no symlink.
+The exact cap is seven paths, one regular file, zero links, and 1,800 net
+added lines; the fixture inventory may not exceed 58 regular files, five
+links, or 2,250 lines. This is post-checkpoint oracle packet two after
+`22de3631`; it does not trigger the next five-packet review.
+
+Add an optional fixture-wide ordered `startup_argv` baseline and fixture-wide
+environment overrides, then these optional per-command fields:
+
+- ordered `startup_argv`, appended after the fixture baseline;
+- `capture_server_epoch`; and
+- `capture_startup_diagnostics`.
+
+Emit the harness-owned `--output_base=<path>`, fixture baseline, command
+startup argv, then the command. Apply fixture environment first and command
+overrides second. Record both startup vectors separately. Do not infer startup
+options from command argv. For every daemon command, including the existing
+first fourteen, observe the live server identity even when the command does
+not serialize it. For Bazel use PID plus `server.starttime` when present; for
+Slug the eventual oracle must use authenticated Status and its instance token,
+never a PID file. Map each first-seen live identity to a run-local ordinal.
+Therefore the existing default daemon is epoch 1 and the first host-JVM
+mismatch is epoch 2. Compare only records that declare
+`capture_server_epoch`.
+
+For diagnostic capture, the runner supplies one unique absolute
+`--build_event_json_file=<run_dir>/startup-bep/<command-index>.json`.
+Require exactly one `structuredCommandLine` event labelled `original` and one
+`startup options` section. Extract only the ordered
+`optionList.option[].combinedForm` values, preserving every duplicate and
+empty string without sorting, deduplication, or filtering. Normalize only the
+existing workspace, run, and output-base path replacements plus slash style.
+Do not store or compare invocation IDs, timestamps, unrelated BEP events, or
+the raw file. Extract complete ordered `--announce_rc` messages only in the
+exact form
+`Reading 'startup' options from <normalized source>: <comma-space-joined options>`.
+The comparator checks the generated oracle's declared epoch, combined-form
+list, and announcement list in addition to existing semantic fields.
+
+The runner must shut both tools down in `finally`. Bazel cleanup invokes
+`<bazel> --output_base=<path>`, the same fixture-wide RC-suppression startup
+baseline, then `shutdown`, under the same fixture-wide empty/unset `BAZELRC`
+environment and without user host arguments. It requires exit zero and waits
+for every observed PID/starttime epoch to be dead. Slug cleanup eventually
+uses authenticated shutdown, a termination-expected acknowledgement, and
+verified process death; delete the current fire-and-forget socket/PID unlink
+behavior rather than copying it into the harness. A remaining process or
+reachable endpoint fails the run.
+
+Reuse the existing `MODULE.portable`, empty directory, ordinary file, and
+four dynamic names. Existing rows already pin default 91-byte/SRI
+`sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=`, found-empty, and
+ordinary restoration. The fixture-wide startup baseline supplies
+`--nosystem_rc`, `--noworkspace_rc`, and `--nohome_rc`, and its environment
+sets `BAZELRC` empty for all nineteen commands and cleanup. Thus epoch 1 and
+the existing default 91-byte row are hermetic too. Row 3 alone additionally
+supplies the explicit fixture RC. Append exactly five rows:
+
+1. `fresh_conflicting_last_wins_utf8` reactivates the same portable directory
+   and dynamic names. With hermetic automatic RC discovery disabled, CLI
+   occurrences ISO-8859-1 then UTF-8 must restart to epoch 2 and produce
+   94-byte SRI `sha256-gRvJ2ESPFofDvDoCMw9Kc1sx8cJHJ9o9PQEEz62HCGU=`,
+   with exact populated/synthetic-empty BEP ordering.
+2. `reordered_same_multiset_retains_utf8` requests UTF-8 then ISO-8859-1.
+   It must retain epoch 2, the 94-byte result, and the retained launch/graph
+   identity while its current CLI BEP pairs appear in the requested order.
+3. `rc_source_change_same_multiset_reuses` supplies ISO-8859-1 in generic
+   `startup` and UTF-8 in matching `startup:<platform>` through the explicit
+   hermetic RC and includes command option `--announce_rc`. It must retain
+   epoch 2 and 94 bytes while pinning RC synthetic-empty BEP entries plus one
+   source-grouped populated `--announce_rc` message.
+4. `occurrence_change_restarts_latin1` uses one CLI ISO-8859-1 occurrence.
+   It must restart to epoch 3 and produce the exact 91-byte result.
+5. `zero_occurrences_restores_default` disables RC discovery and supplies no
+   host occurrence. It must restart to epoch 4 and restore the exact default
+   91-byte result.
+
+No mutation follows the initial portable reactivation. Fresh graphs cover
+restart rows; unchanged workspace state makes the two equal-identity rows
+discriminating. Bazel PID/source evidence does not prove Slug graph identity.
+Later authenticated lifecycle tests must separately compare graph-instance
+diagnostics and runtime factory construction counts. The graph instance is
+diagnostic, not the semantic input; the local-directory byte key must directly
+depend on the graph-construction input.
+
+Parser, fixture/command startup merge and argv placement, fixture/command
+environment precedence, BEP cardinality/filtering, RC grouping, identity
+ordinalization, missing/stale identity, hermetic shutdown
+success/failure/timeout, and path normalization all receive focused harness
+tests before generation. Run one pinned Bazel 9.2 generation, two absolute
+distinct-root replays, the focused harness/fixture suite, exact
+scope/growth/hash/provenance checks, and terminal latest-diff reviews. Stop on
+any copied registry scaffold, raw PID or BEP nondeterminism, inferred graph
+identity, unverified shutdown, or harness support broader than the declared
+fields.
+
+#### Unresolved exact execution boundary
+
+A long-lived OpenJDK helper would have the right lifetime for ordinary
+properties, locale/provider inputs, explicit javabase, extra classpath,
+sanitized environment, and directory `URLConnection`. JNI is not equivalent
+to launcher execution. More importantly, a helper changes Bazel's fixed
+main/JAR/classpath suffix. A Bazel-valid agent can inspect
+`sun.java.command`, the Bazel main class/resources/classpath, or Bazel server
+classes before changing locale or `FileURLConnection` behavior. Argument
+files, module/classpath options, native agents, and an in-place-modified
+explicit JDK can also depend on the exact launcher process.
+
+Consequently a standalone helper has demonstrable
+Bazel-success/helper-different inputs and violates the no-ignore/no-reject
+gate. A sidecar helper workspace is still distinguishable. The only general
+exact process found is the original Bazel 9.2 JVM executing the original
+command, workspace, classpath, and main; that means delegating the original
+command to Bazel, not implementing Slug's registry byte owner. Do not accept a
+Rust fold, whitelist, silent ignore, fallback, or custom helper.
+
+After the oracle, run design-only
+`WP-5-m1-host-jvm-registry-byte-execution-feasibility`. It must add no fixture
+or production code. Freeze an adversarial source/native matrix containing:
+
+- invalid-name UTF-8 fallback and `COMPAT` against captured
+  `native.encoding`;
+- all three sanitized Java-option variables and exact warnings;
+- unknown HotSpot and invalid explicit-javabase diagnostics;
+- last-wins scalar diagnostic-versus-identity behavior;
+- a deterministic SPI provider/classpath collator change;
+- an agent whose `premain` branches on `sun.java.command` or Bazel-only
+  classes; and
+- pinned minimized-JDK artifacts/vendor patches, explicit-JDK compatibility,
+  same-path provider/agent mutation, and startup-failure provenance.
+
+Return `REPLAN` on any Bazel-success/candidate-failure or behavior difference.
+No CLI, server, transport, parser, canonicalizer, helper, DICE, directory IO,
+consumer, or activation work may begin without an exact mechanism and a new
+terminally reviewed packet.
+
+The later accepted sequence, if feasibility succeeds, is: real-Windows
+portable/empty/lone-surrogate and transport evidence; dormant full startup
+parser/canonical-vector/comparator; authenticated cross-platform loopback
+transport plus output-base lifecycle; dormant executor plus graph-construction
+semantic input; DICE-owned external-directory observation and byte dependency;
+then one atomic daemon/one-shot/Host-consumer activation.
+
+The lifecycle contract remains frozen for that later sequence: an `fs4`
+output-base lock precedes metadata inspection; ACL-protected atomically
+published server info carries protocol tag, loopback address, request/response
+cookies, instance nonce, PID/start token, actual retained identity, and
+executor/graph instance diagnostics. Equal identity holds the lock through
+authenticated Run stream creation/submission, then releases before response
+completion. Mismatch requires authenticated shutdown,
+termination-expected acknowledgement, and verified exact-process death before
+restart. Status remains responsive while a dedicated worker serializes
+commands; no lock is held across DICE computation. Never unlink, kill, or
+replace from reachability alone.

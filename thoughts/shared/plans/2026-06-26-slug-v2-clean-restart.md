@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, Registry IO bridge with native local paths, focused registry-file vendor oracle, exact ASCII local-directory registry oracle, and accepted default-launch collation/charset oracle; the required five-packet fixture-growth checkpoint is accepted through `22de3631`, with this oracle recorded as post-checkpoint packet one; detailed evidence remains in the Stage 5 and oracle-harness owner plans plus routing log | production retry/publication activation remains gated on Host migrations and typed production roots; the native-path bridge still errors on local directories, the exact JVM execution/provider boundary and locked daemon identity/lifecycle are not frozen, and native Windows directory-byte behavior remains unobserved, so the private Host registry-file owner remains blocked; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | design only `WP-5-m1-host-jvm-registry-byte-input-oracle-boundary-correction` |
+| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, Registry IO bridge with native local paths, focused registry-file vendor oracle, exact ASCII local-directory registry oracle, and accepted default-launch collation/charset oracle; the required five-packet fixture-growth checkpoint is accepted through `22de3631`, with this oracle recorded as post-checkpoint packet one; detailed evidence remains in the Stage 5 and oracle-harness owner plans plus routing log | production retry/publication activation remains gated on Host migrations and typed production roots; the native-path bridge still errors on local directories, no exact standalone executor exists for the full Bazel-valid JVM agent/classpath surface, locked daemon identity/lifecycle is absent, and native Windows directory-byte behavior remains unobserved, so the private Host registry-file owner remains blocked; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | implement only `WP-5-m1-host-jvm-registry-startup-reuse-oracle` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -144,17 +144,16 @@ or fixture changed.
 
 ### Current packet
 
-Design only
-`WP-5-m1-host-jvm-registry-byte-input-oracle-boundary-correction`.
+Implement only
+`WP-5-m1-host-jvm-registry-startup-reuse-oracle`.
 
-Freeze the exact startup-argument oracle seam and JVM execution/provider
-boundary, Bazel's distinct ordered launch semantics and occurrence-counted
-order-insensitive daemon identity, locked/authenticated restart lifecycle,
-graph-construction DICE ownership, and the remaining native-Windows
-observations. Preserve request-local startup diagnostics as nonsemantic data.
-Do not edit fixtures, harnesses, Rust, Cargo, dependencies, APIs, DICE keys,
-the runtime bridge, private Host registry-file owner, consumer, or activation
-before terminal latest-text review.
+Within the terminally reviewed seven-path Stage 5 contract, add the
+fixture-wide hermetic startup/environment baseline, per-command startup and
+diagnostic capture, run-local authenticated server epochs, verified cleanup,
+and exactly five retained rows in `nonroot-interim-module-graph`. Add only the
+one nonregistry RC file; do not add a registry/module/JVM/Java asset or any
+Rust, Cargo, dependency, API, DICE, runtime, CLI/server, private Host owner,
+consumer, or activation change.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
