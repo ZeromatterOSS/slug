@@ -10903,3 +10903,36 @@ packet five and must perform and record the focused fixture-growth review.
 
 Next packet: implement only
 `WP-5-m1-starlark-bazel-internal-string-seam`.
+
+### Bazel-internal string parser seam implementation
+
+Status: `ACCEPT` on 2026-07-27 in `c8f13ee9` after focused and broad root
+validation plus three terminal source/parity, implementation/evidence, and
+architecture/orchestration latest-diff reviews.
+
+The exact eight-file dormant seam adds public `StringEncoding` and
+`AstModule::parse_with_string_encoding`, a crate-private token-local byte
+lexer, and a separate opt-in byte-column reporting resolver. Original UTF-8
+source, byte spans, ordinary `AstModule::parse`, `Lexer::new`, every
+`Dialect`, `resolve_span`, formatted rendering, compiler/value representation,
+and every production call site remain unchanged. Tests prove the accepted
+literal, escape, diagnostic, source/span/location, dynamic carrier,
+cross-parse runtime equality, equal-key lookup, and frozen/unfrozen function
+pass-through matrix. The new entrypoint has zero non-test callers.
+
+Focused lexer and runtime tests passed 2/2 and 5/5. Full
+`starlark_syntax` plus doctest, `starlark` doctests, all unchanged bzlmod,
+loading, and analysis suites, and five-crate GNU-Windows no-run linkage
+passed. The current broad Starlark suite passes 822 tests after filtering the
+same 11 golden/profile failures reproduced by exact name and signature in an
+isolated clean `b51de40d` worktree, where 817 tests pass; the five-test delta
+is exactly this packet. Formatting, diff, archive, dependency, default/API,
+caller, credential, process, scope/cap, and utility-boundary guards passed.
+Final scope is +696/-2, with every per-file cap satisfied and the new test at
+299/300 additions. No fixture or oracle changed, so the post-checkpoint oracle
+count remains four.
+
+Next packet: design only
+`WP-5-m1-loading-raw-name-pattern-lazy-glob-oracle-design`. Its eventual
+oracle implementation is packet five and must perform and record the focused
+fixture-growth review before terminal acceptance.
