@@ -1,33 +1,42 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-loading-host-package-key-input-ownership-design`
+Packet: `WP-5-m1-loading-host-package-key-input-ownership`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted Host glob transactional attempt design and private owner;
-existing Host root-module, path, package-boundary, traversal, and adapter keys
-Validation tier: reserved DICE identity and ownership design
+Evidence: accepted Host package-loading key input and ownership design; pinned
+Bazel 9.2 package/BzlLoad source; existing Host root-module, package lookup,
+special-capable file, raw-string parser, glob traversal/adapter/attempt, and
+legacy cycle-detector owners
+Validation tier: public cross-crate DICE identity, lifecycle, and event owner
 
-Allowed files:
+Implementation files:
 
-- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- exceptional routing update only if the reviewed route changes
+- `app/slug_bzlmod_v2/src/host_package.rs`
+- `app/slug_bzlmod_v2/src/lib.rs`
+- `app/slug_loading_v2/src/bzl_module.rs`
+- `app/slug_loading_v2/src/cycle_detector.rs`
+- new `app/slug_loading_v2/src/host_package_load_tests.rs`
 
-Result: design only the parallel private `HostPackageLoadKey` and the Host
-inputs it needs for root-module readiness, package markers, BUILD selection and
-bytes, load-label resolution, and loaded `.bzl` modules. Freeze one
-caller-owned DICE transaction, exact key identity/equality/validity, typed
-`Need`/terminal/event propagation, package/load-cycle ownership, and the
-boundary with the accepted transactional evaluator owner. Explain same-graph
-create/edit/delete/restoration and why no lock, direct IO, injected
-post-startup semantic value, fresh graph, or legacy `Arc<Result<...>>` package
-path can carry Host state.
+Terminal scheduling updates may also change this manifest, the owner plan, and
+canonical Live Status.
 
-Keep activation for a later packet: add no Rust, fixture, dependency, API,
-DICE key, production caller, command/query/analysis root, JVM/Bazel delegation,
-legacy `PackageLoadKey` change, or external-repository breadth. Use pinned
-Bazel 9.2 source plus the live V2 key graph, and obtain one independent
-reserved-architecture review. Stop if exact ownership requires command
-activation, changing the legacy key, or combining repository materialization
-with this root-package design.
+Result: implement the accepted public bzlmod `RootPackageBzlTarget` and
+`RootPackageSourceKey` projection plus dormant private
+`HostBzlModuleEvalKey`/`HostPackageLoadKey`. Preserve exact package/BUILD/
+special-byte selection, nested-package checks, root-only load labels,
+Bazel-internal parsing, typed Need/errors, complete-only equality/validity,
+local event batches, legacy-versus-Host cycle isolation, same-DICE lifecycle,
+and the accepted transactional glob-attempt boundary.
+
+Add no dependency, fixture, command/query/analysis/core caller, public loading
+export, legacy key/value/diagnostic change, external repository or
+materialization breadth, direct IO, injected semantic value, fresh graph,
+blocking/lock-across-compute path, JVM, Java bytecode, or Bazel delegation.
+Stop on a sixth implementation file, a private bzlmod-owner exposure, arbitrary
+invalid-UTF-8 source parsing, legacy behavior change, or required activation.
+
+Validate focused source/key/cycle/lifecycle/event tests, full
+`slug_bzlmod_v2` and `slug_loading_v2`, one direct `slug_core_v2` compile
+dependent, GNU-Windows no-run linkage, formatting, diff/archive status, and
+exact scope/public/Cargo/dependency/caller/legacy/IO/lock/blocking/JVM guards.
+Obtain one terminal independent implementation review.

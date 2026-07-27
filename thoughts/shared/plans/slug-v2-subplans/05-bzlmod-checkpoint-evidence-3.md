@@ -12449,3 +12449,233 @@ After this dormant attempt owner, separately design the parallel
 inputs. Only later typed query/analysis command roots and the accepted native
 demand driver may activate it. No Host `Need` may pass through the legacy
 `Arc<Result<...>>` package key or become a string error.
+
+### Host package-loading key input and ownership design
+
+Status: **ACCEPT** for
+`WP-5-m1-loading-host-package-key-input-ownership-design` on 2026-07-27 after
+one independent reserved-architecture review and focused correction rereview.
+No Rust, API, DICE key, dependency, fixture, consumer, or runtime path changed.
+
+Pinned Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` fixes the observable dependency
+shape. `PackageFunction.java:1044-1167` obtains repository mapping, selects and
+compiles the active BUILD file, resolves its load labels, loads every direct
+`.bzl`, and only then commits to evaluation with no further Skyframe restart.
+`BzlLoadValue.java:45-64,101-195,214-220` keys an ordinary loaded module by its
+absolute label and retains its transitive module/digest state.
+`BzlLoadFunction.java:662-730` requires the label package to equal the file's
+innermost containing package, while `:768-921` resolves each module's loads
+relative to that module, computes the child module keys, retains their
+transitive state, and then evaluates the module.
+`ContainingPackageLookupFunction.java:32-62` checks the deepest directory and
+walks parents across nonpackages, including invalid/deleted lookup results.
+`BzlCompileFunction.java:105-127` accepts both regular and special source
+files. The already accepted root-package lookup source pins ordered package
+roots, deleted/ignored packages, invalid package names, and `BUILD.bazel`
+before `BUILD`. Slug reproduces those dependencies in Rust; no JVM, Java
+bytecode, or Bazel execution belongs in this runtime path.
+
+The live public `HostRootPackageBoundaryKey` cannot supply direct loading.
+It is intentionally a traversal projection: invalid and missing packages both
+become `NoPackage`, and it hides the selected BUILD basename. Loading also
+cannot use public `PathFileBytesKey`, which rejects `SpecialFile`. The exact
+shared boundary is one new public bzlmod projection,
+`RootPackageSourceKey`, over the existing private
+`HostRootPackageLookupKey` and `HostFileBytesKey`. It owns package policy,
+marker selection, source-path construction, and regular-or-special bytes once;
+loading does not reproduce any of them.
+
+The projection also exposes one small immutable
+`RootPackageBzlTarget`, retaining a validated `Arc<[u8]>` relative target
+path with raw-byte equality, hashing, and ordering. Its checked constructor
+first applies Bazel `TargetName` validity and then maps every
+U+0000..=U+00ff carrier scalar to the same byte. It rejects a larger scalar,
+an empty or absolute target, `.` or `..` component, doubled or trailing
+separator, backslash, colon, control/DEL byte, non-`.bzl` suffix, or any other
+shape that could escape or ambiguously reconstruct the selected package
+directory. Failed construction occurs before a DICE key exists. This is the
+only raw target type accepted by the source key and private Host module key.
+
+`RootPackageSourceKey` has two constructors:
+
+- `for_build(workspace, package)`, whose semantic identity is the normalized
+  workspace, root-repository `PackagePath`, and `Build` request kind; and
+- `for_bzl(workspace, package, RootPackageBzlTarget)`, whose identity replaces
+  `Build` with the complete validated target raw bytes.
+
+Repository identity is deliberately absent because this first surface accepts
+only the main repository. Mapping provenance, selected package root, BUILD
+basename, bytes, capture mode, and path-observation generation are dependency
+results, not key identity. The validated target path is split on raw `/`; on
+Unix each nonempty component becomes one `OsStringExt` component without
+UTF-8 decoding. On Windows each component uses Bazel's internal
+UTF-8-to-platform shape; an invalid internal UTF-8 path remains an explicit
+typed unsupported result. There is no lossy path conversion on either
+platform.
+
+Its value is
+`SourcePreparationOutcome<Arc<Result<RootPackageSource,
+RootPackageSourceError>>>`. Complete success privately retains the selected
+package-path root, exact logical source path, selected relative source bytes,
+and one shared `Arc<[u8]>` content. Read-only accessors expose those four
+facts to loading. Complete typed errors preserve private lookup or Host-file
+errors and separately distinguish no BUILD file, deleted/ignored package,
+invalid package name, selected source missing, and unsupported platform path.
+Path Need becomes only `SourcePreparationNeeds::path` and otherwise passes
+unchanged. DICE infrastructure failure is fail-fast. Equality compares the
+entire complete result; validity accepts only Complete, so every Need is
+invalid and self-unequal. The projection captures and stores no events.
+
+The projection first computes `HostRootPackageLookupKey`. A package result
+supplies both its selected package root and active BUILD basename. `Build`
+reads that basename. Before a `.bzl` read, the projection walks target-parent
+package candidates from deepest to the declared label package through the same
+private lookup owner. It constructs each candidate by lifting every raw byte
+to the same-valued Latin-1 scalar, exactly as the accepted Host traversal
+boundary does. A deeper `Package` is the typed
+`LabelCrossesPackageBoundary` result; only an innermost package equal to the
+declared package supplies the source root. This matches Bazel's containing-
+package check for labels such as `//pkg:subpkg/file.bzl`; loading may not
+approximate it after source acquisition. Intermediate `NoBuildFile`,
+`Deleted`, and `InvalidPackageName` candidates continue to their parent; those
+states remain distinct only for the declared label package. The projection
+then appends the checked target components and computes the existing
+regular-or-special `HostFileBytesKey`. A marker selected by the lookup but
+missing at the byte edge is a typed selected-source inconsistency, never a
+fallback probe performed by loading. Declared-package `NoBuildFile`,
+`Deleted`, `InvalidPackageName`, and package-boundary crossing remain distinct
+direct-load results. Ignore policy keeps the private lookup's accepted direct-
+load behavior (`Deleted`); the public traversal projection remains unchanged
+and continues to expose `IgnoredDirectory` only for traversal pruning.
+
+Loading adds two private, dormant DICE keys in `bzl_module.rs`.
+`HostPackageLoadKey` identity is exactly normalized workspace plus root
+`PackagePath`; its value is
+`SourcePreparationOutcome<Arc<Result<LoadedPackage,
+HostPackageLoadError>>>`. `HostBzlModuleEvalKey` identity is normalized
+workspace plus a private mapping-free root-label value containing
+`PackagePath` and `RootPackageBzlTarget`; its value is
+`SourcePreparationOutcome<Arc<Result<FrozenBzlModule,
+HostBzlModuleError>>>`. Neither key includes selected roots, physical paths,
+source bytes/digests, loaded modules, event-capture mode, prepared globs, or
+command state. Both use structural complete equality and complete-only
+validity. Existing `Arc` source/module closures, `Dupe`, `Allocative`,
+`SmallMap`, and immutable slices remain the retained utility boundary; add no
+interner, global cache, retained standard map/set, or copied Buck/V1 loading
+tree.
+
+Load-label resolution is a pure checked helper, not another DICE key: it has
+no observable input beyond the requesting root package and one parsed load
+string. It preserves the original Bazel-internal spelling, resolves `:x.bzl`,
+`//pkg:x.bzl`, explicit apparent-main `@//pkg:x.bzl`, and canonical-main
+`@@//pkg:x.bzl` to the same mapping-free private root-label identity, and
+constructs the shared validated raw target only after full label/target
+validation. Any named apparent or canonical repository is
+`UnsupportedExternalRepositoryLoad`, retaining the spelling; `.scl`,
+builtins, prelude, autoload, and external mapping remain explicitly outside
+this root-only slice. The resolved label, not its physical selected path, is
+the `HostBzlModuleEvalKey` identity, matching Bazel's label key.
+
+Both BUILD and `.bzl` source bytes must first pass exact UTF-8 validation and
+then enter
+`AstModule::parse_with_string_encoding(..., StringEncoding::BazelInternal)`
+unchanged. This activates the accepted token-local raw-byte carrier without a
+whole-source Latin-1 transform. Arbitrary invalid-UTF-8 source content remains
+the seam's explicit typed `UnsupportedSourceEncoding` boundary. On Unix,
+codemap input names lift every logical-path byte to its same-valued Latin-1
+scalar instead of using lossy display. The accepted transactional BUILD
+attempt owner must use the same opt-in parser on every retry; standard parser
+behavior elsewhere remains unchanged.
+
+`HostPackageLoadKey::compute` performs this exact order in one caller-owned
+`DiceComputations`:
+
+1. compute `RootModuleLoadingAnchorKey`; return its Need unchanged or a typed
+   root error before any package/source observation;
+2. compute `RootPackageSourceKey::for_build`; preserve its Need/error and
+   selected root/source;
+3. validate and opt-in parse the BUILD source, resolve load statements in
+   source order, and compute each `HostBzlModuleEvalKey` through the same DICE
+   computation;
+4. after every reached module is Complete, call the accepted
+   `evaluate_host_package_attempts` with the selected package root, exact
+   source/path, and loaded frozen modules; and
+5. return its terminal package/error or its transient Need without converting
+   either to the legacy `LoadingError` package path.
+
+`HostBzlModuleEvalKey` computes `RootPackageSourceKey::for_bzl`, performs the
+same source validation and parser mode, resolves direct loads in source order,
+computes each child Host key, then evaluates and freezes the module with the
+existing manifest and lifetime-closure helpers. Sequential direct-child waits
+make one frontier Need active at a time and retain source-order error
+selection; completed child/source keys remain DICE-owned across the next
+caller round. No Need is stored in a temporary module or prepared-glob map.
+
+The existing request-scoped `bzl_load_cycle_detector()` remains the single
+installed `UserCycleDetector`, but its private backend must recognize a
+legacy-or-Host node enum. Keep `BzlLoadCycle`, `BzlLoadCycleGuard`, their
+legacy key fields, and all legacy diagnostics unchanged. Add a separate
+`HostBzlLoadCycle` and `HostBzlLoadCycleGuard`; each guard records edges only
+to its own key family, while the shared event loop stores the private node
+enum. Mixed-family edges are impossible because neither implementation
+computes the other. Host child waits race through the Host guard and compute
+the existing always-invalid cycle poison on detection so edit/break/restore
+recovers in the same DICE graph. A missing/mismatched detector is an
+infrastructure invariant, not a Bazel terminal error. Host cycle rendering
+uses the selected BUILD origin plus canonical root `.bzl` labels and preserves
+the existing Bazel cycle message shape without altering legacy rendering.
+
+Event ownership is local and complete-only:
+
+- the private root-module producer owns root readiness/evaluation events;
+- every Complete `HostBzlModuleEvalKey`, including a parse/load/evaluation
+  error, stores exactly one local batch (empty when it executed no print);
+- `HostPackageLoadKey` stores exactly the final BUILD attempt batch for a
+  Complete success or terminal error; and
+- every Need stores no local batch. Pending BUILD attempts discard prints and
+  targets as already accepted, while dependency batches stay
+  dependency-owned and are never merged or replayed by the package key.
+
+No evaluator, `RefCell` borrow, recorder, Starlark module, cycle-detector
+guard lock, or shared lock crosses a DICE await except the existing
+request-local async cycle wait, which has one sequential outstanding child
+and cannot re-enter its guard. The temporary prepared-glob `SmallMap` lives
+only inside one package compute and may be dropped on Need; DICE owns every
+completed semantic dependency. There is no direct filesystem IO, injected
+post-startup semantic value, fresh DICE graph, blocking executor, process
+global, or legacy workspace snapshot/file/directory key.
+
+Implement next only
+`WP-5-m1-loading-host-package-key-input-ownership` in exactly:
+
+- `app/slug_bzlmod_v2/src/host_package.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`;
+- `app/slug_loading_v2/src/bzl_module.rs`;
+- `app/slug_loading_v2/src/cycle_detector.rs`; and
+- new `app/slug_loading_v2/src/host_package_load_tests.rs`.
+
+Add no Cargo/dependency change, fixture, command/query/analysis/core caller,
+public loading export, legacy key/value/diagnostic change, repository
+materialization, JVM/Java/Bazel runtime path, or sixth file. Focused tests must
+prove both source kinds and regular/special bytes; BUILD primary/fallback and
+package-root selection; deleted/ignored/invalid/missing and nested-package-
+crossing distinctions; exact key identity and complete equality/Need
+invalidity; root-anchor-before-source ordering; relative and all explicit main
+load spellings; absolute/up-level/dot/doubled-separator/backslash/control/
+trailing-separator path rejection before key construction; external/`.scl`
+and invalid-source boundaries; transitive loads, source-order errors, and
+load-cycle render/recovery; local event ownership; pending glob print/target
+discard; and one retained graph covering marker, BUILD, `.bzl`,
+nested-package, load-edge, cycle, package-policy, and restoration transitions.
+Reuse the accepted Bazel-internal-string and glob evidence; add no oracle
+fixture.
+
+Validate the focused bzlmod source and Host loading/cycle tests, full
+`slug_bzlmod_v2` and `slug_loading_v2`, one direct `slug_core_v2` compile
+dependent, GNU-Windows no-run linkage, formatting, `git diff --check`,
+archive status, and exact scope/public/Cargo/dependency/caller/legacy/IO/lock/
+blocking/JVM guards. Stop and `REPLAN` if implementation requires exposing a
+private bzlmod owner, changing `PackageLoadKey` or `BzlModuleEvalKey`, command
+activation, external repository mapping/materialization, arbitrary
+invalid-UTF-8 source parsing, a fresh graph, or a sixth file.
