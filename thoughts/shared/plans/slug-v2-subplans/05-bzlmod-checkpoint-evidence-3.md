@@ -12797,3 +12797,114 @@ Cargo/dependency/legacy/IO/blocking/JVM guards pass.
 
 Next design only `WP-5-m1-analysis-typed-propagation-design`, bounded to the
 minimum typed analysis boundary required before the query command-root design.
+
+### Root configured-analysis typed-propagation design
+
+Status: **ACCEPT** for
+`WP-5-m1-analysis-typed-propagation-design` on 2026-07-27 after one independent
+reserved-boundary review and focused correction rereview.
+
+The live `ConfiguredTargetAnalysisKey` is already a public production key with
+`PathBuf` workspace identity and `Arc<Result<AnalysisResult, AnalysisError>>`
+value. It computes legacy `PackageLoadKey`, recursively computes itself through
+`try_compute_join`, and converts every loading or DICE failure to
+`AnalysisError`. Existing core callers inject eager workspace snapshots and
+cannot accept a preparation Need. Changing that key in place would activate an
+unprepared runtime path and break the accepted no-entrypoint-switch boundary.
+
+Add one parallel dormant public `RootConfiguredTargetAnalysisKey`. Its identity
+is normalized `NormalizedAbsolutePath` workspace plus the complete existing
+`ConfiguredTargetKey`; fields stay private and its public constructor accepts
+those two typed values. Its value is exactly
+`AnalysisPreparationOutcome<Arc<Result<AnalysisResult, AnalysisError>>>`, where
+`AnalysisPreparationOutcome` and `AnalysisPreparationNeeds` are analysis-root
+aliases of the loading-owned shared preparation envelope. This avoids a
+production `slug_bzlmod_v2` dependency while preserving one root/bootstrap/
+path/repository Need representation through loading and analysis.
+
+The root key accepts only root-repository configured labels. It computes
+`RootPackageLoadKey` for the configured label package in the same
+`DiceComputations`. Need passes through unchanged. A Complete loading error
+becomes the existing opaque `AnalysisError`; a Complete package selects the
+same target, Starlark-rule implementation, configured dependency keys, and
+analysis evaluator as the legacy key. External repositories, missing targets,
+non-Starlark rules, evaluator failures, providers, actions, and diagnostics
+retain the existing message and value shapes.
+
+Refactor only pure, post-loading analysis preparation shared by the two keys:
+
+- before dependency computes, one helper temporarily borrows the Complete
+  package value, finds the configured target, validates its Starlark-rule kind,
+  and returns owned declared dependency keys in declaration order;
+- both key families retain only their immutable owned
+  `Arc<Result<LoadedPackage, ...>>` dependency value across child computes,
+  with every package/target/implementation borrow dropped; and
+- after dependency computes, one helper reborrows that same completed package
+  value, re-finds the implementation, projects prepared providers in
+  declaration order, evaluates the rule, and owns the local print batch.
+
+Do not recompute either package key after the dependency horizon: its completed
+immutable value is already retained and DICE owns the dependency edge. No
+package/target/implementation borrow, evaluator, `RefCell`, print capture, or
+provider collection may cross a DICE await. The legacy key keeps its exact
+identity, value, dependency family, equality/validity, local event behavior,
+messages, and callers while using the shared pure helpers. For the root key,
+package Need can arise only from its initial `RootPackageLoadKey` compute and
+returns before dependency selection or local event capture.
+
+The root key deduplicates dependency keys in first-seen declaration order and
+computes every unique `RootConfiguredTargetAnalysisKey` with one
+`compute_join`. Each joined item retains its key and raw DICE result. After all
+complete:
+
+1. union every dependency Need in first-seen order with
+   `AnalysisPreparationNeeds::try_union`; conflicting Needs are a fail-fast
+   infrastructure invariant;
+2. if any Need exists, return the union and no local event batch;
+3. otherwise select the first DICE or Complete analysis error in first-seen
+   order; and
+4. otherwise restore declared duplicate/order projections and evaluate.
+
+This makes Need dominate a simultaneously observed terminal child result, as a
+Skyframe restart does, while keeping deterministic error and dependency order.
+Child event batches remain child-owned. Every root-key Complete success or
+terminal error stores exactly one local batch, empty when evaluation did not
+run or print; every Need stores none. Root-key equality is structural across
+the entire Complete result and self-unequal for Need; validity accepts only
+Complete. The existing legacy key continues to treat only successful results
+as equal/valid.
+
+The retained value stays one `Arc<Result<...>>`, existing `AnalysisResult`,
+immutable dependency slices, `SmallSet`, and `SmallMap`. The new preparation
+enum is an alias, not another wrapper or allocation. Add no interner, global
+cache, retained standard map/set, copied analysis graph, or new dependency
+value.
+
+Implement next only `WP-5-m1-analysis-typed-propagation` in:
+
+- `app/slug_analysis_v2/Cargo.toml`;
+- `app/slug_analysis_v2/src/dice.rs`;
+- `app/slug_analysis_v2/src/lib.rs`; and
+- new `app/slug_analysis_v2/tests/root_analysis.rs`.
+
+Move `slug_workspace_v2` from development-only to production dependencies for
+the normalized key identity; keep `slug_bzlmod_v2` development-only for
+focused Host input injection. Add no other dependency. The new focused test
+must prove public constructor identity, root package loading, recursive
+dependency order, two-child Need union, Complete equality/Need invalidity,
+local event ownership and initial package-Need suppression, and same-graph
+BUILD/`.bzl`/dependency edit-delete-restore behavior. Reuse the accepted
+loading source, cycle, glob, and event evidence; add no oracle.
+
+Run the focused root-analysis test, full `slug_analysis_v2` because shared pure
+helpers change the legacy call flow, direct `slug_core_v2` compile coverage,
+GNU-Windows no-run linkage, formatting, diff/archive status, and exact
+four-file/public-export/no-caller/Cargo/dependency/legacy-identity/IO/lock/
+blocking/JVM guards.
+
+Add no existing-key replacement, core/query/CLI/server caller, command/runtime
+activation, external repository, configuration transition, platform/toolchain,
+directory discovery, execution/materialization, fixture/oracle, JVM, Java
+bytecode, or Bazel delegation. Stop if Rust requires changing the legacy key
+value/identity, holding evaluator state across an await, adding a fifth file,
+or converting Need to `AnalysisError`.
