@@ -10640,3 +10640,52 @@ This is post-checkpoint oracle packet three after accepted checkpoint
 
 Next packet: implement only
 `WP-5-m1-loading-host-dirent-observation`.
+
+### Host typed no-follow dirent observation implementation
+
+Status: `ACCEPT` on 2026-07-27 in `609da3e1` after tests-first implementation,
+focused and full serial validation, and independent source/API,
+implementation/evidence, plus architecture/orchestration terminal latest-diff
+reviews.
+
+The five-file packet atomically replaces the names-only directory observation
+with `PathDirectoryEntryKind`, `PathDirectoryEntry`, and one retained
+`Arc<[PathDirectoryEntry]>`. Stable raw-name-only sorting preserves duplicate
+names and their input order while complete equality includes kind. The
+obsolete duplicate-name error, re-export, `.names()` accessor, and names-only
+constructor surface are removed without a compatibility or default-Unknown
+shim.
+
+Unix now copies `d_name` and `d_type`, directly maps regular, directory,
+symlink, and known special types, closes enumeration before refining only
+unknown or unrecognized types through no-follow metadata, maps missing,
+ENOTDIR, ELOOP, and present special values to `Unknown`, and terminalizes other
+child-stat IO. Windows preserves raw UTF-16 enumeration through close, then
+uses no-follow metadata attributes plus the existing reparse-aware node-kind
+classifier; special, null, and child-status IO map to `Unknown` without the
+change-time query. The existing single `DirectoryEntries` demand and complete
+DICE value own all classification; no child Need, key, operation, lock, or
+consumer was added.
+
+Focused regressions prove raw names, stable duplicate-kind order, separately
+allocated and kind-sensitive equality, invalid/self-unequal Need, one retained
+Need→File→Directory→Unknown→File lineage, complete restoration, typed listing
+forwarding, repository kind-only dirtiness and equal-reorder cleanliness,
+every Unix native type and unknown-status mapping after close, no-follow real
+file/directory/symlink/socket lifecycles, and Windows raw-unit/status ordering.
+Native Windows behavior and lone-surrogate ordering remain explicit activation
+gates; the GNU-Windows result proves compilation and linkage only.
+
+Validation passed 36 `slug_workspace_v2` tests, 109 `slug_core_v2` unit tests,
+13 core integration tests, all `slug_bzlmod_v2` and `slug_loading_v2` suites
+and doctests, and GNU-Windows no-run linkage for all four crates. Formatting,
+diff, archive, public-API removal, dependency, process, scope, and forbidden
+collection/owner guards passed. Exact additions are 506/520 in core path
+observation, 18/30 in repository validation tests, 2/5 in the workspace
+re-export, 144/150 in workspace path observation, and 28/45 in path-resolution
+tests: +698/-139 total under the +750 addition cap. No Cargo, dependency,
+fixture, loading, bzlmod, Starlark, DICE-key, consumer, or activation file
+changed. All terminal reviews returned `ACCEPT`.
+
+Next packet: design only
+`WP-5-m1-loading-byte-string-oracle-feasibility-design`.
