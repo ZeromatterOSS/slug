@@ -2277,11 +2277,12 @@ outputs must be exact.
 Do not change Cargo/dependencies, query functions/registry, parser grammar,
 graph identity/equality, loading metadata, evaluator traversal, target-pattern
 breadth, cquery/aquery behavior, JVM/regex code, other fixtures, or workspace
-assets. Validate the three exact Bazel rows from two fresh roots, protected
-fixture rows, focused command/query/CLI/server tests, the direct four-crate
-suite, formatting, diff, archive, and daemon cleanup. Stop if formatting needs
-new graph state, external-repository loading, a DICE key, or any behavior
-beyond Bazel 9.2 `PackageOutputFormatter`.
+assets. Validate one pinned Bazel 9.2 generation of the three exact rows, exact
+Slug replay of changed and protected fixture rows, focused
+command/query/CLI/server tests, the direct four-crate suite, formatting, diff,
+archive, and daemon cleanup. Stop if formatting needs new graph state,
+external-repository loading, a DICE key, or any behavior beyond Bazel 9.2
+`PackageOutputFormatter`.
 
 The package-output packet is accepted. Three generated Bazel rows, two
 fresh-root Bazel replays, and exact Slug replay prove root-package blank
