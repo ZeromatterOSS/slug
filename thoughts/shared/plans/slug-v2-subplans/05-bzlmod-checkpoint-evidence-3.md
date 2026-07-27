@@ -9640,3 +9640,146 @@ checkpoint is due: accepted post-`22de3631` packets
 `WP-5-m1-host-jvm-registry-startup-reuse-oracle` total +4 regular files, +3
 links, and +1,065 text lines, below all five-packet/+100-file/+10,000-line
 triggers, and the selected loading design adds no fixture.
+
+### Loading typed propagation design
+
+Status: `REPLAN` on 2026-07-27 after independent live-call-graph,
+Host-path/evidence, and architecture/orchestration audits. No non-plan
+repository file, Rust, Cargo, dependency, API, fixture, DICE key, loading
+consumer, or entrypoint changed.
+
+The loading-only implementation boundary is not yet truthful.
+`PackageLoadKey` first computes `RootModuleGraphKey` at
+`app/slug_loading_v2/src/bzl_module.rs:897-925`; the resulting repository
+mapping is presently unused, but the dependency anchors root `MODULE.bazel`
+validity and event ownership before package listing or BUILD evaluation.
+Keeping that legacy `Arc<Result<...>>` edge preserves eager snapshot state and
+cannot propagate a future Host Need. Dropping it loses root semantics and
+events. The accepted replacement, `HostRootModuleFileKey`, already returns
+`SourcePreparationOutcome` with complete-only equality, validity, and event
+storage, but its key, constructor, success value, and error remain
+crate-private at `app/slug_bzlmod_v2/src/host_module.rs:50-120`.
+
+Changing the existing loading keys in place is also outside this packet.
+`PackageLoadKey` has direct analysis, query, and core consumers that require
+its current `Arc<Result<...>>` value; the public evaluator methods return
+`anyhow::Result`. `PackageListingKey` recursively consumes
+`WorkspaceDirectoryKey`; BUILD fallback and every `.bzl` parse use
+`WorkspaceFileKey`; and both companion-discovery paths use the eager
+directory projection. `BzlModuleEvalKey`'s cycle detector recognizes only
+that legacy key identity. A typed replacement must therefore be a parallel,
+dormant, root-only surface until the separately scheduled analysis, query,
+core, and companion migrations consume it.
+
+Two further leaf prerequisites remain. The current `PackageListing` stores
+UTF-8 `CompactString`, while pinned Bazel
+9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a` preserves Unix
+directory-name bytes as internal strings:
+`src/main/native/unix_jni.cc:507,552-615` creates each `dirent::d_name` with
+`NewStringLatin1`, `src/main/native/latin1_jni_path.cc:26-44` maps every
+unsigned byte directly to one Java character,
+`src/main/java/com/google/devtools/build/lib/unix/UnixFileSystem.java:54-63,88-110`
+retains it in directory entries, and
+`src/main/java/com/google/devtools/build/lib/util/StringEncoding.java:50-85`
+defines the raw-byte invariant. `PathFragment.java:84-113` compares those raw
+unsigned bytes. There is no UTF-8 decode or invalid-name diagnostic:
+`StarlarkUtil.java:43-66` separately validates source contents, then
+`UnixGlob.java:212-248` compares patterns and names in the same internal byte
+representation. Raw non-ASCII directories remain traversable rather than
+package boundaries under `LabelValidator.java:50-61,96-138`,
+`PackageLookupFunction.java:91-96`, and
+`DirectoryDirentProducer.java:95-116`. Neither rejection nor
+`to_string_lossy` is authorized. A separate design must freeze a byte-capable
+Unix/Windows internal component plus Starlark pattern/result representation
+before `PackageListing` changes; it must reuse the existing compact
+deterministic collections/shared slices or record an explicit V2-owned
+utility extraction, not add standard map/string churn.
+Filesystem-only Latin-1 mapping is insufficient: pinned
+`StarlarkUtil.java:43-66` and `net/starlark/java/syntax/Lexer.java:274-425`
+retain distinct internal bytes for literal UTF-8 `é` (`c3 a9`) and octal
+`\351` (`e9`). If starlark-rust has already collapsed those spellings to one
+Unicode scalar, the later design also needs a Bazel-internal-string
+parser/evaluator seam; it may not reconstruct origin after evaluation.
+
+`PathDirectoryListingKey` also returns only sorted names, while Bazel's
+no-follow directory value retains direct kinds and resolves symlinks only
+after an active glob fragment matches. Pinned
+`DirectoryListingStateValue.java:84-90`,
+`PatternWithWildcardProducer.java:102-139,172-208`,
+`PatternWithoutWildcardProducer.java:68-97`, and
+`FileValue.java:49-82,113-120` prove the split: an unrelated dangling or
+cyclic symlink must not fail the glob; a matched final directory recurses
+under the logical path, a matched final file participates, and a matched
+dangling path is omitted. Direct special entries are skipped by a wildcard
+but accepted through a matching literal FileValue. Therefore eager
+whole-listing child resolution and terminalization is not exact. The later
+loading design must choose either a prepared value that retains raw
+no-follow kind plus deferred per-entry resolution/error state for synchronous
+pattern use, or a pattern-keyed Host glob owner. Its exact allowlist may
+include `glob.rs` and cannot be frozen by this packet.
+
+The public `PathFileBytesKey` is not the missing file owner: it accepts only a
+resolved `RegularFile`. Pinned Bazel
+`src/main/java/com/google/devtools/build/lib/skyframe/BzlCompileFunction.java:117-123`
+and
+`src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java:1287-1294`
+read special `.bzl` and BUILD files as files, and the accepted private bzlmod
+`HostFileBytesKey` already models regular-or-special behavior. Loading needs a
+separately reviewed reusable Host byte projection rather than copying that
+private owner or narrowing Bazel-valid input.
+
+The first prerequisite is design-only
+`WP-5-m1-bzlmod-root-loading-anchor-projection-design`. Its eventual
+implementation allowlist is exactly:
+
+- `app/slug_bzlmod_v2/src/host_module.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+Add one public opaque `RootModuleLoadingAnchorKey` over the private
+`HostRootModuleFileKey`, returning
+`SourcePreparationOutcome<Arc<Result<RootModuleLoadingAnchor,
+RootModuleLoadingAnchorError>>>`. The opaque success and error wrappers retain
+the complete private values internally so equality remains exact without
+exposing evaluated-module, include/file-error, repository-mapping, lockfile,
+or registry internals. Need passes through unchanged. The wrapper uses
+`complete_eq` and `is_complete`, owns no event batch, and leaves the private
+producer and its batch in the dependency closure. A DICE compute failure is a
+fail-fast invariant, never a terminal wrapper. Focused tests remain in
+`host_module.rs` and prove bootstrap/path Need pass-through, self-unequal
+invalid Need, equal complete success/error, no wrapper batch, and retained
+private-producer event closure. No Cargo change is permitted.
+
+After that anchor and both leaf designs are accepted, loading still requires
+parallel dormant root-only keys rather than an in-place conversion: at
+minimum `HostBzlParseKey`, `HostBzlModuleEvalKey`, and
+`HostPackageLoadKey`, each returning
+`SourcePreparationOutcome<Arc<Result<T, LoadingError>>>`. The exact
+listing/glob key and production/test allowlists remain owned by the
+byte-capable pattern-lazy design. `cycle_detector.rs` must eventually
+generalize its private node identity to legacy-or-Host without changing
+legacy diagnostics. The Host package root must compute the public bzlmod
+anchor before listing; actual Path Needs become only
+`SourcePreparationNeeds::path`; infrastructure failures and Needs are never
+stringified. A Need stores no local event batch, Complete success/error stores
+one exact batch, dependency batches remain dependency-owned, and runtime
+failure retains only its executed print prefix.
+
+Future focused evidence must cover root-anchor ordering; BUILD
+primary/fallback and `.bzl` create/edit/delete/recreate; regular and special
+bytes; matching versus unrelated file/directory symlink
+retarget/dangling/cycle behavior; raw non-UTF-8 names; literal-versus-wildcard
+special entries; reached-frontier Need union without eager unmatched
+resolution; self-unequal Need and semantic-equal Complete pruning; cycle
+recovery; and a speculative Need attempt whose local events do not enter the
+completed root closure. Existing external guards remain unchanged:
+`resolve_local_load` rejects nonroot repositories before Host observation,
+package paths stay normalized absolute descendants of the root workspace,
+`package.rs` keeps dependency/output labels root-local, and `visibility.rs`
+keeps external package specifications deferred. The Host blocks must contain
+no eager workspace snapshot/file/directory key, legacy root graph/files key,
+materialization namespace, direct filesystem IO, Need-to-string arm, or
+entrypoint/downstream consumer.
+
+No fixture-growth checkpoint is due: this design and its selected anchor
+design add no fixture. Next packet: design only
+`WP-5-m1-bzlmod-root-loading-anchor-projection-design`.
