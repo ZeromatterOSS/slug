@@ -341,31 +341,60 @@ impl ProjectionKey for RootPackageLookupInputsProjection {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+#[allow(dead_code)]
+struct RootVendorDirectoryProjection;
+
+impl fmt::Display for RootVendorDirectoryProjection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("root-vendor-directory-projection")
+    }
+}
+
+impl ProjectionKey for RootVendorDirectoryProjection {
+    type DeriveFromKey = RootPackagePolicyInputsKey;
+    type Value = Option<NormalizedAbsolutePath>;
+
+    fn compute(
+        &self,
+        inputs: &Arc<RootPackagePolicyInputs>,
+        _ctx: &DiceProjectionComputations,
+    ) -> Self::Value {
+        inputs.vendor_directory.dupe()
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 macro_rules! root_package_policy_projection_key {
     (
-        $key:ident,
+        $visibility:vis $key:ident,
         $value:ty,
         $projection:expr,
         $display:literal
     ) => {
         #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-        pub struct $key {
+        #[allow(dead_code)]
+        $visibility struct $key {
             workspace: NormalizedAbsolutePath,
         }
 
+        #[allow(dead_code)]
         impl $key {
-            pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+            $visibility fn new(workspace: NormalizedAbsolutePath) -> Self {
                 Self { workspace }
             }
 
-            pub fn workspace(&self) -> &NormalizedAbsolutePath {
+            $visibility fn workspace(&self) -> &NormalizedAbsolutePath {
                 &self.workspace
             }
         }
 
         impl fmt::Display for $key {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{}:{}", $display, self.workspace)
+                write!(f, "{}:{}", $display, self.workspace())
             }
         }
 
@@ -401,22 +430,28 @@ macro_rules! root_package_policy_projection_key {
 }
 
 root_package_policy_projection_key!(
-    RootRepoFileSemanticsProjectionKey,
+    pub RootRepoFileSemanticsProjectionKey,
     RootRepoFileSemantics,
     RootRepoFileSemanticsProjection,
     "root-repo-file-semantics"
 );
 root_package_policy_projection_key!(
-    RootRepositoryIgnoreInputsProjectionKey,
+    pub RootRepositoryIgnoreInputsProjectionKey,
     RootRepositoryIgnoreInputs,
     RootRepositoryIgnoreInputsProjection,
     "root-repository-ignore-inputs"
 );
 root_package_policy_projection_key!(
-    RootPackageLookupInputsProjectionKey,
+    pub RootPackageLookupInputsProjectionKey,
     Arc<RootPackageLookupInputs>,
     RootPackageLookupInputsProjection,
     "root-package-lookup-inputs"
+);
+root_package_policy_projection_key!(
+    pub(crate) RootVendorDirectoryProjectionKey,
+    Option<NormalizedAbsolutePath>,
+    RootVendorDirectoryProjection,
+    "root-vendor-directory"
 );
 
 pub fn inject_root_package_policy_inputs(

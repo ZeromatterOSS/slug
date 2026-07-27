@@ -7316,3 +7316,43 @@ activation changed.
 Next packet: implement only the accepted
 `WP-5-m1-host-registry-inputs` three-file prerequisite, serially and within
 the exact evidence and stop gates above.
+
+#### Host registry-input owners implementation status
+
+**Status:** Accepted after terminal latest-diff review on 2026-07-26.
+
+The dormant prerequisite changes exactly the three accepted paths with 899
+additions and eight deletions. The new private owner uses Arc-backed
+`SmallSet`/`SmallMap` values for separate registry-list and complete mirror-map
+injected keys, preserves the implicit BCR slash and structured
+post-converter normalization, and provides the separate opaque Refresh token.
+The package-policy owner adds only the private vendor-directory projection;
+`lib.rs` adds only the private module declaration. No public export,
+production injector, consumer, IO, clock, dependency, fixture, or activation
+is present.
+
+Four focused tests prove normalization, fresh-order versus set/map equality,
+retained old-order pruning, unequal A→B→A installation, workspace and input
+isolation, exact successful dependency edges, fail-closed absence, vendor-only
+projection pruning, typed vendor absence, and request-generation-independent
+Refresh tokens. The complete `slug_bzlmod_v2` surface passed 190 unit plus 184
+integration tests, zero failures, and zero doctests. GNU-Windows compile-only
+validation built all twelve test executables. Formatting, exact scope/growth,
+diff, archive, credential, and forbidden-edge scans passed.
+
+An isolated temporary audit, removed before acceptance, clarified the DICE
+invariant behind missing inputs. A direct absent `InjectedKey` has no graph
+node or dependency; a consumer that maps that setup failure is non-replayable
+after first injection in the same retained graph. Missing input is therefore
+an activation-order invariant diagnostic, not a recoverable request state,
+and no missing→present same-graph recovery is claimed. The later production
+activation owner must atomically preinject every required registry input
+before exposing any Host RegistryFunction or root consumer transaction.
+Successful initialized consumers each retain exactly one correct named
+input/projection dependency; fail-closed missing probes acquire zero forbidden
+edges.
+
+Source/parity, implementation/evidence, and architecture/orchestration
+terminal latest-diff reviews all returned `ACCEPT`. Next packet: implement
+only the accepted pure, root-free `WP-5-m1-host-registry-function` owner.
+Perform no registry IO and retain every later file/fetch/activation boundary.
