@@ -1,36 +1,45 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-loading-host-glob-callable-activation-design`
+Packet: `WP-5-m1-loading-host-glob-transactional-attempt-owner`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted callable/lifecycle fixtures `glob-callable-contract` and
-`glob-directory-invalidation`; private traversal `18f4b2db` and accepted
-loading adapter in the current tree
-Validation tier: docs/source/architecture
+Evidence: accepted `Host glob transactional package-evaluation design`,
+private traversal `18f4b2db`, and loading adapter `cb892552`
+Validation tier: private/local Rust
 
 Allowed files:
 
-- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
+- `app/slug_loading_v2/src/host_glob/mod.rs`
+- `app/slug_loading_v2/src/host_glob/adapter.rs`
+- `app/slug_loading_v2/src/package.rs`
+- `app/slug_loading_v2/src/bzl_module.rs`
+- new `app/slug_loading_v2/src/host_package_attempt_tests.rs`
 - terminal canonical, manifest, and exceptional routing updates
 
-Result: inspect the current `PackageLoadKey`/`PackageRecorder` evaluation path,
-the accepted private Host adapter, DICE ownership guidance, and pinned Bazel
-glob restart semantics. Freeze the smallest exact ownership design by which a
-synchronous Starlark `glob()` can request an asynchronous Host traversal
-without blocking, direct IO, a fresh graph, or speculative placeholder values.
+Result: add the reviewed private, dormant abort/await/restart owner. Across
+attempts retain only a compact prepared map keyed by one shared raw pattern
+plus operation. Every attempt reparses immutable source and owns a fresh
+module, recorder, targets, used-glob state, and print capture. Missing prepared
+work exits through typed `Pending`; prepared traversal/non-UTF8 failures exit
+through typed `Terminal`; outer control is recognized only through the
+attempt-local slot, never error text.
 
-The design must name attempt-local recorder, target, event, and prepared-match
-state; the caller-owned retained DICE transaction; how a missing one-pattern
-result aborts and retries evaluation; how completed matches and errors are
-reused; and why partial attempts cannot publish package or event state. It must
-preserve current include/exclude, operation, sorting, and `allow_empty`
-semantics over the accepted pattern subset and define exact same-daemon
-invalidation/restoration evidence.
+Drop evaluator state and all targets before any adapter await. Complete work
+enters the prepared map and retries; `Need` returns unchanged; typed input
+failure retains only its saved print prefix. Pending attempts publish no
+events. Terminal errors retain their exact typed payload and print prefix but
+never call `finish`; final success alone publishes package targets. Preserve
+include-then-exclude source order, both operations, per-include/all-excluded
+`allow_empty` diagnostics, leading-`@` disambiguation, sorting, deduplication,
+and exact UTF-8 conversion or typed rejection.
 
-Do not edit Rust, Cargo, fixtures, generated records, Stage 9, dependencies, or
-tests. Do not authorize JVM execution, blocking on DICE inside Starlark,
-placeholder-driven speculative evaluation, raw-byte Starlark ingress,
-BUILD/`.bzl` acquisition changes, external repositories, SUBPACKAGES,
-native-Windows behavior, or broader glob grammar. Validate source anchors,
-current call-flow and event ownership, exact docs-only scope, formatting,
-`git diff --check`, archive status, and one independent architecture review.
+Add no public export, dependency, DICE key, legacy `PackageLoadKey` change,
+production caller, fixture, parser change, direct IO, lock, blocking, fresh
+graph, speculative value, JVM code, external repository, SUBPACKAGES,
+native-Windows, or broader grammar. Tests must cover one/multiple/repeated
+requests, loaded macros, operations and composition, payload-bearing
+traversal/input/non-UTF8 errors, `Need`, pending discard, terminal/final event
+and target ownership, same-graph reuse/restoration, and zero production
+callers. Run focused attempt/adapter/traversal tests, full loading crate,
+formatting, diff/archive, and exact scope/public/key/dependency/IO/lock/caller
+guards. Stop on a sixth file or downstream propagation requirement.

@@ -12311,3 +12311,141 @@ Starlark-evaluator versus asynchronous DICE retry/attempt ownership required
 for callable activation. JVM execution, blocking DICE, direct filesystem
 fallback, native-Windows ordering, raw-byte Starlark ingress, BUILD/`.bzl`
 acquisition, external repositories, and SUBPACKAGES remain excluded.
+
+### Host glob transactional package-evaluation design
+
+Status: **ACCEPT** for
+`WP-5-m1-loading-host-glob-callable-activation-design` on 2026-07-27 after
+independent architecture review and focused correction rereview.
+
+Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+establishes the observable contract without prescribing Slug's machinery.
+`Globber.java:20-62` defines one `(includes, excludes, operation, allowEmpty)`
+call and an unordered fetched result.
+`StarlarkNativeModule.java:93-131` chooses FILES versus FILES_AND_DIRS, fetches
+the matches synchronously, disambiguates leading `@`, and natural-sorts the
+returned Starlark list. `GlobsValue.java:68-123` keys individual dependency
+work by pattern plus operation.
+`PackageFunctionWithSingleGlobsDep.java:98-155,174-218` records those requests
+while a non-Skyframe globber evaluates the package, then validates the same
+requests through Skyframe. Slug must match the result and dependency behavior,
+not reproduce that direct-filesystem hybrid.
+
+The live Rust evaluator has no async native-call suspension seam:
+`starlark/src/values/types/function.rs:90-160` defines a synchronous
+`NativeFuncFn` returning `Result<Value>`, and
+`starlark/src/eval/compiler/module.rs:261-270` evaluates one module
+synchronously. The complete Starlark statement enum at
+`starlark_syntax/src/syntax/ast.rs:384-400` has no exception handler, so BUILD
+or loaded-macro code cannot catch a native-call failure. The exact V2 seam is
+therefore an attempt-local abort/await/restart loop, not `block_on`, a
+placeholder value, direct IO, or evaluator emulation.
+
+The first implementation remains private and dormant. It does not change
+legacy `PackageLoadKey`, `PackageListingKey`, any consumer, or any command
+root. It adds a crate-private Host request containing exactly one shared
+raw-byte pattern and FILES/FILES_AND_DIRS operation. Request equality and
+hashing contain both fields. The accepted adapter computes that request through
+the caller's `DiceComputations`; pattern/key-construction failures and complete
+traversal failures stay typed, while `Need` remains transient control state.
+
+One temporary
+`SmallMap<HostGlobLoadingRequest, Arc<Result<HostGlobLoadingMatches,
+HostGlobTraversalError>>>` lives outside evaluator attempts but inside one
+future Host package computation; `Need` is never stored. It is neither a DICE
+value nor a cache. Each attempt reparses the same already-validated immutable
+source and constructs a new Starlark `Module`, `PackageRecorder`, target state,
+used-glob list, and print capture while reusing already loaded frozen `.bzl`
+modules. The recorder borrows only the prepared map and owns one
+`RefCell<Option<HostGlobAttemptControl>>` slot. The control enum is exactly
+`Pending(HostGlobLoadingRequest)` or
+`Terminal(HostGlobAttemptError)`. The typed terminal error distinguishes a
+request-construction failure, a payload-preserving traversal failure, and an
+unsupported non-UTF-8 result; the future outer Host package error may wrap it
+but may not stringify it.
+
+`glob()` first performs the existing argument/type and `GlobSpec` validation.
+It examines include patterns in source order followed by excludes, all under
+the operation selected from `exclude_directories`. On the first absent request,
+it stores `Pending(request)` in the empty control slot and returns one private
+control error. If a prepared request contains a traversal error, it stores
+`Terminal(Traversal(error))`; if an otherwise successful path cannot convert
+exactly to the current UTF-8 Starlark representation, it stores
+`Terminal(UnsupportedPath { path })`. Both then return the same private control
+error. The outer evaluator never recognizes that error by text: after
+`eval_module` fails, it consumes the recorder's typed control slot. A control
+slot with successful evaluation, a second control value, or the private
+control error without a slot is an invariant failure. Starlark has no catch
+construct, so the transfer is not user-observable.
+
+Before awaiting, the outer loop converts the print capture to an attempt-local
+batch and drops the evaluator, Starlark module, recorder, target/used-glob
+state, and evaluation error. It then computes exactly the pending request
+through the existing adapter with no lock or `RefCell` borrow alive. A complete
+success or typed traversal error enters the temporary prepared map, discards
+the pending batch, and starts a fresh attempt. A `Need` discards that batch and
+returns unchanged to the future Host package owner. A typed pattern/key
+construction failure becomes `Terminal(Input(error))` and returns with that
+attempt's saved print prefix; targets remain dropped. The temporary map may be
+dropped on Need because completed traversal keys remain DICE-owned and are
+reused on the next computation. There is no retry cap: every complete retry
+adds one previously absent request, so progress is finite for one finite
+evaluation trace.
+
+On `Terminal`, the outer loop does not await or retry. It consumes and returns
+the exact typed error, retains that attempt's print prefix as its complete
+local event batch, and drops the module, recorder, and all partially declared
+targets without calling `finish`. A normal Starlark error with no control slot
+does the same through the existing loading-error branch. Thus only `Pending`
+discards its print capture; terminal glob and ordinary evaluation failures
+retain executed prints while never publishing targets.
+
+Once every reached request is prepared, callable composition preserves the
+accepted `GlobSpec` behavior: union each include's sorted raw paths, remember
+whether each include matched before excludes, remove the union of exclude
+matches, diagnose the first empty include when `allow_empty` is false, then
+diagnose an all-excluded result, sort, and deduplicate once. Only paths that
+convert exactly to the current UTF-8 Starlark representation may complete this
+dormant owner; a non-UTF-8 path is an explicit typed unsupported boundary,
+never lossy text. Leading-`@` disambiguation remains a required composition
+case. `used_globs` is appended only after successful composition.
+
+Only a final successful attempt may call `PackageRecorder::finish`. A final
+success, normal Starlark error, or typed terminal glob error may retain its
+local print batch; every pending attempt publishes no batch and drops all
+declared targets. Loaded-module event batches remain dependency-owned and are
+not replayed by BUILD attempts. This preserves the accepted command-level rule
+that a `Need` is invalid and never becomes `LoadingError`; eventual propagation
+through a parallel Host package key and typed command root remains a separate
+reviewed packet.
+
+Implement next only
+`WP-5-m1-loading-host-glob-transactional-attempt-owner` in:
+
+- `app/slug_loading_v2/src/host_glob/mod.rs`;
+- `app/slug_loading_v2/src/host_glob/adapter.rs`;
+- `app/slug_loading_v2/src/package.rs`;
+- `app/slug_loading_v2/src/bzl_module.rs`; and
+- new `app/slug_loading_v2/src/host_package_attempt_tests.rs`.
+
+Add no public export, dependency, DICE key, production caller, fixture, parser
+change, or legacy behavior change. Focused tests must prove one and multiple
+requests, repeated-request reuse, include/exclude ordering, both operations,
+per-include and all-excluded diagnostics, leading `@`, explicit non-UTF-8
+rejection, a payload-bearing typed traversal error and `Need`, typed identity
+through the control transfer, pending-attempt print/target discard, terminal
+traversal/non-UTF-8 print-prefix retention with target nonpublication,
+final-success print/target retention, typed input failure with its print
+prefix, loaded-macro requests, same-graph complete reuse/restoration, and zero
+legacy/production callers.
+Run the focused attempt/adapter/traversal tests, full loading crate, formatting,
+diff/archive, exact allowlist, no-public/key/dependency/IO/lock/blocking, and
+caller guards. Stop if the owner requires changing `PackageLoadKey`, a fresh
+DICE graph, blocking evaluator work, speculative values, a sixth file, or
+downstream propagation.
+
+After this dormant attempt owner, separately design the parallel
+`HostPackageLoadKey` and its root-module/package-marker/BUILD/`.bzl` Host
+inputs. Only later typed query/analysis command roots and the accepted native
+demand driver may activate it. No Host `Need` may pass through the legacy
+`Arc<Result<...>>` package key or become a string error.
