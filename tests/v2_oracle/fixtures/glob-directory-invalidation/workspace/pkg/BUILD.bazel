@@ -2,3 +2,28 @@ filegroup(
     name = "txts",
     srcs = glob(["*.txt"]),
 )
+
+[
+    filegroup(name = "state_files_" + path.replace("/", "_"), srcs = [path])
+    for path in glob(["state*"], allow_empty = True)
+]
+
+[
+    filegroup(name = "state_all_" + path.replace("/", "_"), srcs = [path])
+    for path in glob(["state*"], exclude_directories = 0, allow_empty = True)
+]
+
+[
+    filegroup(name = "special_wild_" + path.replace("/", "_"), srcs = [path])
+    for path in glob(["specials/*"], allow_empty = True)
+]
+
+[
+    filegroup(name = "special_literal_" + path.replace("/", "_"), srcs = [path])
+    for path in glob(["specials/direct"], allow_empty = True)
+]
+
+[
+    filegroup(name = "links_" + path.replace("/", "_"), srcs = [path])
+    for path in glob(["links/*-match.txt"], allow_empty = True)
+]

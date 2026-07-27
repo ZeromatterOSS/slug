@@ -1,31 +1,52 @@
 [fixture]
 name = "glob-directory-invalidation"
-description = "A filegroup glob observes create, rename, and delete mutations in one warm workspace."
+description = "A filegroup glob observes create, rename, delete, kind, special, and symlink mutations in one warm workspace."
 comparison = "message_shape"
 daemon = true
-oracle_notes = "Same-daemon directory listing and glob invalidation over a single copied workspace and output base."
+observe_server_epochs = true
+required_host_os = "posix"
+oracle_notes = "Same-daemon directory listing and glob invalidation over a copied workspace and one output base, with explicit absent observations for stale atomic kind replacements."
 
 [provenance]
 bazel_release = "9.2.0"
 bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
 source_anchors = [
-  "src/main/java/com/google/devtools/build/lib/skyframe/DirectoryListingValue.java",
-  "src/main/java/com/google/devtools/build/lib/skyframe/GlobFunctionWithMultipleRecursiveFunctions.java",
+  "src/main/java/com/google/devtools/build/lib/packages/StarlarkNativeModule.java",
+  "src/main/java/com/google/devtools/build/lib/packages/GlobCache.java",
   "src/main/java/com/google/devtools/build/lib/skyframe/PackageFunctionWithMultipleGlobDeps.java",
+  "src/main/java/com/google/devtools/build/lib/packages/producers/PatternWithWildcardProducer.java",
+  "src/main/java/com/google/devtools/build/lib/packages/producers/PatternWithoutWildcardProducer.java",
+  "src/main/java/com/google/devtools/build/lib/packages/producers/DirectoryDirentProducer.java",
+  "src/main/java/com/google/devtools/build/lib/vfs/UnixGlob.java",
+  "src/main/java/com/google/devtools/build/lib/vfs/Dirent.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/DirectoryListingStateValue.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/CompactSortedDirents.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/DirtinessCheckerUtils.java",
+  "src/main/java/com/google/devtools/build/lib/unix/NativePosixFiles.java",
+  "src/main/java/com/google/devtools/build/lib/unix/UnixFileSystem.java",
+  "src/main/java/com/google/devtools/build/lib/vfs/FileSymlinkLoopException.java",
+  "src/main/native/unix_jni.cc",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/FileFunction.java",
+  "src/test/java/com/google/devtools/build/lib/skyframe/GlobTestBase.java",
+  "src/test/java/com/google/devtools/build/lib/skyframe/PackageFunctionTest.java",
+  "src/test/java/com/google/devtools/build/lib/analysis/AnalysisFailureReportingTest.java",
 ]
-translation_notes = "Reduced to one package-local *.txt filegroup query so each directory mutation has a sorted-label oracle."
+translation_notes = "Extends the retained four-row *.txt invalidation fixture with explicit allow-empty POSIX ASCII regular/absent/directory/symlink/FIFO states and isolated matched-cycle recovery. Two absent observations are required because pinned Bazel controls retain atomic regular-to-directory and directory-to-symlink membership."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture glob-directory-invalidation --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture glob-directory-invalidation --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
 name = "initial"
 argv = ["query", "deps(//pkg:txts)"]
+capture_server_epoch = true
 expected_exit = 0
 stdout_patterns = ["\\A//pkg:keep\\.txt\\n//pkg:txts\\Z"]
 
 [[commands]]
 name = "after_create"
 argv = ["query", "deps(//pkg:txts)"]
+capture_server_epoch = true
 expected_exit = 0
 stdout_patterns = ["\\A//pkg:created\\.txt\\n//pkg:keep\\.txt\\n//pkg:txts\\Z"]
 
@@ -37,6 +58,7 @@ content = "created\n"
 [[commands]]
 name = "after_rename"
 argv = ["query", "deps(//pkg:txts)"]
+capture_server_epoch = true
 expected_exit = 0
 stdout_patterns = ["\\A//pkg:keep\\.txt\\n//pkg:renamed\\.txt\\n//pkg:txts\\Z"]
 
@@ -48,9 +70,131 @@ destination = "pkg/renamed.txt"
 [[commands]]
 name = "after_delete"
 argv = ["query", "deps(//pkg:txts)"]
+capture_server_epoch = true
 expected_exit = 0
 stdout_patterns = ["\\A//pkg:keep\\.txt\\n//pkg:txts\\Z"]
 
 [[commands.mutations]]
 op = "delete"
 path = "pkg/renamed.txt"
+
+[[commands]]
+name = "kind_baseline"
+argv = ["query", "//pkg:all except //pkg:txts"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:links_links_good-match\\.txt\\n//pkg:special_literal_specials_direct\\n//pkg:special_wild_specials_link-to-direct\\n//pkg:state_all_state\\n//pkg:state_files_state\\Z"]
+
+[[commands.mutations]]
+op = "fifo"
+path = "pkg/specials/direct"
+
+[[commands.mutations]]
+op = "fifo"
+path = "staging/special"
+
+[[commands]]
+name = "kind_absent_after_regular"
+argv = ["query", "//pkg:all except //pkg:txts"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:links_links_good-match\\.txt\\n//pkg:special_literal_specials_direct\\n//pkg:special_wild_specials_link-to-direct\\Z"]
+
+[[commands.mutations]]
+op = "rename"
+path = "pkg/state"
+destination = "staging/file"
+
+[[commands]]
+name = "kind_directory"
+argv = ["query", "//pkg:all except //pkg:txts"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:links_links_good-match\\.txt\\n//pkg:special_literal_specials_direct\\n//pkg:special_wild_specials_link-to-direct\\n//pkg:state_all_state\\Z"]
+
+[[commands.mutations]]
+op = "rename"
+path = "staging/dir"
+destination = "pkg/state"
+
+[[commands]]
+name = "kind_absent_after_directory"
+argv = ["query", "//pkg:all except //pkg:txts"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:links_links_good-match\\.txt\\n//pkg:special_literal_specials_direct\\n//pkg:special_wild_specials_link-to-direct\\Z"]
+
+[[commands.mutations]]
+op = "rename"
+path = "pkg/state"
+destination = "staging/dir-used"
+
+[[commands]]
+name = "kind_symlink_to_special"
+argv = ["query", "//pkg:all except //pkg:txts"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:links_links_good-match\\.txt\\n//pkg:special_literal_specials_direct\\n//pkg:special_wild_specials_link-to-direct\\n//pkg:state_all_state\\n//pkg:state_files_state\\Z"]
+
+[[commands.mutations]]
+op = "rename"
+path = "staging/link"
+destination = "pkg/state"
+
+[[commands]]
+name = "kind_direct_fifo"
+argv = ["query", "//pkg:all except //pkg:txts"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:links_links_good-match\\.txt\\n//pkg:special_literal_specials_direct\\n//pkg:special_wild_specials_link-to-direct\\Z"]
+
+[[commands.mutations]]
+op = "rename"
+path = "pkg/state"
+destination = "staging/link-used"
+
+[[commands.mutations]]
+op = "rename"
+path = "staging/special"
+destination = "pkg/state"
+
+[[commands]]
+name = "kind_regular_restored"
+argv = ["query", "//pkg:all except //pkg:txts"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:links_links_good-match\\.txt\\n//pkg:special_literal_specials_direct\\n//pkg:special_wild_specials_link-to-direct\\n//pkg:state_all_state\\n//pkg:state_files_state\\Z"]
+
+[[commands.mutations]]
+op = "rename"
+path = "pkg/state"
+destination = "staging/special-used"
+
+[[commands.mutations]]
+op = "rename"
+path = "staging/file"
+destination = "pkg/state"
+
+[[commands]]
+name = "matched_cycle_failure"
+argv = ["query", "//cycle_error:probe"]
+capture_server_epoch = true
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "error globbing [matched-*] op=FILES:",
+  "cycle_error/matched-cycle.txt",
+  "Too many levels of symbolic links",
+]
+
+[[commands]]
+name = "matched_cycle_recovery"
+argv = ["query", "//cycle_error:probe"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//cycle_error:probe\\Z"]
+
+[[commands.mutations]]
+op = "rename"
+path = "cycle_error/matched-cycle.txt"
+destination = "cycle_error/.parked"

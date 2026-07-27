@@ -249,6 +249,30 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
                 record["content"] = mutation.content
             applied.append(record)
             continue
+        if mutation.op == "fifo":
+            if os.name != "posix":
+                raise RuntimeError("fifo mutation requires a POSIX host")
+            if os.path.lexists(path):
+                raise FileExistsError(
+                    f"mutation fifo destination exists: {mutation.path}"
+                )
+            _require_existing_real_parent(path, mutation.path)
+            created = False
+            try:
+                os.mkfifo(path, 0o600)
+                created = True
+                os.chmod(path, 0o600)
+                mode = path.lstat().st_mode
+                if not stat.S_ISFIFO(mode) or stat.S_IMODE(mode) != 0o600:
+                    raise RuntimeError(
+                        f"mutation fifo did not retain FIFO type and mode 0600: {mutation.path}"
+                    )
+            except BaseException:
+                if created:
+                    path.unlink(missing_ok=True)
+                raise
+            applied.append({"op": "fifo", "path": mutation.path})
+            continue
         if mutation.op == "delete":
             _require_regular_or_symlink_source(path, mutation.path)
             path.unlink()
@@ -257,7 +281,7 @@ def _apply_mutations(workspace: Path, command: FixtureCommand) -> list[dict[str,
         if mutation.op == "rename":
             assert mutation.destination is not None
             destination = _workspace_mutation_entry_path(workspace, mutation.destination)
-            _require_regular_or_symlink_source(path, mutation.path)
+            _require_rename_source(path, mutation.path)
             if os.path.lexists(destination):
                 raise FileExistsError(f"mutation rename destination exists: {mutation.destination}")
             _require_existing_real_parent(destination, mutation.destination)
@@ -320,6 +344,22 @@ def _require_regular_or_symlink_source(path: Path, display_path: str) -> None:
     if not (stat.S_ISREG(mode) or stat.S_ISLNK(mode)):
         raise ValueError(
             f"mutation source must be a regular file or symlink: {display_path}"
+        )
+
+
+def _require_rename_source(path: Path, display_path: str) -> None:
+    if not os.path.lexists(path):
+        raise FileNotFoundError(f"mutation source does not exist: {display_path}")
+    mode = path.lstat().st_mode
+    if not (
+        stat.S_ISREG(mode)
+        or stat.S_ISLNK(mode)
+        or stat.S_ISDIR(mode)
+        or stat.S_ISFIFO(mode)
+    ):
+        raise ValueError(
+            "mutation rename source must be a regular file, symlink, directory, "
+            f"or FIFO: {display_path}"
         )
 
 
@@ -633,6 +673,10 @@ def _extract_reapi_evidence(stderr: str) -> dict[str, Any] | None:
 
 
 def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict[str, Any]:
+    if fixture.required_host_os == "posix" and os.name != "posix":
+        raise RuntimeError(
+            f"fixture {fixture.name} requires a POSIX host"
+        )
     if fixture.observe_server_epochs and tool.name != "bazel":
         raise RuntimeError(
             "server epoch observation is Bazel-only because authenticated Slug Status "

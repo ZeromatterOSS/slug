@@ -1,0 +1,4 @@
+filegroup(
+    name = "probe",
+    srcs = glob(["matched-*"], allow_empty = True),
+)

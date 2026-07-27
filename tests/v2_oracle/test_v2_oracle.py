@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import uuid
@@ -101,15 +103,68 @@ def test_fixture_parser_reads_commands_and_mutations() -> None:
 
 def test_fixture_parser_reads_file_operations_and_provenance() -> None:
     fixture = load_fixture(FIXTURES / "glob-directory-invalidation")
-    assert [command.mutations[0].op for command in fixture.commands[1:]] == [
+    assert fixture.required_host_os == "posix"
+    assert fixture.observe_server_epochs
+    assert [command.name for command in fixture.commands] == [
+        "initial",
+        "after_create",
+        "after_rename",
+        "after_delete",
+        "kind_baseline",
+        "kind_absent_after_regular",
+        "kind_directory",
+        "kind_absent_after_directory",
+        "kind_symlink_to_special",
+        "kind_direct_fifo",
+        "kind_regular_restored",
+        "matched_cycle_failure",
+        "matched_cycle_recovery",
+    ]
+    assert len(fixture.commands) == 13
+    assert all(command.capture_server_epoch for command in fixture.commands)
+    assert [command.mutations[0].op for command in fixture.commands[1:4]] == [
         "create",
         "rename",
         "delete",
     ]
     assert fixture.commands[2].mutations[0].destination == "pkg/renamed.txt"
+    assert [mutation.op for mutation in fixture.commands[4].mutations] == [
+        "fifo",
+        "fifo",
+    ]
     assert fixture.provenance.bazel_release == "9.2.0"
     assert fixture.provenance.bazel_commit == "8220c6198837d5c13d53fea211cf3282aa12408a"
-    assert len(fixture.provenance.source_anchors) == 3
+    assert len(fixture.provenance.source_anchors) == 20
+
+    expected = json.loads(fixture.expected_oracle.read_text(encoding="utf-8"))
+    first_four = []
+    for command in expected["commands"][:4]:
+        projected = dict(command)
+        assert projected.pop("server_epoch") == 1
+        first_four.append(projected)
+    projection = json.dumps(first_four, sort_keys=True, separators=(",", ":")).encode()
+    assert hashlib.sha256(projection).hexdigest() == (
+        "8b071ed78fd40d7046f2b7e4e96461b53ee85346e37d41006e22a53d4137b393"
+    )
+
+
+@pytest.mark.parametrize("value", ['""', '"windows"', "true"])
+def test_fixture_parser_rejects_unsupported_required_host_os(value: str) -> None:
+    root = scratch_dir("required-host-parser")
+    (root / "workspace").mkdir()
+    (root / "expected").mkdir()
+    (root / "fixture.toml").write_text(
+        (
+            "[fixture]\n"
+            'name = "required-host-parser"\n'
+            f"required_host_os = {value}\n\n"
+            "[[commands]]\n"
+            'argv = ["query", "//:BUILD.bazel"]\n'
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="required_host_os"):
+        load_fixture(root)
 
 
 def test_startup_fixture_parser_and_argv_merge_are_strict() -> None:
@@ -332,6 +387,9 @@ def test_fixture_http_registry_bind_failure_is_bounded_and_reports_stderr() -> N
     [
         ('op = "create"\npath = "x.txt"', "create mutation requires content"),
         ('op = "delete"\npath = "x.txt"\ncontent = "x"', "delete mutation permits only path"),
+        ('op = "fifo"\npath = "x.txt"\ncontent = "x"', "fifo mutation permits only path"),
+        ('op = "fifo"\npath = "x.txt"\ndestination = "y.txt"', "fifo mutation permits only path"),
+        ('op = "fifo"\npath = "x.txt"\nextra = true', "fifo mutation permits only"),
         ('op = "rename"\npath = "x.txt"', "rename mutation requires destination"),
         ('op = "create"\npath = "../x.txt"\ncontent = "x"', "relative workspace path"),
         ('op = "rename"\npath = "x.txt"\ndestination = "/tmp/x.txt"', "relative workspace path"),
@@ -423,6 +481,41 @@ path = "renamed.txt"
             ),
         )
 
+    directory = workspace / "directory"
+    directory.mkdir()
+    _apply_mutations(
+        workspace,
+        mutation_command(
+            Mutation(path="directory", op="rename", destination="renamed-directory")
+        ),
+    )
+    assert (workspace / "renamed-directory").is_dir()
+
+    assert _apply_mutations(
+        workspace,
+        mutation_command(Mutation(path="pipe", op="fifo")),
+    ) == [{"op": "fifo", "path": "pipe"}]
+    pipe_mode = (workspace / "pipe").lstat().st_mode
+    assert stat.S_ISFIFO(pipe_mode)
+    assert stat.S_IMODE(pipe_mode) == 0o600
+    _apply_mutations(
+        workspace,
+        mutation_command(
+            Mutation(path="pipe", op="rename", destination="renamed-pipe")
+        ),
+    )
+    assert stat.S_ISFIFO((workspace / "renamed-pipe").lstat().st_mode)
+    with pytest.raises(FileExistsError, match="fifo destination exists"):
+        _apply_mutations(
+            workspace,
+            mutation_command(Mutation(path="source.txt", op="fifo")),
+        )
+    with pytest.raises(FileNotFoundError, match="existing real directory"):
+        _apply_mutations(
+            workspace,
+            mutation_command(Mutation(path="missing/pipe", op="fifo")),
+        )
+
     target_dir = workspace / "target-dir"
     target_dir.mkdir()
     (workspace / "directory-link").symlink_to(target_dir, target_is_directory=True)
@@ -476,9 +569,37 @@ path = "renamed.txt"
     with pytest.raises(ValueError, match="escapes workspace"):
         _apply_mutations(
             workspace,
+            mutation_command(Mutation(path="escape/pipe", op="fifo")),
+        )
+    with pytest.raises(ValueError, match="escapes workspace"):
+        _apply_mutations(
+            workspace,
             mutation_command(Mutation(path="escape/victim.txt", op="delete")),
         )
     assert (outside / "victim.txt").is_file()
+
+
+def test_required_host_rejection_precedes_workspace_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = Fixture(
+        name="posix-only",
+        root=Path("/fixture"),
+        workspace=Path("/fixture/workspace"),
+        expected=Path("/fixture/expected"),
+        required_host_os="posix",
+    )
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.os.name", "nt")
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._copy_workspace",
+        lambda fixture, run_dir: pytest.fail("workspace copied"),
+    )
+    with pytest.raises(RuntimeError, match="requires a POSIX host"):
+        run_fixture(
+            fixture,
+            ToolConfig(name="bazel", executable=Path("/usr/bin/bazel")),
+            RunOptions(run_root=scratch_dir("required-host-run")),
+        )
 
 
 def test_runner_expands_workspace_uri_only_in_copied_utf8_regular_files() -> None:

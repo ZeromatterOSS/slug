@@ -20,6 +20,7 @@
       "name": "initial",
       "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:keep.txt\n//pkg:txts",
+      "server_epoch": 1,
       "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-directory-invalidation/20260722-205923-235264-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/glob-directory-invalidation/20260722-205946-235805-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: aac32260-1a4c-4ebf-ac34-b2d2d178b8a2\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:keep.txt\n//pkg:txts\n"
     },
@@ -48,6 +49,7 @@
       "name": "after_create",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:created.txt\n//pkg:keep.txt\n//pkg:txts",
+      "server_epoch": 1,
       "stderr": "INFO: Invocation ID: 658f4a3d-edea-4275-a7b7-32dda915e00f\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:created.txt\n//pkg:keep.txt\n//pkg:txts\n"
     },
@@ -77,6 +79,7 @@
       "name": "after_rename",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:keep.txt\n//pkg:renamed.txt\n//pkg:txts",
+      "server_epoch": 1,
       "stderr": "INFO: Invocation ID: c6f25b78-3c5b-45d7-9141-cfd3153acf06\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:keep.txt\n//pkg:renamed.txt\n//pkg:txts\n"
     },
@@ -105,8 +108,313 @@
       "name": "after_delete",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "//pkg:keep.txt\n//pkg:txts",
+      "server_epoch": 1,
       "stderr": "INFO: Invocation ID: d6fba891-487a-4c5e-be8c-2c8cb83f7d5e\nLoading: 0 packages loaded\n",
       "stdout": "//pkg:keep.txt\n//pkg:txts\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "op": "fifo",
+          "path": "pkg/specials/direct"
+        },
+        {
+          "op": "fifo",
+          "path": "staging/special"
+        }
+      ],
+      "name": "kind_baseline",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n//pkg:state_all_state\n//pkg:state_files_state",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 34dfcb28-95ba-4246-8355-62e8c501e455\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n//pkg:state_all_state\n//pkg:state_files_state\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "staging/file",
+          "op": "rename",
+          "path": "pkg/state"
+        }
+      ],
+      "name": "kind_absent_after_regular",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 3e87f7e1-7734-40cb-934d-36cd152e500a\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "pkg/state",
+          "op": "rename",
+          "path": "staging/dir"
+        }
+      ],
+      "name": "kind_directory",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n//pkg:state_all_state",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: b8d2b025-77ee-42b0-bd9b-585bcfedb5d3\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n//pkg:state_all_state\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "staging/dir-used",
+          "op": "rename",
+          "path": "pkg/state"
+        }
+      ],
+      "name": "kind_absent_after_directory",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: a5c43825-a5b0-4f6b-878a-e89101cb5394\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "pkg/state",
+          "op": "rename",
+          "path": "staging/link"
+        }
+      ],
+      "name": "kind_symlink_to_special",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n//pkg:state_all_state\n//pkg:state_files_state",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: f2f179cd-e4d9-41b4-bebe-900c45e13bd3\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n//pkg:state_all_state\n//pkg:state_files_state\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "staging/link-used",
+          "op": "rename",
+          "path": "pkg/state"
+        },
+        {
+          "destination": "pkg/state",
+          "op": "rename",
+          "path": "staging/special"
+        }
+      ],
+      "name": "kind_direct_fifo",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 325eb49a-b163-4461-9f50-993394b000be\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//pkg:all except //pkg:txts"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "staging/special-used",
+          "op": "rename",
+          "path": "pkg/state"
+        },
+        {
+          "destination": "pkg/state",
+          "op": "rename",
+          "path": "staging/file"
+        }
+      ],
+      "name": "kind_regular_restored",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n//pkg:state_all_state\n//pkg:state_files_state",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 3acf75b6-53fb-4ebe-8966-733a97d1af82\nLoading: 0 packages loaded\n",
+      "stdout": "//pkg:links_links_good-match.txt\n//pkg:special_literal_specials_direct\n//pkg:special_wild_specials_link-to-direct\n//pkg:state_all_state\n//pkg:state_files_state\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//cycle_error:probe"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//cycle_error:probe"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "matched_cycle_failure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nERROR: no such package 'cycle_error': error globbing [matched-*] op=FILES: [unix_jni.cc:382] <workspace>/cycle_error/matched-cycle.txt (Too many levels of symbolic links)",
+      "normalized_stdout": "",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 3410c25f-f485-45e6-8692-f5fc66edb417\nLoading: 0 packages loaded\nERROR: no such package 'cycle_error': error globbing [matched-*] op=FILES: [unix_jni.cc:382] /run/media/system/Colossus/dev/slug/target/v2o/runs/glob-directory-invalidation/20260727-042645-3986641-bazel/workspace/cycle_error/matched-cycle.txt (Too many levels of symbolic links)\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//cycle_error:probe"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//cycle_error:probe"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "destination": "cycle_error/.parked",
+          "op": "rename",
+          "path": "cycle_error/matched-cycle.txt"
+        }
+      ],
+      "name": "matched_cycle_recovery",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//cycle_error:probe",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 2e6df731-c0b2-4bf8-991a-da030a54906c\nLoading: 0 packages loaded\n",
+      "stdout": "//cycle_error:probe\n"
     }
   ],
   "fixture": "glob-directory-invalidation",

@@ -78,6 +78,7 @@ class Fixture:
     startup_argv: tuple[str, ...] = ()
     env: tuple[tuple[str, str], ...] = ()
     observe_server_epochs: bool = False
+    required_host_os: str | None = None
     http_registry: bool = False
     http_registry_port: int | None = None
 
@@ -146,8 +147,10 @@ def _parse_mutations(items: Any) -> tuple[Mutation, ...]:
             raise ValueError("mutation.path is required")
         _validate_relative_path(path, "mutation.path")
         op = item.get("op")
-        if op is not None and (not isinstance(op, str) or op not in {"create", "delete", "rename"}):
-            raise ValueError("mutation.op must be create, delete, or rename")
+        if op is not None and (
+            not isinstance(op, str) or op not in {"create", "delete", "fifo", "rename"}
+        ):
+            raise ValueError("mutation.op must be create, delete, fifo, or rename")
         find = item.get("find")
         replace = item.get("replace")
         content = item.get("content")
@@ -168,6 +171,9 @@ def _parse_mutations(items: Any) -> tuple[Mutation, ...]:
         elif op == "delete":
             if any(value is not None for value in (find, replace, content, destination)):
                 raise ValueError("delete mutation permits only path")
+        elif op == "fifo":
+            if set(item) != {"op", "path"}:
+                raise ValueError("fifo mutation permits only op and path")
         elif op == "rename":
             if destination is None or any(value is not None for value in (find, replace, content)):
                 raise ValueError("rename mutation requires destination and no find, replace, or content")
@@ -289,6 +295,9 @@ def load_fixture(path: Path) -> Fixture:
     observe_server_epochs = _as_bool(
         fixture_data.get("observe_server_epochs"), "fixture.observe_server_epochs"
     )
+    required_host_os = fixture_data.get("required_host_os")
+    if required_host_os not in (None, "posix"):
+        raise ValueError("fixture.required_host_os must be absent or 'posix'")
     if observe_server_epochs and not daemon:
         raise ValueError("fixture.observe_server_epochs requires fixture.daemon = true")
     if not observe_server_epochs and any(command.capture_server_epoch for command in commands):
@@ -312,6 +321,7 @@ def load_fixture(path: Path) -> Fixture:
         ),
         env=_as_str_map(fixture_data.get("env"), "fixture.env"),
         observe_server_epochs=observe_server_epochs,
+        required_host_os=required_host_os,
         http_registry=http_registry,
         http_registry_port=http_registry_port,
     )
