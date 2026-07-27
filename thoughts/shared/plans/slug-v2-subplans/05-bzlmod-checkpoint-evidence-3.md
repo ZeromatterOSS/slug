@@ -8828,3 +8828,31 @@ Next packet: implement only
 `WP-5-m1-host-registry-local-directory-collation-charset-oracle` inside the
 exact contract above. After its acceptance, design the named typed
 startup-property blocker before retrying the runtime bridge correction.
+
+#### Local registry-directory collation/charset oracle implementation status
+
+Status: `ACCEPT` after terminal latest-diff review on 2026-07-26.
+
+The exact eight-path implementation adds three semantic rows, three regular
+assets, and three relative symlinks to the retained fixture. Pinned Bazel 9.2
+generation and two absolute distinct-root replays passed with exits
+`0/37/0`, identical 1,228-byte visible-lockfile manifests, the exact
+91-byte ROOT/ISO-8859-1 SRI, the found-empty name-mismatch diagnostic, and
+ordinary-file restoration. All packet output-base servers were shut down.
+
+The first eleven expected records remain byte-identical. The fixture is
+exactly 57 regular files, five symlinks, and 1,112 newline-counted lines;
+the full tracked fixture tree is 1,306/19/37,317, making this packet one
+after checkpoint `22de3631`. The parser and 42 focused harness tests, exact
+scope/topology/bytes/hash/manifest/normalization/credential/server gates, and
+`git diff --check` passed. The fixture records the full pinned OpenJDK
+file-and-line matrix, including the verified
+`sun/util/locale/provider/CollationRules.java` path. Source/parity,
+implementation/evidence, and architecture/orchestration terminal
+latest-diff reviews all returned `ACCEPT`.
+
+Next packet: design only `WP-5-m1-host-jvm-registry-byte-input-design`.
+Freeze ordered last-wins startup-property identity plus daemon
+restart/invalidation without weakening the still-required native-Windows
+portable, empty, and lone-surrogate observation gate. Do not retry the
+runtime bridge or activate a consumer first.

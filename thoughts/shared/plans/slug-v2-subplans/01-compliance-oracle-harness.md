@@ -1051,3 +1051,17 @@ signatures, and source/parity, implementation/evidence, plus
 architecture/fixture-hygiene reviews returned `ACCEPT`. The pruning allowlist
 and affected replay set are both `none`. The next checkpoint starts from
 accepted tree `22de3631` and counts later accepted oracle packets only.
+
+### Post-checkpoint oracle packet 1 (2026-07-26)
+
+The accepted local registry-directory collation/charset oracle adds exactly
+three regular files, three relative symlinks, and 332 newline-counted lines
+to `nonroot-interim-module-graph`. That fixture is now 57/5/1,112 and the
+full tracked fixture tree is 1,306 regular files, 19 symlinks, and 37,317
+lines. Its fourteen retained rows include the new ROOT/ISO-8859-1 listing,
+found-empty directory, and ordinary restoration sequence; generation and two
+distinct-root replays passed.
+
+This is packet one after accepted baseline `22de3631`. Growth remains below
+both the roughly 100-file and 10,000-line review triggers, so the checkpoint
+baseline is unchanged and no pruning review is due.

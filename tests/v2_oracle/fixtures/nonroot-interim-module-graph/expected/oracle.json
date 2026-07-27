@@ -539,9 +539,9 @@
       ],
       "name": "portable_directory_root_collation_and_latin1_bytes",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
-      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)",
-      "stderr": "INFO: Invocation ID: <uuid>\n no actions running\n",
-      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)\n"
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file://<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)",
+      "stderr": "INFO: Invocation ID: b37cbd6e-b5e2-4899-858b-becd196c8cb1\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///tmp/slug-collation-gen.o4m8JE/runs/nonroot-interim-module-graph/20260726-233707-3829040-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-XvPSTH8P0MJVFfgfYQPMSsLAvSHGp2uIts690FOHYx4=\",\n  remote_patch_strip = 0,\n)\n\n"
     },
     {
       "argv": [
@@ -614,9 +614,9 @@
         }
       ],
       "name": "empty_followed_directory_is_found",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: <uuid>\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()\n",
+      "stderr": "INFO: Invocation ID: 118f59f8-2384-495c-b434-2f59e37e065e\n no actions running\nERROR: in module dependency chain <root> -> devonly@1.0.0: the MODULE.bazel file of devonly@1.0.0 declares a different name ()\n",
       "stdout": ""
     },
     {
@@ -675,9 +675,9 @@
       ],
       "name": "regular_file_restores_after_empty_directory",
       "normalized_stderr": "INFO: Invocation ID: <uuid>\n no actions running",
-      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
-      "stderr": "INFO: Invocation ID: <uuid>\n no actions running\n",
-      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"fil<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n"
+      "normalized_stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file://<workspace>/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)",
+      "stderr": "INFO: Invocation ID: 42ec8c9b-4848-4afd-8a2f-4bc9e9eecb7b\n no actions running\n",
+      "stdout": "## @@devonly+:\nload(\"@@bazel_tools//tools/build_defs/repo:http.bzl\", \"http_archive\")\nhttp_archive(\n  name = \"devonly+\",\n  urls = [\"https://example.invalid/devonly-1.0.0.tar.gz\"],\n  integrity = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\",\n  strip_prefix = \"\",\n  remote_patches = {},\n  remote_file_urls = {},\n  remote_file_integrity = {},\n  remote_module_file_urls = [\"file:///tmp/slug-collation-gen.o4m8JE/runs/nonroot-interim-module-graph/20260726-233707-3829040-bazel/workspace/registry/modules/devonly/1.0.0/MODULE.bazel\"],\n  remote_module_file_integrity = \"sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=\",\n  remote_patch_strip = 0,\n)\n\n"
     }
   ],
   "fixture": "nonroot-interim-module-graph",
