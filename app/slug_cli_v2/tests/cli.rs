@@ -3081,3 +3081,71 @@ fn package_output_matches_the_three_accepted_bazel_rows() {
         assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
     }
 }
+
+#[test]
+fn explicit_label_output_matches_bazel_and_text_is_rejected() {
+    let workspace = fixture_workspace("query-path-topology");
+    let expression = "allpaths(//:linear_start, //:linear_end)";
+    let cases = [
+        (
+            "--order_output=auto",
+            "//:linear_end\n//:linear_mid\n//:linear_start\n",
+        ),
+        (
+            "--order_output=full",
+            "//:linear_start\n//:linear_mid\n//:linear_end\n",
+        ),
+    ];
+
+    for (order, expected) in cases {
+        let output = slug()
+            .current_dir(&workspace)
+            .args(["query", "--output=label", order, expression])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{order}: {output:?}");
+        assert!(output.stderr.is_empty(), "{order}: {output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            expected,
+            "{order}"
+        );
+    }
+
+    let output_base = scratch("explicit-label-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    for (order, expected) in cases {
+        let output = slug()
+            .current_dir(&workspace)
+            .args([
+                output_base_arg.as_str(),
+                "query",
+                "--output=label",
+                order,
+                expression,
+            ])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{order}: {output:?}");
+        assert!(output.stderr.is_empty(), "{order}: {output:?}");
+        assert_eq!(
+            String::from_utf8(output.stdout).unwrap(),
+            expected,
+            "{order}"
+        );
+    }
+
+    let rejected = slug()
+        .current_dir(&workspace)
+        .args(["query", "--output=text", "//:linear_start"])
+        .output()
+        .unwrap();
+    assert_eq!(rejected.status.code(), Some(2), "{rejected:?}");
+    assert!(rejected.stdout.is_empty(), "{rejected:?}");
+    let rejected_stderr = String::from_utf8_lossy(&rejected.stderr);
+    assert!(
+        rejected_stderr.contains("Invalid output format 'text'. Valid values are: label, label_kind, build, minrank, maxrank, package, location, graph, xml, proto, streamed_jsonproto, streamed_proto"),
+        "{rejected:?}"
+    );
+}

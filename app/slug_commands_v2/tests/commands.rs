@@ -89,7 +89,7 @@ fn build_request_parses_target_patterns_and_classifies_flags() {
 
 #[test]
 fn command_requests_extract_bzlmod_policy_flags() {
-    let query = QueryRequest::parse(&["--output=text", "deps(//pkg:bin)"]).unwrap();
+    let query = QueryRequest::parse(&["--output=label", "deps(//pkg:bin)"]).unwrap();
     let cquery = CqueryRequest::parse(&[
         "--ignore_dev_dependency=false",
         "--lockfile_mode=error",
@@ -101,7 +101,7 @@ fn command_requests_extract_bzlmod_policy_flags() {
     let run = RunRequest::parse(&["--ignore_dev_dependency", "//pkg:bin"]).unwrap();
     let test = TestRequest::parse(&["--noignore_dev_dependency", "//pkg:probe_test"]).unwrap();
 
-    assert_eq!(query.output, QueryOutputFormat::Text);
+    assert_eq!(query.output, QueryOutputFormat::Label);
     assert!(!query.bzlmod_policy.ignore_dev_dependency());
     assert_eq!(query.lockfile_mode, LockfileMode::Update);
     assert_eq!(
@@ -229,10 +229,10 @@ fn environment_value_normalization_is_pure_and_source_specific() {
 #[test]
 fn query_request_parses_expression_and_output_format() {
     let request =
-        QueryRequest::parse(&["--output=text", "--order_output=full", "deps(//pkg:bin)"]).unwrap();
+        QueryRequest::parse(&["--output=label", "--order_output=full", "deps(//pkg:bin)"]).unwrap();
 
     assert_eq!(request.expression.to_string(), "deps(//pkg:bin)");
-    assert_eq!(request.output, QueryOutputFormat::Text);
+    assert_eq!(request.output, QueryOutputFormat::Label);
     assert_eq!(request.order, slug_query_v2::QueryOrder::Full);
 }
 
@@ -314,7 +314,9 @@ fn query_request_parses_strict_test_suite_booleans_and_last_occurrence_wins() {
 }
 
 #[test]
-fn query_request_accepts_label_kind_and_package_and_rejects_other_deferred_output_modes() {
+fn query_request_accepts_label_label_kind_and_package_and_rejects_deferred_or_text_output() {
+    let label = QueryRequest::parse(&["--output=label", "//pkg:bin"]).unwrap();
+    assert_eq!(label.output, QueryOutputFormat::Label);
     let label_kind = QueryRequest::parse(&["--output=label_kind", "//pkg:bin"]).unwrap();
     assert_eq!(label_kind.output, QueryOutputFormat::LabelKind);
     let package = QueryRequest::parse(&["--output=package", "//pkg:bin"]).unwrap();
@@ -323,7 +325,18 @@ fn query_request_accepts_label_kind_and_package_and_rejects_other_deferred_outpu
     let output = QueryRequest::parse(&["--output=build", "//pkg:bin"])
         .unwrap_err()
         .to_string();
-    assert!(output.contains("only text, graph, label_kind, and package are implemented"));
+    assert!(output.contains("only label, graph, label_kind, and package are implemented"));
+
+    let text = QueryRequest::parse(&["--output=text", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
+    assert!(text.contains("Invalid output format 'text'"), "{text}");
+    assert!(
+        text.contains(
+            "label, label_kind, build, minrank, maxrank, package, location, graph, xml, proto, streamed_jsonproto, streamed_proto"
+        ),
+        "{text}"
+    );
 
     for order in ["deps", "no"] {
         let error =
@@ -337,8 +350,8 @@ fn query_request_accepts_label_kind_and_package_and_rejects_other_deferred_outpu
 #[test]
 fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
     for (flag, expected) in [
-        ("--output", "expected text, graph, label_kind, or package"),
-        ("--output=", "expected text, graph, label_kind, or package"),
+        ("--output", "expected label, graph, label_kind, or package"),
+        ("--output=", "expected label, graph, label_kind, or package"),
         ("--order_output", "expected auto or full"),
         ("--order_output=", "expected auto or full"),
         ("--output_base", "expected a non-empty path"),

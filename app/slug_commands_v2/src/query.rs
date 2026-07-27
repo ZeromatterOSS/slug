@@ -94,8 +94,15 @@ fn validate_query_flags(
     for flag in flags {
         match flag.name.as_str() {
             "output" => {
-                let value = required_query_flag_value(flag, "text, graph, label_kind, or package")?;
-                if value != "text"
+                let value =
+                    required_query_flag_value(flag, "label, graph, label_kind, or package")?;
+                if value == "text" {
+                    return Err(CommandParseError::InvalidFlagValue {
+                        flag: flag.raw.clone(),
+                        message: "Invalid output format 'text'. Valid values are: label, label_kind, build, minrank, maxrank, package, location, graph, xml, proto, streamed_jsonproto, streamed_proto".to_owned(),
+                    });
+                }
+                if value != "label"
                     && value != "graph"
                     && value != "label_kind"
                     && value != "package"
@@ -103,7 +110,7 @@ fn validate_query_flags(
                     return Err(CommandParseError::InvalidFlagValue {
                         flag: flag.raw.clone(),
                         message: format!(
-                            "output format '{value}' is recognized but deferred; only text, graph, label_kind, and package are implemented"
+                            "output format '{value}' is recognized but deferred; only label, graph, label_kind, and package are implemented"
                         ),
                     });
                 }

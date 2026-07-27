@@ -398,6 +398,29 @@ fn retained_daemon_matches_the_three_accepted_package_rows() {
 }
 
 #[test]
+fn retained_daemon_accepts_explicit_label_output() {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/query-path-topology/workspace");
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let expression = "allpaths(//:linear_start, //:linear_end)";
+    for (order, expected) in [
+        (
+            QueryOrder::Auto,
+            "//:linear_end\n//:linear_mid\n//:linear_start\n",
+        ),
+        (
+            QueryOrder::Full,
+            "//:linear_start\n//:linear_mid\n//:linear_end\n",
+        ),
+    ] {
+        let result = daemon.query_with_output(expression, order, "label", true);
+        assert_eq!(result.exit_code, 0, "{order}: {result:?}");
+        assert!(result.stderr.is_empty(), "{order}: {result:?}");
+        assert_eq!(result.stdout, expected, "{order}");
+    }
+}
+
+#[test]
 fn retained_daemon_matches_the_ten_accepted_label_kind_rows() {
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/v2_oracle/fixtures");
     let rule_workspace = fixtures.join("query-executables-rule-capability/workspace");

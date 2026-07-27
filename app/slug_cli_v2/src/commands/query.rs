@@ -61,7 +61,7 @@ pub fn run(argv: Vec<String>) -> i32 {
     ) {
         Ok(output) => {
             let stdout = match request.output {
-                QueryOutputFormat::Text => output.stdout(),
+                QueryOutputFormat::Text | QueryOutputFormat::Label => output.stdout(),
                 QueryOutputFormat::Graph => {
                     output.graph_stdout(request.graph_factored, request.order.is_full())
                 }

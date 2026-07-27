@@ -41,12 +41,11 @@ execution/cache breadth becomes the project priority.
 ### Current M3 status
 
 Live Status in the canonical plan owns scheduling. The root-repository query
-command is user-visible with text, graph, and `label_kind` output and 13 of
-Bazel 9.2's 16 default functions. `WP-8-m3-query-label-kind-output` reuses the
-accepted eight rule-capability and two generated-file rows through one-shot
-and retained-daemon paths. Output-specific completion loads only otherwise
-unresolved selected kinds; standard text/graph dependencies and ordering stay
-unchanged. Focused cross-package failure/edit/recovery proves that boundary.
+command is user-visible with default/explicit `label`, graph, `label_kind`, and
+`package` output and 13 of Bazel 9.2's 16 default functions. Output-specific
+kind completion loads only otherwise unresolved selected kinds; standard label
+and graph dependencies and ordering stay unchanged. Focused cross-package
+failure/edit/recovery proves that boundary.
 
 `attr`, `filter`, and `kind` remain blocked on an exact Java-compatible
 `Pattern` substrate. External repositories, pattern breadth, and other output
@@ -2313,6 +2312,19 @@ fixture, dependency, graph, DICE, or Stage 9 change remains.
 `WP-8-m3-query-label-output` is next: accept Bazel's explicit `--output=label`
 as the existing default label renderer and reject the prototype-only
 `--output=text` with Bazel 9's invalid-format diagnostic.
+
+## Explicit label output accepted (2026-07-27)
+
+Three Bazel 9.2 rows prove explicit label equivalence with default output under
+auto/full order and reject `--output=text` with exit 2 and the exact
+12-formatter valid-value list. Pinned generation
+`20260727-120133-118527-bazel`, exact Bazel replay
+`20260727-120219-121350-bazel`, and exact Slug replay
+`20260727-120504-126550-slug` passed while preserving all 43 prior path rows.
+The direct command/CLI/server suites passed 75 tests; formatting, archive,
+diff, daemon cleanup, and exact nine-file scope passed. The internal default
+text discriminator remains request-local for aquery/default routing and is not
+a public query output format.
 
 ## `tests` / `visible` feasibility ranking accepted (2026-07-23)
 

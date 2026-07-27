@@ -280,7 +280,7 @@ impl Daemon {
             ) {
             Ok(output) => {
                 let stdout = match output_format {
-                    "text" => output.stdout(),
+                    "text" | "label" => output.stdout(),
                     "graph" => output.graph_stdout(graph_factored, order.is_full()),
                     "label_kind" => output.label_kind_stdout(),
                     "package" => output.package_stdout(),

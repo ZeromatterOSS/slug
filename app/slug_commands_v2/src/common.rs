@@ -43,6 +43,7 @@ pub struct ParsedFlag {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QueryOutputFormat {
     Text,
+    Label,
     Graph,
     StreamedJsonProto,
     LabelKind,
@@ -130,6 +131,7 @@ impl fmt::Display for QueryOutputFormat {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Text => f.write_str("text"),
+            Self::Label => f.write_str("label"),
             Self::Graph => f.write_str("graph"),
             Self::StreamedJsonProto => f.write_str("streamed_jsonproto"),
             Self::LabelKind => f.write_str("label_kind"),
@@ -333,6 +335,7 @@ pub(crate) fn output_format(flags: &[ParsedFlag]) -> QueryOutputFormat {
     };
     match value {
         "text" => QueryOutputFormat::Text,
+        "label" => QueryOutputFormat::Label,
         "graph" => QueryOutputFormat::Graph,
         "streamed_jsonproto" => QueryOutputFormat::StreamedJsonProto,
         "label_kind" => QueryOutputFormat::LabelKind,

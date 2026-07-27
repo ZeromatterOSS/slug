@@ -1,8 +1,8 @@
 [fixture]
 name = "query-path-topology"
-description = "Bazel 9.2 root-repository loading-query oracle for allpaths and somepath over source and rule topology."
+description = "Bazel 9.2 root-repository loading-query oracle for allpaths, somepath, and explicit label output over source and rule topology."
 comparison = "message_shape"
-oracle_notes = "Root-only, text-only loading-query slice. The workspace has no generated/output nodes, analysis, external repositories, or filesystem-sensitive query functions. somepath is arbitrary by Bazel contract: the bounded alternatives below admit only complete forward shortest paths. QueryCommand deliberately preserves a top-level somepath's forward path for default/auto rather than applying lexicographic AUTO sorting."
+oracle_notes = "Root-only label loading-query slice. The workspace has no generated/output nodes, analysis, external repositories, or filesystem-sensitive query functions. somepath is arbitrary by Bazel contract: the bounded alternatives below admit only complete forward shortest paths. QueryCommand deliberately preserves a top-level somepath's forward path for default/auto rather than applying lexicographic AUTO sorting. Explicit label rows prove equivalence with default output under auto/full order and Bazel 9 rejection of prototype-only text output."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -13,6 +13,9 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryEnvironment.java",
   "src/main/java/com/google/devtools/build/lib/runtime/commands/QueryCommand.java",
   "src/main/java/com/google/devtools/build/lib/query2/engine/QueryExpression.java#isTopLevelSomePathFunction",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/LabelOutputFormatter.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/OutputFormatters.java",
+  "src/main/java/com/google/devtools/build/lib/runtime/commands/QueryEnvironmentBasedCommand.java",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSomePathOperator",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSomePathOperatorOrdering",
   "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testAllPathsOperator",
@@ -38,6 +41,25 @@ name = "allpaths_linear_full"
 argv = ["query", "--order_output=full", "allpaths(//:linear_start, //:linear_end)"]
 expected_exit = 0
 stdout_patterns = ["\\A//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "label_allpaths_linear_auto"
+argv = ["query", "--output=label", "--order_output=auto", "allpaths(//:linear_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_end\\n//:linear_mid\\n//:linear_start\\Z"]
+
+[[commands]]
+name = "label_allpaths_linear_full"
+argv = ["query", "--output=label", "--order_output=full", "allpaths(//:linear_start, //:linear_end)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:linear_start\\n//:linear_mid\\n//:linear_end\\Z"]
+
+[[commands]]
+name = "text_output_rejected"
+argv = ["query", "--output=text", "//:linear_start"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["Invalid output format 'text'\\. Valid values are: label, label_kind, build, minrank, maxrank, package, location, graph, xml, proto, streamed_jsonproto, streamed_proto"]
 
 [[commands]]
 name = "somepath_linear_default"

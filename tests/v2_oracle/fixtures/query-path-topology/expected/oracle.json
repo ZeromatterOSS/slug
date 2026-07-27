@@ -76,6 +76,94 @@
     {
       "argv": [
         "query",
+        "--output=label",
+        "--order_output=auto",
+        "allpaths(//:linear_start, //:linear_end)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label",
+        "--order_output=auto",
+        "allpaths(//:linear_start, //:linear_end)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "label_allpaths_linear_auto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:linear_end\n//:linear_mid\n//:linear_start",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 64a7f2a1-e9c0-49c4-b30c-8697e320c16d\nLoading: 0 packages loaded\n",
+      "stdout": "//:linear_end\n//:linear_mid\n//:linear_start\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=label",
+        "--order_output=full",
+        "allpaths(//:linear_start, //:linear_end)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=label",
+        "--order_output=full",
+        "allpaths(//:linear_start, //:linear_end)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "label_allpaths_linear_full",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "//:linear_start\n//:linear_mid\n//:linear_end",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 990820ea-fb3c-4345-bdcf-689fd0c4d5f9\nLoading: 0 packages loaded\n",
+      "stdout": "//:linear_start\n//:linear_mid\n//:linear_end\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=text",
+        "//:linear_start"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=text",
+        "//:linear_start"
+      ],
+      "exit_code": 2,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "text_output_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: Invalid output format 'text'. Valid values are: label, label_kind, build, minrank, maxrank, package, location, graph, xml, proto, streamed_jsonproto, streamed_proto",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 606f2379-0d1f-4221-8268-49c813226fd3\nERROR: Invalid output format 'text'. Valid values are: label, label_kind, build, minrank, maxrank, package, location, graph, xml, proto, streamed_jsonproto, streamed_proto\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
         "somepath(//:linear_start, //:linear_end)"
       ],
       "cwd": "<workspace>",
