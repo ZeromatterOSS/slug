@@ -1007,3 +1007,47 @@ Root tracked-archive synthesis and three independent corrected terminal
 reviews returned `ACCEPT`. The pruning allowlist and further affected replay
 set are both `none`. The next checkpoint starts from accepted tree `c039c347`
 and counts later accepted oracle packets only.
+
+### Fixture-growth hygiene checkpoint (2026-07-26, fourth review)
+
+The mandatory five-packet review compared tracked archives at baseline
+`c039c347` and accepted oracle tree `22de3631`. The fixture tree grew from
+1,284 regular files, 14 symlinks, and 33,789 newline-counted regular-file
+lines to 1,303 regular files, 16 symlinks, and 36,985 lines: 19 regular
+files, two symlinks, and 3,196 lines.
+
+The accepted packet deltas were exact Bazel v28 schema `eb8c2d23`
+(+12 regular files, +1,311 lines), Host visible-lockfile `d20f6557` (+1,
++500), Host RegistryFunction `204ee408` (no entries, +507), Host
+registry-file vendor `dd57518e` (+4, +496), and local registry-directory
+transport `22de3631` (+2 regular files, +2 symlinks, +382). Their five
+affected fixtures retain 61 rows, 40 more than the baseline: 15 v28-schema,
+nine lockfile-Off, twelve registry-command, fourteen yanked/vendor, and
+eleven nonroot/directory rows.
+
+Per fixture, `bazel-lockfile-v28-schema` grew by 12 regular files, zero
+symlinks, and 1,311 lines; `lockfile-mode-off` by 1/0/500;
+`registry-command-transport` by 0/0/254;
+`registry-yanked-lockfile-mode` by 4/0/749; and
+`nonroot-interim-module-graph` by 2/2/382. These fixture deltas, rather than
+the packet split above, are the pruning inventory and sum to the exact
+19/2/3,196 tree growth.
+
+Every retained row, asset, mutation, manifest field, expected record, and
+negative assertion remains discriminating. The sole default-BCR row is the
+unflagged original-root/default-registry control; the expunge-only row creates
+the synchronous cold server/output-base boundary consumed by its following
+Off replay. The repeated portless vendor hierarchy is Bazel's exact
+`VendorManager` projection, and its four assets distinguish hit, fatal,
+missing, wrong-kind, restoration, and misleading Refresh selection. The two
+directory children intentionally share sentinel contents so their distinct
+names, rather than child bytes, prove the 80-byte listing. Fixture-local v28
+registry files and invalid-UTF8 input remain necessary for hermetic
+provenance, typed failure isolation, and exact replay. No exact repeated
+multi-file addition is safely shareable.
+
+Tracked-archive synthesis, added-entry/hash/use inventory, all 61 evidence
+signatures, and source/parity, implementation/evidence, plus
+architecture/fixture-hygiene reviews returned `ACCEPT`. The pruning allowlist
+and affected replay set are both `none`. The next checkpoint starts from
+accepted tree `22de3631` and counts later accepted oracle packets only.

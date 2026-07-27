@@ -8490,3 +8490,47 @@ Next packet: implement only
 `WP-5-m1-host-registry-local-directory-oracle` inside the exact contract
 above. After acceptance, run the required five-packet fixture-growth review
 before scheduling any sixth oracle.
+
+#### Local registry-directory transport oracle implementation status
+
+Status: `ACCEPT` in `22de3631` after terminal corrected latest-diff review on
+2026-07-26.
+
+Exactly the accepted six paths changed. The retained fixture now has eleven
+commands, 54 regular files, two relative symlinks, and 780
+newline-counted lines. The five semantic suffix rows produced exits
+`0/0/0/37/0`; rows 1 and 5 printed ordinary module SRI
+`sha256-rSW46GS1ppd2SDhQBqh7i7e1O4oG6NK91hvTWEjKYVQ=`, rows 2 and 3
+printed directory-listing SRI
+`sha256-C9Ew3zKolMQLXRmvq5iMfIvrShNOzOxHRORhnWbbFAg=`, and row 4 printed
+none. The exact metadata fail-open Gson warning and local-registry absence
+chain matched. Every row retained the same path-free 1,228-byte visible
+lockfile, SHA-256
+`0ef28bd1c9d2583bcb82da1cc393a5973b7c84839f5961157b4ac99b2c3aecb7`,
+with empty `registryFileHashes`.
+
+Pinned Bazel 9.2 generation and four absolute, distinct fresh-root replays
+across the implementation and correction reviews passed. The original six
+normalized evidence records remained equal except removal of a stale
+output-base startup warning. The two child contents, 80-byte listing,
+44-byte ordinary file, hashes/SRIs, symlink modes/targets, exact restoration,
+schema, normalized host paths, credentials, diff, and server cleanup passed.
+The focused parser/packet-validator suite passed all 52 tests. One bounded
+TOML-only review correction removed an external OpenJDK path from the
+Bazel-commit anchor list and strengthened the Gson assertion through exact
+line, column, and path; all three terminal rereviews returned `ACCEPT`.
+
+The mandatory fifth-packet fixture-growth checkpoint from `c039c347` to
+`22de3631` is recorded in the oracle-harness owner plan. It accepted
+1,303 regular files, 16 symlinks, and 36,985 newline-counted lines
+(+19/+2/+3,196), all 61 affected-fixture rows, and pruning/replay sets
+`none`.
+
+Next packet: design only
+`WP-5-m1-host-registry-local-directory-bridge-correction-design`. Freeze the
+smallest runtime bridge correction that returns the pinned JDK directory
+listing bytes for local registry paths while preserving exact regular,
+missing, URL-conversion, generation-order, legacy, and cross-platform
+behavior. Do not edit Rust until that correction receives terminal
+latest-text review, and do not redesign the private Host registry-file owner,
+consumer, or activation in the same packet.
