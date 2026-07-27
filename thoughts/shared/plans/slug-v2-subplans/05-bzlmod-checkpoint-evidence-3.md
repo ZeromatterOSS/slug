@@ -9783,3 +9783,96 @@ entrypoint/downstream consumer.
 No fixture-growth checkpoint is due: this design and its selected anchor
 design add no fixture. Next packet: design only
 `WP-5-m1-bzlmod-root-loading-anchor-projection-design`.
+
+### Bzlmod root-loading anchor projection design
+
+Status: `ACCEPT` on 2026-07-27 after independent source/API,
+implementation/evidence, and architecture/orchestration audits plus corrected
+terminal latest-text review. No non-plan repository file, Rust, Cargo,
+dependency, fixture, DICE key, consumer, or entrypoint changed. This internal
+projection changes no Bazel behavior and needs no new Bazel citation; the live
+accepted private Host producer and its retained source evidence remain the
+semantic authority.
+
+Implement only `WP-5-m1-bzlmod-root-loading-anchor-projection` with an exact
+two-file allowlist:
+
+- `app/slug_bzlmod_v2/src/host_module.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
+
+In `host_module.rs`, add public `RootModuleLoadingAnchorKey`,
+`RootModuleLoadingAnchor`, and `RootModuleLoadingAnchorError`. The key contains
+only a private `NormalizedAbsolutePath` workspace, derives
+`Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe`, exposes only
+`new(NormalizedAbsolutePath)`, and displays exactly
+`root-module-loading-anchor:{workspace}`. Do not add a path-conversion error,
+workspace accessor, or second identity field.
+
+Both result wrappers have private fields and retain the original
+`Arc<Result<HostRootModuleFileValue, HostRootModuleFileError>>`; a private
+carrier alias is permitted. Construct each wrapper only from its matching
+complete success/error branch. They use `Clone, PartialEq, Eq, Allocative,
+Dupe`, share the carrier without deep cloning the evaluated module, overrides,
+module paths, or error, and implement manual opaque `Debug`. They expose no
+field, constructor, variant, typed accessor, conversion trait, dereference,
+serialization surface, evaluated module, override, module path, repository
+spec, or mapping. Error `Display` delegates byte-for-byte to the retained
+private diagnostic and `Error::source()` delegates to the private error's
+source behavior rather than exposing the private error as a new cause.
+
+The key value is exactly
+`SourcePreparationOutcome<Arc<Result<RootModuleLoadingAnchor,
+RootModuleLoadingAnchorError>>>`. Its compute has exactly one direct semantic
+dependency, `HostRootModuleFileKey::new(self.workspace.dupe())`, unwraps only
+the DICE infrastructure result through the existing fail-fast
+`dice_invariant`, and maps the private outcome so Need moves through unchanged
+while Complete success/error receive the matching opaque wrapper. Do not use a
+DICE projection/opaque compute, terminal infrastructure-error variant,
+`anyhow`, stringification, or direct IO. Equality is `complete_eq`; validity
+is `is_complete`. Complete success/error compare the full retained private
+value, while every Need remains invalid and self-unequal.
+
+The public key never inspects `CaptureEvaluationEvents` or stores evaluation
+data. The private `HostRootModuleFileKey` remains its sole direct dependency
+and sole owner of the exact Complete event batch, including empty and
+failure-prefix batches. Neither key owns a batch on Need; the private Complete
+batch remains reachable through the public key's activation closure.
+
+Keep all focused tests in the existing Unix `host_module.rs` test module and
+within the accepted total cap of 320 additions: at most 315 in
+`host_module.rs` and five in `lib.rs`. Prove:
+
+- normalized workspace identity, distinct-workspace inequality, and exact key
+  display;
+- unchanged first-path and root-bootstrap Needs with no fabricated repository
+  need or wrapper error;
+- invalid/self-unequal Need plus equal and unequal separately allocated
+  Complete success/error values;
+- manual success/error Debug omits private variants, fields, paths, module,
+  overrides, and occurrences, while error Display/source exactly preserves the
+  existing diagnostic behavior;
+- the public key's direct dependency set is exactly the private root key;
+- Need stores no public or private root batch; Complete stores no public batch
+  while the private root batch owns an exact printed event; and
+- one retained DICE graph advances from first-path Need through root-bootstrap
+  Need, Complete success, Complete error, and restored semantically equal
+  success, proving invalid Needs force recomputation; warm semantic reuse adds
+  no replay batch.
+
+Re-export exactly the three public anchor names from `lib.rs`; keep
+`host_module` and every `HostRootModuleFile*` type private. Add no downstream
+consumer or activation. Added production code contains one new `impl Key`,
+owns no event storage, direct filesystem access, snapshot, graph, lockfile,
+registry, global, cache, standard collection, owned string/vector, or new
+dependency. Replan if implementation needs another file, public private-owner
+type, copied semantic payload, wrapper event batch, downstream activation, or
+more than the frozen addition cap.
+
+Validate the focused anchor tests first, then the full
+`slug_bzlmod_v2` and existing `slug_loading_v2` suites, doctests, GNU-Windows
+test-link gate, formatting, diff, exact-scope/Cargo, public-surface,
+implementation-block, archive, credential, and process guards. No oracle or
+fixture is required, and no fixture-growth checkpoint is due.
+
+Next packet: implement only
+`WP-5-m1-bzlmod-root-loading-anchor-projection`.
