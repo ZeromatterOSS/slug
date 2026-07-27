@@ -7932,6 +7932,22 @@ Next packet: implement only
 `registry_dice.rs` and core runtime `registry_io.rs` under the exact
 220-addition/80-deletion cap.
 
+#### Local native-path Registry IO bridge correction implementation status
+
+Status: `ACCEPT` after terminal latest-diff review on 2026-07-26.
+
+Exactly `registry_dice.rs` and core runtime `registry_io.rs` changed by
+113 additions and two deletions. The defaulted native-path method, sole local
+executor routing, direct production `Path` read, legacy behavior, and focused
+decoy/non-UTF-8/order tests passed. Bzlmod passed 201 unit and 184 integration
+tests, loading 54, core 104 unit and 13 integration tests, all doctests, and
+all 20 GNU-Windows executables. Formatting, diff, archive, scope, dependency,
+API, callsite, credential, remote-call, and forbidden-edge gates passed. All
+three terminal latest-diff reviews returned `ACCEPT`.
+
+Next packet: redesign only `WP-5-m1-host-registry-file-owner-design` against
+the accepted native-path bridge. Do not edit Rust or activate a consumer.
+
 #### Host registry-file vendor oracle implementation status
 
 Status: `ACCEPT` after terminal latest-diff review on 2026-07-26.

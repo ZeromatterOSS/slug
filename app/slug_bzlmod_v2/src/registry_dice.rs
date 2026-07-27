@@ -210,6 +210,15 @@ pub trait RegistryIo: Send + Sync + 'static {
         &self,
         url: &RegistryFileUrl,
     ) -> Result<RegistryIoOutcome, RegistryTransportError>;
+
+    async fn read_local_exact(
+        &self,
+        url: &RegistryFileUrl,
+        path: &Path,
+    ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+        let _ = path;
+        self.read_exact(url).await
+    }
 }
 
 struct RegistryIoHandle(Arc<dyn RegistryIo>);
@@ -662,7 +671,7 @@ pub(crate) async fn read_local_registry_file(
         .map_err(|_| RegistryLocalError::MissingIoCapability { url: url.dupe() })?
         .0
         .clone();
-    match io.read_exact(url).await {
+    match io.read_local_exact(url, path).await {
         Ok(RegistryIoOutcome::Found(bytes)) => Ok(RegistryFileValue::Found {
             sha256: sha256(&bytes),
             bytes,
@@ -745,7 +754,7 @@ mod bridge_tests {
 
     const WORKSPACE: &str = "/registry-bridge";
     const REMOTE_URL: &str = "https://registry.example/file";
-    const LOCAL_URL: &str = "file:///registry-bridge/file";
+    const LOCAL_URL: &str = "file:///registry-bridge/absent-decoy";
     const LOCAL_PATH: &str = "/registry-bridge/file";
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -759,6 +768,7 @@ mod bridge_tests {
     struct ScriptedIo {
         response: Mutex<Response>,
         calls: AtomicUsize,
+        last_local_call: Mutex<Option<(RegistryFileUrl, PathBuf)>>,
     }
 
     impl ScriptedIo {
@@ -766,6 +776,7 @@ mod bridge_tests {
             Self {
                 response: Mutex::new(response),
                 calls: AtomicUsize::new(0),
+                last_local_call: Mutex::new(None),
             }
         }
         fn set(&self, response: Response) {
@@ -773,6 +784,9 @@ mod bridge_tests {
         }
         fn calls(&self) -> usize {
             self.calls.load(Ordering::SeqCst)
+        }
+        fn last_local_call(&self) -> Option<(RegistryFileUrl, PathBuf)> {
+            self.last_local_call.lock().unwrap().clone()
         }
     }
 
@@ -788,6 +802,15 @@ mod bridge_tests {
                 Response::NotFound => Ok(RegistryIoOutcome::NotFound),
                 Response::Transport(message) => Err(RegistryTransportError { message }),
             }
+        }
+
+        async fn read_local_exact(
+            &self,
+            url: &RegistryFileUrl,
+            path: &Path,
+        ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+            *self.last_local_call.lock().unwrap() = Some((url.dupe(), path.to_path_buf()));
+            self.read_exact(url).await
         }
     }
 
@@ -1288,6 +1311,10 @@ mod bridge_tests {
                 recordable_remote_expectation: None,
             })
         );
+        assert_eq!(
+            io.last_local_call(),
+            Some((RegistryFileUrl::new(LOCAL_URL), PathBuf::from(LOCAL_PATH)))
+        );
         assert_eq!(tracker.last(), vec![Generation]);
         io.set(found(b"created"));
         let mut same = transaction(&engine, Some(1), None).await;
@@ -1365,5 +1392,22 @@ mod bridge_tests {
             }) if workspace == Path::new(WORKSPACE) && url.as_str() == LOCAL_URL
         ));
         assert_eq!(io.calls(), 1);
+
+        let io = Arc::new(ScriptedIo::new(Response::Transport("offline".into())));
+        let missing_generation_dice = dice(Some(io.dupe()));
+        let mut missing_generation = transaction(&missing_generation_dice, None, None).await;
+        assert!(matches!(
+            missing_generation.compute(&key).await.unwrap().as_ref(),
+            Err(RegistryLocalError::MissingRequestGeneration {
+                workspace,
+                url,
+                ..
+            }) if workspace == Path::new(WORKSPACE) && url.as_str() == LOCAL_URL
+        ));
+        assert_eq!(io.calls(), 1);
+        assert_eq!(
+            io.last_local_call(),
+            Some((RegistryFileUrl::new(LOCAL_URL), PathBuf::from(LOCAL_PATH)))
+        );
     }
 }

@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -104,6 +105,14 @@ impl RegistryIo for HyperRegistryIo {
             .to_bytes();
         Ok(RegistryIoOutcome::Found(Arc::from(body.as_ref())))
     }
+
+    async fn read_local_exact(
+        &self,
+        url: &RegistryFileUrl,
+        path: &Path,
+    ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+        read_local_path(url, path).await
+    }
 }
 
 async fn read_local_file(
@@ -119,6 +128,13 @@ async fn read_local_file(
             message: format!("invalid local registry URL {}", url.as_str()).into(),
         });
     }
+    read_local_path(url, Path::new(path)).await
+}
+
+async fn read_local_path(
+    url: &RegistryFileUrl,
+    path: &Path,
+) -> Result<RegistryIoOutcome, RegistryTransportError> {
     match tokio::fs::read(path).await {
         Ok(bytes) => Ok(RegistryIoOutcome::Found(Arc::from(bytes))),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -233,5 +249,56 @@ mod tests {
             .await
             .unwrap_err();
         assert!(error.message.contains("reading local registry file"));
+    }
+
+    #[tokio::test]
+    async fn native_local_adapter_reads_supplied_path_and_preserves_url_diagnostics() {
+        let io = HyperRegistryIo::new();
+        let directory = tempfile::tempdir().unwrap();
+        let selected = directory.path().join("selected.MODULE.bazel");
+        tokio::fs::write(&selected, b"module(name = 'selected')")
+            .await
+            .unwrap();
+        let decoy = RegistryFileUrl::new("file:///definitely-absent-native-path-decoy");
+
+        assert_eq!(
+            io.read_local_exact(&decoy, &selected).await.unwrap(),
+            RegistryIoOutcome::Found(Arc::from(&b"module(name = 'selected')"[..]))
+        );
+
+        let absent = directory.path().join("absent.MODULE.bazel");
+        assert_eq!(
+            io.read_local_exact(&decoy, &absent).await.unwrap(),
+            RegistryIoOutcome::NotFound
+        );
+
+        let error = io
+            .read_local_exact(&decoy, directory.path())
+            .await
+            .unwrap_err();
+        assert!(error.message.contains("reading local registry file"));
+        assert!(error.message.contains(decoy.as_str()));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn native_local_adapter_reads_non_utf8_path_without_reformatting() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let io = HyperRegistryIo::new();
+        let directory = tempfile::tempdir().unwrap();
+        let selected = directory
+            .path()
+            .join(OsString::from_vec(b"MODULE-\xff.bazel".to_vec()));
+        tokio::fs::write(&selected, b"module(name = 'non_utf8')")
+            .await
+            .unwrap();
+        let decoy = RegistryFileUrl::new("file:///definitely-absent-non-utf8-decoy");
+
+        assert_eq!(
+            io.read_local_exact(&decoy, &selected).await.unwrap(),
+            RegistryIoOutcome::Found(Arc::from(&b"module(name = 'non_utf8')"[..]))
+        );
     }
 }
