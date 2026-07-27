@@ -12279,3 +12279,35 @@ consumer activation. Future glob work begins with a separately bounded private
 loading adapter; it does not reopen JVM execution, native-Windows byte order,
 BUILD/`.bzl` acquisition, include/exclude composition, `allow_empty`, or
 evaluator transaction ownership.
+
+### Private Host glob loading adapter
+
+Status: **ACCEPT** for
+`WP-5-m1-loading-host-glob-loading-adapter` on 2026-07-27 after independent
+implementation review.
+
+The private adapter accepts one normalized workspace, selected logical package
+root, `PackagePath`, complete raw-byte pattern, and FILES or FILES_AND_DIRS
+operation. It uses the accepted checked constructors, computes the existing
+traversal through caller-owned `DiceComputations`, preserves `Need` and typed
+traversal failure, and projects successful ordered paths by duplicating only
+their `Arc` handles into one immutable shared slice. It performs no UTF-8 or
+path-byte copy.
+
+No new DICE key, cache, interner, lock, event, IO, dependency, public export,
+or production caller was added. The Buck2 utility-reuse gate retains the
+accepted `Arc`, `Dupe`, and `Allocative` boundary; the temporary collection
+exists only while projecting the immutable slice.
+
+Focused adapter 5/5 and traversal 13/13 tests passed. The complete
+`slug_loading_v2` suite passed 91 tests (37 unit, 19 build-file, 23 bzl
+invalidation, five callable-boundary, six glob-invalidation, and one removed
+native-rule test), plus doctests. Formatting, diff, archive, exact
+four-file/caller/key/dependency/IO/lock/public-surface guards passed.
+Independent review returned `ACCEPT`.
+
+The adapter remains dormant outside tests. Next review only the synchronous
+Starlark-evaluator versus asynchronous DICE retry/attempt ownership required
+for callable activation. JVM execution, blocking DICE, direct filesystem
+fallback, native-Windows ordering, raw-byte Starlark ingress, BUILD/`.bzl`
+acquisition, external repositories, and SUBPACKAGES remain excluded.

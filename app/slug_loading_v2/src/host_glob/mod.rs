@@ -49,6 +49,7 @@ use slug_workspace_v2::ResolvedPathKey;
 #[cfg(unix)]
 use slug_workspace_v2::ResolvedPathState;
 
+mod adapter;
 #[cfg(all(test, unix))]
 mod tests;
 mod traversal;

@@ -52,7 +52,7 @@ enum HostGlobPatternFragment {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-enum HostGlobPatternError {
+pub(super) enum HostGlobPatternError {
     Invalid {
         pattern: Arc<[u8]>,
         fragment_index: Option<usize>,
@@ -66,13 +66,13 @@ enum HostGlobPatternError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
-struct HostGlobPattern {
+pub(super) struct HostGlobPattern {
     bytes: Arc<[u8]>,
     fragments: Arc<[HostGlobPatternFragment]>,
 }
 
 impl HostGlobPattern {
-    fn new(bytes: impl Into<Arc<[u8]>>) -> Result<Self, HostGlobPatternError> {
+    pub(super) fn new(bytes: impl Into<Arc<[u8]>>) -> Result<Self, HostGlobPatternError> {
         let bytes = bytes.into();
         let invalid = |fragment_index, reason| HostGlobPatternError::Invalid {
             pattern: bytes.dupe(),
@@ -145,13 +145,13 @@ impl HostGlobPattern {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
-enum HostGlobTraversalOperation {
+pub(super) enum HostGlobTraversalOperation {
     Files,
     FilesAndDirs,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostGlobTraversalKeyError {
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(super) enum HostGlobTraversalKeyError {
     NonLatin1PackagePathScalar {
         #[allocative(skip)]
         scalar: char,
@@ -159,7 +159,7 @@ enum HostGlobTraversalKeyError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostGlobTraversalKey {
+pub(super) struct HostGlobTraversalKey {
     workspace: NormalizedAbsolutePath,
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
@@ -169,7 +169,7 @@ struct HostGlobTraversalKey {
 }
 
 impl HostGlobTraversalKey {
-    fn new(
+    pub(super) fn new(
         workspace: NormalizedAbsolutePath,
         logical_package_root: NormalizedAbsolutePath,
         package: PackagePath,
@@ -210,17 +210,17 @@ impl fmt::Display for HostGlobTraversalKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct HostGlobTraversalMatch {
-    relative_path: Arc<[u8]>,
+pub(super) struct HostGlobTraversalMatch {
+    pub(super) relative_path: Arc<[u8]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct HostGlobTraversal {
+pub(super) struct HostGlobTraversal {
     matches: Arc<[HostGlobTraversalMatch]>,
 }
 
 impl HostGlobTraversal {
-    fn from_paths(mut paths: Vec<Arc<[u8]>>) -> Self {
+    pub(super) fn from_paths(mut paths: Vec<Arc<[u8]>>) -> Self {
         paths.sort();
         paths.dedup();
         Self {
@@ -232,13 +232,13 @@ impl HostGlobTraversal {
         }
     }
 
-    fn matches(&self) -> &[HostGlobTraversalMatch] {
+    pub(super) fn matches(&self) -> &[HostGlobTraversalMatch] {
         &self.matches
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostGlobTraversalError {
+pub(super) enum HostGlobTraversalError {
     UnsupportedHost,
     Segment {
         logical_directory: NormalizedAbsolutePath,
@@ -251,7 +251,7 @@ enum HostGlobTraversalError {
     },
 }
 
-type HostGlobTraversalOutcome =
+pub(super) type HostGlobTraversalOutcome =
     SourcePreparationOutcome<Arc<Result<HostGlobTraversal, HostGlobTraversalError>>>;
 
 #[derive(Clone)]
