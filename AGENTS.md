@@ -52,6 +52,10 @@ Start from the live checkout, not from memory.
   Buck2-derived data structures, interning, hashing, compact collections, or
   memory-accounting work, read
   `.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing.
+- Default to root-only work for small read-only or mechanical changes and one
+  worker plus one reviewer for ordinary bounded packets. Use multiple
+  independent audits only when the root names distinct unresolved semantic
+  questions; correction rereviews inspect only the correction diff.
 - Check `git status --short` and inspect dirty diffs before making changes.
   Treat dirty files as active user/agent state unless the user says otherwise.
 - Keep status documentation proportional to scheduling changes. During a work
@@ -92,7 +96,9 @@ computation.
 
 - Every parity fix needs either observed Bazel 9 behavior or a citation from a
   local Bazel source checkout.
-- Add or strengthen the narrow regression first, then implement the fix.
+- Ensure a narrow regression already proves the behavior before implementing
+  the fix. Reuse accepted evidence; add or strengthen it only for an actual
+  coverage gap.
 - Same-daemon behavior matters: create/edit/delete transitions, lockfile
   changes, environment changes, repository mapping changes, and materialized
   output changes should invalidate or replay for a clear reason.
@@ -120,8 +126,12 @@ computation.
 - Update the owning plan with compact evidence when a result changes the
   project state. Do not use a passing real-world target as proof that structural
   acceptance criteria are complete unless the plan says so.
-- New implementation work should add or strengthen the Bazel oracle fixture
-  first, then port or write code until Slug V2 matches that fixture.
+- Every parity implementation needs an accepted discriminating Bazel 9.2
+  oracle or pinned-source regression. Reuse existing evidence when it already
+  proves the behavior; add or strengthen an oracle only for an actual gap.
+  Require a separate design-only packet only for reserved architecture,
+  identity, ownership, public API, DICE, formatter, regex, or stage-boundary
+  decisions.
 
 ## NOT in scope
 

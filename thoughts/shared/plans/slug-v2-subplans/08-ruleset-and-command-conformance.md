@@ -38,14 +38,21 @@ Implement new command work in this order:
 `ActionGraphContainer` for the gate matrix must match Bazel 9.2.0 before actual
 execution/cache breadth becomes the project priority.
 
-### Live packet: `WP-8-m3-tests-loading-metadata-gate-a`
+### Current M3 status
 
-Implement the Sol-accepted loading metadata and unconfigured-graph projection.
-Cover typed inherited attrs, invariant-safe suite membership/provenance,
-implicit finalization, capability/scalar metadata, label attributes, ordinary
-edges, semantic equality, and lifecycle invalidation. Keep `tests()` inactive;
-strict request plumbing and activation are later packets. Live Status in the
-canonical plan owns scheduling.
+Live Status in the canonical plan owns scheduling. The root-repository query
+command is user-visible with text and graph output and 13 of Bazel 9.2's 16
+default functions. `attr`, `filter`, and `kind` remain blocked on an exact
+Java-compatible `Pattern` substrate. The old tests-metadata Gate A and all
+subsequent `tests()`, `labels()`, `executables()`, and `visible()` activation
+packets are accepted history, not live instructions.
+
+When M3 resumes, select one bounded user-visible query gap and reuse accepted
+Bazel 9.2 evidence. The smallest identified candidate is
+`WP-8-m3-query-label-kind-output`: project existing structural node kinds
+through CLI and daemon `--output=label_kind` without a new function, DICE key,
+traversal, regex engine, or fixture unless review finds a missing
+representation row.
 
 ### Query engine reuse policy
 

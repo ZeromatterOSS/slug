@@ -1,6 +1,6 @@
 ---
 name: slug-buck2-utility-reuse
-description: Preserve Buck2-derived hot-path utility reuse in Slug V2. Use when Codex works in /var/mnt/dev/slug on V2 core data structures, labels, attrs, Starlark/DICE integration, graph traversal, REAPI/action metadata, memory profiling, or performance-sensitive maps/sets/strings, and when reviewing changes for accidental std HashMap/String/Vec churn instead of Buck2 utility reuse.
+description: Preserve Buck2-derived hot-path utility reuse in Slug V2. Use when a change creates or alters retained data structures, hashing, compact collections/strings, interning, clone cost, graph storage, or memory accounting. Do not trigger for ordinary CLI, formatter, protocol, test, or call-flow work over unchanged representations.
 ---
 
 # Slug Buck2 Utility Reuse
@@ -9,9 +9,13 @@ Use the live checkout as authority, then compare against `/var/mnt/dev/buck2` or
 
 ## Workflow
 
-1. Read `AGENTS.md`, the V2 owner subplan, and `thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md`.
+1. Read `AGENTS.md`, the active owner section, and only the matching row in
+   `thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md`.
 2. Check `git status --short --branch` and avoid trampling unrelated staged clean-root work.
-3. For hot-path Rust changes, scan for `std::collections::{HashMap, HashSet}`, `String`, `Vec`, repeated `clone()`, and newly invented interner/cache code.
+3. For changed retained hot-path Rust only, scan for
+   `std::collections::{HashMap, HashSet}`, `String`, `Vec`, repeated `clone()`,
+   and newly invented interner/cache code. Skip this skill when storage and
+   representation are unchanged.
 4. Prefer the Buck2 utility below when its semantics match. If importing from V1 or Buck2-derived code, record the source, import mode, oracle, validation, and residual risk in the Stage 9 ledger.
 5. Validate with focused tests plus `scripts/v2_archive_status.sh` and `git diff --check` when touching Slug V2.
 

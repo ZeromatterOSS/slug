@@ -6,134 +6,101 @@ description: Run Slug V2 implementation-plan or roadmap goals through bounded, r
 # Slug Agent Orchestration
 
 The root owns priority, architecture, worktree safety, integration, status, and
-commits. Delegate bounded work to the least-cost capable agent.
+commits.
 
-## Start a Plan Goal
+## Start
 
-1. Read `AGENTS.md` and the canonical plan's **Live Status** plus current
-   packet. Historical plan prose is evidence, not scheduling state.
-2. Read only the current owner plan's goal/current-priority/acceptance sections
-   and the exact active packet heading. Search for the packet ID; do not load an
-   entire long evidence history by default.
-3. Read `references/routing-guide.md`. Search `references/routing-log.md` only
-   when a recent analogous packet may change that default.
-4. Check `git status --short --branch` and dirty diffs. Inspect live
-   agent/Cargo/slugd processes only before overlapping work, retry, or
+1. Read `AGENTS.md`, canonical **Live Status**, and **Current packet**.
+2. Search the owner plan for that packet ID. Read only its active section and
+   matching Stage 9 rows; histories are not routine context.
+3. Check `git status --short --branch` and overlapping dirty diffs.
+4. Continue one clearly owned packet. Check the oracle-harness growth
+   checkpoint before adding fixture breadth.
+5. Inspect agents/Cargo/`slugd` only before overlapping work, retries, or
    daemon-sensitive validation.
-5. Continue a clearly owned active packet; otherwise select exactly one packet
-   from Live Status. Clear a red M0 or other named baseline blocker before
-   beginning another feature packet. Read only matching Stage 9 rows unless
-   reuse scope expands.
-6. Before selecting another oracle packet, check the fixture-growth checkpoint
-   in the oracle-harness owner plan. Each checkpoint records its fixture scope,
-   aggregate text-file and line counts, and the accepted oracle packet count
-   and IDs covered since the preceding checkpoint. Route one bounded
-   fixture-hygiene review before adding more fixture breadth when five packets
-   have been accepted, or fixture growth reaches 100 net files or 10,000 net
-   text lines, since that checkpoint. If no checkpoint exists, first inventory
-   the current accepted tree as the baseline and review all identifiable
-   accepted oracle packets since the latest owner-plan evidence.
 
-## Routing
+Use the routing table below. Read `references/routing-guide.md` only when the
+route is unclear and `references/routing-log.md` only when a recent analogous
+packet may change it.
 
-| Route | Use |
-|-------|-----|
-| Root only | Small read-only or mechanical work where delegation costs more |
-| Terra medium | Default audit, oracle fixture, focused tests, one abstraction |
-| Terra high | Approved difficult multi-file Rust, DICE, Starlark, or query work |
-| Sol low | Pre-review of reserved decisions and final risky-patch review |
-| Sol high review | Concrete unresolved miss or genuinely new architecture |
+## Route
 
-For long autonomous runs, keep one high-capability Sol root when selectable;
-do not add a standing second orchestrator. Explicit worker overrides use
-`gpt-5.6-terra` at medium/high or `gpt-5.6-sol` at low, with
-`fork_turns="none"` or a small task-local fork.
+| Work | Route |
+|------|-------|
+| Small read-only/mechanical | Root |
+| Audit, oracle, focused tests, one abstraction | Terra medium |
+| Approved difficult Rust/DICE/Starlark/query | Terra high |
+| Reserved decision or risky final review | Sol low |
+| Concrete unresolved architecture miss | Sol high |
 
-Default to one write worker. Additional workers must be read-only or own
-disjoint files. Never run parallel Cargo commands against one target directory.
+Ordinary packets use at most one write worker and one reviewer. Add read-only
+audits only for distinct unresolved semantic questions; parallel writers must
+own disjoint files. Correction rereviews inspect only the correction diff and
+prior blocker. Never run parallel Cargo commands on one target directory.
 
-## Packet Contract
+## Packet
 
-Use `references/implementation-worker.md`. Every packet has:
+Use `references/implementation-worker.md`. Always name:
 
-- one owner gate and observable result;
+- one owner and observable result;
 - exact allowed files and exclusions;
-- Bazel 9.2 oracle/source anchors;
-- relevant Stage 9/Buck2/V1 reuse decisions;
+- accepted Bazel 9.2 oracle or pinned-source regression;
 - focused validation and stop conditions; and
-- a residual-risk report.
+- residual risk.
 
-Oracle packets also name their net fixture file/line growth, reused versus
-copied scaffolding, and the last fixture-growth checkpoint. New duplication
-needs an isolation, provenance, or discriminating-behavior reason.
+Add conditional sections only when used: fixture growth/hygiene for oracle
+work; DICE identity/equality for semantic keys; Stage 9/Buck2/V1 reuse for
+representation changes; downstream coverage for public interfaces; platform
+and lifecycle evidence for daemon/platform work.
 
-Fixture-hygiene packets additionally record aggregate before/after counts,
-exact accepted packet IDs, repeated-subtree inventory, retained-row
-discrimination results, the exact pruning allowlist or `none`, and replay
-results for every affected oracle.
+Reuse accepted discriminating evidence. Add an oracle only for an evidence
+gap. Use a separate design packet only for decisions reserved to the root:
+new DICE keys/locks, public or cross-crate APIs, identity/ownership models,
+formatter semantics, regex engines, stage boundaries, and destructive actions.
+Obtain one Sol pre-review for those decisions. Otherwise keep design,
+implementation, and evidence in one logical packet and one terminal rollup.
 
-The root retains new DICE keys/locks, public or cross-crate APIs, identity and
-ownership models, formatter semantics, regex engines, stage boundaries, and
-destructive actions. Obtain Sol review before implementing such a decision.
+Workers edit named files and run focused tests. The root inspects the diff,
+adds a discriminating case for identity/equality/invalidation/order/formatting
+when needed, and owns broader validation and commits.
 
-Workers normally edit only named source/test/fixture files and run focused
-tests. The root inspects the diff, verifies the oracle, adds a discriminating
-case when identity/equality/invalidation/ordering/formatting is involved, and
-owns downstream and broad validation plus documentation and commits.
+## Accept
 
-## Acceptance
+Check only applicable risks:
 
-Check the applicable behavior, not every item mechanically:
+- Bazel success/failure, diagnostics, order, and output;
+- structural identity, ownership, equality, and invalidation;
+- create/edit/delete/recreate for incremental state;
+- DICE-owned discovery without direct filesystem/fresh-graph bypass;
+- named-surface-only activation and compact retained representation; and
+- downstream behavior for changed interfaces.
 
-- exact Bazel success/failure, diagnostics, ordering, and output;
-- identity, ownership, semantic equality, reuse, and invalidation;
-- create/edit/delete/recreate and unsupported/external/generated boundaries;
-- DICE-owned discovery without filesystem or fresh-graph bypass;
-- activation limited to the named surface and compact hot-path utilities; and
-- downstream coverage for changed interfaces.
+Use `references/design-reviewer.md` for reserved decisions or risky patches;
+ordinary packets receive one implementation review. Allow one focused
+correction after a concrete miss. A second material correction is `REPLAN`.
 
-Use `references/design-reviewer.md` for reserved or risky boundaries. The
-verdict is `ACCEPT`, `REVISE`, or `REPLAN`. Allow one focused correction after
-a concrete miss. A second material correction ends the packet in `REPLAN`.
+For oracle growth, review fixtures before the sixth accepted packet or at
++100 files/+10,000 text lines since the last checkpoint. Preserve provenance,
+hermeticity, isolation, and exact outputs while pruning only material proven
+redundant or nondiscriminating.
 
-A fixture-hygiene packet is read-only until it identifies exact redundant,
-unused, or nondiscriminating material. Any pruning then uses a bounded allowlist
-and replays every affected oracle. Preserve immutable Bazel provenance,
-hermeticity, per-row failure isolation, and exact outputs; shared mutable test
-state is not an acceptable size optimization.
+## Validate and close
 
-## Root Validation and Closeout
+- Docs/instructions: source, structure, and diff checks.
+- Oracle-only: focused harness plus changed/protected fixtures.
+- Private Rust: owner tests and direct dependents.
+- Public/DICE/daemon/platform changes: affected downstream, daemon, and
+  cross-target gates.
 
-Run only what the risk requires, serially:
+Run broad suites only when the interface or bug class requires them. Run Rust
+formatting when Rust changes and always run `git diff --check`.
 
-1. focused owner tests;
-2. downstream/public-wrapper tests for changed interfaces;
-3. named comparisons through `tools/v2_oracle`;
-4. risk-appropriate broad Cargo suites, serialized against the shared target
-   directory;
-5. `cargo fmt --check` and `git diff --check`; and
-6. daemon tests in a socket-capable environment, with stale `slugd` cleanup
-   before and after.
-
-Do not weaken environment-limited tests. After a terminal result:
+At terminal `ACCEPT`, `REPLAN`, or genuine stop:
 
 1. update the owner plan once with compact evidence;
-2. update canonical Live Status only if milestone state, blocker, or current
-   packet changed;
-3. append exactly one terminal packet rollup to the bounded routing log;
-4. do not also edit a routing-history archive unless rotating old live rows;
-5. fold status into the accepted code/oracle commit when practical, otherwise
-   use at most one terminal status commit; and
-6. commit only accepted work.
+2. update canonical Live Status only for a scheduling change;
+3. add one bounded routing-log row, rotating history only when needed; and
+4. commit accepted work, folding status into it when practical.
 
-Do not publish separate status commits for packet definition, each audit,
-worker return, correction, review, and acceptance. Keep those details in the
-packet handoff unless they change an architectural decision that future owners
-must read.
-
-## Log Use
-
-`references/routing-guide.md` is the normal routing input.
-`references/routing-log.md` keeps at most 20 terminal packet rows or 250 lines.
-Archive older rows by month as `references/routing-history-YYYY-MM.md`;
-histories are not routine startup context and receive rows only during rollover.
+Do not publish per-audit/correction status commits or duplicate live routing
+rows into history.

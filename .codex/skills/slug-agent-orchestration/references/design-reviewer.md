@@ -12,8 +12,10 @@ Read:
 - Focused and downstream validation evidence
 
 Do not implement, edit files, or broaden the packet.
+For a correction rereview, read only the correction diff, affected evidence,
+and the prior blocker. Do not reconstruct the full packet.
 
-Check:
+Check the applicable risks:
 1. Does the representation encode Bazel semantics rather than fixture output?
 2. Are identity, ownership, semantic equality, and invalidation complete?
 3. Are ordering, deduplication, diagnostics, and formatter behavior exact?
@@ -22,14 +24,14 @@ Check:
 5. Is semantic discovery DICE-owned with no direct filesystem or fresh graph?
 6. Does the patch activate only the named surface?
 7. Is there at least one source-derived adversarial case beyond the happy path?
-8. Are retained compact utilities used appropriately on hot paths?
+8. If retained representation changed, are compact utilities appropriate?
 9. Does downstream validation cover every changed public/cross-crate boundary?
 10. Is any acceptance claim broader than the actual fixture/test set?
-11. For oracle work, is every copied registry/module subtree, mutation,
+11. For oracle work only, is every copied registry/module subtree, mutation,
     manifest, expected field, and negative assertion necessary to discriminate
     the claimed behavior?
-12. Has the fixture-growth checkpoint fired, and if so was a bounded hygiene
-    review completed before adding more fixture breadth?
+12. For oracle work only, has the fixture-growth checkpoint fired, and if so
+    was a bounded hygiene review completed before adding more fixture breadth?
 
 Return exactly one verdict:
 

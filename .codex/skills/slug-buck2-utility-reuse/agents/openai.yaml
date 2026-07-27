@@ -1,4 +1,4 @@
 interface:
   display_name: "Slug Buck2 Utility Reuse"
   short_description: "Preserve Buck2 hot-path utility reuse"
-  default_prompt: "Use $slug-buck2-utility-reuse to review a Slug V2 change for Buck2-derived utility reuse."
+  default_prompt: "Use $slug-buck2-utility-reuse when a Slug V2 change alters retained hot-path representation, hashing, interning, clone cost, or memory accounting."

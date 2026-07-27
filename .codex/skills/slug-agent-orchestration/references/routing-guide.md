@@ -1,34 +1,25 @@
 # Slug Routing Guide
 
-Use this summary for normal packet selection. Historical logs are optional.
+Read this only when the SKILL routing table does not decide the route.
 
 | Work | Route |
 |------|-------|
-| Small read-only/mechanical task | Root |
+| Small read-only/mechanical | Root |
 | Audit, oracle, focused tests, one abstraction | Terra medium |
-| Periodic fixture-growth inventory and pruning proposal | Terra medium |
-| Approved multi-file Rust/DICE/Starlark/query change | Terra high |
-| Reserved-decision or risky-patch review | Sol low |
-| Concrete unresolved architecture miss | Sol high review |
+| Approved difficult Rust/DICE/Starlark/query | Terra high |
+| Reserved decision/risky final review | Sol low |
+| Concrete unresolved architecture miss | Sol high |
 
-Keep a high-capability Sol root for long autonomous plan execution when the
-surface permits it. Default to one write worker with `fork_turns="none"`;
-parallel workers must be read-only or own disjoint files.
+Guardrails:
 
-Observed guardrails:
-
-- Root inspects diffs and owns downstream/broad validation and commits.
-- Public/cross-crate changes need production-wrapper coverage.
-- Identity, ordering, equality, invalidation, and formatting need a
-  discriminating case beyond happy-path output.
+- Use one write worker and one reviewer by default.
+- Add parallel read-only audits only for distinct unresolved questions.
+- Reuse accepted Bazel 9.2 evidence; add an oracle only for a gap.
+- Public interfaces need production-wrapper coverage.
+- Identity/order/equality/invalidation/formatting need a discriminating case.
+- Match validation to risk; broad, daemon, and cross-target gates are not
+  defaults.
 - Check process ownership before retrying Cargo or daemon validation.
-- Do not infer semantics from nondiscriminating oracle output.
-- After five accepted oracle packets, 100 net fixture files, or 10,000 net
-  fixture text lines of growth, route a fixture-hygiene review before another
-  oracle packet. Record exact packet IDs and aggregate before/after counts.
-  When no checkpoint exists, inventory the accepted tree as the first baseline.
-  Prune only exact redundant or nondiscriminating material and replay every
-  affected fixture.
-- Close a packet with one owner-plan evidence update and one routing-log row.
-  Touch canonical Live Status only for a scheduling change, never mirror a live
-  row into routing history, and avoid per-phase status commits.
+- Run fixture hygiene before packet six or +100 files/+10,000 text lines.
+- Close with one owner update and one live routing row; rotate history only
+  when the live log is full.
