@@ -22,7 +22,7 @@ advances the **Current packet**, not an older `next` paragraph.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module and public root-loading-anchor projection, accepted typed no-follow dirent observation design, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, Registry IO bridge with native local paths, focused registry-file vendor oracle, exact ASCII local-directory registry oracle, accepted default-launch collation/charset oracle, and exact host-JVM startup/reuse oracle; the required five-packet fixture-growth checkpoint is accepted through `22de3631`, with the latter two oracles recorded as post-checkpoint packets one and two; detailed evidence remains in the Stage 5 and oracle-harness owner plans plus routing log | production retry/publication activation remains gated on Host migrations and typed production roots; exact typed root globbing next needs a focused ASCII dirent/glob oracle before the accepted typed observation implementation, then a Bazel-internal byte-string parser/evaluator seam, raw-name/pattern-lazy oracle breadth, pure Host glob owner, and transactional package-evaluation retry/suspension boundary; a reusable regular-or-special Host byte projection remains separate; the full Bazel-valid JVM surface disproves every bounded standalone registry-byte executor found, so the private Host registry-file owner is separately blocked unless a genuinely original-process-equivalent Slug mechanism appears; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | design only `WP-5-m1-loading-host-dirent-glob-oracle-design` |
+| M1: one semantic spine | partial | retained runtime/loading spine plus the accepted Host root-module and public root-loading-anchor projection, accepted typed no-follow dirent observation design, and accepted focused ASCII Host-dirent glob-oracle design, Bazel v28 visible-lockfile, registry-input, pure RegistryFunction, Registry IO bridge with native local paths, focused registry-file vendor oracle, exact ASCII local-directory registry oracle, accepted default-launch collation/charset oracle, and exact host-JVM startup/reuse oracle; the required five-packet fixture-growth checkpoint is accepted through `22de3631`, with the latter two oracles recorded as post-checkpoint packets one and two; detailed evidence remains in the Stage 5 and oracle-harness owner plans plus routing log | production retry/publication activation remains gated on Host migrations and typed production roots; exact typed root globbing next needs the accepted focused oracle implemented before the typed observation implementation, then a Bazel-internal byte-string parser/evaluator seam, raw-name/pattern-lazy oracle breadth, pure Host glob owner, and transactional package-evaluation retry/suspension boundary; a reusable regular-or-special Host byte projection remains separate; the full Bazel-valid JVM surface disproves every bounded standalone registry-byte executor found, so the private Host registry-file owner is separately blocked unless a genuinely original-process-equivalent Slug mechanism appears; HTTP and Git PAX/GNU/link/special parity, resolved repository path state, deleted-package request ownership, repository-ignore ownership, package lookup, omitted-`module()` defaults, and discovery composition remain | `WP-5-m1-loading-host-dirent-glob-oracle` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | **active** | parser/evaluator/loading graph; 13 of 16 Bazel default functions; `executables` accepted in `69565a29`; evaluator ownership split accepted in `65c6c54f`; Java `Pattern` feasibility completed and `java_regex` 0.1.0 rejected against `5e78abc1`; `tests(EXPR)` 32-command oracle through `1edb2775`, loading/query metadata through `7abcbdce`, and request-local activation through `3a8ae78a`; labels metadata 39 through `57192df9`; identity, package-context normalization, structural comparison, and direct duplicate rejection through `5bbc4604`; 39-command visibility oracle through `a376e30e`; typed visibility/package-group graph through `f9ae7337`; request-local `visible()` activation through `76025ede` | three Java `Pattern`-dependent functions, external repositories/pattern breadth, and remaining command breadth | pause function activation until an exact Java-compatible engine is accepted; the M1 source-input owner is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -144,20 +144,17 @@ or fixture changed.
 
 ### Current packet
 
-Run only design packet
-`WP-5-m1-loading-host-dirent-glob-oracle-design`.
+Run only implementation packet
+`WP-5-m1-loading-host-dirent-glob-oracle`.
 
-Freeze a minimal pinned Bazel 9.2 ASCII oracle ahead of the accepted typed
-no-follow dirent implementation. Prefer reuse or a bounded extension of the
-existing glob fixtures, and discriminate direct regular, directory, symlink,
-and special/unknown behavior; wildcard-versus-literal special handling;
-matched versus unrelated dangling/cyclic links; and same-path kind
-transitions on one daemon. Keep native `DT_UNKNOWN` refinement and Windows
-status mapping source-backed where the fixture cannot force them. Freeze the
-exact fixture/harness allowlist, command/mutation sequence, expected outputs,
-growth cap, provenance, cleanup, and replay gates before writing assets. Do
-not implement the oracle or Rust, change Cargo, include non-ASCII/parser
-semantics, activate loading, or combine the Host file-byte projection.
+Implement the accepted focused ASCII contract in the Stage 5 owner plan:
+extend only `glob-directory-invalidation`, preserve every pre-existing field
+and value in its first four generated records while adding only the required
+server-epoch field, add only the POSIX/FIFO harness surface and checked assets
+in the frozen allowlist, and pin the eleven-command same-daemon
+regular/directory/symlink/FIFO/cycle-recovery evidence with empty manifests.
+Do not change Rust or Cargo, invoke Slug, include non-ASCII/parser semantics,
+activate loading, or combine the Host file-byte projection.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 

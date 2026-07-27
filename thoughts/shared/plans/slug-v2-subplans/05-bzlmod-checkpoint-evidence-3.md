@@ -10182,10 +10182,171 @@ stats direct Unix kinds/specials, refines Unix unknown before listing close,
 terminalizes a Windows child-status error, resolves a symlink, or converts a
 raw name lossily.
 
-Oracle-first scheduling is mandatory. Next, design
-`WP-5-m1-loading-host-dirent-glob-oracle-design`, then implement and pin that
+Oracle-first scheduling is mandatory. The accepted design for
+`WP-5-m1-loading-host-dirent-glob-oracle` follows. Implement and pin that
 focused ASCII oracle as post-checkpoint oracle packet three, then implement
 only `WP-5-m1-loading-host-dirent-observation`. Resume the byte-string
 oracle/feasibility design only after the typed observation is accepted. No
-fixture-growth checkpoint is due for this design-only packet; the oracle
+fixture-growth checkpoint is due for either design-only packet; the oracle
 packet must record exact net growth against `22de3631`.
+
+### Focused Host-dirent glob oracle design
+
+Status: `ACCEPT` on 2026-07-27 after independent pinned-source/behavior,
+fixture/harness feasibility, and architecture/orchestration audits plus
+terminal latest-text review. No fixture, harness, generated expectation,
+Bazel probe, Rust, Cargo, dependency, consumer, or entrypoint changed.
+
+Extend only the existing Bazel 9.2 `glob-directory-invalidation` fixture.
+Preserve every pre-existing field and value in its first four command records,
+adding only a `server_epoch` field. Set fixture
+`observe_server_epochs = true` and command `capture_server_epoch = true` on
+all eleven rows; require every recorded epoch to be equal and nonzero. Append
+seven commands proving direct-kind and matched-symlink behavior through one
+daemon. Do not alter
+`glob-callable-contract` or `glob-package-boundaries`, and do not create a new
+fixture.
+
+Add a fixture-level `required_host_os = "posix"` field. The parser accepts
+only absent or `"posix"`; the runner rejects an unsupported host before any
+workspace mutation or Bazel invocation. Add only one mutation operation,
+`op = "fifo"`, accepting exactly `path` and creating the FIFO with
+`os.mkfifo(path, 0o600)`, then applying ordinary `os.chmod(path, 0o600)` so
+the exact mode is independent of `umask`. Immediately verify with `lstat`
+that the collision-free fresh entry remains a FIFO and its permission bits are
+exactly `0600`. It must reject escapes, absent or non-real parents, collisions,
+extra fields, and unsupported hosts. Broaden the existing rename source
+validation to use no-follow `lstat` and accept a regular file, symlink,
+directory, or FIFO; retain all destination, escape, and collision checks. Do
+not add generic directory, symlink, deletion, or special-file setup operations.
+Every created FIFO is run-scoped transient cleanup state, never a manifest
+input.
+
+The immutable fixture topology adds exactly four regular assets:
+
+- `workspace/pkg/state`;
+- `workspace/pkg/links/good-match.txt`;
+- `workspace/staging/dir/child`; and
+- `workspace/cycle_error/BUILD.bazel`.
+
+It adds exactly six checked relative symlinks:
+
+- `workspace/staging/link` targets `specials/direct`, so after moving to
+  `pkg/state` it resolves to `pkg/specials/direct`;
+- `workspace/pkg/specials/link-to-direct` targets `direct`;
+- `workspace/pkg/links/dangling-match.txt` targets missing
+  `missing-match.txt`;
+- `workspace/pkg/links/unrelated-dangling.bin` targets missing
+  `missing-unrelated.bin`;
+- `workspace/pkg/links/unrelated-cycle.bin` targets its own basename
+  `unrelated-cycle.bin`; and
+- `workspace/cycle_error/matched-cycle.txt` targets its own basename
+  `matched-cycle.txt`.
+
+`pkg/BUILD.bazel` keeps the accepted `txts` target and adds generated target
+names for:
+
+- `glob(["state*"])`, prefixed `state_files_`;
+- `glob(["state*"], exclude_directories = 0)`, prefixed `state_all_`;
+- `glob(["specials/*"])`, prefixed `special_wild_`;
+- literal `glob(["specials/direct"])`, prefixed `special_literal_`; and
+- `glob(["links/*-match.txt"])`, prefixed `links_`.
+
+Each matched path replaces `/` with `_` in the target name. New success rows
+query `//pkg:all except //pkg:txts` and assert exact ordered output. With
+`pkg/state` regular and `pkg/specials/direct` a FIFO, the baseline is exactly:
+
+- `//pkg:links_links_good-match.txt`;
+- `//pkg:special_literal_specials_direct`;
+- `//pkg:special_wild_specials_link-to-direct`;
+- `//pkg:state_all_state`; and
+- `//pkg:state_files_state`.
+
+The appended same-daemon sequence is:
+
+1. create FIFOs `pkg/specials/direct` and `staging/special`, then assert the
+   baseline;
+2. rename `pkg/state` to `staging/file` and `staging/dir` to `pkg/state`;
+   assert only `state_files_state` disappears;
+3. rename that directory to `staging/dir-used` and `staging/link` to
+   `pkg/state`; assert the baseline, proving a matched symlink to a special;
+4. rename that symlink to `staging/link-used` and `staging/special` to
+   `pkg/state`; assert only the three non-state targets, proving wildcard
+   direct-special omission while the literal special remains accepted; and
+5. rename that FIFO to `staging/special-used` and `staging/file` to
+   `pkg/state`; assert the baseline restoration.
+
+The existing four rows plus these five rows are followed by an isolated
+matched-cycle failure and recovery. `cycle_error/BUILD.bazel` defines a static
+`probe` target whose source uses
+`glob(["matched-*"], allow_empty = True)`. Querying
+`//cycle_error:probe` must exit 7 and include both
+`Symlink issue while evaluating globs: Symlink cycle:` and
+`cycle_error/matched-cycle.txt`. Then rename the cycle to `.parked`, repeat
+the query on the same server, and assert exact success
+`//cycle_error:probe`. Total command count is exactly eleven.
+
+Unmatched dangling and cyclic symlinks must never fail. A matched dangling
+symlink is omitted. A direct FIFO is skipped by wildcard listing but accepted
+by a literal pattern, while a wildcard-matched symlink to that FIFO
+participates. The isolated matched cycle must fail with the pinned diagnostic
+and recover after rename. Source-only follow-ups retain native `DT_UNKNOWN`,
+duplicate-name stability, listing races, every Windows mapping and lone
+surrogate case, raw non-ASCII names, and broader matcher semantics.
+
+The source authority is Bazel 9.2:
+
+- `packages/producers/PatternWithWildcardProducer.java:102-139,164-208`;
+- `packages/producers/PatternWithoutWildcardProducer.java:68-97`;
+- `packages/producers/DirectoryDirentProducer.java:95-156`;
+- `vfs/Dirent.java` and
+  `skyframe/{DirectoryListingStateValue.java,CompactSortedDirents.java}`;
+- `unix/UnixFileSystem.java` plus the matching native Unix directory sources;
+  and
+- test `skyframe/GlobTestBase.java`, `skyframe/PackageFunction.java`, and
+  `io/FileSymlinkCycleException.java`.
+
+The implementation allowlist is exactly:
+
+- `tools/v2_oracle_lib/fixture.py`;
+- `tools/v2_oracle_lib/runner.py`;
+- `tests/v2_oracle/test_v2_oracle.py`;
+- `tests/v2_oracle/fixtures/glob-directory-invalidation/fixture.toml`;
+- its `expected/oracle.json`;
+- its `workspace/pkg/BUILD.bazel`;
+- the four regular assets and six symlinks listed above.
+
+The cap is +900/-100 total lines, exactly four regular and six symlink assets,
+and at most 550 newline-counted regular-file lines in the fixture. Its
+pre-packet baseline is six regular files, zero links, and 183 text lines.
+Against accepted checkpoint `22de3631`, the prior two post-checkpoint oracle
+packets total +4 regular, +3 symlinks, and +1,065 lines. This is
+post-checkpoint oracle packet three; no five-packet/~100-file/~10,000-line
+growth review is due.
+
+Focused harness tests must cover the parser field/operation matrix,
+unsupported-host rejection before mutation, FIFO absent/collision/escape/
+existing-real-parent/mode/raw command record behavior, directory/FIFO rename
+through no-follow classification, retention of existing create/delete/rename
+behavior, exact command count eleven, and byte-identical preservation of the
+projection of every pre-existing field and value in the first four generated
+command records while permitting only the new `server_epoch` field. Assert
+fixture epoch observation plus per-command capture for all eleven rows.
+
+Generate once with pinned `/usr/bin/bazel`, then replay the checked expectation
+from two distinct absolute fresh roots. Require byte-identical output and
+hashes, the same nonempty Bazel server epoch for all eleven commands, no Slug
+execution, and empty manifest output for every command. Clean Bazel, FIFO,
+socket, and runner state before and after. Run focused harness tests and exact
+fixture inventory/growth/provenance, credential, archive, diff, allowlist, cap,
+symlink, and first-four-record guards.
+
+Stop on POSIX unavailability, unsupported filesystem FIFO behavior, a pinned
+Bazel contradiction, an unrelated link failure, a materially different
+matched-cycle diagnostic, failed recovery, server-epoch change, mutation of
+one of the first four records, cap failure, or required scope beyond the
+allowlist. Do not weaken exact expectations, invoke Slug, broaden matcher
+coverage, or absorb the byte-string/parser seam.
+
+Next packet: implement only
+`WP-5-m1-loading-host-dirent-glob-oracle`.
