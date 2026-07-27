@@ -10936,3 +10936,162 @@ Next packet: design only
 `WP-5-m1-loading-raw-name-pattern-lazy-glob-oracle-design`. Its eventual
 oracle implementation is packet five and must perform and record the focused
 fixture-growth review before terminal acceptance.
+
+### Raw-name pattern-lazy glob oracle design
+
+Status: `ACCEPT` on 2026-07-27 after pinned Bazel source and native behavior,
+harness/fixture feasibility, and architecture/orchestration terminal
+latest-text reviews. No harness, fixture, generated expectation, Rust, Cargo,
+dependency, DICE key, loading caller, Host owner, consumer, or entrypoint
+changed.
+
+Pinned Bazel 9.2 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` preserves Linux directory-name
+bytes through `unix_jni.cc:480-540,545-615` and
+`latin1_jni_path.cc:26-44,78-129`, then exposes them as internal Latin-1
+strings under `StringEncoding.java:25-85,100-141,145-162`.
+`StarlarkNativeModule.java:92-131` sorts final BUILD `glob()` results by those
+internal string values. The accepted typed listing and 13-row POSIX
+Host-dirent oracle already own direct kind, literal-versus-wildcard special
+handling, matched good/dangling/cyclic symlinks, unrelated dangling/cyclic
+symlinks, ELOOP recovery, and same-daemon kind transitions. Source authority
+is `Dirent.java:20-31,34-75`,
+`DirectoryListingStateValue.java:84-106`,
+`PatternWithWildcardProducer.java:89-139,164-210`,
+`PatternWithoutWildcardProducer.java:68-97`, and
+`PackageFunctionWithMultipleGlobDeps.java:228-293`.
+
+The new evidence corrects two historical assumptions. BUILD `glob()` rejects
+every `?` before matching even though the lower `UnixGlob.matches` helper can
+interpret it; authority is `GlobValue.java:40-57`,
+`GlobsValue.java:108-124`, and `GlobCache.java:218-238`, and pinned native
+observation exits 7 with
+`Error in glob: invalid glob pattern '?.txt': wildcard ? forbidden`.
+Also, this raw-name boundary is Linux-only: macOS path conversion reencodes
+Unicode and cannot share a generic POSIX claim. Linux bytes such as
+`ed a0 80` are not evidence for a native Windows UTF-16 lone surrogate.
+
+Implement only
+`WP-5-m1-loading-raw-name-pattern-lazy-glob-oracle` in these exact ten paths:
+
+- `tools/v2_oracle_lib/fixture.py` — at most 120 additions;
+- `tools/v2_oracle_lib/runner.py` — at most 180 additions;
+- `tests/v2_oracle/test_v2_oracle.py` — at most 260 additions;
+- new
+  `tests/v2_oracle/fixtures/glob-raw-name-pattern-lazy/fixture.toml` — at
+  most 220 additions;
+- new
+  `tests/v2_oracle/fixtures/glob-raw-name-pattern-lazy/expected/oracle.json`
+  — at most 420 additions;
+- new
+  `tests/v2_oracle/fixtures/glob-raw-name-pattern-lazy/workspace/MODULE.bazel`
+  — exactly one addition;
+- new
+  `tests/v2_oracle/fixtures/glob-raw-name-pattern-lazy/workspace/pkg/BUILD.bazel`
+  — at most 90 additions;
+- new
+  `tests/v2_oracle/fixtures/glob-raw-name-pattern-lazy/workspace/pkg/defs.bzl`
+  — at most 30 additions;
+- new UTF-8-named
+  `tests/v2_oracle/fixtures/glob-raw-name-pattern-lazy/workspace/pkg/é.txt`
+  — at most five additions; and
+- new
+  `tests/v2_oracle/fixtures/glob-raw-name-pattern-lazy/workspace/qmark/BUILD.bazel`
+  — at most ten additions.
+
+The hard packet cap is +1,200/-100. The fixture retains exactly seven regular
+files, zero links, at most 750 newline-counted lines, and no manifest roots.
+Do not modify or narrow the accepted POSIX
+`glob-directory-invalidation` fixture. The new one-line MODULE and two-package
+scaffold are justified by Linux-only raw-name isolation and independent `?`
+failure containment; copy no symlink, special-file, registry, module, or
+subpackage topology.
+
+Extend `required_host_os` with exact value `"linux"` while preserving absent
+and `"posix"` behavior. Reject a Linux-only fixture before run-directory or
+workspace creation unless `sys.platform == "linux"`. Add only two mutation
+operations:
+
+- `raw_create` takes an ASCII relative real-parent `path`, a nonempty
+  canonical lowercase even-length hexadecimal `name_bytes_hex`, and UTF-8
+  `content`; and
+- `raw_delete` takes the same parent/hex identity and removes only an existing
+  regular file.
+
+The decoded final component must reject NUL, slash, empty, `.`, and `..`.
+Reject unsupported fields, noncanonical or invalid hex, symlink or missing
+parents, workspace escape, create collisions, wrong-kind deletes, and every
+non-Linux execution. Build and operate on the final path as bytes without
+decoding it through `Path`, Unicode, or a lossy display. Evidence records only
+the ASCII parent and canonical hex. Do not add raw rename, directory, symlink,
+FIFO, arbitrary full-path, fixture setup, or Windows-code-unit support.
+Focused harness tests must prove all validation, parent/escape/collision/kind
+failures, exact byte creation/deletion, ASCII-only records, unchanged existing
+mutations, and the pre-copy Linux gate.
+
+The fixture has exactly four Bazel-only commands on one retained daemon. Set
+`daemon = true`, `observe_server_epochs = true`,
+`required_host_os = "linux"`, and capture the server epoch on every row:
+
+1. `raw_names_baseline` creates final-component bytes `e9 2e 74 78 74` under
+   ASCII parent `pkg`, alongside the checked UTF-8 filename `é.txt` whose
+   bytes are `c3 a9 2e 74 78 74`. The exact positive calls are
+   `glob(["*.txt"], allow_empty = True)`,
+   `glob(["é*.txt"], allow_empty = True)`,
+   `glob(["\351*.txt"], allow_empty = True)`, and
+   `glob([dynamic_pattern()], allow_empty = True)`, where loaded `defs.bzl`
+   returns `"\303" + "\251*.txt"` and validates that result as
+   `["\303\251.txt"]`. Exact ASCII conditional target labels prove raw-byte
+   ordering and each distinct literal, octal, and dynamic match.
+2. `question_mark_is_forbidden` queries isolated package `//qmark:*`, exits
+   7 with empty stdout, and pins the exact stable error fragment above.
+3. `raw_e9_deleted` deletes only the generated `e9.txt` and succeeds with
+   exact ASCII conditional labels proving the UTF-8 name remains visible,
+   ordered alone, and matched by the literal/dynamic patterns while the
+   one-octal result is empty.
+4. `raw_e9_recreated` recreates the same bytes and content and reproduces the
+   complete baseline stdout byte-for-byte.
+
+Require server epoch 1 on all four rows, empty manifests, ASCII stdout and
+normalized diagnostics, no raw filename in JSON or text evidence, and no Slug
+execution. Generate once with pinned `/usr/bin/bazel`, then replay the checked
+expectation from two distinct absolute fresh roots. Require byte-identical
+normalized projections, exact mutation records, and complete Bazel/runner
+cleanup. Stop if the proposed loaded `.bzl` round trip differs from the
+observed BUILD-only dynamic result, a raw transition restarts the server, or
+an existing accepted fixture or record changes.
+
+Do not add positive `?` rows. Standalone `**`, dot matching, historical
+parenthesis behavior, brackets/braces/backslash breadth, and subpackage
+boundaries are orthogonal matcher-language evidence and remain source-derived
+or owned by existing fixtures, not this raw-segment packet. Full symlink
+retarget breadth, Host equality/invalidation, speculative print suppression,
+transactional evaluator retry, regular-or-special BUILD/`.bzl` byte
+acquisition, production parser activation, mixed native/global byte ingress,
+native Windows/raw UTF-16/lone-surrogate ordering, and reparse parity also
+remain separate. This packet adds no Rust, DICE key or Need, Host owner,
+loading caller, event assertion, direct production IO, dependency, or Stage 9
+import. The dormant parser entrypoint retains zero production callers.
+
+This is the fifth oracle packet after accepted fixture-growth baseline
+`22de3631`, following `d262052d`, `c67dc3a5`, `0a4aa0af`, and `98b8b0e1`.
+Before terminal oracle acceptance, compare tracked archives at `22de3631` and
+the new implementation commit; record exact regular-file, symlink, and
+newline counts by affected fixture and packet; review every retained row,
+asset, mutation, manifest/expected field, and repeated subtree across the
+22-row nonroot fixture, 13-row POSIX glob fixture, eight-row string fixture,
+and new four-row raw fixture; and record the exact pruning allowlist and
+affected replay set or `none` in the oracle-harness owner plan. Do not schedule
+a sixth oracle until that focused review and its terminal reviews accept.
+
+Stop on any pinned Bazel contradiction, server restart, unstable or non-ASCII
+projection, lossy filename decoding, macOS/Windows claim, broader raw mutation
+API, change to accepted POSIX evidence, Slug/Rust/DICE/loading/Host/consumer
+scope, new dependency or imported V1/Buck code, cap/allowlist expansion, or
+inability to complete the mandatory fixture-growth review.
+
+Next packet after terminal acceptance of this design: implement only
+`WP-5-m1-loading-raw-name-pattern-lazy-glob-oracle`. After that oracle and its
+packet-five growth review accept, design only
+`WP-5-m1-loading-pure-host-glob-owner-design`; transactional evaluator retry
+remains later and separate.
