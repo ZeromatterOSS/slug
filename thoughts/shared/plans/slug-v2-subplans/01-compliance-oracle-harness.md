@@ -1137,3 +1137,38 @@ spans. Pinned generation, two distinct-root callable replays, both protected
 glob-fixture replays, 97 harness tests, and structural/cleanup guards passed.
 This is packet one after the checkpoint and remains below every fixture-growth
 review trigger.
+
+### Fixture-growth hygiene checkpoint (2026-07-27, sixth review)
+
+The mandatory five-packet review compared tracked archives at baseline
+`e2cc891d` and accepted tree `8d84d336`. The fixture tree grew from 1,314
+regular files, 24 symlinks, 39,304 newline-counted regular-file lines, and 796
+command rows to 1,325/24/39,632 and 803 rows: +11 regular files, zero symlinks,
++328 lines, and +7 rows.
+
+The accepted packet deltas were terminal-segment glob matching `9f42c3e5`
+(+3 regular files, +78 lines, +1 row), package-boundary projection
+`85ba4975` (+5/-15/-1), pure Host glob traversal `5abff72e` (+3/+52/+1),
+query package output `c2ba9298` (no entries, +103/+3), and explicit query
+label output `8d84d336` (no entries, +110/+3). The final affected fixtures are
+`glob-callable-contract` at 20/0/306 and five rows,
+`glob-package-boundaries` at 18/0/140 and two rows,
+`query-loading-thin-vertical` at 14/0/519 and 15 rows, and
+`query-path-topology` at 6/0/1,478 and 46 rows.
+
+Every retained row and asset remains discriminating. Segment matching isolates
+bare-star hidden membership, suffix hidden exclusion, explicit-dot inclusion,
+and non-adjacent nonempty star spans. The boundary fixture deliberately
+replaced its stale two-row topology with the exact six-state projection, and
+the traversal row separately proves multi-pattern, zero-depth `**`,
+file/directory, and duplicate behavior. The package formatter rows distinguish
+root projection, dependency projection, and loaded-file packages; the label
+rows distinguish auto, explicit full output, and the exact invalid-`text`
+diagnostic.
+
+No added nonempty blob is duplicated across fixtures, and no repeated
+substantive subtree, unused mutation, manifest field, expected field, or
+negative assertion is safely removable. Tracked-archive inventory, per-commit
+and per-fixture attribution, and added-blob inspection therefore set both the
+pruning allowlist and affected replay set to `none`. The next checkpoint starts
+from accepted tree `8d84d336` and counts later accepted oracle packets only.

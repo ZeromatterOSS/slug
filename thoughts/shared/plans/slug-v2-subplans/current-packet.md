@@ -1,30 +1,43 @@
 # Current Slug V2 Packet
 
-Packet: `WP-1-oracle-growth-checkpoint-post-e2cc891d`
-Milestone: oracle-harness maintenance before further fixture breadth
-Owner: `slug-v2-subplans/01-compliance-oracle-harness.md`
-Evidence: accepted baseline `e2cc891d` and five later oracle packets
-`9f42c3e5`, `85ba4975`, `5abff72e`, `c2ba9298`, and the explicit-label
-implementation commit
-Validation tier: docs/inventory, with focused replays only if pruning is needed
+Packet: `WP-5-m1-loading-host-glob-loading-adapter`
+Milestone: M1, one semantic loading spine
+Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
+Evidence: accepted `glob-package-boundaries` traversal oracle `5abff72e` and
+private Host traversal owner `18f4b2db`; exact owner handoff under
+`Pure Host glob traversal owner`
+Validation tier: private/local Rust
 
 Allowed files:
 
-- `thoughts/shared/plans/slug-v2-subplans/01-compliance-oracle-harness.md`
-- terminal canonical, manifest, and exceptional routing updates
+- `app/slug_loading_v2/src/host_glob/mod.rs`
+- `app/slug_loading_v2/src/host_glob/traversal.rs`
+- new `app/slug_loading_v2/src/host_glob/adapter.rs`
+- new `app/slug_loading_v2/src/host_glob/adapter_tests.rs`
+- terminal owner, canonical, manifest, and exceptional routing updates
 
-Result: compare the tracked fixture tree at `e2cc891d` with current accepted
-HEAD. Inventory regular files, symlinks, newline-counted text lines, commands,
-and per-fixture deltas for the five named packets. Inspect repeated substantive
-subtrees and verify every added row, asset, mutation, manifest field, expected
-field, and negative assertion remains discriminating.
+Result: add one private async loading adapter that accepts a normalized
+workspace, selected logical package root, `PackagePath`, one complete raw-byte
+pattern, and FILES or FILES_AND_DIRS operation. It must use the existing
+checked pattern and traversal-key constructors, compute the existing traversal
+through the caller's `DiceComputations`, and project a complete success to the
+same sorted/deduplicated shared raw paths without UTF-8 conversion or copying
+path bytes. Forward `Need` and typed traversal failures unchanged. Pattern and
+key-construction failures remain distinct pre-compute results.
 
-Record a compact checkpoint in the Stage 1 owner. If no pruning is justified,
-advance directly to the next implementation packet. If material is redundant,
-stop and create a separate exact-path cleanup packet with affected fixture
-replays. Do not edit fixtures, harness code, Rust, dependencies, routing
-history, or unrelated plans in this review packet.
+The adapter adds no DICE key, cache, interner, lock, event, direct filesystem
+IO, dependency, public export, or production caller. It does not add
+include/exclude composition, `allow_empty`, callable diagnostics or sorting,
+BUILD/`.bzl` acquisition, parser/evaluator activation or transaction
+ownership, external repositories, SUBPACKAGES, native-Windows behavior, or
+lone-surrogate claims.
 
-Validate deterministic archive/current inventories, packet and fixture
-attribution, duplicate-subtree inspection, `git diff --check`, archive status,
-and exact docs-only scope.
+Focused tests must prove pre-compute pattern/key rejection without traversal
+activation, exact one-pattern operation projection, raw non-UTF8 byte
+preservation, sorted/deduplicated shared-path identity, unchanged Need and
+typed-error propagation, caller-owned same-graph invalidation/restoration, and
+zero production callers. Run focused adapter and traversal tests, one direct
+loading-crate suite, formatting, `git diff --check`, archive status, and exact
+scope/caller/dependency/IO/lock/public-surface guards. Stop on a fifth
+implementation file, a new key or retained cache, any production/callable
+activation, or any need to change accepted traversal semantics.

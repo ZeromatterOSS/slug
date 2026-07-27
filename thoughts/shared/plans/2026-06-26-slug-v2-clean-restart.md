@@ -24,9 +24,9 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | partial | Host loading observations and private glob traversal owner through this commit; full evidence is in the Stage 5 owner plan | private loading adapter and later callable activation; Host publication/retry, byte-aware ingress, native Windows ordering, BUILD/`.bzl` acquisition, registry transports, and discovery composition remain | pause while the bounded M3 Pattern contract is current |
+| M1: one semantic spine | **active** | Host loading observations and private glob traversal owner through this commit; full evidence is in the Stage 5 owner plan | private loading adapter and later callable activation; Host publication/retry, byte-aware ingress, native Windows ordering, BUILD/`.bzl` acquisition, registry transports, and discovery composition remain | implement the bounded private Host-glob loading adapter |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
-| M3: `query` | **active** | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats remain | pause for the mandatory post-packet-five oracle growth review |
+| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 private loading adapter is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-1-oracle-growth-checkpoint-post-e2cc891d`.
+`WP-5-m1-loading-host-glob-loading-adapter`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
