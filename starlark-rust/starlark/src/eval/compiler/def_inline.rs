@@ -230,12 +230,16 @@ impl InlineDefCallSite<'_, '_, '_, '_, '_> {
         call: &IrSpanned<CallCompiled>,
     ) -> Result<IrSpanned<ExprCompiled>, CannotInline> {
         let span = call.span;
-        let CallCompiled { fun, args } = &call.node;
+        let CallCompiled {
+            call_site,
+            fun,
+            args,
+        } = &call.node;
         let fun = self.inline(fun)?;
         let args = self.inline_args(args)?;
         Ok(IrSpanned {
             span,
-            node: CallCompiled::call(span, fun, args, self.ctx),
+            node: CallCompiled::call(span, *call_site, fun, args, self.ctx),
         })
     }
 

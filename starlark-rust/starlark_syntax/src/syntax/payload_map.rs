@@ -174,6 +174,7 @@ impl<A: AstPayload> ExprP<A> {
             ExprP::Call(ca, args) => ExprP::Call(
                 Box::new(ca.into_map_payload(f)),
                 CallArgsP {
+                    lparen: args.lparen,
                     args: args.args.into_map(|a| a.into_map_payload(f)),
                 },
             ),

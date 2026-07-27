@@ -26,9 +26,11 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationDiagnosticLevel;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
+use slug_events_v2::StarlarkSourceLocation;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathOutcome;
 use starlark::PrintHandler;
+use starlark::PrintLocation;
 use starlark::any::ProvidesStaticType;
 use starlark::codemap::Span;
 use starlark::environment::Globals;
@@ -153,14 +155,14 @@ impl fmt::Display for HostRepoFileError {
 impl std::error::Error for HostRepoFileError {}
 
 trait RepoEventReporter {
-    fn print(&self, text: &str) -> starlark::Result<()>;
+    fn print(&self, location: PrintLocation, text: &str) -> starlark::Result<()>;
     fn diagnostic(&self, level: EvaluationDiagnosticLevel, text: &str);
 }
 
 struct DirectRepoEventReporter;
 
 impl RepoEventReporter for DirectRepoEventReporter {
-    fn print(&self, text: &str) -> starlark::Result<()> {
+    fn print(&self, _location: PrintLocation, text: &str) -> starlark::Result<()> {
         eprintln!("{text}");
         Ok(())
     }
@@ -182,10 +184,14 @@ impl RecordingRepoEventReporter {
 }
 
 impl RepoEventReporter for RecordingRepoEventReporter {
-    fn print(&self, text: &str) -> starlark::Result<()> {
+    fn print(&self, location: PrintLocation, text: &str) -> starlark::Result<()> {
+        let (file, line, column) = location.into_parts();
         self.events
             .borrow_mut()
-            .push(EvaluationEvent::StarlarkPrint { text: text.into() });
+            .push(EvaluationEvent::StarlarkPrint {
+                location: StarlarkSourceLocation::new(file, line, column),
+                text: text.into(),
+            });
         Ok(())
     }
 
@@ -202,8 +208,8 @@ struct RepoPrintHandler<'a> {
 }
 
 impl PrintHandler for RepoPrintHandler<'_> {
-    fn println(&self, text: &str) -> starlark::Result<()> {
-        self.reporter.print(text)
+    fn println(&self, location: PrintLocation, text: &str) -> starlark::Result<()> {
+        self.reporter.print(location, text)
     }
 }
 
@@ -1146,12 +1152,65 @@ mod tests {
         assert!(matches!(
             events.as_slice(),
             [
-                EvaluationEvent::StarlarkPrint { text },
+                EvaluationEvent::StarlarkPrint { location, text },
                 EvaluationEvent::Diagnostic {
                     level: EvaluationDiagnosticLevel::Error,
                     ..
                 }
             ] if text == "before"
+                && location.to_string() == format!("{}:1:6", path().as_path().display())
+        ));
+    }
+
+    #[test]
+    fn direct_reporter_keeps_capture_disabled_prints_out_of_event_storage() {
+        const CHILD_ENV: &str = "SLUG_DIRECT_REPO_REPORTER_CHILD";
+        if std::env::var_os(CHILD_ENV).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "repo_file::tests::direct_reporter_keeps_capture_disabled_prints_out_of_event_storage",
+                    "--nocapture",
+                ])
+                .env(CHILD_ENV, "1")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "child failed: stdout={:?}, stderr={:?}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert_eq!(output.stderr, b"direct\n");
+            assert!(
+                !output
+                    .stderr
+                    .windows(b"DEBUG:".len())
+                    .any(|value| value == b"DEBUG:")
+            );
+            return;
+        }
+
+        let value = evaluate_repo_file(
+            &path(),
+            b"print('direct')\nignore_directories(['out'])\n",
+            RootRepoFileUtf8Mode::Warning,
+            &super::DirectRepoEventReporter,
+        )
+        .unwrap();
+        assert_eq!(value.ignored_directories(), ["out"]);
+
+        let recording = RecordingRepoEventReporter::default();
+        evaluate_repo_file(
+            &path(),
+            b"print('direct')\nignore_directories(['out'])\n",
+            RootRepoFileUtf8Mode::Warning,
+            &recording,
+        )
+        .unwrap();
+        assert!(matches!(
+            recording.into_batch().events(),
+            [EvaluationEvent::StarlarkPrint { text, .. }] if text == "direct"
         ));
     }
 
@@ -1411,7 +1470,7 @@ mod tests {
                 batch: Some(batch),
             }] if matches!(
                 batch.events(),
-                [EvaluationEvent::StarlarkPrint { text }] if text == "A"
+                [EvaluationEvent::StarlarkPrint { text, .. }] if text == "A"
             )
         ));
 
@@ -1427,7 +1486,7 @@ mod tests {
         observed_repo(&dice, tracker.dupe(), repo_epoch(Some(source_b), 2)).await;
         assert!(tracker.take().iter().any(|activation| matches!(
             activation.batch.as_ref().map(EventBatch::events),
-            Some([EvaluationEvent::StarlarkPrint { text }]) if text == "B"
+            Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "B"
         )));
 
         let failure = b"print('PREFIX')\nfail('boom')\n";
@@ -1440,7 +1499,7 @@ mod tests {
         assert!(tracker.take().iter().any(|activation| matches!(
             activation.batch.as_ref().map(EventBatch::events),
             Some([
-                EvaluationEvent::StarlarkPrint { text },
+                EvaluationEvent::StarlarkPrint { text, .. },
                 EvaluationEvent::Diagnostic {
                     level: EvaluationDiagnosticLevel::Error,
                     ..
@@ -1457,7 +1516,7 @@ mod tests {
         observed_repo(&dice, tracker.dupe(), repo_epoch(Some(source_a), 5)).await;
         assert!(tracker.take().iter().any(|activation| matches!(
             activation.batch.as_ref().map(EventBatch::events),
-            Some([EvaluationEvent::StarlarkPrint { text }]) if text == "A"
+            Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "A"
         )));
     }
 }

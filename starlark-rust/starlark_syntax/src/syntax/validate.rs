@@ -17,6 +17,8 @@
 
 //! AST for parsed starlark files.
 
+use crate::codemap::Pos;
+use crate::codemap::Span;
 use crate::syntax::DialectTypes;
 use crate::syntax::ast::AstArgument;
 use crate::syntax::ast::AstExpr;
@@ -49,10 +51,15 @@ impl Expr {
     /// We allow at most one **kwargs.
     pub(crate) fn check_call(
         f: AstExpr,
+        lparen: usize,
         args: Vec<AstArgument>,
         parser_state: &mut ParserState<'_>,
     ) -> Expr {
-        let args = CallArgsP { args };
+        let lparen = Pos::new(lparen as u32);
+        let args = CallArgsP {
+            lparen: Span::new(lparen, lparen),
+            args,
+        };
 
         if let Err(e) = CallArgsUnpack::unpack(&args, parser_state.codemap) {
             parser_state.errors.push(e);

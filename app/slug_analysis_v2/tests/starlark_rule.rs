@@ -142,7 +142,7 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
         .events()
         .iter()
         .map(|event| match event {
-            EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+            EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
             EvaluationEvent::Diagnostic { .. } => {
                 unreachable!("diagnostic events are not produced by this packet")
             }
@@ -694,6 +694,28 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             .map(event_texts),
         Some(vec!["PARENT_LOCAL"])
     );
+    let leaf_batch = analysis_event(&initial, &workspace, &leaf_key)
+        .batch
+        .as_ref()
+        .unwrap();
+    let parent_batch = analysis_event(&initial, &workspace, &parent_key)
+        .batch
+        .as_ref()
+        .unwrap();
+    assert!(matches!(
+        leaf_batch.events(),
+        [EvaluationEvent::StarlarkPrint { location, text }]
+            if text == "LEAF_LOCAL"
+                && location.to_string()
+                    == format!("{}:5:10", workspace.join("rules/defs.bzl").display())
+    ));
+    assert!(matches!(
+        parent_batch.events(),
+        [EvaluationEvent::StarlarkPrint { location, text }]
+            if text == "PARENT_LOCAL"
+                && location.to_string()
+                    == format!("{}:9:10", workspace.join("rules/defs.bzl").display())
+    ));
 
     fs::write(
         workspace.join("rules/defs.bzl"),

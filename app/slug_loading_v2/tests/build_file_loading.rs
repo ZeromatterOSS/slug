@@ -285,7 +285,7 @@ fn package_event_texts<'a>(
                 .events()
                 .iter()
                 .map(|event| match event {
-                    EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                    EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                     EvaluationEvent::Diagnostic { .. } => {
                         unreachable!("diagnostic events are not produced by this packet")
                     }
@@ -342,6 +342,20 @@ fn package_event_capture_is_local_and_preserves_empty_and_runtime_prefix_batches
         package_event_texts(&captured, &package),
         Some(vec!["BUILD_LOCAL"])
     );
+    let captured_batch = captured
+        .iter()
+        .find(|activation| {
+            activation.kind == ActivationKind::Evaluated && activation.package == package
+        })
+        .and_then(|activation| activation.batch.as_ref())
+        .unwrap();
+    assert!(matches!(
+        captured_batch.events(),
+        [EvaluationEvent::StarlarkPrint { location, text }]
+            if text == "BUILD_LOCAL"
+                && location.to_string()
+                    == format!("{}:2:6", package.join(BUILD_FILE_PRIMARY).display())
+    ));
 
     fs::write(
         package.join(BUILD_FILE_PRIMARY),

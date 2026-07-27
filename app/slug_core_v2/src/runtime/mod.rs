@@ -33,6 +33,7 @@ pub use dice::observe_workspace;
 pub use dice::observe_workspace_files;
 pub use events::AcceptedCommand;
 pub use events::CommandOutput;
+pub use events::PublishedCommand;
 pub use events::TerminalOutput;
 pub use slug_query_v2::QueryOutputCompletion;
 

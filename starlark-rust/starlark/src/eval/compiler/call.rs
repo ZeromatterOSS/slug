@@ -17,7 +17,6 @@
 
 //! Compile function calls.
 
-use starlark_derive::VisitSpanMut;
 use starlark_syntax::slice_vec_ext::VecExt;
 
 use crate::collections::symbol::symbol::Symbol;
@@ -38,15 +37,25 @@ use crate::values::Value;
 use crate::values::enumeration::FrozenEnumType;
 use crate::values::string::dot_format::parse_format_one;
 
-#[derive(Clone, Debug, VisitSpanMut)]
+#[derive(Clone, Debug)]
 pub(crate) struct CallCompiled {
+    pub(crate) call_site: FrameSpan,
     pub(crate) fun: IrSpanned<ExprCompiled>,
     pub(crate) args: ArgsCompiledValue,
+}
+
+impl VisitSpanMut for CallCompiled {
+    fn visit_spans(&mut self, visitor: &mut impl FnMut(&mut FrameSpan)) {
+        visitor(&mut self.call_site);
+        self.fun.visit_spans(visitor);
+        self.args.visit_spans(visitor);
+    }
 }
 
 impl CallCompiled {
     pub(crate) fn new_method(
         span: FrameSpan,
+        call_site: FrameSpan,
         this: IrSpanned<ExprCompiled>,
         field: &Symbol,
         getattr_span: FrameSpan,
@@ -60,13 +69,14 @@ impl CallCompiled {
                     span: getattr_span,
                     node: v,
                 };
-                return CallCompiled::call(span, v, args, ctx);
+                return CallCompiled::call(span, call_site, v, args, ctx);
             }
         }
 
         ExprCompiled::Call(Box::new(IrSpanned {
             span,
             node: CallCompiled {
+                call_site,
                 fun: IrSpanned {
                     span: getattr_span,
                     node: ExprCompiled::dot(this, field, ctx),
@@ -260,6 +270,7 @@ impl CallCompiled {
 
     pub(crate) fn call(
         span: FrameSpan,
+        call_site: FrameSpan,
         fun: IrSpanned<ExprCompiled>,
         args: ArgsCompiledValue,
         ctx: &mut OptCtx,
@@ -297,21 +308,37 @@ impl CallCompiled {
         }
 
         if let ExprCompiled::Builtin1(Builtin1::Dot(field), this) = &fun.node {
-            return CallCompiled::new_method(span, (**this).clone(), field, fun.span, args, ctx);
+            return CallCompiled::new_method(
+                span,
+                call_site,
+                (**this).clone(),
+                field,
+                fun.span,
+                args,
+                ctx,
+            );
         }
 
         ExprCompiled::Call(Box::new(IrSpanned {
             span,
-            node: CallCompiled { fun, args },
+            node: CallCompiled {
+                call_site,
+                fun,
+                args,
+            },
         }))
     }
 }
 
 impl IrSpanned<CallCompiled> {
     pub(crate) fn optimize(&self, ctx: &mut OptCtx) -> ExprCompiled {
-        let CallCompiled { fun: expr, args } = &self.node;
+        let CallCompiled {
+            call_site,
+            fun: expr,
+            args,
+        } = &self.node;
         let expr = expr.optimize(ctx);
         let args = args.optimize(ctx);
-        CallCompiled::call(self.span, expr, args, ctx)
+        CallCompiled::call(self.span, *call_site, expr, args, ctx)
     }
 }

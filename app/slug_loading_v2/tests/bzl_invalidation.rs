@@ -328,7 +328,7 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
         .events()
         .iter()
         .map(|event| match event {
-            EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+            EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
             EvaluationEvent::Diagnostic { .. } => {
                 unreachable!("diagnostic events are not produced by this packet")
             }
@@ -353,6 +353,17 @@ fn activation_texts_for_kind<'a>(
         .find(|activation| activation.kind == kind && &activation.identity == identity)
         .and_then(|activation| activation.batch.as_ref())
         .map(event_texts)
+}
+
+fn activation_batch_for_kind<'a>(
+    activations: &'a [LoadingEventActivation],
+    identity: &AttributeKeyIdentity,
+    kind: ActivationKind,
+) -> Option<&'a EventBatch> {
+    activations
+        .iter()
+        .find(|activation| activation.kind == kind && &activation.identity == identity)
+        .and_then(|activation| activation.batch.as_ref())
 }
 
 fn scratch(name: &str) -> PathBuf {
@@ -1041,6 +1052,18 @@ fn loading_event_capture_is_key_local_empty_replacing_and_failure_prefix_preserv
         ),
         Some(vec!["DEPENDENCY_LOCAL"])
     );
+    assert!(matches!(
+        activation_batch_for_kind(
+            &initial,
+            &AttributeKeyIdentity::BzlModuleEval(dependency.clone()),
+            ActivationKind::Evaluated,
+        )
+        .unwrap()
+        .events(),
+        [EvaluationEvent::StarlarkPrint { location, text }]
+            if text == "DEPENDENCY_LOCAL"
+                && location.to_string() == format!("{}:1:6", dependency.display())
+    ));
     assert_eq!(
         activation_texts(
             &initial,

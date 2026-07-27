@@ -412,6 +412,7 @@ impl AstModule {
                             }),
                         }),
                         CallArgsP {
+                            lparen: x.span.end_span(),
                             args: vec![
                                 Spanned {
                                     span: lhs.span,

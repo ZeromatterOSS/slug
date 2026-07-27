@@ -38,11 +38,13 @@ use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
+use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark::PrintHandler;
+use starlark::PrintLocation;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
@@ -111,10 +113,14 @@ impl LoadingPrintCapture {
 }
 
 impl PrintHandler for LoadingPrintCapture {
-    fn println(&self, text: &str) -> starlark::Result<()> {
+    fn println(&self, location: PrintLocation, text: &str) -> starlark::Result<()> {
+        let (file, line, column) = location.into_parts();
         self.events
             .borrow_mut()
-            .push(EvaluationEvent::StarlarkPrint { text: text.into() });
+            .push(EvaluationEvent::StarlarkPrint {
+                location: StarlarkSourceLocation::new(file, line, column),
+                text: text.into(),
+            });
         Ok(())
     }
 }

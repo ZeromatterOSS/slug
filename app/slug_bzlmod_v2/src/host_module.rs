@@ -832,7 +832,7 @@ mod tests {
             .events()
             .iter()
             .map(|event| match event {
-                EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
             })
             .collect()

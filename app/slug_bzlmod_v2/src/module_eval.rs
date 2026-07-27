@@ -20,6 +20,7 @@ use dupe::Dupe;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
+use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
@@ -34,6 +35,7 @@ use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceRawFileKey;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use starlark::PrintHandler;
+use starlark::PrintLocation;
 use starlark::any::ProvidesStaticType;
 use starlark::codemap::Span;
 use starlark::environment::Globals;
@@ -1117,10 +1119,14 @@ impl RootModulePrintCapture {
 }
 
 impl PrintHandler for RootModulePrintCapture {
-    fn println(&self, text: &str) -> starlark::Result<()> {
+    fn println(&self, location: PrintLocation, text: &str) -> starlark::Result<()> {
+        let (file, line, column) = location.into_parts();
         self.events
             .borrow_mut()
-            .push(EvaluationEvent::StarlarkPrint { text: text.into() });
+            .push(EvaluationEvent::StarlarkPrint {
+                location: StarlarkSourceLocation::new(file, line, column),
+                text: text.into(),
+            });
         Ok(())
     }
 }
@@ -2197,7 +2203,7 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
 #[allow(dead_code)]
 struct RejectPrint;
 impl PrintHandler for RejectPrint {
-    fn println(&self, _: &str) -> starlark::Result<()> {
+    fn println(&self, _: PrintLocation, _: &str) -> starlark::Result<()> {
         Err(starlark::Error::new_other(anyhow::anyhow!(
             "print() is not permitted in MODULE.bazel"
         )))

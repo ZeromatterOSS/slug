@@ -16,9 +16,13 @@
  */
 
 use std::fmt;
+use std::sync::Arc;
 
+use dupe::Dupe;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use starlark_derive::starlark_module;
+use starlark_syntax::codemap::Span;
 
 use crate as starlark;
 use crate::environment::GlobalsBuilder;
@@ -115,17 +119,76 @@ impl fmt::Display for PrintWrapper<'_, '_> {
     }
 }
 
+/// Bazel-shaped source location for one `print` or `pprint` call.
+#[derive(Clone, Debug, Dupe, Eq, PartialEq)]
+pub struct PrintLocation {
+    file: Arc<str>,
+    line: u32,
+    column: u32,
+}
+
+impl PrintLocation {
+    fn from_evaluator(eval: &Evaluator<'_, '_, '_>) -> Self {
+        static BUILTIN: Lazy<Arc<str>> = Lazy::new(|| Arc::from("<builtin>"));
+
+        let Some(location) = eval.call_stack_top_location() else {
+            return Self {
+                file: BUILTIN.dupe(),
+                line: 0,
+                column: 0,
+            };
+        };
+        if location.file.is_native() {
+            return Self {
+                file: BUILTIN.dupe(),
+                line: 0,
+                column: 0,
+            };
+        };
+
+        let point = location.span.begin();
+        let line = location.file.find_line(point);
+        let line_span = location.file.line_span(line);
+        let prefix = location
+            .file
+            .source_span(Span::new(line_span.begin(), point));
+        Self {
+            file: location.file.filename_shared(),
+            line: (line + 1) as u32,
+            column: (prefix.encode_utf16().count() + 1) as u32,
+        }
+    }
+
+    /// Consume this location into its apparent filename, line, and column.
+    pub fn into_parts(self) -> (Arc<str>, u32, u32) {
+        (self.file, self.line, self.column)
+    }
+}
+
+impl fmt::Display for PrintLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.file)?;
+        if self.line != 0 {
+            write!(f, ":{}", self.line)?;
+            if self.column != 0 {
+                write!(f, ":{}", self.column)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Invoked from `print` or `pprint` to print a value.
 pub trait PrintHandler {
     /// If this function returns error, evaluation fails with this error.
-    fn println(&self, text: &str) -> crate::Result<()>;
+    fn println(&self, location: PrintLocation, text: &str) -> crate::Result<()>;
 }
 
 pub(crate) struct StderrPrintHandler;
 
 impl PrintHandler for StderrPrintHandler {
-    fn println(&self, text: &str) -> crate::Result<()> {
-        eprintln!("{text}");
+    fn println(&self, location: PrintLocation, text: &str) -> crate::Result<()> {
+        eprintln!("{location}: {text}");
         Ok(())
     }
 }
@@ -139,8 +202,9 @@ pub fn print(builder: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         // In practice most users should want to put the print somewhere else, but this does for now
         // Unfortunately, we can't use PrintWrapper because strings to_str() and Display are different.
-        eval.print_handler
-            .println(&args.items.iter().map(|x| x.to_str()).join(" "))?;
+        let location = PrintLocation::from_evaluator(eval);
+        let text = args.items.iter().map(|x| x.to_str()).join(" ");
+        eval.print_handler.println(location, &text)?;
         Ok(NoneType)
     }
 }
@@ -152,8 +216,9 @@ pub fn pprint(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator,
     ) -> starlark::Result<NoneType> {
         // In practice most users may want to put the print somewhere else, but this does for now
+        let location = PrintLocation::from_evaluator(eval);
         eval.print_handler
-            .println(&format!("{:#}", PrintWrapper(&args.items)))?;
+            .println(location, &format!("{:#}", PrintWrapper(&args.items)))?;
         Ok(NoneType)
     }
 }
@@ -201,12 +266,40 @@ pub fn prepr(builder: &mut GlobalsBuilder) {
 mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
+    use std::sync::Arc;
 
     use dupe::Dupe;
+    use starlark_derive::starlark_module;
+    use starlark_syntax::error::StarlarkResultExt;
 
+    use crate as starlark;
     use crate::assert;
     use crate::assert::Assert;
+    use crate::environment::GlobalsBuilder;
+    use crate::environment::Module;
+    use crate::eval::Arguments;
+    use crate::eval::Evaluator;
     use crate::stdlib::PrintHandler;
+    use crate::stdlib::PrintLocation;
+    use crate::values::Value;
+
+    #[starlark_module]
+    fn native_print_location_globals(globals: &mut GlobalsBuilder) {
+        fn native_print_location(eval: &mut Evaluator) -> anyhow::Result<String> {
+            Ok(PrintLocation::from_evaluator(eval).to_string())
+        }
+
+        fn invoke_with_native_location<'v>(
+            function: Value<'v>,
+            eval: &mut Evaluator<'v, '_, '_>,
+        ) -> anyhow::Result<Value<'v>> {
+            use crate::eval::runtime::rust_loc::rust_loc;
+
+            function
+                .invoke_with_loc(Some(rust_loc!()), &Arguments::default(), eval)
+                .into_anyhow_result()
+        }
+    }
 
     #[test]
     fn test_filter() {
@@ -261,23 +354,83 @@ assert_eq(["11",8], map(double, ["1",4]))
     }
 
     #[test]
-    fn test_print() {
-        let s = Rc::new(RefCell::new(String::new()));
-        let s_copy = s.dupe();
+    fn test_print_preserves_bazel_call_locations() {
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let seen_copy = seen.dupe();
         struct PrintHandlerImpl {
-            s: Rc<RefCell<String>>,
+            seen: Rc<RefCell<Vec<(PrintLocation, String)>>>,
         }
         impl PrintHandler for PrintHandlerImpl {
-            fn println(&self, s: &str) -> crate::Result<()> {
-                *self.s.borrow_mut() = s.to_owned();
+            fn println(&self, location: PrintLocation, text: &str) -> crate::Result<()> {
+                self.seen.borrow_mut().push((location, text.to_owned()));
                 Ok(())
             }
         }
-        let print_handler = PrintHandlerImpl { s: s.dupe() };
+        let print_handler = PrintHandlerImpl { seen: seen.dupe() };
         let mut a = Assert::new();
         a.set_print_handler(&print_handler);
-        a.pass("print('hw')");
-        assert_eq!("hw", s_copy.borrow().as_str());
+        a.pass(
+            r#"print("top")
+print ("spaced")
+def nested():
+        print("nested")
+nested()
+x = "😀"; print("utf16")
+pprint("pretty")
+print("first\nsecond")
+"#,
+        );
+
+        let seen = seen_copy.borrow();
+        let expected = [
+            ("assert.bzl:1:6", "top"),
+            ("assert.bzl:2:7", "spaced"),
+            ("assert.bzl:4:14", "nested"),
+            ("assert.bzl:6:16", "utf16"),
+            ("assert.bzl:7:7", "\"pretty\""),
+            ("assert.bzl:8:6", "first\nsecond"),
+        ];
+        assert!(!seen.is_empty());
+        assert_eq!(seen.len() % expected.len(), 0);
+        for run in seen.chunks_exact(expected.len()) {
+            let actual = run
+                .iter()
+                .map(|(location, text)| (location.to_string(), text.as_str()))
+                .collect::<Vec<_>>();
+            assert_eq!(
+                actual,
+                expected
+                    .iter()
+                    .map(|(location, text)| ((*location).to_owned(), *text))
+                    .collect::<Vec<_>>()
+            );
+            assert!(
+                run.windows(2)
+                    .all(|pair| Arc::ptr_eq(&pair[0].0.file, &pair[1].0.file))
+            );
+        }
+    }
+
+    #[test]
+    fn print_location_without_a_call_frame_is_builtin() {
+        let module = Module::new();
+        let eval = Evaluator::new(&module);
+        assert_eq!(
+            PrintLocation::from_evaluator(&eval).to_string(),
+            "<builtin>"
+        );
+    }
+
+    #[test]
+    fn print_location_with_a_native_call_frame_is_builtin() {
+        let mut a = Assert::new();
+        a.globals_add(native_print_location_globals);
+        a.pass(
+            r#"assert_eq(
+                invoke_with_native_location(native_print_location),
+                "<builtin>",
+            )"#,
+        );
     }
 
     #[test]

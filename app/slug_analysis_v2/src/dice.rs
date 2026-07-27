@@ -23,6 +23,7 @@ use futures::FutureExt;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
+use slug_events_v2::StarlarkSourceLocation;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
@@ -32,6 +33,7 @@ use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark::PrintHandler;
+use starlark::PrintLocation;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -124,10 +126,14 @@ impl AnalysisPrintCapture {
 }
 
 impl PrintHandler for AnalysisPrintCapture {
-    fn println(&self, text: &str) -> starlark::Result<()> {
+    fn println(&self, location: PrintLocation, text: &str) -> starlark::Result<()> {
+        let (file, line, column) = location.into_parts();
         self.events
             .borrow_mut()
-            .push(EvaluationEvent::StarlarkPrint { text: text.into() });
+            .push(EvaluationEvent::StarlarkPrint {
+                location: StarlarkSourceLocation::new(file, line, column),
+                text: text.into(),
+            });
         Ok(())
     }
 }

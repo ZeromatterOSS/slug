@@ -437,7 +437,7 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
         .events()
         .iter()
         .map(|event| match event {
-            EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+            EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
             EvaluationEvent::Diagnostic { .. } => {
                 unreachable!("diagnostic events are not produced by this packet")
             }
@@ -935,6 +935,29 @@ async fn root_event_batch_preserves_inline_order_and_never_replays() {
     let events = tracker.take();
     assert_single_root_batch(&events, &v1);
     assert_eq!(event_bearing_activations(&events).len(), 1);
+    let locations = event_bearing_activations(&events)[0]
+        .batch
+        .as_ref()
+        .unwrap()
+        .events()
+        .iter()
+        .map(|event| match event {
+            EvaluationEvent::StarlarkPrint { location, .. } => location.to_string(),
+            EvaluationEvent::Diagnostic { .. } => unreachable!(),
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        locations,
+        [
+            "/root-module-dice-test/MODULE.bazel:2:6",
+            "/root-module-dice-test/deps.MODULE.bazel:1:6",
+            "/root-module-dice-test/nested.MODULE.bazel:1:6",
+            "/root-module-dice-test/deps.MODULE.bazel:3:6",
+            "/root-module-dice-test/nested.MODULE.bazel:1:6",
+            "/root-module-dice-test/deps.MODULE.bazel:5:6",
+            "/root-module-dice-test/MODULE.bazel:4:6",
+        ]
+    );
 
     let warm = observed_graph(
         &dice,

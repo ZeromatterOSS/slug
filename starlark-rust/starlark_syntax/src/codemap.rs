@@ -246,7 +246,7 @@ impl CodeMaps {
 #[derive(Allocative)]
 struct CodeMapData {
     /// The filename as it would be displayed in an error message.
-    filename: String,
+    filename: Arc<str>,
     /// Contents of the file.
     source: String,
     /// Byte positions of line beginnings.
@@ -318,7 +318,7 @@ impl CodeMap {
         lines.extend(source.match_indices('\n').map(|(p, _)| Pos(p as u32 + 1)));
 
         CodeMap(CodeMapImpl::Real(Arc::new(CodeMapData {
-            filename,
+            filename: filename.into(),
             source,
             lines,
             byte_column_reporting: false,
@@ -330,7 +330,7 @@ impl CodeMap {
         lines.extend(source.match_indices('\n').map(|(p, _)| Pos(p as u32 + 1)));
 
         CodeMap(CodeMapImpl::Real(Arc::new(CodeMapData {
-            filename,
+            filename: filename.into(),
             source,
             lines,
             byte_column_reporting: true,
@@ -371,6 +371,21 @@ impl CodeMap {
         match &self.0 {
             CodeMapImpl::Real(data) => &data.filename,
             CodeMapImpl::Native(data) => data.filename,
+        }
+    }
+
+    /// Whether this codemap describes a native Rust frame.
+    #[doc(hidden)]
+    pub fn is_native(&self) -> bool {
+        matches!(self.0, CodeMapImpl::Native(_))
+    }
+
+    /// Gets shared ownership of the displayed filename.
+    #[doc(hidden)]
+    pub fn filename_shared(&self) -> Arc<str> {
+        match &self.0 {
+            CodeMapImpl::Real(data) => data.filename.dupe(),
+            CodeMapImpl::Native(data) => Arc::from(data.filename),
         }
     }
 

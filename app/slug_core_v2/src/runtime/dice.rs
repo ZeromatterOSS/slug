@@ -768,6 +768,7 @@ impl Key for SyntheticEventKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         ctx.store_evaluation_data(EventBatch::from_events([EvaluationEvent::StarlarkPrint {
+            location: slug_events_v2::StarlarkSourceLocation::new(Arc::from("synthetic.bzl"), 1, 6),
             text: self.text.as_ref().into(),
         }]))
         .expect("synthetic event capture is installed");
@@ -3543,7 +3544,7 @@ mod tests {
             .iter()
             .flat_map(EventBatch::events)
             .map(|event| match event {
-                EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => {
                     unreachable!("diagnostic events are not produced by this packet")
                 }
@@ -3557,7 +3558,7 @@ mod tests {
             .iter()
             .flat_map(EventBatch::events)
             .map(|event| match event {
-                EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => {
                     unreachable!("diagnostic events are not produced by this packet")
                 }
@@ -5632,7 +5633,7 @@ probe = rule(implementation = _impl)
             .iter()
             .flat_map(EventBatch::events)
             .map(|event| match event {
-                EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
             })
             .collect::<Vec<_>>();
@@ -5739,7 +5740,7 @@ probe = rule(implementation = _impl)
                 .iter()
                 .flat_map(EventBatch::events)
                 .map(|event| match event {
-                    EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                    EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                     EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
                 })
                 .collect::<Vec<_>>();

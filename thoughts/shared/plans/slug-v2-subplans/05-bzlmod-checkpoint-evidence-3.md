@@ -13985,4 +13985,38 @@ real codemap and event filenames to one evaluation-shared `Arc<str>`, and
 freezes Bazel's platform line-separator behavior. The focused correction
 rereview returned `ACCEPT`.
 
-Implement next only `WP-5-m1-source-aware-command-events`.
+### Source-aware command event implementation
+
+Status: **ACCEPT** for `WP-5-m1-source-aware-command-events` on 2026-07-27
+after one terminal independent implementation review and focused correction
+rereview.
+
+The retained Starlark parser and compiler now preserve the exact opening
+parenthesis independently from the full expression span. `print` and `pprint`
+produce 1-based Bazel-shaped UTF-16 locations; real codemaps share one
+`Arc<str>` filename, while missing and native frames share static
+`<builtin>:0:0`. MODULE, recorded REPO, BUILD/`.bzl`, and analysis producers
+retain those locations without changing the capture-disabled REPO path.
+
+`EvaluationEvent::StarlarkPrint` now owns the structural source location.
+The consuming `CommandOutput::publish` boundary renders selected events in
+closure order with Bazel DEBUG/diagnostic prefixes and platform line
+separators, then appends terminal stderr while leaving stdout independent.
+The terminal value and primitive streams are reachable only through the
+opaque consuming publication path.
+
+Focused retained-Starlark, event, producer, and seven publication tests pass;
+direct bzlmod/loading/analysis/query/core checks, GNU-Windows no-run linkage,
+formatting, diff/archive/scope/no-Cargo guards, and the unchanged six-match
+activation scan pass. The initial review found native-frame fallback and three
+missing discriminators plus a release-only constructor invariant. The bounded
+correction adds native/multiline/raw-REPO/loaded-`.bzl` evidence and a hard
+location invariant; the focused rereview returned `ACCEPT`.
+
+No production caller, activation, execution, REAPI, JVM, Java-bytecode, or
+Bazel delegation was added.
+
+Design next only `WP-5-m1-query-first-activation-design`. Freeze one atomic
+typed-query vertical slice across core, one-shot CLI, daemon, and focused
+equivalence tests; preserve metric-only filesystem observation and do not
+interpose build execution.

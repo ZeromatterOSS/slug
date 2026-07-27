@@ -7,6 +7,7 @@
  * source tree. You may select the license that applies to you.
  */
 
+use std::fmt;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -27,10 +28,42 @@ pub enum EvaluationDiagnosticLevel {
     Error,
 }
 
+/// Owned Bazel-shaped location of one Starlark print call.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct StarlarkSourceLocation {
+    file: Arc<str>,
+    line: u32,
+    column: u32,
+}
+
+impl StarlarkSourceLocation {
+    pub fn new(file: Arc<str>, line: u32, column: u32) -> Self {
+        assert!(
+            line != 0 || column == 0,
+            "a source column requires a source line"
+        );
+        Self { file, line, column }
+    }
+}
+
+impl fmt::Display for StarlarkSourceLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.file)?;
+        if self.line != 0 {
+            write!(f, ":{}", self.line)?;
+            if self.column != 0 {
+                write!(f, ":{}", self.column)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// One evaluation-local event captured for later command-owned publication.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum EvaluationEvent {
     StarlarkPrint {
+        location: StarlarkSourceLocation,
         text: CompactString,
     },
     Diagnostic {
@@ -79,9 +112,11 @@ mod tests {
     use super::EvaluationDiagnosticLevel;
     use super::EvaluationEvent;
     use super::EventBatch;
+    use super::StarlarkSourceLocation;
 
     fn print(text: &str) -> EvaluationEvent {
         EvaluationEvent::StarlarkPrint {
+            location: StarlarkSourceLocation::new(Arc::from("test.bzl"), 1, 6),
             text: CompactString::new(text),
         }
     }
@@ -178,6 +213,7 @@ mod tests {
             cloned.events(),
             &[
                 EvaluationEvent::StarlarkPrint {
+                    location: StarlarkSourceLocation::new(Arc::from("test.bzl"), 1, 6),
                     text: CompactString::new("before"),
                 },
                 EvaluationEvent::Diagnostic {
@@ -185,6 +221,29 @@ mod tests {
                     text: CompactString::new(text),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn starlark_location_is_structural_and_shares_filename_storage() {
+        let file: Arc<str> = Arc::from("/long/apparent/workspace/path/defs.bzl");
+        let first = StarlarkSourceLocation::new(file.clone(), 3, 14);
+        let second = StarlarkSourceLocation::new(file.clone(), 3, 14);
+        let different = StarlarkSourceLocation::new(file.clone(), 3, 15);
+        assert_eq!(first, second);
+        assert_ne!(first, different);
+        assert_eq!(
+            first.to_string(),
+            "/long/apparent/workspace/path/defs.bzl:3:14"
+        );
+        assert!(Arc::ptr_eq(&first.file, &second.file));
+    }
+
+    #[test]
+    fn starlark_builtin_location_omits_zero_line_and_column() {
+        assert_eq!(
+            StarlarkSourceLocation::new(Arc::from("<builtin>"), 0, 0).to_string(),
+            "<builtin>"
         );
     }
 }

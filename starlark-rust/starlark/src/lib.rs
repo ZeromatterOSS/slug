@@ -435,6 +435,7 @@ pub use starlark_syntax::Result;
 pub use starlark_syntax::StarlarkResultExt;
 pub use starlark_syntax::codemap;
 pub use stdlib::PrintHandler;
+pub use stdlib::PrintLocation;
 
 pub mod analysis;
 pub mod any;

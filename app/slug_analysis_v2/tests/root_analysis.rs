@@ -253,7 +253,7 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
         .events()
         .iter()
         .map(|event| match event {
-            EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+            EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
             EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
         })
         .collect()

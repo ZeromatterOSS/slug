@@ -800,6 +800,7 @@ mod tests {
 
     fn batch(text: &str) -> EventBatch {
         EventBatch::from_events([EvaluationEvent::StarlarkPrint {
+            location: slug_events_v2::StarlarkSourceLocation::new(Arc::from("synthetic.bzl"), 1, 6),
             text: CompactString::new(text),
         }])
     }
@@ -992,7 +993,7 @@ mod tests {
             .iter()
             .flat_map(EventBatch::events)
             .map(|event| match event {
-                EvaluationEvent::StarlarkPrint { text } => text.as_str(),
+                EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
                 EvaluationEvent::Diagnostic { .. } => {
                     unreachable!("diagnostic events are not produced by this packet")
                 }

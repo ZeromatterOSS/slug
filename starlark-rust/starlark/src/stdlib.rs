@@ -32,6 +32,7 @@ pub(crate) mod json;
 pub(crate) mod partial;
 
 pub use extra::PrintHandler;
+pub use extra::PrintLocation;
 
 use crate::stdlib::funcs::globals::register_globals;
 use crate::stdlib::internal::register_internal;

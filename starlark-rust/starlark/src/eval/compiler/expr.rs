@@ -971,6 +971,7 @@ impl ExprCompiled {
             _ => ExprCompiled::Call(Box::new(IrSpanned {
                 span,
                 node: CallCompiled {
+                    call_site: span.end_span(),
                     fun: IrSpanned {
                         span,
                         node: ExprCompiled::Value(Constants::get().fn_type.0),
@@ -1004,6 +1005,7 @@ impl ExprCompiled {
         ExprCompiled::Call(Box::new(IrSpanned {
             span,
             node: CallCompiled {
+                call_site: span.end_span(),
                 fun: IrSpanned {
                     span,
                     node: ExprCompiled::Value(Constants::get().fn_len.0),
@@ -1275,9 +1277,10 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
                 ExprCompiled::dot(left, &s, &mut self.opt_ctx())
             }
             ExprP::Call(left, args) => {
+                let call_site = FrameSpan::new(FrozenFileSpan::new(self.codemap, args.lparen));
                 let left = self.expr(left)?;
                 let args = self.args(args)?;
-                CallCompiled::call(span, left, args, &mut self.opt_ctx())
+                CallCompiled::call(span, call_site, left, args, &mut self.opt_ctx())
             }
             ExprP::Index(array_index) => {
                 let (array, index) = &**array_index;
@@ -1454,7 +1457,7 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
                     args.push_pos(self.expr(expr)?);
                 }
 
-                CallCompiled::call(span, method, args, &mut self.opt_ctx())
+                CallCompiled::call(span, span.end_span(), method, args, &mut self.opt_ctx())
             }
         };
         Ok(IrSpanned { node: expr, span })

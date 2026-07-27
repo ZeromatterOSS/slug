@@ -172,6 +172,8 @@ impl<P: AstPayload> LambdaP<P> {
 
 #[derive(Debug, Clone)]
 pub struct CallArgsP<P: AstPayload> {
+    /// Zero-width span at the opening parenthesis token.
+    pub lparen: Span,
     pub args: Vec<AstArgumentP<P>>,
 }
 

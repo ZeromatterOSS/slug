@@ -97,7 +97,11 @@ impl CallCompiled {
     /// After evaluation of call like `a[b](c.d)`,
     /// variables `a`, `b`, and `c` are definitely assigned.
     pub(crate) fn mark_definitely_assigned_after(&self, bc: &mut BcWriter) {
-        let CallCompiled { fun, args } = self;
+        let CallCompiled {
+            call_site: _,
+            fun,
+            args,
+        } = self;
         fun.mark_definitely_assigned_after(bc);
         args.mark_definitely_assigned_after(bc);
     }
@@ -124,12 +128,13 @@ impl IrSpanned<CallCompiled> {
 
     fn write_call_frozen(
         span: FrameSpan,
+        call_site: FrameSpan,
         fun: FrozenValue,
         args: &ArgsCompiledValue,
         target: BcSlotOut,
         bc: &mut BcWriter,
     ) {
-        let file_span = bc.alloc_file_span(span);
+        let file_span = bc.alloc_file_span(call_site);
         if let Some(fun) = FrozenValueTyped::<FrozenDef>::new(fun) {
             Self::write_args(args, bc, |args, bc| match args {
                 Either::Left(npops) => {
@@ -168,13 +173,14 @@ impl IrSpanned<CallCompiled> {
     fn write_call_method(
         target: BcSlotOut,
         span: FrameSpan,
+        call_site: FrameSpan,
         this: &IrSpanned<ExprCompiled>,
         symbol: &Symbol,
         args: &ArgsCompiledValue,
         bc: &mut BcWriter,
     ) {
         this.write_bc_cb(bc, |this, bc| {
-            let file_span = bc.alloc_file_span(span);
+            let file_span = bc.alloc_file_span(call_site);
             let known_method = get_known_method(symbol.as_str());
             if let Some(pos) = args.pos_only() {
                 write_exprs(pos, bc, |pos, bc| {
@@ -239,10 +245,11 @@ impl IrSpanned<CallCompiled> {
         }
 
         let span = self.span;
-        let file_span = bc.alloc_file_span(span);
+        let call_site = self.call_site;
+        let file_span = bc.alloc_file_span(call_site);
         match self.method() {
             None => match self.fun.as_value() {
-                Some(f) => Self::write_call_frozen(span, f, &self.args, target, bc),
+                Some(f) => Self::write_call_frozen(span, call_site, f, &self.args, target, bc),
                 None => {
                     self.fun.write_bc_cb(bc, |fun, bc| {
                         Self::write_args(&self.args, bc, |args, bc| match args {
@@ -256,7 +263,7 @@ impl IrSpanned<CallCompiled> {
                 }
             },
             Some((this, symbol, args)) => {
-                Self::write_call_method(target, span, this, symbol, args, bc)
+                Self::write_call_method(target, span, call_site, this, symbol, args, bc)
             }
         }
     }
