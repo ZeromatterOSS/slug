@@ -6748,3 +6748,188 @@ or activation changed during design.
 
 Next evidence: Implement only
 `WP-5-m1-host-registry-function-oracle` in the exact four paths above.
+
+#### Host RegistryFunction oracle first implementation replan
+
+**Status:** Stopped cleanly and replanned on 2026-07-26.
+
+The first pinned `registry-yanked-lockfile-mode` generation reached all three
+new Off rows and exposed one mandatory contract failure. After the preceding
+Update row, cumulative first-aaa, second-aaa, yyy-MODULE, and yyy-metadata
+counts were `1,1,1,1`. The root-version-mutating Off absence row remained
+`1,1,1,1`; the Off selected-yanked row also remained `1,1,1,1`; and the Off
+SHA row became `1,1,2,1`. Thus selected-yanked reuse and SHA enforcement were
+feasible, but changing only the root module version did not dirty the cached
+nonroot `ModuleFileValue`. The frozen second-aaa `+1` discriminator failed and
+the recorded-absence result remained explainable by warm reuse.
+
+The writer stopped before transport generation or any fresh-root replay,
+removed all three partial changed paths through `apply_patch`, and restored a
+clean `8875ce19` worktree. No expected output or fixture change is accepted,
+this stopped attempt does not increment oracle-packet growth accounting, and
+no server, workspace, harness, Rust, Cargo, dependency, API, consumer, or
+activation changed.
+
+Correct only the three Off rows in
+`WP-5-m1-host-registry-function-oracle-unused-registry-correction`. Remove the
+root `0.1.0`→`0.1.1` mutation, its restoration, and the second-aaa `+1`
+requirement. Append exactly
+`--registry={{http_registry}}/unused-off` after the BCR registry in all three
+Off rows; keep that same suffix stable across the later yanked and SHA rows.
+Pinned `ModuleFileFunction` directly depends on the injected ordered
+`REGISTRIES` value, so the transition into the first Off row dirties nonroot
+module-file computation. Registry construction performs no IO, and aaa
+resolves through first then second before BCR or the unused suffix.
+
+The corrected absence proof is the inseparable combination:
+
+- the prior mutation has made first-registry aaa physically present and would
+  select `newdep@1.0.0` if fetched;
+- the changed registry-list dependency forces a fresh nonroot module-file
+  computation;
+- the graph contains `olddep@1.0.0` and excludes `newdep@1.0.0`; and
+- `/first/modules/aaa/1.0.0/MODULE.bazel` remains at cumulative count 1,
+  delta zero.
+
+Do not require a second-aaa request: its recorded SHA may be served from
+Bazel's checksum repository cache. The later selected-yanked row keeps the
+same registry list, reports `reason-a` rather than served `reason-b`, and
+increments no HTTP counter, especially yyy metadata. The SHA row keeps the
+same list and the accepted digest mutation, exact diagnostic, yyy-MODULE
+`+1`, metadata `+0`, and no-yanked assertions. Restore only the digest before
+Refresh. Every mirror row, provenance/metadata update, exact four-path and
+seven-row scope, final inventory/line caps, generation/two-replay matrix,
+claim deferral, validation, and stop gate from the accepted design remains
+unchanged.
+
+Pinned correction anchors are
+`ModuleFileFunction.java:748-799`,
+`BazelRepositoryModule.java:612-616,756`, and
+`IndexRegistry.java:169-197`. Stop again on a first-aaa request, newdep graph,
+different yanked/SHA behavior, any request to the unused registry before aaa
+resolves, a changed second-aaa requirement, distinct unused suffixes that
+redirty the later rows, or any expansion of the accepted packet.
+
+#### Host RegistryFunction oracle clean-cache correction
+
+**Status:** Replanned after native invalidation probe on 2026-07-26.
+
+An isolated Bazel 9.2 probe applied the exact stable `/unused-off` correction.
+The Off graph retained olddep and excluded newdep, yanked reuse retained
+reason-a, and SHA enforcement remained exact, but cumulative
+first-aaa/second-aaa/yyy-MODULE/yyy-metadata counts stayed
+`1,1,1,1` through the first two Off rows and became `1,1,2,1` only for the
+bad SHA. The registry-list transition did not force an observable fresh
+registry-file decision; unchanged counts left warm reuse or cache pruning
+possible. Therefore registry-list invalidation plus graph output and
+first-aaa delta zero still does not prove a fresh recorded-absence decision.
+The `/unused-off` correction is rejected; none of its probe files or processes
+remain.
+
+A second isolated probe found the bounded positive discriminator. After the
+Update priming/mutation rows, `bazel clean --expunge` followed by Off with the
+original registry list and exact flags
+`--repository_cache=../off-repository-cache` and
+`--repo_contents_cache=` produced olddep and no newdep while changing
+first-aaa/second-aaa/yyy-MODULE/yyy-metadata from `1,1,1,1` to
+`1,2,2,1`. Skyframe/output-base state was removed, and the Off rows were
+isolated from the surviving shared checksum cache by a new sibling cache; the
+generated visible lockfile and exact first/second URL keys remained in the
+workspace. Shutdown alone, a fresh output base with the default shared
+repository cache, fresh cache flags on the warm daemon, and the unused
+registry transition did not produce this discriminator.
+
+Correct only
+`WP-5-m1-host-registry-function-oracle-clean-cache-correction` as follows:
+
+1. Remove the accepted existing
+   `update_replays_selected_yanked_reason_a` command and replace it in the
+   same sequence position with `off_probe_expunge`, running exactly
+   `clean --expunge`, expecting exit 0, and preserving the visible lockfile,
+   every workspace mutation, and the unchanged cumulative request manifest.
+   This keeps the yanked fixture at nine commands and the complete two-fixture
+   packet at net seven added commands.
+2. Remove every root-version and unused-registry mutation, argument,
+   restoration, assertion, and stop gate. Each of the three Off rows uses the
+   original first, second, and BCR registry list plus the same two fresh-cache
+   flags above.
+3. The first Off row is now a cold computation. Expect exit 0, olddep, no
+   newdep, first-aaa delta zero, second-aaa `+1`, yyy-MODULE `+1`, and
+   yyy-metadata delta zero. The physical first-aaa file already exists.
+   With Skyframe and checksum caches cold, fetching legacy-Unrecorded first
+   aaa would request it and select newdep; correct Off instead consumes its
+   recorded absence and proceeds to the recorded-SHA second registry.
+4. The next Off row removes the allow-yanked flag while keeping identical
+   registry/cache arguments. Expect exit 37, reason-a rather than reason-b,
+   and no HTTP counter increase, especially yyy metadata. It replaces the
+   removed Update reason-a row while the later accepted post-Refresh Update
+   reason-b row continues to prove Update reuse.
+5. The SHA Off row keeps the same arguments and accepted unique digest→zero
+   mutation. Expect the exact actual/wanted checksum error before yanked,
+   yyy-MODULE `+1`, metadata `+0`, and no other contract change. Restore only
+   that digest before the existing Refresh row.
+
+Add exact yanked-fixture provenance for the fresh-cache boundary from
+`src/main/java/com/google/devtools/build/lib/runtime/commands/CleanCommand.java`
+and
+`src/main/java/com/google/devtools/build/lib/bazel/repository/RepositoryOptions.java`
+plus
+`src/main/java/com/google/devtools/build/lib/bazel/BazelRepositoryModule.java`,
+while retaining the previously frozen anchors and metadata updates. Record
+`CleanCommand.java:235-264,305-307` and
+`BazelRepositoryModule.java:316-330,704-721` in the translation detail rather
+than in the literal anchor entry. `CleanCommand` owns output-base deletion and
+shutdown;
+`RepositoryOptions` documents the flags; and `BazelRepositoryModule` resolves
+the relative cache path from the workspace and maps empty
+`--repo_contents_cache=` to no contents cache. State explicitly that this
+recorded-absence proof crosses an intentional cold
+server/output-base boundary; it is not same-daemon invalidation evidence.
+The cumulative request log and workspace lockfile survive outside the
+expunged output base, as the native probe observed. The
+`../off-repository-cache` directory is run-local, initially absent in every
+generation or fresh replay root, untracked, outside all manifest roots, and
+not an external or shared asset.
+
+Every mirror row, exact four-path scope, final 29-file/zero-link and
+1,800-line caps, packet-three accounting, one-generation/two-fresh-replay
+matrix, actual mirror/vendor/hourly-token deferrals, and non-root validation
+gate remains unchanged. Replace the stale root/list discriminator validation
+with exact expunge position, unchanged clean-row counts, identical
+fresh-cache flags across all three Off rows, absence-row `1,2,2,1`
+cumulative counts, later zero deltas, digest restoration, and no retained
+`off-repository-cache` manifest or tracked path.
+
+Stop on a tenth yanked command, more than seven net new commands, retained
+root/unused-registry logic, clean without expunge, a shared/default or
+workspace-contained repository cache, a nonempty repo-contents cache, lost
+workspace lockfile or request log, first-aaa `+1`, missing second-aaa or
+yyy-MODULE `+1`, metadata `+1`, newdep, changed exact yanked/SHA behavior,
+cache artifacts in the tracked/manifest inventory, a different exit, or any
+scope/claim/implementation expansion.
+
+##### Host RegistryFunction oracle clean-cache correction status
+
+**Status:** Accepted after terminal latest-text review on 2026-07-26.
+
+The first implementation and its `/unused-off` correction were both removed
+after native probes proved that root or registry-list invalidation could
+leave all relevant HTTP counts warm. The accepted correction replaces the
+redundant pre-Refresh Update reason-a row with `clean --expunge`, then runs all
+three Off rows against the original registries with a fresh run-local sibling
+repository cache and disabled contents cache. Native Bazel 9.2 observation
+produced the discriminating `1,1,1,1`→`1,2,2,1` absence transition,
+reason-a with zero later requests, and exact SHA yyy-MODULE `+1`/metadata
+`+0`.
+
+Pinned source confirms synchronous output-base deletion/shutdown, surviving
+shared-cache isolation, workspace-relative cache wiring, and empty
+repo-contents-cache disabling. Pinned-source/parity,
+native-implementability, and architecture/orchestration terminal latest-text
+reviews all returned `ACCEPT`. The stopped drafts remain unaccepted and do
+not advance fixture-growth accounting. The worktree contains only this plan
+correction; no fixture, expected output, server, workspace, harness, Rust,
+Cargo, dependency, API, consumer, or activation is retained.
+
+Next evidence: Implement only the corrected
+`WP-5-m1-host-registry-function-oracle` in the original exact four-path scope.

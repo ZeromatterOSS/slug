@@ -43,27 +43,29 @@ implementation/evidence, and orchestration reviews returned `ACCEPT`. No
 failed draft, registry scaffold, network claim, harness, Rust, Cargo,
 production edge, or activation is retained.
 
-The focused Host RegistryFunction oracle design is accepted. It changes only
-the metadata and expected output of two existing fixtures: three remote Off
-rows prove recorded absence, selected-yanked, and SHA consumption after a
-root recomputation discriminator; four `show_repo` rows prove ordered default,
-per-registry/later-wins, explicit-empty, and exit-2 unknown-registry mirror
-semantics without archive download. The exact packet is four paths, seven
-rows, zero new files or links, and at most 1,800 combined lines. Vendor reads,
-actual mirror fallback, and hourly Refresh turnover remain explicit later
-gates. All three terminal latest-text reviews returned `ACCEPT`; no fixture,
-Rust, Cargo, dependency, API, consumer, or activation changed during design.
+The corrected Host RegistryFunction oracle design is accepted after two
+cleanly removed cache-discriminator misses. It replaces one redundant Update
+row with `clean --expunge`, then uses a fresh run-local repository cache and
+disabled contents cache for the three Off rows. Native Bazel 9.2 observation
+forces the exact `1,1,1,1`→`1,2,2,1` absence transition while preserving
+reason-a reuse and SHA-before-yanked evidence. Four `show_repo` rows still
+prove ordered default, per-registry/later-wins, explicit-empty, and exit-2
+unknown-registry mirror semantics without archive download. All three
+terminal latest-text reviews returned `ACCEPT`; stopped drafts are removed
+and no fixture, Rust, Cargo, dependency, API, consumer, or activation is
+retained.
 
 ### Current packet
 
-Implement only `WP-5-m1-host-registry-function-oracle`.
+Implement only the corrected `WP-5-m1-host-registry-function-oracle`.
 
 Edit exactly the two accepted fixture TOML files and their generated expected
-JSON files. Add the frozen three Off and four `show_repo` rows, run one pinned
-Bazel 9.2 generation and two distinct fresh-root replays for each fixture,
-then enforce the exact row, request, mutation/restoration, URL-order,
-provenance, metadata, four-path, 29-file/zero-link, 1,800-line, archive, diff,
-and credential gates. Do not edit Rust or Cargo.
+JSON files. Replace the frozen Update reason-a row with the expunge row, add
+the corrected three Off and four `show_repo` rows, run one pinned Bazel 9.2
+generation and two distinct fresh-root replays for each fixture, then enforce
+the exact cache, row, request, digest restoration, URL-order, provenance,
+metadata, four-path, 29-file/zero-link, 1,800-line, archive, diff, and
+credential gates. Do not edit Rust or Cargo.
 
 ### Replanned semantic-error/evidence contract (preserved for correction)
 
