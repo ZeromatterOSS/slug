@@ -1,0 +1,286 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "//:static_pass",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:static_pass",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "static_byte_matrix",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>",
+      "normalized_stdout": "//:static_pass",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 304bc9af-e01a-4ca9-a4af-22874f70bb7b\n",
+      "stdout": "//:static_pass\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//:dynamic_pass",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//:dynamic_pass",
+        "--noshow_progress"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "dynamic_byte_matrix",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "//:dynamic_pass",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: f839088e-9252-4204-b295-7d38b9a77c81\n",
+      "stdout": "//:dynamic_pass\n"
+    },
+    {
+      "argv": [
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "    tags = [\"seed\"],",
+          "old_digest_hint": "52",
+          "path": "bad/BUILD.bazel",
+          "replace": "    tags = [\"\\400\"],"
+        }
+      ],
+      "name": "reject_octal_400",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: <workspace>/bad/BUILD.bazel:3:17: octal escape sequence out of range (maximum is /377)\nERROR: package contains errors: bad: octal escape sequence out of range (maximum is /377)\nERROR: Evaluation of query \"//bad:*\" failed",
+      "normalized_stdout": "",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 123174f1-2912-4514-8c42-acd801068869\nERROR: /tmp/slug-string-oracle-generation.ym8Si1/runs/starlark-internal-string-bytes/20260727-053754-4029559-bazel/workspace/bad/BUILD.bazel:3:17: octal escape sequence out of range (maximum is \\377)\nERROR: package contains errors: bad: octal escape sequence out of range (maximum is \\377)\nERROR: Evaluation of query \"//bad:*\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "    tags = [\"\\400\"],",
+          "old_digest_hint": "52",
+          "path": "bad/BUILD.bazel",
+          "replace": "    tags = [\"\\x41\"],"
+        }
+      ],
+      "name": "reject_hex_escape",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: <workspace>/bad/BUILD.bazel:3:15: invalid escape sequence: /x. Use '//' to insert '/'.\nERROR: package contains errors: bad: invalid escape sequence: /x. Use '//' to insert '/'.\nERROR: Evaluation of query \"//bad:*\" failed",
+      "normalized_stdout": "",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 60b087f9-fe35-4893-b6d7-ac418a8b835f\nERROR: /tmp/slug-string-oracle-generation.ym8Si1/runs/starlark-internal-string-bytes/20260727-053754-4029559-bazel/workspace/bad/BUILD.bazel:3:15: invalid escape sequence: \\x. Use '\\\\' to insert '\\'.\nERROR: package contains errors: bad: invalid escape sequence: \\x. Use '\\\\' to insert '\\'.\nERROR: Evaluation of query \"//bad:*\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "    tags = [\"\\x41\"],",
+          "old_digest_hint": "52",
+          "path": "bad/BUILD.bazel",
+          "replace": "    tags = [\"\\u00e9\"],"
+        }
+      ],
+      "name": "reject_short_unicode_escape",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: <workspace>/bad/BUILD.bazel:3:15: invalid escape sequence: /u. Use '//' to insert '/'.\nERROR: package contains errors: bad: invalid escape sequence: /u. Use '//' to insert '/'.\nERROR: Evaluation of query \"//bad:*\" failed",
+      "normalized_stdout": "",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: fe295604-4581-4893-b99f-1db6a83ec2f6\nERROR: /tmp/slug-string-oracle-generation.ym8Si1/runs/starlark-internal-string-bytes/20260727-053754-4029559-bazel/workspace/bad/BUILD.bazel:3:15: invalid escape sequence: \\u. Use '\\\\' to insert '\\'.\nERROR: package contains errors: bad: invalid escape sequence: \\u. Use '\\\\' to insert '\\'.\nERROR: Evaluation of query \"//bad:*\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "    tags = [\"\\u00e9\"],",
+          "old_digest_hint": "54",
+          "path": "bad/BUILD.bazel",
+          "replace": "    tags = [\"\\U0001f600\"],"
+        }
+      ],
+      "name": "reject_long_unicode_escape",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: <workspace>/bad/BUILD.bazel:3:15: invalid escape sequence: /U. Use '//' to insert '/'.\nERROR: package contains errors: bad: invalid escape sequence: /U. Use '//' to insert '/'.\nERROR: Evaluation of query \"//bad:*\" failed",
+      "normalized_stdout": "",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 10df6521-99ef-4802-a489-28758a17f36b\nERROR: /tmp/slug-string-oracle-generation.ym8Si1/runs/starlark-internal-string-bytes/20260727-053754-4029559-bazel/workspace/bad/BUILD.bazel:3:15: invalid escape sequence: \\U. Use '\\\\' to insert '\\'.\nERROR: package contains errors: bad: invalid escape sequence: \\U. Use '\\\\' to insert '\\'.\nERROR: Evaluation of query \"//bad:*\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "    tags = [\"\\U0001f600\"],",
+          "old_digest_hint": "58",
+          "path": "bad/BUILD.bazel",
+          "replace": "    tags = [\"\\q\"],"
+        }
+      ],
+      "name": "reject_unknown_escape",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: <workspace>/bad/BUILD.bazel:3:15: invalid escape sequence: /q. Use '//' to insert '/'.\nERROR: package contains errors: bad: invalid escape sequence: /q. Use '//' to insert '/'.\nERROR: Evaluation of query \"//bad:*\" failed",
+      "normalized_stdout": "",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: f0780204-1083-4e58-b3dc-4c265ea7e63c\nERROR: /tmp/slug-string-oracle-generation.ym8Si1/runs/starlark-internal-string-bytes/20260727-053754-4029559-bazel/workspace/bad/BUILD.bazel:3:15: invalid escape sequence: \\q. Use '\\\\' to insert '\\'.\nERROR: package contains errors: bad: invalid escape sequence: \\q. Use '\\\\' to insert '\\'.\nERROR: Evaluation of query \"//bad:*\" failed\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "//bad:*",
+        "--noshow_progress"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "    tags = [\"\\q\"],",
+          "old_digest_hint": "50",
+          "path": "bad/BUILD.bazel",
+          "replace": "    tags = [\"\"\"\u00e9\"\"\" + missing_name],"
+        }
+      ],
+      "name": "report_byte_column_after_multibyte_triple_string",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nERROR: <workspace>/bad/BUILD.bazel:3:24: name 'missing_name' is not defined\nERROR: package contains errors: bad: name 'missing_name' is not defined\nERROR: Evaluation of query \"//bad:*\" failed",
+      "normalized_stdout": "",
+      "server_epoch": 1,
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: e7f81696-4261-4950-ae65-17a0e27715f1\nERROR: /tmp/slug-string-oracle-generation.ym8Si1/runs/starlark-internal-string-bytes/20260727-053754-4029559-bazel/workspace/bad/BUILD.bazel:3:24: name 'missing_name' is not defined\nERROR: package contains errors: bad: name 'missing_name' is not defined\nERROR: Evaluation of query \"//bad:*\" failed\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "starlark-internal-string-bytes",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

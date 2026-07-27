@@ -1,0 +1,140 @@
+[fixture]
+name = "starlark-internal-string-bytes"
+description = "Bazel 9.2 ordinary Starlark strings retain Latin-1 parser-input bytes, octal-only escapes, and byte-counted locations."
+comparison = "exact"
+daemon = true
+observe_server_epochs = true
+oracle_notes = "Two ASCII-label queries prove BUILD and .bzl literal and dynamic byte-string behavior. Six ordered full-line replacements then prove invalid escape recovery and a multibyte-prefix byte column on one retained Bazel server."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/skyframe/StarlarkUtil.java:43-66",
+  "src/main/java/net/starlark/java/syntax/ParserInput.java:82-95",
+  "src/main/java/net/starlark/java/syntax/Lexer.java:274-425,443-495",
+  "src/main/java/com/google/devtools/build/lib/util/StringEncoding.java:25-85,116-141",
+  "src/main/java/net/starlark/java/syntax/FileLocations.java:21-23,38-40,69-72,95-120",
+  "src/main/java/net/starlark/java/syntax/Location.java:21-26",
+  "src/main/java/com/google/devtools/build/lib/skyframe/PackageFunction.java:1331-1366",
+  "src/main/java/com/google/devtools/build/lib/skyframe/BzlCompileFunction.java:177-215",
+  "src/main/java/net/starlark/java/syntax/Parser.java:666-675,1042-1054",
+  "src/main/java/net/starlark/java/eval/Eval.java:588-597",
+  "src/main/java/net/starlark/java/eval/EvalUtils.java:77-99,225-249,420-438,494-497",
+  "src/main/java/net/starlark/java/eval/MethodLibrary.java:209-290",
+  "src/main/java/net/starlark/java/eval/Starlark.java:302-310,662-745",
+  "src/main/java/com/google/devtools/build/lib/packages/DotBazelFileSyntaxChecker.java:33-44,85-165",
+]
+translation_notes = "Bazel maps each raw BUILD and ordinary .bzl source byte to one internal character before lexing. Target creation turns the non-ASCII value checks into exact ASCII query labels. Full-line sentinels make every cumulative bad BUILD replacement independently countable."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture starlark-internal-string-bytes --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture starlark-internal-string-bytes --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "static_byte_matrix"
+argv = ["query", "//:static_pass", "--noshow_progress"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//:static_pass\\n?\\Z"]
+
+[[commands]]
+name = "dynamic_byte_matrix"
+argv = ["query", "//:dynamic_pass", "--noshow_progress"]
+capture_server_epoch = true
+expected_exit = 0
+stdout_patterns = ["\\A//:dynamic_pass\\n?\\Z"]
+
+[[commands]]
+name = "reject_octal_400"
+argv = ["query", "//bad:*", "--noshow_progress"]
+capture_server_epoch = true
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "bad/BUILD.bazel:3:17",
+  'octal escape sequence out of range (maximum is /377)',
+]
+
+  [[commands.mutations]]
+  path = "bad/BUILD.bazel"
+  find = '    tags = ["seed"],'
+  replace = '    tags = ["\400"],'
+
+[[commands]]
+name = "reject_hex_escape"
+argv = ["query", "//bad:*", "--noshow_progress"]
+capture_server_epoch = true
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "bad/BUILD.bazel:3:15",
+  "invalid escape sequence: /x. Use '//' to insert '/'.",
+]
+
+  [[commands.mutations]]
+  path = "bad/BUILD.bazel"
+  find = '    tags = ["\400"],'
+  replace = '    tags = ["\x41"],'
+
+[[commands]]
+name = "reject_short_unicode_escape"
+argv = ["query", "//bad:*", "--noshow_progress"]
+capture_server_epoch = true
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "bad/BUILD.bazel:3:15",
+  "invalid escape sequence: /u. Use '//' to insert '/'.",
+]
+
+  [[commands.mutations]]
+  path = "bad/BUILD.bazel"
+  find = '    tags = ["\x41"],'
+  replace = '    tags = ["\u00e9"],'
+
+[[commands]]
+name = "reject_long_unicode_escape"
+argv = ["query", "//bad:*", "--noshow_progress"]
+capture_server_epoch = true
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "bad/BUILD.bazel:3:15",
+  "invalid escape sequence: /U. Use '//' to insert '/'.",
+]
+
+  [[commands.mutations]]
+  path = "bad/BUILD.bazel"
+  find = '    tags = ["\u00e9"],'
+  replace = '    tags = ["\U0001f600"],'
+
+[[commands]]
+name = "reject_unknown_escape"
+argv = ["query", "//bad:*", "--noshow_progress"]
+capture_server_epoch = true
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "bad/BUILD.bazel:3:15",
+  "invalid escape sequence: /q. Use '//' to insert '/'.",
+]
+
+  [[commands.mutations]]
+  path = "bad/BUILD.bazel"
+  find = '    tags = ["\U0001f600"],'
+  replace = '    tags = ["\q"],'
+
+[[commands]]
+name = "report_byte_column_after_multibyte_triple_string"
+argv = ["query", "//bad:*", "--noshow_progress"]
+capture_server_epoch = true
+expected_exit = 7
+stdout_patterns = ["\\A\\Z"]
+stderr_contains = [
+  "bad/BUILD.bazel:3:24",
+  "name 'missing_name' is not defined",
+]
+
+  [[commands.mutations]]
+  path = "bad/BUILD.bazel"
+  find = '    tags = ["\q"],'
+  replace = '    tags = ["""é""" + missing_name],'

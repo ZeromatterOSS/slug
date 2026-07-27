@@ -1,0 +1,14 @@
+load("//:defs.bzl", "dynamic_projection", "static_projection")
+
+_BUILD_LITERAL = "é"
+
+_DYNAMIC_RETURN = dynamic_projection(
+    name = "dynamic",
+    build_value = _BUILD_LITERAL,
+)
+
+static_projection(
+    name = "static",
+    build_literal = _BUILD_LITERAL,
+    macro_return = _DYNAMIC_RETURN,
+)
