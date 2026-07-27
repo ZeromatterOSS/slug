@@ -9876,3 +9876,47 @@ fixture is required, and no fixture-growth checkpoint is due.
 
 Next packet: implement only
 `WP-5-m1-bzlmod-root-loading-anchor-projection`.
+
+### Public bzlmod root-loading anchor projection
+
+Status: `ACCEPT` on 2026-07-27. The exact two-file implementation is +314/−4:
++311/−4 in `app/slug_bzlmod_v2/src/host_module.rs` and +3 in
+`app/slug_bzlmod_v2/src/lib.rs`, within every frozen cap. No Cargo,
+dependency, fixture, loading/downstream consumer, entrypoint, or other
+repository file changed.
+
+The public normalized-workspace key computes only the accepted private Host
+root-module key through the fail-fast DICE boundary. It passes Need unchanged,
+retains the original private `Arc<Result<...>>` in opaque success/error
+wrappers, uses complete-only equality/validity, and stores no evaluation data.
+The private producer remains the sole direct dependency and sole event-batch
+owner. The three intended public names are the only exports; manual Debug
+reveals no carrier structure, while error Display/source preserve the existing
+diagnostic without exposing a typed private cause or accessor.
+
+Focused regressions prove exact identity/display, invalid self-unequal Needs,
+valid equal and discriminating unequal Complete success/error values,
+diagnostic opacity/transparency, sole dependency ownership, and no public
+batch. One retained DICE graph passes through first-path Need, root-bootstrap
+Need, printed Complete success, Complete error, semantically equal restored
+success, and warm no-replay reuse; Need owns no private or public root batch,
+while Complete retains the exact private producer event.
+
+Validation passed:
+
+- focused anchor tests: 2 passed;
+- `slug_bzlmod_v2`: 203 unit plus 184 integration tests and zero doctests;
+- downstream `slug_loading_v2`: 54 tests and zero doctests;
+- GNU-Windows no-run linkage: all 12 bzlmod and six loading test executables;
+  and
+- formatting, diff, exact two-file/addition cap, Cargo, archive, public-surface,
+  implementation-block, forbidden-edge, credential, downstream-use, and
+  process guards.
+
+Independent source/API, implementation/evidence, and
+architecture/orchestration terminal latest-diff reviews all returned
+`ACCEPT`. No oracle or fixture was added, so no fixture-growth checkpoint is
+due.
+
+Next packet: design only
+`WP-5-m1-loading-byte-capable-pattern-lazy-glob-design`.

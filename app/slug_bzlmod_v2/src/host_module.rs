@@ -116,8 +116,8 @@ impl fmt::Display for HostRootModuleFileKey {
     }
 }
 
-type HostRootModuleFileOutcome =
-    SourcePreparationOutcome<Arc<Result<HostRootModuleFileValue, HostRootModuleFileError>>>;
+type HostRootModuleFileCarrier = Arc<Result<HostRootModuleFileValue, HostRootModuleFileError>>;
+type HostRootModuleFileOutcome = SourcePreparationOutcome<HostRootModuleFileCarrier>;
 
 fn path_need(need: NeedPathObservations) -> HostRootModuleFileOutcome {
     SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
@@ -363,8 +363,99 @@ impl Key for HostRootModuleFileKey {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct RootModuleLoadingAnchor {
+    carrier: HostRootModuleFileCarrier,
+}
+
+impl fmt::Debug for RootModuleLoadingAnchor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("RootModuleLoadingAnchor")
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct RootModuleLoadingAnchorError {
+    carrier: HostRootModuleFileCarrier,
+}
+
+impl fmt::Debug for RootModuleLoadingAnchorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("RootModuleLoadingAnchorError")
+    }
+}
+
+impl fmt::Display for RootModuleLoadingAnchorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.carrier.as_ref() {
+            Err(error) => fmt::Display::fmt(error, f),
+            Ok(_) => unreachable!("root-loading anchor error retains an error carrier"),
+        }
+    }
+}
+
+impl std::error::Error for RootModuleLoadingAnchorError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self.carrier.as_ref() {
+            Err(error) => std::error::Error::source(error),
+            Ok(_) => unreachable!("root-loading anchor error retains an error carrier"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct RootModuleLoadingAnchorKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl RootModuleLoadingAnchorKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for RootModuleLoadingAnchorKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "root-module-loading-anchor:{}", self.workspace)
+    }
+}
+
+#[async_trait]
+impl Key for RootModuleLoadingAnchorKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<RootModuleLoadingAnchor, RootModuleLoadingAnchorError>>,
+    >;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        dice_invariant(
+            ctx.compute(&HostRootModuleFileKey::new(self.workspace.dupe()))
+                .await,
+        )
+        .map(|carrier| {
+            Arc::new(if carrier.is_ok() {
+                Ok(RootModuleLoadingAnchor { carrier })
+            } else {
+                Err(RootModuleLoadingAnchorError { carrier })
+            })
+        })
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(all(test, unix))]
 mod tests {
+    use std::error::Error as _;
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::sync::Mutex;
@@ -402,6 +493,9 @@ mod tests {
     use super::HostRootModuleFileError;
     use super::HostRootModuleFileKey;
     use super::HostRootModuleFileValue;
+    use super::RootModuleLoadingAnchor;
+    use super::RootModuleLoadingAnchorError;
+    use super::RootModuleLoadingAnchorKey;
     use crate::BzlmodCommandPolicyKey;
     use crate::BzlmodEnvironmentPolicyKey;
     use crate::EvaluatedRootModule;
@@ -535,21 +629,32 @@ mod tests {
     #[derive(Default)]
     struct EventTracker {
         entries: Mutex<Vec<TrackedBatch>>,
+        anchor_dependencies: Mutex<Vec<Vec<String>>>,
     }
 
     impl EventTracker {
         fn take(&self) -> Vec<TrackedBatch> {
             std::mem::take(&mut *self.entries.lock().unwrap())
         }
+
+        fn take_anchor_dependencies(&self) -> Vec<Vec<String>> {
+            std::mem::take(&mut *self.anchor_dependencies.lock().unwrap())
+        }
     }
 
     impl ActivationTracker for EventTracker {
         fn key_activated(
             &self,
-            _key: &DynKey,
-            _deps: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            deps: &mut dyn Iterator<Item = &DynKey>,
             _activation: ActivationData,
         ) {
+            if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
+                self.anchor_dependencies
+                    .lock()
+                    .unwrap()
+                    .push(deps.map(ToString::to_string).collect());
+            }
         }
 
         fn tracks_rich_activations(&self) -> bool {
@@ -558,6 +663,7 @@ mod tests {
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
             if key.downcast_ref::<HostRootModuleFileKey>().is_none()
+                && key.downcast_ref::<RootModuleLoadingAnchorKey>().is_none()
                 && key.downcast_ref::<HostRepoFileKey>().is_none()
                 && key.downcast_ref::<HostFileBytesKey>().is_none()
             {
@@ -675,6 +781,45 @@ mod tests {
             .unwrap()
     }
 
+    async fn observed_anchor(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        tracker: &Arc<EventTracker>,
+    ) -> SourcePreparationOutcome<Arc<Result<RootModuleLoadingAnchor, RootModuleLoadingAnchorError>>>
+    {
+        let mut user_data = UserComputationData {
+            activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                snapshot(None),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(&mut updater, policy(&["/workspace"])).unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace().as_path(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        transaction
+            .compute(&RootModuleLoadingAnchorKey::new(workspace()))
+            .await
+            .unwrap()
+    }
+
     fn complete_value(outcome: &super::HostRootModuleFileOutcome) -> &HostRootModuleFileValue {
         match outcome {
             SourcePreparationOutcome::Complete(value) => value.as_ref().as_ref().unwrap(),
@@ -691,6 +836,168 @@ mod tests {
                 EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
             })
             .collect()
+    }
+
+    #[test]
+    fn loading_anchor_identity_equality_and_opacity_are_exact() {
+        let key = RootModuleLoadingAnchorKey::new(workspace());
+        assert_eq!(key, RootModuleLoadingAnchorKey::new(workspace()));
+        let other_workspace = NormalizedAbsolutePath::new("/other-workspace").unwrap();
+        assert_ne!(key, RootModuleLoadingAnchorKey::new(other_workspace));
+        assert_eq!(key.to_string(), "root-module-loading-anchor:\"/workspace\"");
+
+        let success = |value| RootModuleLoadingAnchor {
+            carrier: Arc::new(Ok(value)),
+        };
+        let success_a = success(empty_value());
+        assert_eq!(format!("{success_a:?}"), "RootModuleLoadingAnchor");
+        let equal_success_a = SourcePreparationOutcome::Complete(Arc::new(Ok(success_a)));
+        let equal_success_b =
+            SourcePreparationOutcome::Complete(Arc::new(Ok(success(empty_value()))));
+        assert!(RootModuleLoadingAnchorKey::equality(
+            &equal_success_a,
+            &equal_success_b
+        ));
+        assert!(RootModuleLoadingAnchorKey::validity(&equal_success_a));
+        let mut different_value = empty_value();
+        different_value.module_file_paths = Arc::from([PathBuf::from("different")]);
+        let unequal_success =
+            SourcePreparationOutcome::Complete(Arc::new(Ok(success(different_value))));
+        assert!(!RootModuleLoadingAnchorKey::equality(
+            &equal_success_a,
+            &unequal_success
+        ));
+        let private_error = HostRootModuleFileError::CommandPolicy {
+            message: "PRIVATE_DIAGNOSTIC".into(),
+        };
+        let expected_display = private_error.to_string();
+        let error = |message: &str| RootModuleLoadingAnchorError {
+            carrier: Arc::new(Err(HostRootModuleFileError::CommandPolicy {
+                message: message.into(),
+            })),
+        };
+        let error_a = error("PRIVATE_DIAGNOSTIC");
+        assert_eq!(format!("{error_a:?}"), "RootModuleLoadingAnchorError");
+        assert!(!format!("{error_a:?}").contains("PRIVATE_DIAGNOSTIC"));
+        assert_eq!(error_a.to_string(), expected_display);
+        assert!(error_a.source().is_none());
+        let equal_error_a = SourcePreparationOutcome::Complete(Arc::new(Err(error_a)));
+        let equal_error_b =
+            SourcePreparationOutcome::Complete(Arc::new(Err(error("PRIVATE_DIAGNOSTIC"))));
+        assert!(RootModuleLoadingAnchorKey::equality(
+            &equal_error_a,
+            &equal_error_b
+        ));
+        assert!(RootModuleLoadingAnchorKey::validity(&equal_error_a));
+        let unequal_error =
+            SourcePreparationOutcome::Complete(Arc::new(Err(error("DIFFERENT_DIAGNOSTIC"))));
+        assert!(!RootModuleLoadingAnchorKey::equality(
+            &equal_error_a,
+            &unequal_error
+        ));
+    }
+
+    #[tokio::test]
+    async fn loading_anchor_retained_dice_lifecycle_and_event_closure_are_exact() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(EventTracker::default());
+
+        let first_path = observed_anchor(&dice, EpochBuilder::default().build(), &tracker).await;
+        let SourcePreparationOutcome::Need(first_path_need) = &first_path else {
+            panic!("expected first-path Need");
+        };
+        assert_eq!(
+            first_path_need.path_observations().unwrap().demands()[0]
+                .path()
+                .as_path(),
+            std::path::Path::new("/")
+        );
+        assert!(first_path_need.root_module_bootstrap_request().is_none());
+        assert!(first_path_need.repository_materializations().is_empty());
+        assert!(!RootModuleLoadingAnchorKey::validity(&first_path));
+        assert!(!RootModuleLoadingAnchorKey::equality(
+            &first_path,
+            &first_path
+        ));
+        assert!(tracker.take().iter().all(|entry| {
+            (!entry.key.starts_with("root-module-loading-anchor:")
+                && !entry.key.starts_with("host-root-module-file:"))
+                || entry.batch.is_none()
+        }));
+        tracker.take_anchor_dependencies();
+
+        let mut missing = EpochBuilder::default();
+        missing.directory("/", 1);
+        missing.directory("/workspace", 1);
+        missing.missing("/workspace/MODULE.bazel");
+        let bootstrap = observed_anchor(&dice, missing.build(), &tracker).await;
+        let SourcePreparationOutcome::Need(bootstrap_need) = &bootstrap else {
+            panic!("expected root-bootstrap Need");
+        };
+        assert!(bootstrap_need.path_observations().is_none());
+        assert!(bootstrap_need.root_module_bootstrap_request().is_some());
+        assert!(bootstrap_need.repository_materializations().is_empty());
+        assert!(tracker.take().iter().all(|entry| {
+            (!entry.key.starts_with("root-module-loading-anchor:")
+                && !entry.key.starts_with("host-root-module-file:"))
+                || entry.batch.is_none()
+        }));
+        tracker.take_anchor_dependencies();
+
+        let success = observed_anchor(
+            &dice,
+            EpochBuilder::root("print('ANCHOR_EVENT')\n", 2).build(),
+            &tracker,
+        )
+        .await;
+        assert!(matches!(success, SourcePreparationOutcome::Complete(ref value) if value.is_ok()));
+        let success_events = tracker.take();
+        let wrapper = success_events
+            .iter()
+            .find(|entry| entry.key.starts_with("root-module-loading-anchor:"))
+            .unwrap();
+        assert!(wrapper.batch.is_none());
+        let producer = success_events
+            .iter()
+            .find(|entry| entry.key.starts_with("host-root-module-file:"))
+            .unwrap();
+        assert_eq!(
+            event_texts(producer.batch.as_ref().unwrap()),
+            ["ANCHOR_EVENT"]
+        );
+        assert_eq!(
+            tracker.take_anchor_dependencies(),
+            vec![vec![String::from("host-root-module-file:\"/workspace\"")]]
+        );
+
+        let error = observed_anchor(
+            &dice,
+            EpochBuilder::root("unknown_identifier\n", 3).build(),
+            &tracker,
+        )
+        .await;
+        assert!(matches!(error, SourcePreparationOutcome::Complete(ref value) if value.is_err()));
+        tracker.take();
+        tracker.take_anchor_dependencies();
+
+        let restored = observed_anchor(
+            &dice,
+            EpochBuilder::root("print('ANCHOR_EVENT')\n", 4).build(),
+            &tracker,
+        )
+        .await;
+        assert!(RootModuleLoadingAnchorKey::equality(&success, &restored));
+        tracker.take();
+        tracker.take_anchor_dependencies();
+
+        let warm = observed_anchor(
+            &dice,
+            EpochBuilder::root("print('ANCHOR_EVENT')\n", 4).build(),
+            &tracker,
+        )
+        .await;
+        assert!(RootModuleLoadingAnchorKey::equality(&restored, &warm));
+        assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
     }
 
     #[test]
