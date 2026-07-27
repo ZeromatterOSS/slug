@@ -1120,3 +1120,20 @@ inspection, focused and full harness validation, and source/evidence plus
 architecture/fixture-hygiene reviews returned `ACCEPT`. The next checkpoint
 starts from accepted tree `e2cc891d` and counts later accepted oracle packets
 only.
+
+### Post-checkpoint oracle packet 1 (2026-07-27)
+
+Commit `9f42c3e5` extends only `glob-callable-contract` with a simple
+terminal-segment matcher package. The fixture grew from 17 regular files,
+zero symlinks, 228 newline-counted lines, and four rows to 20/0/306 and five
+rows: +3 regular files, +0 symlinks, +78 lines, and +1 row. The whole fixture
+tree is now 1,317 regular files, 24 symlinks, and 39,382 lines, the same
++3/+0/+78 delta from checkpoint `e2cc891d`.
+
+The added BUILD and two assets are all discriminating: exact query labels
+separately expose bare-star hidden membership, ordinary suffix hidden
+exclusion, explicit-dot inclusion, and multiple non-adjacent nonempty star
+spans. Pinned generation, two distinct-root callable replays, both protected
+glob-fixture replays, 97 harness tests, and structural/cleanup guards passed.
+This is packet one after the checkpoint and remains below every fixture-growth
+review trigger.

@@ -11456,3 +11456,34 @@ projection, multi-segment and `**` traversal, regular-or-special BUILD/`.bzl`
 acquisition, parser activation, transactional evaluator retry, and every
 consumer remain later and separate. No Stage 9 edit is due for this design or
 oracle-only implementation.
+
+### Simple Host glob segment matcher oracle implementation
+
+Status: `ACCEPT` in `9f42c3e5` on 2026-07-27 after terminal source/parity,
+implementation/evidence, and architecture/fixture-hygiene latest-diff
+reviews.
+
+The exact five implementation paths changed by +86/-8, within every per-file
+and aggregate cap. The isolated package contains exactly a 28-line BUILD and
+two one-line assets. Its four direct comprehensions generate the exact six
+query labels proving bare-star hidden and BUILD membership, ordinary suffix
+hidden exclusion, explicit-dot inclusion, and two nonempty non-adjacent star
+spans. The fifth record exits zero with no mutations and an empty manifest;
+the accepted semantic projection of the first four callable records is
+unchanged.
+
+Pinned Bazel 9.2 generation and two distinct fresh-absolute-root callable
+replays passed. The protected 13-row POSIX and four-row Linux raw-name
+fixtures were unchanged and both replayed successfully. The 97-test oracle
+harness passed through the repository test requirements; direct schema,
+Python compilation, expected-projection, fixture listing, archive, scope/cap,
+credential, process cleanup, and diff guards passed. No Slug command ran.
+
+The callable fixture is now 20 regular files, zero symlinks, 306
+newline-counted lines, and five rows, a delta of +3/+0/+78/+1 row. The whole
+fixture tree is 1,317 regular files, 24 symlinks, and 39,382 lines. This is
+oracle packet one after checkpoint `e2cc891d`, below every review trigger, so
+no fixture-growth checkpoint is due.
+
+Next packet: implement only
+`WP-5-m1-loading-pure-host-glob-segment-candidates-owner`.
