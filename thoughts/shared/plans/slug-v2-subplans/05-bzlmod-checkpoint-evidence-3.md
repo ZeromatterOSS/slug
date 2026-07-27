@@ -13700,3 +13700,289 @@ focused correction rereview returned `ACCEPT`.
 Design next only `WP-5-m1-source-aware-command-event-design`. Freeze the
 smallest source-span event representation and publication boundary required to
 match Bazel 9.2 Starlark print diagnostics before query-first activation.
+
+### Source-aware command event design
+
+Status: **ACCEPT** for `WP-5-m1-source-aware-command-event-design` on
+2026-07-27 after one terminal independent design review and focused correction
+rereview.
+
+This packet remains design-only. It adds no Rust and authorizes no production
+caller, CLI/server behavior, semantic activation, execution, REAPI, JVM,
+Java-bytecode, or Bazel delegation.
+
+#### Bazel 9.2 source of truth
+
+The pinned local Bazel tag `9.2.0` resolves to
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Its observable contract is:
+
+- `Event.makeDebugPrintHandler` in
+  `src/main/java/com/google/devtools/build/lib/events/Event.java` constructs
+  `Event.debug(thread.getCallerLocation(), msg)`;
+- `Eval.evalCall` in
+  `src/main/java/net/starlark/java/eval/Eval.java` sets the enclosing frame's
+  program-counter location to `CallExpression.getLparenLocation()` immediately
+  before the call. `StarlarkThread.getCallerLocation()` returns that enclosing
+  frame location;
+- `Location` in
+  `src/main/java/net/starlark/java/syntax/Location.java` is the apparent file
+  name plus optional 1-based line and column, with columns measured in UTF-16
+  code units and zero line/column omitted; and
+- `UiEventHandler.handleLocked` in
+  `src/main/java/com/google/devtools/build/lib/runtime/UiEventHandler.java`
+  writes `<KIND>: `, then `<location>: ` when present, then the message, and
+  appends a line terminator only when the message does not already end in
+  `\n`.
+
+The accepted
+`tests/v2_oracle/fixtures/load-invalidation/expected/oracle.json` evidence
+therefore has `DEBUG: <path>:<line>:<column>: <text>` with column 6 for
+top-level `print(` and column 14 for an eight-space-indented `print(`. Those
+columns identify the actual `(` token. They are not the beginning of the call
+expression and must not be reconstructed by adding the spelling length of
+`print`, scanning source text, or consulting fixture text.
+
+#### Retained Starlark source contract
+
+Preserve the call token at parse time. Extend `CallArgsP` with the zero-width
+span at the actual opening parenthesis, captured with the grammar token's
+`@L`. Carry it as a distinct `FrameSpan` on `CallCompiled`, including through
+optimization and inlining. Full call-expression spans remain the bytecode
+instruction/profiling/error spans; only the location supplied to
+`with_call_stack` becomes the exact parenthesis span. Synthetic compiler calls
+that have no parsed token use the enclosing expression's end span. This also
+makes retained call-stack program-counter locations Bazel-shaped without
+discarding the existing full expression span.
+
+Break the prototype `PrintHandler` API directly; add no compatibility method:
+
+```text
+PrintLocation {
+    file: Arc<str>,
+    line: u32,
+    column: u32,
+}
+
+PrintHandler::println(
+    &self,
+    location: PrintLocation,
+    text: &str,
+) -> starlark::Result<()>
+```
+
+Re-export `PrintLocation` beside `PrintHandler` through both `stdlib.rs` and
+the crate root; every external handler must be able to name the public method
+argument without reaching a private module.
+
+`print` and `pprint` resolve `Evaluator::call_stack_top_location()` immediately
+before invoking the handler. The filename is the exact retained codemap
+filename. Line is 1-based. Column is computed from the source-line prefix
+ending at the saved parenthesis byte offset by counting `char::len_utf16`, then
+adding one. Do not use the ordinary Unicode-scalar resolver or the
+Bazel-internal byte-reporting resolver for this value: neither implements
+Bazel's UTF-16 `Location` contract.
+
+Change the retained real `CodeMapData.filename` backing from `String` to
+`Arc<str>` while preserving the existing borrowed `filename() -> &str` API.
+Add one crate-internal shared-filename accessor so resolving each print clones
+only that Arc pointer. `CodeMap::new` still accepts `String` and performs the
+single conversion when the codemap is created. Native/no-frame fallback uses
+one static shared `<builtin>` value with line and column zero. Thus every print
+from one codemap shares filename storage without retaining or cloning source
+text, adding an interner, or changing a Cargo dependency.
+
+The retained default stderr handler writes `<location>: <text>` with its
+existing `eprintln!` behavior, matching Starlark's direct fallback rather than
+the Bazel UI renderer. Every Slug capture handler receives the same
+source-aware callback. `RejectPrint` may ignore the location. No handler derives
+a path or position from an evaluator input, workspace fixture, function
+spelling, or message text.
+
+#### Retained event representation
+
+Add this owned value in `slug_events_v2`:
+
+```text
+StarlarkSourceLocation {
+    file: Arc<str>,
+    line: u32,
+    column: u32,
+}
+```
+
+It has structural equality, `Allocative`, one exact public constructor, and a
+`Display` implementation matching Bazel's zero-omission rules. Change only the
+print variant to:
+
+```text
+EvaluationEvent::StarlarkPrint {
+    location: StarlarkSourceLocation,
+    text: CompactString,
+}
+```
+
+MODULE, REPO, loading, and analysis capture handlers move or clone only the
+codemap's shared filename pointer into that event. The filename is the apparent
+name already passed to `AstModule`; it is not canonicalized,
+workspace-relative rewritten, or recovered from a DICE key. Message bytes
+remain exact. Diagnostics retain their existing level and already-located
+text.
+
+Keep `EventBatch` as `Arc<[EvaluationEvent]>` and `Dupe`. An event is allocated
+once in its producing compute; filename duplicates are Arc pointer bumps, and
+closure/output-buffer copies share the whole batch. Add no global interner,
+source map, path table, `String`/`Vec` sidecar, per-command deduplication, or
+event clone path. Structural event/batch equality includes file, line, column,
+message, level, and order.
+
+The four source-owning producer families are:
+
+- `RootModulePrintCapture` in `slug_bzlmod_v2::module_eval`;
+- `RepoPrintHandler` and `RecordingRepoEventReporter` in
+  `slug_bzlmod_v2::repo_file`;
+- `LoadingPrintCapture` in `slug_loading_v2::bzl_module`; and
+- `AnalysisPrintCapture` in `slug_analysis_v2::dice`.
+
+Registry MODULE evaluation remains deliberately silent where Bazel makes it
+silent. Existing marker-conditioned capture remains unchanged. A reused warm
+key contributes its previously retained batch only when it is in the selected
+terminal activation closure; it does not replay the evaluator or append a
+second event.
+
+`DirectRepoEventReporter` is an explicitly preserved uncaptured path, not a
+fifth event producer. `RepoPrintHandler` passes it the source-aware callback,
+but the direct reporter deliberately ignores the location and keeps its
+existing raw `eprintln!("{text}")` bytes. Only
+`RecordingRepoEventReporter` converts the location into an event. This packet
+must not turn capture-disabled REPO evaluation into a new DEBUG-rendering or
+CLI publication path.
+
+#### Consuming publication boundary
+
+After source-aware events exist, add a public `#[must_use]`
+`PublishedCommand<T>` with private terminal, exit-code, stdout, and stderr
+fields. Its only extraction API is consuming:
+
+```text
+CommandOutput<T>::publish(self) -> PublishedCommand<T>
+
+PublishedCommand<T>::into_parts(self)
+    -> (T, i32, String, String)
+```
+
+`publish` consumes the still-opaque `CommandOutput<T>`, renders every selected
+batch and event in exact closure order, and then consumes the private event
+buffer. No terminal/event getter, iterator, clone, public constructor,
+alternate renderer, or pre-publication parts API is added.
+
+Render a print as `DEBUG: {location}: {text}`. Render a diagnostic as
+`WARNING: {text}` or `ERROR: {text}` from its retained level; its text already
+owns any source location. For either kind, append `\n` only when the retained
+text does not already end in `\n`; the appended separator is `\r\n` on Windows
+and `\n` elsewhere, matching `UiEventHandler.crlf()` and
+`System.lineSeparator()`. A retained message that already ends in bare `\n`
+is not rewritten on Windows because Bazel performs the same `endsWith("\n")`
+test. Prefix only the first line of a multiline message. Event stderr precedes
+the projected terminal stderr. Terminal stdout stays independent, so no
+cross-stream order is invented. An empty buffer adds no bytes.
+
+The existing terminal envelope timing does not change. Both
+`Complete(Ok(...))` and `Complete(Err(...))` may own the one selected terminal
+closure only after accepted snapshot replacement and successful lease close.
+Retry-only, canceled, restoration, DICE, closure, native, materializer,
+snapshot-replacement, and close failures publish nothing. Publication performs
+no DICE computation, filesystem read, formatting query, or semantic retry.
+
+#### Implementation scope
+
+Implement this accepted design as one serial packet with two locally
+reviewable phases and one terminal independent review. Phase one preserves the
+source token and converts all producers; phase two adds publication. Do not
+write a second design/status checkpoint between phases.
+
+Production allowlist:
+
+- `starlark-rust/starlark_syntax/src/codemap.rs`;
+- `starlark-rust/starlark_syntax/src/syntax/{ast.rs,grammar.lalrpop,validate.rs,payload_map.rs,module.rs}`;
+- `starlark-rust/starlark/src/eval/compiler/{expr.rs,call.rs,def_inline.rs}`;
+- `starlark-rust/starlark/src/eval/bc/compiler/call.rs`;
+- `starlark-rust/starlark/src/{stdlib/extra.rs,stdlib.rs,lib.rs}`;
+- `app/slug_events_v2/src/lib.rs`;
+- `app/slug_bzlmod_v2/src/{module_eval.rs,repo_file.rs,host_module.rs}`;
+- `app/slug_loading_v2/src/bzl_module.rs`;
+- `app/slug_analysis_v2/src/dice.rs`; and
+- `app/slug_core_v2/src/runtime/{events.rs,mod.rs}`.
+
+Tests colocated in those files and the existing direct event assertions in
+`app/slug_bzlmod_v2/tests/root_module_dice.rs`,
+`app/slug_loading_v2/tests/{bzl_invalidation.rs,build_file_loading.rs}`,
+`app/slug_loading_v2/src/{host_package_load_tests.rs,host_package_attempt_tests.rs}`,
+`app/slug_analysis_v2/tests/{starlark_rule.rs,root_analysis.rs}`, and
+`app/slug_core_v2/src/runtime/{dice.rs,demands.rs}` may change mechanically to
+assert the new field. No Cargo manifest change is permitted.
+
+#### Required evidence and stop gates
+
+Add the narrow retained-Starlark regression first. It must distinguish:
+
+1. top-level and eight-space-indented `print` parenthesis columns 6 and 14;
+2. whitespace between the callee and `(`, proving the token was preserved;
+3. `pprint`;
+4. a non-BMP scalar before the call, proving UTF-16 rather than Unicode-scalar
+   or UTF-8-byte columns;
+5. `<builtin>` fallback; and
+6. exact multiline message preservation without handler-side rewriting.
+
+Then prove exact source identities and locations at root MODULE, REPO,
+BUILD/`.bzl` loading, and analysis producers; structural location inequality;
+shared filename pointer identity across multiple prints from one codemap;
+shared `EventBatch::dupe` storage; cold capture; warm selected reuse without
+reevaluation or duplication; and absence when capture is disabled or the key
+is outside the terminal closure. A focused REPO test must also prove that the
+capture-disabled direct path retains raw message output semantics and creates
+no source-aware event.
+
+Focused core publication tests must prove mixed batch/event order, DEBUG and
+diagnostic prefixes, UTF-8 and multiline bytes, no double newline, event
+stderr before terminal stderr, stdout separation, empty-buffer identity,
+retained terminal identity, success and typed-error publication, and that
+primitive parts become reachable only through the consuming publication
+method. Platform-conditional assertions must freeze the appended system line
+separator and the unchanged already-LF-terminated case.
+
+Run focused retained-Starlark, event, producer, and core publication tests,
+then quiet direct compile checks for `slug_bzlmod_v2`, `slug_loading_v2`,
+`slug_analysis_v2`, `slug_query_v2`, and `slug_core_v2`. Do not rerun their
+unrelated full suites before the query integration milestone. Then run
+GNU-Windows no-run linkage, formatting, `git diff --check`,
+`scripts/v2_archive_status.sh`, the exact allowlist/no-Cargo guard, and the
+existing six-match CLI/server activation blocker plus metric-only daemon
+observation scans. Cargo commands remain serial and focused output remains
+quiet.
+
+Stop with `REPLAN` rather than:
+
+- infer an opening parenthesis from the callee span or source/message text;
+- report scalar or UTF-8-byte columns as Bazel locations;
+- clone a codemap/source into an event or retain an event outside its batch;
+- introduce a second output owner, renderer, public raw event/buffer API, or
+  non-consuming terminal access;
+- alter marker capture, DICE key equality, closure selection, retry,
+  acceptance, snapshot, lease, or materializer semantics; or
+- add a production caller, query/build activation, CLI/server behavior,
+  execution, REAPI, JVM, Java bytecode, or Bazel delegation.
+
+After terminal acceptance, schedule the exact implementation above. After its
+acceptance, design the query-first atomic vertical activation; do not interpose
+build execution work.
+
+The first terminal review returned `REPLAN` because the public location type
+needed two explicit re-export files, one exhaustive Host test match was outside
+the allowlist, the uncaptured REPO stderr path was not frozen, and a
+`CompactString` filename would allocate repeatedly for long apparent paths.
+The correction adds the missing files, preserves raw direct-REPO output, moves
+real codemap and event filenames to one evaluation-shared `Arc<str>`, and
+freezes Bazel's platform line-separator behavior. The focused correction
+rereview returned `ACCEPT`.
+
+Implement next only `WP-5-m1-source-aware-command-events`.
