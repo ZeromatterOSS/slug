@@ -13093,3 +13093,118 @@ dependency/legacy/carrier/IO/blocking/JVM guards pass.
 Next design only `WP-5-m1-query-host-migration-design`, bounded to the
 remaining eager subtree discovery and build-companion query paths before any
 runtime activation.
+
+### Query Host-migration design
+
+Status: **ACCEPT** for `WP-5-m1-query-host-migration-design` on 2026-07-27
+after one reserved DICE-boundary review and focused correction rereview. The
+correction matches Host regular/special marker kinds and exact
+root-major/basename-minor precedence.
+
+The accepted dormant `RootQueryCommandKey` uses Host ownership for its module
+anchor, ordinary package graph, and direct `buildfiles()`/`loadfiles()`
+package load. Two root-mode operations still deliberately reach legacy eager
+projections: recursive target patterns compute `SubtreePackageSetKey`, and
+`buildfiles()` calls `discover_build_file_companion` for each reachable
+`.bzl` package. The legacy query facade must retain both paths unchanged, but
+the typed root closure cannot activate while either remains reachable.
+
+Add one private `RootSubtreePackageSetKey` in `graph.rs`. Its identity is
+normalized `NormalizedAbsolutePath` workspace plus typed `PackagePath` prefix,
+and its value is exactly
+`QueryPreparationOutcome<Arc<Result<SubtreePackageSet, QueryError>>>`. It
+computes `RootPackageLookupInputsProjectionKey` once to obtain the complete
+ordered package-root set. A missing/projection error is Complete
+`QueryError`, not Need.
+
+Traverse relative directory paths in the same deterministic depth-first shape
+as the legacy key. For each UTF-8 valid relative candidate, first compute
+`HostRootPackageBoundaryKey`:
+
+- ignored directories stop without listing or descending;
+- selected packages are recorded but still descended for nested packages;
+- deleted/no-package candidates are not recorded and still descend; and
+- Need passes through before any child is reached.
+
+For every candidate that continues, compute `PathDirectoryListingKey` in Host
+namespace for that relative directory under every configured package root.
+Issue all root listings for the candidate together, retain their root order,
+union every reached path Need in that order before selecting the first
+complete error, then merge only OS-native `Directory` entry names. Sort and
+deduplicate the merged native names, push them in reverse order, and finally
+sort/deduplicate recorded UTF-8 package strings exactly as the legacy result
+does. Missing roots contribute no entries; wrong-kind, observation,
+resolution, and inconsistent-state failures become deterministic Complete
+`QueryError`.
+
+Keep traversal identity OS-native. A non-UTF-8 candidate cannot enter
+`PackagePath`/ignore ownership. Probe its markers with typed
+`ResolvedPathKey` in the exact Host lookup ordinal: for each package root in
+input order, probe that root's `BUILD.bazel` and then its `BUILD` before
+advancing to the next root. A resolved `RegularFile` or `SpecialFile` is a
+marker, matching current Host package lookup; other present kinds and Missing
+are not. If no marker exists, continue native traversal; if one exists, return
+the existing `package path is not UTF-8` semantic error. Issue the probes for
+the candidate together, retain this root-major/basename-minor ordinal, union
+every Need in that order before selecting the first complete error or marker,
+and do not silently skip, lossily encode, or prematurely reject a non-package
+native directory.
+
+The root subtree key has Complete-only structural equality/validity. It stores
+only the final compact sorted package slice, not directory listings, roots,
+or a copied traversal graph. It emits no event batch.
+
+Migrate root-mode companion discovery without loading or parsing the companion
+BUILD. For each first-seen reachable `.bzl` package:
+
+1. compute `HostRootPackageBoundaryKey`;
+2. return no companion for ignored, deleted, or no-package results;
+3. for a selected package root, probe `BUILD.bazel` then `BUILD` with Host
+   `ResolvedPathKey`; and
+4. construct the existing companion label/path from the first resolved
+   `RegularFile` or `SpecialFile`.
+
+The boundary already owns package-root precedence, deleted policy, ignore, and
+marker selection; the typed probes recover only the selected basename and
+symlink-resolved Host marker kind. A boundary claiming Package while neither
+marker resolves to a regular or special file is a fail-fast DICE invariant.
+Need enters the existing private query environment side channel and the inert
+restart sentinel unwinds it; operational Complete errors retain the existing
+query-evaluation diagnostic kind. Root mode must never call
+`discover_build_file_companion`.
+
+Keep the legacy `SubtreePackageSetKey`, `discover_build_file_companion`,
+facade, keys, callers, ordering, diagnostics, and equality unchanged. Split
+mode-specific helpers where needed so the root call graph has no semantic
+`WorkspaceDirectoryKey`, `WorkspaceDirectorySnapshotKey`, or eager companion
+edge. No query event, output, parser, generic evaluator, command key, or
+public export changes.
+
+Implement next only `WP-5-m1-query-host-migration` in:
+
+- `app/slug_query_v2/src/graph.rs`;
+- `app/slug_query_v2/src/loading_environment.rs`; and
+- `app/slug_query_v2/tests/loading_query.rs`.
+
+Focused scripted Host regressions must prove multi-root directory-name union
+and package-root precedence, cumulative ordered Needs across roots,
+ignored/deleted/package transitions, recursive create/edit/delete/recreate,
+native-name and root-major marker precedence, stable package/output order, no
+legacy subtree activation, and parse-independent companion
+fallback/primary/symlink/special-file/missing/restore behavior including a
+broken BUILD file. Reuse the accepted
+Host boundary/path/symlink evidence and existing query fixtures; add no new
+fixture or oracle.
+
+Run the focused Host-query tests and full `slug_query_v2`, direct
+`slug_core_v2` compile coverage, query/core GNU-Windows no-run linkage,
+formatting, diff/archive status, and exact three-file/no-export/no-caller/
+Cargo/dependency/legacy/eager-root-path/IO/blocking/JVM guards.
+
+Add no Cargo/dependency change, public key, existing-key replacement,
+core/CLI/server caller, runtime activation, external repository, new query
+function/format, evaluator concurrency, event owner, fixture/oracle, JVM,
+Java bytecode, or Bazel delegation. Stop if implementation needs a fourth
+file, converts Need to `QueryError`, changes legacy behavior, evaluates a
+companion BUILD, lists only the workspace root instead of all package roots,
+or lossily converts an OS-native name.
