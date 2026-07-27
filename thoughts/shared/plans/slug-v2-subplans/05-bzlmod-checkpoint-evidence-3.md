@@ -13208,3 +13208,29 @@ Java bytecode, or Bazel delegation. Stop if implementation needs a fourth
 file, converts Need to `QueryError`, changes legacy behavior, evaluates a
 companion BUILD, lists only the workspace root instead of all package roots,
 or lossily converts an OS-native name.
+
+### Query Host-migration implementation
+
+Status: **ACCEPT** for `WP-5-m1-query-host-migration` on 2026-07-27 after one
+terminal implementation review and one focused correction rereview.
+
+Exactly `graph.rs`, `loading_environment.rs`, and `loading_query.rs` now keep
+the dormant typed query root on Host-owned recursive package discovery and
+BUILD-companion lookup while leaving the legacy facade unchanged. The private
+subtree owner unions every package root, preserves native path identity,
+Complete-only DICE validity, Need dominance, and exact
+root-major/basename-minor marker order. Companion lookup accepts regular and
+special markers without evaluating BUILD content.
+
+Focused evidence covers multi-root union and precedence, ignore/deleted and
+create/edit/delete/restore transitions, no legacy subtree activation, primary,
+fallback, symlink, special, missing/restored, and syntactically broken
+companions, plus a two-root non-UTF-8 ordinal discriminator. The focused 3
+tests and full `slug_query_v2` 17-unit/43-loading/6-query suites pass; direct
+core coverage, query/core GNU-Windows linkage, formatting, scope, and diff
+checks pass. The correction rereview returned `ACCEPT` with no remaining
+contract gap.
+
+Design next only `WP-5-m1-build-typed-command-root-design`. Freeze the core
+analysis/package-root bundle, always-present empty-target anchor, deterministic
+Need union, and exact core/Cargo/test implementation allowlist before Rust.

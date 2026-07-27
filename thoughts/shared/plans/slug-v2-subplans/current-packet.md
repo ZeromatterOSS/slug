@@ -1,38 +1,35 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-query-host-migration`
+Packet: `WP-5-m1-build-typed-command-root-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted query Host-migration design; dormant typed query root;
-accepted Host path, package-boundary, and package-policy owners
-Validation tier: private DICE discovery identity, Need union, and lifecycle
+Evidence: accepted typed root loading and analysis boundaries; dormant typed
+query root with accepted Host migration
+Validation tier: design-only core call-graph and DICE ownership audit
 
-Implementation files:
+Design inputs:
 
-- `app/slug_query_v2/src/graph.rs`
-- `app/slug_query_v2/src/loading_environment.rs`
-- `app/slug_query_v2/tests/loading_query.rs`
+- the current core build request, target-pattern, analysis, and event paths;
+- the accepted bzlmod/loading/analysis typed root owners; and
+- the exact core Cargo/source/test paths selected by the design audit.
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Result: add private typed root subtree discovery over every ordered package
-root and switch root-mode BUILD companion lookup to package-boundary plus Host
-resolved-marker ownership. Preserve OS-native traversal, root-major then
-basename marker precedence, regular/special marker kinds, deterministic Need
-union, lazy order, and all legacy paths.
+Result: produce one implementation-ready design for a dormant typed build
+command root. Freeze its typed request identity, core analysis and package-root
+bundle, always-present anchor for an empty target set, deterministic union of
+all independently reached Needs, Complete-only equality/validity, exact event
+ownership, and an exact core/Cargo/test allowlist.
 
-Add no Cargo/dependency/public export, existing-key replacement,
-core/CLI/server caller, runtime activation, external repository, new query
-surface, fixture/oracle, JVM, Java bytecode, or Bazel delegation. Stop on a
-fourth implementation file, Need-to-error conversion, legacy behavior change,
-companion BUILD evaluation, workspace-root-only listing, or lossy native-name
-conversion.
+Make no Rust, Cargo, fixture, oracle, runtime, CLI, server, public API, JVM,
+Java-bytecode, or Bazel-delegation change in this packet. Do not activate build
+or query, broaden repository capability, or convert Need into an operational
+error.
 
-Validate focused multi-root/Need/ignore/deleted/native-order/recursive
-lifecycle and companion fallback/primary/symlink/special/missing/restore
-regressions, full `slug_query_v2`, direct `slug_core_v2` compile coverage,
-query/core GNU-Windows no-run linkage, formatting, `git diff --check`, archive
-status, and exact three-file/no-export/no-caller/Cargo/dependency/legacy/
-eager-root-path/IO/blocking/JVM guards. Obtain one terminal independent
-implementation review.
+The design must identify every compute above or beside the proposed root,
+prove an empty valid build still seals a nonempty exact dependency closure,
+separate producer event ownership from later opaque-envelope consumption, and
+name focused Need/lifecycle/equality/event-suppression tests. Obtain at most one
+terminal independent review only if the final contract changes a risky public,
+DICE, or activation boundary.

@@ -22,6 +22,11 @@ use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
+use futures::FutureExt;
+use slug_bzlmod_v2::HostRootPackageBoundaryKey;
+use slug_bzlmod_v2::HostRootPackageBoundaryKind;
+use slug_bzlmod_v2::RootPackageLookupInputsProjectionKey;
+use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackagePath;
 use slug_loading_v2::AttributeProvenance;
@@ -40,6 +45,14 @@ use slug_loading_v2::keys::WorkspaceDirectoryKey;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryListing;
+use slug_workspace_v2::PathDirectoryListingKey;
+use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathOutcome;
+use slug_workspace_v2::ResolvedPathKey;
+use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -187,6 +200,24 @@ pub struct SubtreePackageSet {
 pub struct SubtreePackageSetKey {
     pub workspace: PathBuf,
     pub prefix: PathBuf,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub(crate) struct RootSubtreePackageSetKey {
+    workspace: NormalizedAbsolutePath,
+    prefix: PackagePath,
+}
+
+impl RootSubtreePackageSetKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, prefix: PackagePath) -> Self {
+        Self { workspace, prefix }
+    }
+}
+
+impl fmt::Display for RootSubtreePackageSetKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "root-subtree-package-set://{}", self.prefix.as_str())
+    }
 }
 
 impl fmt::Display for SubtreePackageSetKey {
@@ -741,6 +772,247 @@ impl Key for SubtreePackageSetKey {
     fn validity(value: &Self::Value) -> bool {
         value.is_ok()
     }
+}
+
+#[async_trait]
+impl Key for RootSubtreePackageSetKey {
+    type Value = LoadingPreparationOutcome<PackageSetValue>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        compute_root_subtree_packages(ctx, &self.workspace, &self.prefix).await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn union_source_need(
+    accumulated: &mut Option<SourcePreparationNeeds>,
+    next: SourcePreparationNeeds,
+) {
+    *accumulated = Some(match accumulated.take() {
+        Some(existing) => existing
+            .try_union(&next)
+            .expect("root query source Needs must be compatible"),
+        None => next,
+    });
+}
+
+async fn compute_root_subtree_packages(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    prefix: &PackagePath,
+) -> LoadingPreparationOutcome<PackageSetValue> {
+    let roots = match ctx
+        .compute(&RootPackageLookupInputsProjectionKey::new(
+            workspace.clone(),
+        ))
+        .await
+    {
+        Err(error) => {
+            return LoadingPreparationOutcome::Complete(Arc::new(Err(QueryError::evaluation(
+                error.to_string(),
+            ))));
+        }
+        Ok(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Arc::new(Err(QueryError::evaluation(
+                error.to_string(),
+            ))));
+        }
+        Ok(Ok(inputs)) => inputs.package_roots().to_vec(),
+    };
+
+    let mut pending = vec![PathBuf::from(prefix.as_str())];
+    let mut packages = Vec::new();
+    while let Some(relative) = pending.pop() {
+        let package_text = relative.to_str().map(|value| value.replace('\\', "/"));
+        if let Some(package_text) = package_text.as_deref() {
+            let package = match PackagePath::parse(package_text) {
+                Ok(package) => package,
+                Err(error) => {
+                    return LoadingPreparationOutcome::Complete(Arc::new(Err(
+                        QueryError::evaluation(error),
+                    )));
+                }
+            };
+            let boundary = ctx
+                .compute(&HostRootPackageBoundaryKey::new(workspace.clone(), package))
+                .await
+                .expect("Host package-boundary DICE invariant");
+            match boundary {
+                PathOutcome::Need(need) => {
+                    return LoadingPreparationOutcome::Need(SourcePreparationNeeds::path(need));
+                }
+                PathOutcome::Complete(value) => match value.as_ref() {
+                    Err(error) => {
+                        return LoadingPreparationOutcome::Complete(Arc::new(Err(
+                            QueryError::evaluation(error.to_string()),
+                        )));
+                    }
+                    Ok(boundary)
+                        if boundary.kind() == HostRootPackageBoundaryKind::IgnoredDirectory =>
+                    {
+                        continue;
+                    }
+                    Ok(boundary) if boundary.kind() == HostRootPackageBoundaryKind::Package => {
+                        packages.push(CompactString::new(package_text));
+                    }
+                    Ok(_) => {}
+                },
+            }
+        } else {
+            match probe_native_package_marker(ctx, &roots, &relative).await {
+                LoadingPreparationOutcome::Need(need) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    return LoadingPreparationOutcome::Complete(Arc::new(Err(error)));
+                }
+                LoadingPreparationOutcome::Complete(Ok(true)) => {
+                    return LoadingPreparationOutcome::Complete(Arc::new(Err(
+                        QueryError::evaluation(format!(
+                            "package path is not UTF-8: {}",
+                            relative.display()
+                        )),
+                    )));
+                }
+                LoadingPreparationOutcome::Complete(Ok(false)) => {}
+            }
+        }
+
+        let mut needs = None;
+        let mut first_error = None;
+        let mut children = Vec::new();
+        let listings = ctx
+            .compute_join(roots.iter().cloned(), |ctx, root| {
+                let logical = NormalizedAbsolutePath::new(root.as_path().join(&relative))
+                    .expect("package-root child remains absolute");
+                async move {
+                    ctx.compute(&PathDirectoryListingKey::new(
+                        PathObservationNamespace::Host,
+                        logical,
+                    ))
+                    .await
+                }
+                .boxed()
+            })
+            .await;
+        for listing in listings {
+            match listing {
+                Err(error) => {
+                    first_error.get_or_insert_with(|| QueryError::evaluation(error.to_string()));
+                }
+                Ok(PathOutcome::Need(need)) => {
+                    union_source_need(&mut needs, SourcePreparationNeeds::path(need));
+                }
+                Ok(PathOutcome::Complete(Err(error))) => {
+                    first_error.get_or_insert_with(|| {
+                        QueryError::evaluation(format!(
+                            "reading workspace directory {}: {error:?}",
+                            relative.display()
+                        ))
+                    });
+                }
+                Ok(PathOutcome::Complete(Ok(PathDirectoryListing::Missing))) => {}
+                Ok(PathOutcome::Complete(Ok(PathDirectoryListing::Present(entries)))) => {
+                    children.extend(
+                        entries
+                            .entries()
+                            .iter()
+                            .filter(|entry| entry.kind() == PathDirectoryEntryKind::Directory)
+                            .map(|entry| relative.join(entry.name().as_os_str())),
+                    );
+                }
+            }
+        }
+        if let Some(need) = needs {
+            return LoadingPreparationOutcome::Need(need);
+        }
+        if let Some(error) = first_error {
+            return LoadingPreparationOutcome::Complete(Arc::new(Err(error)));
+        }
+        children.sort_unstable();
+        children.dedup();
+        pending.extend(children.into_iter().rev());
+    }
+    packages.sort_unstable();
+    packages.dedup();
+    LoadingPreparationOutcome::Complete(Arc::new(Ok(SubtreePackageSet {
+        packages: packages.into(),
+    })))
+}
+
+async fn probe_native_package_marker(
+    ctx: &mut DiceComputations<'_>,
+    roots: &[NormalizedAbsolutePath],
+    relative: &Path,
+) -> LoadingPreparationOutcome<Result<bool, QueryError>> {
+    let probes = roots
+        .iter()
+        .flat_map(|root| {
+            ["BUILD.bazel", "BUILD"].map(|basename| {
+                NormalizedAbsolutePath::new(root.as_path().join(relative).join(basename))
+                    .expect("package marker remains absolute")
+            })
+        })
+        .collect::<Vec<_>>();
+    let results = ctx
+        .compute_join(probes, |ctx, marker| {
+            async move {
+                ctx.compute(&ResolvedPathKey::new(
+                    PathObservationNamespace::Host,
+                    marker,
+                ))
+                .await
+            }
+            .boxed()
+        })
+        .await;
+    let mut needs = None;
+    let mut completed = Vec::new();
+    for result in results {
+        match result {
+            Err(error) => {
+                completed.push(Err(QueryError::evaluation(error.to_string())));
+            }
+            Ok(PathOutcome::Need(need)) => {
+                union_source_need(&mut needs, SourcePreparationNeeds::path(need));
+            }
+            Ok(PathOutcome::Complete(Err(error))) => {
+                completed.push(Err(QueryError::evaluation(format!("{error:?}"))));
+            }
+            Ok(PathOutcome::Complete(Ok(resolved))) => {
+                completed.push(Ok(matches!(
+                    resolved.state(),
+                    ResolvedPathState::Present(lstat)
+                        if matches!(
+                            lstat.kind(),
+                            PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                        )
+                )));
+            }
+        }
+    }
+    if let Some(need) = needs {
+        return LoadingPreparationOutcome::Need(need);
+    }
+    for result in completed {
+        match result {
+            Err(error) => return LoadingPreparationOutcome::Complete(Err(error)),
+            Ok(true) => return LoadingPreparationOutcome::Complete(Ok(true)),
+            Ok(false) => {}
+        }
+    }
+    LoadingPreparationOutcome::Complete(Ok(false))
 }
 
 async fn compute_subtree_packages(

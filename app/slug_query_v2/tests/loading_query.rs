@@ -1,4 +1,8 @@
+#[cfg(unix)]
+use std::ffi::OsString;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStringExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -47,11 +51,19 @@ use slug_query_v2::evaluate_loading_query;
 use slug_query_v2::evaluate_loading_query_with_policy;
 use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathDirectoryEntries;
+use slug_workspace_v2::PathDirectoryEntry;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryName;
+#[cfg(unix)]
+use slug_workspace_v2::PathIoErrorKind;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationEpochKey;
+#[cfg(unix)]
+use slug_workspace_v2::PathObservationError;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
@@ -3606,6 +3618,20 @@ impl RootQueryEpochBuilder {
         self.node(path, PathNodeKind::Directory, variant);
     }
 
+    fn directory_entries(&mut self, path: &str, names: &[&str]) {
+        self.entries.insert(
+            Self::demand(path, PathObservationOperation::DirectoryEntries),
+            PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+                PathDirectoryEntries::new(names.iter().map(|name| {
+                    PathDirectoryEntry::new(
+                        PathDirectoryName::new(*name).unwrap(),
+                        PathDirectoryEntryKind::Directory,
+                    )
+                })),
+            )),
+        );
+    }
+
     fn missing(&mut self, path: &str) {
         self.entries.insert(
             Self::demand(path, PathObservationOperation::Lstat),
@@ -3623,6 +3649,16 @@ impl RootQueryEpochBuilder {
         );
     }
 
+    fn symlink(&mut self, path: &str, target: &str, variant: i64) {
+        self.node(path, PathNodeKind::Symlink, variant);
+        self.entries.insert(
+            Self::demand(path, PathObservationOperation::ReadLink),
+            PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(PathBuf::from(
+                target,
+            )))),
+        );
+    }
+
     fn base(variant: i64) -> Self {
         let mut builder = Self::default();
         builder.directory("/", variant);
@@ -3634,12 +3670,46 @@ impl RootQueryEpochBuilder {
     }
 
     fn package(&mut self, name: &str, source: &str, variant: i64) {
-        self.directory(&format!("/workspace/{name}"), variant);
-        self.file(&format!("/workspace/{name}/BUILD.bazel"), source, variant);
+        self.package_at("/workspace", name, "BUILD.bazel", source, variant);
+    }
+
+    fn package_at(&mut self, root: &str, name: &str, marker: &str, source: &str, variant: i64) {
+        let directory = if name.is_empty() {
+            root.to_owned()
+        } else {
+            format!("{root}/{name}")
+        };
+        self.directory(&directory, variant);
+        self.directory_entries(&directory, &[]);
+        self.file(&format!("{directory}/{marker}"), source, variant);
     }
 
     fn rules(&mut self, implementation: &str, variant: i64) {
-        self.package("rules", "", variant);
+        self.rules_with_marker(
+            implementation,
+            "BUILD.bazel",
+            PathNodeKind::RegularFile,
+            variant,
+        );
+    }
+
+    fn rules_with_marker(
+        &mut self,
+        implementation: &str,
+        marker: &str,
+        kind: PathNodeKind,
+        variant: i64,
+    ) {
+        self.directory("/workspace/rules", variant);
+        self.directory_entries("/workspace/rules", &[]);
+        if marker == "BUILD" {
+            self.missing("/workspace/rules/BUILD.bazel");
+        }
+        if kind == PathNodeKind::RegularFile {
+            self.file(&format!("/workspace/rules/{marker}"), "", variant);
+        } else {
+            self.node(&format!("/workspace/rules/{marker}"), kind, variant);
+        }
         self.file(
             "/workspace/rules/defs.bzl",
             &format!("def make(name):\n    native.{implementation}(name = name)\n"),
@@ -3647,9 +3717,28 @@ impl RootQueryEpochBuilder {
         );
     }
 
-    fn deleted_rules(&mut self, variant: i64) {
-        self.package("rules", "", variant);
-        self.missing("/workspace/rules/defs.bzl");
+    fn rules_without_marker(&mut self, variant: i64) {
+        self.directory("/workspace/rules", variant);
+        self.directory_entries("/workspace/rules", &[]);
+        self.missing("/workspace/rules/BUILD.bazel");
+        self.missing("/workspace/rules/BUILD");
+        self.file(
+            "/workspace/rules/defs.bzl",
+            "def make(name):\n    native.filegroup(name = name)\n",
+            variant,
+        );
+    }
+
+    fn symlink_rules(&mut self, variant: i64) {
+        self.directory("/workspace/rules", variant);
+        self.directory_entries("/workspace/rules", &[]);
+        self.file("/workspace/rules/real_build", "", variant);
+        self.symlink("/workspace/rules/BUILD.bazel", "real_build", variant);
+        self.file(
+            "/workspace/rules/defs.bzl",
+            "def make(name):\n    native.filegroup(name = name)\n",
+            variant,
+        );
     }
 
     fn build(self) -> PathObservationEpoch {
@@ -3664,6 +3753,7 @@ fn root_query_workspace() -> NormalizedAbsolutePath {
 #[derive(Default)]
 struct RootAnchorTracker {
     activations: AtomicUsize,
+    legacy_subtrees: AtomicUsize,
 }
 
 impl ActivationTracker for RootAnchorTracker {
@@ -3676,6 +3766,9 @@ impl ActivationTracker for RootAnchorTracker {
         if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
             self.activations.fetch_add(1, Ordering::Relaxed);
         }
+        if key.downcast_ref::<SubtreePackageSetKey>().is_some() {
+            self.legacy_subtrees.fetch_add(1, Ordering::Relaxed);
+        }
     }
 }
 
@@ -3683,6 +3776,25 @@ async fn root_query_transaction(
     dice: &Arc<Dice>,
     epoch: PathObservationEpoch,
     tracker: Arc<RootAnchorTracker>,
+) -> DiceTransaction {
+    root_query_transaction_with_roots(dice, epoch, tracker, vec![root_query_workspace()]).await
+}
+
+async fn root_query_transaction_with_roots(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+    tracker: Arc<RootAnchorTracker>,
+    package_roots: Vec<NormalizedAbsolutePath>,
+) -> DiceTransaction {
+    root_query_transaction_with_policy(dice, epoch, tracker, package_roots, &[]).await
+}
+
+async fn root_query_transaction_with_policy(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+    tracker: Arc<RootAnchorTracker>,
+    package_roots: Vec<NormalizedAbsolutePath>,
+    deleted_packages: &[&str],
 ) -> DiceTransaction {
     let user_data = UserComputationData {
         cycle_detector: Some(bzl_load_cycle_detector()),
@@ -3697,8 +3809,8 @@ async fn root_query_transaction(
         &mut updater,
         RootPackagePolicyInputs::new(
             root_query_workspace(),
-            [root_query_workspace()],
-            std::iter::empty::<&str>(),
+            package_roots,
+            deleted_packages,
             None,
             Some("warning"),
         )
@@ -3877,6 +3989,48 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         loadfiles.as_ref().as_ref().unwrap().labels.as_ref(),
         ["//rules:defs.bzl"]
     );
+    let buildfiles_key = root_query_key("buildfiles(//first:t)");
+    let QueryPreparationOutcome::Complete(buildfiles) =
+        complete.compute(&buildfiles_key).await.unwrap()
+    else {
+        panic!("buildfiles returned Need")
+    };
+    assert_eq!(
+        buildfiles.as_ref().as_ref().unwrap().labels.as_ref(),
+        [
+            "//first:BUILD.bazel",
+            "//rules:BUILD.bazel",
+            "//rules:defs.bzl"
+        ]
+    );
+
+    let mut broken_companion_epoch = RootQueryEpochBuilder::base(21);
+    broken_companion_epoch.rules("filegroup", 21);
+    broken_companion_epoch.file(
+        "/workspace/rules/BUILD.bazel",
+        "this is not valid BUILD syntax (",
+        21,
+    );
+    broken_companion_epoch.package(
+        "first",
+        "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
+        21,
+    );
+    let mut broken_companion =
+        root_query_transaction(&dice, broken_companion_epoch.build(), tracker.clone()).await;
+    let QueryPreparationOutcome::Complete(broken_companion) =
+        broken_companion.compute(&buildfiles_key).await.unwrap()
+    else {
+        panic!("broken companion BUILD returned Need")
+    };
+    assert_eq!(
+        broken_companion.as_ref().as_ref().unwrap().labels.as_ref(),
+        [
+            "//first:BUILD.bazel",
+            "//rules:BUILD.bazel",
+            "//rules:defs.bzl"
+        ]
+    );
 
     let kind_key = RootQueryCommandKey::new(
         root_query_workspace(),
@@ -3895,7 +4049,7 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
     );
 
     let mut edited_epoch = RootQueryEpochBuilder::base(3);
-    edited_epoch.rules("test_suite", 3);
+    edited_epoch.rules_with_marker("test_suite", "BUILD", PathNodeKind::RegularFile, 3);
     edited_epoch.package(
         "first",
         "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
@@ -3909,18 +4063,72 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         v2.as_ref().as_ref().unwrap().label_kind_stdout(),
         "test_suite rule //first:t\n"
     );
+    let QueryPreparationOutcome::Complete(fallback) =
+        edited.compute(&buildfiles_key).await.unwrap()
+    else {
+        panic!("fallback companion returned Need")
+    };
+    assert_eq!(
+        fallback.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//first:BUILD.bazel", "//rules:BUILD", "//rules:defs.bzl"]
+    );
+
+    let mut special_epoch = RootQueryEpochBuilder::base(31);
+    special_epoch.rules_with_marker("filegroup", "BUILD.bazel", PathNodeKind::SpecialFile, 31);
+    special_epoch.package(
+        "first",
+        "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
+        31,
+    );
+    let mut special = root_query_transaction(&dice, special_epoch.build(), tracker.clone()).await;
+    let QueryPreparationOutcome::Complete(special) =
+        special.compute(&buildfiles_key).await.unwrap()
+    else {
+        panic!("special-file companion returned Need")
+    };
+    assert_eq!(
+        special.as_ref().as_ref().unwrap().labels.as_ref(),
+        [
+            "//first:BUILD.bazel",
+            "//rules:BUILD.bazel",
+            "//rules:defs.bzl"
+        ]
+    );
+
+    let mut symlink_epoch = RootQueryEpochBuilder::base(32);
+    symlink_epoch.symlink_rules(32);
+    symlink_epoch.package(
+        "first",
+        "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
+        32,
+    );
+    let mut symlink = root_query_transaction(&dice, symlink_epoch.build(), tracker.clone()).await;
+    let QueryPreparationOutcome::Complete(symlink) =
+        symlink.compute(&buildfiles_key).await.unwrap()
+    else {
+        panic!("symlink companion returned Need")
+    };
+    assert_eq!(
+        symlink.as_ref().as_ref().unwrap().labels.as_ref(),
+        [
+            "//first:BUILD.bazel",
+            "//rules:BUILD.bazel",
+            "//rules:defs.bzl"
+        ]
+    );
 
     let mut deleted_epoch = RootQueryEpochBuilder::base(4);
-    deleted_epoch.deleted_rules(4);
+    deleted_epoch.rules_without_marker(4);
     deleted_epoch.package(
         "first",
         "load(\"//rules:defs.bzl\", \"make\")\nmake(name = \"t\")\n",
         4,
     );
     let mut deleted = root_query_transaction(&dice, deleted_epoch.build(), tracker.clone()).await;
-    let QueryPreparationOutcome::Complete(deleted) = deleted.compute(&kind_key).await.unwrap()
+    let QueryPreparationOutcome::Complete(deleted) =
+        deleted.compute(&buildfiles_key).await.unwrap()
     else {
-        panic!("delete returned Need")
+        panic!("missing companion marker returned Need")
     };
     assert!(deleted.as_ref().is_err());
 
@@ -3932,12 +4140,315 @@ async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control(
         5,
     );
     let mut restored = root_query_transaction(&dice, restored_epoch.build(), tracker).await;
-    let QueryPreparationOutcome::Complete(restored) = restored.compute(&kind_key).await.unwrap()
+    let QueryPreparationOutcome::Complete(restored) =
+        restored.compute(&buildfiles_key).await.unwrap()
     else {
-        panic!("restore returned Need")
+        panic!("restored companion marker returned Need")
     };
     assert_eq!(
-        restored.as_ref().as_ref().unwrap().label_kind_stdout(),
-        "filegroup rule //first:t\n"
+        restored.as_ref().as_ref().unwrap().labels.as_ref(),
+        [
+            "//first:BUILD.bazel",
+            "//rules:BUILD.bazel",
+            "//rules:defs.bzl"
+        ]
+    );
+}
+
+fn multi_root_epoch(variant: i64) -> RootQueryEpochBuilder {
+    let mut epoch = RootQueryEpochBuilder::base(variant);
+    for root in ["/root-a", "/root-b"] {
+        epoch.directory(root, variant);
+        epoch.missing(&format!("{root}/.bazelignore"));
+        epoch.missing(&format!("{root}/BUILD.bazel"));
+        epoch.missing(&format!("{root}/BUILD"));
+    }
+    epoch
+}
+
+#[tokio::test]
+async fn typed_recursive_query_unions_package_roots_and_replays_package_lifecycle() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let roots = || {
+        vec![
+            NormalizedAbsolutePath::new("/root-a").unwrap(),
+            NormalizedAbsolutePath::new("/root-b").unwrap(),
+        ]
+    };
+    let key = root_query_key("//...");
+
+    let need_epoch = multi_root_epoch(10);
+    let mut need =
+        root_query_transaction_with_roots(&dice, need_epoch.build(), tracker.clone(), roots())
+            .await;
+    let QueryPreparationOutcome::Need(needs) = need.compute(&key).await.unwrap() else {
+        panic!("missing root listings escaped as QueryError");
+    };
+    let paths = needs
+        .path_observations()
+        .unwrap()
+        .demands()
+        .iter()
+        .map(|demand| demand.path().as_path())
+        .collect::<Vec<_>>();
+    assert!(paths.contains(&Path::new("/root-a")), "{paths:?}");
+    assert!(paths.contains(&Path::new("/root-b")), "{paths:?}");
+
+    let complete_epoch = |variant: i64, alpha_name: &str, include_beta: bool| {
+        let mut epoch = multi_root_epoch(variant);
+        epoch.directory_entries("/root-a", &["shared", "alpha"]);
+        epoch.directory_entries("/root-b", &["beta", "shared"]);
+        epoch.package_at(
+            "/root-a",
+            "alpha",
+            "BUILD.bazel",
+            &format!("filegroup(name = \"{alpha_name}\")\n"),
+            variant,
+        );
+        epoch.missing("/root-b/alpha");
+        epoch.missing("/root-a/beta");
+        epoch.directory("/root-b/beta", variant);
+        epoch.directory_entries("/root-b/beta", &[]);
+        if include_beta {
+            epoch.file(
+                "/root-b/beta/BUILD.bazel",
+                "filegroup(name = \"t\")\n",
+                variant,
+            );
+        } else {
+            epoch.missing("/root-b/beta/BUILD.bazel");
+            epoch.missing("/root-b/beta/BUILD");
+        }
+        epoch.package_at(
+            "/root-a",
+            "shared",
+            "BUILD",
+            "filegroup(name = \"root_a\")\n",
+            variant,
+        );
+        epoch.missing("/root-a/shared/BUILD.bazel");
+        epoch.package_at(
+            "/root-b",
+            "shared",
+            "BUILD.bazel",
+            "filegroup(name = \"root_b\")\n",
+            variant,
+        );
+        epoch
+    };
+
+    let mut complete = root_query_transaction_with_roots(
+        &dice,
+        complete_epoch(11, "t", true).build(),
+        tracker.clone(),
+        roots(),
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(result) = complete.compute(&key).await.unwrap() else {
+        panic!("complete recursive query returned Need");
+    };
+    assert_eq!(
+        result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//alpha:t", "//beta:t", "//shared:root_a"]
+    );
+    assert_eq!(tracker.legacy_subtrees.load(Ordering::Relaxed), 0);
+
+    let mut policy_deleted = root_query_transaction_with_policy(
+        &dice,
+        complete_epoch(111, "t", true).build(),
+        tracker.clone(),
+        roots(),
+        &["//beta"],
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(policy_deleted) =
+        policy_deleted.compute(&key).await.unwrap()
+    else {
+        panic!("deleted-package policy returned Need");
+    };
+    assert_eq!(
+        policy_deleted.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//alpha:t", "//shared:root_a"]
+    );
+
+    let mut ignored_epoch = complete_epoch(112, "t", true);
+    ignored_epoch.file("/root-a/.bazelignore", "beta\n", 112);
+    let mut ignored =
+        root_query_transaction_with_roots(&dice, ignored_epoch.build(), tracker.clone(), roots())
+            .await;
+    let QueryPreparationOutcome::Complete(ignored) = ignored.compute(&key).await.unwrap() else {
+        panic!("ignored-package transition returned Need");
+    };
+    assert_eq!(
+        ignored.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//alpha:t", "//shared:root_a"]
+    );
+
+    let mut edited = root_query_transaction_with_roots(
+        &dice,
+        complete_epoch(12, "edited", true).build(),
+        tracker.clone(),
+        roots(),
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(edited) = edited.compute(&key).await.unwrap() else {
+        panic!("recursive edit returned Need");
+    };
+    assert_eq!(
+        edited.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//alpha:edited", "//beta:t", "//shared:root_a"]
+    );
+
+    let mut deleted = root_query_transaction_with_roots(
+        &dice,
+        complete_epoch(13, "edited", false).build(),
+        tracker.clone(),
+        roots(),
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(deleted) = deleted.compute(&key).await.unwrap() else {
+        panic!("recursive deletion returned Need");
+    };
+    assert_eq!(
+        deleted.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//alpha:edited", "//shared:root_a"]
+    );
+
+    let mut restored = root_query_transaction_with_roots(
+        &dice,
+        complete_epoch(14, "t", true).build(),
+        tracker,
+        roots(),
+    )
+    .await;
+    let QueryPreparationOutcome::Complete(restored) = restored.compute(&key).await.unwrap() else {
+        panic!("recursive restore returned Need");
+    };
+    assert_eq!(
+        restored.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["//alpha:t", "//beta:t", "//shared:root_a"]
+    );
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn typed_recursive_query_preserves_non_utf8_directory_identity_until_a_marker_exists() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let key = root_query_key("//...");
+    let bad_name = OsString::from_vec(vec![b'b', b'a', b'd', 0xff]);
+    let roots = || {
+        vec![
+            NormalizedAbsolutePath::new("/root-a").unwrap(),
+            NormalizedAbsolutePath::new("/root-b").unwrap(),
+        ]
+    };
+    let demand = |path: PathBuf, operation| {
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            operation,
+        )
+    };
+    let epoch = |variant: i64, marker: bool| {
+        let mut epoch = multi_root_epoch(variant);
+        for root in ["/root-a", "/root-b"] {
+            epoch.entries.insert(
+                RootQueryEpochBuilder::demand(root, PathObservationOperation::DirectoryEntries),
+                PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+                    PathDirectoryEntries::new([PathDirectoryEntry::new(
+                        PathDirectoryName::new(bad_name.clone()).unwrap(),
+                        PathDirectoryEntryKind::Directory,
+                    )]),
+                )),
+            );
+            let bad_directory = PathBuf::from(root).join(&bad_name);
+            epoch.entries.insert(
+                demand(bad_directory.clone(), PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::Directory,
+                    variant,
+                    variant,
+                    variant,
+                    variant,
+                    0o755,
+                ))),
+            );
+            epoch.entries.insert(
+                demand(
+                    bad_directory.clone(),
+                    PathObservationOperation::DirectoryEntries,
+                ),
+                PathObservationResult::DirectoryEntries(PathOperationResult::Present(
+                    PathDirectoryEntries::new([]),
+                )),
+            );
+            for basename in ["BUILD.bazel", "BUILD"] {
+                epoch.entries.insert(
+                    demand(
+                        bad_directory.join(basename),
+                        PathObservationOperation::Lstat,
+                    ),
+                    PathObservationResult::Lstat(PathOperationResult::Missing),
+                );
+            }
+        }
+        if marker {
+            let root_a_build = PathBuf::from("/root-a").join(&bad_name).join("BUILD");
+            epoch.entries.insert(
+                demand(root_a_build, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::RegularFile,
+                    variant,
+                    variant,
+                    variant,
+                    variant,
+                    0o644,
+                ))),
+            );
+            let later_root_b_primary = PathBuf::from("/root-b").join(&bad_name).join("BUILD.bazel");
+            epoch.entries.insert(
+                demand(later_root_b_primary, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Error(
+                    PathObservationError::Io {
+                        kind: PathIoErrorKind::PermissionDenied,
+                        raw_os_error: Some(13),
+                    },
+                )),
+            );
+        }
+        epoch.build()
+    };
+
+    let mut without_marker =
+        root_query_transaction_with_roots(&dice, epoch(20, false), tracker.clone(), roots()).await;
+    let QueryPreparationOutcome::Complete(without_marker) =
+        without_marker.compute(&key).await.unwrap()
+    else {
+        panic!("non-UTF8 non-package returned Need");
+    };
+    assert!(
+        without_marker
+            .as_ref()
+            .as_ref()
+            .unwrap_err()
+            .message
+            .contains("no targets found")
+    );
+
+    let mut with_marker =
+        root_query_transaction_with_roots(&dice, epoch(21, true), tracker, roots()).await;
+    let QueryPreparationOutcome::Complete(with_marker) = with_marker.compute(&key).await.unwrap()
+    else {
+        panic!("non-UTF8 package marker returned Need");
+    };
+    assert!(
+        with_marker
+            .as_ref()
+            .as_ref()
+            .unwrap_err()
+            .message
+            .contains("package path is not UTF-8")
     );
 }

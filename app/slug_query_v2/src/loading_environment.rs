@@ -17,6 +17,8 @@ use async_trait::async_trait;
 use compact_str::CompactString;
 use dice::DiceComputations;
 use dupe::Dupe;
+use slug_bzlmod_v2::HostRootPackageBoundaryKey;
+use slug_bzlmod_v2::HostRootPackageBoundaryKind;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetPattern;
@@ -28,6 +30,11 @@ use slug_loading_v2::TestRuleKind;
 use slug_loading_v2::discover_build_file_companion;
 use slug_loading_v2::keys::PackageLoadKey;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathOutcome;
+use slug_workspace_v2::ResolvedPathKey;
+use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -41,6 +48,7 @@ use crate::generic::TestTargetKind;
 use crate::graph::QueryError;
 use crate::graph::QueryLabel;
 use crate::graph::QueryNode;
+use crate::graph::RootSubtreePackageSetKey;
 use crate::graph::RootUnconfiguredPackageGraphKey;
 use crate::graph::SubtreePackageSetKey;
 use crate::graph::UnconfiguredPackageGraph;
@@ -350,14 +358,28 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         &mut self,
         prefix: &str,
     ) -> Result<TargetSet<QueryLabel>, QueryError> {
-        let packages = self
-            .ctx
-            .compute(&SubtreePackageSetKey {
-                workspace: self.workspace.clone(),
-                prefix: PathBuf::from(prefix),
-            })
-            .await
-            .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        let packages = if let Some(workspace) = self.root_workspace.clone() {
+            let prefix = PackagePath::parse(prefix).map_err(QueryError::evaluation)?;
+            match self
+                .ctx
+                .compute(&RootSubtreePackageSetKey::new(workspace, prefix))
+                .await
+                .expect("root subtree package-set DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => {
+                    return Err(self.preparation_restart(need));
+                }
+                LoadingPreparationOutcome::Complete(packages) => packages,
+            }
+        } else {
+            self.ctx
+                .compute(&SubtreePackageSetKey {
+                    workspace: self.workspace.clone(),
+                    prefix: PathBuf::from(prefix),
+                })
+                .await
+                .map_err(|error| QueryError::evaluation(error.to_string()))?
+        };
         let packages = packages.as_ref().as_ref().map_err(|error| error.clone())?;
         let mut result = TargetSet::default();
         let mut graphs = Vec::with_capacity(packages.packages.len());
@@ -379,6 +401,81 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             self.record_pattern_graph(&graph, &result);
         }
         Ok(result)
+    }
+
+    async fn root_build_file_companion(
+        &mut self,
+        package: &PackagePath,
+    ) -> Result<Option<QueryLabel>, QueryError> {
+        let workspace = self
+            .root_workspace
+            .clone()
+            .expect("root companion lookup requires root query mode");
+        let boundary = self
+            .ctx
+            .compute(&HostRootPackageBoundaryKey::new(workspace, package.clone()))
+            .await
+            .expect("Host package-boundary DICE invariant");
+        let selected_root = match boundary {
+            PathOutcome::Need(need) => {
+                return Err(self.preparation_restart(LoadingPreparationNeeds::path(need)));
+            }
+            PathOutcome::Complete(value) => match value.as_ref() {
+                Err(error) => return Err(QueryError::evaluation(error.to_string())),
+                Ok(boundary) if boundary.kind() != HostRootPackageBoundaryKind::Package => {
+                    return Ok(None);
+                }
+                Ok(boundary) => boundary
+                    .selected_package_root()
+                    .expect("Package boundary retains its selected root")
+                    .clone(),
+            },
+        };
+        let mut selected = None;
+        for basename in ["BUILD.bazel", "BUILD"] {
+            let marker = NormalizedAbsolutePath::new(
+                selected_root
+                    .as_path()
+                    .join(package.as_str())
+                    .join(basename),
+            )
+            .expect("selected BUILD marker remains absolute");
+            match self
+                .ctx
+                .compute(&ResolvedPathKey::new(
+                    PathObservationNamespace::Host,
+                    marker,
+                ))
+                .await
+                .expect("resolved BUILD marker DICE invariant")
+            {
+                PathOutcome::Need(need) => {
+                    return Err(self.preparation_restart(LoadingPreparationNeeds::path(need)));
+                }
+                PathOutcome::Complete(Err(error)) => {
+                    return Err(QueryError::evaluation(format!("{error:?}")));
+                }
+                PathOutcome::Complete(Ok(resolved))
+                    if matches!(
+                        resolved.state(),
+                        ResolvedPathState::Present(lstat)
+                            if matches!(
+                                lstat.kind(),
+                                PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                            )
+                    ) =>
+                {
+                    selected = Some(basename);
+                    break;
+                }
+                PathOutcome::Complete(Ok(_)) => {}
+            }
+        }
+        let basename = selected.expect("Package boundary selected one BUILD marker");
+        Ok(Some(QueryLabel::from_canonical(
+            CanonicalLabel::parse(&format!("@@//{}:{basename}", package.as_str()))
+                .expect("typed package and BUILD basename form a canonical label"),
+        )))
     }
 
     fn real_delivery(
@@ -762,14 +859,18 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                         delivered.push(QueryCandidate::fake(label.clone(), owner.clone()));
                     }
                     if include_buildfiles {
-                        let load_package =
-                            self.workspace.join(load.label.package().package().as_str());
-                        let companion =
+                        let companion = if self.root_workspace.is_some() {
+                            self.root_build_file_companion(load.label.package().package())
+                                .await?
+                        } else {
+                            let load_package =
+                                self.workspace.join(load.label.package().package().as_str());
                             discover_build_file_companion(self.ctx, &self.workspace, &load_package)
                                 .await
-                                .map_err(|error| QueryError::evaluation(error.to_string()))?;
-                        if let Some(companion) = companion {
-                            let label = QueryLabel::from_canonical(companion.label);
+                                .map_err(|error| QueryError::evaluation(error.to_string()))?
+                                .map(|companion| QueryLabel::from_canonical(companion.label))
+                        };
+                        if let Some(label) = companion {
                             if seen_output_labels.insert(label.clone()) {
                                 delivered.push(QueryCandidate::fake(label, owner.clone()));
                             }
