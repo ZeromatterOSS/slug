@@ -12931,3 +12931,139 @@ pass.
 
 Next design only `WP-5-m1-query-typed-command-root-design`, prioritizing the
 smallest observable query path without runtime activation or Host migration.
+
+### Typed query command-root design
+
+Status: **ACCEPT** for `WP-5-m1-query-typed-command-root-design` on 2026-07-27
+after one reserved-boundary review and focused correction rereview. The
+correction keeps typed Needs in the private root environment and uses only an
+inert sentinel to unwind the fixed `QueryError` call chain.
+
+The live query facade is an async function over a caller-owned
+`DiceComputations`, raw `PathBuf` workspace, query text, order, policy, and
+output completion. It computes legacy `UnconfiguredPackageGraphKey`,
+`PackageLoadKey`, and `SubtreePackageSetKey` values and returns only
+`Result<QueryOutput, QueryError>`. An in-place replacement would activate
+unprepared core/CLI/server callers and would either erase Host preparation
+Needs or change the public evaluator contract.
+
+Add one parallel dormant public `RootQueryCommandKey`. Its private identity is:
+
+- normalized `NormalizedAbsolutePath` workspace;
+- exact compact query source text;
+- `QueryOrder`;
+- `QueryPolicy`; and
+- `QueryOutputCompletion`.
+
+Its public constructor validates parsing and the supported loading-query
+function set before returning the key, so invalid syntax/function requests
+remain preflight work that can later run before a command attempt. Derive the
+missing hash/retained-data traits only on the existing policy/completion value
+types; do not add a second option representation. The key value is exactly
+`QueryPreparationOutcome<Arc<Result<QueryOutput, QueryError>>>`, where
+`QueryPreparationOutcome` and `QueryPreparationNeeds` are public query aliases
+of the loading-owned preparation envelope.
+
+Every valid root query first computes
+`slug_bzlmod_v2::RootModuleLoadingAnchorKey` with the same normalized
+workspace. Its Need passes through unchanged; its Complete error becomes the
+existing package-loading-shaped `QueryError`; its Complete success permits
+evaluation. This is the always-present DICE dependency that gives `set()` and
+other valid empty-result queries a nonempty exact closure without inventing a
+root BUILD package or eagerly loading the workspace. Query owns this
+command-level anchor directly, so move `slug_bzlmod_v2` and
+`slug_workspace_v2` from development-only to production dependencies rather
+than reexporting a command concern through loading.
+
+Keep every existing legacy key, facade, caller, identity, value, diagnostic,
+ordering rule, and validity/equality rule unchanged. Add one private
+root-package-graph key over normalized workspace plus `PackagePath`; its value
+is the preparation envelope around the existing immutable graph result. Share
+only a pure post-loading projection from `LoadedPackage` between the legacy
+and root graph keys. The root graph computes `RootPackageLoadKey`; Need passes
+through and a Complete loading error retains the existing query diagnostic
+shape. It has Complete-only structural equality/validity and no public export.
+
+Give `LoadingQueryEnvironment` a private legacy/root mode. Legacy construction
+and all current public evaluator functions remain unchanged. Root mode:
+
+- computes the private root-package-graph key for ordinary package graph
+  access;
+- computes `RootPackageLoadKey` for the direct package load used by
+  `buildfiles()`/`loadfiles()`; and
+- retains the existing `SubtreePackageSetKey` and build-companion discovery
+  paths until the separate query Host-migration packet.
+
+The last bullet is an explicit dormant-boundary limitation, not an activation
+claim: recursive directory discovery and companion lookup still depend on
+eager workspace projections and are forbidden by the later preactivation
+scan.
+
+The generic evaluator and traversal surface is fixed to `QueryError`, whose
+public `message` and `exit_code` fields cannot themselves hold typed control
+state without changing compatibility. Root-mode `LoadingQueryEnvironment`
+therefore owns a private `Option<QueryPreparationNeeds>` side channel. On a
+reached Need it unions the typed value into that slot with `try_union` and
+returns one private `QueryErrorKind::PreparationRestart` sentinel solely to
+unwind the fixed generic call chain.
+
+The sentinel's mandatory public fields use reserved inert values: empty
+message and `i32::MIN` exit code. Those fields encode no Need and are never a
+semantic result. Only root-mode package access may create the sentinel;
+message rewriting and context-classification helpers must recognize it and
+pass it through unchanged without formatting. The private root evaluator must
+match the sentinel, take the typed side-channel value, and immediately return
+`QueryPreparationOutcome::Need`. A missing side-channel value, a semantic
+error accompanied by one, or a sentinel reaching a Complete/public/legacy
+result is an infrastructure invariant failure. Legacy construction cannot
+create the sentinel. Thus the typed Need is never stored, formatted, or
+exposed as `QueryError`; the sentinel is only an internal unwind token required
+by the frozen generic signature. All existing semantic `QueryError` fields,
+constructors, display, exit codes, and behavior remain unchanged.
+
+The evaluator remains sequential and lazy. A Need unwinds at the first DICE
+dependency actually reached; it must not evaluate a later union operand,
+literal, function branch, recursive package, or completion lookup merely to
+seek more work. A reached root package key already returns the deterministic
+union of its internal independent Needs. If a future query operation joins
+multiple already-reached DICE branches, it must union all of those Needs in
+stable input order before selecting an error; this packet adds no such join.
+Root-key equality is structural across the entire Complete result and
+self-unequal for Need; validity accepts only Complete. The command root emits
+no local event batch, while its exact dependency closure retains anchor and
+loading events.
+
+Implement next only `WP-5-m1-query-typed-command-root` in:
+
+- `app/slug_query_v2/Cargo.toml`;
+- `app/slug_query_v2/src/graph.rs`;
+- `app/slug_query_v2/src/loading_environment.rs`;
+- `app/slug_query_v2/src/generic.rs` only if required to pass the private
+  carrier without rewriting it;
+- `app/slug_query_v2/src/evaluator.rs`;
+- `app/slug_query_v2/src/lib.rs`;
+- `app/slug_query_v2/tests/loading_query.rs`; and
+- `app/slug_query_v2/tests/query.rs`.
+
+Focused regressions must prove public constructor identity and preflight
+rejection, root-anchor Need/Complete behavior for `set()`, nonempty anchor
+activation for its empty output, package Need rather than Complete
+`QueryError`, private-carrier non-escape, lazy later-operand suppression,
+existing Auto/Full result order, Complete equality/Need invalidity, and one
+same-DICE BUILD/`.bzl` edit-delete-restore transition. Reuse existing query
+fixtures and the accepted loading lifecycle evidence; add no fixture or
+oracle.
+
+Run the focused root-query regressions and full `slug_query_v2` because the
+environment/error control boundary changes, direct `slug_core_v2` compile
+coverage, query/core GNU-Windows no-run linkage, formatting, diff/archive
+status, and exact allowlist/export/no-caller/Cargo/dependency/legacy-identity/
+carrier-escape/IO/blocking/JVM guards.
+
+Add no existing-key replacement, analysis dependency, core/CLI/server caller,
+runtime activation, external-repository breadth, recursive Host migration,
+new output format or query function, eager query preloading, evaluator
+concurrency, event owner, fixture/oracle, JVM, Java bytecode, or Bazel
+delegation. Stop if implementation requires changing the public legacy
+facade, exposing the carrier, adding `traversal.rs` or another ninth file,
+forcing an otherwise-lazy branch, or representing Need as text.
