@@ -7033,3 +7033,33 @@ ignored run state is not evidence and no fixture change is accepted.
 Next evidence: Rerun only the complete corrected
 `WP-5-m1-host-registry-function-oracle` implementation from the clean
 four-path baseline.
+
+###### Host RegistryFunction oracle implementation status
+
+**Status:** Accepted after terminal latest-diff review on 2026-07-26.
+
+The corrected exact four-path implementation passed one pinned Bazel 9.2
+generation and two distinct fresh-root replays for both fixtures. The yanked
+fixture now has nine commands and proves cold-cache Off recorded absence
+`1,1,1,1`→`1,2,2,1`, selected-yanked reuse, checksum precedence, digest
+restoration, and Refresh refetch. The transport fixture now has twelve
+commands and proves exact default, per-registry/later-wins, empty, and
+exit-2 unknown-registry mirror projections with the explicit BCR empty
+override and comma-inclusive formatter boundary.
+
+The fixtures contain 29 regular files, zero links, and 1,659 lines, a
+507-line increase within the accepted 648-line growth and 1,800-line final
+caps. The exact four-path diff, schema/list, ten packet-validator checks,
+source anchors, archive status, credential scan, and `git diff --check`
+passed. All six generated/replayed fixture runs passed, all Bazel servers
+were shut down, and source/parity, implementation/evidence, plus
+architecture/orchestration terminal reviews returned `ACCEPT`. Host `pytest`
+is unavailable, so the Python test module was not imported; its executable
+schema and packet validators passed directly. No Rust, Cargo, dependency,
+API, consumer, or activation changed, and packet three does not trigger the
+fixture-growth checkpoint.
+
+Next packet: run only `WP-5-m1-host-registry-inputs-design`; it is
+design-only. Freeze small serial private owners for raw registry/mirror input
+normalization, a vendor-only package-policy projection, and a dedicated
+Refresh invalidation token before any Rust.

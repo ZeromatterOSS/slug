@@ -1,11 +1,11 @@
 [fixture]
 name = "registry-command-transport"
-description = "Bazel 9.2 registry option normalization and ordered fallback."
+description = "Bazel 9.2 registry option normalization, ordered fallback, and command-mirror RepoSpec projection."
 comparison = "message_shape"
 http_registry = true
 http_registry_port = 0
 manifest_roots = ["http_registry_request_counts.json"]
-oracle_notes = "Default resolution proves the BCR path with rules_shell@0.6.1. Lockfile-off option rows isolate registry command transport: yyy records a first A 404 then B success, missingprobe records normalized ordered diagnostics, and fatalprobe proves a fatal first registry stops before the B-served copy."
+oracle_notes = "Default resolution proves the BCR path with rules_shell@0.6.1. Lockfile-off option rows isolate registry command transport: yyy records a first A 404 then B success, missingprobe records normalized ordered diagnostics, and fatalprobe proves a fatal first registry stops before the B-served copy. Four show_repo rows pin ordered default mirrors, per-registry later-wins selection, explicit empty selection, and exit-2 unknown-registry rejection. Successful rows explicitly empty BCR command mirrors so embedded closure processing cannot leak the synthetic mirrors into stderr."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -16,8 +16,11 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFactoryImpl.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFunction.java",
   "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/modcommand/RepoOutputFormatter.java",
+  "src/main/protobuf/failure_details.proto",
 ]
-translation_notes = "The response log deliberately retains only bazel_registry.json and the fixture's three probe modules. The all-missing row, rather than retry counts, is the order/dedup assertion: Bazel's diagnostic lists normalized A then B exactly once. BCR is appended only where Bazel's embedded-module closure needs it."
+translation_notes = "The response log deliberately retains only bazel_registry.json and the fixture's three probe modules. The all-missing row, rather than retry counts, is the order/dedup assertion: Bazel's diagnostic lists normalized A then B exactly once. IndexRegistry supplies command-mirror-first transformed source URLs, RepoOutputFormatter prints the exact one-line urls attribute, and failure_details.proto supplies UNKNOWN_REGISTRY exit 2. Each successful show_repo row appends an explicit empty BCR mirror entry after its subject flags; this isolates embedded-module scaffolding while retaining the fixture-b default, later-wins, or explicit-empty selection. The registry-only HTTP logger is not archive-attempt evidence; stderr negatives cover only observed failed-download/host diagnostics and the configured mirror or exact yyy-original domains."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture registry-command-transport --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture registry-command-transport --tool bazel --bazel /usr/bin/bazel"
 
@@ -69,6 +72,33 @@ stdout_contains = ["yyy@1.0.0"]
   path = "MODULE.bazel"
   find = "bazel_dep(name = \"fatalprobe\", version = \"1.0.0\")"
   replace = "bazel_dep(name = \"yyy\", version = \"1.0.0\")"
+
+[[commands]]
+name = "show_repo_default_module_mirrors"
+argv = ["mod", "show_repo", "@@yyy+", "--lockfile_mode=off", "--registry={{http_registry}}/b", "--registry=https://bcr.bazel.build", "--module_mirrors=https://default-one.example/mirror,https://default-two.example/mirror", "--module_mirrors=https://bcr.bazel.build="]
+expected_exit = 0
+stdout_patterns = ['(?m)^  urls = \["https://default-one\.example/mirror/example\.invalid/yyy-1\.0\.0\.tar\.gz", "https://default-two\.example/mirror/example\.invalid/yyy-1\.0\.0\.tar\.gz", "https://example\.invalid/yyy-1\.0\.0\.tar\.gz"\],$']
+stderr_patterns = ['(?s)\A(?!.*WARNING: Download from)(?!.*Unknown host)(?!.*default-one\.example)(?!.*default-two\.example)(?!.*https://example\.invalid/yyy-1\.0\.0\.tar\.gz).*\Z']
+
+[[commands]]
+name = "show_repo_per_registry_last_wins"
+argv = ["mod", "show_repo", "@@yyy+", "--lockfile_mode=off", "--registry={{http_registry}}/b", "--registry=https://bcr.bazel.build", "--module_mirrors=https://default.example/mirror", "--module_mirrors={{http_registry}}/b=https://stale.example/mirror", "--module_mirrors={{http_registry}}/b=https://specific-one.example/mirror,https://specific-two.example/mirror", "--module_mirrors=https://bcr.bazel.build="]
+expected_exit = 0
+stdout_patterns = ['(?m)^  urls = \["https://specific-one\.example/mirror/example\.invalid/yyy-1\.0\.0\.tar\.gz", "https://specific-two\.example/mirror/example\.invalid/yyy-1\.0\.0\.tar\.gz", "https://example\.invalid/yyy-1\.0\.0\.tar\.gz"\],$']
+stderr_patterns = ['(?s)\A(?!.*WARNING: Download from)(?!.*Unknown host)(?!.*default\.example)(?!.*stale\.example)(?!.*specific-one\.example)(?!.*specific-two\.example)(?!.*https://example\.invalid/yyy-1\.0\.0\.tar\.gz).*\Z']
+
+[[commands]]
+name = "show_repo_explicit_empty_registry_override"
+argv = ["mod", "show_repo", "@@yyy+", "--lockfile_mode=off", "--registry={{http_registry}}/b", "--registry=https://bcr.bazel.build", "--module_mirrors=https://default.example/mirror", "--module_mirrors={{http_registry}}/b=", "--module_mirrors=https://bcr.bazel.build="]
+expected_exit = 0
+stdout_patterns = ['(?m)^  urls = \["https://example\.invalid/yyy-1\.0\.0\.tar\.gz"\],$']
+stderr_patterns = ['(?s)\A(?!.*WARNING: Download from)(?!.*Unknown host)(?!.*default\.example)(?!.*https://example\.invalid/yyy-1\.0\.0\.tar\.gz).*\Z']
+
+[[commands]]
+name = "module_mirrors_unknown_registry"
+argv = ["mod", "show_repo", "@@yyy+", "--lockfile_mode=off", "--registry={{http_registry}}/b", "--registry=https://bcr.bazel.build", "--module_mirrors=https://unknown.example=https://mirror.example"]
+expected_exit = 2
+stderr_contains = ["--module_mirrors references registries not listed in --registries: https://unknown.example"]
 
 [[commands]]
 name = "no_scheme"
