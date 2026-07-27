@@ -7405,3 +7405,142 @@ must factor Bazel-shaped expectation-aware remote and typed local executors
 inside `registry_dice.rs` while preserving every active legacy wrapper and
 legacy Off behavior byte-for-byte. Do not implement the Host registry-file
 owner or activate any Host consumer in that design packet.
+
+### Stage 5 Host Registry IO bridge design
+
+`WP-5-m1-host-registry-io-bridge-design` freezes exactly one implementation
+path:
+
+- `app/slug_bzlmod_v2/src/registry_dice.rs`
+
+The implementation may add at most 850 lines and delete at most 120. Inline
+tests remain under `#[cfg(test)]`. No second file, Cargo/dependency change,
+public item or reexport, production key, injector, activation, cache, lock,
+interner, Host registry-file owner, root/mapping/source-preparation/write
+owner, path observation, or direct filesystem IO enters this packet.
+
+Keep every public legacy type, function, signature, URL dispatch, error
+shape, and equality unchanged. `RegistryFileKey` retains its existing
+`RegistryPolicyKey` and redundant `RootModuleFilesKey` dependencies and their
+order. Legacy file-URL parsing stays before those dependencies. The shared
+capability layer begins only after the legacy wrapper has completed those
+steps.
+
+Factor a private closed execution plan with exactly these cases:
+
+```text
+FetchUnverified
+ReplayRecordedAbsent
+RejectUnrecorded
+VerifySha256([u8; 32])
+```
+
+Add only crate-private dormant Host entrypoints equivalent to:
+
+```text
+read_host_remote_registry_file(
+    ctx, workspace, url, RegistryKnownFileHashesMode, RegistryFileExpectation
+) -> Result<RegistryFileValue, typed bridge error>
+
+read_local_registry_file(
+    ctx, workspace, url, already-derived native path
+) -> Result<RegistryFileValue, typed bridge error>
+```
+
+The bridge error surface is closed and fully typed. It distinguishes remote
+mode/scheme mismatch, enforced missing checksum, missing request generation,
+missing IO capability, remote transport, checksum mismatch with expected and
+actual digests, and local read with URL/path/message. It retains compact
+strings and existing URL/path/hash types, derives full semantic equality and
+`Allocative`, exposes no string-erased Host error, and has no Need variant.
+Legacy adapters exhaustively preserve the existing public error projection;
+legacy-only invalid-lockfile-expectation handling stays outside the Host
+entrypoint.
+
+The Host remote matrix is exact:
+
+| hash mode | unrecorded | recorded absent | recorded SHA |
+| --- | --- | --- | --- |
+| `IGNORE` | typed remote-routing error | typed remote-routing error | typed remote-routing error |
+| `USE_AND_UPDATE` | fetch unverified | replay absence | verify SHA |
+| `USE_IMMUTABLE_AND_UPDATE` | fetch unverified | fetch unverified | verify SHA |
+| `ENFORCE` | typed missing-checksum error | replay absence | verify SHA |
+
+Pinned `RegistryFactoryImpl` makes `IGNORE` reachable only for file
+registries. Although a manually constructed `IndexRegistry` in Ignore mode
+would fetch without hashes, the Host HTTP(S) wrapper must reject Ignore
+before generation, capability, or IO. The later file owner routes file
+registries to the local entrypoint.
+
+Legacy Off does not pass through the Host mode/expectation adapter. It selects
+`FetchUnverified` directly before inspecting `VisibleLockfileRead`, preserving
+its existing behavior for ignored, absent, and SHA-bearing lockfiles
+byte-for-byte. Legacy Update, Refresh, Error, and every active caller/output
+remain unchanged.
+
+Execution order is exact:
+
+- `ReplayRecordedAbsent` and `RejectUnrecorded` acquire no generation or
+  capability and perform no IO.
+- `FetchUnverified` acquires `RegistryRequestGenerationKey` before capability
+  lookup and IO. Found returns bytes, actual SHA, and recordable
+  `RecordedSha256`; 404 returns `Io404` plus recordable `RecordedAbsent`;
+  transport remains typed. Every outcome retains the pre-IO generation edge.
+- `VerifySha256` acquires capability and performs IO first. Matching Found and
+  checksum mismatch acquire no generation. A 404 or transport failure
+  acquires generation only after IO; missing generation therefore masks that
+  outcome exactly as the current bridge does.
+- Local execution acquires capability and performs one `read_exact`. Found
+  returns bytes and actual SHA with no generation and no recordable remote
+  expectation. Local absence and read failure acquire generation after IO;
+  missing generation masks the outcome. Missing capability precedes both IO
+  and generation.
+
+Direct absent generation has no retained dependency and is a non-replayable
+preinjection invariant. Missing-input tests use fresh graphs or distinct test
+identities and never claim missing-to-present recovery. No new production
+semantic key or equality is added.
+
+Focused inline evidence must prove the complete four-by-three Host matrix,
+legacy Off translation, exact generation/capability/IO order, missing
+generation and capability precedence, exact values/sources/recordable
+expectations, expected/actual digest fields, local typed path/message fields,
+separately allocated equality, and retained retry/stickiness. Unverified
+remote outcomes retry on generation changes. Verified remote 404/transport
+and local absence/read failure retry after generation changes. Verified
+remote Found, checksum mismatch, and local Found remain sticky across
+generation and scripted response changes. Test-only direct-dependency
+tracking permits only `RegistryRequestGenerationKey`; global `RegistryIo` is
+a capability call, not a DICE dependency.
+
+Run the focused inline bridge tests, the unchanged twelve-test
+`tests/registry_dice.rs` legacy regression, registry-sensitive
+source-preparation tests, complete bzlmod/loading/core suites and doctests,
+and all corresponding GNU-Windows test executables serially. Then run
+formatting, diff, archive, exact one-file/growth, credential, public-API
+baseline, call-site, and forbidden-edge scans.
+
+Stop and replan on Host remote Ignore fetching; legacy Off routed through the
+Host adapter; any legacy output, diagnostic, dependency, URL-validation, or
+generation-order change; generation before verified/local Found or checksum
+mismatch; IO before generation for unverified fetch; generation before IO for
+verified/local 404 or error; direct filesystem/path Need; vendor or mirror
+claims; an erased Host error; Host file owner/consumer/activation; a public
+surface; a new production key/dependency/cache/map/set/lock/interner; a second
+file; or growth beyond the cap.
+
+#### Host Registry IO bridge design status
+
+**Status:** Accepted after terminal latest-text review on 2026-07-26.
+
+Pinned Bazel 9.2 source, the live legacy seam, and DICE architecture reviews
+agree on the closed plan, exact Host mode/expectation table, and generation
+ordering above. Review corrected the provisional `IGNORE` interpretation:
+the Host remote wrapper rejects this factory-impossible cell, while legacy
+Off selects the internal unverified plan directly. The one-file bridge is
+implementable without changing any active legacy wrapper, public surface,
+dependency, consumer, or activation. All three terminal design reviews
+returned `ACCEPT`; no Rust, Cargo, fixture, or production state changed.
+
+Next packet: implement only
+`WP-5-m1-host-registry-io-bridge` inside the exact one-file scope above.
