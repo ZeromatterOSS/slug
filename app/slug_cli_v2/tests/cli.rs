@@ -788,6 +788,90 @@ fn query_prints_text_labels_in_auto_and_full_order() {
 }
 
 #[test]
+fn typed_query_activation_publishes_cold_events_without_warm_daemon_replay() {
+    let workspace = scratch("typed-query-activation");
+    let package = workspace.join("pkg");
+    write(
+        workspace.join("MODULE.bazel"),
+        "print(\"MODULE_EVENT\")\nmodule(name = \"typed_query\")\n",
+    );
+    write(
+        package.join("defs.bzl"),
+        "print(\"BZL_EVENT\")\nNAME = \"probe\"\n",
+    );
+    write(
+        package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"NAME\")\nprint(\"BUILD_EVENT\")\nfilegroup(name = NAME)\n",
+    );
+    let workspace = workspace.canonicalize().unwrap();
+    let event_stderr = format!(
+        "DEBUG: {}:1:6: MODULE_EVENT\nDEBUG: {}:1:6: BZL_EVENT\nDEBUG: {}:2:6: BUILD_EVENT\n",
+        workspace.join("MODULE.bazel").display(),
+        package.join("defs.bzl").display(),
+        package.join("BUILD.bazel").display(),
+    );
+
+    let one_shot = slug()
+        .current_dir(&workspace)
+        .args(["query", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert!(one_shot.status.success(), "{one_shot:?}");
+    assert_eq!(one_shot.stdout, b"//pkg:probe\n");
+    assert_eq!(String::from_utf8(one_shot.stderr).unwrap(), event_stderr,);
+
+    let output_base = scratch("typed-query-activation-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    for index in 0..2 {
+        let daemon = slug()
+            .current_dir(&workspace)
+            .args(["query", &output_base_arg, "deps(//pkg:probe)"])
+            .output()
+            .unwrap();
+        assert!(daemon.status.success(), "{daemon:?}");
+        assert_eq!(daemon.stdout, b"//pkg:probe\n");
+        let stderr = String::from_utf8(daemon.stderr).unwrap();
+        if index == 0 {
+            assert_eq!(stderr, event_stderr);
+        } else {
+            assert!(stderr.is_empty(), "{stderr:?}");
+        }
+    }
+
+    let missing = slug()
+        .current_dir(&workspace)
+        .args(["query", "//pkg:missing"])
+        .output()
+        .unwrap();
+    assert_eq!(missing.status.code(), Some(7), "{missing:?}");
+    assert!(missing.stdout.is_empty());
+    let missing_stderr = String::from_utf8(missing.stderr).unwrap();
+    assert!(
+        missing_stderr.starts_with(&event_stderr),
+        "{missing_stderr:?}"
+    );
+    assert_eq!(
+        missing_stderr,
+        format!(
+            "{event_stderr}{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"no such target '//pkg:missing': target 'missing' not declared in package 'pkg'\",\"runtime_mode\":\"one-shot\"}}\n"
+        )
+    );
+
+    let syntax = slug()
+        .current_dir(&workspace)
+        .args(["query", "deps("])
+        .output()
+        .unwrap();
+    assert_eq!(syntax.status.code(), Some(2), "{syntax:?}");
+    assert!(syntax.stdout.is_empty());
+    let syntax_stderr = String::from_utf8(syntax.stderr).unwrap();
+    assert!(!syntax_stderr.contains("DEBUG:"), "{syntax_stderr:?}");
+    assert!(syntax_stderr.ends_with('\n'));
+    assert_eq!(syntax_stderr.lines().count(), 1, "{syntax_stderr:?}");
+}
+
+#[test]
 fn tests_query_expansion_fixture_matches_exact_twenty_seven_non_build_rows_one_shot() {
     let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace");

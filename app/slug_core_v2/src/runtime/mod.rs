@@ -35,7 +35,38 @@ pub use events::AcceptedCommand;
 pub use events::CommandOutput;
 pub use events::PublishedCommand;
 pub use events::TerminalOutput;
+pub use slug_query_v2::QueryError;
 pub use slug_query_v2::QueryOutputCompletion;
+
+/// One-shot typed query command. Source preparation observes only paths
+/// demanded by the retained command root.
+pub fn evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+    workspace: &std::path::Path,
+    expression: &str,
+    order: slug_query_v2::QueryOrder,
+    policy: slug_query_v2::QueryPolicy,
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+    completion: slug_query_v2::QueryOutputCompletion,
+) -> Result<
+    AcceptedCommand<std::sync::Arc<Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError>>>,
+    slug_query_v2::QueryError,
+> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
+        .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
+    runtime.query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+        expression,
+        order,
+        policy,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+        completion,
+    )
+}
 
 /// One-shot convenience that enters the identical retained-runtime query
 /// method used by the daemon.

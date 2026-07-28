@@ -21,6 +21,7 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::WorkspaceObservation;
 use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_core_v2::runtime::observe_workspace;
@@ -246,7 +247,17 @@ impl Daemon {
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
     ) -> QueryResult {
-        let (observations, invalidated) = match self.observations.observe(&self.workspace) {
+        let completion = match output_format {
+            "text" | "label" | "graph" | "package" => QueryOutputCompletion::Standard,
+            "label_kind" => QueryOutputCompletion::LabelKind,
+            other => {
+                return QueryResult::error(
+                    2,
+                    &format!("output format '{other}' is not supported by loading query"),
+                );
+            }
+        };
+        let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
                 return QueryResult::error(7, &error.to_string());
@@ -261,10 +272,9 @@ impl Daemon {
                 &registry_urls,
             ),
         );
-        match self
+        let accepted = match self
             .runtime
-            .query_observations_with_policy_and_bzlmod_inputs_and_output_completion(
-                observations,
+            .query_command_with_policy_and_bzlmod_inputs_and_output_completion(
                 expression,
                 order,
                 policy,
@@ -272,42 +282,36 @@ impl Daemon {
                 environment_policy,
                 lockfile_mode,
                 &registry_urls,
-                if output_format == "label_kind" {
-                    QueryOutputCompletion::LabelKind
-                } else {
-                    QueryOutputCompletion::Standard
-                },
+                completion,
             ) {
-            Ok(output) => {
-                let stdout = match output_format {
-                    "text" | "label" => output.stdout(),
-                    "graph" => output.graph_stdout(graph_factored, order.is_full()),
-                    "label_kind" => output.label_kind_stdout(),
-                    "package" => output.package_stdout(),
-                    other => {
-                        return QueryResult::error(
-                            2,
-                            &format!("output format '{other}' is not supported by loading query"),
-                        );
-                    }
-                };
-                QueryResult {
-                    exit_code: 0,
-                    stdout,
-                    stderr: String::new(),
-                    invalidated_files: invalidated,
+            Ok(accepted) => accepted,
+            Err(error) => return QueryResult::query_error(&error, invalidated),
+        };
+        let published = accepted
+            .project(|terminal| match terminal.as_ref() {
+                Ok(output) => {
+                    let stdout = match output_format {
+                        "text" | "label" => output.stdout(),
+                        "graph" => output.graph_stdout(graph_factored, order.is_full()),
+                        "label_kind" => output.label_kind_stdout(),
+                        "package" => output.package_stdout(),
+                        _ => unreachable!("output format was validated before evaluation"),
+                    };
+                    TerminalOutput::new(0, stdout, String::new())
                 }
-            }
-            Err(error) => QueryResult {
-                exit_code: error.exit_code,
-                stdout: String::new(),
-                stderr: format!(
-                    "{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{}}}",
-                    json_escape(&query_error_message(&error)),
-                    invalidated,
+                Err(error) => TerminalOutput::new(
+                    error.exit_code,
+                    String::new(),
+                    query_error_json(error, invalidated),
                 ),
-                invalidated_files: invalidated,
-            },
+            })
+            .publish();
+        let (_terminal, exit_code, stdout, stderr) = published.into_parts();
+        QueryResult {
+            exit_code,
+            stdout,
+            stderr,
+            invalidated_files: invalidated,
         }
     }
 
@@ -323,6 +327,13 @@ fn query_error_message(error: &slug_query_v2::QueryError) -> String {
         message.push_str("\nEvaluation of query");
     }
     message
+}
+
+fn query_error_json(error: &slug_query_v2::QueryError, invalidated_files: usize) -> String {
+    format!(
+        "{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
+        json_escape(&query_error_message(error)),
+    )
 }
 
 /// Result of a daemon build request.
@@ -364,10 +375,19 @@ impl QueryResult {
             exit_code,
             stdout: String::new(),
             stderr: format!(
-                "{{\"error\":\"query_runtime_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}",
+                "{{\"error\":\"query_runtime_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}\n",
                 json_escape(message),
             ),
             invalidated_files: 0,
+        }
+    }
+
+    fn query_error(error: &slug_query_v2::QueryError, invalidated_files: usize) -> Self {
+        Self {
+            exit_code: error.exit_code,
+            stdout: String::new(),
+            stderr: query_error_json(error, invalidated_files),
+            invalidated_files,
         }
     }
 }

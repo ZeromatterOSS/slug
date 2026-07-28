@@ -734,6 +734,80 @@ fn retained_daemon_query_observes_build_dependency_edits() {
 }
 
 #[test]
+fn retained_daemon_query_publishes_cold_events_without_warm_replay() {
+    let workspace = scratch("query-selected-events");
+    let package = workspace.join("pkg");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "print(\"MODULE_EVENT\")\nmodule(name = \"demo\")\n",
+    );
+    write(
+        &package.join("defs.bzl"),
+        "print(\"BZL_EVENT\")\nNAME = \"probe\"\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"NAME\")\nprint(\"BUILD_EVENT\")\nfilegroup(name = NAME)\n",
+    );
+    let workspace = workspace.canonicalize().unwrap();
+    let expected = format!(
+        "DEBUG: {}:1:6: MODULE_EVENT\nDEBUG: {}:1:6: BZL_EVENT\nDEBUG: {}:2:6: BUILD_EVENT\n",
+        workspace.join("MODULE.bazel").display(),
+        workspace.join("pkg/defs.bzl").display(),
+        workspace.join("pkg/BUILD.bazel").display(),
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    for index in 0..2 {
+        let result = daemon.query("deps(//pkg:probe)", QueryOrder::Auto);
+        assert_eq!(result.exit_code, 0, "{result:?}");
+        assert_eq!(result.stdout, "//pkg:probe\n");
+        if index == 0 {
+            assert_eq!(result.stderr, expected);
+        } else {
+            assert!(result.stderr.is_empty(), "{result:?}");
+        }
+        assert_eq!(result.invalidated_files, 0);
+    }
+
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"NAME\")\nprint(\"BUILD_CHANGED\")\nfilegroup(name = NAME)\n",
+    );
+    let changed = daemon.query("deps(//pkg:probe)", QueryOrder::Auto);
+    assert_eq!(changed.exit_code, 0, "{changed:?}");
+    assert_eq!(changed.stdout, "//pkg:probe\n");
+    assert_eq!(
+        changed.stderr,
+        format!(
+            "DEBUG: {}:2:6: BUILD_CHANGED\n",
+            workspace.join("pkg/BUILD.bazel").display()
+        )
+    );
+    assert_eq!(changed.invalidated_files, 1);
+
+    let warm_after_change = daemon.query("deps(//pkg:probe)", QueryOrder::Auto);
+    assert_eq!(warm_after_change.exit_code, 0, "{warm_after_change:?}");
+    assert!(warm_after_change.stderr.is_empty(), "{warm_after_change:?}");
+    assert_eq!(warm_after_change.invalidated_files, 0);
+}
+
+#[test]
+fn daemon_query_preflight_error_has_one_terminal_newline() {
+    let workspace = scratch("query-preflight-error");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let result = daemon.query_with_output("set()", QueryOrder::Auto, "unsupported", true);
+    assert_eq!(result.exit_code, 2, "{result:?}");
+    assert!(result.stdout.is_empty());
+    assert_eq!(
+        result.stderr,
+        "{\"error\":\"query_runtime_error\",\"command\":\"query\",\"message\":\"output format 'unsupported' is not supported by loading query\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}\n"
+    );
+    assert_eq!(result.stderr.lines().count(), 1);
+    assert_eq!(result.invalidated_files, 0);
+}
+
+#[test]
 fn retained_daemon_some_observes_candidate_create_rename_delete_recreate() {
     let workspace = scratch("some-candidate-transitions");
     let build = workspace.join("cand/BUILD.bazel");

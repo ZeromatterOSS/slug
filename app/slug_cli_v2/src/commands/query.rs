@@ -13,8 +13,10 @@ use slug_commands_v2::QueryOutputFormat;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::query::QueryRequest;
 use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::QueryError;
 use slug_core_v2::runtime::QueryOutputCompletion;
-use slug_core_v2::runtime::evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion;
+use slug_core_v2::runtime::TerminalOutput;
+use slug_core_v2::runtime::evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output_completion;
 
 pub fn run(argv: Vec<String>) -> i32 {
     let request = match QueryRequest::parse(&argv) {
@@ -48,38 +50,50 @@ pub fn run(argv: Vec<String>) -> i32 {
     } else {
         QueryOutputCompletion::Standard
     };
-    match evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_completion(
-        &workspace,
-        &request.expression,
-        request.order,
-        request.policy,
-        request.bzlmod_policy,
-        environment_policy,
-        request.lockfile_mode,
-        &request.registry_urls,
-        completion,
-    ) {
-        Ok(output) => {
-            let stdout = match request.output {
-                QueryOutputFormat::Text | QueryOutputFormat::Label => output.stdout(),
-                QueryOutputFormat::Graph => {
-                    output.graph_stdout(request.graph_factored, request.order.is_full())
-                }
-                QueryOutputFormat::LabelKind => output.label_kind_stdout(),
-                QueryOutputFormat::Package => output.package_stdout(),
-                _ => unreachable!("query parser rejects deferred output formats"),
-            };
-            print!("{stdout}");
-            0
-        }
-        Err(error) => {
-            let mut message = error.to_string();
-            if error.needs_evaluation_context() {
-                message.push_str("\nEvaluation of query");
+    let accepted =
+        match evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+            &workspace,
+            &request.expression,
+            request.order,
+            request.policy,
+            request.bzlmod_policy,
+            environment_policy,
+            request.lockfile_mode,
+            &request.registry_urls,
+            completion,
+        ) {
+            Ok(accepted) => accepted,
+            Err(error) => return emit_query_error(&error, "one-shot"),
+        };
+    let published = accepted
+        .project(|terminal| match terminal.as_ref() {
+            Ok(output) => {
+                let stdout = match request.output {
+                    QueryOutputFormat::Text | QueryOutputFormat::Label => output.stdout(),
+                    QueryOutputFormat::Graph => {
+                        output.graph_stdout(request.graph_factored, request.order.is_full())
+                    }
+                    QueryOutputFormat::LabelKind => output.label_kind_stdout(),
+                    QueryOutputFormat::Package => output.package_stdout(),
+                    _ => unreachable!("query parser rejects deferred output formats"),
+                };
+                TerminalOutput::new(0, stdout, String::new())
             }
-            emit_error(error.exit_code, &message, "one-shot")
-        }
+            Err(error) => TerminalOutput::new(
+                error.exit_code,
+                String::new(),
+                query_error_json(error, "one-shot"),
+            ),
+        })
+        .publish();
+    let (_terminal, exit_code, stdout, stderr) = published.into_parts();
+    if !stdout.is_empty() {
+        print!("{stdout}");
     }
+    if !stderr.is_empty() {
+        eprint!("{stderr}");
+    }
+    exit_code
 }
 
 fn run_daemon_query(
@@ -111,7 +125,7 @@ fn run_daemon_query(
                 print!("{}", response.stdout);
             }
             if !response.stderr.is_empty() {
-                eprintln!("{}", response.stderr);
+                eprint!("{}", response.stderr);
             }
             response.exit_code
         }
@@ -120,10 +134,27 @@ fn run_daemon_query(
 }
 
 fn emit_error(exit_code: i32, message: &str, runtime_mode: &str) -> i32 {
-    eprintln!(
-        "{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"{}\"}}",
+    eprint!("{}", query_error_json_message(message, runtime_mode));
+    exit_code
+}
+
+fn emit_query_error(error: &QueryError, runtime_mode: &str) -> i32 {
+    eprint!("{}", query_error_json(error, runtime_mode));
+    error.exit_code
+}
+
+fn query_error_json(error: &QueryError, runtime_mode: &str) -> String {
+    let mut message = error.to_string();
+    if error.needs_evaluation_context() {
+        message.push_str("\nEvaluation of query");
+    }
+    query_error_json_message(&message, runtime_mode)
+}
+
+fn query_error_json_message(message: &str, runtime_mode: &str) -> String {
+    format!(
+        "{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"{}\"}}\n",
         json_escape(message),
         runtime_mode,
-    );
-    exit_code
+    )
 }

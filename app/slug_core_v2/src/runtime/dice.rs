@@ -60,8 +60,10 @@ use slug_bzlmod_v2::RootModuleLoadingAnchorError;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
 use slug_bzlmod_v2::RootModuleRegistryUrlsKey;
+use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
@@ -84,6 +86,7 @@ use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryOutput;
 use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
+use slug_query_v2::RootQueryCommandKey;
 use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathObservationDemand;
@@ -503,6 +506,35 @@ enum NativeDemandSessionError {
     Restoration(anyhow::Error),
 }
 
+impl fmt::Display for NativeDemandSessionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Busy => f.write_str("another workspace command is already active"),
+            Self::LeaseTokenExhausted => f.write_str("workspace command lease tokens exhausted"),
+            Self::StaleLease => f.write_str("workspace command lease is stale"),
+            Self::Repository(_) => f.write_str("repository session failed"),
+            Self::ConflictingRepository(repository) => {
+                write!(f, "conflicting repository requests for {repository}")
+            }
+            Self::RepositoryInternalNonProgress => {
+                f.write_str("repository preparation made no progress")
+            }
+            Self::PathInternalNonProgress => f.write_str("path preparation made no progress"),
+            Self::MissingSelectedPath(_) => {
+                f.write_str("a selected path observation was not materialized")
+            }
+            Self::PathEpoch(error) => write!(f, "path observation epoch failed: {error}"),
+            Self::Effect(error) => write!(f, "command effect selection failed: {error}"),
+            Self::ForeignEffects => f.write_str("command effects belong to another command"),
+            Self::Computation(error) => write!(f, "command computation failed: {error}"),
+            Self::Injection(error) => write!(f, "command input injection failed: {error}"),
+            Self::Restoration(error) => write!(f, "command restoration failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for NativeDemandSessionError {}
+
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum NativeDemandProgress {
@@ -652,20 +684,28 @@ struct SyntheticEventKey {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-struct SyntheticCommandResult {
-    accepted: AcceptedCommand<Result<SyntheticCommandValue, SyntheticCommandError>>,
+struct DrivenCommand<T> {
+    accepted: AcceptedCommand<T>,
     attempts: usize,
     terminal_root_count: usize,
 }
 
 #[allow(dead_code)]
-enum SyntheticAttemptResult {
+enum CommandAttemptResult<T> {
     Retry(slug_bzlmod_v2::SourcePreparationNeeds),
-    Terminal(
-        Result<SyntheticCommandValue, SyntheticCommandError>,
-        NativeDemandPreparedAcceptance,
-        usize,
-    ),
+    Terminal(T, NativeDemandPreparedAcceptance, usize),
+}
+
+type SyntheticCommandResult = DrivenCommand<Result<SyntheticCommandValue, SyntheticCommandError>>;
+
+#[async_trait]
+trait NativeCommandRoot: Clone {
+    type Terminal: Clone;
+
+    async fn compute(
+        &self,
+        transaction: &mut dice::DiceTransaction,
+    ) -> Result<slug_bzlmod_v2::SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError>;
 }
 
 #[cfg(test)]
@@ -965,7 +1005,10 @@ macro_rules! impl_synthetic_root_key {
 impl_synthetic_root_key!(SyntheticBuildRootKey);
 impl_synthetic_root_key!(SyntheticQueryRootKey);
 
-impl SyntheticCommandRoot {
+#[async_trait]
+impl NativeCommandRoot for SyntheticCommandRoot {
+    type Terminal = Result<SyntheticCommandValue, SyntheticCommandError>;
+
     async fn compute(
         &self,
         transaction: &mut dice::DiceTransaction,
@@ -982,12 +1025,30 @@ impl SyntheticCommandRoot {
         }
         .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}")))
     }
+}
 
+impl SyntheticCommandRoot {
     fn plan(&self) -> &SyntheticCommandPlan {
         match self {
             Self::Build(key) => &key.plan,
             Self::Query(key) => &key.plan,
         }
+    }
+}
+
+#[async_trait]
+impl NativeCommandRoot for RootQueryCommandKey {
+    type Terminal = Arc<Result<QueryOutput, QueryError>>;
+
+    async fn compute(
+        &self,
+        transaction: &mut dice::DiceTransaction,
+    ) -> Result<slug_bzlmod_v2::SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError>
+    {
+        transaction
+            .compute(self)
+            .await
+            .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}")))
     }
 }
 
@@ -1858,11 +1919,14 @@ impl WorkspaceRuntime {
     }
 
     #[allow(dead_code)]
-    fn drive_synthetic_command(
+    fn drive_command<R>(
         &self,
         request: NativeDemandRequestInputBundle,
-        root: SyntheticCommandRoot,
-    ) -> Result<SyntheticCommandResult, NativeDemandSessionError> {
+        root: R,
+    ) -> Result<DrivenCommand<R::Terminal>, NativeDemandSessionError>
+    where
+        R: NativeCommandRoot,
+    {
         let preflight = self.begin_native_demand_command_with_inputs(request)?;
         let mut guard = NativeDemandAbortGuard::new(preflight.into_command());
         let mut attempts = 0usize;
@@ -1885,7 +1949,7 @@ impl WorkspaceRuntime {
                         drop(root_outcome);
                         drop(attempt_root);
                         drop(transaction);
-                        Ok(SyntheticAttemptResult::Retry(needs))
+                        Ok(CommandAttemptResult::Retry(needs))
                     }
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal) => {
                         let terminal = terminal.clone();
@@ -1900,7 +1964,7 @@ impl WorkspaceRuntime {
                         self.native_demand_sessions
                             .record_trace(NativeDemandTestTrace::TerminalTransactionDropped);
                         let prepared = prepared?;
-                        Ok(SyntheticAttemptResult::Terminal(
+                        Ok(CommandAttemptResult::Terminal(
                             terminal,
                             prepared,
                             terminal_root_count,
@@ -1918,14 +1982,14 @@ impl WorkspaceRuntime {
                 }
             };
             match attempt {
-                SyntheticAttemptResult::Retry(needs) => {
+                CommandAttemptResult::Retry(needs) => {
                     if let Err(error) = guard.progress(&needs) {
                         return guard.abort(error);
                     }
                 }
-                SyntheticAttemptResult::Terminal(terminal, prepared, terminal_root_count) => {
+                CommandAttemptResult::Terminal(terminal, prepared, terminal_root_count) => {
                     let accepted = guard.accept_prepared(prepared, terminal)?;
-                    return Ok(SyntheticCommandResult {
+                    return Ok(DrivenCommand {
                         accepted,
                         attempts,
                         terminal_root_count,
@@ -1933,6 +1997,15 @@ impl WorkspaceRuntime {
                 }
             }
         }
+    }
+
+    #[allow(dead_code)]
+    fn drive_synthetic_command(
+        &self,
+        request: NativeDemandRequestInputBundle,
+        root: SyntheticCommandRoot,
+    ) -> Result<SyntheticCommandResult, NativeDemandSessionError> {
+        self.drive_command(request, root)
     }
 
     fn inject_bzlmod_request_inputs(
@@ -1972,6 +2045,40 @@ impl WorkspaceRuntime {
                 ),
             )])
             .context("injecting repository materialization generation")
+    }
+
+    /// Evaluate one typed loading-query command through the retained native
+    /// demand, terminal-selection, and publication owner.
+    pub fn query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+        &self,
+        expression: &str,
+        order: QueryOrder,
+        policy: QueryPolicy,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        completion: QueryOutputCompletion,
+    ) -> Result<AcceptedCommand<Arc<Result<QueryOutput, QueryError>>>, QueryError> {
+        let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
+            .map_err(|error| QueryError::evaluation(error.to_string()))?;
+        let root = RootQueryCommandKey::new(
+            NormalizedAbsolutePath::new(self.workspace.clone())
+                .map_err(|error| QueryError::evaluation(error.to_string()))?,
+            expression,
+            order,
+            policy,
+            completion,
+        )?;
+        let request = NativeDemandRequestInputBundle {
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+        };
+        self.drive_command(request, root)
+            .map(|result| result.accepted)
+            .map_err(|error| QueryError::evaluation(format!("typed query command failed: {error}")))
     }
 
     /// Evaluate one loading query in this runtime's retained DICE graph.
@@ -3169,6 +3276,18 @@ fn inject_native_demand_snapshot(
         inputs.request.lockfile_mode.clone(),
     )
     .context("injecting fixed root module request inputs")?;
+    inject_root_package_policy_inputs(
+        updater,
+        RootPackagePolicyInputs::new(
+            workspace.clone(),
+            [workspace.clone()],
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .context("constructing fixed root package policy inputs")?,
+    )
+    .context("injecting fixed root package policy inputs")?;
     inject_registry_request_inputs(
         updater,
         &runtime.workspace,
@@ -3564,6 +3683,82 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    #[test]
+    fn real_query_command_drives_typed_results_and_cold_events_without_warm_replay() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "print(\"MODULE_EVENT\")\nmodule(name = \"driver\")\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        fs::write(
+            workspace.path().join("pkg/defs.bzl"),
+            "print(\"BZL_EVENT\")\nNAME = \"probe\"\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"NAME\")\nprint(\"BUILD_EVENT\")\nfilegroup(name = NAME)\n",
+        )
+        .unwrap();
+        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let query = |runtime: &WorkspaceRuntime, expression: &str| {
+            runtime.query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+                expression,
+                QueryOrder::Auto,
+                QueryPolicy::default(),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                QueryOutputCompletion::Standard,
+            )
+        };
+
+        let accepted = query(&runtime, "deps(//pkg:probe)").unwrap();
+        assert_eq!(
+            accepted
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "//pkg:probe\n"
+        );
+        assert_eq!(
+            accepted_output_text(&accepted),
+            ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT"]
+        );
+
+        let warm = query(&runtime, "deps(//pkg:probe)").unwrap();
+        assert!(warm.terminal_for_test().as_ref().is_ok());
+        assert!(accepted_output_text(&warm).is_empty());
+
+        let empty = query(&runtime, "set()").unwrap();
+        assert_eq!(
+            empty
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            ""
+        );
+
+        let missing_runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let missing = query(&missing_runtime, "//pkg:missing").unwrap();
+        let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "no such target '//pkg:missing': target 'missing' not declared in package 'pkg'"
+        );
+        assert_eq!(
+            accepted_output_text(&missing),
+            ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT"]
+        );
     }
 
     fn accepted_native_snapshot(runtime: &WorkspaceRuntime) -> AcceptedNativeDemandSnapshot {

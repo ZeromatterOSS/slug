@@ -13936,9 +13936,11 @@ Add the narrow retained-Starlark regression first. It must distinguish:
 Then prove exact source identities and locations at root MODULE, REPO,
 BUILD/`.bzl` loading, and analysis producers; structural location inequality;
 shared filename pointer identity across multiple prints from one codemap;
-shared `EventBatch::dupe` storage; cold capture; warm selected reuse without
-reevaluation or duplication; and absence when capture is disabled or the key
-is outside the terminal closure. A focused REPO test must also prove that the
+shared `EventBatch::dupe` storage; cold capture; unchanged warm reuse without
+reevaluation or event replay; and absence when capture is disabled or the key
+is outside the terminal closure. This matches the pinned Bazel 9.2
+`unchanged_warm_build_no_replay` and `unchanged_warm_query_no_replay` oracle
+rows. A focused REPO test must also prove that the
 capture-disabled direct path retains raw message output semantics and creates
 no source-aware event.
 
@@ -14170,8 +14172,9 @@ build-command, or execution file changes are permitted.
 Core evidence must run a real `RootQueryCommandKey` through the generalized
 driver and prove valid-empty plus direct-label success, typed missing-target
 error, retry progress, one accepted terminal, selected MODULE/`.bzl`/BUILD
-events once in dependency order, no retry-only event, and zero activation of
-every eager snapshot/legacy key from the preactivation gate. Existing
+events once in dependency order on cold or changed evaluation, no replay on an
+unchanged warm command, no retry-only event, and zero activation of every eager
+snapshot/legacy key from the preactivation gate. Existing
 synthetic cancellation, restoration, replacement, close, and publication
 tests remain green.
 
@@ -14218,3 +14221,42 @@ bytes, metric-only daemon observation, and the no-JVM/no-Bazel-delegation
 boundary.
 
 Implement next only `WP-5-m1-query-first-activation`.
+
+### Query-first atomic activation implementation
+
+Status: **ACCEPT** for `WP-5-m1-query-first-activation` on 2026-07-27 after
+one terminal independent implementation review and one focused correction.
+
+One-shot CLI and retained-daemon query now use the existing typed
+`RootQueryCommandKey` through the sole retained retry/accept/publication
+owner. The public command entry points return only the opaque
+`AcceptedCommand<Arc<Result<QueryOutput, QueryError>>>`; adapters consume it
+once through projection and publication. No activated query caller injects a
+legacy workspace snapshot. Daemon filesystem observation remains metric-only,
+and invalid output is rejected before observation or semantic evaluation.
+
+Focused evidence proves direct-label, dependency, valid-empty, typed
+missing-target, syntax, exact JSON newline, cold MODULE/`.bzl`/BUILD event
+order, exact changed-BUILD publication, and no unchanged warm replay. The
+retained create/edit/delete/recreate and invalidation-metric tests remain
+green. Synthetic retry, acceptance, restoration, and publication tests pass;
+quiet core/CLI/server/query/loading/analysis checks, formatting, diff, archive,
+scope, no-Cargo, activated-call, metric-only observation, and no-delegation
+guards pass. GNU-Windows no-run linkage passes for the changed core; CLI/server
+remain blocked by the pre-existing unguarded Unix-socket transport in
+`slug_server_v2/src/server.rs`.
+
+The independent review found one outer daemon preflight-error path without its
+terminal newline. The correction adds the newline, freezes exact unsupported
+output JSON, and strengthens changed-event/invalidation evidence; rereview
+returned `ACCEPT`.
+
+No build activation, execution, REAPI, JVM, Java-bytecode, or Bazel delegation
+was added. Simple loading-query operations are now on the typed production
+path.
+
+Design next only `WP-5-m1-build-activation-design`. Freeze an atomic
+typed-build CLI/server activation through the same accepted envelope and
+metric-only observation boundary. It may expose loading/analysis results only;
+it must not add action execution, REAPI, JVM, Java bytecode, or Bazel
+delegation.
