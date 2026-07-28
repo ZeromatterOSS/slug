@@ -14260,3 +14260,182 @@ typed-build CLI/server activation through the same accepted envelope and
 metric-only observation boundary. It may expose loading/analysis results only;
 it must not add action execution, REAPI, JVM, Java bytecode, or Bazel
 delegation.
+
+### Typed build atomic activation design
+
+Status: **ACCEPT** for `WP-5-m1-build-activation-design` on 2026-07-27 after
+one terminal independent design review.
+
+This packet is design-only. It adds no Rust and authorizes no new execution,
+action semantics, REAPI behavior, JVM, Java bytecode, or Bazel delegation.
+
+#### Live boundary and execution preservation
+
+`BuildCommandRootKey` already owns the complete Host loading/optional-analysis
+terminal as
+`SourcePreparationOutcome<Arc<Result<BuildCommandEvaluation,
+BuildCommandError>>>`. Its accepted preactivation tracker proves zero eager
+workspace snapshot or legacy loading/analysis activation. The query packet
+activated the sole generic retry, exact closure selection, acceptance, and
+consuming publication owner.
+
+The remaining three activated legacy build calls are the one-shot import/call
+to `evaluate_workspace_targets_with_bzlmod_inputs` and the daemon call to
+`evaluate_observations_with_bzlmod_inputs`. Both create complete workspace
+snapshots before semantic evaluation. Daemon observation also owns the public
+`invalidated_files` compatibility metric.
+
+Both adapters already support native REAPI execution after loading/analysis.
+That is retained behavior, not part of the typed DICE transaction. The new
+root stops at the accepted analysis terminal. Existing CLI and server REAPI
+helpers remain the sole downstream execution/materialization owners and run
+only from the terminal projector when `RemoteMode::Execute` was already
+selected. Do not add a DICE execution key, action mutation, executor,
+materializer, local fallback, JVM, or delegation path.
+
+#### Public typed command boundary
+
+Make `BuildCommandEvaluation` a public type with private fields. Replace the
+private error enum at the public boundary with an opaque public
+`BuildCommandError` wrapper around a private, equality-preserving kind; do not
+export its variants or underlying loading/analysis error types. The evaluation
+exposes only borrowed summary accessors:
+`loaded_package_count`, `analyzed_target_count`, `declared_action_count`, and
+an iterator over borrowed `AnalysisResult` values for the existing REAPI
+helpers. It exposes no anchor, requested-target storage, DICE identity,
+revision, event, demand, lease, or mutable action access. Give
+`BuildCommandError` stable `Display`/`Error` behavior matching the current
+adapter diagnostics for root-anchor, package, missing-target, analysis,
+external-repository, recursive-pattern, and infrastructure failures.
+
+Implement `NativeCommandRoot` only for the existing `BuildCommandRootKey`,
+using the retained
+`Arc<Result<BuildCommandEvaluation, BuildCommandError>>` terminal. Keep one
+fixed target configuration,
+`ConfigurationKey::target("first-build")`, matching the legacy adapter.
+Normalize the root key and registry URLs before lease acquisition. Map key
+preflight and retained-session failures once into the public build error; a
+semantic `Ok` or `Err` remains inside the accepted `Arc`.
+
+Add exactly these core entry points:
+
+```text
+WorkspaceRuntime::build_command_with_bzlmod_inputs(
+    &self,
+    targets,
+    command_policy,
+    environment_policy,
+    lockfile_mode,
+    registry_urls,
+) -> Result<
+    AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+    BuildCommandError,
+>
+
+evaluate_workspace_build_command_with_bzlmod_inputs(
+    workspace,
+    targets,
+    command_policy,
+    environment_policy,
+    lockfile_mode,
+    registry_urls,
+) -> Result<
+    AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+    BuildCommandError,
+>
+```
+
+The one-shot wrapper creates one retained runtime and performs no
+`observe_workspace` call. Keep legacy wrappers and legacy-only tests dormant
+until a later retirement packet, but remove every activated CLI/server caller.
+
+#### Adapter projection and exact streams
+
+Parse command and environment inputs as today. One-shot retains its current
+remote-configuration timing after semantic evaluation; daemon retains the
+already-parsed request value. Each adapter consumes the accepted envelope
+exactly once through `project(...).publish().into_parts()`.
+
+For non-execute mode, the projector computes the existing counts and exact
+`analysis_not_implemented` JSON from borrowed typed data. For execute mode, it
+passes the borrowed evaluation to the existing CLI/server REAPI helper and
+turns that helper's existing outcome into `TerminalOutput`; execution does not
+escape the projector or become a second output owner. Adapt the helpers only
+to consume borrowed typed analyses and return primitive outcome data. Do not
+clone the accepted terminal, analyses, or actions.
+
+Every terminal JSON stderr ends in exactly one `\n`. Selected source-aware
+events precede it. One-shot and daemon clients write published bytes with
+`eprint!`, not `eprintln!`. Preserve all current JSON fields, exit codes,
+runtime modes, invalidation counts, completed-boundary values, REAPI evidence,
+and materialized-output behavior. Outer parse/preflight/infrastructure errors
+use the same exact newline rule and have no selected-event prefix.
+
+Daemon still calls `FilesystemObservationAdapter::observe` before the typed
+command. Discard the observation value and retain only its failure behavior
+and invalidation count; no observation enters core or the selected closure.
+
+#### Exact implementation scope and evidence
+
+Production files:
+
+- `app/slug_core_v2/src/runtime/{dice.rs,mod.rs}`;
+- `app/slug_cli_v2/src/commands/build.rs`; and
+- `app/slug_server_v2/src/{lib.rs,reapi.rs}`.
+
+Focused tests may change only colocated core tests,
+`app/slug_cli_v2/tests/cli.rs`, and
+`app/slug_server_v2/src/tests.rs`. No event, query-language, loading,
+analysis, command-parser, protocol-schema, REAPI-crate, Cargo, or execution
+fixture file may change.
+
+Core evidence must drive the real build root through the shared retained
+driver and prove empty, package-wide, native direct, Starlark-analysis, and
+typed missing-target results; retry progress; one accepted terminal; exact
+cold and changed MODULE/`.bzl`/BUILD/analysis events; no unchanged warm or
+retry-only replay; and the accepted zero-forbidden-activation gate.
+
+One focused CLI test must compare one-shot and daemon native/Starlark/missing
+rows, source-aware success/error ordering, counts, completed boundary, exit
+code, and exact single newlines while allowing only runtime-mode and metric
+fields to differ. Focused daemon evidence must retain create/edit/delete/
+restore invalidation counts. Preserve the existing native REAPI result and
+materialization shape with a focused helper/integration regression; do not
+claim loading/analysis success as build success.
+
+Run focused core/CLI/server tests; quiet direct checks for core, CLI, server,
+loading, and analysis; available native REAPI evidence; core GNU-Windows
+no-run linkage; formatting, diff, archive, exact-file/no-Cargo guards; and:
+
+```text
+rg -n 'evaluate_workspace_targets_with_bzlmod_inputs|evaluate_observations_with_bzlmod_inputs' \
+  app/slug_cli_v2/src/commands/build.rs app/slug_server_v2/src/lib.rs
+
+rg -n 'evaluate_workspace_build_command_with_bzlmod_inputs|build_command_with_bzlmod_inputs' \
+  app/slug_cli_v2/src/commands/build.rs app/slug_server_v2/src/lib.rs
+
+rg -n 'observe_workspace|WorkspaceObservation' app/slug_server_v2/src/lib.rs
+
+rg -n 'slug_reapi|execute_action|materialize_outputs|RemoteMode' \
+  app/slug_core_v2/src/runtime/{dice.rs,mod.rs}
+```
+
+The first and fourth scans must be empty. The second identifies only the new
+one-shot and daemon calls. The third retains observation use only in the
+metric adapter/query chain. Full CLI/server GNU-Windows linkage remains
+separately blocked by the pre-existing Unix transport and is not evidence
+against this packet.
+
+Stop on a second retry/accept/publication or execution owner, eager snapshot
+injection, terminal/action clone, output after publication, changed REAPI
+semantics, event replay, metric/protocol ownership change, build success
+without execution, new action execution, JVM, Java bytecode, or Bazel
+delegation.
+
+The terminal review returned `ACCEPT`. It confirmed that the synchronous
+borrowed projector runs only after the retained driver's internal DICE
+transaction, can preserve the existing native REAPI helpers and action order,
+and returns primitive terminal output without exposing the accepted value or
+creating another output/execution owner.
+
+Implement next only `WP-5-m1-build-activation`.
