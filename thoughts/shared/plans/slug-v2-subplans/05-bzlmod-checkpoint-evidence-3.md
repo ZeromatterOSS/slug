@@ -14497,3 +14497,160 @@ the smallest observable typed-query vertical slice that resolves one external
 repository label through Bazel 9 repository mapping and the accepted native
 source-preparation/materialization owners. Do not broaden into build
 execution, general repository discovery, JVM, or Bazel delegation.
+
+### Direct external-repository query routing design
+
+Status: **ACCEPT AFTER CORRECTION** for
+`WP-5-m1-external-repository-query-routing-design` on 2026-07-27. The first
+independent review returned `REPLAN` because the proposed existing source key
+activated a legacy snapshot chain and because output and diagnostic rendering
+were not separated. The corrected independent rereview returned `ACCEPT`.
+
+This packet is design-only. It adds no Rust or fixture change and authorizes
+only one apparent, single-target query label backed by a direct root
+`bazel_dep` with a non-registry `local_path_override`.
+
+#### Bazel 9 observation and exact first gate
+
+A local Bazel 9.2.0 batch probe over the existing `module-local-override`
+workspace established:
+
+- `query @dep//:target.txt` exits 0 and writes exactly
+  `@dep//:target.txt\n`;
+- an unknown `@missing` exits 7 with normalized terminal diagnostic
+  `ERROR: no such package '@@[unknown repo 'missing' requested from @@]//': The repository '@@[unknown repo 'missing' requested from @@]' could not be resolved: No repository visible as '@missing' from main repository`;
+- `@dep//:missing` exits 7 with normalized terminal diagnostic
+  `ERROR: no such target '@@dep+//:missing': target 'missing' not declared in package '' defined by <output_base>/external/dep+/BUILD.bazel`; and
+- `@dep//nope:missing` exits 7 with normalized terminal diagnostic
+  `ERROR: no such package '@@dep+//nope': BUILD file not found in directory 'nope' of external repository @@dep+. Add a BUILD file to a directory to mark it as a package.`
+
+The implementation oracle adds only the successful query row to the existing
+local-only `module-local-override` fixture. Focused Rust tests pin the three
+negative shapes without growing the fixture. This slice does not claim
+external pattern, registry, repository-rule, extension, or transitive mapping
+support.
+
+#### Mapping and loading ownership
+
+Add a Host `RootRepositoryRouteKey` in `slug_bzlmod_v2::host_module`. Its
+identity is normalized workspace plus validated apparent repository. It
+projects the accepted `HostRootModuleFileKey` carrier into an opaque route
+containing apparent name, direct module name, canonical `<module>+` identity,
+and the exact Host-carried non-registry `RepoSpec`. It selects only a
+non-`nodep` dependency visible after existing command-policy evaluation and
+requires its matching `local_path_override`. Unknown apparent names produce
+the Bazel-shaped main-repository diagnostic above; registry and other route
+kinds fail as explicitly unsupported for this slice. It must not read
+`RootModuleGraphKey` or `RootModuleFilesKey`, re-evaluate MODULE files, infer
+a module by stripping `+`, or expose the root module carrier or repository
+spec outside `slug_bzlmod_v2`.
+
+Add `HostRepositorySourceFileKey` in
+`slug_bzlmod_v2::source_preparation`. Its identity is the complete route plus
+a checked repository-relative path. It constructs the exact
+`RepositoryMaterializationRequest` from the route's retained workspace,
+canonical repo, and `RepoSpec`, then reuses the existing private
+`RepositoryMaterializationResultKey` and repository path-observation
+projection. Refactor shared result/path projection rather than copying the
+materializer. Its Need contains the same exact request consumed by the
+retained native materialization session. It provides the same
+`RepositorySourceScope` metadata used by acceptance, while exposing no
+physical root, result epoch, generation, observation instance, or request.
+It must not compute `RepositoryMaterializationKey`,
+`RepositoryMaterializationRequestKey`, `RootModuleFilesKey`,
+`RootModuleEvaluationKey`, `WorkspaceFileKey`, or any workspace snapshot key.
+
+Add `RepositoryPackageLoadKey` in `slug_loading_v2::bzl_module`. Its identity
+is normalized workspace, the complete route identity, and `PackagePath`. It
+reads `BUILD.bazel`, then `BUILD`, only through the new
+`HostRepositorySourceFileKey`, so every materialization/path Need returns
+unchanged to the typed command retry driver.
+
+The loader evaluates only a load-free, glob-free BUILD with the existing
+loading globals and package recorder, captures its local print batch once,
+and returns the ordinary `LoadedPackage`. It uses a canonical logical
+`<output_base>/external/<canonical-repo>/...` diagnostic path without
+exposing or depending on the native generation root. It remaps
+package-context root labels to the route's canonical repository during query
+graph projection; the stored package representation and root loader remain
+unchanged. A `load()`, `glob()`, external attribute label, or edge that would
+require another repository/package route is an explicit unsupported error and
+stop gate, not a root-workspace fallback. Physical generation roots,
+observation instances, materialization epochs, and repository requests do not
+cross the loading boundary.
+
+#### Typed query and rendering
+
+For `TargetPattern::Single`, preserve the parsed `ApparentLabel`. Root labels
+keep the existing path. An external label computes `RootRepositoryRouteKey`,
+then an `ExternalUnconfiguredPackageGraphKey` keyed by the route and package.
+The graph contains canonical `@@dep+` identity but retains the selected
+apparent `@dep` spelling solely as render provenance. `QueryLabel` equality,
+hashing, ordering, traversal, lookup, graph keys, and diagnostics use only the
+canonical label. Add an explicit output-rendering projection used by
+`evaluate_parsed_query`; it emits the apparent spelling when present.
+`Display` and the missing-target/package paths remain canonical for nonroot
+labels. Render provenance is ignored by semantic equality and cannot create a
+second node.
+
+`RootQueryCommandKey` remains the sole semantic command owner. Its existing
+private preparation-restart sentinel unions and returns mapping,
+materialization, and path Needs to the one retained retry/accept/publication
+driver. CLI and daemon adapters, protocol, terminal projection, and
+source-event selection do not change. Cold evaluation publishes the selected
+root MODULE and external BUILD print events before the terminal response;
+an unchanged warm query publishes neither again. Output remains exactly one
+apparent label with one newline.
+
+#### Exact implementation scope and evidence
+
+Production changes are limited to:
+
+- `app/slug_bzlmod_v2/src/{host_module.rs,source_preparation.rs,lib.rs}`;
+- `app/slug_loading_v2/src/{bzl_module.rs,lib.rs}`; and
+- `app/slug_query_v2/src/{evaluator.rs,graph.rs,loading_environment.rs}`.
+
+Focused tests may change colocated bzlmod/loading/query tests,
+`app/slug_core_v2/src/runtime/dice.rs`,
+`app/slug_cli_v2/tests/cli.rs`, `app/slug_server_v2/src/tests.rs`, and only
+the `module-local-override` fixture TOML/expected JSON. No Cargo, protocol,
+command-parser, analysis, execution, REAPI, materializer, registry, extension,
+or other fixture file may change.
+
+Evidence must prove:
+
+1. route identity maps an apparent alias to the direct canonical module repo,
+   rejects unknown and `nodep` names, and invalidates on the root mapping;
+2. the Host source key emits the exact route-derived materialization request,
+   advances through materialization/path Needs, and never activates the legacy
+   root/snapshot chain;
+3. external BUILD fallback, no-BUILD, source error, load/glob rejection, and
+   materialization/path Need propagation at their owning layers;
+4. canonical graph uniqueness with apparent text output, canonical
+   diagnostics, and the exact normalized Bazel strings and exit codes above;
+5. one-shot and same-daemon cold, unchanged warm, BUILD edit, missing-create,
+   and delete-recreate behavior with exact output, event order, invalidation
+   counts, and no replay; and
+6. the existing fixture's Bazel 9.2.0 success row passes through the rebuilt
+   Slug binary.
+
+Run focused bzlmod/loading/query/core/CLI/server tests serially, quiet checks
+for those crates, GNU-Windows no-run linkage where the existing Unix transport
+permits, the focused Bazel and Slug oracle row, formatting, diff/archive,
+exact-file/no-Cargo guards, and scans proving no legacy snapshot,
+`RootModuleGraphKey`, `RootModuleFilesKey`, `RootModuleEvaluationKey`,
+`WorkspaceFileKey`, `WorkspaceSnapshotKey`, direct filesystem, JVM,
+Java-bytecode, or Bazel delegation entered the new path. An activation
+tracker must assert those keys remain absent on cold, retry, error, and warm
+external queries.
+
+Stop and replan on registry transport, repository rules/extensions,
+transitive mapping, canonical-label input, package-wide/recursive patterns,
+external `.bzl` loads, glob traversal, cross-package/repository edges, a
+second retry/publication owner, eager snapshot injection, physical-path
+leakage, or any new build/execution behavior.
+
+Implement next only `WP-5-m1-external-repository-query-routing` under the
+exact scope and evidence contract above. Do not substitute the existing
+legacy-backed `RepositorySourceFileKey` for the accepted Host route/source
+projection.

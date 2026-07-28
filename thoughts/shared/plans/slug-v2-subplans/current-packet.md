@@ -1,41 +1,47 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-external-repository-query-routing-design`
+Packet: `WP-5-m1-external-repository-query-routing`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted Host source-preparation/materialization owners, repository
-mapping foundations, typed query/build production activation, opaque
-publication, and source-aware command events
-Validation tier: design-only external repository command boundary
+Evidence: accepted corrected direct external-repository query routing design,
+Host source-preparation/materialization owners, typed query production
+activation, opaque publication, and source-aware command events
+Validation tier: public cross-crate DICE/daemon vertical plus one focused
+Bazel 9.2 oracle row
 
-Design areas:
+Implement only:
 
-- Bazel 9 apparent-to-canonical repository mapping and root-module graph
-  ownership in `slug_bzlmod_v2`;
-- external repository materialization and Host loading boundaries;
-- the active typed query root and retained retry/publication path; and
-- the smallest oracle/core/CLI/server evidence for one external query label.
+- `RootRepositoryRouteKey` over the accepted Host root-module carrier for one
+  direct non-nodep `bazel_dep` with `local_path_override`;
+- `HostRepositorySourceFileKey`, constructing the exact route-carried native
+  materialization request without any legacy root/snapshot key;
+- a load-free, glob-free external BUILD package key;
+- canonical query identity/diagnostics with separate apparent text rendering;
+  and
+- one apparent single-target query through the existing typed command,
+  one-shot/daemon publication, and retry path.
 
-Terminal scheduling updates may also change this manifest, the owner plan, and
-canonical Live Status.
+Production allowlist:
 
-Design the smallest observable external-repository query slice that:
+- `app/slug_bzlmod_v2/src/{host_module.rs,source_preparation.rs,lib.rs}`;
+- `app/slug_loading_v2/src/{bzl_module.rs,lib.rs}`; and
+- `app/slug_query_v2/src/{evaluator.rs,graph.rs,loading_environment.rs}`.
 
-1. resolves one apparent external label through the command's Bazel 9
-   repository mapping;
-2. prepares/materializes the repository through accepted native owners before
-   loading it;
-3. keeps the typed root as the sole semantic query owner in one-shot and
-   daemon modes; and
-4. publishes exact output/events without eager workspace snapshots or
-   delegation.
+Tests may change only the colocated bzlmod/loading/query tests, core runtime
+tests, CLI/server tests, and the existing `module-local-override` fixture
+TOML/expected JSON. Add no Cargo or protocol change.
 
-This packet is design-only. Inspect only the live mapping, materialization,
-typed-query, and relevant oracle seams. Freeze exact files, API/identity,
-retry/error/event behavior, focused evidence, and stop gates, then obtain one
-independent terminal review. Do not edit Rust or fixtures.
+Prove apparent `@dep//:target.txt` → canonical `@@dep+` lookup → apparent
+output; exact unknown/missing diagnostics; BUILD fallback and lifecycle;
+materialization/path Need progress; cold/changed event order; warm no-replay;
+one typed root and publication owner; and zero activation of
+`RepositoryMaterializationKey`, `RootModuleGraphKey`, `RootModuleFilesKey`,
+`RootModuleEvaluationKey`, legacy workspace file/snapshot keys, or direct
+filesystem owners.
 
-Add no Cargo change, build execution, new materializer, REAPI behavior, JVM,
-Java bytecode, or Bazel delegation. Stop if the slice would bypass repository
-mapping, fabricate `@bazel_tools`, mix legacy snapshots into the transaction,
-or require general discovery breadth beyond the first external query.
+Stop on registry transport, repository rules/extensions, transitive mapping,
+canonical-label input, external patterns, `.bzl` loads, glob traversal,
+cross-package/repository edges, eager snapshots, a second retry/publication
+owner, build/execution behavior, JVM, Java bytecode, or Bazel delegation.
+Finish with serial focused checks, the focused Bazel/Slug oracle row, scope
+guards, and one independent terminal implementation review.
