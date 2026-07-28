@@ -986,6 +986,23 @@ impl HostBzlModuleError {
             | Self::Freeze { .. } => None,
         }
     }
+
+    fn missing_label<'a>(
+        &'a self,
+        current_label: &'a HostRootBzlLabel,
+    ) -> Option<&'a HostRootBzlLabel> {
+        match self {
+            Self::Source(error) if error.is_missing() => Some(current_label),
+            Self::Child { label, error, .. } => error.missing_label(label),
+            Self::Source(_) => None,
+            Self::Input(_)
+            | Self::Parse { .. }
+            | Self::LoadLabel { .. }
+            | Self::Cycle(_)
+            | Self::Evaluation(_)
+            | Self::Freeze { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -1058,8 +1075,8 @@ impl fmt::Display for RootPackageLoadError {
             RootPackageLoadErrorInner::Bzl {
                 origin,
                 load,
+                label,
                 error,
-                ..
             } => {
                 if let Some(cycle) = error.cycle() {
                     let path = cycle
@@ -1073,6 +1090,8 @@ impl fmt::Display for RootPackageLoadError {
                         .map(|key| key.label.to_string())
                         .collect::<Vec<_>>();
                     f.write_str(&render_bzl_cycle(origin, &path, &keys))
+                } else if let Some(missing) = error.missing_label(label) {
+                    write!(f, "cannot load '{missing}': no such file")
                 } else {
                     write!(f, "loading `{load}`: {error}")
                 }

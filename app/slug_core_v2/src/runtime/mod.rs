@@ -18,6 +18,8 @@ mod repository_io;
 mod root_bootstrap;
 pub mod starlark;
 
+pub use dice::BuildCommandError;
+pub use dice::BuildCommandEvaluation;
 pub use dice::WorkspaceBuildEvaluation;
 pub use dice::WorkspaceDirectoryObservation;
 pub use dice::WorkspaceEvaluation;
@@ -37,6 +39,30 @@ pub use events::PublishedCommand;
 pub use events::TerminalOutput;
 pub use slug_query_v2::QueryError;
 pub use slug_query_v2::QueryOutputCompletion;
+
+/// One-shot typed build command. Source preparation observes only paths
+/// demanded by the retained command root.
+pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
+    workspace: &std::path::Path,
+    targets: &[slug_identity_v2::TargetPattern],
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+) -> Result<
+    AcceptedCommand<std::sync::Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+    BuildCommandError,
+> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
+        .map_err(BuildCommandError::infrastructure)?;
+    runtime.build_command_with_bzlmod_inputs(
+        targets,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+    )
+}
 
 /// One-shot typed query command. Source preparation observes only paths
 /// demanded by the retained command root.

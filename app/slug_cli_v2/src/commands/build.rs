@@ -13,7 +13,9 @@ use slug_commands_v2::CommandParseError;
 use slug_commands_v2::build::BuildRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::evaluate_workspace_targets_with_bzlmod_inputs;
+use slug_core_v2::runtime::BuildCommandEvaluation;
+use slug_core_v2::runtime::TerminalOutput;
+use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
@@ -55,7 +57,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         }
     };
 
-    match evaluate_workspace_targets_with_bzlmod_inputs(
+    let accepted = match evaluate_workspace_build_command_with_bzlmod_inputs(
         &workspace,
         &request.targets,
         request.bzlmod_policy.clone(),
@@ -63,23 +65,25 @@ pub fn run(argv: Vec<String>) -> i32 {
         request.lockfile_mode.clone(),
         &request.registry_urls,
     ) {
-        Ok(evaluation) => {
+        Ok(accepted) => accepted,
+        Err(error) => {
+            eprint!("{}", build_error_json(&error.to_string(), "one-shot"));
+            return 2;
+        }
+    };
+    let published = accepted
+        .project(|terminal| match terminal.as_ref() {
+            Err(error) => {
+                TerminalOutput::new(2, String::new(), build_error_json(&error.to_string(), "one-shot"))
+            }
+            Ok(evaluation) => {
             let argv_json = argv
                 .iter()
                 .map(|arg| format!("\"{}\"", json_escape(arg)))
                 .collect::<Vec<_>>()
                 .join(",");
-            let analyzed_target_count = evaluation
-                .packages
-                .iter()
-                .filter(|package| package.analysis.is_some())
-                .count();
-            let declared_action_count = evaluation
-                .packages
-                .iter()
-                .filter_map(|package| package.analysis.as_ref())
-                .map(|analysis| analysis.actions().len())
-                .sum::<usize>();
+            let analyzed_target_count = evaluation.analyzed_target_count();
+            let declared_action_count = evaluation.declared_action_count();
             let completed_boundary = if analyzed_target_count == 0 {
                 "dice_starlark_package_loading"
             } else {
@@ -89,61 +93,75 @@ pub fn run(argv: Vec<String>) -> i32 {
             let remote = match RemoteConfig::from_args(&remote_args) {
                 Ok(remote) => remote,
                 Err(error) => {
-                    eprintln!(
-                        "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
-                        json_escape(&error.to_string())
+                    return TerminalOutput::new(
+                        2,
+                        String::new(),
+                        build_error_json(&error.to_string(), "one-shot"),
                     );
-                    return 2;
                 }
             };
             if remote.mode() == RemoteMode::Execute {
-                return run_reapi_build(
+                run_reapi_build(
                     &workspace,
-                    &evaluation,
+                    evaluation,
                     analyzed_target_count,
                     declared_action_count,
                     &remote,
-                );
+                )
+            } else {
+                TerminalOutput::new(
+                    2,
+                    String::new(),
+                    format!(
+                        "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"argv\":[{}],\"target_count\":{},\"loaded_package_count\":{},\"analyzed_target_count\":{},\"declared_action_count\":{},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"{}\"}}\n",
+                        argv_json,
+                        request.targets.len(),
+                        evaluation.loaded_package_count(),
+                        analyzed_target_count,
+                        declared_action_count,
+                        completed_boundary,
+                    ),
+                )
             }
-            eprintln!(
-                "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"argv\":[{}],\"target_count\":{},\"loaded_package_count\":{},\"analyzed_target_count\":{},\"declared_action_count\":{},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"{}\"}}",
-                argv_json,
-                request.targets.len(),
-                evaluation.packages.len(),
-                analyzed_target_count,
-                declared_action_count,
-                completed_boundary,
-            );
-            2
-        }
-        Err(error) => {
-            eprintln!(
-                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
-                json_escape(&error.to_string())
-            );
-            2
-        }
+            }
+        })
+        .publish();
+    let (_terminal, exit_code, stdout, stderr) = published.into_parts();
+    if !stdout.is_empty() {
+        print!("{stdout}");
     }
+    if !stderr.is_empty() {
+        eprint!("{stderr}");
+    }
+    exit_code
+}
+
+fn build_error_json(message: &str, runtime_mode: &str) -> String {
+    format!(
+        "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"{}\"}}\n",
+        json_escape(message),
+        runtime_mode,
+    )
 }
 
 fn run_reapi_build(
     workspace: &std::path::Path,
-    evaluation: &slug_core_v2::runtime::WorkspaceBuildEvaluation,
+    evaluation: &BuildCommandEvaluation,
     analyzed_target_count: usize,
     declared_action_count: usize,
     remote: &RemoteConfig,
-) -> i32 {
+) -> TerminalOutput {
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
     {
         Ok(runtime) => runtime,
         Err(error) => {
-            eprintln!(
-                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
-                json_escape(&error.to_string())
+            return TerminalOutput::new(
+                2,
+                String::new(),
+                build_error_json(&error.to_string(), "one-shot"),
             );
-            return 2;
         }
     };
     let output_root = workspace.join("bazel-bin");
@@ -161,10 +179,7 @@ fn run_reapi_build(
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         platform_properties.sort();
-        for package in &evaluation.packages {
-            let Some(analysis) = &package.analysis else {
-                continue;
-            };
+        for analysis in evaluation.analyses() {
             for action in analysis.actions() {
                 let result = slug_reapi_v2::execute_action(remote, action)
                     .await
@@ -234,34 +249,35 @@ fn run_reapi_build(
                 .map(|(key, value)| format!("\"{}\":\"{}\"", json_escape(key), json_escape(value)))
                 .collect::<Vec<_>>()
                 .join(",");
-            eprintln!(
-                "{{\"success\":true,\"command\":\"build\",\"analyzed_target_count\":{},\"declared_action_count\":{},\"reapi_actions\":{},\"direct_local_actions\":{},\"ac_hits\":{},\"ac_misses\":{},\"action_digests\":[{}],\"uploaded_digests\":[{}],\"materialized_outputs\":[{}],\"platform_properties\":{{{}}},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"reapi_native_execution\"}}",
-                analyzed_target_count,
-                declared_action_count,
-                reapi_actions,
-                direct_local_actions,
-                ac_hits,
-                ac_misses,
-                action_digests_json,
-                uploaded_digests_json,
-                materialized_outputs_json,
-                platform_properties_json,
-            );
-            0
+            TerminalOutput::new(
+                0,
+                String::new(),
+                format!(
+                    "{{\"success\":true,\"command\":\"build\",\"analyzed_target_count\":{},\"declared_action_count\":{},\"reapi_actions\":{},\"direct_local_actions\":{},\"ac_hits\":{},\"ac_misses\":{},\"action_digests\":[{}],\"uploaded_digests\":[{}],\"materialized_outputs\":[{}],\"platform_properties\":{{{}}},\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"reapi_native_execution\"}}\n",
+                    analyzed_target_count,
+                    declared_action_count,
+                    reapi_actions,
+                    direct_local_actions,
+                    ac_hits,
+                    ac_misses,
+                    action_digests_json,
+                    uploaded_digests_json,
+                    materialized_outputs_json,
+                    platform_properties_json,
+                ),
+            )
         }
-        Ok(_) => {
-            eprintln!(
-                "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"message\":\"no executable actions were declared\",\"runtime_mode\":\"one-shot\"}}"
-            );
-            2
-        }
-        Err(error) => {
-            eprintln!(
-                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
-                json_escape(&error)
-            );
-            2
-        }
+        Ok(_) => TerminalOutput::new(
+            2,
+            String::new(),
+            "{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"message\":\"no executable actions were declared\",\"runtime_mode\":\"one-shot\"}\n"
+                .to_owned(),
+        ),
+        Err(error) => TerminalOutput::new(
+            2,
+            String::new(),
+            build_error_json(&error, "one-shot"),
+        ),
     }
 }
 
@@ -334,7 +350,7 @@ fn run_daemon_build(
                 print!("{}", response.stdout);
             }
             if !response.stderr.is_empty() {
-                eprintln!("{}", response.stderr);
+                eprint!("{}", response.stderr);
             }
             response.exit_code
         }

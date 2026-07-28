@@ -212,6 +212,67 @@ fn third_build_after_no_edit_invalidates_zero() {
 }
 
 #[test]
+fn retained_daemon_build_publishes_cold_and_changed_events_without_warm_replay() {
+    let workspace = scratch("build-selected-events");
+    let package = workspace.join("pkg");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "print(\"MODULE_EVENT\")\nmodule(name = \"demo\")\n",
+    );
+    write(
+        &package.join("defs.bzl"),
+        "print(\"BZL_EVENT\")\ndef _impl(ctx):\n    print(\"ANALYSIS_EVENT\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprint(\"BUILD_EVENT\")\nprobe(name = \"probe\")\n",
+    );
+    let workspace = workspace.canonicalize().unwrap();
+    let cold_events = format!(
+        "DEBUG: {}:1:6: MODULE_EVENT\nDEBUG: {}:1:6: BZL_EVENT\nDEBUG: {}:2:6: BUILD_EVENT\nDEBUG: {}:3:10: ANALYSIS_EVENT\n",
+        workspace.join("MODULE.bazel").display(),
+        workspace.join("pkg/defs.bzl").display(),
+        workspace.join("pkg/BUILD.bazel").display(),
+        workspace.join("pkg/defs.bzl").display(),
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let targets = [target("//pkg:probe")];
+
+    let cold = daemon.build(&targets, &remote_disabled(), &[]);
+    assert_eq!(cold.exit_code, 2, "{cold:?}");
+    assert!(cold.stderr.starts_with(&cold_events), "{cold:?}");
+    assert_eq!(cold.invalidated_files, 0);
+
+    let warm = daemon.build(&targets, &remote_disabled(), &[]);
+    assert_eq!(warm.exit_code, 2, "{warm:?}");
+    assert!(!warm.stderr.contains("DEBUG:"), "{warm:?}");
+    assert_eq!(warm.invalidated_files, 0);
+
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprint(\"BUILD_CHANGED\")\nprobe(name = \"probe\")\n",
+    );
+    let changed = daemon.build(&targets, &remote_disabled(), &[]);
+    assert_eq!(changed.exit_code, 2, "{changed:?}");
+    assert!(
+        changed.stderr.starts_with(&format!(
+            "DEBUG: {}:2:6: BUILD_CHANGED\n",
+            workspace.join("pkg/BUILD.bazel").display()
+        )),
+        "{changed:?}"
+    );
+    assert_eq!(changed.invalidated_files, 1);
+
+    let warm_after_change = daemon.build(&targets, &remote_disabled(), &[]);
+    assert_eq!(warm_after_change.exit_code, 2, "{warm_after_change:?}");
+    assert!(
+        !warm_after_change.stderr.contains("DEBUG:"),
+        "{warm_after_change:?}"
+    );
+    assert_eq!(warm_after_change.invalidated_files, 0);
+}
+
+#[test]
 fn missing_loaded_bzl_is_absent_then_create_is_observed_without_a_key_panic() {
     let workspace = scratch("missing-then-create-bzl");
     let package = workspace.join("pkg");
@@ -242,6 +303,39 @@ fn missing_loaded_bzl_is_absent_then_create_is_observed_without_a_key_panic() {
         "{created:?}"
     );
     assert!(created.stderr.contains("dice_starlark_package_loading"));
+}
+
+#[test]
+fn transitive_missing_bzl_reports_the_deepest_label_and_recovers() {
+    let workspace = scratch("transitive-missing-then-create-bzl");
+    let package = workspace.join("pkg");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"declare\")\ndeclare()\n",
+    );
+    write(
+        &package.join("defs.bzl"),
+        "load(\":missing.bzl\", \"NAME\")\ndef declare():\n    native.filegroup(name = NAME)\n",
+    );
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let missing = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
+    assert!(
+        missing
+            .stderr
+            .contains("cannot load '//pkg:missing.bzl': no such file"),
+        "{missing:?}"
+    );
+    assert!(!missing.stderr.contains("cannot load '//pkg:defs.bzl'"));
+
+    write(&package.join("missing.bzl"), "NAME = \"probe\"\n");
+    let created = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
+    assert_eq!(created.invalidated_files, 1);
+    assert!(
+        !created.stderr.contains("build_runtime_error"),
+        "{created:?}"
+    );
 }
 
 #[test]

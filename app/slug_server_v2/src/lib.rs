@@ -10,8 +10,8 @@
 //! Same-daemon workspace runtime requests.
 //!
 //! The daemon owns one [`WorkspaceRuntime`]. A filesystem observation adapter
-//! supplies complete present, absent, and failed-read values before each
-//! request; DICE, not the adapter, determines semantic reuse.
+//! retains compatibility invalidation metrics and failure behavior; typed
+//! build/query commands discover their semantic path inputs through DICE.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -37,7 +37,7 @@ use crate::reapi::run_reapi_build;
 
 /// The retained daemon state: one workspace runtime and a non-semantic
 /// observation adapter. The adapter's previous values are used only to report
-/// the compatibility metric; every observation is injected into DICE.
+/// the compatibility metric.
 pub struct Daemon {
     workspace: PathBuf,
     runtime: WorkspaceRuntime,
@@ -93,7 +93,7 @@ impl Daemon {
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
     ) -> BuildResult {
-        let (observations, invalidated) = match self.observations.observe(&self.workspace) {
+        let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
                 return BuildResult::error("build_runtime_error", &error.to_string());
@@ -108,74 +108,77 @@ impl Daemon {
                 &registry_urls,
             ),
         );
-        let evaluation = match self.runtime.evaluate_observations_with_bzlmod_inputs(
-            observations,
+        let accepted = match self.runtime.build_command_with_bzlmod_inputs(
             targets,
             command_policy,
             environment_policy,
             lockfile_mode,
             &registry_urls,
         ) {
-            Ok(eval) => eval,
+            Ok(accepted) => accepted,
             Err(error) => {
-                return BuildResult::error("build_runtime_error", &error.to_string());
+                return BuildResult::error_with_invalidated(
+                    "build_runtime_error",
+                    &error.to_string(),
+                    invalidated,
+                );
             }
         };
-
-        let analyzed_target_count = evaluation
-            .packages
-            .iter()
-            .filter(|p| p.analysis.is_some())
-            .count();
-        let declared_action_count = evaluation
-            .packages
-            .iter()
-            .filter_map(|p| p.analysis.as_ref())
-            .map(|a| a.actions().len())
-            .sum::<usize>();
-
-        if remote.mode() == RemoteMode::Execute {
-            let outcome = run_reapi_build(
-                &self.workspace,
-                &evaluation,
-                analyzed_target_count,
-                declared_action_count,
-                remote,
-                "daemon",
-                invalidated,
-            );
-            return BuildResult {
-                exit_code: outcome.exit_code,
-                stdout: String::new(),
-                stderr: outcome.stderr,
-                invalidated_files: invalidated,
-            };
-        }
-
-        // Non-REAPI: analysis only (no local execution per non-negotiables).
-        let argv_json = argv
-            .iter()
-            .map(|arg| format!("\"{}\"", json_escape(arg)))
-            .collect::<Vec<_>>()
-            .join(",");
-        let completed_boundary = if analyzed_target_count == 0 {
-            "dice_starlark_package_loading"
-        } else {
-            "dice_starlark_rule_analysis"
-        };
+        let published = accepted
+            .project(|terminal| match terminal.as_ref() {
+                Err(error) => TerminalOutput::new(
+                    2,
+                    String::new(),
+                    build_error_json("build_runtime_error", &error.to_string(), invalidated),
+                ),
+                Ok(evaluation) => {
+                    let analyzed_target_count = evaluation.analyzed_target_count();
+                    let declared_action_count = evaluation.declared_action_count();
+                    if remote.mode() == RemoteMode::Execute {
+                        let outcome = run_reapi_build(
+                            &self.workspace,
+                            evaluation,
+                            analyzed_target_count,
+                            declared_action_count,
+                            remote,
+                            "daemon",
+                            invalidated,
+                        );
+                        TerminalOutput::new(outcome.exit_code, String::new(), outcome.stderr)
+                    } else {
+                        let argv_json = argv
+                            .iter()
+                            .map(|arg| format!("\"{}\"", json_escape(arg)))
+                            .collect::<Vec<_>>()
+                            .join(",");
+                        let completed_boundary = if analyzed_target_count == 0 {
+                            "dice_starlark_package_loading"
+                        } else {
+                            "dice_starlark_rule_analysis"
+                        };
+                        TerminalOutput::new(
+                            2,
+                            String::new(),
+                            format!(
+                                "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"argv\":[{}],\"target_count\":{},\"loaded_package_count\":{},\"analyzed_target_count\":{},\"declared_action_count\":{},\"runtime_mode\":\"daemon\",\"invalidated_files\":{},\"completed_boundary\":\"{}\"}}\n",
+                                argv_json,
+                                targets.len(),
+                                evaluation.loaded_package_count(),
+                                analyzed_target_count,
+                                declared_action_count,
+                                invalidated,
+                                completed_boundary,
+                            ),
+                        )
+                    }
+                }
+            })
+            .publish();
+        let (_terminal, exit_code, stdout, stderr) = published.into_parts();
         BuildResult {
-            exit_code: 2,
-            stdout: String::new(),
-            stderr: format!(
-                "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"argv\":[{}],\"target_count\":{},\"loaded_package_count\":{},\"analyzed_target_count\":{},\"declared_action_count\":{},\"runtime_mode\":\"daemon\",\"invalidated_files\":{},\"completed_boundary\":\"{}\"}}",
-                argv_json,
-                targets.len(),
-                evaluation.packages.len(),
-                analyzed_target_count,
-                declared_action_count,
-                invalidated,
-                completed_boundary,
-            ),
+            exit_code,
+            stdout,
+            stderr,
             invalidated_files: invalidated,
         }
     }
@@ -345,17 +348,25 @@ pub struct BuildResult {
     pub invalidated_files: usize,
 }
 
+fn build_error_json(kind: &str, message: &str, invalidated_files: usize) -> String {
+    format!(
+        "{{\"error\":\"{}\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
+        kind,
+        json_escape(message),
+    )
+}
+
 impl BuildResult {
     fn error(kind: &str, message: &str) -> Self {
+        Self::error_with_invalidated(kind, message, 0)
+    }
+
+    fn error_with_invalidated(kind: &str, message: &str, invalidated_files: usize) -> Self {
         Self {
             exit_code: 2,
             stdout: String::new(),
-            stderr: format!(
-                "{{\"error\":\"{}\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}",
-                kind,
-                json_escape(message),
-            ),
-            invalidated_files: 0,
+            stderr: build_error_json(kind, message, invalidated_files),
+            invalidated_files,
         }
     }
 }

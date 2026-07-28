@@ -1052,6 +1052,22 @@ impl NativeCommandRoot for RootQueryCommandKey {
     }
 }
 
+#[async_trait]
+impl NativeCommandRoot for BuildCommandRootKey {
+    type Terminal = Arc<Result<BuildCommandEvaluation, BuildCommandError>>;
+
+    async fn compute(
+        &self,
+        transaction: &mut dice::DiceTransaction,
+    ) -> Result<slug_bzlmod_v2::SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError>
+    {
+        transaction
+            .compute(self)
+            .await
+            .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}")))
+    }
+}
+
 async fn poll_then_cancel_synthetic_compute<K>(
     transaction: &mut dice::DiceTransaction,
     key: &K,
@@ -1316,9 +1332,8 @@ enum BuildCommandRequestError {
     RecursivePattern { pattern: Arc<str> },
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-#[allow(dead_code)]
-struct BuildCommandEvaluation {
+#[derive(Clone, Eq, PartialEq, Allocative)]
+pub struct BuildCommandEvaluation {
     anchor: RootModuleLoadingAnchor,
     targets: Arc<[BuildRequestedTarget]>,
 }
@@ -1331,9 +1346,13 @@ struct BuildRequestedTarget {
     analysis: Option<AnalysisResult>,
 }
 
+#[derive(Clone, Eq, PartialEq, Allocative)]
+pub struct BuildCommandError {
+    kind: BuildCommandErrorKind,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-#[allow(dead_code)]
-enum BuildCommandError {
+enum BuildCommandErrorKind {
     RootAnchor(RootModuleLoadingAnchorError),
     Package {
         pattern: Arc<str>,
@@ -1349,6 +1368,13 @@ enum BuildCommandError {
         pattern: Arc<str>,
         error: AnalysisError,
     },
+    ExternalRepository {
+        pattern: Arc<str>,
+    },
+    RecursivePattern {
+        pattern: Arc<str>,
+    },
+    Infrastructure(Arc<str>),
 }
 
 #[allow(dead_code)]
@@ -1395,6 +1421,135 @@ impl BuildCommandRootKey {
         })
     }
 }
+
+impl BuildCommandEvaluation {
+    pub fn loaded_package_count(&self) -> usize {
+        self.targets.len()
+    }
+
+    pub fn analyzed_target_count(&self) -> usize {
+        self.targets
+            .iter()
+            .filter(|target| target.analysis.is_some())
+            .count()
+    }
+
+    pub fn declared_action_count(&self) -> usize {
+        self.analyses()
+            .map(|analysis| analysis.actions().len())
+            .sum()
+    }
+
+    pub fn analyses(&self) -> impl Iterator<Item = &AnalysisResult> {
+        self.targets
+            .iter()
+            .filter_map(|target| target.analysis.as_ref())
+    }
+}
+
+impl fmt::Debug for BuildCommandEvaluation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BuildCommandEvaluation")
+            .field("loaded_package_count", &self.loaded_package_count())
+            .field("analyzed_target_count", &self.analyzed_target_count())
+            .field("declared_action_count", &self.declared_action_count())
+            .finish()
+    }
+}
+
+impl BuildCommandError {
+    fn root_anchor(error: RootModuleLoadingAnchorError) -> Self {
+        Self {
+            kind: BuildCommandErrorKind::RootAnchor(error),
+        }
+    }
+
+    fn package(pattern: Arc<str>, error: RootPackageLoadError) -> Self {
+        Self {
+            kind: BuildCommandErrorKind::Package { pattern, error },
+        }
+    }
+
+    fn target_not_found(
+        pattern: Arc<str>,
+        package: PackagePath,
+        target: TargetName,
+        build_file: PathBuf,
+    ) -> Self {
+        Self {
+            kind: BuildCommandErrorKind::TargetNotFound {
+                pattern,
+                package,
+                target,
+                build_file,
+            },
+        }
+    }
+
+    fn analysis(pattern: Arc<str>, error: AnalysisError) -> Self {
+        Self {
+            kind: BuildCommandErrorKind::Analysis { pattern, error },
+        }
+    }
+
+    fn request(error: BuildCommandRequestError) -> Self {
+        let kind = match error {
+            BuildCommandRequestError::ExternalRepository { pattern } => {
+                BuildCommandErrorKind::ExternalRepository { pattern }
+            }
+            BuildCommandRequestError::RecursivePattern { pattern } => {
+                BuildCommandErrorKind::RecursivePattern { pattern }
+            }
+        };
+        Self { kind }
+    }
+
+    pub(super) fn infrastructure(error: impl fmt::Display) -> Self {
+        Self {
+            kind: BuildCommandErrorKind::Infrastructure(Arc::from(error.to_string())),
+        }
+    }
+}
+
+impl fmt::Display for BuildCommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            BuildCommandErrorKind::RootAnchor(error) => error.fmt(f),
+            BuildCommandErrorKind::Package { error, .. } => error.fmt(f),
+            BuildCommandErrorKind::TargetNotFound {
+                pattern,
+                build_file,
+                ..
+            } => {
+                write!(
+                    f,
+                    "target `{pattern}` was not found in {}",
+                    build_file.display()
+                )
+            }
+            BuildCommandErrorKind::Analysis { error, .. } => error.fmt(f),
+            BuildCommandErrorKind::ExternalRepository { pattern } => write!(
+                f,
+                "external repository target patterns are not supported before Stage 5 repository mapping: {pattern}"
+            ),
+            BuildCommandErrorKind::RecursivePattern { pattern } => write!(
+                f,
+                "recursive target patterns are not supported before Stage 6 analysis: {pattern}"
+            ),
+            BuildCommandErrorKind::Infrastructure(error) => f.write_str(error),
+        }
+    }
+}
+
+impl fmt::Debug for BuildCommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("BuildCommandError")
+            .field(&self.to_string())
+            .finish()
+    }
+}
+
+impl std::error::Error for BuildCommandError {}
 
 impl fmt::Display for BuildCommandRootKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1497,10 +1652,7 @@ async fn compute_build_branch(
             Err(error) => {
                 return BuildBranchResult::Outcome(
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
-                        BuildCommandError::Package {
-                            pattern,
-                            error: error.clone(),
-                        },
+                        BuildCommandError::package(pattern, error.clone()),
                     )),
                 );
             }
@@ -1516,12 +1668,12 @@ async fn compute_build_branch(
             else {
                 return BuildBranchResult::Outcome(
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
-                        BuildCommandError::TargetNotFound {
+                        BuildCommandError::target_not_found(
                             pattern,
                             package,
-                            target: label.target().clone(),
-                            build_file: package_value.build_file.clone(),
-                        },
+                            label.target().clone(),
+                            package_value.build_file.clone(),
+                        ),
                     )),
                 );
             };
@@ -1554,10 +1706,7 @@ async fn compute_build_branch(
                             Err(error) => {
                                 return BuildBranchResult::Outcome(
                                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
-                                        BuildCommandError::Analysis {
-                                            pattern,
-                                            error: error.clone(),
-                                        },
+                                        BuildCommandError::analysis(pattern, error.clone()),
                                     )),
                                 );
                             }
@@ -1599,7 +1748,7 @@ impl Key for BuildCommandRootKey {
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) => match value.as_ref() {
                 Ok(anchor) => anchor.clone(),
                 Err(error) => {
-                    return build_complete(Err(BuildCommandError::RootAnchor(error.clone())));
+                    return build_complete(Err(BuildCommandError::root_anchor(error.clone())));
                 }
             },
         };
@@ -2047,6 +2196,43 @@ impl WorkspaceRuntime {
             .context("injecting repository materialization generation")
     }
 
+    /// Evaluate one typed loading/analysis build command through the retained
+    /// native demand, terminal-selection, and publication owner.
+    pub fn build_command_with_bzlmod_inputs(
+        &self,
+        targets: &[TargetPattern],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+    ) -> Result<
+        AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+        BuildCommandError,
+    > {
+        let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
+            .map_err(BuildCommandError::infrastructure)?;
+        let configuration =
+            ConfigurationKey::target("first-build").map_err(BuildCommandError::infrastructure)?;
+        let root = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new(self.workspace.clone())
+                .map_err(BuildCommandError::infrastructure)?,
+            targets,
+            configuration,
+        )
+        .map_err(BuildCommandError::request)?;
+        let request = NativeDemandRequestInputBundle {
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+        };
+        self.drive_command(request, root)
+            .map(|result| result.accepted)
+            .map_err(|error| {
+                BuildCommandError::infrastructure(format!("typed build command failed: {error}"))
+            })
+    }
+
     /// Evaluate one typed loading-query command through the retained native
     /// demand, terminal-selection, and publication owner.
     pub fn query_command_with_policy_and_bzlmod_inputs_and_output_completion(
@@ -2297,6 +2483,7 @@ impl WorkspaceRuntime {
     /// Production requests pass no probes. Keeping this private prevents the
     /// migration observer from turning every directory into an eager semantic
     /// dependency before a real glob consumer exists.
+    #[allow(dead_code)] // Retained only for legacy observation-path tests.
     fn evaluate_observations_with_directory_probes(
         &self,
         observations: WorkspaceObservation,
@@ -3754,6 +3941,77 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "no such target '//pkg:missing': target 'missing' not declared in package 'pkg'"
+        );
+        assert_eq!(
+            accepted_output_text(&missing),
+            ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT"]
+        );
+    }
+
+    #[test]
+    fn real_build_command_drives_typed_analysis_and_cold_events_without_warm_replay() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "print(\"MODULE_EVENT\")\nmodule(name = \"driver\")\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        fs::write(
+            workspace.path().join("pkg/defs.bzl"),
+            "print(\"BZL_EVENT\")\ndef _impl(ctx):\n    print(\"ANALYSIS_EVENT\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe\")\nprint(\"BUILD_EVENT\")\nprobe(name = \"probe\")\n",
+        )
+        .unwrap();
+        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let target = TargetPattern::parse("//pkg:probe").unwrap();
+        let build = |runtime: &WorkspaceRuntime, targets: &[TargetPattern]| {
+            runtime.build_command_with_bzlmod_inputs(
+                targets,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+            )
+        };
+
+        let accepted = build(&runtime, std::slice::from_ref(&target)).unwrap();
+        let evaluation = accepted.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(evaluation.loaded_package_count(), 1);
+        assert_eq!(evaluation.analyzed_target_count(), 1);
+        assert_eq!(evaluation.declared_action_count(), 0);
+        assert_eq!(
+            accepted_output_text(&accepted),
+            ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT", "ANALYSIS_EVENT"]
+        );
+
+        let warm = build(&runtime, std::slice::from_ref(&target)).unwrap();
+        assert!(warm.terminal_for_test().as_ref().is_ok());
+        assert!(accepted_output_text(&warm).is_empty());
+
+        let empty = build(&runtime, &[]).unwrap();
+        let evaluation = empty.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(evaluation.loaded_package_count(), 0);
+        assert_eq!(evaluation.analyzed_target_count(), 0);
+
+        let missing_runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let missing_target = TargetPattern::parse("//pkg:missing").unwrap();
+        let missing = build(&missing_runtime, &[missing_target]).unwrap();
+        let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert!(matches!(
+            error.kind,
+            BuildCommandErrorKind::TargetNotFound { .. }
+        ));
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "target `//pkg:missing` was not found in {}",
+                workspace.path().join("pkg/BUILD.bazel").display()
+            )
         );
         assert_eq!(
             accepted_output_text(&missing),
@@ -5626,12 +5884,12 @@ mod tests {
     }
 
     fn build_test_error(pattern: &str) -> BuildCommandError {
-        BuildCommandError::TargetNotFound {
-            pattern: Arc::from(pattern),
-            package: PackagePath::parse("pkg").unwrap(),
-            target: TargetName::parse("missing").unwrap(),
-            build_file: PathBuf::from("/workspace/pkg/BUILD.bazel"),
-        }
+        BuildCommandError::target_not_found(
+            Arc::from(pattern),
+            PackagePath::parse("pkg").unwrap(),
+            TargetName::parse("missing").unwrap(),
+            PathBuf::from("/workspace/pkg/BUILD.bazel"),
+        )
     }
 
     fn build_test_need(path: &str) -> slug_bzlmod_v2::SourcePreparationNeeds {
@@ -6021,7 +6279,12 @@ probe = rule(implementation = _impl)
         assert!(matches!(
             deleted,
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
-                if matches!(value.as_ref(), Err(BuildCommandError::Package { .. }))
+                if matches!(
+                    value.as_ref(),
+                    Err(BuildCommandError {
+                        kind: BuildCommandErrorKind::Package { .. },
+                    })
+                )
         ));
 
         let mut restored_transaction = build_root_transaction(&dice, epoch(14, "V1", false)).await;
@@ -6066,7 +6329,12 @@ probe = rule(implementation = _impl)
         assert!(matches!(
             invalid,
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
-                if matches!(value.as_ref(), Err(BuildCommandError::RootAnchor(_)))
+                if matches!(
+                    value.as_ref(),
+                    Err(BuildCommandError {
+                        kind: BuildCommandErrorKind::RootAnchor(_),
+                    })
+                )
         ));
     }
 
@@ -6121,11 +6389,13 @@ probe = rule(implementation = _impl)
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
                 if matches!(
                     value.as_ref(),
-                    Err(BuildCommandError::TargetNotFound {
-                        pattern,
-                        package,
-                        target,
-                        build_file,
+                    Err(BuildCommandError {
+                        kind: BuildCommandErrorKind::TargetNotFound {
+                            pattern,
+                            package,
+                            target,
+                            build_file,
+                        },
                     }) if pattern.as_ref() == "//native:missing"
                         && package.as_str() == "native"
                         && target.as_str() == "missing"
@@ -6193,7 +6463,12 @@ probe = rule(implementation = _impl)
         assert!(matches!(
             missing_build.compute(&package).await.unwrap(),
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
-                if matches!(value.as_ref(), Err(BuildCommandError::Package { .. }))
+                if matches!(
+                    value.as_ref(),
+                    Err(BuildCommandError {
+                        kind: BuildCommandErrorKind::Package { .. },
+                    })
+                )
         ));
         let mut created_build =
             build_root_transaction(&dice, build_epoch(46, Some("filegroup(name = \"v1\")\n")))
@@ -6208,7 +6483,12 @@ probe = rule(implementation = _impl)
         assert!(matches!(
             deleted_build.compute(&package).await.unwrap(),
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
-                if matches!(value.as_ref(), Err(BuildCommandError::Package { .. }))
+                if matches!(
+                    value.as_ref(),
+                    Err(BuildCommandError {
+                        kind: BuildCommandErrorKind::Package { .. },
+                    })
+                )
         ));
         let mut restored_build =
             build_root_transaction(&dice, build_epoch(49, Some("filegroup(name = \"v1\")\n")))

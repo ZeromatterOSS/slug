@@ -14439,3 +14439,61 @@ and returns primitive terminal output without exposing the accepted value or
 creating another output/execution owner.
 
 Implement next only `WP-5-m1-build-activation`.
+
+Implementation-review correction: the original seven-file allowlist was too
+narrow to preserve the accepted adapter diagnostic. The typed root's opaque
+loading error exposed `root package source is missing` where the activated
+legacy path emitted Bazel-shaped
+`cannot load '//pkg:defs.bzl': no such file`. Expand production scope only to
+`app/slug_bzlmod_v2/src/host_package.rs` for a typed missing-source predicate
+and `app/slug_loading_v2/src/bzl_module.rs` for the owning load-error
+projection. Adapter string rewriting is forbidden. The existing loading and
+server missing-then-create regressions must retain the exact Bazel-shaped
+message and same-daemon recovery.
+
+### Typed build atomic activation implementation
+
+Status: **ACCEPT** for `WP-5-m1-build-activation` on 2026-07-27 after one
+terminal independent implementation review and two focused diagnostic
+corrections.
+
+One-shot CLI and retained-daemon build now use `BuildCommandRootKey` through
+the same sole retained retry/accept/publication owner as query. The public
+terminal and error are opaque; adapters receive borrowed counts and ordered
+analyses only inside the consuming projector. No activated build caller
+injects a legacy workspace snapshot. Daemon observation values are discarded
+after retaining failure behavior and `invalidated_files`.
+
+Non-execute output retains exact loading/analysis counts, exit code, runtime
+mode, completed boundary, and one terminal newline. The existing CLI/server
+native REAPI helpers now borrow the typed analyses inside the projector,
+preserving target/action order, evidence fields, and materialization behavior
+without adding an execution owner or moving execution into DICE. Selected
+cold and changed MODULE/`.bzl`/BUILD/analysis events precede terminal JSON;
+unchanged warm commands do not replay them.
+
+Focused evidence covers the real retained driver, empty/native/Starlark/
+missing terminals, eight dormant root cases, retry/acceptance behavior,
+one-shot/daemon source events, changed invalidation, warm no-replay,
+missing-then-create, and the no-action native REAPI projector. Direct and
+transitive missing `.bzl` diagnostics retain
+`cannot load '<deepest canonical label>': no such file` and same-daemon
+recovery. The formatter follows the existing Bazel-shaped `load_error`
+contract in `slug_loading_v2/src/bzl_module.rs`; no adapter rewrites strings.
+
+Quiet bzlmod/loading/analysis/core/CLI/server checks, focused tests, bzlmod/
+loading/core GNU-Windows no-run linkage, formatting, diff, archive, exact
+scope/no-Cargo, activated-call, metric-only observation, and core
+no-REAPI/no-delegation guards pass. Full CLI/server Windows linkage remains
+blocked only by the pre-existing Unix transport. The independent review found
+the direct diagnostic and transitive-label issues; both corrections passed
+focused rereview and the final result is `ACCEPT`.
+
+No new action execution, REAPI behavior, JVM, Java bytecode, or Bazel
+delegation was added.
+
+Design next only `WP-5-m1-external-repository-query-routing-design`. Freeze
+the smallest observable typed-query vertical slice that resolves one external
+repository label through Bazel 9 repository mapping and the accepted native
+source-preparation/materialization owners. Do not broaden into build
+execution, general repository discovery, JVM, or Bazel delegation.

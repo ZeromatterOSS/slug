@@ -13,14 +13,14 @@
 use std::path::Path;
 
 use slug_core_v2::error::json_escape;
-use slug_core_v2::runtime::WorkspaceBuildEvaluation;
+use slug_core_v2::runtime::BuildCommandEvaluation;
 use slug_reapi_v2::RemoteConfig;
 
 /// Execute all declared actions in the evaluation through REAPI and return the
 /// JSON evidence line plus the exit code.
 pub fn run_reapi_build(
     workspace: &Path,
-    evaluation: &WorkspaceBuildEvaluation,
+    evaluation: &BuildCommandEvaluation,
     analyzed_target_count: usize,
     declared_action_count: usize,
     remote: &RemoteConfig,
@@ -51,10 +51,7 @@ pub fn run_reapi_build(
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         platform_properties.sort();
-        for package in &evaluation.packages {
-            let Some(analysis) = &package.analysis else {
-                continue;
-            };
+        for analysis in evaluation.analyses() {
             for action in analysis.actions() {
                 let result = slug_reapi_v2::execute_action(remote, action)
                     .await
@@ -125,7 +122,7 @@ pub fn run_reapi_build(
                 .collect::<Vec<_>>()
                 .join(",");
             let stderr = format!(
-                "{{\"success\":true,\"command\":\"build\",\"analyzed_target_count\":{},\"declared_action_count\":{},\"reapi_actions\":{},\"direct_local_actions\":{},\"ac_hits\":{},\"ac_misses\":{},\"action_digests\":[{}],\"uploaded_digests\":[{}],\"materialized_outputs\":[{}],\"platform_properties\":{{{}}},\"runtime_mode\":\"{}\",\"invalidated_files\":{},\"completed_boundary\":\"reapi_native_execution\"}}",
+                "{{\"success\":true,\"command\":\"build\",\"analyzed_target_count\":{},\"declared_action_count\":{},\"reapi_actions\":{},\"direct_local_actions\":{},\"ac_hits\":{},\"ac_misses\":{},\"action_digests\":[{}],\"uploaded_digests\":[{}],\"materialized_outputs\":[{}],\"platform_properties\":{{{}}},\"runtime_mode\":\"{}\",\"invalidated_files\":{},\"completed_boundary\":\"reapi_native_execution\"}}\n",
                 analyzed_target_count,
                 declared_action_count,
                 reapi_actions,
@@ -147,7 +144,7 @@ pub fn run_reapi_build(
         Ok(_) => ReapiBuildOutcome {
             exit_code: 2,
             stderr: format!(
-                "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"message\":\"no executable actions were declared\",\"runtime_mode\":\"{}\",\"invalidated_files\":{}}}",
+                "{{\"error\":\"analysis_not_implemented\",\"command\":\"build\",\"message\":\"no executable actions were declared\",\"runtime_mode\":\"{}\",\"invalidated_files\":{}}}\n",
                 runtime_mode, invalidated_files,
             ),
         },
@@ -167,7 +164,7 @@ impl ReapiBuildOutcome {
         Self {
             exit_code: 2,
             stderr: format!(
-                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"{}\",\"invalidated_files\":{}}}",
+                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"{}\",\"invalidated_files\":{}}}\n",
                 json_escape(message),
                 runtime_mode,
                 invalidated_files,

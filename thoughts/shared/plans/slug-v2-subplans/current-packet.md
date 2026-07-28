@@ -1,47 +1,41 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-build-activation`
-Milestone: M1, one semantic build spine
+Packet: `WP-5-m1-external-repository-query-routing-design`
+Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted preactivation Host closure gate, opaque consuming
-publication boundary, source-aware command events, dormant typed build root,
-and accepted query-first production activation
-Validation tier: public production activation boundary
+Evidence: accepted Host source-preparation/materialization owners, repository
+mapping foundations, typed query/build production activation, opaque
+publication, and source-aware command events
+Validation tier: design-only external repository command boundary
 
-Implementation areas:
+Design areas:
 
-- dormant `BuildCommandRootKey` and the now-active shared
-  retry/accept/publication seam in `slug_core_v2`;
-- one-shot build adapter in `slug_cli_v2`;
-- daemon build adapter and its existing filesystem observation metric in
-  `slug_server_v2`; and
-- the narrow existing build/core/CLI/server evidence needed to freeze an
-  atomic non-executing activation.
+- Bazel 9 apparent-to-canonical repository mapping and root-module graph
+  ownership in `slug_bzlmod_v2`;
+- external repository materialization and Host loading boundaries;
+- the active typed query root and retained retry/publication path; and
+- the smallest oracle/core/CLI/server evidence for one external query label.
 
 Terminal scheduling updates may also change this manifest, the owner plan, and
 canonical Live Status.
 
-Implement the accepted `### Typed build atomic activation design` as one
-atomic packet that:
+Design the smallest observable external-repository query slice that:
 
-1. makes the dormant typed build root the only semantic loading/analysis owner
-   for both one-shot and
-   daemon paths;
-2. reuses the sole accepted retry/accept/publication owner and opaque envelope;
-3. preserves daemon `invalidated_files` as metric-only and removes legacy
-   snapshot values from the future semantic transaction; and
-4. stops the typed DICE transaction at loading/analysis while preserving the
-   already-authorized native REAPI projector outside DICE.
+1. resolves one apparent external label through the command's Bazel 9
+   repository mapping;
+2. prepares/materializes the repository through accepted native owners before
+   loading it;
+3. keeps the typed root as the sole semantic query owner in one-shot and
+   daemon modes; and
+4. publishes exact output/events without eager workspace snapshots or
+   delegation.
 
-Add the real-driver regression first, then convert core, one-shot CLI, daemon,
-and the existing REAPI projectors serially without an intermediate activation
-state. Run only the focused tests and quiet checks frozen by the accepted
-design plus one terminal independent review.
+This packet is design-only. Inspect only the live mapping, materialization,
+typed-query, and relevant oracle seams. Freeze exact files, API/identity,
+retry/error/event behavior, focused evidence, and stop gates, then obtain one
+independent terminal review. Do not edit Rust or fixtures.
 
-Add no Cargo change, execution owner, action semantics, REAPI behavior, JVM,
-Java-bytecode, or Bazel delegation. The live adapters already execute through
-native REAPI when requested; preserve that downstream path without moving it
-into DICE or the retry driver. Stop if the slice would mix legacy snapshots
-into the typed transaction, expose raw events/terminal internals, publish
-retry output, change metric ownership, or imply that loading/analysis success
-is execution success.
+Add no Cargo change, build execution, new materializer, REAPI behavior, JVM,
+Java bytecode, or Bazel delegation. Stop if the slice would bypass repository
+mapping, fabricate `@bazel_tools`, mix legacy snapshots into the transaction,
+or require general discovery breadth beyond the first external query.

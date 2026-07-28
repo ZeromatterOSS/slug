@@ -739,6 +739,122 @@ fn build_file_loading_fixture_reaches_package_loading_before_analysis() {
 }
 
 #[test]
+fn typed_build_activation_publishes_cold_events_without_warm_daemon_replay() {
+    let workspace = scratch("typed-build-activation");
+    let package = workspace.join("pkg");
+    write(
+        workspace.join("MODULE.bazel"),
+        "print(\"MODULE_EVENT\")\nmodule(name = \"typed_build\")\n",
+    );
+    write(
+        package.join("defs.bzl"),
+        "print(\"BZL_EVENT\")\ndef _impl(ctx):\n    print(\"ANALYSIS_EVENT\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        package.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprint(\"BUILD_EVENT\")\nprobe(name = \"probe\")\n",
+    );
+    let workspace = workspace.canonicalize().unwrap();
+    let event_stderr = format!(
+        "DEBUG: {}:1:6: MODULE_EVENT\nDEBUG: {}:1:6: BZL_EVENT\nDEBUG: {}:2:6: BUILD_EVENT\nDEBUG: {}:3:10: ANALYSIS_EVENT\n",
+        workspace.join("MODULE.bazel").display(),
+        package.join("defs.bzl").display(),
+        package.join("BUILD.bazel").display(),
+        package.join("defs.bzl").display(),
+    );
+
+    let one_shot = slug()
+        .current_dir(&workspace)
+        .args(["build", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert_eq!(one_shot.status.code(), Some(2), "{one_shot:?}");
+    assert!(one_shot.stdout.is_empty());
+    let stderr = String::from_utf8(one_shot.stderr).unwrap();
+    assert!(stderr.starts_with(&event_stderr), "{stderr:?}");
+    assert!(stderr.ends_with('\n'));
+    assert!(stderr.contains("\"loaded_package_count\":1"));
+    assert!(stderr.contains("\"analyzed_target_count\":1"));
+    assert!(stderr.contains("\"runtime_mode\":\"one-shot\""));
+
+    let output_base = scratch("typed-build-activation-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    for index in 0..2 {
+        let daemon = slug()
+            .current_dir(&workspace)
+            .args([output_base_arg.as_str(), "build", "//pkg:probe"])
+            .output()
+            .unwrap();
+        assert_eq!(daemon.status.code(), Some(2), "{daemon:?}");
+        assert!(daemon.stdout.is_empty());
+        let stderr = String::from_utf8(daemon.stderr).unwrap();
+        if index == 0 {
+            assert!(stderr.starts_with(&event_stderr), "{stderr:?}");
+        } else {
+            assert!(!stderr.contains("DEBUG:"), "{stderr:?}");
+        }
+        assert!(stderr.ends_with('\n'));
+        assert!(stderr.contains("\"analyzed_target_count\":1"));
+        assert!(stderr.contains("\"runtime_mode\":\"daemon\""));
+        assert!(stderr.contains("\"invalidated_files\":0"));
+    }
+
+    let missing = slug()
+        .current_dir(&workspace)
+        .args(["build", "//pkg:missing"])
+        .output()
+        .unwrap();
+    assert_eq!(missing.status.code(), Some(2), "{missing:?}");
+    assert!(missing.stdout.is_empty());
+    let stderr = String::from_utf8(missing.stderr).unwrap();
+    assert!(stderr.starts_with(&event_stderr[..event_stderr.rfind("DEBUG:").unwrap()]));
+    assert!(stderr.contains("target `//pkg:missing` was not found in"));
+    assert!(stderr.ends_with('\n'));
+}
+
+#[test]
+fn typed_build_activation_preserves_native_reapi_projector_for_no_action_terminal() {
+    let workspace = scratch("typed-build-reapi-projector");
+    write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"typed_build\")\n",
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let output_base = scratch("typed-build-reapi-projector-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+
+    for args in [
+        vec![
+            "build",
+            "//pkg:probe",
+            "--remote_executor=grpc://127.0.0.1:1",
+        ],
+        vec![
+            output_base_arg.as_str(),
+            "build",
+            "//pkg:probe",
+            "--remote_executor=grpc://127.0.0.1:1",
+        ],
+    ] {
+        let output = slug().current_dir(&workspace).args(args).output().unwrap();
+        assert_eq!(output.status.code(), Some(2), "{output:?}");
+        assert!(output.stdout.is_empty());
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("\"message\":\"no executable actions were declared\""),
+            "{stderr:?}"
+        );
+        assert!(stderr.ends_with('\n'));
+        assert_eq!(stderr.lines().count(), 1, "{stderr:?}");
+    }
+}
+
+#[test]
 fn missing_build_target_is_structured_parse_error() {
     let output = slug().arg("build").output().unwrap();
     assert_eq!(output.status.code(), Some(2));

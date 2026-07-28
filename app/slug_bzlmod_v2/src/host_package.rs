@@ -501,6 +501,11 @@ impl RootPackageSourceError {
     fn new(inner: RootPackageSourceErrorInner) -> Self {
         Self { inner }
     }
+
+    /// Whether the requested source was semantically absent.
+    pub fn is_missing(&self) -> bool {
+        matches!(&self.inner, RootPackageSourceErrorInner::Missing { .. })
+    }
 }
 
 impl fmt::Display for RootPackageSourceError {
