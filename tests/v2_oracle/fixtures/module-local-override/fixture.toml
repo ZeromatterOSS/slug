@@ -1,12 +1,19 @@
 [fixture]
 name = "module-local-override"
-description = "Root module depends on a local_path_override module and builds a target from it."
+description = "Root module depends on a local_path_override module and builds or queries a target from it."
 comparison = "semantic"
 manifest_roots = ["bazel-bin"]
-oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once local registry/network policy is settled."
+oracle_notes = "Bazel 9.2 evidence covers both build and apparent-repository query output for a direct local_path_override."
 
 [[commands]]
 name = "build_dep_target"
 argv = ["build", "@dep//:target.txt"]
 compare = "semantic"
 expected_exit = 0
+
+[[commands]]
+name = "query_dep_target"
+argv = ["query", "@dep//:target.txt"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:target.txt"]

@@ -10,6 +10,7 @@
 
 use std::cell::RefCell;
 use std::fmt;
+use std::hash::Hash;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -26,6 +27,9 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_bzlmod_v2::HostRepositorySourceFileKey;
+use slug_bzlmod_v2::RepositorySourceFileError;
+use slug_bzlmod_v2::RepositorySourceFileValue;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorError;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
@@ -34,6 +38,7 @@ use slug_bzlmod_v2::RootPackageBzlTargetError;
 use slug_bzlmod_v2::RootPackageSource;
 use slug_bzlmod_v2::RootPackageSourceError;
 use slug_bzlmod_v2::RootPackageSourceKey;
+use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
@@ -1110,6 +1115,140 @@ pub struct RootPackageLoadKey {
     package: PackagePath,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum RepositoryPackageLoadErrorInner {
+    Source {
+        path: PathBuf,
+        error: RepositorySourceFileError,
+    },
+    SourceCompute {
+        path: PathBuf,
+        message: Arc<str>,
+    },
+    MissingBuild {
+        canonical_repo: CompactString,
+        package: PackagePath,
+    },
+    Encoding {
+        path: PathBuf,
+    },
+    Parse {
+        canonical_repo: CompactString,
+        package: PackagePath,
+        message: Arc<str>,
+    },
+    LoadsUnsupported {
+        canonical_repo: CompactString,
+        package: PackagePath,
+    },
+    GlobUnsupported {
+        canonical_repo: CompactString,
+        package: PackagePath,
+    },
+    Attempt(HostPackageAttemptError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepositoryPackageLoadError {
+    inner: RepositoryPackageLoadErrorInner,
+}
+
+impl RepositoryPackageLoadError {
+    fn new(inner: RepositoryPackageLoadErrorInner) -> Self {
+        Self { inner }
+    }
+}
+
+impl fmt::Display for RepositoryPackageLoadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.inner {
+            RepositoryPackageLoadErrorInner::Source { path, error } => {
+                write!(
+                    f,
+                    "reading external repository source {}: {error:?}",
+                    path.display()
+                )
+            }
+            RepositoryPackageLoadErrorInner::SourceCompute { path, message } => {
+                write!(
+                    f,
+                    "computing external repository source {}: {message}",
+                    path.display()
+                )
+            }
+            RepositoryPackageLoadErrorInner::MissingBuild {
+                canonical_repo,
+                package,
+            } => write!(
+                f,
+                "no such package '@@{canonical_repo}//{package}': BUILD file not found in directory '{package}' of external repository @@{canonical_repo}. Add a BUILD file to a directory to mark it as a package."
+            ),
+            RepositoryPackageLoadErrorInner::Encoding { path } => {
+                write!(
+                    f,
+                    "external repository BUILD file is not UTF-8: {}",
+                    path.display()
+                )
+            }
+            RepositoryPackageLoadErrorInner::Parse {
+                canonical_repo,
+                package,
+                message,
+            } => write!(
+                f,
+                "parsing BUILD file for @@{canonical_repo}//{package}: {message}"
+            ),
+            RepositoryPackageLoadErrorInner::LoadsUnsupported {
+                canonical_repo,
+                package,
+            } => write!(
+                f,
+                "external repository BUILD loads are deferred: @@{canonical_repo}//{package}"
+            ),
+            RepositoryPackageLoadErrorInner::GlobUnsupported {
+                canonical_repo,
+                package,
+            } => write!(
+                f,
+                "external repository BUILD globs are deferred: @@{canonical_repo}//{package}"
+            ),
+            RepositoryPackageLoadErrorInner::Attempt(error) => write!(f, "{error:?}"),
+        }
+    }
+}
+
+impl std::error::Error for RepositoryPackageLoadError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepositoryPackageLoadKey {
+    route: RootRepositoryRoute,
+    package: PackagePath,
+}
+
+impl RepositoryPackageLoadKey {
+    pub fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
+        Self { route, package }
+    }
+}
+
+impl std::hash::Hash for RepositoryPackageLoadKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.route.hash(state);
+        self.package.hash(state);
+    }
+}
+
+impl fmt::Display for RepositoryPackageLoadKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "repository-package-load:{}//{}",
+            self.route.canonical_repo(),
+            self.package
+        )
+    }
+}
+
 impl RootPackageLoadKey {
     pub fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
         Self { workspace, package }
@@ -1464,6 +1603,208 @@ impl Key for RootPackageLoadKey {
         if capture_events && value.is_complete() {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
                 .expect("HostPackageLoadKey stores one local Complete event batch");
+        }
+        value
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn repository_package_complete(
+    result: Result<LoadedPackage, RepositoryPackageLoadError>,
+) -> SourcePreparationOutcome<Arc<Result<LoadedPackage, RepositoryPackageLoadError>>> {
+    SourcePreparationOutcome::Complete(Arc::new(result))
+}
+
+#[async_trait]
+impl Key for RepositoryPackageLoadKey {
+    type Value = SourcePreparationOutcome<Arc<Result<LoadedPackage, RepositoryPackageLoadError>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = async {
+            let primary = PathBuf::from(self.package.as_str()).join("BUILD.bazel");
+            let fallback = PathBuf::from(self.package.as_str()).join("BUILD");
+            let primary_path = primary;
+            let primary_value = ctx
+                .compute(&HostRepositorySourceFileKey::new(
+                    self.route.clone(),
+                    primary_path.clone(),
+                ))
+                .await;
+            let source = match primary_value {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(
+                    bytes,
+                )))) => (primary_path, bytes),
+                Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))) => {
+                    let fallback_path = fallback;
+                    let fallback_value = ctx
+                        .compute(&HostRepositorySourceFileKey::new(
+                            self.route.clone(),
+                            fallback_path.clone(),
+                        ))
+                        .await;
+                    match fallback_value {
+                        Ok(SourcePreparationOutcome::Need(need)) => {
+                            return SourcePreparationOutcome::Need(need);
+                        }
+                        Ok(SourcePreparationOutcome::Complete(Ok(
+                            RepositorySourceFileValue::Present(bytes),
+                        ))) => (fallback_path, bytes),
+                        Ok(SourcePreparationOutcome::Complete(Ok(
+                            RepositorySourceFileValue::Absent,
+                        ))) => {
+                            return repository_package_complete(Err(
+                                RepositoryPackageLoadError::new(
+                                    RepositoryPackageLoadErrorInner::MissingBuild {
+                                        canonical_repo: CompactString::new(
+                                            self.route.canonical_repo().as_str(),
+                                        ),
+                                        package: self.package.clone(),
+                                    },
+                                ),
+                            ));
+                        }
+                        Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                            return repository_package_complete(Err(
+                                RepositoryPackageLoadError::new(
+                                    RepositoryPackageLoadErrorInner::Source {
+                                        path: fallback_path,
+                                        error,
+                                    },
+                                ),
+                            ));
+                        }
+                        Err(error) => {
+                            return repository_package_complete(Err(
+                                RepositoryPackageLoadError::new(
+                                    RepositoryPackageLoadErrorInner::SourceCompute {
+                                        path: fallback_path,
+                                        message: Arc::from(error.to_string()),
+                                    },
+                                ),
+                            ));
+                        }
+                    }
+                }
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
+                        RepositoryPackageLoadErrorInner::Source {
+                            path: primary_path,
+                            error,
+                        },
+                    )));
+                }
+                Err(error) => {
+                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
+                        RepositoryPackageLoadErrorInner::SourceCompute {
+                            path: primary_path,
+                            message: Arc::from(error.to_string()),
+                        },
+                    )));
+                }
+            };
+            let (relative_build_file, bytes) = source;
+            let source = match std::str::from_utf8(bytes.as_ref()) {
+                Ok(source) => Arc::new(source.to_owned()),
+                Err(_) => {
+                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
+                        RepositoryPackageLoadErrorInner::Encoding {
+                            path: relative_build_file,
+                        },
+                    )));
+                }
+            };
+            let canonical_repo = CompactString::new(self.route.canonical_repo().as_str());
+            let logical_package_dir = PathBuf::from("<output_base>")
+                .join("external")
+                .join(canonical_repo.as_str())
+                .join(self.package.as_str());
+            let logical_build_file = logical_package_dir.join(
+                relative_build_file
+                    .file_name()
+                    .expect("BUILD candidate has a basename"),
+            );
+            let ast = match AstModule::parse_with_string_encoding(
+                &logical_build_file.display().to_string(),
+                source.as_ref().clone(),
+                &Dialect::Standard,
+                StringEncoding::BazelInternal,
+            ) {
+                Ok(ast) => ast,
+                Err(error) => {
+                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
+                        RepositoryPackageLoadErrorInner::Parse {
+                            canonical_repo,
+                            package: self.package.clone(),
+                            message: Arc::from(error.to_string()),
+                        },
+                    )));
+                }
+            };
+            if !ast.loads().is_empty() {
+                return repository_package_complete(Err(RepositoryPackageLoadError::new(
+                    RepositoryPackageLoadErrorInner::LoadsUnsupported {
+                        canonical_repo,
+                        package: self.package.clone(),
+                    },
+                )));
+            }
+            let input = HostPackageAttemptInput {
+                workspace: self.route.workspace().dupe(),
+                logical_package_root: self.route.workspace().dupe(),
+                package: self.package.clone(),
+                package_dir: logical_package_dir,
+                build_file: logical_build_file,
+                source,
+                package_label: CompactString::new(self.package.as_str()),
+                loaded_modules: &[],
+                capture_events,
+            };
+            match evaluate_host_package_attempt(&input, Arc::new(SmallMap::new())) {
+                HostPackageAttemptStep::Pending {
+                    event_batch: batch, ..
+                } => {
+                    event_batch = Some(batch);
+                    repository_package_complete(Err(RepositoryPackageLoadError::new(
+                        RepositoryPackageLoadErrorInner::GlobUnsupported {
+                            canonical_repo,
+                            package: self.package.clone(),
+                        },
+                    )))
+                }
+                HostPackageAttemptStep::Terminal(terminal) => {
+                    event_batch = Some(terminal.event_batch);
+                    repository_package_complete(terminal.result.map_err(|error| {
+                        RepositoryPackageLoadError::new(RepositoryPackageLoadErrorInner::Attempt(
+                            error,
+                        ))
+                    }))
+                }
+            }
+        }
+        .await;
+        if capture_events && value.is_complete() {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("RepositoryPackageLoadKey stores one local Complete event batch");
         }
         value
     }

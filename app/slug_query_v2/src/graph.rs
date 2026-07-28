@@ -10,7 +10,10 @@
 
 //! Demand-driven unconfigured package graph ownership for loading query.
 
+use std::cmp::Ordering;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -26,14 +29,19 @@ use futures::FutureExt;
 use slug_bzlmod_v2::HostRootPackageBoundaryKey;
 use slug_bzlmod_v2::HostRootPackageBoundaryKind;
 use slug_bzlmod_v2::RootPackageLookupInputsProjectionKey;
+use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::SourcePreparationNeeds;
+use slug_identity_v2::ApparentLabel;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackagePath;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::PackageGroupContents;
 use slug_loading_v2::PackageTargetKind;
+use slug_loading_v2::RepositoryPackageLoadKey;
 use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::RuleCapability;
 use slug_loading_v2::RuleVisibility;
@@ -56,8 +64,37 @@ use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Allocative, Dupe)]
-pub struct QueryLabel(Arc<CanonicalLabel>);
+#[derive(Debug, Clone, Allocative, Dupe)]
+pub struct QueryLabel {
+    canonical: Arc<CanonicalLabel>,
+    apparent_repo: Option<Arc<ApparentRepoName>>,
+}
+
+impl PartialEq for QueryLabel {
+    fn eq(&self, other: &Self) -> bool {
+        self.canonical == other.canonical
+    }
+}
+
+impl Eq for QueryLabel {}
+
+impl Hash for QueryLabel {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.canonical.hash(state);
+    }
+}
+
+impl Ord for QueryLabel {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.canonical.cmp(&other.canonical)
+    }
+}
+
+impl PartialOrd for QueryLabel {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl QueryLabel {
     pub fn parse_root(value: &str) -> Result<Self, QueryError> {
@@ -68,24 +105,77 @@ impl QueryLabel {
         }
         let canonical = format!("@@{value}");
         CanonicalLabel::parse(&canonical)
-            .map(|label| Self(Arc::new(label)))
+            .map(|label| Self {
+                canonical: Arc::new(label),
+                apparent_repo: None,
+            })
             .map_err(QueryError::evaluation)
     }
 
     pub fn from_canonical(label: CanonicalLabel) -> Self {
-        Self(Arc::new(label))
+        Self {
+            canonical: Arc::new(label),
+            apparent_repo: None,
+        }
+    }
+
+    pub(crate) fn from_apparent_route(
+        label: &ApparentLabel,
+        canonical_repo: &CanonicalRepoName,
+    ) -> Result<Self, QueryError> {
+        let canonical = CanonicalLabel::parse(&format!(
+            "{}//{}:{}",
+            canonical_repo,
+            label.package(),
+            label.target()
+        ))
+        .map_err(QueryError::evaluation)?;
+        Ok(Self {
+            canonical: Arc::new(canonical),
+            apparent_repo: Some(Arc::new(label.repo().clone())),
+        })
+    }
+
+    pub(crate) fn in_external_package(
+        canonical_repo: &CanonicalRepoName,
+        apparent_repo: &ApparentRepoName,
+        package: &PackagePath,
+        target: &str,
+    ) -> Result<Self, QueryError> {
+        let canonical = CanonicalLabel::parse(&format!("{}//{}:{target}", canonical_repo, package))
+            .map_err(QueryError::evaluation)?;
+        Ok(Self {
+            canonical: Arc::new(canonical),
+            apparent_repo: Some(Arc::new(apparent_repo.clone())),
+        })
     }
 
     pub fn package(&self) -> &str {
-        self.0.package().package().as_str()
+        self.canonical.package().package().as_str()
     }
 
     pub fn target(&self) -> &str {
-        self.0.target().as_str()
+        self.canonical.target().as_str()
     }
 
     pub fn is_root_repository(&self) -> bool {
-        self.0.package().repo().is_root()
+        self.canonical.package().repo().is_root()
+    }
+
+    pub(crate) fn apparent_repo(&self) -> Option<&ApparentRepoName> {
+        self.apparent_repo.as_deref()
+    }
+
+    pub(crate) fn output_label(&self) -> CompactString {
+        match &self.apparent_repo {
+            Some(repo) => CompactString::new(format!(
+                "@{}//{}:{}",
+                repo.as_str(),
+                self.package(),
+                self.target()
+            )),
+            None => CompactString::new(self.to_string()),
+        }
     }
 }
 
@@ -94,7 +184,7 @@ impl fmt::Display for QueryLabel {
         if self.is_root_repository() {
             write!(f, "//{}:{}", self.package(), self.target())
         } else {
-            write!(f, "{}:{}", self.0.package(), self.target())
+            write!(f, "{}:{}", self.canonical.package(), self.target())
         }
     }
 }
@@ -169,9 +259,28 @@ pub(crate) struct RootUnconfiguredPackageGraphKey {
     package: PackagePath,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub(crate) struct ExternalUnconfiguredPackageGraphKey {
+    route: RootRepositoryRoute,
+    package: PackagePath,
+}
+
 impl RootUnconfiguredPackageGraphKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
         Self { workspace, package }
+    }
+}
+
+impl ExternalUnconfiguredPackageGraphKey {
+    pub(crate) fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
+        Self { route, package }
+    }
+}
+
+impl Hash for ExternalUnconfiguredPackageGraphKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.route.hash(state);
+        self.package.hash(state);
     }
 }
 
@@ -181,6 +290,17 @@ impl fmt::Display for RootUnconfiguredPackageGraphKey {
             f,
             "root-unconfigured-package-graph://{}",
             self.package.as_str()
+        )
+    }
+}
+
+impl fmt::Display for ExternalUnconfiguredPackageGraphKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "external-unconfigured-package-graph:{}//{}",
+            self.route.canonical_repo(),
+            self.package
         )
     }
 }
@@ -373,6 +493,48 @@ impl Key for RootUnconfiguredPackageGraphKey {
                                 loaded,
                             )
                             .map(Arc::new)
+                        }),
+                ))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for ExternalUnconfiguredPackageGraphKey {
+    type Value = RootGraphValue;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match ctx
+            .compute(&RepositoryPackageLoadKey::new(
+                self.route.clone(),
+                self.package.clone(),
+            ))
+            .await
+            .expect("external package loading DICE invariant")
+        {
+            LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(loaded) => {
+                LoadingPreparationOutcome::Complete(Arc::new(
+                    loaded
+                        .as_ref()
+                        .as_ref()
+                        .map_err(|error| QueryError::package_loading(error.to_string()))
+                        .and_then(|loaded| {
+                            external_package_graph_from_loaded(&self.route, &self.package, loaded)
+                                .map(Arc::new)
                         }),
                 ))
             }
@@ -676,6 +838,104 @@ fn package_graph_from_loaded(
 
     Ok(UnconfiguredPackageGraph {
         package: package_name,
+        nodes,
+    })
+}
+
+fn external_package_graph_from_loaded(
+    route: &RootRepositoryRoute,
+    package: &PackagePath,
+    loaded: &LoadedPackage,
+) -> Result<UnconfiguredPackageGraph, QueryError> {
+    let build_basename = loaded
+        .build_file
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            QueryError::evaluation("loaded external BUILD file has no UTF-8 basename")
+        })?;
+    let build_file = CompactString::new(loaded.build_file.to_string_lossy());
+    let mut nodes = SmallMap::with_capacity(loaded.targets.len() + 1);
+
+    for target in &loaded.targets {
+        if !matches!(target.kind, PackageTargetKind::ExportedFile) {
+            return Err(QueryError::evaluation(format!(
+                "external repository rule graph is deferred: {}//{}:{}",
+                route.canonical_repo(),
+                package,
+                target.name
+            )));
+        }
+        let effective_visibility = effective_visibility(loaded, target)?;
+        if !effective_visibility.dependency_labels().is_empty() {
+            return Err(QueryError::evaluation(format!(
+                "external repository visibility edges are deferred: {}//{}:{}",
+                route.canonical_repo(),
+                package,
+                target.name
+            )));
+        }
+        let label = QueryLabel::in_external_package(
+            route.canonical_repo(),
+            route.apparent_repo(),
+            package,
+            &target.name,
+        )?;
+        let kind = if target.name == build_basename {
+            QueryNodeKind::BuildFile
+        } else {
+            QueryNodeKind::SourceFile
+        };
+        nodes.insert(
+            label.dupe(),
+            QueryNode {
+                label,
+                kind,
+                rule_capability: None,
+                test_metadata: None,
+                build_file: build_file.clone(),
+                effective_visibility,
+                visibility_source: target.visibility.clone(),
+                package_group_contents: None,
+                edges: Arc::from([]),
+                attributes: Arc::from([]),
+            },
+        );
+    }
+
+    if !loaded.default_visibility.dependency_labels().is_empty() {
+        return Err(QueryError::evaluation(format!(
+            "external repository default visibility edges are deferred: {}//{}",
+            route.canonical_repo(),
+            package
+        )));
+    }
+    let build_label = QueryLabel::in_external_package(
+        route.canonical_repo(),
+        route.apparent_repo(),
+        package,
+        build_basename,
+    )?;
+    if nodes.get(&build_label).is_none() {
+        nodes.insert(
+            build_label.dupe(),
+            QueryNode {
+                label: build_label,
+                kind: QueryNodeKind::BuildFile,
+                rule_capability: None,
+                test_metadata: None,
+                build_file,
+                effective_visibility: loaded.default_visibility.clone(),
+                visibility_source: VisibilitySource::PackageDefault,
+                package_group_contents: None,
+                edges: Arc::from([]),
+                attributes: Arc::from([]),
+            },
+        );
+    }
+
+    Ok(UnconfiguredPackageGraph {
+        package: CompactString::new(package.as_str()),
         nodes,
     })
 }
@@ -1075,4 +1335,44 @@ fn path_to_package(path: &Path) -> Result<CompactString, QueryError> {
 
 fn label_in_package(package: &str, target: &str) -> Result<QueryLabel, QueryError> {
     QueryLabel::parse_root(&format!("//{package}:{target}"))
+}
+
+#[cfg(test)]
+mod label_tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
+
+    use slug_identity_v2::ApparentLabel;
+    use slug_identity_v2::CanonicalRepoName;
+
+    use super::QueryLabel;
+
+    #[test]
+    fn external_label_identity_is_canonical_while_output_is_apparent() {
+        let canonical = CanonicalRepoName::new("dep+").unwrap();
+        let dep = QueryLabel::from_apparent_route(
+            &ApparentLabel::parse("@dep//pkg:target").unwrap(),
+            &canonical,
+        )
+        .unwrap();
+        let alias = QueryLabel::from_apparent_route(
+            &ApparentLabel::parse("@alias//pkg:target").unwrap(),
+            &canonical,
+        )
+        .unwrap();
+        let hash = |label: &QueryLabel| {
+            let mut state = DefaultHasher::new();
+            label.hash(&mut state);
+            state.finish()
+        };
+
+        assert_eq!(dep, alias);
+        assert_eq!(dep.cmp(&alias), std::cmp::Ordering::Equal);
+        assert_eq!(hash(&dep), hash(&alias));
+        assert_eq!(dep.to_string(), "@@dep+//pkg:target");
+        assert_eq!(alias.to_string(), "@@dep+//pkg:target");
+        assert_eq!(dep.output_label(), "@dep//pkg:target");
+        assert_eq!(alias.output_label(), "@alias//pkg:target");
+    }
 }

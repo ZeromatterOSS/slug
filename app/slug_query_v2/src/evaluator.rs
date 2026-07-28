@@ -204,7 +204,7 @@ async fn evaluate_parsed_query(
             .environment
             .selected_full_order(&targets)
             .into_iter()
-            .map(|label| CompactString::new(label.to_string()))
+            .map(|label| label.output_label())
             .collect()
     } else {
         let mut labels = targets
@@ -217,7 +217,7 @@ async fn evaluate_parsed_query(
         }
         labels
             .into_iter()
-            .map(|label| CompactString::new(label.to_string()))
+            .map(|label| label.output_label())
             .collect()
     };
     Ok(QueryOutput {

@@ -18,18 +18,30 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicU64;
+#[cfg(test)]
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::task::Poll;
 
 use allocative::Allocative;
 use anyhow::Context;
 use async_trait::async_trait;
+#[cfg(test)]
+use dice::ActivationData;
+#[cfg(test)]
+use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceComputations;
 use dice::DiceTransactionUpdater;
+#[cfg(test)]
+use dice::DynKey;
 use dice::InjectedKey;
 use dice::Key;
+#[cfg(test)]
+use dice::RichActivation;
+#[cfg(test)]
+use dice::RootActivation;
 use dice::UserComputationData;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
@@ -372,6 +384,117 @@ pub struct WorkspaceRuntime {
     repository_materializer: Arc<super::repository_io::RepositoryMaterializer>,
     #[allow(dead_code)] // Dormant until the shared retry-driver packet.
     native_demand_sessions: NativeDemandSessionOwner,
+    #[cfg(test)]
+    activation_audit: Option<Arc<ExternalQueryActivationAudit>>,
+}
+
+#[cfg(test)]
+#[derive(Default)]
+struct ExternalQueryActivationAudit {
+    forbidden: Mutex<Vec<String>>,
+    typed_roots: AtomicUsize,
+}
+
+#[cfg(test)]
+impl ExternalQueryActivationAudit {
+    fn checkpoint(&self) -> (usize, usize) {
+        (
+            self.forbidden.lock().unwrap().len(),
+            self.typed_roots.load(Ordering::Relaxed),
+        )
+    }
+
+    fn assert_phase_clean(
+        &self,
+        checkpoint: (usize, usize),
+        minimum_typed_root_activations: usize,
+    ) {
+        let forbidden = self.forbidden.lock().unwrap();
+        assert_eq!(
+            forbidden.len(),
+            checkpoint.0,
+            "external query activated forbidden legacy keys: {:?}",
+            &forbidden[checkpoint.0..]
+        );
+        assert!(
+            self.typed_roots.load(Ordering::Relaxed)
+                >= checkpoint.1 + minimum_typed_root_activations,
+            "external query did not activate the typed root enough times to prove the requested phase"
+        );
+    }
+
+    fn record_key(&self, key: &DynKey) {
+        let key_text = key.to_string();
+        if key
+            .downcast_ref::<slug_bzlmod_v2::RepositoryMaterializationKey>()
+            .is_some()
+            || key.downcast_ref::<RootModuleGraphKey>().is_some()
+            || key
+                .downcast_ref::<slug_bzlmod_v2::RootModuleFilesKey>()
+                .is_some()
+            || key.downcast_ref::<WorkspaceEvaluationKey>().is_some()
+            || key
+                .downcast_ref::<slug_loading_v2::keys::PackageLoadKey>()
+                .is_some()
+            || key
+                .downcast_ref::<slug_loading_v2::keys::WorkspaceDirectorySnapshotKey>()
+                .is_some()
+            || key
+                .downcast_ref::<slug_loading_v2::keys::WorkspaceDirectoryKey>()
+                .is_some()
+            || key.downcast_ref::<WorkspaceSnapshotKey>().is_some()
+            || key.downcast_ref::<WorkspaceRawSnapshotKey>().is_some()
+            || key.downcast_ref::<WorkspaceFileKey>().is_some()
+            || key
+                .downcast_ref::<slug_workspace_v2::WorkspaceRawFileKey>()
+                .is_some()
+            || key_text.starts_with("root-module-evaluation:")
+        {
+            self.forbidden.lock().unwrap().push(key_text);
+        }
+    }
+
+    fn record_root(&self, key: &DynKey) {
+        if key.downcast_ref::<RootQueryCommandKey>().is_some() {
+            self.typed_roots.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+}
+
+#[cfg(test)]
+struct AuditedRuntimeActivationTracker {
+    runtime: Arc<dyn ActivationTracker>,
+    audit: Arc<ExternalQueryActivationAudit>,
+}
+
+#[cfg(test)]
+impl ActivationTracker for AuditedRuntimeActivationTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
+        activation: ActivationData,
+    ) {
+        // RuntimeActivationTracker's legacy callback is deliberately empty;
+        // preserve its rich callback below and give the audit the one legacy
+        // dependency iterator.
+        let _ = (deps, activation);
+        self.audit.record_key(key);
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        self.runtime.tracks_rich_activations()
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        self.audit.record_key(key);
+        self.runtime.key_activated_rich(key, activation);
+    }
+
+    fn root_activated(&self, key: &DynKey, activation: RootActivation) {
+        self.runtime.root_activated(key, activation);
+        self.audit.record_root(key);
+    }
 }
 
 #[allow(dead_code)]
@@ -1969,6 +2092,8 @@ impl WorkspaceRuntime {
             next_repository_materialization_generation: AtomicU64::new(1),
             repository_materializer,
             native_demand_sessions,
+            #[cfg(test)]
+            activation_audit: None,
         })
     }
 
@@ -1985,7 +2110,24 @@ impl WorkspaceRuntime {
             ..Default::default()
         };
         self.demand_owner.install(&self.dice, &mut data, effects)?;
+        #[cfg(test)]
+        if let Some(audit) = &self.activation_audit {
+            let runtime = data
+                .activation_tracker
+                .take()
+                .expect("the runtime demand owner installed its tracker");
+            data.activation_tracker = Some(Arc::new(AuditedRuntimeActivationTracker {
+                runtime,
+                audit: audit.dupe(),
+            }));
+        }
         Ok(data)
+    }
+
+    #[cfg(test)]
+    fn with_activation_audit(mut self, audit: Arc<ExternalQueryActivationAudit>) -> Self {
+        self.activation_audit = Some(audit);
+        self
     }
 
     #[allow(dead_code)]
@@ -3945,6 +4087,221 @@ mod tests {
         assert_eq!(
             accepted_output_text(&missing),
             ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT"]
+        );
+    }
+
+    #[test]
+    fn direct_external_query_uses_host_route_native_materialization_and_apparent_output() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "print(\"MODULE_EVENT\")\nmodule(name = \"driver\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("dep")).unwrap();
+        fs::write(
+            workspace.path().join("dep/MODULE.bazel"),
+            "module(name = \"dep\", version = \"1.0.0\")\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
+        )
+        .unwrap();
+        fs::write(workspace.path().join("dep/target.txt"), "target").unwrap();
+
+        let activation_audit = Arc::new(ExternalQueryActivationAudit::default());
+        let runtime = WorkspaceRuntime::new(workspace.path())
+            .unwrap()
+            .with_activation_audit(activation_audit.clone());
+        let query = |expression: &str| {
+            runtime.query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+                expression,
+                QueryOrder::Auto,
+                QueryPolicy::default(),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                QueryOutputCompletion::Standard,
+            )
+        };
+
+        let phase = activation_audit.checkpoint();
+        let first = query("@dep//:target.txt").unwrap();
+        activation_audit.assert_phase_clean(phase, 2);
+        assert_eq!(
+            first
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:target.txt\n"
+        );
+        assert_eq!(
+            accepted_output_text(&first),
+            ["MODULE_EVENT", "EXTERNAL_BUILD_EVENT"]
+        );
+        let phase = activation_audit.checkpoint();
+        let warm = query("@dep//:target.txt").unwrap();
+        activation_audit.assert_phase_clean(phase, 1);
+        assert!(accepted_output_text(&warm).is_empty());
+
+        fs::rename(
+            workspace.path().join("dep/BUILD.bazel"),
+            workspace.path().join("dep/BUILD"),
+        )
+        .unwrap();
+        let fallback = query("@dep//:target.txt").unwrap();
+        assert_eq!(
+            fallback
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:target.txt\n"
+        );
+        assert_eq!(accepted_output_text(&fallback), ["EXTERNAL_BUILD_EVENT"]);
+
+        fs::write(
+            workspace.path().join("dep/BUILD"),
+            "print(\"EXTERNAL_BUILD_EDITED\")\nexports_files([\"edited.txt\"])\n",
+        )
+        .unwrap();
+        fs::write(workspace.path().join("dep/edited.txt"), "edited").unwrap();
+        let edited = query("@dep//:edited.txt").unwrap();
+        assert_eq!(
+            edited
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:edited.txt\n"
+        );
+        assert_eq!(accepted_output_text(&edited), ["EXTERNAL_BUILD_EDITED"]);
+
+        fs::remove_file(workspace.path().join("dep/BUILD")).unwrap();
+        let phase = activation_audit.checkpoint();
+        let deleted = query("@dep//:edited.txt").unwrap();
+        activation_audit.assert_phase_clean(phase, 2);
+        assert!(
+            deleted
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("BUILD file not found")
+        );
+
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
+        )
+        .unwrap();
+        let phase = activation_audit.checkpoint();
+        let restored = query("@dep//:target.txt").unwrap();
+        activation_audit.assert_phase_clean(phase, 2);
+        assert_eq!(
+            restored
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:target.txt\n"
+        );
+        assert_eq!(accepted_output_text(&restored), ["EXTERNAL_BUILD_EVENT"]);
+
+        let phase = activation_audit.checkpoint();
+        let missing = query("@dep//:missing").unwrap();
+        activation_audit.assert_phase_clean(phase, 1);
+        let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "no such target '@@dep+//:missing': target 'missing' not declared in package '' defined by <output_base>/external/dep+/BUILD.bazel"
+        );
+        assert_eq!(error.exit_code, 7);
+
+        let missing_package = query("@dep//nope:missing").unwrap();
+        let error = missing_package
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "no such package '@@dep+//nope': BUILD file not found in directory 'nope' of external repository @@dep+. Add a BUILD file to a directory to mark it as a package."
+        );
+        assert_eq!(error.exit_code, 7);
+
+        let phase = activation_audit.checkpoint();
+        let unknown = query("@missing//:target.txt").unwrap();
+        activation_audit.assert_phase_clean(phase, 1);
+        let error = unknown.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "no such package '@@[unknown repo 'missing' requested from @@]//': The repository '@@[unknown repo 'missing' requested from @@]' could not be resolved: No repository visible as '@missing' from main repository"
+        );
+        assert_eq!(error.exit_code, 7);
+
+        for pattern in ["@dep//:all", "@dep//:*", "@dep//..."] {
+            let pattern_error = query(pattern).unwrap();
+            assert_eq!(
+                pattern_error
+                    .terminal_for_test()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap_err()
+                    .to_string(),
+                format!("external repository query patterns are deferred: {pattern}")
+            );
+        }
+
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "load(\":defs.bzl\", \"defs\")\nexports_files([\"target.txt\"])\n",
+        )
+        .unwrap();
+        let load = query("@dep//:target.txt").unwrap();
+        assert!(
+            load.terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("external repository BUILD loads are deferred")
+        );
+
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "exports_files(glob([\"*.txt\"]))\n",
+        )
+        .unwrap();
+        let glob = query("@dep//:target.txt").unwrap();
+        assert!(
+            glob.terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("external repository BUILD globs are deferred")
+        );
+
+        fs::write(workspace.path().join("dep/BUILD.bazel"), [0xff]).unwrap();
+        let invalid_utf8 = query("@dep//:target.txt").unwrap();
+        assert!(
+            invalid_utf8
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("external repository BUILD file is not UTF-8")
         );
     }
 

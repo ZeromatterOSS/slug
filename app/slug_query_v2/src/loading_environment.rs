@@ -19,6 +19,8 @@ use dice::DiceComputations;
 use dupe::Dupe;
 use slug_bzlmod_v2::HostRootPackageBoundaryKey;
 use slug_bzlmod_v2::HostRootPackageBoundaryKind;
+use slug_bzlmod_v2::RootRepositoryRoute;
+use slug_bzlmod_v2::RootRepositoryRouteKey;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetPattern;
@@ -45,6 +47,7 @@ use crate::generic::TargetSet;
 use crate::generic::TestSuiteAttribute;
 use crate::generic::TestTargetInfo;
 use crate::generic::TestTargetKind;
+use crate::graph::ExternalUnconfiguredPackageGraphKey;
 use crate::graph::QueryError;
 use crate::graph::QueryLabel;
 use crate::graph::QueryNode;
@@ -151,34 +154,95 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             .clone()
     }
 
-    async fn lookup_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
-        if !label.is_root_repository() {
-            return Err(QueryError::evaluation(format!(
-                "external repository query labels are deferred: {label}"
-            )));
+    async fn repository_route(
+        &mut self,
+        apparent_repo: &slug_identity_v2::ApparentRepoName,
+    ) -> Result<RootRepositoryRoute, QueryError> {
+        let workspace = self.root_workspace.clone().ok_or_else(|| {
+            QueryError::evaluation("external repository query requires Host mode")
+        })?;
+        let key = RootRepositoryRouteKey::new(workspace, apparent_repo.clone())
+            .map_err(QueryError::evaluation)?;
+        match self
+            .ctx
+            .compute(&key)
+            .await
+            .expect("root repository route DICE invariant")
+        {
+            LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+            LoadingPreparationOutcome::Complete(value) => value
+                .as_ref()
+                .as_ref()
+                .cloned()
+                .map_err(|error| QueryError::evaluation(error.to_string())),
         }
-        let graph = self.package_graph(label.package()).await.map_err(|error| {
-            if error.is_preparation_restart() {
-                return error;
-            }
-            if error.message.contains("no BUILD.bazel or BUILD file")
-                || error.message.contains("package directory is absent")
-            {
-                error.with_message(format!(
-                    "no such package '{}': BUILD file not found",
+    }
+
+    async fn external_package_graph(
+        &mut self,
+        route: RootRepositoryRoute,
+        package: &str,
+    ) -> Result<Arc<UnconfiguredPackageGraph>, QueryError> {
+        let package = PackagePath::parse(package).map_err(QueryError::evaluation)?;
+        match self
+            .ctx
+            .compute(&ExternalUnconfiguredPackageGraphKey::new(route, package))
+            .await
+            .expect("external query graph DICE invariant")
+        {
+            LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+            LoadingPreparationOutcome::Complete(value) => value.as_ref().clone(),
+        }
+    }
+
+    async fn lookup_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
+        let graph = if label.is_root_repository() {
+            self.package_graph(label.package()).await.map_err(|error| {
+                if error.is_preparation_restart() {
+                    return error;
+                }
+                if error.message.contains("no BUILD.bazel or BUILD file")
+                    || error.message.contains("package directory is absent")
+                {
+                    error.with_message(format!(
+                        "no such package '{}': BUILD file not found",
+                        label.package()
+                    ))
+                } else {
+                    error
+                }
+            })?
+        } else {
+            let apparent_repo = label
+                .apparent_repo()
+                .cloned()
+                .ok_or_else(|| QueryError::evaluation("external query label lost render route"))?;
+            let route = self.repository_route(&apparent_repo).await?;
+            self.external_package_graph(route, label.package()).await?
+        };
+        let node = graph.nodes.get(&label).cloned().ok_or_else(|| {
+            if label.is_root_repository() {
+                QueryError::target_missing(format!(
+                    "no such target '{}': target '{}' not declared in package '{}'",
+                    label,
+                    label.target(),
                     label.package()
                 ))
             } else {
-                error
+                let build_file = graph
+                    .nodes
+                    .values()
+                    .next()
+                    .map(|node| node.build_file.as_str())
+                    .unwrap_or("<output_base>/external/unknown/BUILD.bazel");
+                QueryError::target_missing(format!(
+                    "no such target '{}': target '{}' not declared in package '{}' defined by {}",
+                    label,
+                    label.target(),
+                    label.package(),
+                    build_file
+                ))
             }
-        })?;
-        let node = graph.nodes.get(&label).cloned().ok_or_else(|| {
-            QueryError::target_missing(format!(
-                "no such target '{}': target '{}' not declared in package '{}'",
-                label,
-                label.target(),
-                label.package()
-            ))
         })?;
         Ok(node)
     }
@@ -526,7 +590,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                 .expect("query graph exceeds u32 node capacity");
             target_to_index.insert(label.clone(), index);
             if self.generated_file_labels.contains(&label) {
-                generated_file_labels.insert(CompactString::new(label.to_string()));
+                generated_file_labels.insert(label.output_label());
             }
             let kind = if included.get(&label).copied() == Some(true) {
                 self.node_kinds.get(&label).cloned()
@@ -536,7 +600,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                 Some(CompactString::const_new("source file"))
             };
             nodes.push(SelectedQueryGraphNode {
-                label: CompactString::new(label.to_string()),
+                label: label.output_label(),
                 kind,
                 successors: Vec::new(),
             });
@@ -699,10 +763,25 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             let labels = self.resolve_recursive("").await?;
             return Ok(self.real_delivery(labels.iter().cloned()));
         }
+        if literal.starts_with('@') && !literal.starts_with("@@") && literal.ends_with("//...") {
+            return Err(QueryError::evaluation(format!(
+                "external repository query patterns are deferred: {literal}"
+            )));
+        }
         let pattern = TargetPattern::parse(literal).map_err(QueryError::evaluation)?;
         match pattern {
             TargetPattern::Single(label) => {
-                let label = QueryLabel::parse_root(&label.to_string())?;
+                if !label.repo().is_root() && label.target().as_str() == "*" {
+                    return Err(QueryError::evaluation(format!(
+                        "external repository query patterns are deferred: {literal}"
+                    )));
+                }
+                let label = if label.repo().is_root() {
+                    QueryLabel::parse_root(&label.to_string())?
+                } else {
+                    let route = self.repository_route(label.repo()).await?;
+                    QueryLabel::from_apparent_route(&label, route.canonical_repo())?
+                };
                 self.resolve_single(label.clone()).await?;
                 Ok(self.real_delivery([label]))
             }

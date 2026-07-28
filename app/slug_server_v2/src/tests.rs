@@ -886,6 +886,54 @@ fn retained_daemon_query_publishes_cold_events_without_warm_replay() {
 }
 
 #[test]
+fn retained_daemon_direct_external_query_replays_only_changed_external_build() {
+    let workspace = scratch("external-query-selected-events");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "print(\"MODULE_EVENT\")\nmodule(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    );
+    write(
+        &workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    );
+    write(
+        &workspace.join("dep/BUILD.bazel"),
+        "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
+    );
+    write(&workspace.join("dep/target.txt"), "target\n");
+    let mut daemon = Daemon::new(&workspace).unwrap();
+
+    let first = daemon.query("@dep//:target.txt", QueryOrder::Auto);
+    assert_eq!(first.exit_code, 0, "{first:?}");
+    assert_eq!(first.stdout, "@dep//:target.txt\n");
+    let module_index = first.stderr.find("MODULE_EVENT").unwrap();
+    let build_index = first.stderr.find("EXTERNAL_BUILD_EVENT").unwrap();
+    assert!(module_index < build_index, "{first:?}");
+    assert_eq!(first.invalidated_files, 0);
+
+    let warm = daemon.query("@dep//:target.txt", QueryOrder::Auto);
+    assert_eq!(warm.exit_code, 0, "{warm:?}");
+    assert_eq!(warm.stdout, "@dep//:target.txt\n");
+    assert!(warm.stderr.is_empty(), "{warm:?}");
+    assert_eq!(warm.invalidated_files, 0);
+
+    write(
+        &workspace.join("dep/BUILD.bazel"),
+        "print(\"EXTERNAL_BUILD_EDITED\")\nexports_files([\"edited.txt\"])\n",
+    );
+    write(&workspace.join("dep/edited.txt"), "edited\n");
+    let edited = daemon.query("@dep//:edited.txt", QueryOrder::Auto);
+    assert_eq!(edited.exit_code, 0, "{edited:?}");
+    assert_eq!(edited.stdout, "@dep//:edited.txt\n");
+    assert!(
+        edited.stderr.contains("EXTERNAL_BUILD_EDITED"),
+        "{edited:?}"
+    );
+    assert!(!edited.stderr.contains("MODULE_EVENT"), "{edited:?}");
+    assert_eq!(edited.invalidated_files, 2);
+}
+
+#[test]
 fn daemon_query_preflight_error_has_one_terminal_newline() {
     let workspace = scratch("query-preflight-error");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

@@ -2835,6 +2835,95 @@ fn output_base_query_reuses_one_daemon_across_build_edits() {
 }
 
 #[test]
+fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events() {
+    let workspace = scratch("external-query-workspace");
+    let output_base = scratch("external-query-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(
+        workspace.join("MODULE.bazel"),
+        "print(\"MODULE_EVENT\")\nmodule(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    );
+    write(
+        workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    );
+    write(
+        workspace.join("dep/BUILD.bazel"),
+        "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
+    );
+    write(workspace.join("dep/target.txt"), "target\n");
+
+    let one_shot = slug()
+        .current_dir(&workspace)
+        .args(["query", "@dep//:target.txt"])
+        .output()
+        .unwrap();
+    assert!(one_shot.status.success(), "{one_shot:?}");
+    assert_eq!(
+        String::from_utf8(one_shot.stdout).unwrap(),
+        "@dep//:target.txt\n"
+    );
+    let one_shot_stderr = String::from_utf8(one_shot.stderr).unwrap();
+    let module_index = one_shot_stderr.find("MODULE_EVENT").unwrap();
+    let build_index = one_shot_stderr.find("EXTERNAL_BUILD_EVENT").unwrap();
+    assert!(module_index < build_index, "{one_shot_stderr}");
+
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let first = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "query", "@dep//:target.txt"])
+        .output()
+        .unwrap();
+    assert!(first.status.success(), "{first:?}");
+    assert_eq!(
+        String::from_utf8(first.stdout).unwrap(),
+        "@dep//:target.txt\n"
+    );
+    let first_stderr = String::from_utf8(first.stderr).unwrap();
+    assert!(first_stderr.contains("MODULE_EVENT"), "{first_stderr}");
+    assert!(
+        first_stderr.contains("EXTERNAL_BUILD_EVENT"),
+        "{first_stderr}"
+    );
+    let pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+
+    let warm = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "query", "@dep//:target.txt"])
+        .output()
+        .unwrap();
+    assert!(warm.status.success(), "{warm:?}");
+    assert_eq!(String::from_utf8_lossy(&warm.stdout), "@dep//:target.txt\n");
+    assert!(warm.stderr.is_empty(), "{warm:?}");
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        pid
+    );
+
+    write(
+        workspace.join("dep/BUILD.bazel"),
+        "print(\"EXTERNAL_BUILD_EDITED\")\nexports_files([\"edited.txt\"])\n",
+    );
+    write(workspace.join("dep/edited.txt"), "edited\n");
+    let edited = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "query", "@dep//:edited.txt"])
+        .output()
+        .unwrap();
+    assert!(edited.status.success(), "{edited:?}");
+    assert_eq!(
+        String::from_utf8(edited.stdout).unwrap(),
+        "@dep//:edited.txt\n"
+    );
+    let edited_stderr = String::from_utf8(edited.stderr).unwrap();
+    assert!(
+        edited_stderr.contains("EXTERNAL_BUILD_EDITED"),
+        "{edited_stderr}"
+    );
+    assert!(!edited_stderr.contains("MODULE_EVENT"), "{edited_stderr}");
+}
+
+#[test]
 fn bzlmod_environment_is_captured_per_one_shot_and_daemon_query_child() {
     let workspace = scratch("bzlmod-env-workspace");
     let output_base = scratch("bzlmod-env-output-base");

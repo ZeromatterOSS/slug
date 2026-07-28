@@ -14654,3 +14654,40 @@ Implement next only `WP-5-m1-external-repository-query-routing` under the
 exact scope and evidence contract above. Do not substitute the existing
 legacy-backed `RepositorySourceFileKey` for the accepted Host route/source
 projection.
+
+### Direct external-repository source-file query accepted
+
+Status: **ACCEPT AFTER CORRECTION** for
+`WP-5-m1-external-repository-query-routing` on 2026-07-27.
+
+One apparent single target backed by a direct root `bazel_dep` and
+`local_path_override` now resolves through the Host root-module carrier,
+constructs the exact native materialization request without the legacy
+root/snapshot chain, loads a load-free/glob-free external BUILD, stores
+canonical `@@dep+` query identity, and renders the requested `@dep` spelling.
+BUILD fallback, create/edit/delete/recreate, exact unknown/missing
+diagnostics, one-shot and retained-daemon events, warm silence, and explicit
+external pattern/load/glob/canonical-label stop gates are covered.
+
+Focused route/source/query/core/CLI/server tests pass. Full loading and query
+suites pass; the bzlmod suite passed 216 tests with one untouched pre-existing
+span assertion failure. Six-crate checks, four-crate GNU-Windows no-run
+linkage, formatting, diff, scope, and no-Cargo guards pass. Bazel 9.2 generated
+and replayed the focused fixture row; the rebuilt Slug result for that query
+is exact. The fixture's older external-build row remains intentionally outside
+this packet and still stops before external build/execution.
+
+Independent review first found incomplete route hashing and a source-local
+rather than end-to-end activation guard. The correction gives the complete
+recursive `RepoSpec` an order-independent semantic hash and delegates all
+route-dependent keys to it. A composed runtime tracker proves cold retry,
+warm reuse, error, and recovery activate no legacy materialization/root
+graph/evaluation/workspace file or snapshot owner. Rereview found that reused
+nodes take a rich-only callback; the final correction audits both evaluated
+and reused activations while preserving runtime event tracking, and final
+rereview returned `ACCEPT`.
+
+Design next only `WP-5-m1-external-repository-rule-query-design`: freeze the
+smallest same-package native-rule query slice, beginning with `filegroup`,
+without crossing into external loads, glob traversal, patterns, transitive
+mapping, build/execution, JVM, Java bytecode, or Bazel delegation.

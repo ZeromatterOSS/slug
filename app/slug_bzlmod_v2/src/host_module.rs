@@ -10,6 +10,8 @@
 #![allow(dead_code)] // Dormant until the Host root-module activation packet.
 
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -22,6 +24,9 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EventBatch;
+use slug_identity_v2::ApparentRepoName;
+use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathOutcome;
@@ -32,7 +37,11 @@ use crate::EvaluatedRootModule;
 use crate::LogicalModuleFileId;
 use crate::LogicalSpan;
 use crate::NonrootIncludeRequest;
+use crate::OverrideAttributeKey;
+use crate::OverrideAttributeValue;
+use crate::RepoSpec;
 use crate::RootModuleBootstrapRequest;
+use crate::RootModuleOverride;
 use crate::RootModuleOverrides;
 use crate::SourcePreparationNeeds;
 use crate::SourcePreparationOutcome;
@@ -453,9 +462,302 @@ impl Key for RootModuleLoadingAnchorKey {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Allocative)]
+pub struct RootRepositoryRoute {
+    workspace: NormalizedAbsolutePath,
+    apparent_repo: ApparentRepoName,
+    module_name: CompactString,
+    canonical_repo: CanonicalRepoName,
+    repo_spec: RepoSpec,
+}
+
+fn hash_override_attribute_value<H: Hasher>(value: &OverrideAttributeValue, state: &mut H) {
+    std::mem::discriminant(value).hash(state);
+    match value {
+        OverrideAttributeValue::None => {}
+        OverrideAttributeValue::Bool(value) => value.hash(state),
+        OverrideAttributeValue::Int(value) => value.hash(state),
+        OverrideAttributeValue::String(value) => value.hash(state),
+        OverrideAttributeValue::Label(value) => value.hash(state),
+        OverrideAttributeValue::Iterable(values) => {
+            values.len().hash(state);
+            for value in values.iter() {
+                hash_override_attribute_value(value, state);
+            }
+        }
+        OverrideAttributeValue::Map(values) => {
+            hash_override_attribute_map(values, state);
+        }
+    }
+}
+
+fn hash_override_attribute_map<H: Hasher>(
+    values: &SmallMap<OverrideAttributeKey, OverrideAttributeValue>,
+    state: &mut H,
+) {
+    let mut entry_hashes = values
+        .iter()
+        .map(|(key, value)| {
+            let mut entry = std::collections::hash_map::DefaultHasher::new();
+            key.hash(&mut entry);
+            hash_override_attribute_value(value, &mut entry);
+            entry.finish()
+        })
+        .collect::<Vec<_>>();
+    entry_hashes.sort_unstable();
+    entry_hashes.hash(state);
+}
+
+fn hash_repo_spec<H: Hasher>(spec: &RepoSpec, state: &mut H) {
+    spec.rule_id.bzl_file.hash(state);
+    spec.rule_id.rule_name.hash(state);
+    let mut entry_hashes = spec
+        .attributes
+        .iter()
+        .map(|(key, value)| {
+            let mut entry = std::collections::hash_map::DefaultHasher::new();
+            key.hash(&mut entry);
+            hash_override_attribute_value(value, &mut entry);
+            entry.finish()
+        })
+        .collect::<Vec<_>>();
+    entry_hashes.sort_unstable();
+    entry_hashes.hash(state);
+}
+
+impl Hash for RootRepositoryRoute {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.workspace.hash(state);
+        self.apparent_repo.hash(state);
+        self.module_name.hash(state);
+        self.canonical_repo.hash(state);
+        hash_repo_spec(&self.repo_spec, state);
+    }
+}
+
+impl fmt::Debug for RootRepositoryRoute {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RootRepositoryRoute")
+            .field("apparent_repo", &self.apparent_repo)
+            .field("canonical_repo", &self.canonical_repo)
+            .finish_non_exhaustive()
+    }
+}
+
+impl RootRepositoryRoute {
+    pub fn apparent_repo(&self) -> &ApparentRepoName {
+        &self.apparent_repo
+    }
+
+    pub fn canonical_repo(&self) -> &CanonicalRepoName {
+        &self.canonical_repo
+    }
+
+    pub fn module_name(&self) -> &str {
+        self.module_name.as_str()
+    }
+
+    pub fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
+    }
+
+    pub(crate) fn repo_spec(&self) -> &RepoSpec {
+        &self.repo_spec
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+        module_name: CompactString,
+        canonical_repo: CanonicalRepoName,
+        repo_spec: RepoSpec,
+    ) -> Self {
+        Self {
+            workspace,
+            apparent_repo,
+            module_name,
+            canonical_repo,
+            repo_spec,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum RootRepositoryRouteErrorKind {
+    Root(HostRootModuleFileError),
+    Unknown {
+        apparent_repo: ApparentRepoName,
+    },
+    Unsupported {
+        apparent_repo: ApparentRepoName,
+        module_name: CompactString,
+    },
+}
+
+#[derive(Clone, PartialEq, Eq, Allocative)]
+pub struct RootRepositoryRouteError {
+    kind: RootRepositoryRouteErrorKind,
+}
+
+impl fmt::Debug for RootRepositoryRouteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("RootRepositoryRouteError")
+    }
+}
+
+impl fmt::Display for RootRepositoryRouteError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            RootRepositoryRouteErrorKind::Root(error) => error.fmt(f),
+            RootRepositoryRouteErrorKind::Unknown { apparent_repo } => write!(
+                f,
+                "no such package '@@[unknown repo '{}' requested from @@]//': The repository '@@[unknown repo '{}' requested from @@]' could not be resolved: No repository visible as '@{}' from main repository",
+                apparent_repo.as_str(),
+                apparent_repo.as_str(),
+                apparent_repo.as_str(),
+            ),
+            RootRepositoryRouteErrorKind::Unsupported {
+                apparent_repo,
+                module_name,
+            } => write!(
+                f,
+                "external repository '@{}' from module '{}' is not a direct local_path_override",
+                apparent_repo.as_str(),
+                module_name,
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RootRepositoryRouteError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RootRepositoryRouteKey {
+    workspace: NormalizedAbsolutePath,
+    apparent_repo: ApparentRepoName,
+}
+
+impl RootRepositoryRouteKey {
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Result<Self, String> {
+        if apparent_repo.is_root() {
+            return Err("external repository route requires a nonroot apparent name".to_owned());
+        }
+        Ok(Self {
+            workspace,
+            apparent_repo,
+        })
+    }
+}
+
+impl fmt::Display for RootRepositoryRouteKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "root-repository-route:{}:@{}",
+            self.workspace,
+            self.apparent_repo.as_str()
+        )
+    }
+}
+
+fn is_local_path_override(spec: &RepoSpec) -> bool {
+    let local_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
+        .expect("pinned local repository label is canonical");
+    spec.rule_id.bzl_file == local_bzl && spec.rule_id.rule_name == "local_repository"
+}
+
+#[async_trait]
+impl Key for RootRepositoryRouteKey {
+    type Value =
+        SourcePreparationOutcome<Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let carrier = match dice_invariant(
+            ctx.compute(&HostRootModuleFileKey::new(self.workspace.dupe()))
+                .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            SourcePreparationOutcome::Complete(carrier) => carrier,
+        };
+        let value = match carrier.as_ref() {
+            Err(error) => Err(RootRepositoryRouteError {
+                kind: RootRepositoryRouteErrorKind::Root(error.clone()),
+            }),
+            Ok(root) => {
+                let dependency = root.module.dependencies.iter().find(|dependency| {
+                    !dependency.nodep
+                        && dependency
+                            .repo_name
+                            .as_deref()
+                            .unwrap_or(dependency.name.as_str())
+                            == self.apparent_repo.as_str()
+                });
+                match dependency {
+                    None => Err(RootRepositoryRouteError {
+                        kind: RootRepositoryRouteErrorKind::Unknown {
+                            apparent_repo: self.apparent_repo.clone(),
+                        },
+                    }),
+                    Some(dependency) => {
+                        let repo_spec = match root.overrides.get(dependency.name.as_str()) {
+                            Some(RootModuleOverride::NonRegistry(spec))
+                                if is_local_path_override(spec) =>
+                            {
+                                spec.clone()
+                            }
+                            _ => {
+                                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                                    RootRepositoryRouteError {
+                                        kind: RootRepositoryRouteErrorKind::Unsupported {
+                                            apparent_repo: self.apparent_repo.clone(),
+                                            module_name: dependency.name.clone(),
+                                        },
+                                    },
+                                )));
+                            }
+                        };
+                        let canonical_repo =
+                            CanonicalRepoName::new(format!("{}+", dependency.name))
+                                .expect("validated module name forms a canonical repository");
+                        Ok(RootRepositoryRoute {
+                            workspace: self.workspace.dupe(),
+                            apparent_repo: self.apparent_repo.clone(),
+                            module_name: dependency.name.clone(),
+                            canonical_repo,
+                            repo_spec,
+                        })
+                    }
+                }
+            }
+        };
+        SourcePreparationOutcome::Complete(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(all(test, unix))]
 mod tests {
+    use std::collections::hash_map::DefaultHasher;
     use std::error::Error as _;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::sync::Mutex;
@@ -473,6 +775,7 @@ mod tests {
     use slug_events_v2::CaptureEvaluationEvents;
     use slug_events_v2::EvaluationEvent;
     use slug_events_v2::EventBatch;
+    use slug_identity_v2::ApparentRepoName;
     use slug_workspace_v2::NeedPathObservations;
     use slug_workspace_v2::NormalizedAbsolutePath;
     use slug_workspace_v2::PathLstat;
@@ -496,6 +799,7 @@ mod tests {
     use super::RootModuleLoadingAnchor;
     use super::RootModuleLoadingAnchorError;
     use super::RootModuleLoadingAnchorKey;
+    use super::RootRepositoryRouteKey;
     use crate::BzlmodCommandPolicyKey;
     use crate::BzlmodEnvironmentPolicyKey;
     use crate::EvaluatedRootModule;
@@ -820,6 +1124,37 @@ mod tests {
             .unwrap()
     }
 
+    async fn observed_route(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        apparent_repo: &str,
+    ) -> <RootRepositoryRouteKey as Key>::Value {
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        inject_root_package_policy_inputs(&mut updater, policy(&["/workspace"])).unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace().as_path(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        transaction
+            .compute(
+                &RootRepositoryRouteKey::new(
+                    workspace(),
+                    ApparentRepoName::new(apparent_repo).unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap()
+    }
+
     fn complete_value(outcome: &super::HostRootModuleFileOutcome) -> &HostRootModuleFileValue {
         match outcome {
             SourcePreparationOutcome::Complete(value) => value.as_ref().as_ref().unwrap(),
@@ -895,6 +1230,79 @@ mod tests {
             &equal_error_a,
             &unequal_error
         ));
+    }
+
+    #[tokio::test]
+    async fn repository_route_maps_direct_alias_and_rejects_unknown_without_legacy_graph() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let source = "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n";
+        let route = observed_route(&dice, EpochBuilder::root(source, 1).build(), "dep_alias").await;
+        let SourcePreparationOutcome::Complete(route) = route else {
+            panic!("complete root module returned Need");
+        };
+        let route = route.as_ref().as_ref().unwrap();
+        assert_eq!(route.apparent_repo().as_str(), "dep_alias");
+        assert_eq!(route.module_name(), "dep");
+        assert_eq!(route.canonical_repo().as_str(), "dep+");
+        assert_eq!(route.workspace(), &workspace());
+        let hash = |route: &super::RootRepositoryRoute| {
+            let mut state = DefaultHasher::new();
+            route.hash(&mut state);
+            state.finish()
+        };
+        let mut changed_spec = route.clone();
+        Arc::make_mut(&mut changed_spec.repo_spec.attributes).insert(
+            "path".into(),
+            crate::OverrideAttributeValue::String("other-dep".into()),
+        );
+        assert_ne!(route, &changed_spec);
+        assert_ne!(hash(route), hash(&changed_spec));
+
+        let unknown = observed_route(&dice, EpochBuilder::root(source, 1).build(), "missing").await;
+        let SourcePreparationOutcome::Complete(unknown) = unknown else {
+            panic!("complete root module returned Need");
+        };
+        assert_eq!(
+            unknown.as_ref().as_ref().unwrap_err().to_string(),
+            "no such package '@@[unknown repo 'missing' requested from @@]//': The repository '@@[unknown repo 'missing' requested from @@]' could not be resolved: No repository visible as '@missing' from main repository"
+        );
+
+        let nodep = observed_route(
+            &dice,
+            EpochBuilder::root(
+                "module(name = \"root\")\nbazel_dep(name = \"nodep_dep\", version = \"1.0.0\", repo_name = None)\nlocal_path_override(module_name = \"nodep_dep\", path = \"dep\")\n",
+                2,
+            )
+            .build(),
+            "nodep_dep",
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(nodep) = nodep else {
+            panic!("complete root module returned Need");
+        };
+        assert!(nodep.as_ref().is_err());
+
+        let unsupported = observed_route(
+            &dice,
+            EpochBuilder::root(
+                "module(name = \"root\")\nbazel_dep(name = \"registry_dep\", version = \"1.0.0\")\n",
+                3,
+            )
+            .build(),
+            "registry_dep",
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(unsupported) = unsupported else {
+            panic!("complete root module returned Need");
+        };
+        assert!(
+            unsupported
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("is not a direct local_path_override")
+        );
     }
 
     #[tokio::test]
