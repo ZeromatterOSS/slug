@@ -18439,3 +18439,36 @@ public activation, direct IO, fixture/oracle, or root-horizon semantic change
 requires `REPLAN`. After focused serial tests, formatting, GNU-Windows no-run,
 archive/scope/cap/diff gates, and independent latest-diff review, resume only
 the occurrence-preserving direct-local fragment-closure design.
+
+### WP-5-m1 direct-local route package-horizon implementation (2026-08-04)
+
+**Status: ACCEPTED in `1d5edc7c`; resume only the read-only
+`WP-5-m1-direct-local-nonregistry-occurrence-closure-design`.** The one-file
+`source_preparation.rs` change is 298 production lines, 647 test lines, and 945
+total net lines, within its accepted 300/650/950 caps. The private
+`DirectLocalIncludePackageHorizonKey` composes the accepted inspection once,
+parses every occurrence before lookup, rebinds canonical packages to the full
+route, deduplicates only first-seen package dependencies, requests the whole
+group, unions all Needs, and then applies pinned Bazel 9.2 source-order mixed
+terminal/Need selection. Its complete value retains only route plus every
+ordered compact occurrence; it reads no fragment.
+
+Independent review required two evidence corrections. A pure finishing seam now
+discriminates lookup-compute, InvalidPackageName, typed lookup/source chaining,
+reverse-map-order first terminal selection, and multi-kind Need union; a shared
+inspection mapper covers both typed and compute failures. Malformed parsing
+proves zero package activations. A real downstream counter proves absent and
+present-empty inspection changes are pruned at equal horizon output, while
+include add/edit/reorder/delete/recreate and route A-to-B-to-A propagate. The
+corrected event lifecycle proves the horizon itself is event-free when captured
+and uncaptured, has a genuine warm `Reused` activation, and neither copies nor
+suppresses its routed-REPO child's batch. Final rereview returned `ACCEPT`.
+
+Formatting and diff checks passed. Focused horizon tests passed 5/5; all 32
+`source_preparation` tests and all 30 `host_package` tests passed. GNU-Windows
+`slug_bzlmod_v2` check and archive status passed with existing warnings only.
+No Bazel/oracle, fixture, public API, fragment read, closure, evaluator, or
+activation caller changed. The successor may design only occurrence-preserving
+breadth-first acquisition of routed include fragments over the accepted
+package horizon; compilation/evaluation and nonregistry event ownership remain
+deferred.
