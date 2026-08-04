@@ -15428,3 +15428,137 @@ analysis or execution. Decide from Bazel 9.2 evidence and the existing loader
 owners whether one direct `test_suite` membership belongs in that same slice
 or must remain a follow-on. This is a new external-load/identity boundary and
 requires reserved-boundary pre-review before implementation.
+
+## WP-5-m1 external Starlark test-rule query design (2026-08-04)
+
+**Status: REPLAN — no implementation packet is authorized.** The required
+same-repository external `.bzl` load has a bounded private loading-key route,
+but its first observable `test = True` target necessarily contributes Bazel
+test-base implicit dependencies. The current external graph cannot represent
+those dependencies without loading the `@bazel_tools`/toolchain graph. A
+literal/kind-only projection would make ordinary `deps()` observably wrong,
+so it is not an exact Rust-only query slice.
+
+### Direct Bazel 9.2 evidence
+
+A temporary direct-local-override root at
+`/tmp/slug-external-test-rule.8Yj523` declared the same module override used
+by the accepted external packets. `dep/defs.bzl` defined
+`probe_test = rule(implementation = _impl, test = True)` and the external
+BUILD loaded it, declared `probe_test(name = "probe", tags = ["manual", "z",
+"a"], size = "large")`, and declared
+`test_suite(name = "suite", tests = [":probe"])`. Every command used a fresh
+output-user root with `/tmp/slug-bazel-9.2-metrics-wrapper --batch
+--ignore_all_rc_files` and exited 0:
+
+| query | observable stdout |
+| --- | --- |
+| `query @dep//:probe` | `@dep//:probe` |
+| `query --output=label_kind @dep//:probe` | `probe_test rule @dep//:probe` |
+| `query @dep//:suite` | `@dep//:suite` |
+| `query 'labels(tests, @dep//:suite)'` | `@dep//:probe` |
+| `query 'deps(@dep//:probe)'` | `@dep//:probe` **plus** the test-base closure: `@bazel_tools//tools/test:{test_wrapper,xml_writer,collect_coverage,...}`, `@bazel_tools//tools/jdk:*`, `@bazel_tools//tools/launcher:*`, `@@platforms//os:*`, `@@rules_java+//:*`, `@@rules_shell+//:*`, and remote-coverage targets. |
+
+The final row is the discriminating failure of the proposed bounded graph: it
+is not self-only and it crosses into upstream tool repositories before any
+user-defined dependency. The accepted external graph currently creates no
+such implicit test edges; therefore both `deps(@dep//:probe)` and any
+unbounded `deps(@dep//:suite)` that reaches `probe` would disagree with Bazel.
+No fixture was added for this rejected design.
+
+Pinned Bazel source at `8220c6198837d5c13d53fea211cf3282aa12408a` explains
+the result:
+
+- `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java`
+  lines 254-368 gives every Starlark `test = True` rule the test base's
+  configured `$test_wrapper`, `$xml_writer`, `$test_runtime`, setup/XML, and
+  coverage label attributes rooted at the tools repository; it also supplies
+  `size` metadata.
+- `src/main/java/com/google/devtools/build/lib/packages/TestTargetUtils.java`
+  lines 89-145 reads test `tags` and `size` to filter suite members.
+- `src/main/java/com/google/devtools/build/lib/query2/engine/TestsFunction.java`
+  lines 161-211 partitions explicit suite members by test kind and uses their
+  test metadata while recursively expanding suites. Thus the direct suite
+  member is not independently atomic: it depends on a correct projected test
+  target, although its `tests()` output itself need not traverse the test-base
+  dependency closure.
+
+### Owner and identity reconciliation
+
+`ExternalUnconfiguredPackageGraphKey` in `app/slug_query_v2/src/graph.rs`
+lines 263-303 and 512-548 correctly keys the graph by `RootRepositoryRoute`
+and `PackagePath`, then reuses `RepositoryPackageLoadKey`. The latter already
+owns route-keyed external BUILD source observation through
+`HostRepositorySourceFileKey`, complete-only equality, and one local complete
+event batch (`app/slug_loading_v2/src/bzl_module.rs` lines 1223-1248 and
+1626-1810). But it explicitly returns `LoadsUnsupported` for every nonempty
+BUILD `ast.loads()` (lines 1763-1769).
+
+`HostBzlModuleEvalKey` cannot be reused: it is keyed by normalized root
+workspace plus `HostRootBzlLabel`, reads `RootPackageSourceKey`, and its
+`HostBzlLoadCycleGuard`/detector downcast only that key family
+(`bzl_module.rs` lines 1014-1029 and 1276-1431;
+`cycle_detector.rs` lines 36-37, 63-99, 174-204, and 286-305). Reusing it for
+`@dep` would conflate root and external source/label identity. A technically
+bounded future loading design could instead introduce a *private*, route-keyed
+external Bzl-module key using `RootRepositoryRoute + PackagePath + target`,
+`HostRepositorySourceFileKey`, an external canonical label, complete-only
+semantic equality/validity, its own local complete event batch, and a matching
+private cycle-detector node/guard. It must prove cold publication, warm
+silence, BUILD and `.bzl` edits, failure/recovery, route mapping changes, and
+no direct filesystem bypass. That is a loading-owner design, not permission to
+reuse the root Host key or to implement this query packet.
+
+The accepted root tests establish the data a future owner must preserve but do
+not eliminate the implicit-edge blocker:
+`app/slug_loading_v2/tests/build_file_loading.rs`
+`test_metadata_retains_inherited_values_suite_provenance_and_bazel_ordering`
+(lines 1056-1203) fixes test capability, sorted tags, size, manual, and suite
+membership; `app/slug_query_v2/tests/loading_query.rs`
+`graph_projects_test_suite_membership_scalars_edges_and_total_explicitness`
+(lines 1690-1888) and `test_suite_metadata_reuses_reorders_and_recovers_across_same_dice_lifecycle`
+cover the root graph and lifecycle convention. They cannot make omitted
+external test-base edges exact.
+
+### Replan decision and deferred allowlist
+
+Do not combine direct `test_suite` membership with a nonexistent test-rule
+projection. It is a follow-on only after an accepted external Starlark test
+rule *and its complete query dependency closure* exist. Adding a direct member
+now would merely make `tests()` appear to work while `deps()` remains wrong.
+
+A future proposal must first choose one of these bounded architectural paths:
+
+1. Port and load the exact Bazel-9 `@bazel_tools` test-base dependency surface
+   needed by query, with source-proven graph coverage and repository routes;
+   or
+2. establish a separately exact query semantic that can reject every
+   dependency traversal reaching an external test rule before partial output
+   (which would require accepted Bazel evidence for that observable behavior).
+
+Path 1 necessarily needs a new package/repository discovery and upstream
+tools-content boundary; path 2 currently contradicts Bazel's successful
+`deps()` result. Both exceed this packet. Do not amend
+`module-local-override`: it now has 17 commands and 598 total fixture/
+expected/dep-BUILD lines, after the sixth-packet hygiene checkpoint. Any future
+fixture growth requires a new bounded hygiene review and must retain the 17
+existing discriminating rows.
+
+The residual unsupported surface is external BUILD/Bzl loads, Starlark test
+rule query, test-base implicit labels, `@bazel_tools` content/routes,
+test-suite membership to external test rules, configuration, analysis,
+actions, execution, external globs/patterns, cross-package/repository loads,
+repository rules/extensions, visibility content evaluation, JVM, Java bytecode,
+and Bazel delegation. Stop and REPLAN again if resolving the future path needs
+a public cross-crate identity/ownership model, direct filesystem observation,
+or unbounded repository discovery.
+
+Independent reserved-boundary review returned `ACCEPT` for this REPLAN. A
+fresh Bazel 9.2 replay confirmed the implicit dependency closure, and live
+owner review confirmed that root-key reuse would conflate source and label
+identity. The smallest safe next packet is design only:
+`WP-5-m1-external-repository-starlark-rule-query-design`, limited to one
+same-repository `.bzl` load defining a dependency-free non-test Starlark rule.
+It must prove route-keyed module identity, load cycles, retained frozen-module
+lifetime, events, edit/recovery invalidation, literal/kind output, and a
+self-only dependency closure without crossing the test-base boundary.
