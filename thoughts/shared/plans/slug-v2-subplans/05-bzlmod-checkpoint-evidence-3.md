@@ -17669,3 +17669,61 @@ preservation of the accepted Private/Java fragment shortcut. The correction
 froze 542+140+30 test lines under 720, placed the Restricted target in the
 dependency root package with both callers in `viewer`, and was accepted on
 rereview.
+
+### WP-5-m1 external Restricted-visibility typed implementation accepted (2026-08-04)
+
+**Status: ACCEPTED in `fc022925`.** The final five-file implementation is 207
+net production lines, 697 net test lines, and 904 total against caps of
+220/720/940. The inline single-route caller setup is exactly 140 test lines.
+No fixture, oracle tool/schema, Cargo metadata, plan, DICE key/owner/lock,
+repository route, or dependency-filter surface changed.
+
+`CanonicalLabel::rebind_provisional_root_repository` performs the sole typed
+provisional-root-to-selected-nonroot reconstruction, clones package and target
+identity, clears stale mapping provenance, rejects both invalid directions,
+and never formats, parses, or resolves a label. Loading preserves declared
+order, duplicates, and every package-group contents class. The graph validates
+the whole Restricted slice before target/source synthesis, then keeps raw
+visibility, effective `VisibilityNodep`, ordinary filegroup, and
+`PackageGroupInclude` edges separate. Group contents bind to the selected
+canonical repository and `visible()` restores groups through the target's
+verified apparent route.
+
+Evidence covers every enabled consumer/output, exact edge order, nine
+rejection families before synthesis, package-group contents and include
+semantics, root/same/different canonical callers, edits, recovery, route
+remapping, and stale-route failure. One real `@dep -> dep+` graph plus
+request-local fake `dep+`/`other+` callers proves caller identity without a
+second route. Rich root-key activation proves one cold Evaluated and one
+same-transaction warm Reused result. Existing Private/Java fragment behavior
+remains covered.
+
+Root validation passed 16 identity, 110 loading, and 84 query tests; six direct
+dependent crates checked; identity/loading/query GNU-Windows no-run passed;
+formatting, archive, exact scope/caps, and diff checks passed. The rebuilt CLI
+passed oracle rows one through six with exact exit, normalized stdout,
+manifest, and empty normalized stderr; Bazel-only row seven was not invoked.
+Independent latest-diff review required restoring the three-candidate,
+two-input-batch delivery regression; the focused correction passed and
+rereview returned `ACCEPT`.
+
+Resume only the read-only
+`WP-5-m1-loading-native-windows-host-glob-ordering-design`. Freeze the smallest
+native-Windows Bazel 9.2 evidence and representation contract around the
+accepted typed OS-native directory-entry representation and Windows classifier
+seam. The private `Arc<[u8]>` segment/traversal computation is Unix-only,
+non-Unix returns `UnsupportedHost`, and the loading adapter is dormant; do not
+describe them as existing Windows carriers. No Rust is authorized. Require
+lossless UTF-16 identity and ordering through listing, candidates, traversal,
+and final Bazel `glob()` for ASCII, BMP, non-BMP, and a Win32-created lone
+surrogate, plus repeat/restoration and the native symlink/reparse behavior
+needed by a future traversal. GNU-Windows compile/link evidence is
+supplemental only. Retained-server evidence is deferred until a later
+implementation activates the path.
+
+Stop with `REPLAN` without native-Windows evidence, on lossy UTF-16/WTF-8/UTF-8
+conversion, inferred surrogate semantics, or if the existing private carrier
+cannot represent the result. Do not add a key/owner, public identity,
+observation operation, direct filesystem bypass, registry JVM transport,
+discovery/MVS, external-repository breadth, parser/evaluator activation, or
+broader glob syntax/composition.

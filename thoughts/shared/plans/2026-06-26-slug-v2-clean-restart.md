@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure is unsupported under the current architecture; explicit same-package external Restricted visibility awaits its corrected single-route typed projection; native Windows glob ordering, registry transports, and discovery composition remain | implement the single-route typed external visibility projection |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport are unsupported under the current architecture; native Windows glob ordering lacks native evidence, and discovery composition requires a new owner graph | design the native-Windows Host glob ordering evidence boundary |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,10 +35,17 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-restricted-visibility-single-route-typed-implementation`.
+`WP-5-m1-loading-native-windows-host-glob-ordering-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
+
+The external Restricted-visibility typed implementation is accepted in
+`fc022925`. The next packet is read-only and tests whether the accepted typed
+OS-native directory representation and the current Unix-only private byte-glob
+representation can close the remaining native Windows ordering gap without a
+new owner or representation. Native-Windows runtime evidence is mandatory
+before Rust; GNU-Windows compilation alone is not semantic evidence.
 
 The external query package-identity implementation is accepted in five files.
 One private request-local Arc owner retains full canonical package identity
