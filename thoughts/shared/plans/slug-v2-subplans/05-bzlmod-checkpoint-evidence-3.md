@@ -18037,3 +18037,30 @@ It may validate syntax and retain include requests with the full raw input,
 but it must not acquire includes, construct selected identity or mapping, call
 the evaluator, or claim to solve discovery. Review the proposed one-file
 90-production/330-test/420-total implementation boundary before Rust.
+
+### WP-5-m1 direct-local module inspection design (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-5-m1-direct-local-module-inspection-implementation`.** One private
+callerless key in `source_preparation.rs` depends only on the accepted Direct
+input. It retains that full route/source input plus `None` for Absent or the
+existing parser inspection for Present, forwards Needs exactly, uses the
+requested Host logical-path display convention, and owns no events. Includes
+are discovered only; selection, mappings, acquisition, and evaluation remain
+forbidden.
+
+Two independent cap audits disagreed because the tighter proposal required
+refactoring the accepted Direct lifecycle/tracker carrier. Review rejected
+that compression after the earlier evidence-cap failures. Keep every accepted
+Direct assertion unchanged; add isolated inspection compute/lifecycle helpers
+and an activation tracker that filters only the inspection key. `InputCompute`
+is structural-only because no real compute failure is injectable without a
+forbidden fault hook; real input semantic errors remain exercised.
+
+The accepted caps are 100 production lines, 350 test lines, and 450 total,
+from an isolated 94-production/326-test estimate plus 6/24 lines of formatting-
+and compaction-only slack. The slack authorizes no new behavior, evidence,
+hook, file, or semantic surface. Use only the existing parser and Direct input;
+reuse accepted evidence without a new oracle. Run focused tests, formatting,
+scope/cap/diff checks, and independent latest-diff review before root-owned
+broader validation and commit.

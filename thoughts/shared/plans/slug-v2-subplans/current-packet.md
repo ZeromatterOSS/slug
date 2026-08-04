@@ -1,14 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-module-inspection-design`
+Packet: `WP-5-m1-direct-local-module-inspection-implementation`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: read-only private inspection-owner design before selected evaluation
+Role: private callerless inspection owner before selected evaluation
 Evidence: accepted direct `local_path_override` route,
 `HostRootModuleFileKey`, `HostRepositorySourceFileKey`, and the accepted
 direct-local handoff design/cap correction in the owner plan.
 
-Do not edit Rust. Design one private, callerless
+Implement one private, callerless
 `DirectLocalModuleInspectionKey { workspace, apparent_repo }` in
 `app/slug_bzlmod_v2/src/source_preparation.rs`. It depends only on the accepted
 `DirectLocalModuleFileKey` and, after a complete Present input, calls the
@@ -31,10 +31,16 @@ parse errors; typed real direct input errors; same-key A-to-B-to-A and
 Present/edit/Absent/recreate; capture-enabled cold/warm no-data activations;
 and a structural no-evaluator/no-legacy/no-fault scan.
 
-Proposed implementation caps are 90 production, 330 tests, and 420 total;
-review their exact evidence arithmetic before authorizing Rust. Stop with
+Caps are 100 production, 350 tests, and 450 total. The reviewed isolated
+estimate is 94 production/326 tests; the remaining 6/24 lines are formatting-
+and compaction-only slack. Preserve every accepted Direct test unchanged and
+use isolated inspection helpers plus an activation tracker filtered only to
+`DirectLocalModuleInspectionKey`. `InputCompute` receives structural shape/
+equality evidence only; no fault hook or runtime compute-error family is
+authorized. Stop with
 **REPLAN** on a selected or root-requested version, `NonrootModuleKey`,
 `EvaluatedNonrootModule`, include acquisition, evaluator call, contextual
 mapping, MVS/registry/discovery edge, public export/caller, direct filesystem
-IO, new dependency, second file, or event ownership. Do not edit Rust, format,
-run Cargo/Bazel, or change an oracle in this design packet.
+IO, new dependency, second file, cap excess, or event ownership. Run focused
+owner tests, formatting, scope/cap/diff checks, then independent latest-diff
+review. Do not run Bazel or change an oracle.
