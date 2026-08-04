@@ -1,74 +1,76 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-external-repository-source-identity`
+Packet: `WP-5-m1-external-repository-starlark-rule-query-redesign`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: implementation worker
-Evidence: accepted independent retained-representation/DICE review of the
-Host-only source result; the existing Host key is sole route-keyed,
-complete-only owner, while legacy immutable source values retain bytes-only
-equal-byte pruning.
+Role: read-only design worker
+Evidence: the prior dependency-free non-test external Starlark-rule Bazel 9.2
+evidence and REPLAN, plus accepted commit `980373f9`, which now supplies the
+Host requested logical source path without changing legacy immutable pruning.
 
-Implement the accepted source-identity boundary only. Change
-`HostRepositorySourceFileKey` to return public
-`HostRepositorySourceFileValue::{Present { bytes: Arc<[u8]>, logical_path:
-NormalizedAbsolutePath }, Absent}`. `logical_path` is the normalized requested
-path submitted to `ResolvedPathKey` before resolution, may itself be a symlink,
-and is not `real_path`, namespace, symlink provenance, source identity,
-generation, or observation-instance state. Preserve it through the Host mapper
-and use the existing byte Arc; legacy `RepositorySourceFileValue` remains
-exactly `Present(bytes)` / `Absent`.
+Retry the prior proposal for one same-repository `.bzl` load defining a
+dependency-free non-test external Starlark rule, now that exact external source
+identity exists. This is a fresh design audit, not authorization to revive the
+old implementation sketch. Read the live loading, Bzl-module, package,
+repository-route, DICE event/lifecycle, query graph, visibility, and BUILD
+integration code and tests from the checkout. Reuse the accepted Bazel 9.2
+success, missing-load, cycle, `deps`, `loadfiles`, and `buildfiles` evidence;
+add no oracle row.
 
-The shared resolver helper may use one private transient result to transport
-the requested path: the Host mapper retains it and the legacy mapper strips it.
-Do not add a second observation, DICE key, cache, lock, filesystem bypass, or
-hashing/interner utility. Host currently supports direct local overrides only.
-Immutable generation and observation-instance recomputation remains solely on
-the legacy key: equal bytes retain the previous complete value, changed bytes
-replace it. `Need` remains non-valid for both owners. Host value equality
-requires equal bytes and logical path. A local-override root change is a
-distinct `RootRepositoryRoute` key, not a same-key DICE replacement.
+The design must resolve all of these boundaries together:
 
-The production allowlist is exact:
+- Specify one private DICE key identified by `RootRepositoryRoute` plus a
+  validated typed canonical external Bzl label. Prove normalization of every
+  allowed same-package relative/absolute spelling before key construction and
+  rejection of cross-package, apparent-repository, and canonical-repository
+  load spellings before source lookup.
+- Trace `HostRepositorySourceFileValue.logical_path` into public
+  `BzlModuleIdentity`, the direct/reachable manifest and fingerprint, retained
+  frozen-module lifetime, and the final `LoadedPackage` owner. Prove that source
+  paths and frozen values neither disappear nor migrate into `QueryNode`.
+- Specify same-repository load recursion, canonical identity, deterministic
+  direct/reachable order, missing-file diagnostics, ordered cycle diagnostics,
+  and cycle termination for BUILD → `.bzl` → `.bzl` loads.
+- Freeze Complete/Need/error equality and validity, activation events, event
+  replay, and cold/warm/edit/delete/recreate/recovery lifecycle behavior. Use
+  existing DICE source owners; add no direct filesystem or fresh-graph bypass.
+- Trace the existing repository BUILD loader through Starlark module loading,
+  rule declaration/evaluation, dependency-free non-test capability checks,
+  manifest attachment, and `LoadedPackage` construction without activating
+  unrelated rule classes.
+- Define exact public visibility semantics for the external rule and every
+  route-aware check. Do not use the current external-visibility prohibition as
+  a substitute for semantics, and do not claim visibility-content evaluation.
+- Audit every enabled generic consumer reachable from the new node before any
+  fixture or implementation is authorized: `deps`, `loadfiles`, `buildfiles`,
+  `siblings`, `same_pkg_direct_rdeps`, `visible`, and every remaining enabled
+  graph function. Each must either have exact external behavior and coverage or
+  reject the node before partial output; enumerate the complete registered set
+  from live code rather than assuming the prior list is exhaustive.
 
-- `app/slug_bzlmod_v2/src/source_preparation.rs`;
-- `app/slug_bzlmod_v2/src/lib.rs`, only to re-export
-  `HostRepositorySourceFileValue`; and
-- `app/slug_loading_v2/src/bzl_module.rs`, only for the direct
-  `HostRepositorySourceFileKey` import and `Present { bytes, .. }` / `Absent`
-  migration at the existing repository package load boundary.
+The completed design must append to the owner plan and name exact production,
+test, downstream, and oracle allowlists; public/private API effects; DICE key,
+value, equality, validity, event, and lifetime contracts; fixture growth and
+hygiene bounds; serial native, lifecycle, dependent, GNU-Windows, formatting,
+archive, and diff commands; and explicit old-value retention across the stated
+lifecycle transitions. The oracle allowlist must remain empty in this design
+packet, and the existing 17-row, 598-line `module-local-override` fixture is
+frozen. Obtain one independent reserved-boundary review before scheduling any
+implementation.
 
-No loading test edits are authorized. In
-`app/slug_bzlmod_v2/src/source_preparation.rs`, extend
-`host_repository_source_requests_native_materialization_without_legacy_snapshot_keys`
-and `immutable_materialization_equality_is_operationally_exact`; add exactly:
+This packet may edit only
+`thoughts/shared/plans/slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`.
+Do not edit Rust, Cargo metadata, tests, fixtures, expected outputs, oracle
+manifests/harnesses, protocol, CLI, canonical scheduling, current manifest, or
+routing logs while performing the design. Run `git diff --check` and report
+the exact docs-only diff for review.
 
-- `host_repository_source_value_retains_requested_logical_path_and_bytes`;
-- `host_repository_source_value_equality_requires_equal_bytes_and_logical_path`;
-- `host_repository_source_value_need_and_error_have_no_logical_path`;
-- `legacy_immutable_repository_source_value_remains_bytes_only`; and
-- `host_repository_source_local_override_root_change_is_distinct_key`.
-
-Run serially, after cleaning stale `slugd` before and after any daemon-sensitive
-smoke (none is expected here):
-
-1. `cargo test -p slug_bzlmod_v2 source_preparation`
-2. `cargo test -p slug_loading_v2 host_package_load`
-3. `cargo check -p slug_loading_v2`
-4. `cargo check -p slug_query_v2`
-5. `cargo test -p slug_bzlmod_v2 --target x86_64-pc-windows-gnu --no-run`
-6. `cargo test -p slug_loading_v2 --target x86_64-pc-windows-gnu --no-run`
-7. `cargo fmt --check`
-8. `scripts/v2_archive_status.sh`
-9. `git diff --check`
-
-Stop with `REPLAN` if implementation requires retaining `real_path`, namespace,
-symlink route, physical materialization root, source identity, generation, or
-observation instance as semantic state; a second source owner, observation,
-cache/lock, filesystem bypass, public `BzlModuleIdentity` change, external Bzl
-key/loader activation beyond the existing package boundary, query behavior, or
-any oracle fixture/protocol/CLI/Cargo-metadata/cycle-detector/materialization-
-owner change. Root-package source behavior, Starlark loads/rules, test-base
-closure, visibility content evaluation, registry/discovery work,
-configuration, analysis/actions/execution, repository rules/extensions,
-JVM/Java bytecode, and Bazel delegation remain out of scope.
+Stop with `REPLAN` if exactness requires a public cross-crate identity or
+ownership change, root-key reuse, non-local override routing, a second source
+or observation owner, direct filesystem access, unbounded package/repository
+discovery, or partial generic-consumer behavior. Test rules and test-base/
+`@bazel_tools` closure, test suites, implicit/user dependencies,
+cross-package/repository loads, discovery and external globs/patterns,
+visibility-content evaluation, generated outputs, configuration,
+analysis/actions/execution, repository rules/extensions, registry transports,
+JVM, Java bytecode, and Bazel delegation remain out of scope.

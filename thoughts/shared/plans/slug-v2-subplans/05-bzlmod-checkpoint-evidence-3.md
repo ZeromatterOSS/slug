@@ -15884,3 +15884,35 @@ implementation surface is exactly three production paths —
 `app/slug_loading_v2/src/bzl_module.rs` — with the shared helper permitted one
 private transient path transport and no second observation, DICE key, cache,
 or lock. All other stop gates and residual gaps remain in force.
+
+### WP-5-m1 external repository source identity implementation (2026-08-04): ACCEPT
+
+Commit `980373f9` implements the accepted boundary in exactly three production
+files with `+342/-28`: `app/slug_bzlmod_v2/src/source_preparation.rs`,
+`app/slug_bzlmod_v2/src/lib.rs`, and
+`app/slug_loading_v2/src/bzl_module.rs`. The Host key now exposes public
+`Present { bytes, logical_path }`; one private transient observation value
+carries the requested pre-resolution path through the shared helper, while the
+legacy value remains bytes-only and the loading change is only its direct Host
+result match. No second observation, key, cache, lock, loader activation, or
+`BzlModuleIdentity` change was introduced.
+
+Real DICE coverage distinguishes requested symlink
+`/workspace/dep/BUILD.bazel` from resolved physical
+`/resolved/BUILD.bazel`. Validation passed 10 focused owner tests, four
+existing `host_package_load` tests, one lifecycle test, direct loading/query
+checks, both affected GNU-Windows no-run builds, formatting, archive status,
+and diff checks. Independent review initially found test-only gaps: equality
+and `Absent` were not independently exercised, and immutable retention used a
+local helper rather than the retained engine. The correction used a separate
+equal Host value, a separate `Absent`, and the existing retained-engine
+immutable trace; focused rereview returned `ACCEPT` with production unchanged.
+
+The next packet is the read-only
+`WP-5-m1-external-repository-starlark-rule-query-redesign`. It may reuse the
+prior dependency-free non-test Bazel evidence, but source identity acceptance
+does not resolve route-keyed module ownership, frozen lifetime, load behavior,
+visibility, or generic query consumers. The design must freshly audit those
+boundaries and obtain one independent reserved-boundary review before naming
+any implementation. The 17-row `module-local-override` fixture remains frozen;
+no Rust, oracle, or fixture edit is authorized by the redesign packet.
