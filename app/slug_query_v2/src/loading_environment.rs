@@ -440,13 +440,18 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             RuleVisibility::Private => Ok(same_package_or_java),
             RuleVisibility::Restricted(restricted) => {
                 let caller_package = caller_owner.canonical_package();
+                let target_owner = node.label.owner_identity()?;
                 let mut visible = restricted
                     .direct_packages()
                     .contains_package(&caller_package);
                 // Do not short-circuit: Bazel resolves every top-level root so
                 // a positive alternative cannot mask a later missing group.
                 for group in restricted.package_groups() {
-                    let group = QueryLabel::from_canonical(group.clone());
+                    let group = if target_owner.canonical_repo().is_some() {
+                        QueryLabel::from_canonical_in_owner(group, &target_owner)?
+                    } else {
+                        QueryLabel::from_canonical(group.clone())
+                    };
                     visible |= self
                         .visible_in_package_group(&group, &caller_package)
                         .await?;
@@ -1184,69 +1189,209 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
 mod tests {
     use dice::DetectCycles;
     use dice::Dice;
+    use slug_bzlmod_v2 as bzlmod;
+    use slug_identity_v2 as identity;
+    use slug_workspace_v2::PathDirectoryEntries as DirectoryEntries;
+    use slug_workspace_v2::PathLstat;
+    use slug_workspace_v2::PathObservationDemand as Demand;
+    use slug_workspace_v2::PathObservationEpoch as Epoch;
+    use slug_workspace_v2::PathObservationEpochKey as EpochKey;
+    use slug_workspace_v2::PathObservationOperation as Operation;
+    use slug_workspace_v2::PathObservationResult as Observation;
+    use slug_workspace_v2::PathOperationResult as OperationResult;
 
     use super::*;
 
-    #[test]
-    fn external_owner_visible_private_uses_fragment_and_restricted_uses_canonical() {
-        let external = QueryLabel::from_apparent_route(
-            &slug_identity_v2::ApparentLabel::parse("@dep//same:caller").unwrap(),
-            &slug_identity_v2::CanonicalRepoName::new("dep+").unwrap(),
-        )
-        .unwrap()
-        .owner_identity()
-        .unwrap();
-        let root_target = QueryLabel::parse_root("//same:target").unwrap();
-        let root_owner = root_target.owner_identity().unwrap();
-
-        assert!(LoadingQueryEnvironment::same_package_or_java(
-            &external,
-            &root_target
-        ));
-        assert_ne!(external.canonical_package(), root_owner.canonical_package());
-        assert_eq!(external.canonical_package().repo().as_str(), "dep+");
-        assert_eq!(external.canonical_package().package().as_str(), "same");
-    }
-
     #[tokio::test]
-    async fn visible_retains_each_passing_streamed_candidate_as_a_singleton_delivery() {
+    async fn external_restricted_visible_uses_canonical_fake_caller_without_a_second_route() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let mut epoch = SmallMap::new();
+        let demand = |path, operation| {
+            Demand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                operation,
+            )
+        };
+        let lstat = |kind| {
+            Observation::Lstat(OperationResult::Present(PathLstat::new(
+                kind, 1, 1, 1, 1, 0o755,
+            )))
+        };
+        for path in ["/", "/workspace", "/workspace/dep"] {
+            epoch.insert(
+                demand(path, Operation::Lstat),
+                lstat(PathNodeKind::Directory),
+            );
+        }
+        for path in [
+            "/workspace/REPO.bazel",
+            "/workspace/.bazelignore",
+            "/workspace/dep/REPO.bazel",
+        ] {
+            epoch.insert(
+                demand(path, Operation::Lstat),
+                Observation::Lstat(OperationResult::Missing),
+            );
+        }
+        for (path, source) in [
+            ("/workspace/MODULE.bazel", &b"module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n"[..]),
+            ("/workspace/dep/MODULE.bazel", &b"module(name = \"dep\", version = \"1.0.0\")\n"[..]),
+            ("/workspace/dep/BUILD.bazel", &b"package_group(name = \"group\", packages = [\"//viewer\"])\nfilegroup(name = \"restricted\", visibility = [\":group\"])\n"[..]),
+        ] {
+            epoch.insert(
+                demand(path, Operation::Lstat),
+                lstat(PathNodeKind::RegularFile),
+            );
+            epoch.insert(
+                demand(path, Operation::FileBytes),
+                Observation::FileBytes(OperationResult::Present(Arc::from(source)))
+            );
+        }
+        epoch.insert(
+            demand("/workspace/dep", Operation::DirectoryEntries),
+            Observation::DirectoryEntries(OperationResult::Present(DirectoryEntries::new([]))),
+        );
+
         let dice = Dice::builder().build(DetectCycles::Enabled);
-        let mut transaction = dice.updater().commit().await;
-        let mut environment =
-            LoadingQueryEnvironment::new(&mut transaction, PathBuf::new(), QueryPolicy::default());
-        let owner = QueryLabel::parse_root("//consumer:__pkg__")
-            .unwrap()
-            .owner_identity()
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(EpochKey, Epoch::new(epoch).unwrap())])
             .unwrap();
-        let first = environment.candidates.intern(QueryCandidate::fake(
-            QueryLabel::parse_root("//loads:first.bzl").unwrap(),
-            owner.dupe(),
+        bzlmod::inject_root_package_policy_inputs(
+            &mut updater,
+            bzlmod::RootPackagePolicyInputs::new(
+                workspace.clone(),
+                vec![workspace.clone()],
+                &[] as &[&str],
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        bzlmod::inject_root_module_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            bzlmod::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            bzlmod::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            bzlmod::LockfileMode::Update,
+        )
+        .unwrap();
+        let request = Arc::new(bzlmod::RepositoryMaterializationRequest {
+            id: bzlmod::RepositoryMaterializationRequestId {
+                workspace: workspace.clone(),
+                canonical_repo: identity::CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: bzlmod::RepoSpec {
+                rule_id: bzlmod::RepoRuleId {
+                    bzl_file: CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "local_repository".into(),
+                },
+                attributes: Arc::new(SmallMap::from_iter([(
+                    CompactString::from("path"),
+                    bzlmod::OverrideAttributeValue::String("dep".into()),
+                )])),
+            },
+            kind: bzlmod::RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
+            },
+        });
+        updater
+            .changed_to(vec![(
+                bzlmod::RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.clone(),
+                },
+                bzlmod::RepositoryMaterializationResultEpoch::new(
+                    workspace.clone(),
+                    [bzlmod::RepositoryMaterializationEpochEntry {
+                        request,
+                        result: bzlmod::RepositoryMaterializationResult::Success(
+                            bzlmod::RepositoryMaterializationSuccess::Local,
+                        ),
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let mut environment =
+            LoadingQueryEnvironment::new_root(&mut transaction, workspace, QueryPolicy::default());
+
+        let dep = identity::CanonicalRepoName::new("dep+").unwrap();
+        let apparent = identity::ApparentRepoName::new("dep").unwrap();
+        let target = environment.candidates.intern(QueryCandidate::real(
+            QueryLabel::from_apparent_route(
+                &identity::ApparentLabel::parse("@dep//:restricted").unwrap(),
+                &dep,
+            )
+            .unwrap(),
         ));
-        let second = environment.candidates.intern(QueryCandidate::fake(
-            QueryLabel::parse_root("//loads:second.bzl").unwrap(),
-            owner.dupe(),
+        let targets = QueryCandidateBatches::from_delivery_ids(vec![target]);
+        let caller = |repo| {
+            QueryCandidate::fake(
+                QueryLabel::parse_root("//viewer:caller").unwrap(),
+                QueryPackageIdentity::external(
+                    identity::CanonicalRepoName::new(repo).unwrap(),
+                    apparent.clone(),
+                    PackagePath::parse("viewer").unwrap(),
+                )
+                .unwrap(),
+            )
+        };
+        let same = environment.candidates.intern(caller("dep+"));
+        let other = environment.candidates.intern(caller("other+"));
+
+        let visible = environment
+            .visible(&TargetSet::singleton(same), &targets)
+            .await
+            .unwrap();
+        assert_eq!(visible.batches()[0].ids(), &[target]);
+        assert!(
+            environment
+                .visible(&TargetSet::singleton(other), &targets)
+                .await
+                .unwrap()
+                .batches()
+                .is_empty()
+        );
+
+        let same_owner = environment.candidates.get(same).owner_identity().unwrap();
+        let root_target = QueryLabel::parse_root("//viewer:target").unwrap();
+        assert!(
+            LoadingQueryEnvironment::same_package_or_java(&same_owner, &root_target)
+                && same_owner.canonical_package()
+                    != root_target.owner_identity().unwrap().canonical_package()
+        );
+        let java_owner = QueryPackageIdentity::external(
+            identity::CanonicalRepoName::new("dep+").unwrap(),
+            apparent,
+            PackagePath::parse("javatests/lib").unwrap(),
+        )
+        .unwrap();
+        assert!(LoadingQueryEnvironment::same_package_or_java(
+            &java_owner,
+            &QueryLabel::parse_root("//java/lib:target").unwrap()
         ));
         let third = environment.candidates.intern(QueryCandidate::fake(
             QueryLabel::parse_root("//loads:third.bzl").unwrap(),
-            owner,
+            java_owner,
         ));
-        let targets = QueryCandidateBatches::from_delivery_ids(vec![first, second])
-            .union(QueryCandidateBatches::from_delivery_ids(vec![third]));
 
-        let result = environment
-            .visible(&TargetSet::default(), &targets)
+        let streamed = environment
+            .visible(
+                &TargetSet::default(),
+                &QueryCandidateBatches::from_delivery_ids(vec![same, other])
+                    .union(QueryCandidateBatches::from_delivery_ids(vec![third])),
+            )
             .await
             .unwrap();
-        assert_eq!(
-            result
-                .batches()
-                .iter()
-                .map(|batch| batch.ids())
-                .collect::<Vec<_>>(),
-            [first, second, third]
-                .iter()
-                .map(std::slice::from_ref)
-                .collect::<Vec<_>>()
-        );
+        assert_eq!(streamed.batches().len(), 3);
+        assert_eq!(streamed.batches()[0].ids(), &[same]);
+        assert_eq!(streamed.batches()[1].ids(), &[other]);
+        assert_eq!(streamed.batches()[2].ids(), &[third]);
     }
 }

@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use starlark_map::small_set::SmallSet;
 
@@ -87,6 +88,32 @@ impl RuleVisibility {
             Self::Restricted(value) => Some(value.direct_packages()),
             Self::Public | Self::Private => None,
         }
+    }
+
+    pub fn in_repository_context(&self, repo: &CanonicalRepoName) -> anyhow::Result<Self> {
+        let Self::Restricted(value) = self else {
+            return Ok(self.clone());
+        };
+        let project = |label: &CanonicalLabel| {
+            label
+                .rebind_provisional_root_repository(repo)
+                .map_err(anyhow::Error::msg)
+        };
+        Ok(Self::Restricted(Arc::new(RestrictedVisibility {
+            declared_labels: value
+                .declared_labels
+                .iter()
+                .map(project)
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into(),
+            package_groups: value
+                .package_groups
+                .iter()
+                .map(project)
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into(),
+            direct_packages: Arc::new(value.direct_packages.in_repository_context(repo)?),
+        })))
     }
 
     pub(crate) fn from_declared_labels(
@@ -222,6 +249,47 @@ impl PackageGroupContents {
         }
         Ok(value.freeze())
     }
+
+    pub fn in_repository_context(&self, repo: &CanonicalRepoName) -> anyhow::Result<Self> {
+        if repo.is_root() {
+            anyhow::bail!("package specification destination repository must be nonroot");
+        }
+        let project = |package: &PackageIdentifier| {
+            if !package.repo().is_root() {
+                anyhow::bail!("package specification is not provisional-root: {package}");
+            }
+            Ok(PackageIdentifier::new(
+                repo.clone(),
+                package.package().clone(),
+            ))
+        };
+        Ok(Self {
+            exact_positive: self
+                .exact_positive
+                .iter()
+                .map(project)
+                .collect::<anyhow::Result<SmallSet<_>>>()?,
+            subtree_positive: self
+                .subtree_positive
+                .iter()
+                .map(project)
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into(),
+            positive_all: self.positive_all,
+            exact_negative: self
+                .exact_negative
+                .iter()
+                .map(project)
+                .collect::<anyhow::Result<SmallSet<_>>>()?,
+            subtree_negative: self
+                .subtree_negative
+                .iter()
+                .map(project)
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into(),
+            has_private: self.has_private,
+        })
+    }
 }
 
 #[derive(Default)]
@@ -327,6 +395,108 @@ fn direct_kind(label: &CanonicalLabel) -> Option<PackageSpecKind> {
 fn apparent_label(label: &CanonicalLabel) -> String {
     let package = label.package().package().as_str();
     format!("//{package}:{}", label.target())
+}
+
+#[cfg(test)]
+mod tests {
+    use slug_identity_v2::PackagePath;
+
+    use super::*;
+
+    fn package(repo: &str, path: &str) -> PackageIdentifier {
+        PackageIdentifier::new(
+            CanonicalRepoName::new(repo).unwrap(),
+            PackagePath::parse(path).unwrap(),
+        )
+    }
+
+    #[test]
+    fn repository_context_preserves_visibility_order_duplicates_and_rejects_invalid_directions() {
+        let repo = CanonicalRepoName::new("dep+").unwrap();
+        let group = CanonicalLabel::parse("@@//owner:friends").unwrap();
+        let visibility = RuleVisibility::from_declared_labels([group.clone(), group]).unwrap();
+        let projected = visibility.in_repository_context(&repo).unwrap();
+        assert_eq!(
+            projected.dependency_labels(),
+            &[
+                CanonicalLabel::parse("@@dep+//owner:friends").unwrap(),
+                CanonicalLabel::parse("@@dep+//owner:friends").unwrap(),
+            ]
+        );
+        assert_eq!(
+            projected.raw_declared_labels(),
+            projected.dependency_labels()
+        );
+        assert_eq!(
+            RuleVisibility::Public.in_repository_context(&repo).unwrap(),
+            RuleVisibility::Public
+        );
+        assert_eq!(
+            RuleVisibility::Private
+                .in_repository_context(&repo)
+                .unwrap(),
+            RuleVisibility::Private
+        );
+
+        let foreign = RuleVisibility::from_declared_labels([CanonicalLabel::parse(
+            "@@other+//owner:friends",
+        )
+        .unwrap()])
+        .unwrap();
+        assert!(foreign.in_repository_context(&repo).is_err());
+        assert!(
+            visibility
+                .in_repository_context(&CanonicalRepoName::root())
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn repository_context_preserves_every_package_group_contents_class() {
+        let repo = CanonicalRepoName::new("dep+").unwrap();
+        let contents = PackageGroupContents::from_package_specs(&[
+            "//exact".to_owned(),
+            "//tree/...".to_owned(),
+            "-//tree/exact-blocked".to_owned(),
+            "-//tree/blocked/...".to_owned(),
+        ])
+        .unwrap()
+        .in_repository_context(&repo)
+        .unwrap();
+        assert!(contents.contains_package(&package("dep+", "exact")));
+        assert!(contents.contains_package(&package("dep+", "tree/child")));
+        assert!(!contents.contains_package(&package("dep+", "tree/exact-blocked")));
+        assert!(!contents.contains_package(&package("dep+", "tree/blocked/child")));
+        assert!(!contents.contains_package(&package("other+", "tree/child")));
+        assert_eq!(contents.exact_positive().len(), 1);
+        assert_eq!(contents.exact_negative().len(), 1);
+        assert_eq!(contents.subtree_positive().len(), 1);
+        assert_eq!(contents.subtree_negative().len(), 1);
+
+        let public = PackageGroupContents::from_package_specs(&["public".to_owned()])
+            .unwrap()
+            .in_repository_context(&repo)
+            .unwrap();
+        assert!(public.positive_all());
+        assert!(public.contains_package(&package("other+", "anywhere")));
+        let private = PackageGroupContents::from_package_specs(&["private".to_owned()])
+            .unwrap()
+            .in_repository_context(&repo)
+            .unwrap();
+        assert!(private.has_private());
+        assert!(!private.contains_package(&package("dep+", "anywhere")));
+
+        let foreign = PackageGroupContents {
+            exact_positive: [package("other+", "foreign")].into_iter().collect(),
+            ..PackageGroupContents::default()
+        };
+        assert!(foreign.in_repository_context(&repo).is_err());
+        assert!(
+            PackageGroupContents::default()
+                .in_repository_context(&CanonicalRepoName::root())
+                .is_err()
+        );
+    }
 }
 
 fn package_is_beneath(package: &PackageIdentifier, prefix: &PackageIdentifier) -> bool {

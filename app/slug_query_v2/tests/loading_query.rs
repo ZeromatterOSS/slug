@@ -13,12 +13,14 @@ use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 
 use dice::ActivationData;
+use dice::ActivationKind as DiceActivationKind;
 use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
 use dice::DiceTransaction;
 use dice::DynKey;
 use dice::Key;
+use dice::RichActivation;
 use dice::RootActivation;
 use dice::UserComputationData;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -3732,6 +3734,27 @@ impl RootQueryEpochBuilder {
         builder
     }
 
+    fn external_visibility_package(variant: i64, apparent: &str, build: &str) -> Self {
+        let mut builder = Self::external_package(variant);
+        builder.file(
+            "/workspace/MODULE.bazel",
+            &format!(
+                "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\", repo_name = \"{apparent}\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n"
+            ),
+            variant,
+        );
+        builder.file("/workspace/dep/BUILD.bazel", build, variant);
+        builder.package("viewer", "filegroup(name = \"caller\")\n", variant);
+        builder.package_at(
+            "/workspace/dep",
+            "viewer",
+            "BUILD.bazel",
+            "filegroup(name = \"caller\")\n",
+            variant,
+        );
+        builder
+    }
+
     fn external_macro_package(variant: i64) -> Self {
         let mut builder = Self::external_package(variant);
         builder.directory("/workspace/dep/macro", variant);
@@ -3854,9 +3877,25 @@ fn root_query_workspace() -> NormalizedAbsolutePath {
 struct RootAnchorTracker {
     typed_roots: AtomicUsize,
     forbidden: AtomicUsize,
+    root_evaluated: AtomicUsize,
+    root_reused: AtomicUsize,
 }
 
 impl ActivationTracker for RootAnchorTracker {
+    fn tracks_rich_activations(&self) -> bool {
+        true
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        if key.downcast_ref::<RootQueryCommandKey>().is_some() {
+            match activation.kind() {
+                DiceActivationKind::Evaluated => &self.root_evaluated,
+                DiceActivationKind::Reused => &self.root_reused,
+            }
+            .fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
     fn root_activated(&self, key: &DynKey, _activation: RootActivation) {
         if key.downcast_ref::<RootQueryCommandKey>().is_some() {
             self.typed_roots.fetch_add(1, Ordering::Relaxed);
@@ -4005,6 +4044,37 @@ fn root_query_key(source: &str) -> RootQueryCommandKey {
     .unwrap()
 }
 
+async fn external_visibility_transaction(
+    dice: &Arc<Dice>,
+    tracker: Arc<RootAnchorTracker>,
+    variant: i64,
+    apparent: &str,
+    build: &str,
+) -> DiceTransaction {
+    root_query_transaction(
+        dice,
+        RootQueryEpochBuilder::external_visibility_package(variant, apparent, build).build(),
+        tracker,
+    )
+    .await
+}
+
+async fn root_query_labels(
+    transaction: &mut DiceTransaction,
+    source: &str,
+) -> Result<Vec<String>, String> {
+    let QueryPreparationOutcome::Complete(result) =
+        transaction.compute(&root_query_key(source)).await.unwrap()
+    else {
+        return Err("query requested preparation".to_owned());
+    };
+    result
+        .as_ref()
+        .as_ref()
+        .map(|output| output.labels.iter().map(ToString::to_string).collect())
+        .map_err(ToString::to_string)
+}
+
 #[tokio::test]
 async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root_fallback() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -4044,6 +4114,347 @@ async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root
             "{source}"
         );
     }
+}
+
+#[tokio::test]
+async fn external_restricted_visibility_projects_every_enabled_consumer_and_caller() {
+    let build = concat!(
+        "package_group(name = \"leaf\", packages = [\"//viewer\"])\n",
+        "package_group(name = \"top\", includes = [\":leaf\"])\n",
+        "filegroup(name = \"restricted\", srcs = [\":source.txt\"], visibility = [\":top\"])\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut transaction = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_visibility_package(20, "dep", build).build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    for (source, expected) in [
+        ("@dep//:restricted", &["@dep//:restricted"][..]),
+        ("set(@dep//:restricted)", &["@dep//:restricted"]),
+        ("let x = @dep//:restricted in $x", &["@dep//:restricted"]),
+        (
+            "@dep//:restricted union @dep//:restricted",
+            &["@dep//:restricted"],
+        ),
+        ("labels(visibility, @dep//:restricted)", &["@dep//:top"]),
+        (
+            "deps(@dep//:restricted)",
+            &[
+                "@dep//:leaf",
+                "@dep//:restricted",
+                "@dep//:source.txt",
+                "@dep//:top",
+            ],
+        ),
+        (
+            "deps(@dep//:restricted, 1)",
+            &["@dep//:restricted", "@dep//:source.txt", "@dep//:top"],
+        ),
+        ("same_pkg_direct_rdeps(@dep//:top)", &["@dep//:restricted"]),
+        (
+            "rdeps(set(@dep//:leaf @dep//:top @dep//:restricted), @dep//:leaf)",
+            &["@dep//:leaf", "@dep//:restricted", "@dep//:top"],
+        ),
+        (
+            "allpaths(@dep//:restricted, @dep//:leaf)",
+            &["@dep//:leaf", "@dep//:restricted", "@dep//:top"],
+        ),
+        (
+            "somepath(@dep//:restricted, @dep//:leaf)",
+            &["@dep//:restricted", "@dep//:top", "@dep//:leaf"],
+        ),
+        (
+            "siblings(@dep//:restricted)",
+            &[
+                "@dep//:BUILD.bazel",
+                "@dep//:leaf",
+                "@dep//:restricted",
+                "@dep//:source.txt",
+                "@dep//:top",
+            ],
+        ),
+        ("some(@dep//:restricted)", &["@dep//:restricted"]),
+        ("labels(srcs, @dep//:restricted)", &["@dep//:source.txt"]),
+        ("buildfiles(@dep//:restricted)", &["@dep//:BUILD.bazel"]),
+        ("loadfiles(@dep//:restricted)", &[]),
+        ("tests(@dep//:restricted)", &[]),
+        ("executables(@dep//:restricted)", &[]),
+        ("visible(//viewer:caller, @dep//:restricted)", &[]),
+        (
+            "visible(@dep//viewer:caller, @dep//:restricted)",
+            &["@dep//:restricted"],
+        ),
+    ] {
+        let QueryPreparationOutcome::Complete(result) =
+            transaction.compute(&root_query_key(source)).await.unwrap()
+        else {
+            panic!("{source} requested preparation")
+        };
+        assert_eq!(
+            result.as_ref().as_ref().unwrap().labels.as_ref(),
+            expected,
+            "{source}"
+        );
+    }
+    let graph = transaction
+        .compute(&root_query_key("deps(@dep//:restricted)"))
+        .await
+        .unwrap();
+    let QueryPreparationOutcome::Complete(graph) = graph else {
+        panic!("graph requested preparation")
+    };
+    assert_eq!(
+        graph.as_ref().as_ref().unwrap().graph_stdout(true, true),
+        "digraph mygraph {\n  node [shape=box];\n  \"@dep//:restricted\"\n  \"@dep//:restricted\" -> \"@dep//:source.txt\"\n  \"@dep//:restricted\" -> \"@dep//:top\"\n  \"@dep//:top\"\n  \"@dep//:top\" -> \"@dep//:leaf\"\n  \"@dep//:source.txt\"\n  \"@dep//:leaf\"\n}\n"
+    );
+    let full = RootQueryCommandKey::new(
+        root_query_workspace(),
+        "deps(@dep//:restricted)",
+        QueryOrder::Full,
+        QueryPolicy::default(),
+        QueryOutputCompletion::Standard,
+    )
+    .unwrap();
+    let QueryPreparationOutcome::Complete(full) = transaction.compute(&full).await.unwrap() else {
+        panic!("full order requested preparation")
+    };
+    assert_eq!(
+        full.as_ref().as_ref().unwrap().labels.as_ref(),
+        [
+            "@dep//:restricted",
+            "@dep//:source.txt",
+            "@dep//:top",
+            "@dep//:leaf",
+        ]
+    );
+    let kind = RootQueryCommandKey::new(
+        root_query_workspace(),
+        "@dep//:restricted",
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+        QueryOutputCompletion::LabelKind,
+    )
+    .unwrap();
+    let QueryPreparationOutcome::Complete(kind) = transaction.compute(&kind).await.unwrap() else {
+        panic!("kind requested preparation")
+    };
+    let kind = kind.as_ref().as_ref().unwrap();
+    assert_eq!(kind.stdout(), "@dep//:restricted\n");
+    assert_eq!(
+        kind.label_kind_stdout(),
+        "filegroup rule @dep//:restricted\n"
+    );
+    assert_eq!(kind.package_stdout(), "@dep//\n");
+}
+
+#[tokio::test]
+async fn external_restricted_visibility_rejections_precede_competing_synthesis_failures() {
+    let sentinel = concat!(
+        "alias(name = \"sentinel_a\", actual = \":sentinel_b\")\n",
+        "alias(name = \"sentinel_b\", actual = \":source\")\n",
+    );
+    for (source, expected) in [
+        (
+            "package(default_visibility = [\":group\"])\npackage_group(name = \"group\")\nfilegroup(name = \"restricted\")\n",
+            "Restricted package default visibility",
+        ),
+        (
+            "package_group(name = \"group\")\nfilegroup(name = \"restricted\", visibility = [\":group\"])\nfilegroup(name = \"second\", visibility = [\":group\"])\n",
+            "second external repository Restricted target",
+        ),
+        (
+            "package_group(name = \"group\")\nalias(name = \"restricted\", actual = \":missing\", visibility = [\":group\"])\n",
+            "deferred for non-filegroup",
+        ),
+        (
+            "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\"//viewer:__pkg__\"])\n",
+            "direct package visibility",
+        ),
+        (
+            "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\"//other:group\"])\n",
+            "cross-package group",
+        ),
+        (
+            "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\"@dep//:group\"])\n",
+            "external repository dependency labels are not supported",
+        ),
+        (
+            "filegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\":missing\"])\n",
+            "missing group",
+        ),
+        (
+            "alias(name = \"group\", actual = \":missing\")\nfilegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\":group\"])\n",
+            "alias group",
+        ),
+        (
+            "filegroup(name = \"group\")\nfilegroup(name = \"restricted\", srcs = [\"//other:source\"], visibility = [\":group\"])\n",
+            "wrong-kind group",
+        ),
+    ] {
+        let build = format!("{source}{sentinel}");
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut transaction = root_query_transaction(
+            &dice,
+            RootQueryEpochBuilder::external_visibility_package(21, "dep", &build).build(),
+            Arc::new(RootAnchorTracker::default()),
+        )
+        .await;
+        let QueryPreparationOutcome::Complete(result) = transaction
+            .compute(&root_query_key("@dep//:restricted"))
+            .await
+            .unwrap()
+        else {
+            panic!("rejection requested preparation")
+        };
+        let actual = result.as_ref().as_ref().unwrap_err().to_string();
+        assert!(actual.contains(expected), "{expected}: {actual}");
+        assert!(!actual.contains("alias chains are deferred"), "{actual}");
+        assert!(!actual.contains("filegroup source is deferred"), "{actual}");
+    }
+}
+
+#[tokio::test]
+async fn external_restricted_visibility_tracks_every_edit_and_a_to_b_to_a_lifecycle() {
+    let allowed = concat!(
+        "package_group(name = \"base\", packages = [\"//viewer/...\", \"-//viewer\"], includes = [\":cycle\"])\n",
+        "package_group(name = \"cycle\", includes = [\":base\"])\n",
+        "package_group(name = \"reallow\", packages = [\"//viewer\"])\n",
+        "package_group(name = \"alt\", packages = [\"//other\"])\n",
+        "package_group(name = \"top\", includes = [\":base\", \":reallow\"])\n",
+        "filegroup(name = \"restricted\", visibility = [\":top\"])\n",
+    );
+    let content_b = allowed.replace(
+        "name = \"reallow\", packages = [\"//viewer\"]",
+        "name = \"reallow\", packages = [\"//other\"]",
+    );
+    let visibility_b = allowed.replace("visibility = [\":top\"]", "visibility = [\":alt\"]");
+    let include_b = allowed.replace(
+        "includes = [\":base\", \":reallow\"]",
+        "includes = [\":base\", \":alt\"]",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let visible = "visible(@dep//viewer:caller, @dep//:restricted)";
+    let key = root_query_key(visible);
+    let mut cold =
+        external_visibility_transaction(&dice, tracker.clone(), 30, "dep", allowed).await;
+    let initial = compute_root_query(&mut cold, &key, &tracker).await;
+    let QueryPreparationOutcome::Complete(result) = &initial else {
+        panic!("cold requested preparation")
+    };
+    assert_eq!(
+        result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//:restricted"]
+    );
+    assert_eq!(tracker.root_evaluated.load(Ordering::Relaxed), 1);
+    assert_eq!(tracker.root_reused.load(Ordering::Relaxed), 0);
+    let warm = compute_root_query(&mut cold, &key, &tracker).await;
+    assert_eq!(tracker.root_evaluated.load(Ordering::Relaxed), 1);
+    assert_eq!(tracker.root_reused.load(Ordering::Relaxed), 1);
+    assert!(RootQueryCommandKey::equality(&initial, &warm));
+
+    let mut content =
+        external_visibility_transaction(&dice, tracker.clone(), 31, "dep", &content_b).await;
+    assert!(
+        root_query_labels(&mut content, visible)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let mut content_a =
+        external_visibility_transaction(&dice, tracker.clone(), 32, "dep", allowed).await;
+    let content_a = content_a.compute(&key).await.unwrap();
+    assert!(RootQueryCommandKey::equality(&initial, &content_a));
+
+    let mut visibility =
+        external_visibility_transaction(&dice, tracker.clone(), 33, "dep", &visibility_b).await;
+    assert_eq!(
+        root_query_labels(&mut visibility, "labels(visibility, @dep//:restricted)")
+            .await
+            .unwrap(),
+        ["@dep//:alt"]
+    );
+    assert!(
+        root_query_labels(&mut visibility, visible)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let mut visibility_a =
+        external_visibility_transaction(&dice, tracker.clone(), 34, "dep", allowed).await;
+    let visibility_a = visibility_a.compute(&key).await.unwrap();
+    assert!(RootQueryCommandKey::equality(&initial, &visibility_a));
+
+    let mut include =
+        external_visibility_transaction(&dice, tracker.clone(), 35, "dep", &include_b).await;
+    assert!(
+        root_query_labels(&mut include, visible)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        root_query_labels(&mut include, "deps(@dep//:restricted)")
+            .await
+            .unwrap()
+            .contains(&"@dep//:alt".to_owned())
+    );
+    let mut include_a =
+        external_visibility_transaction(&dice, tracker.clone(), 36, "dep", allowed).await;
+    let include_a = include_a.compute(&key).await.unwrap();
+    assert!(RootQueryCommandKey::equality(&initial, &include_a));
+
+    let mut deleted_epoch = RootQueryEpochBuilder::external_visibility_package(37, "dep", allowed);
+    deleted_epoch.missing("/workspace/dep/BUILD.bazel");
+    deleted_epoch.missing("/workspace/dep/BUILD");
+    let mut deleted = root_query_transaction(&dice, deleted_epoch.build(), tracker.clone()).await;
+    assert!(
+        root_query_labels(&mut deleted, visible)
+            .await
+            .unwrap_err()
+            .contains("BUILD file not found")
+    );
+    let mut recreated = external_visibility_transaction(&dice, tracker, 38, "dep", allowed).await;
+    let recreated = recreated.compute(&key).await.unwrap();
+    assert!(RootQueryCommandKey::equality(&initial, &recreated));
+}
+
+#[tokio::test]
+async fn external_restricted_visibility_remaps_apparent_route_and_rejects_stale_route() {
+    let build = "package_group(name = \"group\", packages = [\"//viewer\"])\nfilegroup(name = \"restricted\", visibility = [\":group\"])\n";
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let mut original =
+        external_visibility_transaction(&dice, tracker.clone(), 40, "dep", build).await;
+    assert_eq!(
+        root_query_labels(&mut original, "labels(visibility, @dep//:restricted)")
+            .await
+            .unwrap(),
+        ["@dep//:group"]
+    );
+
+    let mut renamed = external_visibility_transaction(&dice, tracker, 41, "friend", build).await;
+    assert_eq!(
+        root_query_labels(&mut renamed, "labels(visibility, @friend//:restricted)")
+            .await
+            .unwrap(),
+        ["@friend//:group"]
+    );
+    assert_eq!(
+        root_query_labels(
+            &mut renamed,
+            "visible(@friend//viewer:caller, @friend//:restricted)"
+        )
+        .await
+        .unwrap(),
+        ["@friend//:restricted"]
+    );
+    let stale = root_query_labels(&mut renamed, "@dep//:restricted")
+        .await
+        .unwrap_err();
+    assert!(stale.contains("No repository visible as '@dep'"), "{stale}");
 }
 
 #[tokio::test]

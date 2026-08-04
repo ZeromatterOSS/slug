@@ -90,6 +90,23 @@ impl CanonicalLabel {
         self.mapping_id.as_ref()
     }
 
+    pub fn rebind_provisional_root_repository(
+        &self,
+        destination: &CanonicalRepoName,
+    ) -> Result<Self, String> {
+        if !self.package.repo().is_root() {
+            return Err("canonical label source repository must be provisional root".to_owned());
+        }
+        if destination.is_root() {
+            return Err("canonical label destination repository must be nonroot".to_owned());
+        }
+        Ok(Self {
+            package: PackageIdentifier::new(destination.clone(), self.package.package().clone()),
+            target: self.target.clone(),
+            mapping_id: None,
+        })
+    }
+
     /// Bazel's natural `Label` order compares canonical repository, package,
     /// then target identity. Repository-mapping provenance is not part of a
     /// resolved Bazel label and is intentionally ignored here.
@@ -171,4 +188,49 @@ fn split_package_and_target(value: &str) -> Result<(PackagePath, TargetName), St
         }
     };
     Ok((package, target))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ApparentLabel;
+    use crate::CanonicalLabel;
+    use crate::CanonicalRepoName;
+    use crate::RepositoryMapping;
+    use crate::RepositoryMappingId;
+    use crate::serialization::StableSerialize;
+
+    #[test]
+    fn rebind_provisional_root_repository_is_typed_and_clears_mapping_provenance() {
+        let mapping = RepositoryMapping::new(RepositoryMappingId::new("root-map").unwrap());
+        let mapped_root = ApparentLabel::parse("//pkg/sub:target")
+            .unwrap()
+            .resolve(&mapping);
+        assert_eq!(mapped_root.mapping_id(), Some(mapping.id()));
+
+        let rebound = mapped_root
+            .rebind_provisional_root_repository(&CanonicalRepoName::new("dep+").unwrap())
+            .unwrap();
+        assert_eq!(
+            rebound,
+            CanonicalLabel::parse("@@dep+//pkg/sub:target").unwrap()
+        );
+        assert_eq!(rebound.package().package(), mapped_root.package().package());
+        assert_eq!(rebound.target(), mapped_root.target());
+        assert_eq!(rebound.mapping_id(), None);
+        assert_eq!(rebound.stable_serialize(), "@@dep+//pkg/sub:target");
+
+        let nonroot = CanonicalLabel::parse("@@other+//pkg:target").unwrap();
+        assert_eq!(
+            nonroot
+                .rebind_provisional_root_repository(&CanonicalRepoName::root())
+                .unwrap_err(),
+            "canonical label source repository must be provisional root"
+        );
+        assert_eq!(
+            mapped_root
+                .rebind_provisional_root_repository(&CanonicalRepoName::root())
+                .unwrap_err(),
+            "canonical label destination repository must be nonroot"
+        );
+    }
 }

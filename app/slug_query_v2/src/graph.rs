@@ -938,6 +938,7 @@ fn external_package_graph_from_targets(
     // Validate them before generic source synthesis so an include can neither
     // discover a source nor take a permissive edge fallback.
     validate_external_package_group_includes(package, targets)?;
+    validate_external_restricted_visibility(package, default_visibility, targets)?;
 
     for target in targets {
         let target_effective_visibility = match &target.visibility {
@@ -951,17 +952,24 @@ fn external_package_graph_from_targets(
                 )));
             }
         };
-        if !target_effective_visibility.dependency_labels().is_empty() {
-            return Err(QueryError::evaluation(format!(
-                "external repository visibility edges are deferred: {}//{}:{}",
-                canonical_repo, package, target.name
-            )));
-        }
         let (effective_visibility, visibility_source) = match &target.kind {
             PackageTargetKind::PackageGroup { .. } => {
                 (RuleVisibility::Public, VisibilitySource::AlwaysPublic)
             }
-            _ => (target_effective_visibility, target.visibility.clone()),
+            _ => {
+                let effective_visibility = target_effective_visibility
+                    .in_repository_context(canonical_repo)
+                    .map_err(|error| QueryError::evaluation(error.to_string()))?;
+                let visibility_source = match &target.visibility {
+                    VisibilitySource::Declared(visibility) => VisibilitySource::Declared(
+                        visibility
+                            .in_repository_context(canonical_repo)
+                            .map_err(|error| QueryError::evaluation(error.to_string()))?,
+                    ),
+                    source => source.clone(),
+                };
+                (effective_visibility, visibility_source)
+            }
         };
         let label =
             QueryLabel::in_external_package(canonical_repo, apparent_repo, package, &target.name)?;
@@ -999,15 +1007,46 @@ fn external_package_graph_from_targets(
                         target,
                     })
                     .collect::<Vec<_>>();
+                let visibility_labels = effective_visibility
+                    .dependency_labels()
+                    .iter()
+                    .map(|label| {
+                        QueryLabel::in_external_package(
+                            canonical_repo,
+                            apparent_repo,
+                            package,
+                            label.target().as_str(),
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let mut edges = visibility_labels
+                    .iter()
+                    .cloned()
+                    .map(|target| QueryEdge {
+                        kind: QueryEdgeKind::VisibilityNodep,
+                        target,
+                    })
+                    .collect::<Vec<_>>();
+                edges.extend(ordinary);
+                let mut attributes = vec![QueryAttribute {
+                    name: CompactString::new("srcs"),
+                    labels: labels.into(),
+                    explicit: *srcs_explicit,
+                }];
+                if matches!(
+                    &visibility_source,
+                    VisibilitySource::Declared(RuleVisibility::Restricted(_))
+                ) {
+                    attributes.push(QueryAttribute {
+                        name: CompactString::new("visibility"),
+                        labels: visibility_labels.into(),
+                        explicit: true,
+                    });
+                }
                 (
                     QueryNodeKind::Rule(CompactString::new("filegroup rule")),
-                    ordinary.into(),
-                    vec![QueryAttribute {
-                        name: CompactString::new("srcs"),
-                        labels: labels.into(),
-                        explicit: *srcs_explicit,
-                    }]
-                    .into(),
+                    edges.into(),
+                    attributes.into(),
                 )
             }
             PackageTargetKind::Alias { actual } => {
@@ -1143,7 +1182,11 @@ fn external_package_graph_from_targets(
                 effective_visibility,
                 visibility_source,
                 package_group_contents: match &target.kind {
-                    PackageTargetKind::PackageGroup { contents, .. } => Some(contents.clone()),
+                    PackageTargetKind::PackageGroup { contents, .. } => Some(Arc::new(
+                        contents
+                            .in_repository_context(canonical_repo)
+                            .map_err(|error| QueryError::evaluation(error.to_string()))?,
+                    )),
                     _ => None,
                 },
                 edges,
@@ -1342,6 +1385,79 @@ fn validate_external_package_group_includes(
                 _ => {
                     return Err(QueryError::evaluation(format!(
                         "external repository package_group non-package-group include is deferred: {include}"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_external_restricted_visibility(
+    package: &PackagePath,
+    default_visibility: &RuleVisibility,
+    targets: &[slug_loading_v2::PackageTarget],
+) -> Result<(), QueryError> {
+    if matches!(default_visibility, RuleVisibility::Restricted(_)) {
+        return Err(QueryError::evaluation(
+            "external repository Restricted package default visibility is deferred",
+        ));
+    }
+    let mut protected = None;
+    for target in targets {
+        let VisibilitySource::Declared(RuleVisibility::Restricted(visibility)) = &target.visibility
+        else {
+            continue;
+        };
+        if protected.replace(target.name.as_str()).is_some() {
+            return Err(QueryError::evaluation(
+                "a second external repository Restricted target is deferred",
+            ));
+        }
+        if !matches!(target.kind, PackageTargetKind::Filegroup { .. }) {
+            return Err(QueryError::evaluation(format!(
+                "external repository Restricted visibility is deferred for non-filegroup '{}'",
+                target.name
+            )));
+        }
+        if visibility.package_groups().is_empty()
+            || visibility.declared_labels().len() != visibility.package_groups().len()
+        {
+            return Err(QueryError::evaluation(format!(
+                "external repository direct package visibility is deferred: {}",
+                target.name
+            )));
+        }
+        for group in visibility.package_groups() {
+            let group_package = group.package();
+            if !group_package.repo().is_root() || group_package.package() != package {
+                let deferred = if group_package.repo().is_root() {
+                    "cross-package"
+                } else {
+                    "named-repository"
+                };
+                return Err(QueryError::evaluation(format!(
+                    "external repository visibility {deferred} group is deferred: {group}"
+                )));
+            }
+            let Some(group_target) = targets
+                .iter()
+                .find(|candidate| candidate.name == group.target().as_str())
+            else {
+                return Err(QueryError::evaluation(format!(
+                    "external repository visibility missing group is deferred: {group}"
+                )));
+            };
+            match &group_target.kind {
+                PackageTargetKind::PackageGroup { .. } => {}
+                PackageTargetKind::Alias { .. } => {
+                    return Err(QueryError::evaluation(format!(
+                        "external repository visibility alias group is deferred: {group}"
+                    )));
+                }
+                _ => {
+                    return Err(QueryError::evaluation(format!(
+                        "external repository visibility wrong-kind group is deferred: {group}"
                     )));
                 }
             }
@@ -2435,16 +2551,16 @@ mod graph_tests {
         assert!(empty.edges.is_empty());
         assert_eq!(empty.effective_visibility, RuleVisibility::Public);
         assert_eq!(empty.visibility_source, VisibilitySource::AlwaysPublic);
-        assert!(Arc::ptr_eq(
-            empty.package_group_contents.as_ref().unwrap(),
-            &contents
-        ));
+        assert_eq!(
+            empty.package_group_contents.as_ref().unwrap().as_ref(),
+            contents.as_ref()
+        );
 
         let parent = graph.nodes.get(&label("parent")).unwrap();
-        assert!(Arc::ptr_eq(
-            parent.package_group_contents.as_ref().unwrap(),
-            &contents
-        ));
+        assert_eq!(
+            parent.package_group_contents.as_ref().unwrap().as_ref(),
+            contents.as_ref()
+        );
         assert_eq!(
             parent
                 .edges
