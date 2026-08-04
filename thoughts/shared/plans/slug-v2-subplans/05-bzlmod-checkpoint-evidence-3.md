@@ -15562,3 +15562,108 @@ same-repository `.bzl` load defining a dependency-free non-test Starlark rule.
 It must prove route-keyed module identity, load cycles, retained frozen-module
 lifetime, events, edit/recovery invalidation, literal/kind output, and a
 self-only dependency closure without crossing the test-base boundary.
+
+## WP-5-m1 external dependency-free Starlark-rule query design (2026-08-04)
+
+**Status: REPLAN — no implementation is authorized.** The Bazel evidence
+remains useful, but the required external source identity and all already
+enabled generic query consumers do not have a bounded exact owner under the
+current public `BzlModuleIdentity` and bytes-only repository source value.
+
+### Bazel 9.2 evidence
+
+The temporary root `/tmp/slug-external-rule.DG0nHw` declared
+`bazel_dep(name = "dep", version = "1.0.0")` plus
+`local_path_override(module_name = "dep", path = "dep")`. The dependency
+BUILD loaded `:defs.bzl`; `defs.bzl` loaded `:helper.bzl`; the latter supplied
+an implementation to `probe = rule(implementation = impl)`. The BUILD
+declared `probe(name = "rule")`. Each successful command used a fresh
+output-user root with `/tmp/slug-bazel-9.2-metrics-wrapper --batch
+--ignore_all_rc_files` and exited 0:
+
+| query | exact stdout |
+| --- | --- |
+| `query @dep//:rule` | `@dep//:rule` |
+| `query --output=label_kind @dep//:rule` | `probe rule @dep//:rule` |
+| `query 'deps(@dep//:rule)'` | `@dep//:rule` |
+| `query 'labels(tags, @dep//:rule)'` | empty (`INFO: Empty results`) |
+| `query 'loadfiles(@dep//:rule)'` | `@dep//:defs.bzl`, then `@dep//:helper.bzl` |
+| `query 'buildfiles(@dep//:rule)'` | `@dep//:BUILD.bazel`, then `@dep//:defs.bzl`, then `@dep//:helper.bzl` |
+
+Changing the BUILD load to `:missing.bzl` produced exit 7 and
+`error loading package '@@dep+//': cannot load '@@dep+//:missing.bzl': no such
+file`. Adding `load(":defs.bzl", "probe")` to `helper.bzl` produced exit 7
+with the ordered cycle `@@dep+///BUILD -> @@dep+//:defs.bzl ->
+@@dep+//:helper.bzl -> @@dep+//:defs.bzl` and `cycles detected during target
+parsing`. These are the required missing-load and same-repository cycle
+diagnostics; no fixture was changed in this design packet.
+
+The accepted test-rule REPLAN establishes the discriminator: non-test
+`deps(@dep//:rule)` is self-only, while `test = True` necessarily reaches the
+test-base tools closure. Pinned Bazel source
+`8220c6198837d5c13d53fea211cf3282aa12408a`,
+`StarlarkRuleClassFunctions.java` lines 254-368, supplies that test-only
+closure. The root Starlark projection convention is fixed by
+`app/slug_loading_v2/tests/build_file_loading.rs`
+`test_metadata_retains_inherited_values_suite_provenance_and_bazel_ordering`
+and `app/slug_query_v2/tests/loading_query.rs`
+`graph_projects_test_suite_membership_scalars_edges_and_total_explicitness`.
+Any future bounded slice would have to accept `PackageTargetKind::StarlarkRule`
+only when its retained capability is non-test and it has no projected ordinary
+label dependency.
+
+### REPLAN blockers and next prerequisite
+
+1. `HostRepositorySourceFileKey` returns bytes-only
+   `RepositorySourceFileValue`; it does not retain the normalized absolute
+   evaluated source path required by public `BzlModuleIdentity.workspace_path`.
+   A private external module key cannot honestly construct that identity from
+   its current value. It must not synthesize `<output_base>` or invent an
+   absolute path, and this packet makes no claim that apparent routes are
+   distinct under the existing identity.
+2. `QueryNode` retains capability/test metadata/attributes and graph edges; it
+   never owns a frozen Starlark implementation. The proposed projection could
+   not "retain the frozen implementation" without a representation/ownership
+   change outside this packet.
+3. The future key's only candidate identity is route plus a validated typed
+   canonical external Bzl label. It must normalize equivalent same-package
+   relative and absolute load spellings to that one label and stop
+   cross-package and named/canonical-repository inputs before source lookup.
+   The required typed resolution cannot be specified exactly until blocker 1
+   is resolved.
+4. The previous implementation proposal omitted an exact focused-test
+   allowlist. That is material for this new DICE owner: any future packet must
+   name the key/module/manifest/lifetime/cycle tests, route mapping identity,
+   cold/warm/edit/delete/recreate/recovery events, graph and direct
+   loading-files consumers, CLI/server direct dependents, and the exact
+   fixture hygiene decision before editing.
+5. Auditing only `loadfiles()`/`buildfiles()` is insufficient. Every enabled
+   consumer reachable from the new node must be exact or fail before partial
+   output: `loadfiles`, `buildfiles`, `siblings`, `same_pkg_direct_rdeps`,
+   `visible`, and the remaining generic graph functions. A future accepted
+   rule must be explicitly public unless a route-aware external visibility
+   implementation lands; it may not rely on the current external visibility
+   prohibition while claiming generic consumer completeness.
+
+The next prerequisite is design-only
+`WP-5-m1-external-repository-source-identity-design`. It must decide a bounded
+exact way for `HostRepositorySourceFileKey` or its value to retain the
+evaluated normalized absolute source identity, or a reviewed public
+`BzlModuleIdentity` generalization, without a filesystem bypass or a new
+ownership model. Only after that design is independently accepted may another
+external non-test Starlark-rule proposal specify production/test/oracle
+allowlists or fixture growth. The current 17-command, 598-line
+`module-local-override` fixture remains frozen.
+
+Residual stops remain: public identity/API changes without review, root-key
+reuse, non-local override routing, external load labels beyond normalized
+same-package forms, package/repository discovery, direct filesystem access,
+implicit/user dependencies, test/executable rules, test suites, generated
+outputs, visibility content evaluation, `@bazel_tools`, globs/patterns,
+configuration, analysis/actions/execution, repository rules/extensions, JVM,
+Java bytecode, and Bazel delegation.
+
+Independent correction rereview returned `ACCEPT` for this REPLAN. No Rust,
+Cargo, fixture, oracle, public API, DICE key, or query behavior changed. The
+only authorized continuation is the source-identity design prerequisite named
+above.
