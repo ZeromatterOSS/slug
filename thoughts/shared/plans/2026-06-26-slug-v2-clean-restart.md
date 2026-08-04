@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus accepted Host-only external source, request-local external query package identity, and dormant external Bzl owner design; full evidence is in the Stage 5 owner plan | Starlark loads/rules and package activation, test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | implement the private dormant route-keyed external Bzl module/cycle owner before a separate package/query activation design |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus accepted Host-only external source, request-local external query package identity, and the dormant route-keyed external Bzl owner; full evidence is in the Stage 5 owner plan | External Starlark package/query activation, test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | design the bounded external Bzl package/query activation without exposing unreviewed macro provenance |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-bzl-module-owner`.
+`WP-5-m1-external-bzl-package-query-activation-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -49,13 +49,20 @@ lifecycle, output, route-remap, and real-path Private/Restricted evidence
 passed; independent latest-diff rereview accepted. The 17-row fixture remains
 frozen while the external Bzl owner proceeds as a separate design.
 
-The dormant external Bzl-module owner design is independently accepted. Its
-private route-derived label/key, typed complete errors, Host logical source
-path, existing manifest/frozen-lifetime representation, local event metadata,
-and isolated third cycle family fit exactly two loading production files plus
-one same-module test file. `RepositoryPackageLoadKey::LoadsUnsupported`
-remains unchanged so macro-produced native targets and query provenance cannot
-activate before their separate review.
+The dormant external Bzl-module owner implementation is accepted in exactly
+two loading production files plus one same-module test file. Its private
+route-derived label/key, typed complete errors, Host logical source path,
+canonical manifest/frozen-lifetime representation, evaluation-only local
+event metadata, and isolated third cycle family passed 104 loading tests, the
+downstream query non-activation guard, native checks, and both GNU-Windows
+no-run gates. DICE `Reused` activations carry no evaluation data and therefore
+prove reuse without recapture rather than retained-batch exposure. Freeze
+coverage is structural-only because every value in the current loading globals
+implements `Freeze`. Independent correction rereview accepted the final
+three-file `+1205/-8` diff. `RepositoryPackageLoadKey::LoadsUnsupported`
+remains unchanged and no production caller reaches the private key, so
+macro-produced native targets and query provenance remain dormant pending the
+separate activation design.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of

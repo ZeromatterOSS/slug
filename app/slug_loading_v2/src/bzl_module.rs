@@ -9,10 +9,13 @@
  */
 
 use std::cell::RefCell;
+use std::ffi::OsString;
 use std::fmt;
 use std::hash::Hash;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStringExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -61,6 +64,8 @@ use starlark_map::small_set::SmallSet;
 
 use crate::cycle_detector::BzlLoadCycle;
 use crate::cycle_detector::BzlLoadCycleGuard;
+use crate::cycle_detector::ExternalBzlLoadCycle;
+use crate::cycle_detector::ExternalBzlLoadCycleGuard;
 use crate::cycle_detector::HostBzlLoadCycle;
 use crate::cycle_detector::HostBzlLoadCycleGuard;
 use crate::glob::PackageListing;
@@ -130,9 +135,9 @@ impl PrintHandler for LoadingPrintCapture {
     }
 }
 
-/// Stable identity for one local `.bzl` module in a workspace.
+/// Stable identity for one `.bzl` module evaluated through a logical source path.
 ///
-/// `label` is the canonical root-repository label and `workspace_path` is the
+/// `label` is the canonical repository label and `workspace_path` is the
 /// normalized absolute path DICE evaluated.  The value intentionally carries
 /// no evaluator handle, so it can be used at semantic equality boundaries.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -868,6 +873,160 @@ fn resolve_host_load_label(
     Ok(HostRootBzlLabel::new(package, target))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct RepositoryBzlLabel {
+    package: PackagePath,
+    target: RootPackageBzlTarget,
+}
+
+impl RepositoryBzlLabel {
+    fn new(
+        package: PackagePath,
+        target: RootPackageBzlTarget,
+    ) -> Result<Self, ExternalLoadLabelError> {
+        if target.raw_bytes().contains(&b'/') {
+            return Err(ExternalLoadLabelError::SlashTarget {
+                target: target.to_string().into(),
+            });
+        }
+        Ok(Self { package, target })
+    }
+
+    fn canonical_label(&self, route: &RootRepositoryRoute) -> CanonicalLabel {
+        CanonicalLabel::parse(&format!(
+            "{}//{}:{}",
+            route.canonical_repo(),
+            self.package,
+            self.target
+        ))
+        .expect("typed external bzl label is canonical")
+    }
+
+    fn repository_relative_path(&self) -> PathBuf {
+        let target = repository_bzl_target_os_string(&self.target);
+        let mut path = PathBuf::from(self.package.as_str());
+        path.push(target);
+        path
+    }
+}
+
+#[cfg(unix)]
+fn repository_bzl_target_os_string(target: &RootPackageBzlTarget) -> OsString {
+    OsString::from_vec(target.raw_bytes().to_vec())
+}
+
+#[cfg(not(unix))]
+fn repository_bzl_target_os_string(target: &RootPackageBzlTarget) -> OsString {
+    target
+        .raw_bytes()
+        .iter()
+        .copied()
+        .map(char::from)
+        .collect::<String>()
+        .into()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum ExternalLoadLabelError {
+    Invalid {
+        load: Arc<str>,
+        message: Arc<str>,
+    },
+    Target {
+        load: Arc<str>,
+        error: RootPackageBzlTargetError,
+    },
+    Repository {
+        load: Arc<str>,
+    },
+    CrossPackage {
+        load: Arc<str>,
+        requesting_package: PackagePath,
+        loaded_package: PackagePath,
+    },
+    SlashTarget {
+        target: Arc<str>,
+    },
+}
+
+impl fmt::Display for ExternalLoadLabelError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Invalid { load, message } => {
+                write!(f, "invalid external load label `{load}`: {message}")
+            }
+            Self::Target { load, error } => {
+                write!(f, "invalid external load label `{load}`: {error}")
+            }
+            Self::Repository { load } => {
+                write!(f, "repository-qualified external load is deferred: {load}")
+            }
+            Self::CrossPackage {
+                load,
+                requesting_package,
+                loaded_package,
+            } => write!(
+                f,
+                "cross-package external load is deferred: {load} ({requesting_package} -> {loaded_package})"
+            ),
+            Self::SlashTarget { target } => write!(
+                f,
+                "external load target must be a direct file in its package: {target}"
+            ),
+        }
+    }
+}
+
+fn resolve_external_load_label(
+    requesting_package: &PackagePath,
+    load: &str,
+) -> Result<RepositoryBzlLabel, ExternalLoadLabelError> {
+    if load.starts_with('@') {
+        return Err(ExternalLoadLabelError::Repository {
+            load: Arc::from(load),
+        });
+    }
+    let (package, target) = if let Some(target) = load.strip_prefix(':') {
+        (
+            requesting_package.clone(),
+            RootPackageBzlTarget::parse(target).map_err(|error| {
+                ExternalLoadLabelError::Target {
+                    load: Arc::from(load),
+                    error,
+                }
+            })?,
+        )
+    } else {
+        let label =
+            ApparentLabel::parse(load).map_err(|message| ExternalLoadLabelError::Invalid {
+                load: Arc::from(load),
+                message: Arc::from(message),
+            })?;
+        if !label.repo().is_root() {
+            return Err(ExternalLoadLabelError::Repository {
+                load: Arc::from(load),
+            });
+        }
+        if label.package() != requesting_package {
+            return Err(ExternalLoadLabelError::CrossPackage {
+                load: Arc::from(load),
+                requesting_package: requesting_package.clone(),
+                loaded_package: label.package().clone(),
+            });
+        }
+        (
+            label.package().clone(),
+            RootPackageBzlTarget::parse(label.target().as_str()).map_err(|error| {
+                ExternalLoadLabelError::Target {
+                    load: Arc::from(load),
+                    error,
+                }
+            })?,
+        )
+    };
+    RepositoryBzlLabel::new(package, target)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) enum HostSourceInputError {
     UnsupportedSourceEncoding {
@@ -1025,6 +1184,116 @@ impl HostBzlModuleEvalKey {
 impl fmt::Display for HostBzlModuleEvalKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "host-bzl-module:{}:{}", self.workspace, self.label)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct ExternalBzlModuleEvalKey {
+    route: RootRepositoryRoute,
+    label: RepositoryBzlLabel,
+}
+
+impl ExternalBzlModuleEvalKey {
+    fn new(route: RootRepositoryRoute, label: RepositoryBzlLabel) -> Self {
+        Self { route, label }
+    }
+
+    fn canonical_label(&self) -> CanonicalLabel {
+        self.label.canonical_label(&self.route)
+    }
+}
+
+impl fmt::Display for ExternalBzlModuleEvalKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "external-bzl-module:{}", self.canonical_label())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum ExternalBzlModuleError {
+    SourceCompute {
+        label: CanonicalLabel,
+        message: Arc<str>,
+    },
+    Source {
+        label: CanonicalLabel,
+        error: RepositorySourceFileError,
+    },
+    Absent {
+        label: CanonicalLabel,
+    },
+    Encoding {
+        label: CanonicalLabel,
+    },
+    Parse {
+        label: CanonicalLabel,
+        message: Arc<str>,
+    },
+    LoadLabel {
+        source: CanonicalLabel,
+        error: ExternalLoadLabelError,
+    },
+    Child {
+        raw_load: Arc<str>,
+        canonical_label: CanonicalLabel,
+        error: Arc<ExternalBzlModuleError>,
+    },
+    Cycle(ExternalBzlLoadCycle),
+    Evaluation {
+        label: CanonicalLabel,
+        message: Arc<str>,
+    },
+    Freeze {
+        label: CanonicalLabel,
+        message: Arc<str>,
+    },
+}
+
+impl fmt::Display for ExternalBzlModuleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SourceCompute { label, message } => {
+                write!(f, "computing source for {label}: {message}")
+            }
+            Self::Source { label, error } => write!(f, "reading {label}: {error:?}"),
+            Self::Absent { label } => write!(f, "cannot load '{label}': no such file"),
+            Self::Encoding { label } => {
+                write!(
+                    f,
+                    "external Starlark source bytes or parser path have unsupported encoding: {label}"
+                )
+            }
+            Self::Parse { label, message } => write!(f, "parsing {label}: {message}"),
+            Self::LoadLabel { source, error } => {
+                write!(f, "resolving a load in {source}: {error}")
+            }
+            Self::Child {
+                raw_load, error, ..
+            } => write!(f, "loading `{raw_load}`: {error}"),
+            Self::Cycle(_) => f.write_str("cycle detected in extension files"),
+            Self::Evaluation { label, message } => write!(f, "evaluating {label}: {message}"),
+            Self::Freeze { label, message } => write!(f, "freezing {label}: {message}"),
+        }
+    }
+}
+
+impl std::error::Error for ExternalBzlModuleError {}
+
+#[cfg(all(test, unix))]
+impl ExternalBzlModuleError {
+    fn cycle(&self) -> Option<&ExternalBzlLoadCycle> {
+        match self {
+            Self::Cycle(cycle) => Some(cycle),
+            Self::Child { error, .. } => error.cycle(),
+            Self::SourceCompute { .. }
+            | Self::Source { .. }
+            | Self::Absent { .. }
+            | Self::Encoding { .. }
+            | Self::Parse { .. }
+            | Self::LoadLabel { .. }
+            | Self::Evaluation { .. }
+            | Self::Freeze { .. } => None,
+        }
     }
 }
 
@@ -1427,6 +1696,254 @@ impl Key for HostBzlModuleEvalKey {
         if capture_events && value.is_complete() {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
                 .expect("HostBzlModuleEvalKey stores one local Complete event batch");
+        }
+        value
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn external_bzl_complete(
+    result: Result<FrozenBzlModule, ExternalBzlModuleError>,
+) -> SourcePreparationOutcome<Arc<Result<FrozenBzlModule, ExternalBzlModuleError>>> {
+    SourcePreparationOutcome::Complete(Arc::new(result))
+}
+
+fn external_source_name(logical_path: &NormalizedAbsolutePath) -> Result<String, ()> {
+    #[cfg(unix)]
+    {
+        Ok(logical_path
+            .as_path()
+            .as_os_str()
+            .as_bytes()
+            .iter()
+            .copied()
+            .map(char::from)
+            .collect())
+    }
+    #[cfg(not(unix))]
+    {
+        logical_path.as_path().to_str().map(str::to_owned).ok_or(())
+    }
+}
+
+#[async_trait]
+impl Key for ExternalBzlModuleEvalKey {
+    type Value = SourcePreparationOutcome<Arc<Result<FrozenBzlModule, ExternalBzlModuleError>>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = async {
+            let canonical_label = self.canonical_label();
+            let source_path = self.label.repository_relative_path();
+            let source = match ctx
+                .compute(&HostRepositorySourceFileKey::new(
+                    self.route.clone(),
+                    source_path,
+                ))
+                .await
+            {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                Ok(SourcePreparationOutcome::Complete(Ok(
+                    HostRepositorySourceFileValue::Present {
+                        bytes,
+                        logical_path,
+                    },
+                ))) => (bytes, logical_path),
+                Ok(SourcePreparationOutcome::Complete(Ok(
+                    HostRepositorySourceFileValue::Absent,
+                ))) => {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::Absent {
+                        label: canonical_label,
+                    }));
+                }
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::Source {
+                        label: canonical_label,
+                        error,
+                    }));
+                }
+                Err(error) => {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::SourceCompute {
+                        label: canonical_label,
+                        message: Arc::from(error.to_string()),
+                    }));
+                }
+            };
+            let (bytes, logical_path) = source;
+            let source_text = match String::from_utf8(bytes.to_vec()) {
+                Ok(source) => Arc::new(source),
+                Err(_) => {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::Encoding {
+                        label: canonical_label,
+                    }));
+                }
+            };
+            let source_name = match external_source_name(&logical_path) {
+                Ok(source_name) => source_name,
+                Err(()) => {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::Encoding {
+                        label: canonical_label,
+                    }));
+                }
+            };
+            let ast = match AstModule::parse_with_string_encoding(
+                &source_name,
+                source_text.as_ref().clone(),
+                &Dialect::Standard,
+                StringEncoding::BazelInternal,
+            ) {
+                Ok(ast) => ast,
+                Err(error) => {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::Parse {
+                        label: canonical_label,
+                        message: Arc::from(error.to_string()),
+                    }));
+                }
+            };
+            let loads = ast
+                .loads()
+                .into_iter()
+                .map(|load| load.module_id.to_owned())
+                .collect::<Vec<_>>();
+            // Validate the complete direct-load set before any child source key
+            // can be requested. This keeps rejected route/package forms outside
+            // the external source graph.
+            let resolved_loads = match loads
+                .iter()
+                .map(|load| {
+                    resolve_external_load_label(&self.label.package, load)
+                        .map(|label| (load.clone(), label))
+                })
+                .collect::<Result<Vec<_>, _>>()
+            {
+                Ok(loads) => loads,
+                Err(error) => {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::LoadLabel {
+                        source: canonical_label,
+                        error,
+                    }));
+                }
+            };
+
+            let mut loaded_modules = Vec::with_capacity(resolved_loads.len());
+            for (raw_load, label) in resolved_loads {
+                let child = ExternalBzlModuleEvalKey::new(self.route.clone(), label);
+                let child_label = child.canonical_label();
+                let guard = ctx
+                    .cycle_guard::<ExternalBzlLoadCycleGuard>()
+                    .unwrap_or_else(|error| {
+                        panic!("external Bzl cycle-guard invariant failed: {error:?}")
+                    })
+                    .expect("external Bzl loading requires the request cycle detector");
+                let child_value = match guard.guard_this(ctx.compute(&child)).await {
+                    Ok(Ok(value)) => value,
+                    Ok(Err(error)) => {
+                        return external_bzl_complete(Err(ExternalBzlModuleError::Child {
+                            raw_load: Arc::from(raw_load.as_str()),
+                            canonical_label: child_label.clone(),
+                            error: Arc::new(ExternalBzlModuleError::SourceCompute {
+                                label: child_label,
+                                message: Arc::from(error.to_string()),
+                            }),
+                        }));
+                    }
+                    Err(cycle) => {
+                        let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+                        return external_bzl_complete(Err(ExternalBzlModuleError::Cycle(cycle)));
+                    }
+                };
+                let module = match child_value {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                        Ok(module) => module.clone(),
+                        Err(error) => {
+                            return external_bzl_complete(Err(ExternalBzlModuleError::Child {
+                                raw_load: Arc::from(raw_load.as_str()),
+                                canonical_label: child_label,
+                                error: Arc::new(error.clone()),
+                            }));
+                        }
+                    },
+                };
+                loaded_modules.push((raw_load, module));
+            }
+
+            let module = Module::new();
+            let manifest = BzlLoadManifest::new(
+                BzlModuleIdentity {
+                    label: canonical_label.clone(),
+                    workspace_path: logical_path.as_path().to_path_buf(),
+                },
+                digest(source_text.as_str()),
+                loaded_modules.iter().map(|(_, module)| module),
+            );
+            let loader = LocalBzlLoader {
+                modules: loaded_modules
+                    .iter()
+                    .map(|(load, module)| (load.as_str(), module.module.dupe()))
+                    .collect(),
+            };
+            let evaluation_context = BzlEvaluationContext::new(canonical_label.to_string());
+            let print_capture = capture_events.then(LoadingPrintCapture::default);
+            let globals = loading_globals();
+            {
+                let mut evaluator = Evaluator::new(&module);
+                evaluator.extra = Some(&evaluation_context);
+                evaluator.set_loader(&loader);
+                if let Some(print_capture) = print_capture.as_ref() {
+                    evaluator.set_print_handler(print_capture);
+                }
+                let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
+                drop(evaluator);
+                event_batch = print_capture.map(LoadingPrintCapture::into_batch);
+                if let Err(error) = evaluation {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::Evaluation {
+                        label: canonical_label,
+                        message: Arc::from(error.to_string()),
+                    }));
+                }
+            }
+            let module = match module.freeze() {
+                Ok(module) => module,
+                Err(error) => {
+                    return external_bzl_complete(Err(ExternalBzlModuleError::Freeze {
+                        label: canonical_label,
+                        message: Arc::from(format!("{error:?}")),
+                    }));
+                }
+            };
+            external_bzl_complete(Ok(FrozenBzlModule {
+                module,
+                path: logical_path.as_path().to_path_buf(),
+                loads,
+                retained_bzl_modules: retained_module_closure(&loaded_modules),
+                manifest,
+            }))
+        }
+        .await;
+        if capture_events && value.is_complete() {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("ExternalBzlModuleEvalKey stores one local Complete event batch");
         }
         value
     }
@@ -2606,3 +3123,21 @@ mod host_package_attempt_tests;
 #[cfg(all(test, unix))]
 #[path = "host_package_load_tests.rs"]
 mod host_package_load_tests;
+
+#[cfg(all(test, windows))]
+mod external_bzl_windows_tests {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+    use std::path::PathBuf;
+
+    use slug_workspace_v2::NormalizedAbsolutePath;
+
+    use super::external_source_name;
+
+    #[test]
+    fn external_bzl_module_non_unicode_parser_path_is_a_typed_encoding_input() {
+        let raw = OsString::from_wide(&[b'C'.into(), b':'.into(), b'\\'.into(), 0xd800]);
+        let path = NormalizedAbsolutePath::new(PathBuf::from(raw)).unwrap();
+        assert!(external_source_name(&path).is_err());
+    }
+}

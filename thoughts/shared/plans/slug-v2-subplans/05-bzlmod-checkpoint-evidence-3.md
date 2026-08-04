@@ -16404,9 +16404,9 @@ Private/Restricted evidence. The next bounded prerequisite is design-only
 
 ## WP-5-m1 external Bzl-module owner design (2026-08-04)
 
-**Status: ACCEPTED — only the dormant implementation contract below is
-authorized.** This is a private, dormant loading-owner design
-only. `RepositoryPackageLoadKey::LoadsUnsupported` remains unchanged: an
+**Status: IMPLEMENTED AND ACCEPTED.** The contract below is the acceptance
+record for a private, dormant loading owner.
+`RepositoryPackageLoadKey::LoadsUnsupported` remains unchanged: an
 external `BUILD` `load()` must not evaluate yet, because the existing external
 native graph could otherwise expose macro-produced native targets before a
 separate query/provenance activation is accepted.
@@ -16496,14 +16496,12 @@ remain semantic state.
 Each external Bzl key owns exactly one local complete `EventBatch` when
 `CaptureEvaluationEvents` is installed, as the root Bzl key does. A later
 package key owns only its BUILD/macro-local batch. Cold evaluation publishes
-the Bzl batch by storing it only when this key recomputes to Complete; warm
-cached reuse does not recompute or capture, but may expose the retained batch
-through rich activation metadata. User-visible silence is the command's
-selection rule ignoring `Reused`, not the absence of retained metadata. Direct
-tests prove evaluated versus reused activation and unchanged retained metadata,
-not aggregate output. Empty replacement and failure-prefix behavior remain
-key-local. This proposal does not claim an unproven aggregate or cross-key
-external print order.
+the Bzl batch by storing it only when this key recomputes to Complete. DICE
+`ActivationData::Reused` explicitly carries no evaluation data, so warm cached
+reuse exposes the reused semantic value without reevaluation, metadata replay,
+or recapture. Direct tests prove evaluated batches, `Reused` with no batch,
+empty replacement, failure-prefix capture, and no recapture; they do not claim
+aggregate output or cross-key external print order.
 
 ### Isolated cycle family and DICE contract
 
@@ -16560,11 +16558,37 @@ Required focused cases are relative/absolute equivalence; every named,
 canonical, and cross-package rejection before source; missing source; direct
 duplicate/diamond order; private recursive-cycle release; retained frozen
 modules; and capture/no-capture recomputation, evaluated versus reused
-activation, unchanged retained metadata, and no recapture. BUILD edits,
+activation, evaluation-only metadata, and no recapture. The defensive Freeze
+error variant receives structural equality coverage only because all values
+currently exposed by `loading_globals` implement `Freeze`; no exercised
+freeze-failure claim is made. BUILD edits,
 BUILD-origin rendering, and external package lifecycle
 claims are reserved for the separate activation owner.
 
-After a later implementation, run serially:
+### WP-5-m1 external Bzl-module owner implementation acceptance (2026-08-04)
+
+**Status: ACCEPTED.** The private dormant owner landed in the exact three-file
+boundary at `+1205/-8`: `bzl_module.rs` `+537/-2`, `cycle_detector.rs`
+`+99/-6`, and `host_package_load_tests.rs` `+569`. It retains full route
+identity in the DICE key while deriving canonical manifest identity only from
+the route's canonical repository, validates every direct load before any child
+source request, reads only `HostRepositorySourceFileKey`, retains the existing
+flattened frozen-module lifetime closure, and uses a third isolated cycle
+family with poison release and fresh-detector recovery. A correction removed a
+non-Unix non-Unicode parser-path panic by returning the complete typed encoding
+terminal instead.
+
+Five focused external-owner tests, nine Host package-filter tests, all 104
+`slug_loading_v2` tests, the downstream external-owner non-activation guard,
+native loading/query checks, both GNU-Windows no-run builds, formatting,
+archive status, and diff hygiene passed. Independent latest-diff review and
+correction rereview returned `ACCEPT`. `RepositoryPackageLoadKey` still returns
+`LoadsUnsupported` for external BUILD loads, and no production caller reaches
+`ExternalBzlModuleEvalKey`. The next packet is design-only activation of this
+owner through external package loading and query projection; no implementation
+scope follows implicitly from this acceptance.
+
+The accepted implementation passed this serial validation matrix:
 
 ```
 cargo test -p slug_loading_v2 host_package_load
