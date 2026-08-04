@@ -18472,3 +18472,40 @@ activation caller changed. The successor may design only occurrence-preserving
 breadth-first acquisition of routed include fragments over the accepted
 package horizon; compilation/evaluation and nonregistry event ownership remain
 deferred.
+
+### WP-5-m1 direct-local occurrence-closure design (2026-08-04)
+
+**Status: REPLAN before Rust; resume only
+`WP-5-m1-direct-local-nonregistry-include-cycle-boundary-design`.** Parallel
+Terra pinned-source and live-DICE audits confirmed the full acyclic traversal
+contract but found that the proposed unrestricted complete closure key has no
+bounded exact result for cyclic inputs. Bazel 9.2 has no visited set or include
+cycle check: a reachable self-cycle or multi-file cycle keeps producing
+nonempty breadth-first horizons, reuses file dependencies, recompiles every
+occurrence, and never returns a closure or finite diagnostic.
+
+A finite Slug value, invented retry Need, visited-set truncation, depth limit,
+or cycle error would change Bazel behavior. Recursive DICE ownership would also
+replace the required breadth-first horizons and enter the documented
+lock/native-key deadlock risk; intentionally hanging a DICE computation is not
+an acceptable Rust architecture. The repo rule therefore requires a narrow
+unsupported boundary or `REPLAN`, not approximate Rust. No source, Cargo,
+Bazel/oracle, fixture, public API, or cap changed in this packet.
+
+The audits also found a prerequisite ownership correction. The accepted
+`DirectLocalIncludePackageHorizonKey` is rooted in the initial
+`DirectLocalModuleInspectionKey`, so it cannot preflight nested fragment
+occurrences. Any later closure implementation must first extract a single
+same-file private route-plus-requests preflight helper consumed by both the
+accepted key and nested horizons; duplicating package lookup/order/Need logic is
+forbidden.
+
+Pinned acyclic behavior remains exact evidence for a later bounded packet:
+package preflight completes before any fragment request; fragment paths
+deduplicate only within the current horizon; the whole dependency group is
+requested before source-order mixed terminal/Need selection; successful
+occurrences compile and append nested includes in breadth-first occurrence
+order; repeated identical and canonical-equivalent paths retain every
+occurrence; and the full reachable closure compiles before execution. The
+current successor decides only whether and where Slug may expose a non-deceptive
+unsupported-cycle capability boundary, without inventing a Bazel diagnostic.

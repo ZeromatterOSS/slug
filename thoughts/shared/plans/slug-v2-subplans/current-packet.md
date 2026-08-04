@@ -1,78 +1,67 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-nonregistry-occurrence-closure-design`
+Packet: `WP-5-m1-direct-local-nonregistry-include-cycle-boundary-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: read-only occurrence-preserving direct-local include-closure design
-Evidence: accepted direct-local source/inspection in `e5e2c55d` and
-`8aae11d6`; accepted route package horizon in `1d5edc7c`; existing root closure
-acquisition shape; and pinned Bazel 9.2 nonroot include traversal. Add no oracle
-unless the design proves one exact discriminator is absent.
+Role: read-only direct-local include-cycle support-boundary design
+Evidence: accepted package horizon in `1d5edc7c`; pinned Bazel 9.2
+`ModuleFileFunction.advanceHorizon`; accepted repeated-include and nested-order
+oracles; the existing unvisited root-closure loop; and
+`docs/developers/dice.md`. Add no oracle unless the boundary analysis proves an
+exact discriminator is absent.
 
-Do not edit or format Rust. Design only the private DICE-owned acquisition of a
-complete direct-local MODULE include closure. Start from the accepted
-`DirectLocalModuleInspectionKey` and
-`DirectLocalIncludePackageHorizonKey`; do not reconstruct their route, source,
-inspection, package policy, or package lookup. Decide the smallest key/helper
-boundary, exact implementation file allowlist, and measured production/test/
-total caps before authorizing code.
+Do not edit or format Rust. The unrestricted occurrence-closure packet reached
+`REPLAN`: a reachable self-cycle or multi-file include cycle keeps Bazel's
+breadth-first horizon permanently nonempty, recompiling repeated occurrences
+without a visited set and producing no finite cycle diagnostic. A complete
+finite Rust closure value, invented Need, visited-set truncation, depth limit,
+cycle error, or recursive DICE dependency would all violate accepted semantics
+or DICE ownership.
 
-The closure must advance breadth-first, one source horizon at a time. For each
-ordered horizon, finish the accepted package preflight before requesting any
-included fragment source. Only after package success derive the normalized
-repository-relative fragment path from that occurrence's canonical package and
-target and consume the accepted routed source owner. Deduplicate only identical
-fragment dependency requests within that horizon in deterministic first-seen
-order; preserve every occurrence, including duplicates, in the closure's
-ordered execution sequence and diagnostic provenance.
+Design only the narrow support/activation boundary. Decide whether Slug may
+explicitly classify direct-local MODULE include cycles as unsupported under the
+project's exact-Rust boundary rule, and if so where that classification lives
+without pretending it is a Bazel diagnostic. Distinguish a planning/capability
+boundary from a semantic closure-key result. Do not authorize an acyclic-only
+closure key until the design proves how every public activation path establishes
+or reports the supported domain without hanging DICE or silently changing
+observable Bazel behavior.
 
-Freeze exact source-result ordering. Request the complete first-seen fragment
-group for one horizon, union every `SourcePreparationNeeds`, and then restore
-raw label/`LogicalSpan` source order when choosing a missing/wrong-kind/source,
-source-compute, UTF-8/parser, or unresolved result. Establish from pinned Bazel
-source whether mixed terminal/Need selection mirrors package-horizon source
-order or has a distinct rule. Do not infer it from async completion order.
-Inspect every successfully acquired fragment once per unique dependency, but
-replay its occurrence carrier wherever the raw include appeared.
+Audit existing typed unsupported-feature owners and command publication paths,
+but do not activate or modify them. Freeze the exact future owner of cycle
+detection, whether detection is allowed before fragment dependency acquisition,
+the retained provenance needed to identify a repeated active occurrence, and
+the public diagnostic/status contract if the architecture permits one. A
+supported boundary may not deduplicate ordinary repeated includes, reject a
+finite duplicate DAG, alter breadth-first order, or add cycle identity to the
+equality of acyclic closure values.
 
-The design must freeze the complete retained representation: route; root MODULE
-logical identity/source/inspection as needed by the later evaluator; every
-reachable fragment's route-derived logical identity, shared bytes, inspection,
-raw label, and span; breadth-first horizons; and repeated execution
-occurrences. Use existing `Arc<[u8]>`, `Arc<[T]>`, `CompactString`, compact
-collections, `Dupe`, and `Allocative`. Do not retain package lookup results,
-path-resolution internals, event batches, mutable evaluation state, or public
-activation data.
+Also freeze the prerequisite ownership correction for any later acyclic closure
+packet. The accepted `DirectLocalIncludePackageHorizonKey` is rooted in
+`DirectLocalModuleInspectionKey` and cannot preflight nested fragment requests.
+Any successor must extract one same-file private
+`preflight_direct_local_include_package_horizon(ctx, route, requests)` helper
+and make both the accepted key and closure owner consume it; it may not copy the
+package parse/dedupe/Need/order logic or add a second route/policy/lookup graph.
 
-Resolve repeated-include and cycle semantics from pinned Bazel 9.2 source.
-Dependency deduplication may not become a visited-set truncation, and no new
-finite cycle diagnostic is allowed without oracle/source authority. If exact
-Bazel behavior requires unbounded recursion/nontermination that cannot be
-represented by a bounded safe Rust owner, record the narrow unsupported
-boundary or `REPLAN`; do not invent success, a cycle error, or occurrence
-elision.
+If a bounded unsupported-cycle policy is architecturally acceptable, design the
+smallest serial packets and exact file allowlists/caps for (1) the support
+boundary and shared package-preflight refactor, then (2) acyclic breadth-first
+fragment acquisition. Retain pinned acyclic behavior: package success before
+fragment demand; horizon-local first-seen dependency dedupe; source-order mixed
+terminal/Need selection; repeated occurrence compilation and execution;
+next-horizon order; complete reachable compilation before execution; exact
+multi-kind Need union; route/raw-label/span provenance; complete-only equality;
+and no closure-local event batch.
 
-Specify exact key/value/error identity, display, source chains, complete-only
-equality, and transient Need behavior. The closure owns no local event batch and
-must not copy the package-policy child's routed-REPO batch. Fragment compilation
-and module execution remain later owners; this packet may parse/inspect acquired
-fragment bytes only to discover the next horizon, never execute directives.
+If no non-deceptive bounded support boundary exists without explicit product
+approval, record terminal unsupported status for direct-local include closure
+activation and pivot the canonical plan to another bounded M1 gap. Do not
+silently assume approval.
 
-Freeze lifecycle evidence for duplicate fragment dependencies versus repeated
-ordered occurrences; breadth-first rather than depth-first discovery; package
-success before fragment demand; both mixed terminal/Need directions; exact
-multi-kind Need union; raw label/span errors; fragment add/edit/delete/recreate;
-nested include add/remove/reorder; route A-to-B-to-A; root MODULE
-absence/recreate; warm reuse and downstream pruning; and captured/uncaptured
-child policy events with no closure-local data. Require structural stops proving
-no evaluator, declarations, contextual mapping, registry/MVS/JVM transport,
-public caller/export/activation, direct IO, lock across DICE, fixture, or oracle
-enters the implementation packet.
-
-Stops: no Rust, recursive module evaluation, empty-key declaration defaults or
-validation, print/event ownership changes, contextual repository mappings,
-registry resolution or transport, root-horizon semantic changes, public API,
-fixture/oracle, direct filesystem IO, or speculative cap. Finish by recording
-an accepted bounded implementation packet, a narrow unsupported boundary, or
-`REPLAN` in the owner/canonical/manifest/routing records. Do not run Cargo or
-Bazel.
+Stops: no Rust, Cargo, Bazel, fixture/oracle, finite cycle result, intentional
+hang, DICE recursion, visited set, occurrence elision, fragment acquisition,
+evaluator/default/validation/print change, contextual mappings, registry/MVS/
+JVM transport, public activation, or speculative implementation cap. Finish by
+recording an accepted bounded design sequence, terminal unsupported status, or
+`REPLAN` in the owner/canonical/manifest/routing records.
