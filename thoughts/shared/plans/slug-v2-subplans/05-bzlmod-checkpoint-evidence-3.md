@@ -18064,3 +18064,36 @@ hook, file, or semantic surface. Use only the existing parser and Direct input;
 reuse accepted evidence without a new oracle. Run focused tests, formatting,
 scope/cap/diff checks, and independent latest-diff review before root-owned
 broader validation and commit.
+
+### WP-5-m1 direct-local module inspection implementation (2026-08-04)
+
+**Status: ACCEPTED in `8aae11d6`.** The one-file private parser projection is
+98 production/342 test/440 total lines within its 100/350/450 caps. It depends
+only on the accepted Direct input, retains that full input plus optional
+inspection, forwards Needs exactly, uses requested Host logical IDs, and owns
+no events or include acquisition. Six focused tests pass with exact include,
+UTF-8/parser error, input-error, A-to-B-to-A, Present/edit/Absent/recreate, and
+capture-enabled reuse evidence. Independent corrected-diff review accepted.
+The full library result was 235 passes plus the unchanged clean-baseline
+proxy-span failure; loading/core checks, doctests, GNU-Windows no-run,
+formatting, archive, scope/cap, and diff gates passed.
+
+### WP-5-m1 direct-local nonregistry identity correction (2026-08-04)
+
+**Status: REPLAN the prior assumption; no code or oracle changed.** Pinned Bazel
+9.2 source and the accepted `module-local-override-version-selection` oracle
+establish an exact evaluation identity. Discovery rewrites every nonregistry
+override request to `ModuleKey(name, Version.EMPTY)`. Bazel validates the
+external declaration's name but skips declared-version equality for the empty
+key; the declared version remains evaluator output. Selection therefore keeps
+the empty-version key, while canonical `name+` source identity precedes final
+post-selection contextual mappings. Neither the root-requested version nor the
+file-declared version is the expected key.
+
+Resume only the read-only
+`WP-5-m1-direct-local-nonregistry-empty-key-evaluation-design`. Use route module
+name plus empty version and design the complete DICE-owned include closure
+before evaluation. Decide closure/evaluation packet splitting, logical
+identity, Need/error/cycle/lifecycle and event ownership without entering
+registry MVS, contextual mappings, the legacy source graph, or public
+activation.
