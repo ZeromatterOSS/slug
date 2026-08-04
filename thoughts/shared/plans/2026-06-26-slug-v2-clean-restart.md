@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, the accepted 20-row external macro-created native filegroup/query-provenance oracle, and accepted external Bzl package/query activation with bare query progress-flag compatibility; full evidence is in the Stage 5 owner plan | External Starlark test-base closure is blocked on installed `@bazel_tools` and contextual resolved/generated repository ownership; test-rule/member breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | design only the DICE-owned tools/query repository closure prerequisite |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, the accepted 20-row external macro-created native filegroup/query-provenance oracle, and accepted external Bzl package/query activation with bare query progress-flag compatibility; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure is unsupported under the current architecture; package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | design only same-package external package-group visibility through existing owners |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-bazel-tools-query-repository-closure-owner-design`.
+`WP-5-m1-external-package-group-visibility-query-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -79,6 +79,15 @@ rules_shell/rules_java/platforms mappings, and an extension-generated remote
 coverage repository that the current direct-local route cannot own. The
 current packet designs only that DICE-owned repository-closure prerequisite;
 external test rules and suites remain frozen.
+
+The repository-closure ownership audit also reached terminal `REPLAN`.
+Installed tools bytes can be source-pinned, but the exact selected-module,
+registry, contextual mapping, extension-generated repository, and complete
+package/query semantics have no bounded Rust owner; the exact Host registry
+byte surface already has an accepted JVM/process-state impossibility result.
+The external test-base/tools branch is therefore unsupported under the current
+architecture. The current packet returns to an existing-owner vertical slice:
+same-package external package-group visibility for `visible()` only.
 
 The external Bzl macro-query oracle is accepted in the exact four-path
 `+112`-line boundary. Bazel 9.2 generation and a distinct-root replay passed

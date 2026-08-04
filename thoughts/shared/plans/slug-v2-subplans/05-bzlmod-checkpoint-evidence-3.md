@@ -17162,3 +17162,72 @@ analysis, actions, execution, configured toolchain resolution, JVM, Java
 bytecode, or Bazel delegation. Stop with `REPLAN` if this requires a parallel
 source owner, direct filesystem observation, invented tools content, or
 unbounded repository discovery/native-rule semantics.
+
+### WP-5-m1 Bazel-tools query repository-closure owner decision (2026-08-04)
+
+**Status: REPLAN — the external test-base/tools branch is unsupported under
+the current architecture.** No implementation, inventory, or further tools-
+graph prerequisite is authorized. A source-pinned installed-tools byte owner
+is feasible in isolation, but it cannot make the query closure exact.
+
+The isolated source contract would have to reproduce Bazel 9.2's installed
+`embedded_tools_nojdk_srcs` archive at commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, applying only the exact
+`create_embedded_tools.py` destination transforms, modes, bytes, collision
+rules, and installed manifest. The dormant `scripts/sync_bazel_tools.sh` is
+not such an owner: it defaults to 9.0, copies source-tree `tools/`, and creates
+un-pinned root metadata. Bundling the correct archive alone would nevertheless
+expose a partial built-in repository whose contextual loads and targets could
+not be resolved.
+
+The required semantic owners are absent. `ResolvedBzlmodGraphDiceKey` is an
+identity record, not a `dice::Key`; the live `RootModuleGraphKey` retains only
+root evaluation and mapping. `ModuleSourcePreparationKey` requires an already
+selected module/version. No live key owns MVS selection, registry `source.json`
+to `RepoSpec`, per-repository contextual mappings, module-extension execution,
+or the generated remote-coverage repository. Existing materialization and
+source-file keys are reusable only after an exact route and RepoSpec already
+exist. Hard-coding the observed versions, canonical names, extension output,
+or lockfile-generated specs would create the forbidden parallel discovery
+graph and would fail lockfile-off/absent cold evaluation.
+
+The existing exact-Host route is not available as a future bounded bridge.
+The accepted `WP-5-m1-host-jvm-registry-byte-execution-feasibility` result
+already proves there is no bounded Slug-owned Rust executor for Bazel's local
+registry bytes across explicit javabases, agents, classpaths, JVM/native
+process state, and same-path reuse. Reopening selected-module discovery would
+therefore rename an accepted architectural blocker rather than supply a new
+exact owner.
+
+Query breadth is independently terminal. Bazel evaluates every complete
+BUILD package reached by the closure. Enabled `siblings()`, same-package
+reverse deps, `labels()`, `deps()`, `tests()`, `executables()`, kind/output,
+and provenance consumers expose every declaration, real edge, attribute,
+capability, and load. Pinned tools/test, JDK, and launcher packages require
+repository-qualified and cross-package loads, rules_shell/rules_java/
+rules_python, executable and build-setting rules, aliases, selects, globs,
+toolchain declarations, and mixed packages that the current loader explicitly
+rejects. A 44-target table or package inventory would hide declarations,
+evaluation errors, conflicts, and sibling targets and is not a Bazel semantic
+representation.
+
+Three independent source, route/DICE, and consumer audits returned `REPLAN`.
+Independent reserved-boundary review returned `ACCEPT` for ending this branch
+rather than scheduling speculative substrate breadth. No Rust, fixture, tool,
+generated evidence, Bazel command, Cargo command, public API, DICE key, or
+production behavior changed.
+
+Resume the next bounded M1 vertical slice with read-only design:
+`WP-5-m1-external-package-group-visibility-query-design`. Limit it to one
+existing direct-local repository route, one already-supported native target
+whose explicit visibility names already-loaded package groups in the same
+external package, repository-relative package specifications, same-package
+include closure/cycles, existing root/external caller identities, and the
+`visible()` consumer only. It must freeze canonical repository-relative
+matching, positive/negative package-spec behavior, include-cycle handling,
+identity/equality/invalidation, exact evidence, allowlist, and stop gates.
+Do not run Bazel or edit Rust, fixtures, tools, or generated evidence in the
+design packet. Stop before cross-package/repository discovery, wildcard target
+discovery, implicit/default visibility expansion, general visibility loading,
+configuration, analysis/actions/execution, JVM, Java bytecode, or Bazel
+delegation.
