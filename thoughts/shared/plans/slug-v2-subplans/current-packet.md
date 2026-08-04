@@ -1,38 +1,47 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-nonregistry-empty-key-evaluation-design`
+Packet: `WP-5-m1-direct-local-nonregistry-external-package-policy-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: read-only nonregistry include-closure and evaluation ownership design
-Evidence: accepted direct `local_path_override` route,
-`HostRootModuleFileKey`, `HostRepositorySourceFileKey`, and the accepted
-direct-local handoff design/cap correction in the owner plan.
+Role: read-only route-aware external package-policy and lookup design
+Evidence: accepted nonroot package-policy and repository path-state oracles;
+the live sparse path producer/retry owner; accepted root package-policy,
+REPO/ignore, lookup, and include-horizon owners; and the accepted direct route,
+source, and inspection handoff.
 
-Do not edit Rust. Design one private, callerless direct-local nonregistry
-evaluation owner above the accepted `DirectLocalModuleInspectionKey`. Its exact
-expected identity is `NonrootModuleKey { name: route.module_name(), version:
-"" }`: Bazel rewrites nonregistry override requests to empty version before
-discovery, validates the declared name, and skips declared-version equality
-only for that empty key.
+Do not edit Rust. Design the smallest private route-keyed package-policy and
+package-lookup boundary required before any direct-local included-fragment
+read. Its semantic identity must retain the accepted `RootRepositoryRoute`
+plus canonical external `PackageIdentifier`; raw include spelling/span remain
+adapter diagnostics and do not enter package-key identity.
 
-Freeze the DICE dependency order for acquiring the complete transitive
-nonregistry include closure through the same retained route and existing Host
-source owner. All reachable files must be inspected before execution, with
-exact Need/error/cycle/missing/unreachable semantics and logical identities.
-Then define the smallest evaluator wrapper/value/error/event boundary that can
-consume the empty expected key plus complete supplied closure. Preserve the
-declared name/version separately in evaluator output.
+Freeze the exact dependency order: validate the package and check global
+canonical deleted-package membership first; only a non-deleted package may
+obtain route-local materialization/path authority, read/evaluate that
+repository's `REPO.bazel`, read its `.bazelignore`, and select `BUILD.bazel`
+before `BUILD` by resolved regular-or-special kind without reading marker
+bytes. It must propagate exact `SourcePreparationNeeds`, retain typed route/
+materialization/path/policy failures, use complete-only equality, and own
+marker-conditional evaluation data only where Bazel evaluates policy.
 
-Decide whether closure acquisition and evaluation require serial packets, the
-exact file allowlist and caps, event capture/replay ownership, complete-only
-equality and transient Need behavior, and the lifecycle matrix. Reuse the
-accepted local-override version-selection oracle; add no oracle unless an
-observable include/evaluation discriminator is demonstrably absent.
+Decide whether existing root policy projections can be split to expose only
+global canonical deletion inputs or require a new minimal projection; root
+package roots, vendor policy, root `REPO.bazel`, and root `.bazelignore` must
+not leak into external equality. Decide how the existing external package-load
+path will later consume the same owner so an include-only parallel policy graph
+cannot land. Freeze the exact implementation packet split, Rust file allowlist,
+production/test/total caps, error/event boundary, and lifecycle matrix for
+BUILD priority and create/delete/recovery, route retarget, symlink/error,
+deleted-package, `.bazelignore`, and `REPO.bazel` changes. Deleted-package
+evidence must prove the short circuit requests no route materialization or
+route-local policy Need and stores/emits no route-local policy event.
 
-Stop with **REPLAN** on a root-requested or file-declared version used as the
-expected key, nonempty nonregistry selected version, root mapping used as final
-nonroot context, contextual mapping construction, registry/JVM transport,
-legacy `ModuleFile::parse`/`resolve_*`/`ModuleSourcePreparationKey`, direct
-filesystem IO, a parallel source graph, public activation/export, or evaluation
-before the full owned include closure. Do not edit/format Rust, run Cargo/Bazel,
-or change an oracle in this design packet.
+Keep the serial successors explicit: route-aware package horizon, occurrence-
+preserving closure acquisition, then the empty-key evaluator correction and
+nonregistry event producer. Stop with **REPLAN** on root package lookup reused
+as external policy, BUILD-marker byte reads, direct filesystem IO, a second
+materialization/path owner, include-fragment acquisition, cycle rejection,
+evaluator changes, contextual mappings, registry/JVM transport, public
+activation/export, or any new oracle without a demonstrated discriminator.
+Do not edit/format Rust, run Cargo/Bazel, or change a fixture in this design
+packet.

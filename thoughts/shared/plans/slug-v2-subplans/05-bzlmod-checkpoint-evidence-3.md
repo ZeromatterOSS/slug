@@ -18097,3 +18097,59 @@ before evaluation. Decide closure/evaluation packet splitting, logical
 identity, Need/error/cycle/lifecycle and event ownership without entering
 registry MVS, contextual mappings, the legacy source graph, or public
 activation.
+
+### WP-5-m1 direct-local nonregistry closure/evaluation design (2026-08-04)
+
+**Status: REPLAN before Rust; no code or oracle changed.** Pinned Bazel 9.2 and
+the accepted nonroot include/package/path-state evidence require one breadth-
+first horizon at a time: deduplicated package preflight before any fragment
+read, deduplicated file dependencies after package success, source-order
+terminal selection, full reachable compile before execution, and repeated
+include occurrences executed repeatedly. Bazel supplies no finite include-
+cycle diagnostic, so neither visited-set truncation nor a new cycle error is
+allowed. Unreachable supplied-file rejection remains only an internal test
+seam, not acquisition semantics.
+
+The live sparse path observation producer, symlink resolver, whole-command
+Need retry loop, and route-derived materialization/source owner are already
+complete; the older path-state prerequisite is superseded. The missing first
+owner is route-aware external package policy and lookup. The existing
+`HostRootPackageLookupKey`, `HostRepoFileKey`,
+`HostRepositoryIgnoreKey`, and root horizon are hard-bound to main-repository
+package roots and policy. `HostRepositorySourceFileKey` can read a final routed
+file but cannot establish canonical deleted-package membership, route-local
+`REPO.bazel`/`.bazelignore`, or `BUILD.bazel`-before-`BUILD` package existence.
+Using it directly for includes would violate the accepted package-before-file
+and source-order failure evidence.
+
+Two later evaluator defects also require separate correction. The private
+supplied-file evaluator seeds declared name, declared version, and repo name
+from the expected key, so it cannot represent omitted `module()` or the
+required declared-name-first, empty-key-version-skip validation. It also uses
+`RejectPrint`, while Bazel emits nonregistry print only on fresh evaluation and
+does not replay it from an unchanged cached value. A future evaluation key must
+keep `NonrootModuleKey { name: route.module_name(), version: "" }` separate
+from initially empty declarations, validate name first, preserve declared
+version in output, and attach marker-conditional local event batches without
+putting events in semantic equality or copying child batches.
+
+The accepted serial sequence is therefore: (1) route-aware external package-
+policy/lookup design and implementation; (2) route-aware package horizon; (3)
+occurrence-preserving direct-local closure acquisition; and (4) evaluator
+defaults/validation plus nonregistry event ownership. Closure values will
+retain root plus ordered include occurrences—raw label/location, route-derived
+logical ID, shared bytes, and inspection—while dependency requests may
+deduplicate within a horizon. Use existing `Arc<[u8]>`, `Arc<[T]>`,
+`CompactString`, `SmallMap`/`SmallSet`, `Dupe`, and `Allocative`; add no
+interner, cache, V1 import, direct IO, lock across DICE, public caller, mapping,
+registry transport, or normative cycle behavior.
+
+Resume only read-only
+`WP-5-m1-direct-local-nonregistry-external-package-policy-design`. It must
+freeze the route/materialization/policy identity, canonical deletion versus
+route-local ignore order, including deletion before any materialization or
+route-local policy Need/event; REPO/ignore event boundary, exact package result
+and errors, BUILD marker-kind precedence, future shared consumption by external
+package loading, implementation file allowlist/caps, and lifecycle matrix.
+The accepted nonroot package-policy and path-state fixtures already supply the
+discriminators; add no oracle unless that design proves a specific gap.

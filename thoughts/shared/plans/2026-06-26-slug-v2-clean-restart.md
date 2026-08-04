@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff and parser inspection, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering are unsupported under the current architecture/evidence; full discovery composition still lacks registry MVS, contextual-mapping, and extension owners | design direct-local nonregistry empty-key include closure and evaluation ownership |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff and parser inspection, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | Direct-local evaluation still lacks route-aware external package policy/preflight, exact omitted-declaration evaluator defaults, and nonregistry evaluation-only event capture; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | design route-aware external package policy and lookup before the direct-local include horizon |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-direct-local-nonregistry-empty-key-evaluation-design`.
+`WP-5-m1-direct-local-nonregistry-external-package-policy-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -60,9 +60,13 @@ accepted at 100 production/545 tests/645 total: 525 mandatory test lines plus
 accepted in `e5e2c55d`. Direct evaluation remains blocked because the raw
 handoff uses Bazel's exact nonregistry identity: route module name plus empty
 version, independent of both the root-requested and file-declared versions.
-The parser-backed inspection projection is accepted in `8aae11d6`; the current
-packet designs its DICE-owned include closure and evaluation/event boundary
-without creating contextual mappings or entering registry MVS.
+The parser-backed inspection projection is accepted in `8aae11d6`. The first
+closure/evaluation design reached `REPLAN`: the live sparse path/retry owner is
+already sufficient, but direct include reads lack route-aware external package
+policy/preflight; the private evaluator also prepopulates declarations from the
+expected key and rejects nonregistry print. The current packet designs only the
+external package-policy/lookup prerequisite. Package horizon, occurrence-
+preserving closure, and corrected evaluation/event ownership remain serial.
 
 The external query package-identity implementation is accepted in five files.
 One private request-local Arc owner retains full canonical package identity
