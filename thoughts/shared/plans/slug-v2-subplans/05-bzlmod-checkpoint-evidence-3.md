@@ -18373,3 +18373,69 @@ No Bazel/oracle or fixture changed. The next design may add only one
 breadth-first route package-preflight horizon over accepted direct-local include
 occurrences and the private lookup. Fragment reads, recursive occurrence
 closure, evaluator changes, and public activation remain deferred.
+
+### WP-5-m1 direct-local route package-horizon design (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-5-m1-direct-local-route-package-horizon-implementation`.** Parallel Terra
+audits of the live inspection/lookup graph and pinned Bazel 9.2 horizon source
+found one material flaw in the draft manifest: an incomplete package does not
+globally beat every completed terminal. Bazel first requests the whole
+first-seen package group and unions all unresolved Needs, then rewalks original
+occurrences. An earlier complete terminal beats a later Need; an earlier Need
+returns the whole union and beats a later terminal. The corrected packet freezes
+that source-order mixed precedence and adds no oracle.
+
+Implement one private key and its carriers in exactly
+`app/slug_bzlmod_v2/src/source_preparation.rs`, capped at **300 production
+lines, 650 test lines, and 950 total net lines**. The exact private owners are
+`DirectLocalIncludePackageHorizonKey`,
+`DirectLocalIncludePackageHorizon`,
+`DirectLocalIncludePackageOccurrence`,
+`DirectLocalIncludePackageHorizonError`, and
+`DirectLocalIncludePackageFailure`. The key identity is workspace plus nonroot
+apparent repository and computes the accepted `DirectLocalModuleInspectionKey`
+once. It forwards inspection Needs, and keeps inspection semantic and compute
+failures distinct; it may not reconstruct the route, source, or inspection.
+
+Parse every occurrence through the existing `parse_root_include` seam before
+issuing a package dependency. Retain canonical target plus raw label/span, but
+replace the parser's root repository with `route.canonical_repo()` for the
+external `PackageIdentifier`. Deduplicate only the package dependencies in
+deterministic first-seen order, compute every unique private
+`ExternalRepositoryPackageLookupKey` in one group, preserve lookup-compute
+failures, and union all Needs through `SourcePreparationNeeds::try_union`.
+After the group completes, the original occurrence scan chooses the first
+terminal or unresolved package using the corrected mixed precedence. Typed
+InvalidPackageName, Deleted, NoBuildFile, operational lookup, and lookup-compute
+failures restore the occurrence's raw spelling and `LogicalSpan`.
+
+The complete value retains exactly the full `RootRepositoryRoute` plus ordered
+`Arc<[DirectLocalIncludePackageOccurrence]>`. It retains duplicates for later
+execution but no MODULE bytes, lookup results, derived fragment paths or bytes,
+event batches, evaluation state, or activation data. Absent and present-empty
+MODULE inputs intentionally compare equal for an equal route; their inspection
+dependency still recomputes, and a later closure owner—not this package
+horizon—owns source presence. Complete values/errors use semantic equality;
+every Need is invalid and self-unequal. The horizon owns no local event batch
+and neither copies nor replays child routed-REPO events.
+
+Focused evidence must cover parse-all-before-lookup, duplicate occurrences
+with one lookup activation, both mixed terminal/Need directions, first terminal
+by source order independent of completion order, exact multi-kind Need union,
+all typed mappings/source chains, raw-label/span restoration,
+absent/present-empty pruning, include add/edit/reorder/delete/recreate, global
+deletion, route REPO/ignore and BUILD-marker lifecycles, route A-to-B-to-A, warm
+reuse, and captured/uncaptured child events with no horizon-local evaluation
+data or fragment demand. Structural checks prohibit a fragment source key,
+derived fragment path, `FileBytes`, filesystem API, evaluator, event storage,
+public export, or caller.
+
+Do not change `host_include.rs` or generalize the accepted root horizon: its
+root identity, `PathOutcome`, and selected-path result remain separate. Any
+second Rust file, cap breach, visibility widening, second route/inspection/
+policy/lookup graph, fragment read, recursive closure/cycle rule, evaluator,
+public activation, direct IO, fixture/oracle, or root-horizon semantic change
+requires `REPLAN`. After focused serial tests, formatting, GNU-Windows no-run,
+archive/scope/cap/diff gates, and independent latest-diff review, resume only
+the occurrence-preserving direct-local fragment-closure design.
