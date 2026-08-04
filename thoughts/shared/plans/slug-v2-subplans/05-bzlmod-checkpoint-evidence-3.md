@@ -16565,6 +16565,48 @@ freeze-failure claim is made. BUILD edits,
 BUILD-origin rendering, and external package lifecycle
 claims are reserved for the separate activation owner.
 
+If the direct-external CLI dependent is used, rebuild `slug_cli_v2` first and
+clean stale `slugd` before and after its smoke. CLI GNU-Windows no-run remains
+outside this cap because unconditional Unix-socket server imports are an
+existing transport blocker. Do not run a Bazel oracle or workspace-wide Cargo
+suite.
+
+### Explicit non-activation and stop gates
+
+`RepositoryPackageLoadKey::LoadsUnsupported` remains unchanged in this design
+and its first implementation. No external BUILD receives loaded modules, no
+macro-produced native target becomes observable through the external graph,
+and no `loadfiles`/`buildfiles` Bzl or companion candidate appears. The
+external Starlark-rule graph stop stays intact. A separate reviewed activation
+owner must decide how the package key invokes the dormant evaluator and audit
+every enabled query consumer first.
+
+Stop and **REPLAN** if work needs a third production file, public identity
+generalization, root-key/cycle reuse, another source owner or filesystem path,
+cache/interner, any lock other than the isolated per-guard asynchronous
+receiver mutex, query/provenance projection, fake Bzl/BUILD companions, changed
+graph acceptance, cross-package/repository loads, mapping/discovery, non-local
+overrides, globs, visibility content, test/executable rules or suites,
+implicit/user dependencies, generated outputs, `@bazel_tools`, configuration,
+analysis/actions/execution, repository rules/extensions, JVM, Java bytecode,
+or Bazel delegation. The `module-local-override` fixture stays frozen at 17
+rows and 598 lines; oracle allowlist is empty. An independent
+DICE/retained-lifetime review is required before an implementation packet.
+
+### Independent DICE/retained-lifetime review (2026-08-04): ACCEPT
+
+Independent review accepted the dormant two-production-file architecture and
+required one bounded wording correction cycle. The final contract explicitly
+keeps `RepositoryPackageLoadKey::LoadsUnsupported`, derives canonical identity
+only from the retained route, validates every raw load before any child source,
+uses byte-exact target-to-path conversion and the Host source logical path,
+freezes `ExternalBzlModuleError`, preserves manifest-only equality plus frozen
+lifetime ownership, and isolates a third cycle family. It also records the
+sole per-guard receiver-mutex exception, fresh-detector recovery, evaluated
+versus reused event metadata without claiming command replay, exact three-file
+caps, and the later activation stop. Final rereview returned **ACCEPT**; the
+fixture and oracle allowlist remain frozen.
+
 ### WP-5-m1 external Bzl-module owner implementation acceptance (2026-08-04)
 
 **Status: ACCEPTED.** The private dormant owner landed in the exact three-file
@@ -16669,23 +16711,15 @@ evidence. Preserve all 17 existing `module-local-override` commands and
 mixing loaded-target restrictions with the existing Alias, ConfigSetting,
 TestSuite, and PackageGroup rows.
 
-The next packet is design-only
-`WP-5-m1-external-bzl-macro-query-oracle-design`. It may specify only two new
-subpackage assets and three nonduplicative Bazel 9.2 query rows: macro-created
-native filegroup `label_kind`, `loadfiles()`, and `buildfiles()`. It must freeze
-exact contents, order, normalization, generation/replay procedure, fixture
-hygiene arithmetic, and implementation caps before any fixture edit. If Bazel
-9.2 differs, return to this activation design before Rust.
-
-After that oracle is accepted, the activation implementation may be bounded to
-`bzl_module.rs`, a test-only lifetime accessor in `package.rs`, the existing
-same-module loading tests, `loading_environment.rs`, loading-query tests, the
-existing direct external CLI lifecycle test, and the accepted fixture paths,
-with an audited cap no larger than +2100. Required coverage includes manifest
-and lifetime transfer, all-load prevalidation, missing/cycle preparation,
-Need/equality/validity, edit/delete/recreate and fresh-detector same-DICE
-recovery, evaluation-only events, every fake-candidate consumer, apparent
-output, and a real root BUILD proving no root companion fallback.
+After the oracle below is accepted, the activation implementation may be
+bounded to `bzl_module.rs`, a test-only lifetime accessor in `package.rs`, the
+existing same-module loading tests, `loading_environment.rs`, loading-query
+tests, the existing direct external CLI lifecycle test, and the accepted
+fixture paths, with an audited cap no larger than +2100. Required coverage
+includes manifest and lifetime transfer, all-load prevalidation, missing/cycle
+preparation, Need/equality/validity, edit/delete/recreate and fresh-detector
+same-DICE recovery, evaluation-only events, every fake-candidate consumer,
+apparent output, and a real root BUILD proving no root companion fallback.
 
 Residual `REPLAN` stops are cross-package or cross-repository loads,
 mapping/discovery, non-local overrides, globs, loaded target kinds beyond
@@ -16694,44 +16728,130 @@ executable, suite, generated, or Starlark-rule projection, analysis/actions/
 execution, and any new source owner, DICE key, lock, public identity, JVM,
 Java bytecode, or Bazel delegation.
 
-If the direct-external CLI dependent is used, rebuild `slug_cli_v2` first and
-clean stale `slugd` before and after its smoke. CLI GNU-Windows no-run remains
-outside this cap because unconditional Unix-socket server imports are an
-existing transport blocker. Do not run a Bazel oracle or workspace-wide Cargo
-suite.
+## WP-5-m1 external Bzl macro-query oracle design (2026-08-04)
 
-### Explicit non-activation and stop gates
+**Status: ACCEPTED — implement only the exact oracle contract below.** An
+isolated Bazel 9.2 probe ran the three commands on two distinct fresh output
+bases with byte-identical stdout. Independent fixture/harness and proof-
+minimality audits accepted the two-asset, three-row boundary. No Rust, fixture,
+generated record, or tool changed during design.
 
-`RepositoryPackageLoadKey::LoadsUnsupported` remains unchanged in this design
-and its first implementation. No external BUILD receives loaded modules, no
-macro-produced native target becomes observable through the external graph,
-and no `loadfiles`/`buildfiles` Bzl or companion candidate appears. The
-external Starlark-rule graph stop stays intact. A separate reviewed activation
-owner must decide how the package key invokes the dormant evaluator and audit
-every enabled query consumer first.
+### Exact isolated subpackage
 
-Stop and **REPLAN** if work needs a third production file, public identity
-generalization, root-key/cycle reuse, another source owner or filesystem path,
-cache/interner, any lock other than the isolated per-guard asynchronous
-receiver mutex, query/provenance projection, fake Bzl/BUILD companions, changed
-graph acceptance, cross-package/repository loads, mapping/discovery, non-local
-overrides, globs, visibility content, test/executable rules or suites,
-implicit/user dependencies, generated outputs, `@bazel_tools`, configuration,
-analysis/actions/execution, repository rules/extensions, JVM, Java bytecode,
-or Bazel delegation. The `module-local-override` fixture stays frozen at 17
-rows and 598 lines; oracle allowlist is empty. An independent
-DICE/retained-lifetime review is required before an implementation packet.
+Preserve every existing `module-local-override` workspace asset and command,
+especially `workspace/dep/BUILD.bazel`, byte-for-byte. Add only these two
+regular files, each with its shown final newline:
 
-### Independent DICE/retained-lifetime review (2026-08-04): ACCEPT
+`workspace/dep/macro/BUILD.bazel`:
 
-Independent review accepted the dormant two-production-file architecture and
-required one bounded wording correction cycle. The final contract explicitly
-keeps `RepositoryPackageLoadKey::LoadsUnsupported`, derives canonical identity
-only from the retained route, validates every raw load before any child source,
-uses byte-exact target-to-path conversion and the Host source logical path,
-freezes `ExternalBzlModuleError`, preserves manifest-only equality plus frozen
-lifetime ownership, and isolates a third cycle family. It also records the
-sole per-guard receiver-mutex exception, fresh-detector recovery, evaluated
-versus reused event metadata without claiming command replay, exact three-file
-caps, and the later activation stop. Final rereview returned **ACCEPT**; the
-fixture and oracle allowlist remain frozen.
+```starlark
+load(":defs.bzl", "make_filegroup")
+
+make_filegroup(name = "macro_files")
+```
+
+`workspace/dep/macro/defs.bzl`:
+
+```starlark
+def make_filegroup(name):
+    native.filegroup(name = name)
+```
+
+There is no MODULE copy, helper file, visibility argument, source attribute,
+glob, direct `filegroup` declaration, or other target. The exact asset
+structure, rather than query metadata, proves macro origin: the BUILD file can
+create `macro_files` only by invoking the loaded macro.
+
+### Exact three rows
+
+Append only these three commands to `fixture.toml`, in this order. Preserve the
+first 123 lines byte-for-byte. Each row uses `message_shape`, exit 0, and an
+anchored normalized-stdout pattern. `normalize_text` strips the final newline.
+Do not constrain stderr: routine Bazel server/progress information is
+observational, and a generated exact stderr comparison would prevent the later
+Slug replay. Do not add fixture or command startup RC flags.
+
+```toml
+[[commands]]
+name = "query_dep_macro_files_label_kind"
+argv = ["query", "--noshow_progress", "--output=label_kind", "@dep//macro:macro_files"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\Afilegroup rule @dep//macro:macro_files\\Z"]
+
+[[commands]]
+name = "query_dep_macro_files_loadfiles"
+argv = ["query", "--noshow_progress", "loadfiles(@dep//macro:macro_files)"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\A@dep//macro:defs\\.bzl\\Z"]
+
+[[commands]]
+name = "query_dep_macro_files_buildfiles"
+argv = ["query", "--noshow_progress", "buildfiles(@dep//macro:macro_files)"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\A@dep//macro:BUILD\\.bazel\\n@dep//macro:defs\\.bzl\\Z"]
+```
+
+`label_kind` subsumes a literal query and pins the sole macro-created target as
+`filegroup rule`. `loadfiles()` uniquely proves apparent external Bzl inclusion
+without the BUILD file. `buildfiles()` uniquely proves apparent external BUILD
+inclusion, Bzl companion inclusion, no root fallback, and the default
+formatter's exact BUILD-before-Bzl observable order. Bazel's underlying load-
+file API is unordered; this row claims only the deterministic default query
+output, not internal provenance traversal order. A `labels(srcs)` row, helper
+load, missing/cycle mutation, daemon epoch, or lifecycle row does not further
+discriminate this macro activation seam and is forbidden here.
+
+### Provenance, caps, and validation
+
+The accepted probe used `/usr/bin/bazel` via Bazelisk v1.29.0, Bazel build
+label `9.2.0`, and packet-pinned source commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. It used fresh output bases and
+`--ignore_all_rc_files` outside the fixture, then cleaned every temporary
+workspace/output directory and shut down both Bazel servers. The permanent
+fixture intentionally carries no startup RC flag so its later Slug replay uses
+the same command rows.
+
+The implementation allowlist is exactly four paths:
+
+- `tests/v2_oracle/fixtures/module-local-override/fixture.toml`: exactly +21
+  lines, 123 to 144;
+- `tests/v2_oracle/fixtures/module-local-override/expected/oracle.json`:
+  exactly +86 lines, 460 to 546;
+- `tests/v2_oracle/fixtures/module-local-override/workspace/dep/macro/BUILD.bazel`:
+  new, exactly three lines; and
+- `tests/v2_oracle/fixtures/module-local-override/workspace/dep/macro/defs.bzl`:
+  new, exactly two lines.
+
+The fixture grows from 17 to exactly 20 commands, five to seven workspace
+assets, seven to nine total fixture files, and by exactly two files/+112 lines.
+The protected metric grows from 598 to 710 lines; whole-fixture `wc -l` grows
+from 601 to 713. No other file or generated metadata may change.
+
+Before generation, save the first 17 expected command objects and the protected
+TOML/BUILD bytes. Require `/usr/bin/bazel --version` to report exactly
+`bazel 9.2.0`. Use distinct `mktemp` run roots for generation and replay:
+
+```text
+python3 -B -m tools.v2_oracle run --fixture module-local-override --tool bazel --bazel /usr/bin/bazel --run-root <generation-root> --update-expected
+python3 -B -m tools.v2_oracle run --fixture module-local-override --tool bazel --bazel /usr/bin/bazel --run-root <replay-root>
+```
+
+Restore any volatile regeneration churn in command objects 0 through 16 so
+they remain JSON-deep-equal to the accepted baseline; retain only the three new
+generated objects. Then require all 20 rows to pass on the distinct replay,
+the three new normalized stdout fields to equal the anchored values above,
+the protected TOML prefix and dependency BUILD bytes to match, the stated
+counts/caps to hold, the full oracle harness unit suite to pass, archive status
+to pass, and `git diff --check` to be clean. A Slug fixture replay is not an
+oracle-only gate and waits for activation.
+
+Stop with **REPLAN** if Bazel is not exactly 9.2.0; either fresh-root pass
+fails; stdout/order differs; any protected row/path changes semantically; the
+generated record cannot fit the exact cap; more assets/rows or a tool change is
+needed; or the evidence reaches MODULE changes, visibility, sources,
+cross-package/repository loads, globs, another target kind, lifecycle,
+missing/cycle diagnostics, daemon observation, Rust, CLI, JVM, Java bytecode,
+or Bazel delegation.
