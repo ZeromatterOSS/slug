@@ -17727,3 +17727,41 @@ cannot represent the result. Do not add a key/owner, public identity,
 observation operation, direct filesystem bypass, registry JVM transport,
 discovery/MVS, external-repository breadth, parser/evaluator activation, or
 broader glob syntax/composition.
+
+### WP-5-m1 native-Windows Host glob ordering decision (2026-08-04)
+
+**Status: REPLAN; no implementation or oracle edit is authorized.** This host
+is Linux-only, with GNU-Windows cross artifacts but no native Windows or Wine
+runtime. The packet's mandatory native evidence gate therefore fails. More
+fundamentally, the live segment and traversal computations are Unix-only and
+return `UnsupportedHost` on non-Unix. Directory observation preserves native
+names as `OsString`, but segment candidates, traversal, and the loading adapter
+retain `Arc<[u8]>`; traversal additionally maps bytes to Latin-1 package
+scalars. Those representations cannot prove arbitrary non-BMP or unpaired
+UTF-16 identity and ordering end to end.
+
+GNU-Windows compilation and scripted classifier seams are shape evidence only.
+A future native-Windows prerequisite may reuse the existing glob-directory
+fixture, but must first observe Bazel 9.2 ASCII, BMP, non-BMP, Win32-created
+lone-surrogate, file/directory, reparse/symlink, repetition, mutation,
+restoration, and final ordering behavior. Even that evidence would not
+authorize Rust until a separately reviewed typed UTF-16 representation and
+ownership decision replaces the byte-boundary contradiction.
+
+Resume only the read-only
+`WP-5-m1-direct-local-nonroot-source-preparation-handoff-design`. The older
+full discovery-composition design is not schedulable: live
+`ModuleSourcePreparationKey` still consumes legacy `RootModuleFilesKey`,
+`RegistryPolicyKey`, and `RegistryFileKey`, while no DICE owner performs MVS,
+selected registry `source.json` to `RepoSpec`, final contextual mappings, or
+extension-generated routes. Decide only whether the accepted direct
+`local_path_override` route, `HostRootModuleFileKey`, and
+`HostRepositorySourceFileKey` can provide a closed callerless nonroot
+preparation handoff without touching those legacy branches.
+
+Freeze exact key identity, complete equality/Need behavior, source provenance,
+create/edit/delete/recreate recovery, implementation split, evidence, and stop
+gates before Rust. Stop with `REPLAN` on legacy root/registry keys, remote
+registry/JVM transport, MVS or hard-coded selection, a second route, root
+bootstrap effects, direct filesystem IO, public activation, or a copied
+evaluator.
