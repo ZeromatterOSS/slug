@@ -17999,3 +17999,41 @@ slack authorizes no new behavior, evidence family, hook, file, or semantic
 surface. Rebuild from clean HEAD; discarded Rust and validation receive no
 credit. Run the accepted serial suite and obtain independent latest-diff
 acceptance before committing Rust.
+
+### WP-5-m1 direct-local completion implementation (2026-08-04)
+
+**Status: ACCEPTED in `e5e2c55d`.** The private one-file handoff is 636 added
+lines and remains within the accepted production/test/total caps. It computes
+the root route before the fixed Host `MODULE.bazel` source, retains the opaque
+route plus Present/Absent source, forwards all Needs exactly, exposes no caller
+or public API, and owns no event or bootstrap effect. Independent latest-diff
+review accepted the corrected same-key A-to-B-to-A and
+Present/edit/Absent/recreate lifecycle, requested logical-path provenance,
+capture-enabled successful version-only `Evaluated` to `Reused` activations
+with no direct evaluation data, exact Need/request comparisons, typed real
+errors, and structural stops.
+
+Focused direct tests passed 8/8. All eleven integration binaries passed 184
+tests; doctests, loading/core direct checks, GNU-Windows no-run linkage,
+formatting, archive, scope, cap, and diff gates passed. The full library result
+was 229 passes plus the exact pre-existing
+`records_exact_proxy_tag_and_innate_call_spans` failure: actual line 2 column
+22 point versus expected line 2 columns 9-39, matching the clean baseline.
+
+### WP-5-m1 selected direct-local evaluation audit (2026-08-04)
+
+**Status: REPLAN; no code or evidence changed.** The accepted raw handoff has
+route/module name/source identity but deliberately no selected version.
+`evaluate_nonroot_module_file` requires an upstream `NonrootModuleKey { name,
+version }` before parsing and execution. Substituting the root-requested
+version or the file's own declaration would violate MVS selection; using the
+root mapping as the final nonroot contextual mapping is likewise inexact. The
+legacy `ModuleSourcePreparationKey` is not a bridge because it re-enters the
+root/registry graph.
+
+Resume only the read-only `WP-5-m1-direct-local-module-inspection-design`.
+Bound one private callerless parser projection over the accepted direct input.
+It may validate syntax and retain include requests with the full raw input,
+but it must not acquire includes, construct selected identity or mapping, call
+the evaluator, or claim to solve discovery. Review the proposed one-file
+90-production/330-test/420-total implementation boundary before Rust.

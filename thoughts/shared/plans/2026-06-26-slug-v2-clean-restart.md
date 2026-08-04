@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering are unsupported under the current architecture/evidence; full discovery composition still lacks MVS, selected-source, contextual-mapping, and extension owners | make the corrected bounded direct-local MODULE-file handoff retry |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering are unsupported under the current architecture/evidence; full discovery composition still lacks MVS, selected-source, contextual-mapping, and extension owners | design the private direct-local MODULE inspection projection before selected evaluation |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-direct-local-module-file-handoff-completion-implementation`.
+`WP-5-m1-direct-local-module-inspection-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -56,8 +56,11 @@ enabled, its version edit asserted only value equality, and it never completed
 the external source through Present/edit/Absent/recreate states. The
 100/480/580 cap is therefore revoked. The corrected evidence design is now
 accepted at 100 production/545 tests/645 total: 525 mandatory test lines plus
-20 lines of formatting/compaction-only slack. The current packet makes one
-clean-HEAD retry without semantic widening.
+20 lines of formatting/compaction-only slack. The corrected implementation is
+accepted in `e5e2c55d`. Direct evaluation remains blocked because the raw
+handoff has no MVS-selected `NonrootModuleKey`; the current packet designs only
+a parser-backed inspection projection that preserves the raw input and stops
+before include acquisition or evaluation.
 
 The external query package-identity implementation is accepted in five files.
 One private request-local Arc owner retains full canonical package identity
