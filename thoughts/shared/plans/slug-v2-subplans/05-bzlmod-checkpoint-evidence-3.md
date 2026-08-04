@@ -16990,3 +16990,79 @@ rule evidence. It must freeze the exact whole-package gate and graph projection
 for one explicitly public, same-package loaded, dependency-free, non-test,
 non-executable `StarlarkRule`, decide whether permanent oracle growth is
 necessary, and obtain independent reserved-boundary review before Rust.
+
+## WP-5-m1 external dependency-free Starlark-rule projection design (2026-08-04)
+
+**Status: ACCEPTED — implement only
+`WP-5-m1-external-dependency-free-starlark-rule-projection-implementation`.**
+The accepted Bazel 9.2 dependency-free non-test rule probe, pinned visibility
+representation, root visibility regression, and now-accepted external loading,
+route, provenance, lifecycle, and consumer owners are sufficient. No permanent
+oracle or fixture growth is needed.
+
+### Exact package and graph boundary
+
+Preserve the existing external native `ExportedFile`/`Filegroup` acceptance.
+Add one disjoint whole-package case only: the loaded package has exactly one
+recorded target and it is `PackageTargetKind::StarlarkRule`. Require its
+visibility source to be exactly `VisibilitySource::Declared(Public)`, its
+retained capability to have `test_kind == None` and `executable == false`, and
+its ordinary `dependencies()` aggregate to be empty.
+
+Dependency emptiness alone is insufficient: output/output-list labels are
+query-reachable but do not contribute ordinary dependencies. Therefore also
+zip every retained schema/value pair, inspect every `dependency_reachable()`
+schema, and require its value to contain zero labels. Reject the whole package
+before projection on any ordinary, output, or other query-reachable label,
+generated or additional target, default/private/restricted visibility, test or
+executable capability, or malformed schema/value relationship.
+Represent each rejection as a private typed complete package error with its
+semantic reason; do not add an untyped catch-all or public error API.
+
+`external_package_graph_from_targets` independently revalidates the same sole-
+target predicate. It projects `QueryNodeKind::Rule("rule")`, retains the rule
+class capability, produces no edges or test metadata, reuses the existing
+dependency-reachable attribute projection, and appends the existing raw
+visibility attribute. Bazel stores explicitly declared public visibility as
+effective Public with an empty raw NODEP label list, so the visibility
+attribute is explicit with zero labels and `labels(visibility, rule)` is empty.
+Do not add a loading-environment, provenance, candidate, output, identity,
+lifetime, event, or DICE change.
+
+### Consumer evidence, allowlist, and validation
+
+Existing route-aware owners make the enabled generic surface exact: literal,
+kind, package, default/label/label_kind/package/graph formats, and traversal/
+path functions are self-only; `siblings()` returns BUILD plus the rule;
+same-package reverse deps, `tests()`, `executables()`, and label attributes are
+empty; `visible()` accepts the public rule; and `loadfiles()`/`buildfiles()`
+retain their accepted Bzl and BUILD-first order. Deferred functions and
+external patterns remain deferred.
+
+The exact implementation allowlist is:
+
+- `app/slug_loading_v2/src/bzl_module.rs`;
+- `app/slug_loading_v2/src/host_package_load_tests.rs`;
+- `app/slug_query_v2/src/graph.rs`;
+- `app/slug_query_v2/tests/loading_query.rs`; and
+- `app/slug_cli_v2/tests/cli.rs`.
+
+The cap is `+550/-60` lines with no Cargo, protocol, public API, fixture, tool,
+or generated-record change. Focused tests must prove accepted loading and frozen
+lifetime/event reuse; every negative gate including ordinary/output labels and
+mixed/generated targets; graph defense in depth; all enabled consumers and
+four output formats; empty explicit-public visibility labels; exact apparent
+route and loading-file output; and one-shot plus retained-daemon edit/delete/
+recreate recovery. Run focused loading/query/CLI tests and direct checks, both
+affected loading/query GNU-Windows no-run gates, rebuild `slug_cli_v2`, clean
+`slugd` around direct lifecycle evidence, formatting, archive status, exact
+scope/cap guards, and `git diff --check`. Do not run Bazel, change a fixture, or
+run a workspace-wide Cargo suite.
+
+Stop with **REPLAN** rather than widening on any additional/mixed target,
+default or nonpublic visibility, reachable label or generated output,
+test/suite/executable rule, cross-package/repository load, glob, external
+pattern, configuration, analysis/action/execution, repository rule/extension,
+`@bazel_tools`, JVM, Java bytecode, Bazel delegation, new owner/key/lock/API,
+sixth file, or cap excess. The external Starlark test-rule packet remains
+blocked on its test-base/tool-repository closure.

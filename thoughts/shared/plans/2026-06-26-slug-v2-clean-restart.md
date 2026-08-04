@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, the accepted 20-row external macro-created native filegroup/query-provenance oracle, and accepted external Bzl package/query activation with bare query progress-flag compatibility; full evidence is in the Stage 5 owner plan | Dependency-free external Starlark-rule projection remains behind explicit package and graph stops; test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | design only the smallest public dependency-free non-test external Starlark-rule projection |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, the accepted 20-row external macro-created native filegroup/query-provenance oracle, and accepted external Bzl package/query activation with bare query progress-flag compatibility; full evidence is in the Stage 5 owner plan | Dependency-free external Starlark-rule projection remains behind explicit package and graph stops; test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | implement only the accepted sole-target, explicit-public, dependency-free non-test external Starlark-rule projection |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-dependency-free-starlark-rule-projection-design`.
+`WP-5-m1-external-dependency-free-starlark-rule-projection-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -82,9 +82,10 @@ accepted. No Rust, Cargo, tool, daemon, lifecycle, or activation surface
 changed. The external Bzl package/query activation and exact bare-
 `--noshow_progress` compatibility prerequisite are accepted together in eight
 paths at `+829/-21`. All three macro rows now pass Slug exactly; only the
-pre-existing unrelated external-build row remains red. The current packet is
-design-only for the smallest dependency-free non-test external Starlark-rule
-projection.
+pre-existing unrelated external-build row remains red. The dependency-free
+external Starlark-rule projection design is accepted without new oracle
+growth. The current packet implements only its sole-target, explicit-public,
+non-test/non-executable, zero-reachable-label boundary.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of
