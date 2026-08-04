@@ -1,2 +1,3 @@
 exports_files(["target.txt"])
 filegroup(name = "files", srcs = ["target.txt", "missing_input.txt"])
+alias(name = "files_alias", actual = ":files")

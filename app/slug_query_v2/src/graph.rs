@@ -941,6 +941,23 @@ fn external_package_graph_from_targets(
                     .into(),
                 )
             }
+            PackageTargetKind::Alias { actual } => {
+                let actual =
+                    external_alias_actual_label(canonical_repo, apparent_repo, package, actual)?;
+                (
+                    QueryNodeKind::Rule(CompactString::new("alias rule")),
+                    target.rule_capability().cloned(),
+                    Arc::from([QueryEdge {
+                        kind: QueryEdgeKind::Ordinary,
+                        target: actual.dupe(),
+                    }]),
+                    Arc::from([QueryAttribute {
+                        name: CompactString::new("actual"),
+                        labels: Arc::from([actual]),
+                        explicit: true,
+                    }]),
+                )
+            }
             _ => {
                 return Err(QueryError::evaluation(format!(
                     "external repository rule graph is deferred: {}//{}:{}",
@@ -997,9 +1014,9 @@ fn external_package_graph_from_targets(
         );
     }
 
-    // Native filegroup attributes create same-package source targets during
-    // loading. This query projection deliberately retains that semantic
-    // result without observing the source path.
+    // Accepted native label attributes create same-package source targets
+    // during loading. This query projection retains that semantic result for
+    // filegroup `srcs` and alias `actual` without observing the source path.
     let referenced_sources = nodes
         .values()
         .flat_map(|node| node.edges.iter())
@@ -1025,6 +1042,38 @@ fn external_package_graph_from_targets(
                 attributes: Arc::from([]),
             },
         );
+    }
+
+    for node in nodes.values() {
+        if !matches!(&node.kind, QueryNodeKind::Rule(rule) if rule == "alias rule") {
+            continue;
+        }
+        let actual = node
+            .edges
+            .iter()
+            .find(|edge| edge.kind == QueryEdgeKind::Ordinary)
+            .map(|edge| &edge.target)
+            .expect("external alias projection has exactly one ordinary edge");
+        match &nodes
+            .get(actual)
+            .expect("same-package external alias actual is projected")
+            .kind
+        {
+            QueryNodeKind::SourceFile => {}
+            QueryNodeKind::Rule(rule) if rule == "filegroup rule" => {}
+            QueryNodeKind::Rule(rule) if rule == "alias rule" => {
+                return Err(QueryError::evaluation(format!(
+                    "external repository alias chains are deferred: {}",
+                    node.label
+                )));
+            }
+            _ => {
+                return Err(QueryError::evaluation(format!(
+                    "external repository alias actual destination is deferred: {}",
+                    node.label
+                )));
+            }
+        }
     }
 
     Ok(UnconfiguredPackageGraph {
@@ -1055,6 +1104,31 @@ fn external_filegroup_source_label(
     };
     Err(QueryError::evaluation(format!(
         "external repository filegroup {deferred} srcs are deferred: {source}"
+    )))
+}
+
+fn external_alias_actual_label(
+    canonical_repo: &CanonicalRepoName,
+    apparent_repo: &ApparentRepoName,
+    package: &PackagePath,
+    actual: &CanonicalLabel,
+) -> Result<QueryLabel, QueryError> {
+    let actual_package = actual.package();
+    if actual_package.repo().is_root() && actual_package.package() == package {
+        return QueryLabel::in_external_package(
+            canonical_repo,
+            apparent_repo,
+            package,
+            actual.target().as_str(),
+        );
+    }
+    let deferred = if actual_package.repo().is_root() {
+        "cross-package"
+    } else {
+        "named-repository"
+    };
+    Err(QueryError::evaluation(format!(
+        "external repository alias {deferred} actual is deferred: {actual}"
     )))
 }
 
@@ -1538,6 +1612,13 @@ mod graph_tests {
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
+            PackageTarget {
+                name: "files_alias".to_owned(),
+                kind: PackageTargetKind::Alias {
+                    actual: source("files"),
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
         ];
         let graph = external_package_graph_from_targets(
             &canonical_repo,
@@ -1590,6 +1671,43 @@ mod graph_tests {
         assert!(omitted.attributes[0].labels.is_empty());
         assert!(!omitted.attributes[0].explicit);
 
+        let alias = graph.nodes.get(&label("files_alias")).unwrap();
+        assert_eq!(alias.kind, QueryNodeKind::Rule("alias rule".into()));
+        assert_eq!(
+            alias
+                .rule_capability
+                .as_ref()
+                .map(|capability| capability.rule_class.as_str()),
+            Some("alias")
+        );
+        assert_eq!(alias.attributes.len(), 1);
+        assert_eq!(alias.attributes[0].name, "actual");
+        assert!(alias.attributes[0].explicit);
+        assert_eq!(
+            alias.attributes[0]
+                .labels
+                .iter()
+                .map(QueryLabel::output_label)
+                .collect::<Vec<_>>(),
+            ["@dep//:files"]
+        );
+        assert_eq!(
+            alias
+                .edges
+                .iter()
+                .map(|edge| (edge.kind, edge.target.output_label()))
+                .collect::<Vec<_>>(),
+            [(QueryEdgeKind::Ordinary, "@dep//:files".into())]
+        );
+        assert_eq!(alias.label.to_string(), "@@dep+//:files_alias");
+        assert_eq!(alias.label.output_label(), "@dep//:files_alias");
+        assert!(
+            alias
+                .attributes
+                .iter()
+                .all(|attribute| attribute.name != "visibility")
+        );
+
         let existing = graph.nodes.get(&label("existing.txt")).unwrap();
         assert_eq!(existing.kind, QueryNodeKind::SourceFile);
         assert_eq!(existing.effective_visibility, RuleVisibility::Public);
@@ -1604,5 +1722,62 @@ mod graph_tests {
         assert_eq!(absent.visibility_source, VisibilitySource::PackageDefault);
         assert!(absent.edges.is_empty());
         assert!(absent.attributes.is_empty());
+    }
+
+    #[test]
+    fn external_alias_projection_rejects_chains_and_build_destinations() {
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let source = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let project = |targets: Vec<PackageTarget>| {
+            external_package_graph_from_targets(
+                &canonical_repo,
+                &apparent_repo,
+                &package,
+                Path::new("/external/dep+/BUILD.bazel"),
+                &RuleVisibility::Private,
+                &targets,
+            )
+        };
+
+        let chain = project(vec![
+            PackageTarget {
+                name: "first".to_owned(),
+                kind: PackageTargetKind::Alias {
+                    actual: source("second"),
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
+            PackageTarget {
+                name: "second".to_owned(),
+                kind: PackageTargetKind::Alias {
+                    actual: source("source.txt"),
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
+        ])
+        .unwrap_err();
+        assert!(
+            chain
+                .to_string()
+                .contains("external repository alias chains are deferred"),
+            "{chain}"
+        );
+
+        let build_destination = project(vec![PackageTarget {
+            name: "to_build".to_owned(),
+            kind: PackageTargetKind::Alias {
+                actual: source("BUILD.bazel"),
+            },
+            visibility: VisibilitySource::PackageDefault,
+        }])
+        .unwrap_err();
+        assert!(
+            build_destination
+                .to_string()
+                .contains("external repository alias actual destination is deferred"),
+            "{build_destination}"
+        );
     }
 }

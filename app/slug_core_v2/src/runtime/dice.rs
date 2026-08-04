@@ -4106,7 +4106,7 @@ mod tests {
         .unwrap();
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\n",
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\n",
         )
         .unwrap();
         fs::write(workspace.path().join("dep/target.txt"), "target").unwrap();
@@ -4175,6 +4175,36 @@ mod tests {
                 .stdout(),
             "@dep//:files\n@dep//:missing_input.txt\n@dep//:target.txt\n"
         );
+        assert_eq!(
+            query("@dep//:files_alias")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:files_alias\n"
+        );
+        assert_eq!(
+            query("labels(actual, @dep//:files_alias)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:files\n"
+        );
+        assert_eq!(
+            query("deps(@dep//:files_alias)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:files\n@dep//:files_alias\n@dep//:missing_input.txt\n@dep//:target.txt\n"
+        );
         assert!(
             query("labels(visibility, @dep//:files)")
                 .unwrap()
@@ -4204,7 +4234,7 @@ mod tests {
 
         for (build, expected) in [
             (
-                "alias(name = \"other\", actual = \":files\")\n",
+                "config_setting(name = \"other\", values = {\"cpu\": \"k8\"})\n",
                 "external repository rule graph is deferred",
             ),
             (
@@ -4216,8 +4246,24 @@ mod tests {
                 "external repository visibility edges are deferred",
             ),
             (
+                "filegroup(name = \"group\")\nfilegroup(name = \"files\")\nalias(name = \"files_alias\", actual = \":files\", visibility = [\":group\"])\n",
+                "external repository visibility edges are deferred",
+            ),
+            (
                 "filegroup(name = \"BUILD.bazel\")\n",
                 "collides with active BUILD file",
+            ),
+            (
+                "filegroup(name = \"files\")\nalias(name = \"first\", actual = \":second\")\nalias(name = \"second\", actual = \":files\")\n",
+                "external repository alias chains are deferred",
+            ),
+            (
+                "alias(name = \"to_build\", actual = \":BUILD.bazel\")\n",
+                "external repository alias actual destination is deferred",
+            ),
+            (
+                "alias(name = \"cross\", actual = \"//other:item\")\n",
+                "external repository alias cross-package actual is deferred",
             ),
         ] {
             fs::write(workspace.path().join("dep/BUILD.bazel"), build).unwrap();
@@ -4247,12 +4293,12 @@ mod tests {
         }
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\n",
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\n",
         )
         .unwrap();
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "filegroup(name = \"files\", srcs = [\"@other//:item\"])\n",
+            "alias(name = \"files_alias\", actual = \"@other//:item\")\n",
         )
         .unwrap();
         let stopped = WorkspaceRuntime::new(workspace.path()).unwrap();

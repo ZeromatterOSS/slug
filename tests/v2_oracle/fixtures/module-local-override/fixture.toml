@@ -31,3 +31,17 @@ argv = ["query", "labels(srcs, @dep//:files)"]
 compare = "semantic"
 expected_exit = 0
 stdout_contains = ["@dep//:missing_input.txt", "@dep//:target.txt"]
+
+[[commands]]
+name = "query_dep_files_alias"
+argv = ["query", "@dep//:files_alias"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:files_alias"]
+
+[[commands]]
+name = "query_dep_files_alias_actual"
+argv = ["query", "labels(actual, @dep//:files_alias)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:files"]

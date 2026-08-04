@@ -14928,3 +14928,54 @@ graph-projection abstraction and needs no separate design packet: project one
 direct same-package native alias whose `actual` resolves within the already
 loaded external package, and prove its literal, node-local `labels(actual,
 ...)`, and forward `deps` behavior without adding discovery or ownership.
+
+### Direct external-repository native alias query accepted
+
+Status: **ACCEPT** for `WP-5-m1-external-repository-alias-query` on
+2026-08-04. Independent terminal implementation review found no blocker. The
+residual risk is limited to the deliberately stopped external build,
+alias-chain and unsupported-destination, and cross-package/repository
+surfaces.
+
+Production changed only `app/slug_query_v2/src/graph.rs`. The existing private
+external projector now accepts `PackageTargetKind::Alias`, remaps only a
+root-context same-package `actual`, and projects the accepted native alias
+capability, one explicit `actual` attribute, and one ordinary edge. Canonical
+identity and route-specific apparent rendering are unchanged. The existing
+generic same-package edge closure may synthesize an undeclared source without
+path observation; a post-projection check accepts only direct filegroup or
+source destinations and stops alias chains, BUILD destinations, and other
+unsupported destinations. No key, owner, representation, or public API
+changed.
+
+The existing `module-local-override` fixture grew by one alias declaration and
+exactly two query rows, with no asset. Live Bazel 9.2 generation at
+`/tmp/slug-alias-oracle/runs/module-local-override/20260804-002550-995222-bazel`
+and a distinct-root replay at
+`/tmp/slug-alias-oracle-replay/runs/module-local-override/20260804-003103-1001931-bazel`
+both passed all six rows. The new exact outputs are `@dep//:files_alias` for
+the literal and `@dep//:files` for `labels(actual, ...)`. A direct Bazel 9.2
+probe and rebuilt Slug replay both produced the exact sorted forward closure:
+filegroup, alias, missing implicit source, and exported source under apparent
+`@dep` spelling. The protected source query still replays exactly; the older
+external-build row remains outside this packet.
+
+The private structural tests prove alias kind, capability, explicit
+attribute, single edge, canonical/apparent labels, visibility-attribute
+exclusion, and chain/BUILD-destination rejection. Focused core lifecycle
+coverage proves the literal, `labels(actual, ...)`, forward `deps`, all prior
+filegroup/source noninvalidation behavior, and alias cross-package,
+named-repository, visibility, chain, and destination stops. Formatting,
+focused query/core, the complete 20-unit/43-integration/6-parser query suite,
+four-crate checks, GNU-Windows query/core no-run linkage, CLI/server external
+regressions, the CLI rebuild, archive, diff, no-Cargo, and forbidden-owner
+scans all passed. The full Slug fixture still fails only at the pre-existing
+unsupported external-build row, as required by the explicit query-only
+boundary.
+
+The next packet is
+`WP-5-m1-external-repository-config-setting-query`. It remains at the same
+private graph-projection abstraction and needs no separate design packet:
+project the already retained native `config_setting` as a dependency-free
+query rule and prove its literal and `label_kind` output without activating
+configuration, analysis, discovery, or execution.
