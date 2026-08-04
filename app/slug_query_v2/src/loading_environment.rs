@@ -26,6 +26,7 @@ use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
+use slug_loading_v2::RepositoryPackageLoadKey;
 use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestRuleKind;
@@ -62,6 +63,7 @@ use crate::provenance::QueryCandidate;
 use crate::provenance::QueryCandidateArena;
 use crate::provenance::QueryCandidateBatches;
 use crate::provenance::QueryCandidateId;
+use crate::provenance::QueryPackageIdentity;
 use crate::traversal::ResolvedGraph;
 
 pub(crate) struct LoadingQueryEnvironment<'a, 'd> {
@@ -178,15 +180,42 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         }
     }
 
-    async fn external_package_graph(
+    async fn verified_repository_route(
         &mut self,
-        route: RootRepositoryRoute,
-        package: &str,
+        owner: &QueryPackageIdentity,
+    ) -> Result<RootRepositoryRoute, QueryError> {
+        let apparent_repo = owner.apparent_repo().ok_or_else(|| {
+            QueryError::evaluation("external package owner lost its apparent repository route")
+        })?;
+        let canonical_repo = owner.canonical_repo().ok_or_else(|| {
+            QueryError::evaluation("external package owner lost its canonical repository")
+        })?;
+        let route = self.repository_route(apparent_repo).await?;
+        if route.canonical_repo() != canonical_repo {
+            return Err(QueryError::evaluation(format!(
+                "apparent repository '{}' now resolves to '{}' instead of retained '{}'",
+                apparent_repo,
+                route.canonical_repo(),
+                canonical_repo
+            )));
+        }
+        Ok(route)
+    }
+
+    async fn package_graph_for_owner(
+        &mut self,
+        owner: &QueryPackageIdentity,
     ) -> Result<Arc<UnconfiguredPackageGraph>, QueryError> {
-        let package = PackagePath::parse(package).map_err(QueryError::evaluation)?;
+        if owner.canonical_repo().is_none() {
+            return self.package_graph(owner.package().as_str()).await;
+        }
+        let route = self.verified_repository_route(owner).await?;
         match self
             .ctx
-            .compute(&ExternalUnconfiguredPackageGraphKey::new(route, package))
+            .compute(&ExternalUnconfiguredPackageGraphKey::new(
+                route,
+                owner.package().clone(),
+            ))
             .await
             .expect("external query graph DICE invariant")
         {
@@ -196,30 +225,29 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
     }
 
     async fn lookup_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
-        let graph = if label.is_root_repository() {
-            self.package_graph(label.package()).await.map_err(|error| {
-                if error.is_preparation_restart() {
-                    return error;
-                }
-                if error.message.contains("no BUILD.bazel or BUILD file")
-                    || error.message.contains("package directory is absent")
-                {
-                    error.with_message(format!(
-                        "no such package '{}': BUILD file not found",
-                        label.package()
-                    ))
+        let owner = label.owner_identity()?;
+        let graph = self
+            .package_graph_for_owner(&owner)
+            .await
+            .map_err(|error| {
+                if label.is_root_repository() {
+                    if error.is_preparation_restart() {
+                        return error;
+                    }
+                    if error.message.contains("no BUILD.bazel or BUILD file")
+                        || error.message.contains("package directory is absent")
+                    {
+                        error.with_message(format!(
+                            "no such package '{}': BUILD file not found",
+                            label.package()
+                        ))
+                    } else {
+                        error
+                    }
                 } else {
                     error
                 }
-            })?
-        } else {
-            let apparent_repo = label
-                .apparent_repo()
-                .cloned()
-                .ok_or_else(|| QueryError::evaluation("external query label lost render route"))?;
-            let route = self.repository_route(&apparent_repo).await?;
-            self.external_package_graph(route, label.package()).await?
-        };
+            })?;
         let node = graph.nodes.get(&label).cloned().ok_or_else(|| {
             if label.is_root_repository() {
                 QueryError::target_missing(format!(
@@ -282,6 +310,40 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             .map_err(|error| QueryError::evaluation(error.to_string()))
     }
 
+    async fn package_load_provenance_for_owner(
+        &mut self,
+        owner: &QueryPackageIdentity,
+    ) -> Result<(PathBuf, Arc<[slug_loading_v2::BzlModuleIdentity]>), QueryError> {
+        if owner.canonical_repo().is_none() {
+            return self.package_load_provenance(owner.package().as_str()).await;
+        }
+        let route = self.verified_repository_route(owner).await?;
+        match self
+            .ctx
+            .compute(&RepositoryPackageLoadKey::new(
+                route,
+                owner.package().clone(),
+            ))
+            .await
+            .expect("external package loading DICE invariant")
+        {
+            LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+            LoadingPreparationOutcome::Complete(value) => {
+                let loaded = value
+                    .as_ref()
+                    .as_ref()
+                    .map_err(|error| QueryError::evaluation(error.to_string()))?;
+                if !loaded.reachable_loads.is_empty() {
+                    return Err(QueryError::evaluation(format!(
+                        "external repository Bzl loading is deferred for {}",
+                        owner.canonical_package()
+                    )));
+                }
+                Ok((loaded.build_file.clone(), Arc::from([])))
+            }
+        }
+    }
+
     async fn resolve_single(&mut self, label: QueryLabel) -> Result<QueryNode, QueryError> {
         let node = self.lookup_single(label.clone()).await?;
         if matches!(node.kind, crate::QueryNodeKind::GeneratedFile) {
@@ -295,6 +357,18 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         self.node_kinds
             .insert(node.label.clone(), selected_node_kind(node));
         self.evaluation_graph.record_node(node.label.clone());
+    }
+
+    fn same_package_or_java(owner: &QueryPackageIdentity, target: &QueryLabel) -> bool {
+        let caller_package = owner.package().as_str();
+        caller_package == target.package()
+            || matches!(
+                (
+                    caller_package.strip_prefix("javatests/"),
+                    target.package().strip_prefix("java/")
+                ),
+                (Some(caller_suffix), Some(target_suffix)) if caller_suffix == target_suffix
+            )
     }
 
     async fn visible_in_package_group(
@@ -360,27 +434,18 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         caller: QueryCandidateId,
         target: QueryCandidateId,
     ) -> Result<bool, QueryError> {
-        let caller_package = self.candidates.get(caller).owner_package();
+        let caller_owner = self.candidates.get(caller).owner_identity()?;
         let target = self.candidates.get(target).clone();
         let Some(label) = target.evaluation_graph_label().cloned() else {
             return Ok(true);
         };
         let node = self.lookup_single(label).await?;
-        let same_package_or_java = caller_package == node.label.package()
-            || matches!(
-                (
-                    caller_package.strip_prefix("javatests/"),
-                    node.label.package().strip_prefix("java/")
-                ),
-                (Some(caller_suffix), Some(target_suffix)) if caller_suffix == target_suffix
-            );
+        let same_package_or_java = Self::same_package_or_java(&caller_owner, &node.label);
         match &node.effective_visibility {
             RuleVisibility::Public => Ok(true),
             RuleVisibility::Private => Ok(same_package_or_java),
             RuleVisibility::Restricted(restricted) => {
-                let caller = CanonicalLabel::parse(&format!("@@//{caller_package}:__pkg__"))
-                    .map_err(QueryError::evaluation)?;
-                let caller_package = caller.package().clone();
+                let caller_package = caller_owner.canonical_package();
                 let mut visible = restricted
                     .direct_packages()
                     .contains_package(&caller_package);
@@ -838,7 +903,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         &mut self,
         targets: &TargetSet<Self::Target>,
     ) -> Result<TargetSet<Self::Target>, QueryError> {
-        let mut by_package = SmallMap::<CompactString, SmallSet<QueryLabel>>::new();
+        let mut by_package = SmallMap::<QueryPackageIdentity, SmallSet<QueryLabel>>::new();
         for target in targets.iter() {
             let Some(target) = self
                 .candidates
@@ -848,15 +913,13 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             else {
                 continue;
             };
-            by_package
-                .entry(CompactString::new(target.package()))
-                .or_default()
-                .insert(target);
+            let owner = target.owner_identity()?;
+            by_package.entry(owner).or_default().insert(target);
         }
 
         let mut result = TargetSet::default();
         for (package, package_targets) in by_package {
-            let graph = self.package_graph(&package).await?;
+            let graph = self.package_graph_for_owner(&package).await?;
             for node in graph.nodes.values() {
                 self.record_node(node);
                 for edge in node.edges.iter() {
@@ -879,10 +942,10 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
     }
 
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
-        let packages = targets.sibling_packages(&self.candidates);
+        let packages = targets.sibling_packages(&self.candidates)?;
         let mut result = QueryCandidateBatches::empty();
         for package in packages.iter() {
-            let graph = self.package_graph(package).await?;
+            let graph = self.package_graph_for_owner(package).await?;
             let mut labels = Vec::with_capacity(graph.nodes.len());
             for node in graph.nodes.values() {
                 self.record_node(node);
@@ -908,13 +971,12 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
             let mut delivered = Vec::new();
             for id in ids {
                 let candidate = self.candidates.get(id).clone();
-                let candidate_package = CompactString::new(candidate.printed_label().package());
-                if !seen_packages.insert(candidate_package) {
+                let owner = candidate.owner_identity()?;
+                if !seen_packages.insert(owner.dupe()) {
                     continue;
                 }
-                let owner = candidate.owner_package();
                 let (build_file, reachable_loads) =
-                    self.package_load_provenance(owner.as_str()).await?;
+                    self.package_load_provenance_for_owner(&owner).await?;
 
                 if include_buildfiles {
                     let basename = build_file
@@ -923,19 +985,23 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                         .ok_or_else(|| {
                             QueryError::evaluation("loaded BUILD file has no UTF-8 basename")
                         })?;
-                    let label = QueryLabel::parse_root(&format!("//{owner}:{basename}"))?;
+                    let label = QueryLabel::in_owner_package(&owner, basename)?;
                     if seen_output_labels.insert(label.clone()) {
                         delivered.push(QueryCandidate::real(label));
                     }
                 }
 
                 for load in reachable_loads.iter() {
-                    let label = QueryLabel::from_canonical(load.label.clone());
+                    let label = if owner.canonical_repo().is_some() {
+                        QueryLabel::from_canonical_in_owner(&load.label, &owner)?
+                    } else {
+                        QueryLabel::from_canonical(load.label.clone())
+                    };
                     if !seen_bzl_labels.insert(label.clone()) {
                         continue;
                     }
                     if seen_output_labels.insert(label.clone()) {
-                        delivered.push(QueryCandidate::fake(label.clone(), owner.clone()));
+                        delivered.push(QueryCandidate::fake(label.clone(), owner.dupe()));
                     }
                     if include_buildfiles {
                         let companion = if self.root_workspace.is_some() {
@@ -951,7 +1017,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                         };
                         if let Some(label) = companion {
                             if seen_output_labels.insert(label.clone()) {
-                                delivered.push(QueryCandidate::fake(label, owner.clone()));
+                                delivered.push(QueryCandidate::fake(label, owner.dupe()));
                             }
                         }
                     }
@@ -1123,23 +1189,48 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn external_owner_visible_private_uses_fragment_and_restricted_uses_canonical() {
+        let external = QueryLabel::from_apparent_route(
+            &slug_identity_v2::ApparentLabel::parse("@dep//same:caller").unwrap(),
+            &slug_identity_v2::CanonicalRepoName::new("dep+").unwrap(),
+        )
+        .unwrap()
+        .owner_identity()
+        .unwrap();
+        let root_target = QueryLabel::parse_root("//same:target").unwrap();
+        let root_owner = root_target.owner_identity().unwrap();
+
+        assert!(LoadingQueryEnvironment::same_package_or_java(
+            &external,
+            &root_target
+        ));
+        assert_ne!(external.canonical_package(), root_owner.canonical_package());
+        assert_eq!(external.canonical_package().repo().as_str(), "dep+");
+        assert_eq!(external.canonical_package().package().as_str(), "same");
+    }
+
     #[tokio::test]
     async fn visible_retains_each_passing_streamed_candidate_as_a_singleton_delivery() {
         let dice = Dice::builder().build(DetectCycles::Enabled);
         let mut transaction = dice.updater().commit().await;
         let mut environment =
             LoadingQueryEnvironment::new(&mut transaction, PathBuf::new(), QueryPolicy::default());
+        let owner = QueryLabel::parse_root("//consumer:__pkg__")
+            .unwrap()
+            .owner_identity()
+            .unwrap();
         let first = environment.candidates.intern(QueryCandidate::fake(
             QueryLabel::parse_root("//loads:first.bzl").unwrap(),
-            "consumer",
+            owner.dupe(),
         ));
         let second = environment.candidates.intern(QueryCandidate::fake(
             QueryLabel::parse_root("//loads:second.bzl").unwrap(),
-            "consumer",
+            owner.dupe(),
         ));
         let third = environment.candidates.intern(QueryCandidate::fake(
             QueryLabel::parse_root("//loads:third.bzl").unwrap(),
-            "consumer",
+            owner,
         ));
         let targets = QueryCandidateBatches::from_delivery_ids(vec![first, second])
             .union(QueryCandidateBatches::from_delivery_ids(vec![third]));

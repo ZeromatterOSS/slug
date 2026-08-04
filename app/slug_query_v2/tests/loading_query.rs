@@ -24,10 +24,23 @@ use dice::UserComputationData;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::RepoRuleId;
+use slug_bzlmod_v2::RepoSpec;
+use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
+use slug_bzlmod_v2::RepositoryMaterializationKind;
+use slug_bzlmod_v2::RepositoryMaterializationRequest;
+use slug_bzlmod_v2::RepositoryMaterializationRequestId;
+use slug_bzlmod_v2::RepositoryMaterializationResult;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+use slug_bzlmod_v2::RepositoryMaterializationSuccess;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::VisibilitySource;
 use slug_loading_v2::bzl_load_cycle_detector;
@@ -3674,6 +3687,51 @@ impl RootQueryEpochBuilder {
         builder
     }
 
+    fn external_package(variant: i64) -> Self {
+        let mut builder = Self::base(variant);
+        builder.file(
+            "/workspace/MODULE.bazel",
+            "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+            variant,
+        );
+        builder.directory("/workspace/dep", variant);
+        builder.directory_entries("/workspace/dep", &[]);
+        builder.file(
+            "/workspace/dep/MODULE.bazel",
+            "module(name = \"dep\", version = \"1.0.0\")\n",
+            variant,
+        );
+        builder.missing("/workspace/dep/REPO.bazel");
+        builder.file(
+            "/workspace/dep/BUILD.bazel",
+            "filegroup(name = \"rule\")\n",
+            variant,
+        );
+        builder.package(
+            "pkg",
+            "filegroup(name = \"private\", visibility = [\"//visibility:private\"])\n",
+            variant,
+        );
+        builder.package(
+            "target",
+            "filegroup(name = \"restricted\", visibility = [\"//pkg:__pkg__\"])\nfilegroup(name = \"group_restricted\", visibility = [\"//groups:root_pkg\"])\n",
+            variant,
+        );
+        builder.package(
+            "groups",
+            "package_group(name = \"root_pkg\", packages = [\"//pkg\"])\n",
+            variant,
+        );
+        builder.directory("/workspace/dep/pkg", variant);
+        builder.directory_entries("/workspace/dep/pkg", &[]);
+        builder.file(
+            "/workspace/dep/pkg/BUILD.bazel",
+            "filegroup(name = \"caller\")\n",
+            variant,
+        );
+        builder
+    }
+
     fn package(&mut self, name: &str, source: &str, variant: i64) {
         self.package_at("/workspace", name, "BUILD.bazel", source, variant);
     }
@@ -3860,6 +3918,42 @@ async fn root_query_transaction_with_policy(
         LockfileMode::Update,
     )
     .unwrap();
+    let mut attributes = SmallMap::new();
+    attributes.insert("path".into(), OverrideAttributeValue::String("dep".into()));
+    let request = Arc::new(RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: root_query_workspace(),
+            canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+        },
+        repo_spec: RepoSpec {
+            rule_id: RepoRuleId {
+                bzl_file: CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
+                    .unwrap(),
+                rule_name: "local_repository".into(),
+            },
+            attributes: Arc::new(attributes),
+        },
+        kind: RepositoryMaterializationKind::Local {
+            logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
+        },
+    });
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: root_query_workspace(),
+            },
+            RepositoryMaterializationResultEpoch::new(
+                root_query_workspace(),
+                [RepositoryMaterializationEpochEntry {
+                    request,
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Local,
+                    ),
+                }],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
     updater.commit().await
 }
 
@@ -3872,6 +3966,121 @@ fn root_query_key(source: &str) -> RootQueryCommandKey {
         QueryOutputCompletion::Standard,
     )
     .unwrap()
+}
+
+#[tokio::test]
+async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root_fallback() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let mut transaction = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_package(1).build(),
+        tracker,
+    )
+    .await;
+
+    for (source, expected) in [
+        (
+            "siblings(@dep//:rule)",
+            &["@dep//:BUILD.bazel", "@dep//:rule"][..],
+        ),
+        ("same_pkg_direct_rdeps(@dep//:rule)", &[][..]),
+        ("buildfiles(@dep//:rule)", &["@dep//:BUILD.bazel"][..]),
+        ("loadfiles(@dep//:rule)", &[][..]),
+        (
+            "visible(@dep//pkg:caller, //pkg:private)",
+            &["//pkg:private"][..],
+        ),
+        ("visible(@dep//pkg:caller, //target:restricted)", &[][..]),
+        (
+            "visible(@dep//pkg:caller, //target:group_restricted)",
+            &[][..],
+        ),
+    ] {
+        let value = transaction.compute(&root_query_key(source)).await.unwrap();
+        let QueryPreparationOutcome::Complete(result) = value else {
+            panic!("{source} requested unexpected preparation: {value:?}")
+        };
+        assert_eq!(
+            result.as_ref().as_ref().unwrap().labels.as_ref(),
+            expected,
+            "{source}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn external_owner_route_lifecycle_reuses_edits_deletes_recreates_and_recovers() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let key = root_query_key("buildfiles(@dep//:rule)");
+
+    let mut cold = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_package(10).build(),
+        tracker.clone(),
+    )
+    .await;
+    let cold_value = cold.compute(&key).await.unwrap();
+    let QueryPreparationOutcome::Complete(cold_result) = &cold_value else {
+        panic!("cold external owner requested preparation: {cold_value:?}")
+    };
+    assert_eq!(
+        cold_result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//:BUILD.bazel"]
+    );
+    let warm_value = cold.compute(&key).await.unwrap();
+    assert!(RootQueryCommandKey::equality(&cold_value, &warm_value));
+
+    let mut edited_epoch = RootQueryEpochBuilder::external_package(11);
+    edited_epoch.file(
+        "/workspace/dep/BUILD.bazel",
+        "filegroup(name = \"edited\")\n",
+        11,
+    );
+    let mut edited = root_query_transaction(&dice, edited_epoch.build(), tracker.clone()).await;
+    let edited_key = root_query_key("buildfiles(@dep//:edited)");
+    let edited_value = edited.compute(&edited_key).await.unwrap();
+    let QueryPreparationOutcome::Complete(edited_result) = &edited_value else {
+        panic!("edited external owner requested preparation: {edited_value:?}")
+    };
+    assert_eq!(
+        edited_result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//:BUILD.bazel"]
+    );
+
+    let mut deleted_epoch = RootQueryEpochBuilder::external_package(12);
+    deleted_epoch.missing("/workspace/dep/BUILD.bazel");
+    deleted_epoch.missing("/workspace/dep/BUILD");
+    let mut deleted = root_query_transaction(&dice, deleted_epoch.build(), tracker.clone()).await;
+    let deleted_value = deleted.compute(&edited_key).await.unwrap();
+    let QueryPreparationOutcome::Complete(deleted_result) = &deleted_value else {
+        panic!("deleted external owner requested preparation: {deleted_value:?}")
+    };
+    assert!(
+        deleted_result
+            .as_ref()
+            .as_ref()
+            .unwrap_err()
+            .to_string()
+            .contains("BUILD file not found")
+    );
+
+    let mut recreated_epoch = RootQueryEpochBuilder::external_package(13);
+    recreated_epoch.file(
+        "/workspace/dep/BUILD.bazel",
+        "filegroup(name = \"edited\")\n",
+        13,
+    );
+    let mut recreated = root_query_transaction(&dice, recreated_epoch.build(), tracker).await;
+    let recreated_value = recreated.compute(&edited_key).await.unwrap();
+    let QueryPreparationOutcome::Complete(recreated_result) = &recreated_value else {
+        panic!("recreated external owner requested preparation: {recreated_value:?}")
+    };
+    assert_eq!(
+        recreated_result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//:BUILD.bazel"]
+    );
 }
 
 #[tokio::test]

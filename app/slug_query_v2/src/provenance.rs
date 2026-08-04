@@ -14,15 +14,122 @@
 //! materialization boundary, while fake candidates remain outside the real
 //! evaluation graph.
 
+use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use compact_str::CompactString;
 use dupe::Dupe;
+use slug_identity_v2::ApparentRepoName;
+use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::PackageIdentifier;
+use slug_identity_v2::PackagePath;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::graph::QueryError;
 use crate::graph::QueryLabel;
+
+#[derive(Debug, Clone, Allocative, Dupe)]
+pub(crate) struct QueryPackageIdentity(Arc<QueryPackageIdentityData>);
+
+#[derive(Debug, Allocative)]
+enum QueryPackageIdentityData {
+    Root {
+        package: PackagePath,
+    },
+    External {
+        canonical_repo: CanonicalRepoName,
+        apparent_repo: ApparentRepoName,
+        package: PackagePath,
+    },
+}
+
+impl QueryPackageIdentity {
+    pub(crate) fn root(package: PackagePath) -> Self {
+        Self(Arc::new(QueryPackageIdentityData::Root { package }))
+    }
+
+    pub(crate) fn external(
+        canonical_repo: CanonicalRepoName,
+        apparent_repo: ApparentRepoName,
+        package: PackagePath,
+    ) -> Result<Self, QueryError> {
+        if canonical_repo.is_root() || apparent_repo.is_root() {
+            return Err(QueryError::evaluation(
+                "external query package identity requires nonroot canonical and apparent repositories",
+            ));
+        }
+        Ok(Self(Arc::new(QueryPackageIdentityData::External {
+            canonical_repo,
+            apparent_repo,
+            package,
+        })))
+    }
+
+    pub(crate) fn package(&self) -> &PackagePath {
+        match self.0.as_ref() {
+            QueryPackageIdentityData::Root { package }
+            | QueryPackageIdentityData::External { package, .. } => package,
+        }
+    }
+
+    pub(crate) fn canonical_repo(&self) -> Option<&CanonicalRepoName> {
+        match self.0.as_ref() {
+            QueryPackageIdentityData::Root { .. } => None,
+            QueryPackageIdentityData::External { canonical_repo, .. } => Some(canonical_repo),
+        }
+    }
+
+    pub(crate) fn apparent_repo(&self) -> Option<&ApparentRepoName> {
+        match self.0.as_ref() {
+            QueryPackageIdentityData::Root { .. } => None,
+            QueryPackageIdentityData::External { apparent_repo, .. } => Some(apparent_repo),
+        }
+    }
+
+    pub(crate) fn canonical_package(&self) -> PackageIdentifier {
+        PackageIdentifier::new(
+            self.canonical_repo()
+                .cloned()
+                .unwrap_or_else(CanonicalRepoName::root),
+            self.package().clone(),
+        )
+    }
+
+    fn canonical_repo_str(&self) -> &str {
+        self.canonical_repo()
+            .map(CanonicalRepoName::as_str)
+            .unwrap_or("")
+    }
+}
+
+impl PartialEq for QueryPackageIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        self.canonical_repo_str() == other.canonical_repo_str() && self.package() == other.package()
+    }
+}
+
+impl Eq for QueryPackageIdentity {}
+
+impl std::hash::Hash for QueryPackageIdentity {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.canonical_repo_str().hash(state);
+        self.package().hash(state);
+    }
+}
+
+impl Ord for QueryPackageIdentity {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.canonical_repo_str(), self.package())
+            .cmp(&(other.canonical_repo_str(), other.package()))
+    }
+}
+
+impl PartialOrd for QueryPackageIdentity {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 /// Full request-local candidate identity.
 ///
@@ -34,7 +141,7 @@ pub(crate) enum QueryCandidate {
     Real(QueryLabel),
     Fake {
         printed_label: QueryLabel,
-        consuming_package: CompactString,
+        consuming_owner: QueryPackageIdentity,
     },
 }
 
@@ -43,13 +150,10 @@ impl QueryCandidate {
         Self::Real(label)
     }
 
-    pub(crate) fn fake(
-        printed_label: QueryLabel,
-        consuming_package: impl Into<CompactString>,
-    ) -> Self {
+    pub(crate) fn fake(printed_label: QueryLabel, consuming_owner: QueryPackageIdentity) -> Self {
         Self::Fake {
             printed_label,
-            consuming_package: consuming_package.into(),
+            consuming_owner,
         }
     }
 
@@ -75,12 +179,12 @@ impl QueryCandidate {
         }
     }
 
-    pub(crate) fn owner_package(&self) -> CompactString {
+    pub(crate) fn owner_identity(&self) -> Result<QueryPackageIdentity, QueryError> {
         match self {
-            Self::Real(label) => CompactString::new(label.package()),
+            Self::Real(label) => label.owner_identity(),
             Self::Fake {
-                consuming_package, ..
-            } => consuming_package.clone(),
+                consuming_owner, ..
+            } => Ok(consuming_owner.dupe()),
         }
     }
 }
@@ -242,14 +346,17 @@ impl QueryCandidateBatches {
     }
 
     /// Visit every candidate in every delivery before package deduplication.
-    pub(crate) fn sibling_packages(&self, arena: &QueryCandidateArena) -> Arc<[CompactString]> {
+    pub(crate) fn sibling_packages(
+        &self,
+        arena: &QueryCandidateArena,
+    ) -> Result<Arc<[QueryPackageIdentity]>, QueryError> {
         let mut packages = SmallSet::new();
         for batch in &self.batches {
             for id in batch.ids.iter().copied() {
-                packages.insert(arena.get(id).owner_package());
+                packages.insert(arena.get(id).owner_identity()?);
             }
         }
-        packages.into_iter().collect::<Vec<_>>().into()
+        Ok(packages.into_iter().collect::<Vec<_>>().into())
     }
 
     /// Collapse to printable labels only after downstream provenance-sensitive
@@ -298,7 +405,22 @@ mod tests {
     }
 
     fn fake(value: &str, consuming_package: &str) -> QueryCandidate {
-        QueryCandidate::fake(label(value), consuming_package)
+        QueryCandidate::fake(label(value), root_owner(consuming_package))
+    }
+
+    fn root_owner(package: &str) -> QueryPackageIdentity {
+        label(&format!("//{package}:__pkg__"))
+            .owner_identity()
+            .unwrap()
+    }
+
+    fn package_names(batches: &QueryCandidateBatches, arena: &QueryCandidateArena) -> Vec<String> {
+        batches
+            .sibling_packages(arena)
+            .unwrap()
+            .iter()
+            .map(|owner| owner.package().as_str().to_owned())
+            .collect()
     }
 
     fn only_candidate<'a>(
@@ -311,10 +433,10 @@ mod tests {
     }
 
     #[test]
-    fn full_identity_and_arena_interning_are_stable_and_symmetric() {
+    fn fake_candidate_owner_identity_is_symmetric_and_route_preserving() {
         let printed = label("//shared:one.bzl");
-        let fake_a = QueryCandidate::fake(printed.dupe(), "a");
-        let fake_b = QueryCandidate::fake(printed.dupe(), "b");
+        let fake_a = QueryCandidate::fake(printed.dupe(), root_owner("a"));
+        let fake_b = QueryCandidate::fake(printed.dupe(), root_owner("b"));
         let real = QueryCandidate::real(printed);
         assert_eq!(fake_a, fake_a.clone());
         assert_ne!(fake_a, fake_b);
@@ -327,7 +449,94 @@ mod tests {
         assert_eq!(fake_a_id, arena.intern(fake_a));
         assert_ne!(fake_a_id, arena.intern(fake_b));
         assert_ne!(fake_a_id, arena.intern(real));
-        assert_eq!(arena.len(), 3);
+
+        let canonical = CanonicalRepoName::new("dep+").unwrap();
+        let external = |apparent: &str| {
+            QueryLabel::from_apparent_route(
+                &slug_identity_v2::ApparentLabel::parse(&format!("@{apparent}//pkg:caller"))
+                    .unwrap(),
+                &canonical,
+            )
+            .unwrap()
+            .owner_identity()
+            .unwrap()
+        };
+        let routed = QueryCandidate::fake(label("//shared:route.bzl"), external("dep"));
+        let aliased = QueryCandidate::fake(label("//shared:route.bzl"), external("alias"));
+        assert_eq!(routed, aliased);
+        let routed_id = arena.intern(routed);
+        assert_eq!(routed_id, arena.intern(aliased));
+        assert_eq!(
+            arena
+                .get(routed_id)
+                .owner_identity()
+                .unwrap()
+                .apparent_repo()
+                .unwrap()
+                .as_str(),
+            "dep"
+        );
+        assert_eq!(arena.len(), 4);
+    }
+
+    #[test]
+    fn query_package_identity_canonical_equality_retains_first_apparent_route() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        use slug_identity_v2::ApparentLabel;
+
+        let canonical = CanonicalRepoName::new("dep+").unwrap();
+        let dep = QueryLabel::from_apparent_route(
+            &ApparentLabel::parse("@dep//pkg:target").unwrap(),
+            &canonical,
+        )
+        .unwrap()
+        .owner_identity()
+        .unwrap();
+        let alias = QueryLabel::from_apparent_route(
+            &ApparentLabel::parse("@alias//pkg:target").unwrap(),
+            &canonical,
+        )
+        .unwrap()
+        .owner_identity()
+        .unwrap();
+        let hash = |owner: &QueryPackageIdentity| {
+            let mut state = DefaultHasher::new();
+            owner.hash(&mut state);
+            state.finish()
+        };
+
+        assert_eq!(dep, alias);
+        assert_eq!(dep.cmp(&alias), std::cmp::Ordering::Equal);
+        assert_eq!(hash(&dep), hash(&alias));
+        let mut owners = SmallSet::new();
+        assert!(owners.insert(dep));
+        assert!(!owners.insert(alias));
+        let first = owners.into_iter().next().unwrap();
+        assert_eq!(first.apparent_repo().unwrap().as_str(), "dep");
+        assert_eq!(first.canonical_repo().unwrap().as_str(), "dep+");
+        assert_eq!(first.package().as_str(), "pkg");
+        assert!(
+            QueryLabel::from_canonical(
+                slug_identity_v2::CanonicalLabel::parse("@@dep+//pkg:target").unwrap()
+            )
+            .owner_identity()
+            .unwrap_err()
+            .to_string()
+            .contains("lost its apparent repository route")
+        );
+        assert!(
+            QueryPackageIdentity::external(
+                CanonicalRepoName::root(),
+                ApparentRepoName::root(),
+                PackagePath::root(),
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("requires nonroot canonical and apparent repositories")
+        );
     }
 
     #[test]
@@ -351,16 +560,10 @@ mod tests {
 
         let ab = a.clone().union(b.clone());
         assert_eq!(ab.batches().len(), 2);
-        assert_eq!(
-            ab.sibling_packages(&arena).as_ref(),
-            &[CompactString::new("a"), CompactString::new("b")]
-        );
+        assert_eq!(package_names(&ab, &arena), ["a", "b"]);
         let ba = b.union(a);
         assert_eq!(ba.batches().len(), 2);
-        assert_eq!(
-            ba.sibling_packages(&arena).as_ref(),
-            &[CompactString::new("b"), CompactString::new("a")]
-        );
+        assert_eq!(package_names(&ba, &arena), ["b", "a"]);
     }
 
     #[test]
@@ -374,10 +577,7 @@ mod tests {
         );
         let union = real_batches.union(fake);
         assert_eq!(union.batches().len(), 2);
-        assert_eq!(
-            union.sibling_packages(&arena).as_ref(),
-            &[CompactString::new("shared"), CompactString::new("consumer")]
-        );
+        assert_eq!(package_names(&union, &arena), ["shared", "consumer"]);
         assert_eq!(
             union.unique_output_labels(&arena).as_ref(),
             &[label("//shared:one.bzl")]

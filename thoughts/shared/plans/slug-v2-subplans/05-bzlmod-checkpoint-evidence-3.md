@@ -16363,3 +16363,41 @@ first apparent-route retention, verified route-before-load dispatch, Private
 fragment versus Restricted canonical-package semantics, exact three-production
 and two-test-file scope, and no external Bzl activation. Independent rereview
 returned **ACCEPT** with no remaining contradiction.
+
+## WP-5-m1 external query package identity implementation (2026-08-04)
+
+**Status: ACCEPTED.** Commit pending with this scheduling update implements the
+accepted private request-local identity in exactly five files at +766/-92:
+`graph.rs`, `provenance.rs`, `loading_environment.rs`,
+`tests/loading_query.rs`, and the permitted extension of the existing CLI
+external-query lifecycle test. No loading/bzlmod production, fixture, oracle,
+Cargo, protocol, schedule, public API, DICE key/value, cache, interner, lock,
+or external Bzl activation changed.
+
+`QueryPackageIdentity` is one `Arc` over typed root/external data. Its borrowed
+canonical-only equality, hash, and order avoid allocation; canonical aliases
+retain the first apparent route. Validated label conversion rejects missing or
+mismatched routes. Real candidates derive owners transiently and fake
+candidates retain the shared owner without changing label-materialization
+boundaries. External sibling, reverse-dependency, and loading-file dispatch
+resolve the apparent route, verify its canonical repository, and then use only
+the existing external graph/package-load owners. Nonempty external Bzl
+manifests remain a complete deferred error, never a root fallback.
+
+Focused evidence passed provenance 12/12, the complete loading integration
+target 45/45, the three external-owner cases 3/3, and the extended direct CLI
+lifecycle 1/1 after rebuilding `slug_cli_v2` and cleaning `slugd`. The retained
+CLI case covers all enabled outputs, external pattern rejection, route remap,
+edit/delete/recreate/recovery, and same-daemon PID. The final visibility
+correction exercises the real query path: cross-repository same-fragment
+Private succeeds, while same-fragment root Restricted direct and root-group
+membership both reject the external canonical caller. Query GNU-Windows
+no-run, CLI check, format, archive, and diff pass. CLI GNU-Windows no-run
+remains blocked before these tests by unchanged unconditional Unix-socket
+imports in `slug_server_v2/src/server.rs`; this is the known out-of-scope
+transport blocker, not a packet regression.
+
+Independent latest-diff review accepted the production implementation and,
+after the one tests-only visibility correction, accepted the discriminating
+Private/Restricted evidence. The next bounded prerequisite is design-only
+`WP-5-m1-external-bzl-module-owner-design`; the 17-row fixture remains frozen.

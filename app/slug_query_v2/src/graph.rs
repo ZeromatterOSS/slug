@@ -64,6 +64,8 @@ use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::provenance::QueryPackageIdentity;
+
 #[derive(Debug, Clone, Allocative, Dupe)]
 pub struct QueryLabel {
     canonical: Arc<CanonicalLabel>,
@@ -150,6 +152,62 @@ impl QueryLabel {
         })
     }
 
+    pub(crate) fn owner_identity(&self) -> Result<QueryPackageIdentity, QueryError> {
+        let canonical_repo = self.canonical.package().repo();
+        let package = self.canonical.package().package();
+        match (canonical_repo.is_root(), self.apparent_repo.as_deref()) {
+            (true, None) => Ok(QueryPackageIdentity::root(package.clone())),
+            (false, Some(apparent_repo)) if !apparent_repo.is_root() => {
+                QueryPackageIdentity::external(
+                    canonical_repo.clone(),
+                    apparent_repo.clone(),
+                    package.clone(),
+                )
+            }
+            (true, Some(_)) => Err(QueryError::evaluation(
+                "root query label unexpectedly retained an apparent repository route",
+            )),
+            (false, None) => Err(QueryError::evaluation(
+                "external query label lost its apparent repository route",
+            )),
+            (false, Some(_)) => Err(QueryError::evaluation(
+                "external query label retained the root apparent repository route",
+            )),
+        }
+    }
+
+    pub(crate) fn in_owner_package(
+        owner: &QueryPackageIdentity,
+        target: &str,
+    ) -> Result<Self, QueryError> {
+        match owner.apparent_repo() {
+            None => Self::parse_root(&format!("//{}:{target}", owner.package().as_str())),
+            Some(apparent_repo) => Self::in_external_package(
+                owner
+                    .canonical_repo()
+                    .expect("external owner retains canonical repository"),
+                apparent_repo,
+                owner.package(),
+                target,
+            ),
+        }
+    }
+
+    pub(crate) fn from_canonical_in_owner(
+        label: &CanonicalLabel,
+        owner: &QueryPackageIdentity,
+    ) -> Result<Self, QueryError> {
+        let owner_package = owner.canonical_package();
+        if label.package() != &owner_package {
+            return Err(QueryError::evaluation(format!(
+                "query label package '{}' does not match consuming owner '{}'",
+                label.package(),
+                owner_package
+            )));
+        }
+        Self::in_owner_package(owner, label.target().as_str())
+    }
+
     pub fn package(&self) -> &str {
         self.canonical.package().package().as_str()
     }
@@ -160,10 +218,6 @@ impl QueryLabel {
 
     pub fn is_root_repository(&self) -> bool {
         self.canonical.package().repo().is_root()
-    }
-
-    pub(crate) fn apparent_repo(&self) -> Option<&ApparentRepoName> {
-        self.apparent_repo.as_deref()
     }
 
     pub(crate) fn output_label(&self) -> CompactString {

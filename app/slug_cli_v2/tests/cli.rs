@@ -2900,6 +2900,70 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         pid
     );
 
+    for (args, expected) in [
+        (
+            vec!["query", "siblings(@dep//:target.txt)"],
+            "@dep//:BUILD.bazel\n@dep//:target.txt\n",
+        ),
+        (
+            vec!["query", "same_pkg_direct_rdeps(@dep//:target.txt)"],
+            "",
+        ),
+        (
+            vec!["query", "buildfiles(@dep//:target.txt)"],
+            "@dep//:BUILD.bazel\n",
+        ),
+        (vec!["query", "loadfiles(@dep//:target.txt)"], ""),
+        (
+            vec!["query", "--output=label", "@dep//:target.txt"],
+            "@dep//:target.txt\n",
+        ),
+        (
+            vec!["query", "--output=label_kind", "@dep//:target.txt"],
+            "source file @dep//:target.txt\n",
+        ),
+        (
+            vec!["query", "--output=package", "@dep//:target.txt"],
+            "@dep//\n",
+        ),
+        (
+            vec!["query", "--output=graph", "@dep//:target.txt"],
+            concat!(
+                "digraph mygraph {\n",
+                "  node [shape=box];\n",
+                "  \"@dep//:target.txt\"\n",
+                "}\n",
+            ),
+        ),
+    ] {
+        let output = slug()
+            .current_dir(&workspace)
+            .arg(output_base_arg.as_str())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        assert!(output.stderr.is_empty(), "{output:?}");
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+    }
+
+    let external_pattern = slug()
+        .current_dir(&workspace)
+        .args(["query", "@dep//:*"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        external_pattern.status.code(),
+        Some(7),
+        "{external_pattern:?}"
+    );
+    assert!(external_pattern.stdout.is_empty(), "{external_pattern:?}");
+    assert!(
+        String::from_utf8_lossy(&external_pattern.stderr)
+            .contains("external repository query patterns are deferred"),
+        "{external_pattern:?}"
+    );
+
     write(
         workspace.join("dep/BUILD.bazel"),
         "print(\"EXTERNAL_BUILD_EDITED\")\nexports_files([\"edited.txt\"])\n",
@@ -2921,6 +2985,62 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         "{edited_stderr}"
     );
     assert!(!edited_stderr.contains("MODULE_EVENT"), "{edited_stderr}");
+
+    write(
+        workspace.join("dep2/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    );
+    write(
+        workspace.join("dep2/BUILD.bazel"),
+        "exports_files([\"remapped.txt\"])\n",
+    );
+    write(workspace.join("dep2/remapped.txt"), "remapped\n");
+    write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep2\")\n",
+    );
+    let remapped = slug()
+        .current_dir(&workspace)
+        .args([
+            output_base_arg.as_str(),
+            "query",
+            "buildfiles(@dep//:remapped.txt)",
+        ])
+        .output()
+        .unwrap();
+    assert!(remapped.status.success(), "{remapped:?}");
+    assert_eq!(
+        String::from_utf8(remapped.stdout).unwrap(),
+        "@dep//:BUILD.bazel\n"
+    );
+
+    std::fs::remove_file(workspace.join("dep2/BUILD.bazel")).unwrap();
+    let deleted = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "query", "@dep//:remapped.txt"])
+        .output()
+        .unwrap();
+    assert_eq!(deleted.status.code(), Some(7), "{deleted:?}");
+    assert!(deleted.stdout.is_empty(), "{deleted:?}");
+
+    write(
+        workspace.join("dep2/BUILD.bazel"),
+        "exports_files([\"remapped.txt\"])\n",
+    );
+    let recovered = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "query", "@dep//:remapped.txt"])
+        .output()
+        .unwrap();
+    assert!(recovered.status.success(), "{recovered:?}");
+    assert_eq!(
+        String::from_utf8(recovered.stdout).unwrap(),
+        "@dep//:remapped.txt\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        pid
+    );
 }
 
 #[test]
