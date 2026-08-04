@@ -18555,3 +18555,22 @@ existing finisher logic unchanged. Add no key, carrier, error, visibility,
 cycle behavior, fragment work, event, fixture, oracle, or second file. The five
 existing focused tests plus a tightened structural assertion are sufficient;
 `REPLAN` on any behavior or cap expansion.
+
+### WP-5-m1 direct-local package-preflight helper refactor (2026-08-04)
+
+**Status: ACCEPTED in `34a2340e`; resume only the read-only
+`WP-5-m1-direct-local-support-gated-acyclic-closure-design`.** The exact
+one-file extraction is 9 production lines, 4 test lines, and 13 total net lines,
+within its accepted 20/12/32 caps. Private
+`preflight_direct_local_include_package_horizon(ctx, route, requests)` now owns
+the unchanged parse/rebind/dedupe/grouped-lookup/finisher sequence, while
+`DirectLocalIncludePackageHorizonKey` remains the sole initial-inspection owner
+and delegates only after deriving its accepted route/request slice.
+
+All five focused horizon tests passed, formatting and diff checks were clean,
+archive status passed, and independent latest-diff review returned `ACCEPT`.
+No key/value/error/equality, cycle behavior, fragment acquisition, event,
+visibility, public API/caller, fixture, or oracle changed. The successor may
+design only the private opaque support-gated acyclic preparation owner. Public
+unsupported-cycle publication remains frozen pending explicit user approval;
+evaluator/default/event work remains later.

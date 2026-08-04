@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff, parser inspection, and route package horizon, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | Direct-local include closure requires a support-gated cycle boundary; evaluator defaults and nonregistry evaluation-only event capture also remain missing; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | extract the shared private route package-preflight helper |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff, parser inspection, route package horizon, and shared nested-horizon preflight, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | Direct-local include closure requires a private support-gated acyclic owner; evaluator defaults and nonregistry evaluation-only event capture also remain missing; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | design private support-gated occurrence-closure acquisition |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-direct-local-package-preflight-helper-refactor`.
+`WP-5-m1-direct-local-support-gated-acyclic-closure-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -79,10 +79,10 @@ an explicit private support-gated architecture for cyclic includes: the
 semantic closure has no cycle result, while a future opaque preparation owner
 may classify Slug's unsupported capability using active-ancestry provenance.
 Public build/query/daemon publication remains frozen pending explicit user
-approval of that product-visible limitation. The current prerequisite extracts
-the accepted route-plus-requests package preflight without behavior change;
-support-gated acyclic acquisition and corrected evaluation/event ownership
-remain serial after it.
+approval of that product-visible limitation. The route-plus-requests package
+preflight refactor is accepted in `34a2340e` at 9 production/4 test/13 total net
+lines. The current packet designs the private support-gated acyclic acquisition
+owner; corrected evaluation/event ownership remains serial after it.
 
 The external package-policy design is accepted as three serial implementation
 packets. First, the accepted private one-file `HostRepositoryPathKey` owns
