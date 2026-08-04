@@ -18509,3 +18509,49 @@ order; repeated identical and canonical-equivalent paths retain every
 occurrence; and the full reachable closure compiles before execution. The
 current successor decides only whether and where Slug may expose a non-deceptive
 unsupported-cycle capability boundary, without inventing a Bazel diagnostic.
+
+### WP-5-m1 direct-local include-cycle boundary design (2026-08-04)
+
+**Status: ACCEPTED for private preparation only; implement
+`WP-5-m1-direct-local-package-preflight-helper-refactor`.** Parallel Terra
+architecture and activation audits found one truthful bounded design. Cycle
+classification is a Slug product capability owned by one future opaque private
+preparation key, never a Bazel semantic closure result. The later semantic
+closure/evaluator consumes only its supported acyclic value. No current public
+caller activates direct-local MODULE closure, so private preparation can proceed
+without changing observable behavior; build/query/one-shot/daemon publication
+of an `unsupported_feature` status remains frozen pending explicit user
+approval.
+
+Detection must retain per-occurrence active ancestry of the routed canonical
+fragment identity plus raw label/`LogicalSpan`. Only an ancestor repeat is a
+cycle: repeated siblings, diamonds, duplicate call sites, and distinct raw
+labels for one canonical path remain supported occurrences. Classification may
+happen only after the current horizon's package preflight, full grouped fragment
+request, and source-order fragment inspection/compile scan all succeed. A
+detected active-ancestry candidate remains pending until that whole scan
+completes, so it cannot hide a later UTF-8, parser, MODULE-syntax, or
+compile/identifier terminal that Bazel reaches in the same horizon; the accepted
+source-order terminal/Need precedence remains exact. Supported closure equality
+excludes ancestry; unsupported provenance is capability metadata and never a
+closure value or Bazel diagnostic.
+
+The accepted serial sequence is: (1) behavior-preserving extraction of one
+same-file route-plus-requests package-preflight helper; (2) a private opaque
+support-gated acyclic occurrence acquisition owner, with its implementation
+packet designed only after Packet 1 lands; and (3) a separate public
+activation/publication design only if the user approves the product-visible
+unsupported-cycle status. No standalone acyclic closure key may become public,
+and every future selected-module consumer must transitively depend on the one
+support-gated owner.
+
+Packet 1 edits exactly `app/slug_bzlmod_v2/src/source_preparation.rs`, capped at
+**20 production lines, 12 test lines, and 32 total net lines**. Extract private
+`preflight_direct_local_include_package_horizon(ctx, route, requests)` and make
+the accepted `DirectLocalIncludePackageHorizonKey` call it after the key alone
+computes the initial inspection and derives route/requests. Move parse-all,
+canonical rebinding, first-seen dedupe, grouped lookup, compute-error, and
+existing finisher logic unchanged. Add no key, carrier, error, visibility,
+cycle behavior, fragment work, event, fixture, oracle, or second file. The five
+existing focused tests plus a tightened structural assertion are sufficient;
+`REPLAN` on any behavior or cap expansion.
