@@ -17231,3 +17231,72 @@ design packet. Stop before cross-package/repository discovery, wildcard target
 discovery, implicit/default visibility expansion, general visibility loading,
 configuration, analysis/actions/execution, JVM, Java bytecode, or Bazel
 delegation.
+
+### WP-5-m1 external package-group visibility query decision (2026-08-04)
+
+**Status: REPLAN — `visible()`-only activation is not an exact projection of
+the shared query graph.** Repository-relative membership itself is bounded,
+but the packet's explicit other-consumer stop fires before implementation.
+
+Pinned Bazel 9.2 source at
+`8220c6198837d5c13d53fea211cf3282aa12408a` fixes the underlying semantics.
+`PackageSpecification.fromString` binds ordinary `//pkg`, `//pkg/...`, and
+fixed-semantics `//...` to the package group's repository. Exact and recursive
+matching use the full canonical `PackageIdentifier`; negatives veto positives
+inside one `PackageGroupContents`, while separate direct or included contents
+remain OR alternatives. `public` matches every repository, `private` matches
+none, and include recursion uses a per-top-level seen set. Existing
+`QueryPackageIdentity` already retains the caller's full canonical package,
+and the accepted same-package external group projection already retains
+contents and include cycles through the direct route/package graph owners.
+
+The retained external values are currently provisional-root contextual:
+`PackageRecorder` parses visibility labels and package specifications as root
+labels/packages, while the external projector remaps accepted native edges to
+the selected canonical route. That contextualization can be implemented as a
+pure derivative of the existing `ExternalUnconfiguredPackageGraphKey` route
+and `RepositoryPackageLoadKey` result. BUILD edits, deletion/recreation, and
+route remapping therefore need no new DICE key, source owner, filesystem
+observation, lock, or discovery graph.
+
+The proposed consumer restriction is nevertheless impossible. Bazel's stored
+raw declared `visibility` label is observable through
+`labels(visibility, target)`, while effective visibility contributes only its
+top-level package-group labels as `VisibilityNodep` graph edges. Included
+groups remain separate `PackageGroupInclude` edges; neither their labels nor
+their contents are flattened into the rule's raw attribute or effective edge
+set. Slug's accepted root projector preserves that split. Its shared graph is
+then consumed by `deps`, dependency-filter variants,
+`same_pkg_direct_rdeps`, bounded `rdeps`, `allpaths`, `somepath`, and graph
+output in addition to `visible()`. The admitted target/package also remains
+observable through literal, sibling, kind, package, and ordinary output paths.
+
+The external graph has no consumer-specific mode. Omitting its raw attribute
+or effective edge would make already-enabled consumers observably partial;
+adding them would violate this packet's `visible()`-only and other-consumer
+stops. A second query-shaped graph/key would violate the new-owner stop. Three
+parallel source/identity, implementation/DICE, and generic-consumer audits
+agreed that the semantic owners are reusable; the generic-consumer audit
+returned `REPLAN` on this contract conflict. Independent reserved-boundary
+conflict review returned `ACCEPT` for the REPLAN and required separate raw and
+effective semantics plus complete enabled-consumer enumeration in the next
+design. No Rust, fixture, tool, generated evidence, Bazel command, Cargo
+command, public API, DICE key, or production behavior changed.
+
+Resume only the read-only
+`WP-5-m1-external-restricted-visibility-query-consumer-design`. For one
+existing direct-local route and one already-supported native target with
+explicit visibility naming valid already-loaded same-package package groups,
+enumerate the complete enabled generic-query and output surface before
+choosing oracle rows or an implementation boundary. Freeze route-remapped raw
+visibility attributes separately from effective top-level `VisibilityNodep`
+edges, existing include edges, repository-relative package matching,
+positive/negative and public/private behavior, include union/cycles,
+root/same-external/different-external caller identity, NODEP filter behavior,
+DICE equality/invalidation, minimum discriminating Bazel 9.2 evidence, exact
+allowlist/cap, and stop gates. Do not run Bazel or edit Rust, fixtures, tools,
+or generated evidence in this design packet. Stop before implicit/default
+visibility, direct package pseudo-labels, missing/wrong-kind groups, direct
+named-repository package specifications, cross-package/repository group
+loading or includes, discovery, a new key/route/owner, configuration,
+analysis/actions/execution, JVM, Java bytecode, or Bazel delegation.
