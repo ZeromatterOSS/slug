@@ -15663,7 +15663,224 @@ outputs, visibility content evaluation, `@bazel_tools`, globs/patterns,
 configuration, analysis/actions/execution, repository rules/extensions, JVM,
 Java bytecode, and Bazel delegation.
 
+## WP-5-m1 external repository source-identity design (2026-08-04)
+
+**Status: ACCEPTED; implementation is a separate bounded packet.**
+Choose option **A**, narrowed to the existing Host owner: give
+`HostRepositorySourceFileKey` a Host-specific present result containing the
+normalized absolute requested logical path submitted to `ResolvedPathKey`
+alongside its shared bytes. Leave the shared legacy
+`RepositorySourceFileValue` bytes-only. Do not generalize
+`BzlModuleIdentity`. This supplies the module manifest's missing fact without
+leaking immutable generation state into legacy equal-byte source equality.
+
+### Evidence and representation decision
+
+`HostRepositorySourceFileKey` is already the sole route-keyed source owner:
+its identity is `RootRepositoryRoute + repo_relative_path`, its equality is
+`complete_eq`, and validity is complete-only
+(`app/slug_bzlmod_v2/src/source_preparation.rs` lines 486-512 and 1185-1250).
+Its `RepositorySourceFileValue` currently exposes only
+`Present(Arc<[u8]>)` / `Absent` (lines 617-624), even though
+`observed_repository_source_file` first constructs a
+`NormalizedAbsolutePath` and submits it to `ResolvedPathKey` before using the
+resolver's distinct `real_path` for the FileBytes observation (lines
+1040-1108). This is exactly the missing source identity identified by the
+accepted external-rule REPLAN.
+
+`ResolvedPath` proves the required separation:
+`requested_path`, `real_path`, namespace, resolver route, symlinks, and
+ancestor expansion are distinct operational fields
+(`app/slug_workspace_v2/src/path_resolution.rs` lines 79-116 and 177-198).
+The source-value boundary intentionally currently hides those operational
+fields; `RepositorySourceFileError` makes that policy explicit (source
+preparation lines 622-624). For local materialization, the requested path is
+`source_root / relative` in Host namespace; for immutable materialization it
+is `generation_root / relative` in that generation's Materialization namespace
+(lines 1133-1182). The requested normalized path—not `real_path`, namespace,
+symlink chain, observation instance, physical override path after resolution,
+or materialization source identity—is the value necessary to populate
+`BzlModuleIdentity.workspace_path` honestly.
+
+`RootRepositoryRoute` currently admits direct `local_path_override` routing,
+but shared `RepositorySourceFileValue` also serves legacy immutable
+materialization. Immutable generation roots and observation instances are
+operational: retaining either, or an immutable requested path, in that shared
+value would defeat equal-byte pruning. The Host-specific result stays on the
+same existing key/owner and leaves the legacy enum unchanged; it creates no
+second key, cache, or lock.
+
+`BzlModuleIdentity` is public and already has the exact two fields needed:
+canonical label and evaluated `workspace_path`
+(`app/slug_loading_v2/src/bzl_module.rs` lines 132-149). It participates in
+manifest/direct/reachable equality, lifetime alignment, and SHA-256 identity
+fingerprints (lines 472-530 and 2538-2570); `LoadedPackage` equality includes
+its manifest roots/fingerprint but excludes frozen-module pointers
+(`app/slug_loading_v2/src/package.rs` lines 88-110). Generalizing that public
+type would migrate every root constructor and consumer without adding any
+missing semantic fact. Retain its `PathBuf` API unchanged; the new source
+value gives future external construction the same normalized logical path that
+the Host constructor already uses.
+
+The matching Stage 9 Stage-4 ledger row prescribes retaining the existing
+Starlark evaluator while rewriting only the BUILD/`.bzl` load boundary around
+V2 labels and DICE keys, with no Buck file/cell semantics
+(`thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md`, row
+97). No Buck2/V1 representation import is appropriate: `Arc<[u8]>`,
+`NormalizedAbsolutePath`, `Arc` slices, `Dupe`, and `Allocative` are already
+the compact retained forms. No interner, cache, lock, or new hashing utility
+is authorized.
+
+### Exact value contract
+
+Add a Host-specific public value (and change only
+`HostRepositorySourceFileKey`'s value type) equivalent to:
+
+```rust
+enum HostRepositorySourceFileValue {
+    Present {
+        bytes: Arc<[u8]>,
+        logical_path: NormalizedAbsolutePath,
+    },
+    Absent,
+}
+```
+
+The legacy `RepositorySourceFileValue` remains exactly bytes-only.
+Host `Absent` and every existing error remain path-free except their current
+diagnostic relative-path fields. The Host source owner creates `logical_path`
+once after `materialized_root.join(relative)` normalizes and immediately
+before computing `ResolvedPathKey`; it is the requested logical path before
+resolution and may itself name a symlink. On successful FileBytes it returns
+that same value with the existing byte arc. It must not re-resolve,
+canonicalize, or read a path outside DICE.
+
+The resolver helper is currently shared by the Host and legacy materialization
+paths. It may use a private, transient observation result carrying the
+requested path so the Host mapper preserves it and the legacy mapper strips it
+before producing `RepositorySourceFileValue`; that transient is neither a DICE
+key value nor a retained legacy semantic value. Host currently routes only
+direct local overrides. Consequently, immutable generation and
+observation-instance semantics belong solely to the unchanged legacy key, not
+to Host. Do not create a parallel Host/legacy source key, cache, or observation
+pass merely to transport the path.
+
+The following equality/invalidation rules are mandatory:
+
+- Host equal bytes **and equal logical path** retain the old complete value,
+  including a resolved physical-path or symlink-chain change that does not
+  change either retained field. Those are operational dependencies, not
+  semantic source identity.
+- The Host value's pure equality requires both bytes and requested logical
+  path. A changed path is therefore unequal even with identical bytes, so a
+  future source consumer cannot retain an older path merely because text
+  matches. The path participates in `BzlModuleIdentity`, manifest identity
+  fingerprint, and package-load fingerprint when that future external path is
+  authorized.
+- A direct-local override root change produces a distinct
+  `RootRepositoryRoute` key, not a same-key DICE replacement. The focused
+  value-equality test proves the differing-path result is unequal; route-key
+  identity proves there is no cross-route result reuse. No apparent-label field
+  is introduced.
+- A symlink retarget that leaves requested logical path and bytes equal retains
+  the old semantic value; if it changes bytes, normal source invalidation
+  occurs. The resolved physical path and symlink provenance remain available
+  only below the owner for diagnostics/observation correctness.
+- `Need` propagates unchanged and is never valid for either owner. The Host
+  value contains no generation or observation-instance state because Host
+  currently has only direct local overrides. The legacy immutable
+  `RepositorySourceFileKey` keeps its existing bytes-only equality:
+  generation/instance changes recompute it but equal bytes retain the old
+  complete value and changed bytes replace it.
+
+This adds a Host public value API and changes only that Host result's semantic
+equality; neither key/hash, DICE ownership, materialization/resolver policy,
+error taxonomy, legacy source-value API, nor `BzlModuleIdentity` layout
+changes. Re-export the new Host value from `app/slug_bzlmod_v2/src/lib.rs` so
+the future loader can name the existing key's public result; its retained cost
+is one `NormalizedAbsolutePath` only for a Host `Present`, while the existing
+`Arc<[u8]>` remains shared. Only Host-key match sites migrate to the named
+form; legacy consumers remain tuple `Present(bytes)`. Consumers that only need
+source text pass through `bytes` and deliberately discard `logical_path`. A
+future external Bzl evaluator may consume both fields, but it is explicitly not
+part of this packet.
+
+### Implementation-ready bounded packet
+
+After independent retained-representation/DICE review,
+`WP-5-m1-external-repository-source-identity` may change only:
+
+- `app/slug_bzlmod_v2/src/source_preparation.rs`, its focused unit tests, and
+  the `HostRepositorySourceFileValue` re-export in
+  `app/slug_bzlmod_v2/src/lib.rs`; and
+- `app/slug_loading_v2/src/bzl_module.rs` only for its direct
+  `HostRepositorySourceFileKey` import and `Present { bytes, .. }` /
+  `Absent` pattern migration at the repository package load boundary; and
+- only direct source-preparation test modules that construct or inspect the
+  new Host result; and
+- no oracle fixture, protocol, CLI behavior, Cargo metadata, query, external
+  Bzl key, loader activation beyond that existing package boundary,
+  `BzlModuleIdentity` change, cycle detector, or source-materialization owner.
+
+The focused test allowlist is exact: extend
+`app/slug_bzlmod_v2/src/source_preparation.rs` tests
+`host_repository_source_requests_native_materialization_without_legacy_snapshot_keys`
+and `immutable_materialization_equality_is_operationally_exact`, and add the
+five precisely named unit tests
+`host_repository_source_value_retains_requested_logical_path_and_bytes`,
+`host_repository_source_value_equality_requires_equal_bytes_and_logical_path`,
+`host_repository_source_value_need_and_error_have_no_logical_path`, and
+`legacy_immutable_repository_source_value_remains_bytes_only`, and
+`host_repository_source_local_override_root_change_is_distinct_key`. Together
+they prove Host local present requested-path retention, Host absent/error handling,
+equal bytes/same-path reuse, pure equal-bytes/different-path inequality, byte
+replacement, requested-symlink retain/replace, and Need/complete validity.
+They also prove immutable generation/observation-instance recomputation stays
+bytes-only (equal bytes retain, changed bytes replace); those immutable cases
+are legacy-only, never Host cases. The direct-local route-root change is
+separately a distinct-key assertion, not a same-key replacement claim. No
+loading test edits and no external Bzl load/query test are authorized:
+`BzlModuleIdentity`, its manifest/fingerprint behavior, and frozen-lifetime
+coverage are intentionally unchanged. Run serially:
+`cargo test -p slug_bzlmod_v2 source_preparation`,
+`cargo test -p slug_loading_v2 host_package_load`,
+`cargo check -p slug_loading_v2`, `cargo check -p slug_query_v2`,
+`cargo test -p slug_bzlmod_v2 --target x86_64-pc-windows-gnu --no-run`,
+`cargo test -p slug_loading_v2 --target x86_64-pc-windows-gnu --no-run`,
+`cargo fmt --check`, `scripts/v2_archive_status.sh`, and `git diff --check`.
+The design adds no fixture rows and no broad Cargo suite.
+
+### Stop gates
+
+**REPLAN** if the implementation needs to retain `real_path`, namespace,
+symlink route, physical materialization root, source identity, generation, or
+observation instance as semantic value state; if a second source owner,
+filesystem bypass, cache/lock, public `BzlModuleIdentity` generalization, or
+external Bzl/query activation is required; or if a route/root/local/immutable
+transition cannot be expressed through the existing source owner and its
+complete-only equality. Root-package source behavior is frozen in this packet;
+route changes remain key changes; local Host values retain the requested path;
+and immutable values retain bytes alone under the legacy key. Configuration,
+analysis, actions, execution, repository rules/extensions, test-base/tools
+graph, JVM, Java bytecode, and Bazel delegation remain out of scope.
+
 Independent correction rereview returned `ACCEPT` for this REPLAN. No Rust,
 Cargo, fixture, oracle, public API, DICE key, or query behavior changed. The
 only authorized continuation is the source-identity design prerequisite named
 above.
+
+### Independent retained-representation/DICE review (2026-08-04): ACCEPT
+
+The independent review accepted the Host-only result: the sole existing
+complete-only `HostRepositorySourceFileKey` retains `Arc<[u8]>` plus the
+requested normalized logical path submitted to `ResolvedPathKey` before
+resolution. It confirmed that this path, not physical resolution provenance,
+is the identity required downstream; the legacy immutable
+`RepositorySourceFileValue` remains bytes-only so equal-byte pruning across
+generation and observation-instance recomputation is preserved. The accepted
+implementation surface is exactly three production paths —
+`app/slug_bzlmod_v2/src/source_preparation.rs`,
+`app/slug_bzlmod_v2/src/lib.rs`, and
+`app/slug_loading_v2/src/bzl_module.rs` — with the shared helper permitted one
+private transient path transport and no second observation, DICE key, cache,
+or lock. All other stop gates and residual gaps remain in force.
