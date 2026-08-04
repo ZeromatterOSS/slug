@@ -59,3 +59,37 @@ argv = ["query", "--output=label_kind", "@dep//:is_k8"]
 compare = "semantic"
 expected_exit = 0
 stdout_contains = ["config_setting rule @dep//:is_k8"]
+
+[[commands]]
+name = "query_dep_suite_parent"
+argv = ["query", "@dep//:suite_parent"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:suite_parent"]
+
+[[commands]]
+name = "query_dep_suite_parent_label_kind"
+argv = ["query", "--output=label_kind", "@dep//:suite_parent"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["test_suite rule @dep//:suite_parent"]
+
+[[commands]]
+name = "query_dep_suite_parent_tests"
+argv = ["query", "labels(tests, @dep//:suite_parent)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:suite_empty"]
+
+[[commands]]
+name = "query_dep_suite_parent_deps"
+argv = ["query", "deps(@dep//:suite_parent)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:suite_empty", "@dep//:suite_parent"]
+
+[[commands]]
+name = "query_dep_suite_parent_expanded_tests"
+argv = ["query", "tests(@dep//:suite_parent)"]
+compare = "semantic"
+expected_exit = 0

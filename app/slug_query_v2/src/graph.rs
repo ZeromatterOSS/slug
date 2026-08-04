@@ -874,6 +874,12 @@ fn external_package_graph_from_targets(
     let build_file = CompactString::new(build_path.to_string_lossy());
     let mut nodes = SmallMap::with_capacity(targets.len() + 1);
 
+    // Validate native test-suite membership before the generic same-package
+    // source synthesis below. A test_suite may name only another loaded native
+    // test_suite in this external slice, so it never causes a source node to
+    // appear or admits an unsupported `Other` member to `tests()`.
+    validate_external_test_suite_memberships(package, targets)?;
+
     for target in targets {
         let effective_visibility = match &target.visibility {
             VisibilitySource::Declared(visibility) => visibility.clone(),
@@ -894,16 +900,15 @@ fn external_package_graph_from_targets(
         }
         let label =
             QueryLabel::in_external_package(canonical_repo, apparent_repo, package, &target.name)?;
-        let (kind, rule_capability, edges, attributes) = match &target.kind {
+        let rule_capability = target.rule_capability().cloned();
+        let test_metadata = target.test_metadata();
+        let (kind, edges, attributes) = match &target.kind {
             PackageTargetKind::ExportedFile if target.name == build_basename => {
-                (QueryNodeKind::BuildFile, None, Arc::from([]), Arc::from([]))
+                (QueryNodeKind::BuildFile, Arc::from([]), Arc::from([]))
             }
-            PackageTargetKind::ExportedFile => (
-                QueryNodeKind::SourceFile,
-                None,
-                Arc::from([]),
-                Arc::from([]),
-            ),
+            PackageTargetKind::ExportedFile => {
+                (QueryNodeKind::SourceFile, Arc::from([]), Arc::from([]))
+            }
             PackageTargetKind::Filegroup {
                 srcs,
                 srcs_explicit,
@@ -931,7 +936,6 @@ fn external_package_graph_from_targets(
                     .collect::<Vec<_>>();
                 (
                     QueryNodeKind::Rule(CompactString::new("filegroup rule")),
-                    target.rule_capability().cloned(),
                     ordinary.into(),
                     vec![QueryAttribute {
                         name: CompactString::new("srcs"),
@@ -946,7 +950,6 @@ fn external_package_graph_from_targets(
                     external_alias_actual_label(canonical_repo, apparent_repo, package, actual)?;
                 (
                     QueryNodeKind::Rule(CompactString::new("alias rule")),
-                    target.rule_capability().cloned(),
                     Arc::from([QueryEdge {
                         kind: QueryEdgeKind::Ordinary,
                         target: actual.dupe(),
@@ -960,10 +963,63 @@ fn external_package_graph_from_targets(
             }
             PackageTargetKind::ConfigSetting { .. } => (
                 QueryNodeKind::Rule(CompactString::new("config_setting rule")),
-                target.rule_capability().cloned(),
                 Arc::from([]),
                 Arc::from([]),
             ),
+            PackageTargetKind::TestSuite { membership, .. } => {
+                let tests = membership
+                    .tests()
+                    .iter()
+                    .map(|member| {
+                        external_test_suite_member_label(
+                            canonical_repo,
+                            apparent_repo,
+                            package,
+                            member,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let implicit_tests = membership
+                    .implicit_tests()
+                    .iter()
+                    .map(|member| {
+                        external_test_suite_member_label(
+                            canonical_repo,
+                            apparent_repo,
+                            package,
+                            member,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let mut seen = SmallSet::new();
+                let ordinary = tests
+                    .iter()
+                    .chain(implicit_tests.iter())
+                    .filter(|label| seen.insert((*label).dupe()))
+                    .map(QueryLabel::dupe)
+                    .map(|target| QueryEdge {
+                        kind: QueryEdgeKind::Ordinary,
+                        target,
+                    })
+                    .collect::<Vec<_>>();
+                (
+                    QueryNodeKind::Rule(CompactString::new("test_suite rule")),
+                    ordinary.into(),
+                    vec![
+                        QueryAttribute {
+                            name: CompactString::new("tests"),
+                            labels: tests.into(),
+                            explicit: membership.tests_explicit(),
+                        },
+                        QueryAttribute {
+                            name: CompactString::new("$implicit_tests"),
+                            labels: implicit_tests.into(),
+                            explicit: true,
+                        },
+                    ]
+                    .into(),
+                )
+            }
             _ => {
                 return Err(QueryError::evaluation(format!(
                     "external repository rule graph is deferred: {}//{}:{}",
@@ -983,7 +1039,7 @@ fn external_package_graph_from_targets(
                 label,
                 kind,
                 rule_capability,
-                test_metadata: None,
+                test_metadata,
                 build_file: build_file.clone(),
                 effective_visibility,
                 visibility_source: target.visibility.clone(),
@@ -1086,6 +1142,70 @@ fn external_package_graph_from_targets(
         package: CompactString::new(package.as_str()),
         nodes,
     })
+}
+
+fn validate_external_test_suite_memberships(
+    package: &PackagePath,
+    targets: &[slug_loading_v2::PackageTarget],
+) -> Result<(), QueryError> {
+    for target in targets {
+        let PackageTargetKind::TestSuite { membership, .. } = &target.kind else {
+            continue;
+        };
+        if !membership.implicit_tests().is_empty() {
+            return Err(QueryError::evaluation(format!(
+                "external repository test_suite implicit tests are deferred: {}",
+                target.name
+            )));
+        }
+        for member in membership.tests() {
+            let member_package = member.package();
+            if !member_package.repo().is_root() || member_package.package() != package {
+                let deferred = if member_package.repo().is_root() {
+                    "cross-package"
+                } else {
+                    "named-repository"
+                };
+                return Err(QueryError::evaluation(format!(
+                    "external repository test_suite {deferred} member is deferred: {member}"
+                )));
+            }
+            let Some(member_target) = targets
+                .iter()
+                .find(|candidate| candidate.name == member.target().as_str())
+            else {
+                return Err(QueryError::evaluation(format!(
+                    "external repository test_suite unresolved member is deferred: {member}"
+                )));
+            };
+            if !matches!(member_target.kind, PackageTargetKind::TestSuite { .. }) {
+                return Err(QueryError::evaluation(format!(
+                    "external repository test_suite non-suite member is deferred: {member}"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn external_test_suite_member_label(
+    canonical_repo: &CanonicalRepoName,
+    apparent_repo: &ApparentRepoName,
+    package: &PackagePath,
+    member: &CanonicalLabel,
+) -> Result<QueryLabel, QueryError> {
+    let member_package = member.package();
+    if member_package.repo().is_root() && member_package.package() == package {
+        return QueryLabel::in_external_package(
+            canonical_repo,
+            apparent_repo,
+            package,
+            member.target().as_str(),
+        );
+    }
+    Err(QueryError::evaluation(format!(
+        "external repository test_suite member is deferred: {member}"
+    )))
 }
 
 fn external_filegroup_source_label(
@@ -1551,6 +1671,8 @@ mod graph_tests {
     use slug_loading_v2::PackageTarget;
     use slug_loading_v2::PackageTargetKind;
     use slug_loading_v2::RuleVisibility;
+    use slug_loading_v2::TestRuleKind;
+    use slug_loading_v2::TestSuiteMembership;
     use slug_loading_v2::VisibilitySource;
 
     use super::QueryEdgeKind;
@@ -1768,6 +1890,234 @@ mod graph_tests {
         assert_eq!(absent.visibility_source, VisibilitySource::PackageDefault);
         assert!(absent.edges.is_empty());
         assert!(absent.attributes.is_empty());
+    }
+
+    #[test]
+    fn external_test_suite_projection_retains_membership_metadata_and_cycles() {
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let source = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let suite = |name: &str, membership, tags: &[&str], visibility| PackageTarget {
+            name: name.to_owned(),
+            kind: PackageTargetKind::TestSuite {
+                membership,
+                tags: tags
+                    .iter()
+                    .map(|tag| (*tag).into())
+                    .collect::<Vec<_>>()
+                    .into(),
+            },
+            visibility,
+        };
+        let targets = vec![
+            suite(
+                "omitted",
+                TestSuiteMembership::Implicit {
+                    members: Arc::from([]),
+                    tests_explicit: false,
+                },
+                &[],
+                VisibilitySource::PackageDefault,
+            ),
+            suite(
+                "empty",
+                TestSuiteMembership::Implicit {
+                    members: Arc::from([]),
+                    tests_explicit: true,
+                },
+                &["a", "manual"],
+                VisibilitySource::AlwaysPublic,
+            ),
+            suite(
+                "parent",
+                TestSuiteMembership::Explicit {
+                    tests: Arc::from([source("empty")]),
+                },
+                &[],
+                VisibilitySource::PackageDefault,
+            ),
+            suite(
+                "cycle_a",
+                TestSuiteMembership::Explicit {
+                    tests: Arc::from([source("cycle_b")]),
+                },
+                &[],
+                VisibilitySource::PackageDefault,
+            ),
+            suite(
+                "cycle_b",
+                TestSuiteMembership::Explicit {
+                    tests: Arc::from([source("cycle_a")]),
+                },
+                &[],
+                VisibilitySource::PackageDefault,
+            ),
+        ];
+        let graph = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            Path::new("/external/dep+/BUILD.bazel"),
+            &RuleVisibility::Private,
+            &targets,
+        )
+        .unwrap();
+        let label = |target| {
+            QueryLabel::in_external_package(&canonical_repo, &apparent_repo, &package, target)
+                .unwrap()
+        };
+        let omitted = graph.nodes.get(&label("omitted")).unwrap();
+        let empty = graph.nodes.get(&label("empty")).unwrap();
+        assert_eq!(
+            graph.nodes.len(),
+            6,
+            "only BUILD plus declared suites exist"
+        );
+        assert_eq!(omitted.kind, QueryNodeKind::Rule("test_suite rule".into()));
+        assert_eq!(omitted.label.to_string(), "@@dep+//:omitted");
+        assert_eq!(omitted.label.output_label(), "@dep//:omitted");
+        assert_eq!(
+            omitted.rule_capability.as_ref().map(|capability| (
+                &capability.rule_class,
+                capability.executable,
+                capability.test_kind
+            )),
+            Some((&"test_suite".into(), false, Some(TestRuleKind::Suite)))
+        );
+        assert_eq!(omitted.attributes.len(), 2);
+        assert_eq!(omitted.attributes[0].name, "tests");
+        assert!(!omitted.attributes[0].explicit);
+        assert!(omitted.attributes[0].labels.is_empty());
+        assert_eq!(omitted.attributes[1].name, "$implicit_tests");
+        assert!(omitted.attributes[1].explicit);
+        assert!(omitted.attributes[1].labels.is_empty());
+        assert!(omitted.edges.is_empty());
+        assert!(
+            omitted
+                .attributes
+                .iter()
+                .all(|attribute| attribute.name != "visibility")
+        );
+
+        assert!(empty.attributes[0].explicit);
+        assert!(empty.attributes[1].explicit);
+        assert_eq!(empty.effective_visibility, RuleVisibility::Public);
+        assert_eq!(
+            empty.test_metadata.as_ref().unwrap().tags.as_ref(),
+            ["a", "manual"]
+        );
+        assert!(empty.test_metadata.as_ref().unwrap().manual);
+        assert!(empty.test_metadata.as_ref().unwrap().size.is_none());
+
+        for (suite_name, member) in [
+            ("parent", "empty"),
+            ("cycle_a", "cycle_b"),
+            ("cycle_b", "cycle_a"),
+        ] {
+            let node = graph.nodes.get(&label(suite_name)).unwrap();
+            assert_eq!(
+                node.attributes[0]
+                    .labels
+                    .iter()
+                    .map(|label| label.output_label().to_string())
+                    .collect::<Vec<_>>(),
+                [format!("@dep//:{member}")]
+            );
+            assert_eq!(
+                node.edges
+                    .iter()
+                    .map(|edge| (edge.kind, edge.target.output_label().to_string()))
+                    .collect::<Vec<_>>(),
+                [(QueryEdgeKind::Ordinary, format!("@dep//:{member}"))]
+            );
+        }
+    }
+
+    #[test]
+    fn external_test_suite_projection_rejects_unsupported_members_before_source_synthesis() {
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let source = |label| CanonicalLabel::parse(label).unwrap();
+        let project = |member: CanonicalLabel, other: PackageTargetKind| {
+            external_package_graph_from_targets(
+                &canonical_repo,
+                &apparent_repo,
+                &package,
+                Path::new("/external/dep+/BUILD.bazel"),
+                &RuleVisibility::Private,
+                &[
+                    PackageTarget {
+                        name: "suite".to_owned(),
+                        kind: PackageTargetKind::TestSuite {
+                            membership: TestSuiteMembership::Explicit {
+                                tests: Arc::from([member]),
+                            },
+                            tags: Arc::from([]),
+                        },
+                        visibility: VisibilitySource::PackageDefault,
+                    },
+                    PackageTarget {
+                        name: "member".to_owned(),
+                        kind: other,
+                        visibility: VisibilitySource::PackageDefault,
+                    },
+                ],
+            )
+        };
+        let non_suite =
+            project(source("@@//:member"), PackageTargetKind::ExportedFile).unwrap_err();
+        assert!(
+            non_suite
+                .to_string()
+                .contains("test_suite non-suite member is deferred")
+        );
+        let unresolved =
+            project(source("@@//:missing"), PackageTargetKind::ExportedFile).unwrap_err();
+        assert!(
+            unresolved
+                .to_string()
+                .contains("test_suite unresolved member is deferred")
+        );
+        let cross_package =
+            project(source("@@//other:member"), PackageTargetKind::ExportedFile).unwrap_err();
+        assert!(
+            cross_package
+                .to_string()
+                .contains("test_suite cross-package member is deferred")
+        );
+        let named_repository =
+            project(source("@@other+//:member"), PackageTargetKind::ExportedFile).unwrap_err();
+        assert!(
+            named_repository
+                .to_string()
+                .contains("test_suite named-repository member is deferred")
+        );
+        let nonempty_implicit = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            Path::new("/external/dep+/BUILD.bazel"),
+            &RuleVisibility::Private,
+            &[PackageTarget {
+                name: "implicit".to_owned(),
+                kind: PackageTargetKind::TestSuite {
+                    membership: TestSuiteMembership::Implicit {
+                        members: Arc::from([source("@@//:member")]),
+                        tests_explicit: false,
+                    },
+                    tags: Arc::from([]),
+                },
+                visibility: VisibilitySource::PackageDefault,
+            }],
+        )
+        .unwrap_err();
+        assert!(
+            nonempty_implicit
+                .to_string()
+                .contains("test_suite implicit tests are deferred")
+        );
     }
 
     #[test]

@@ -15142,3 +15142,46 @@ assert canonical/apparent labels, kind, capability, tags/manual metadata,
 attributes plus explicitness, edge order/dedupe, and accepted visibility.
 Re-run the root test-suite projection test unchanged. Any production change
 outside this allowlist or a broader fixture/oracle family is a review stop.
+
+### Direct external-repository suite-only test-suite query accepted
+
+Status: **ACCEPT** for
+`WP-5-m1-external-repository-test-suite-query` on 2026-08-04. Independent
+terminal implementation review found no blocker. Residual risk remains the
+intentionally deferred external test rules, non-suite members, nonempty
+implicit collection, and external build/execution surfaces.
+
+Production changed only `app/slug_query_v2/src/graph.rs`. The private external
+projector validates every explicit suite member against the same loaded target
+batch before generic source synthesis, then projects omitted, explicit-empty,
+parent-to-suite, and suite-only cycles with the accepted native capability,
+test metadata, `tests`/`$implicit_tests` provenance, ordinary edges, canonical
+identity, and apparent rendering. Nonempty implicit membership and unsupported
+members stop without source synthesis. No key, owner, representation, public
+API, visibility attribute, discovery, or analysis path changed.
+
+The existing `module-local-override` fixture grew by five suite declarations
+and exactly five parent commands, with no asset. Bazel 9.2 generation at
+`/tmp/slug-external-test-suite-oracle.YDguu0/runs/module-local-override/20260804-005708-1024215-bazel`
+and distinct-root replay at
+`/tmp/slug-external-test-suite-replay.JgMdIw/runs/module-local-override/20260804-005810-1026764-bazel`
+both passed. Literal, `label_kind`, `labels(tests, ...)`, and `deps` produced
+the exact apparent parent/leaf outputs; `tests()` succeeded empty. A rebuilt
+Slug binary matched all five rows and the finite two-node cycle closure. The
+full Slug fixture remains red only at the pre-existing external-build row,
+which is outside the query-only packet.
+
+Focused structural/core evidence proves membership explicitness, total empty
+implicit attributes, capability, tags/manual metadata, edge order, cycles,
+canonical/apparent labels, visibility, source noninvalidation, and every
+member/implicit/other-rule stop. Formatting, the complete
+22-unit/43-integration/6-parser query suite, unchanged root suite projection,
+four-crate checks, GNU-Windows query/core no-run linkage, CLI/server external
+regressions, the CLI rebuild, archive, diff, no-Cargo, and forbidden-owner
+scans passed.
+
+The next packet is
+`WP-5-m1-external-repository-package-group-query-design`. It is design-only:
+standalone package-group contents/includes are already retained, but their
+query projection interacts with visibility and package-pattern semantics that
+the current external slice deliberately stops.

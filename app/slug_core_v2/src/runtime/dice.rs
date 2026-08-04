@@ -4106,7 +4106,7 @@ mod tests {
         .unwrap();
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"})\n",
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"})\ntest_suite(name = \"suite_omitted\")\ntest_suite(name = \"suite_empty\", tests = [], tags = [\"manual\", \"a\"])\ntest_suite(name = \"suite_parent\", tests = [\":suite_empty\"])\ntest_suite(name = \"suite_cycle_a\", tests = [\":suite_cycle_b\"])\ntest_suite(name = \"suite_cycle_b\", tests = [\":suite_cycle_a\"])\n",
         )
         .unwrap();
         fs::write(workspace.path().join("dep/target.txt"), "target").unwrap();
@@ -4257,12 +4257,113 @@ mod tests {
                 .stdout()
                 .is_empty()
         );
+        assert_eq!(
+            query("@dep//:suite_omitted")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:suite_omitted\n"
+        );
+        assert_eq!(
+            query("@dep//:suite_empty")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:suite_empty\n"
+        );
+        assert_eq!(
+            query_label_kind("@dep//:suite_parent")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .label_kind_stdout(),
+            "test_suite rule @dep//:suite_parent\n"
+        );
+        assert!(
+            query("labels($implicit_tests, @dep//:suite_omitted)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout()
+                .is_empty()
+        );
+        assert_eq!(
+            query("labels(tests, @dep//:suite_parent)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:suite_empty\n"
+        );
+        assert_eq!(
+            query("deps(@dep//:suite_parent)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:suite_empty\n@dep//:suite_parent\n"
+        );
+        assert!(
+            query("tests(@dep//:suite_parent)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout()
+                .is_empty()
+        );
+        assert_eq!(
+            query("deps(@dep//:suite_cycle_a)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:suite_cycle_a\n@dep//:suite_cycle_b\n"
+        );
+        assert!(
+            query("tests(@dep//:suite_cycle_a)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout()
+                .is_empty()
+        );
 
         // An attribute-created external source is semantic loading state, not
         // a source-file observation. It remains addressable while absent.
         fs::write(workspace.path().join("dep/missing_input.txt"), "present").unwrap();
         let created = query("deps(@dep//:files)").unwrap();
         assert!(accepted_output_text(&created).is_empty());
+        let suite_after_source_create = query("@dep//:suite_parent").unwrap();
+        assert_eq!(
+            suite_after_source_create
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:suite_parent\n"
+        );
+        assert!(accepted_output_text(&suite_after_source_create).is_empty());
         let setting_after_source_create = query("@dep//:is_k8").unwrap();
         assert!(accepted_output_text(&setting_after_source_create).is_empty());
         fs::write(workspace.path().join("dep/missing_input.txt"), "edited").unwrap();
@@ -4278,7 +4379,11 @@ mod tests {
 
         for (build, expected) in [
             (
-                "test_suite(name = \"other\")\n",
+                "filegroup(name = \"member\")\ntest_suite(name = \"other\", tests = [\":member\"])\n",
+                "external repository test_suite non-suite member is deferred",
+            ),
+            (
+                "package_group(name = \"unsupported\", packages = [\"//...\"])\n",
                 "external repository rule graph is deferred",
             ),
             (
@@ -4295,6 +4400,10 @@ mod tests {
             ),
             (
                 "filegroup(name = \"group\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"}, visibility = [\":group\"])\n",
+                "external repository visibility edges are deferred",
+            ),
+            (
+                "filegroup(name = \"group\")\ntest_suite(name = \"suite\", visibility = [\":group\"])\n",
                 "external repository visibility edges are deferred",
             ),
             (
@@ -4332,15 +4441,15 @@ mod tests {
                     QueryOutputCompletion::Standard,
                 )
                 .unwrap();
+            let failure = error
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string();
             assert!(
-                error
-                    .terminal_for_test()
-                    .as_ref()
-                    .as_ref()
-                    .unwrap_err()
-                    .to_string()
-                    .contains(expected),
-                "{error:?}"
+                failure.contains(expected),
+                "expected {expected:?}: {failure}"
             );
         }
         fs::write(
