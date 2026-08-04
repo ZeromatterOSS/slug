@@ -4106,7 +4106,7 @@ mod tests {
         .unwrap();
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"})\ntest_suite(name = \"suite_omitted\")\ntest_suite(name = \"suite_empty\", tests = [], tags = [\"manual\", \"a\"])\ntest_suite(name = \"suite_parent\", tests = [\":suite_empty\"])\ntest_suite(name = \"suite_cycle_a\", tests = [\":suite_cycle_b\"])\ntest_suite(name = \"suite_cycle_b\", tests = [\":suite_cycle_a\"])\n",
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"})\ntest_suite(name = \"suite_omitted\")\ntest_suite(name = \"suite_empty\", tests = [], tags = [\"manual\", \"a\"])\ntest_suite(name = \"suite_parent\", tests = [\":suite_empty\"])\ntest_suite(name = \"suite_cycle_a\", tests = [\":suite_cycle_b\"])\ntest_suite(name = \"suite_cycle_b\", tests = [\":suite_cycle_a\"])\npackage_group(name = \"pg_empty\")\npackage_group(name = \"pg_nonempty\", packages = [\"//pkg\", \"//tree/...\", \"-//blocked\", \"-//blocked_tree/...\", \"public\", \"private\"])\npackage_group(name = \"pg_leaf\", packages = [\"//leaf\"])\npackage_group(name = \"pg_parent\", includes = [\":pg_leaf\"])\npackage_group(name = \"pg_cycle_a\", includes = [\":pg_cycle_b\"])\npackage_group(name = \"pg_cycle_b\", includes = [\":pg_cycle_a\"])\n",
         )
         .unwrap();
         fs::write(workspace.path().join("dep/target.txt"), "target").unwrap();
@@ -4347,6 +4347,56 @@ mod tests {
                 .stdout()
                 .is_empty()
         );
+        assert_eq!(
+            query("@dep//:pg_parent")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:pg_parent\n"
+        );
+        assert_eq!(
+            query_label_kind("@dep//:pg_parent")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .label_kind_stdout(),
+            "package group @dep//:pg_parent\n"
+        );
+        assert_eq!(
+            query("deps(@dep//:pg_parent)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:pg_leaf\n@dep//:pg_parent\n"
+        );
+        assert_eq!(
+            query("deps(@dep//:pg_cycle_a)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:pg_cycle_a\n@dep//:pg_cycle_b\n"
+        );
+        assert!(
+            query("labels(visibility, @dep//:pg_parent)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout()
+                .is_empty()
+        );
 
         // An attribute-created external source is semantic loading state, not
         // a source-file observation. It remains addressable while absent.
@@ -4364,6 +4414,17 @@ mod tests {
             "@dep//:suite_parent\n"
         );
         assert!(accepted_output_text(&suite_after_source_create).is_empty());
+        let group_after_source_create = query("@dep//:pg_parent").unwrap();
+        assert_eq!(
+            group_after_source_create
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:pg_parent\n"
+        );
+        assert!(accepted_output_text(&group_after_source_create).is_empty());
         let setting_after_source_create = query("@dep//:is_k8").unwrap();
         assert!(accepted_output_text(&setting_after_source_create).is_empty());
         fs::write(workspace.path().join("dep/missing_input.txt"), "edited").unwrap();
@@ -4383,8 +4444,20 @@ mod tests {
                 "external repository test_suite non-suite member is deferred",
             ),
             (
-                "package_group(name = \"unsupported\", packages = [\"//...\"])\n",
-                "external repository rule graph is deferred",
+                "package_group(name = \"group\", includes = [\":missing\"])\n",
+                "external repository package_group missing include is deferred",
+            ),
+            (
+                "filegroup(name = \"member\")\npackage_group(name = \"group\", includes = [\":member\"])\n",
+                "external repository package_group non-package-group include is deferred",
+            ),
+            (
+                "exports_files([\"target.txt\"])\nalias(name = \"member\", actual = \":target.txt\")\npackage_group(name = \"group\", includes = [\":member\"])\n",
+                "external repository package_group alias include is deferred",
+            ),
+            (
+                "package_group(name = \"group\", includes = [\"//other:member\"])\n",
+                "external repository package_group cross-package include is deferred",
             ),
             (
                 "filegroup(name = \"files\", srcs = [\"//other:item\"])\n",

@@ -93,3 +93,31 @@ name = "query_dep_suite_parent_expanded_tests"
 argv = ["query", "tests(@dep//:suite_parent)"]
 compare = "semantic"
 expected_exit = 0
+
+[[commands]]
+name = "query_dep_package_group_parent"
+argv = ["query", "@dep//:pg_parent"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:pg_parent"]
+
+[[commands]]
+name = "query_dep_package_group_parent_label_kind"
+argv = ["query", "--output=label_kind", "@dep//:pg_parent"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["package group @dep//:pg_parent"]
+
+[[commands]]
+name = "query_dep_package_group_parent_deps"
+argv = ["query", "deps(@dep//:pg_parent)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:pg_leaf", "@dep//:pg_parent"]
+
+[[commands]]
+name = "query_dep_package_group_cycle_deps"
+argv = ["query", "deps(@dep//:pg_cycle_a)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:pg_cycle_a", "@dep//:pg_cycle_b"]

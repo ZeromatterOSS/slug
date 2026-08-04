@@ -879,9 +879,13 @@ fn external_package_graph_from_targets(
     // test_suite in this external slice, so it never causes a source node to
     // appear or admits an unsupported `Other` member to `tests()`.
     validate_external_test_suite_memberships(package, targets)?;
+    // Package-group includes are the only retained external group traversal.
+    // Validate them before generic source synthesis so an include can neither
+    // discover a source nor take a permissive edge fallback.
+    validate_external_package_group_includes(package, targets)?;
 
     for target in targets {
-        let effective_visibility = match &target.visibility {
+        let target_effective_visibility = match &target.visibility {
             VisibilitySource::Declared(visibility) => visibility.clone(),
             VisibilitySource::PackageDefault => default_visibility.clone(),
             VisibilitySource::AlwaysPublic => RuleVisibility::Public,
@@ -892,12 +896,18 @@ fn external_package_graph_from_targets(
                 )));
             }
         };
-        if !effective_visibility.dependency_labels().is_empty() {
+        if !target_effective_visibility.dependency_labels().is_empty() {
             return Err(QueryError::evaluation(format!(
                 "external repository visibility edges are deferred: {}//{}:{}",
                 canonical_repo, package, target.name
             )));
         }
+        let (effective_visibility, visibility_source) = match &target.kind {
+            PackageTargetKind::PackageGroup { .. } => {
+                (RuleVisibility::Public, VisibilitySource::AlwaysPublic)
+            }
+            _ => (target_effective_visibility, target.visibility.clone()),
+        };
         let label =
             QueryLabel::in_external_package(canonical_repo, apparent_repo, package, &target.name)?;
         let rule_capability = target.rule_capability().cloned();
@@ -1020,6 +1030,31 @@ fn external_package_graph_from_targets(
                     .into(),
                 )
             }
+            PackageTargetKind::PackageGroup { includes, .. } => {
+                let includes = includes
+                    .iter()
+                    .map(|include| {
+                        external_package_group_include_label(
+                            canonical_repo,
+                            apparent_repo,
+                            package,
+                            include,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                (
+                    QueryNodeKind::PackageGroup,
+                    includes
+                        .into_iter()
+                        .map(|target| QueryEdge {
+                            kind: QueryEdgeKind::PackageGroupInclude,
+                            target,
+                        })
+                        .collect::<Vec<_>>()
+                        .into(),
+                    Arc::from([]),
+                )
+            }
             _ => {
                 return Err(QueryError::evaluation(format!(
                     "external repository rule graph is deferred: {}//{}:{}",
@@ -1042,8 +1077,11 @@ fn external_package_graph_from_targets(
                 test_metadata,
                 build_file: build_file.clone(),
                 effective_visibility,
-                visibility_source: target.visibility.clone(),
-                package_group_contents: None,
+                visibility_source,
+                package_group_contents: match &target.kind {
+                    PackageTargetKind::PackageGroup { contents, .. } => Some(contents.clone()),
+                    _ => None,
+                },
                 edges,
                 attributes,
             },
@@ -1142,6 +1180,72 @@ fn external_package_graph_from_targets(
         package: CompactString::new(package.as_str()),
         nodes,
     })
+}
+
+fn validate_external_package_group_includes(
+    package: &PackagePath,
+    targets: &[slug_loading_v2::PackageTarget],
+) -> Result<(), QueryError> {
+    for target in targets {
+        let PackageTargetKind::PackageGroup { includes, .. } = &target.kind else {
+            continue;
+        };
+        for include in includes.iter() {
+            let include_package = include.package();
+            if !include_package.repo().is_root() || include_package.package() != package {
+                let deferred = if include_package.repo().is_root() {
+                    "cross-package"
+                } else {
+                    "named-repository"
+                };
+                return Err(QueryError::evaluation(format!(
+                    "external repository package_group {deferred} include is deferred: {include}"
+                )));
+            }
+            let Some(include_target) = targets
+                .iter()
+                .find(|candidate| candidate.name == include.target().as_str())
+            else {
+                return Err(QueryError::evaluation(format!(
+                    "external repository package_group missing include is deferred: {include}"
+                )));
+            };
+            match &include_target.kind {
+                PackageTargetKind::PackageGroup { .. } => {}
+                PackageTargetKind::Alias { .. } => {
+                    return Err(QueryError::evaluation(format!(
+                        "external repository package_group alias include is deferred: {include}"
+                    )));
+                }
+                _ => {
+                    return Err(QueryError::evaluation(format!(
+                        "external repository package_group non-package-group include is deferred: {include}"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn external_package_group_include_label(
+    canonical_repo: &CanonicalRepoName,
+    apparent_repo: &ApparentRepoName,
+    package: &PackagePath,
+    include: &CanonicalLabel,
+) -> Result<QueryLabel, QueryError> {
+    let include_package = include.package();
+    if include_package.repo().is_root() && include_package.package() == package {
+        return QueryLabel::in_external_package(
+            canonical_repo,
+            apparent_repo,
+            package,
+            include.target().as_str(),
+        );
+    }
+    Err(QueryError::evaluation(format!(
+        "external repository package_group include is deferred: {include}"
+    )))
 }
 
 fn validate_external_test_suite_memberships(
@@ -1658,22 +1762,44 @@ fn label_in_package(package: &str, target: &str) -> Result<QueryLabel, QueryErro
 #[cfg(test)]
 mod graph_tests {
     use std::collections::hash_map::DefaultHasher;
+    use std::fs;
     use std::hash::Hash;
     use std::hash::Hasher;
     use std::path::Path;
     use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::atomic::Ordering;
+    use std::time::SystemTime;
 
+    use dice::DetectCycles;
+    use dice::Dice;
+    use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+    use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+    use slug_bzlmod_v2::LockfileMode;
+    use slug_bzlmod_v2::inject_root_module_request_inputs;
     use slug_identity_v2::ApparentLabel;
     use slug_identity_v2::ApparentRepoName;
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
     use slug_identity_v2::PackagePath;
+    use slug_loading_v2::BzlModuleEvaluator;
     use slug_loading_v2::PackageTarget;
     use slug_loading_v2::PackageTargetKind;
     use slug_loading_v2::RuleVisibility;
     use slug_loading_v2::TestRuleKind;
     use slug_loading_v2::TestSuiteMembership;
     use slug_loading_v2::VisibilitySource;
+    use slug_loading_v2::keys::WorkspaceDirectoryEntry;
+    use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
+    use slug_loading_v2::keys::WorkspaceDirectoryValue;
+    use slug_workspace_v2::WorkspaceDirectorySnapshot;
+    use slug_workspace_v2::WorkspaceDirectorySnapshotKey;
+    use slug_workspace_v2::WorkspaceFileValue;
+    use slug_workspace_v2::WorkspaceRawFileValue;
+    use slug_workspace_v2::WorkspaceRawSnapshot;
+    use slug_workspace_v2::WorkspaceRawSnapshotKey;
+    use slug_workspace_v2::WorkspaceSnapshot;
+    use slug_workspace_v2::WorkspaceSnapshotKey;
 
     use super::QueryEdgeKind;
     use super::QueryLabel;
@@ -2118,6 +2244,345 @@ mod graph_tests {
                 .to_string()
                 .contains("test_suite implicit tests are deferred")
         );
+    }
+
+    #[test]
+    fn external_package_group_projection_retains_opaque_contents_and_include_cycles() {
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let source = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let contents = Arc::new(slug_loading_v2::PackageGroupContents::default());
+        let group = |name: &str, includes: Vec<CanonicalLabel>| PackageTarget {
+            name: name.to_owned(),
+            kind: PackageTargetKind::PackageGroup {
+                contents: contents.clone(),
+                includes: includes.into(),
+            },
+            // Package groups are always public in loaded Bazel metadata. Use
+            // package default here to prove the external projection preserves
+            // their native public-node convention rather than default rules.
+            visibility: VisibilitySource::PackageDefault,
+        };
+        let graph = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            Path::new("/external/dep+/BUILD.bazel"),
+            &RuleVisibility::Private,
+            &[
+                group("empty", vec![]),
+                group("leaf", vec![]),
+                group("parent", vec![source("leaf"), source("leaf")]),
+                group("cycle_a", vec![source("cycle_b")]),
+                group("cycle_b", vec![source("cycle_a")]),
+            ],
+        )
+        .unwrap();
+        let label = |target| {
+            QueryLabel::in_external_package(&canonical_repo, &apparent_repo, &package, target)
+                .unwrap()
+        };
+        let empty = graph.nodes.get(&label("empty")).unwrap();
+        assert_eq!(
+            graph.nodes.len(),
+            6,
+            "only BUILD plus declared groups exist"
+        );
+        assert_eq!(empty.kind, QueryNodeKind::PackageGroup);
+        assert_eq!(empty.label.to_string(), "@@dep+//:empty");
+        assert_eq!(empty.label.output_label(), "@dep//:empty");
+        assert!(empty.rule_capability.is_none());
+        assert!(empty.test_metadata.is_none());
+        assert!(empty.attributes.is_empty());
+        assert!(empty.edges.is_empty());
+        assert_eq!(empty.effective_visibility, RuleVisibility::Public);
+        assert_eq!(empty.visibility_source, VisibilitySource::AlwaysPublic);
+        assert!(Arc::ptr_eq(
+            empty.package_group_contents.as_ref().unwrap(),
+            &contents
+        ));
+
+        let parent = graph.nodes.get(&label("parent")).unwrap();
+        assert!(Arc::ptr_eq(
+            parent.package_group_contents.as_ref().unwrap(),
+            &contents
+        ));
+        assert_eq!(
+            parent
+                .edges
+                .iter()
+                .map(|edge| (edge.kind, edge.target.output_label().to_string()))
+                .collect::<Vec<_>>(),
+            [
+                (QueryEdgeKind::PackageGroupInclude, "@dep//:leaf".to_owned()),
+                (QueryEdgeKind::PackageGroupInclude, "@dep//:leaf".to_owned()),
+            ]
+        );
+        for (group_name, include) in [("cycle_a", "cycle_b"), ("cycle_b", "cycle_a")] {
+            let node = graph.nodes.get(&label(group_name)).unwrap();
+            assert_eq!(
+                node.edges
+                    .iter()
+                    .map(|edge| (edge.kind, edge.target.output_label().to_string()))
+                    .collect::<Vec<_>>(),
+                [(
+                    QueryEdgeKind::PackageGroupInclude,
+                    format!("@dep//:{include}"),
+                )]
+            );
+        }
+    }
+
+    #[test]
+    fn external_package_group_projection_rejects_unsupported_includes_before_source_synthesis() {
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let source = |label| CanonicalLabel::parse(label).unwrap();
+        let contents = Arc::new(slug_loading_v2::PackageGroupContents::default());
+        let project = |include: CanonicalLabel, other: PackageTargetKind| {
+            external_package_graph_from_targets(
+                &canonical_repo,
+                &apparent_repo,
+                &package,
+                Path::new("/external/dep+/BUILD.bazel"),
+                &RuleVisibility::Private,
+                &[
+                    PackageTarget {
+                        name: "group".to_owned(),
+                        kind: PackageTargetKind::PackageGroup {
+                            contents: contents.clone(),
+                            includes: Arc::from([include]),
+                        },
+                        visibility: VisibilitySource::AlwaysPublic,
+                    },
+                    PackageTarget {
+                        name: "member".to_owned(),
+                        kind: other,
+                        visibility: VisibilitySource::PackageDefault,
+                    },
+                ],
+            )
+        };
+        let missing = project(source("@@//:missing"), PackageTargetKind::ExportedFile).unwrap_err();
+        assert!(
+            missing
+                .to_string()
+                .contains("package_group missing include is deferred")
+        );
+        let non_group =
+            project(source("@@//:member"), PackageTargetKind::ExportedFile).unwrap_err();
+        assert!(
+            non_group
+                .to_string()
+                .contains("package_group non-package-group include is deferred")
+        );
+        let alias = project(
+            source("@@//:member"),
+            PackageTargetKind::Alias {
+                actual: source("@@//:source.txt"),
+            },
+        )
+        .unwrap_err();
+        assert!(
+            alias
+                .to_string()
+                .contains("package_group alias include is deferred")
+        );
+        let cross_package =
+            project(source("@@//other:member"), PackageTargetKind::ExportedFile).unwrap_err();
+        assert!(
+            cross_package
+                .to_string()
+                .contains("package_group cross-package include is deferred")
+        );
+        let named_repository =
+            project(source("@@other+//:member"), PackageTargetKind::ExportedFile).unwrap_err();
+        assert!(
+            named_repository
+                .to_string()
+                .contains("package_group named-repository include is deferred")
+        );
+        let unsupported = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            Path::new("/external/dep+/BUILD.bazel"),
+            &RuleVisibility::Private,
+            &[PackageTarget {
+                name: "generated.txt".to_owned(),
+                kind: PackageTargetKind::GeneratedFile {
+                    label: source("@@//:generated.txt"),
+                    generating_rule: "producer".into(),
+                },
+                visibility: VisibilitySource::PackageDefault,
+            }],
+        )
+        .unwrap_err();
+        assert!(
+            unsupported
+                .to_string()
+                .contains("external repository rule graph is deferred")
+        );
+    }
+
+    #[tokio::test]
+    async fn external_package_group_projection_retains_loaded_nonempty_contents_opaquely() {
+        static NEXT_WORKSPACE: AtomicU64 = AtomicU64::new(0);
+        let nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let serial = NEXT_WORKSPACE.fetch_add(1, Ordering::Relaxed);
+        let workspace =
+            std::env::temp_dir().join(format!("slug-external-package-group-{nanos}-{serial}",));
+        fs::create_dir_all(&workspace).unwrap();
+        let module = workspace.join("MODULE.bazel");
+        let build = workspace.join("BUILD.bazel");
+        let module_source = "module(name = \"dep\")\n";
+        let build_source = "package_group(name = \"pg_empty\")\npackage_group(name = \"pg_nonempty\", packages = [\"//pkg\", \"//tree/...\", \"-//blocked\", \"-//blocked_tree/...\", \"public\", \"private\"])\n";
+        fs::write(&module, module_source).unwrap();
+        fs::write(&build, build_source).unwrap();
+
+        let files = WorkspaceSnapshot {
+            files: Arc::new(
+                [
+                    (
+                        module.clone(),
+                        WorkspaceFileValue::Present(Arc::new(module_source.to_owned())),
+                    ),
+                    (
+                        build.clone(),
+                        WorkspaceFileValue::Present(Arc::new(build_source.to_owned())),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        };
+        let raw_files = Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(
+                [
+                    (
+                        module.clone(),
+                        WorkspaceRawFileValue::Present(Arc::from(module_source.as_bytes())),
+                    ),
+                    (
+                        build.clone(),
+                        WorkspaceRawFileValue::Present(Arc::from(build_source.as_bytes())),
+                    ),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+        });
+        let directories = WorkspaceDirectorySnapshot {
+            directories: Arc::new(
+                [(
+                    workspace.clone(),
+                    WorkspaceDirectoryValue::present(vec![
+                        WorkspaceDirectoryEntry {
+                            name: "MODULE.bazel".into(),
+                            kind: WorkspaceDirectoryEntryKind::RegularFile,
+                        },
+                        WorkspaceDirectoryEntry {
+                            name: "BUILD.bazel".into(),
+                            kind: WorkspaceDirectoryEntryKind::RegularFile,
+                        },
+                    ]),
+                )]
+                .into_iter()
+                .collect(),
+            ),
+        };
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                Arc::new(files),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                raw_files,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceDirectorySnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                Arc::new(directories),
+            )])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            &workspace,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let loaded = BzlModuleEvaluator::new(&workspace)
+            .unwrap()
+            .evaluate_package(&mut transaction, &workspace)
+            .await
+            .unwrap();
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let graph = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            &loaded.build_file,
+            &loaded.default_visibility,
+            &loaded.targets,
+        )
+        .unwrap();
+        let label = |target| {
+            QueryLabel::in_external_package(&canonical_repo, &apparent_repo, &package, target)
+                .unwrap()
+        };
+        let empty = graph
+            .nodes
+            .get(&label("pg_empty"))
+            .unwrap()
+            .package_group_contents
+            .as_ref()
+            .unwrap();
+        assert!(empty.exact_positive().is_empty());
+        assert!(empty.subtree_positive().is_empty());
+        assert!(!empty.positive_all());
+        assert!(empty.exact_negative().is_empty());
+        assert!(empty.subtree_negative().is_empty());
+        assert!(!empty.has_private());
+
+        // Inspect only the retained representation; do not call
+        // `contains_package` or otherwise evaluate package-group contents in
+        // an external repository identity context.
+        let nonempty = graph
+            .nodes
+            .get(&label("pg_nonempty"))
+            .unwrap()
+            .package_group_contents
+            .as_ref()
+            .unwrap();
+        assert_eq!(nonempty.exact_positive().len(), 1);
+        assert_eq!(nonempty.subtree_positive().len(), 1);
+        assert!(nonempty.positive_all());
+        assert_eq!(nonempty.exact_negative().len(), 1);
+        assert_eq!(nonempty.subtree_negative().len(), 1);
+        assert!(nonempty.has_private());
+        fs::remove_dir_all(&workspace).unwrap();
     }
 
     #[test]

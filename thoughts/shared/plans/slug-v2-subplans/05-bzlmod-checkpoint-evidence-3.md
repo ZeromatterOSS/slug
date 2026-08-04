@@ -15381,3 +15381,50 @@ filesystem observation, package enumeration, loads/globs, configuration,
 analysis, build/execution, JVM, Java bytecode, or Bazel delegation. Reverse
 and provenance query breadth remains deferred unless its existing generic
 graph implementation is independently shown exact for this projection.
+
+### Direct external-repository package-group query accepted
+
+Status: **ACCEPT AFTER CORRECTION** for
+`WP-5-m1-external-repository-package-group-query` on 2026-08-04. The first
+independent terminal implementation review found that the private projection
+test retained only default-empty contents while the loaded nonempty group was
+not structurally inspected. A focused correction now loads empty and nonempty
+groups through `BzlModuleEvaluator`, projects that loaded target batch through
+the external graph path, and proves retained exact/subtree positive and
+negative forms plus `public` and `private` flags without evaluating package
+membership. Correction rereview returned `ACCEPT`.
+
+Production changed only `app/slug_query_v2/src/graph.rs`. The direct external
+projector prevalidates every include before generic source synthesis, accepts
+only root-context same-package native groups from the same loaded batch,
+remaps them to canonical external identity with route-local apparent
+rendering, and preserves ordered duplicate include edges and finite cycles.
+Nodes reuse the retained contents opaquely, expose package-group kind, remain
+public with no visibility attribute/edge, and add no capability, test
+metadata, query attribute, DICE key, route, loader, or consumer.
+
+The existing `module-local-override` fixture gained six declarations and
+exactly four commands, with no asset. The 13 protected normalized rows remain
+unchanged. Bazel 9.2 generation at
+`/tmp/slug-external-package-group-oracle.Ij1k22/runs/module-local-override/20260804-011618-1043800-bazel`
+and distinct-root replay at
+`/tmp/slug-external-package-group-replay.C3nEK5/runs/module-local-override/20260804-011649-1047085-bazel`
+both passed. A rebuilt Slug binary matched the parent literal, package-group
+kind, parent dependency order, and finite two-node cycle rows. The full Slug
+fixture remains red only at the pre-existing external-build row.
+
+Three focused private projection tests, the direct external lifecycle test,
+unchanged root package-group/visibility tests, and the named CLI/server
+external regressions passed. Formatting, diff, archive, exact-scope,
+no-Cargo, public-owner, JVM/bytecode, and Bazel-delegation guards passed.
+Missing, non-group, alias, cross-package, named-repository includes and the
+generic unsupported target kind all retain bounded stops before discovery.
+
+The next packet is design only:
+`WP-5-m1-external-repository-test-rule-query-design`. Freeze the smallest
+observable direct-local-override slice that loads one same-repository `.bzl`
+test-rule definition and projects its literal/kind/test metadata without
+analysis or execution. Decide from Bazel 9.2 evidence and the existing loader
+owners whether one direct `test_suite` membership belongs in that same slice
+or must remain a follow-on. This is a new external-load/identity boundary and
+requires reserved-boundary pre-review before implementation.
