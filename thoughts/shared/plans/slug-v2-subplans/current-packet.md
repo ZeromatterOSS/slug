@@ -1,43 +1,66 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-external-repository-package-group-query-design`
+Packet: `WP-5-m1-external-repository-package-group-query`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted direct external source/filegroup/alias/config-setting and
-suite-only test-suite queries; accepted root `PackageGroupContents`, includes
-edges, visibility evaluation, and query graph representation; Bazel 9.2 oracle
-infrastructure and complete external route/no-legacy guards
-Validation tier: design-only source/oracle reconciliation plus independent
-terminal design review
+Evidence: accepted corrected standalone external package-group design; live
+Bazel 9.2 empty/nonempty/parent/cycle literal, kind, dependency, labels, and
+visibility probes; pinned package-group/label-visitation source; accepted root
+contents/includes graph representation; accepted external query spine and
+fixture-hygiene checkpoint
+Validation tier: one-file private query projection plus focused public
+query/core and four exact Bazel/Slug oracle rows
 
-Design only a bounded standalone external native `package_group` query slice.
-Do not edit Rust, Cargo metadata, fixtures, generated oracle JSON, protocol,
-or another implementation file. Start from live `PackageTargetKind::PackageGroup`,
-`PackageGroupContents`, the root graph projection, includes edges, visibility
-consumers, and the current external prohibition on visibility dependency
-labels.
+Implement only the accepted standalone external native `package_group`
+projection in `app/slug_query_v2/src/graph.rs`. Reuse
+`PackageTargetKind::PackageGroup`, its `Arc<PackageGroupContents>`, the accepted
+external graph/key, and existing query/render consumers. Treat contents as
+opaque retained data: do not evaluate, reparse, enumerate, discover, render,
+or claim exact external repository identity for package specifications.
 
-Collect exact Bazel 9.2 direct-local-override evidence for package groups with
-empty and nonempty `packages`, direct same-package `includes`, and an include
-cycle. Probe literal output, `--output=label_kind`, `deps`, and any existing
-node-local attribute or visibility consumer that would automatically become
-active. Reconcile live behavior with accepted root fixtures and pinned Bazel
-source, including ordering, duplicate rejection, negative/recursive package
-specs, includes traversal, cycle handling, and apparent/canonical rendering.
+Before generic source synthesis, require every include to be a root-context
+same-package label resolving in the same loaded target batch to another native
+`PackageGroup`. Remap it to canonical external identity with selected apparent
+rendering. Preserve source order and duplicates in
+`PackageGroupInclude` edges; accept direct chains and cycles. Project
+`QueryNodeKind::PackageGroup`, the retained contents, no rule capability/test
+metadata/query attribute, and public visibility with no visibility edge.
 
-The proposed contract must decide whether a useful standalone projection can
-remain independent of rule visibility edges and external package-pattern
-discovery. State exact accepted contents/include forms, graph kind/edges,
-identity/rendering, observable query surface, lifecycle/publication, stop
-gates, implementation/test/fixture allowlist, and serial validation. Keep
-`visible()`, rule visibility labels, cross-package/repository includes, and
-any package discovery stopped unless exact evidence proves they require no new
-owner.
+Production allowlist: `app/slug_query_v2/src/graph.rs`. Tests may change only
+that file and `app/slug_core_v2/src/runtime/dice.rs`. Oracle changes are
+limited to the existing `module-local-override` fixture TOML,
+`workspace/dep/BUILD.bazel`, and expected JSON; add no asset or fixture. Do not
+alter Cargo metadata, public APIs, DICE keys, repository routes,
+loading/source owners, CLI/server adapters, protocol, formatters, contents
+representation, visibility evaluation, analysis, actions, or execution.
 
-Stop and `REPLAN` if parity needs a new retained representation/key, external
-package-pattern discovery, another repository route, visibility dependency
-loading, filesystem observation, loads/globs, configuration, analysis,
-build/execution, JVM, Java bytecode, or Bazel delegation. Append the proposed
-contract only to the owner plan, obtain independent terminal design review,
-and advance the canonical/current packet only after acceptance. Make no
-implementation change in this packet.
+Extend the fixture with empty, nonempty, leaf/parent, and two cyclic package
+groups. Add exactly four commands: parent literal, parent
+`--output=label_kind`, `deps(parent)`, and `deps(cycle_a)`. Exact outputs are
+the apparent parent label, `package group` kind, leaf then parent, and the two
+cycle labels. Protect all 13 existing normalized rows. The bounded sixth-packet
+hygiene review found every existing row discriminating; add no other row or
+asset.
+
+Focused structural/public evidence must prove opaque retained empty and
+positive/negative/exact/recursive/public/private contents shape without
+evaluating it; canonical/apparent labels; public kind; no attributes,
+capability, metadata, or visibility edges; source-ordered includes; finite
+chains/cycles; lifecycle reuse and source noninvalidation. Prove missing,
+non-package-group, alias, cross-package, and named-repository includes stop
+before generic source synthesis/discovery. Preserve all accepted external
+source/filegroup/alias/config-setting/test-suite behavior and stop gates.
+
+Do not activate `labels(packages|includes, ...)`, external rule visibility,
+`visible()` content evaluation, package discovery, alias include resolution,
+or cross-route traversal. Stop and `REPLAN` if parity needs exact external
+contents identity/evaluation, another representation/key/owner/route,
+filesystem observation, loads/globs/patterns, configuration, analysis,
+build/execution, JVM, Java bytecode, or Bazel delegation.
+
+Finish with focused serial query/core/CLI/server external tests, unchanged
+root package-group/visibility tests, four-row Bazel generation and
+distinct-root replay, rebuilt `slug_cli_v2` direct Slug replay, formatting,
+`git diff --check`, archive/scope/no-Cargo and forbidden-owner scans, and one
+independent terminal implementation review. Do not run a broad Cargo suite for
+this packet.

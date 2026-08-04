@@ -15185,3 +15185,199 @@ The next packet is
 standalone package-group contents/includes are already retained, but their
 query projection interacts with visibility and package-pattern semantics that
 the current external slice deliberately stops.
+
+## WP-5-m1 external native `package_group` query design (2026-08-04)
+
+**Status: ACCEPT AFTER CORRECTION; implementation remains a separate packet.**
+This contract is only for a direct `local_path_override` external package whose
+already loaded target batch contains standalone native `package_group` targets.
+It deliberately does not make an external package group a rule-visibility
+dependency or a package-pattern discovery mechanism. The first independent
+review corrected repository-identity wording for package contents and removed
+an unsupported claim that Bazel source rejects alias includes. The contract
+now keeps contents opaque until identity is proven and requires explicit
+pre-synthesis include stop tests. Correction rereview returned `ACCEPT` on
+2026-08-04.
+
+### Bazel 9.2 direct-local-override evidence
+
+A temporary root module used:
+
+```starlark
+bazel_dep(name = "dep", version = "1.0.0")
+local_path_override(module_name = "dep", path = "dep")
+```
+
+Its `dep/BUILD.bazel` declared an empty group, a nonempty group with exact,
+recursive, negative-exact, negative-recursive, `public`, and `private`
+specifications, a same-package `parent` including `:leaf`, and a two-node
+same-package include cycle. Each command used a fresh output-user root and
+`/tmp/slug-bazel-9.2-metrics-wrapper --batch --ignore_all_rc_files` from
+`/tmp/slug-pg-design.3IuSaE`; all listed commands exited 0.
+
+| query | exact stdout |
+| --- | --- |
+| `query @dep//:empty` | `@dep//:empty` |
+| `query @dep//:nonempty` | `@dep//:nonempty` |
+| `query @dep//:parent` | `@dep//:parent` |
+| `query --output=label_kind @dep//:empty` | `package group @dep//:empty` |
+| `query --output=label_kind @dep//:nonempty` | `package group @dep//:nonempty` |
+| `query --output=label_kind @dep//:parent` | `package group @dep//:parent` |
+| `query 'deps(@dep//:empty)'` | `@dep//:empty` |
+| `query 'deps(@dep//:nonempty)'` | `@dep//:nonempty` |
+| `query 'deps(@dep//:parent)'` | `@dep//:leaf` then `@dep//:parent` |
+| `query 'deps(@dep//:cycle_a)'` | `@dep//:cycle_a` then `@dep//:cycle_b` |
+| `query 'labels(packages, @dep//:nonempty)'` | empty (`INFO: Empty results`) |
+| `query 'labels(includes, @dep//:parent)'` | empty (`INFO: Empty results`) |
+
+`visible(//viewer:caller, @dep//:parent)`,
+`visible(//other:caller, @dep//:parent)`, and
+`visible(//viewer:caller, @dep//:cycle_a)` each returned the group target:
+the group target itself is public. This is not evidence to activate external
+rule visibility: `visible(//viewer:caller, //:root)`, where `//:root` named
+`@dep//:parent` in its `visibility`, was empty because the dependency's package
+patterns name its own repository, not the root caller packages.
+
+The pinned source is Bazel `8220c6198837d5c13d53fea211cf3282aa12408a`:
+
+- `src/main/java/com/google/devtools/build/lib/packages/PackageGroup.java`
+  lines 42-80 preserves the supplied `includes` list and turns the `packages`
+  strings into `PackageGroupContents`; lines 152-161 make package groups
+  always public and hide that implementation detail from raw visibility
+  introspection.
+- `src/main/java/com/google/devtools/build/lib/packages/StarlarkNativeModule.java`
+  lines 524-555 type-checks `packages` as strings and `includes` as labels;
+  duplicate target names still take the normal `NameConflictException` path.
+  `PackageSpecification.java` lines 453-590 documents deterministic but
+  potentially deduplicated package-spec storage, separates negative/exact/
+  recursive forms, and tests negatives before positives. Thus this packet must
+  preserve the retained semantic contents, not invent a source-order
+  `packages` query attribute or a duplicate diagnostic not supported by the
+  target model.
+- `src/main/java/com/google/devtools/build/lib/packages/LabelVisitationUtils.java`
+  lines 77-80 and 128-132 expose only `includes` as dependency traversal
+  edges, with no query attribute. This matches the two empty `labels(...)`
+  probes and the `deps` closure above.
+- `src/main/java/com/google/devtools/build/lib/query2/query/BlazeTargetAccessor.java`
+  lines 157-211 recursively loads rule-visibility package groups, folds their
+  contents, and terminates an include cycle by `seen`. That is the separate
+  visibility-loading route which this projection must not activate.
+
+Accepted root evidence already fixes the retained and query graph conventions:
+`app/slug_loading_v2/src/package.rs` lines 250-271 retains
+`PackageTargetKind::PackageGroup { contents, includes }`; its recorder at
+lines 618-634 parses contents and canonicalizes include labels. The root
+projector in `app/slug_query_v2/src/graph.rs` lines 604-610 and 749-758 sets
+`package_group_contents`, emits `QueryNodeKind::PackageGroup`, and creates
+only ordered `PackageGroupInclude` edges. The structural root test
+`app/slug_query_v2/tests/loading_query.rs` around lines 1028-1139 fixes this
+shape; `app/slug_loading_v2/tests/build_file_loading.rs`
+`visibility_and_package_group_shapes_retain_bazel_producer_provenance` (lines
+581-815) covers positive/negative exact/recursive contents, `public`/
+`private`, canonical same-package includes, and `contains_package` behavior.
+The accepted `query-visible-visibility` fixture proves root include-cycle
+termination and graph retention (`deps_package_group_include_cycle_retains_graph`)
+without requiring an external route.
+
+### Decision: exact useful Rust-only projection exists
+
+**Yes.** A standalone external projection is exact for literal target lookup,
+`--output=label_kind`, and forward graph functions including `deps`, while
+remaining independent of rule visibility edges and package discovery. Its
+only externally observable graph relationship is the already retained direct
+include label. `packages` is semantic data consumed by visibility, not a label
+attribute; Bazel exposes neither `packages` nor `includes` to `labels()`.
+Consequently the current root graph's lack of an `includes` `QueryAttribute`
+is correct and must remain unchanged.
+
+### Proposed bounded implementation contract
+
+1. Extend only the existing private direct-external projector in
+   `app/slug_query_v2/src/graph.rs` (the same abstraction that projects the
+   accepted source/filegroup/alias/config-setting/test-suite kinds). Accept
+   `PackageTargetKind::PackageGroup` from the single already loaded external
+   target batch. Reuse its `Arc<PackageGroupContents>` unchanged and emit
+   `QueryNodeKind::PackageGroup`, no rule capability, no query attributes, and
+   ordered `QueryEdgeKind::PackageGroupInclude` edges.
+2. Accept empty or nonempty retained contents as opaque, unconsumed data only.
+   In Bazel, package specifications are interpreted in the dependency
+   repository's package-identity context; they may contain exact/subtree
+   positive and negative forms and Bazel-9 `public` / `private` forms. This
+   packet neither evaluates nor asserts that the current Slug contents have
+   exact external repository identity. Do not reparse, enumerate, render,
+   discover, or otherwise turn contents into package labels. Existing loader
+   validation remains the authority for malformed forms and duplicate
+   declaration rejection; source does not promise package-spec list order or
+   duplicate preservation. REPLAN before any external content evaluation or
+   visibility use until external repository identity is proven exact.
+3. Accept only direct same-package includes whose canonical target is another
+   `PackageTargetKind::PackageGroup` in the same external loaded batch. Remap
+   canonical identity to the selected external repository route and retain
+   route-local apparent rendering (`@dep//:name`), exactly as the accepted
+   external graph projection does for other same-package links. Preserve
+   source order in edges; do not deduplicate or reject a cycle. The generic
+   query visited set gives the Bazel-observed finite `deps` closure.
+4. Before generic source synthesis or any permissive edge fallback, reject an
+   include that is missing, points to another kind, is an alias, crosses
+   package/repository, or cannot be represented on the selected direct route.
+   Alias inputs are a deliberately unsupported bounded input in this packet,
+   not a claim about Bazel's source semantics. This must be a bounded
+   unsupported diagnostic, not a discovery attempt. Focused external-projector
+   tests must prove that missing, non-package-group, alias, cross-package, and
+   named-repository includes all stop before generic source synthesis or
+   discovery.
+5. Preserve the external slice's current package-group default: group target
+   visibility is public with no `visibility` QueryAttribute and no
+   `VisibilityNodep` edge. Do not enable dependency labels in external rule
+   visibility, `visible()`, content evaluation, or the external visibility
+   loading path. The live `visible()` results establish public group-node
+   behavior only; they do not authorize visibility of a root or external rule
+   through a group.
+6. No new query consumer, public API, DICE key/owner, formatter, retained
+   representation, lifecycle event, filesystem observation, loader, package
+   discovery, configuration, analysis, build/execution, JVM, Java bytecode,
+   or Bazel delegation is permitted. Existing literal, label-kind, forward
+   dependency, canonical identity, and apparent rendering consumers read the
+   node directly.
+
+### Follow-on implementation/testing and hygiene allowlist
+
+Only a separately approved implementation packet may change
+`app/slug_query_v2/src/graph.rs`, its targeted private/root structural tests,
+the focused external-query lifecycle test, and the existing
+`tests/v2_oracle/fixtures/module-local-override/{fixture.toml,workspace/dep/BUILD.bazel,expected/oracle.json}`.
+It must keep the protected rows and add no assets. Minimum discriminating
+external oracle growth is four rows: literal `@dep//:parent`, label-kind for
+that parent, `deps(@dep//:parent)`, and `deps(@dep//:cycle_a)`. Structural
+tests—not a fake label attribute—must prove
+the retained nonempty positive/negative/recursive/private/public content
+shape, empty form, source-ordered include edges, same-package canonical/
+apparent remapping, and cycle retention. The direct fixture had 13 commands
+and 458 total TOML/expected/dep-BUILD lines before this design; package group
+would be the sixth accepted external-query packet since the last hygiene
+checkpoint. The bounded review retains the build/source pair as distinct
+command surfaces, the filegroup literal and `srcs`, the alias literal and
+`actual`, the config-setting literal and kind, and the suite
+literal/kind/member/dependency/empty-expansion rows; none duplicates another
+observable. Cap this addition at the four rows above, and require another
+bounded fixture-hygiene review before authorizing any additional package-group
+row or asset.
+
+Serial focused validation for that later packet is: Bazel 9.2 generation and a
+distinct-root replay of protected plus four new rows; rebuild `slug_cli_v2`
+before direct Slug oracle replay; focused query/core/CLI/server external
+tests; the unchanged root package-group/visibility tests; formatting;
+`git diff --check`; no-Cargo/scope guards; and scans for direct filesystem,
+new external visibility, snapshot/root-graph, JVM/bytecode, or Bazel
+delegation owners. No broad Cargo suite is part of this design packet.
+
+### Residual unsupported surface and stop gates
+
+Stop and **REPLAN** rather than broaden if parity requires package-pattern
+discovery, evaluating package-group contents for an external caller, an
+external rule visibility label or `visible()` dependency load, cross-package
+or cross-repository includes, alias/include resolution, a new route/owner/key,
+filesystem observation, package enumeration, loads/globs, configuration,
+analysis, build/execution, JVM, Java bytecode, or Bazel delegation. Reverse
+and provenance query breadth remains deferred unless its existing generic
+graph implementation is independently shown exact for this projection.

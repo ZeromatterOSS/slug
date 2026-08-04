@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, and accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, and suite-only `test_suite` queries; full evidence is in the Stage 5 owner plan | external package-group/visibility and test-rule/member query breadth, native Windows glob ordering, registry transports, and discovery composition remain | design one bounded standalone external `package_group` query slice |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, and suite-only `test_suite` queries, and an accepted standalone external `package_group` design; full evidence is in the Stage 5 owner plan | external package-group visibility/content evaluation and test-rule/member query breadth, native Windows glob ordering, registry transports, and discovery composition remain | implement the bounded standalone external `package_group` query slice |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-repository-package-group-query-design`.
+`WP-5-m1-external-repository-package-group-query`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
