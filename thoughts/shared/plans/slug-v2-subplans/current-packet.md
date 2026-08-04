@@ -1,43 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-module-file-handoff-implementation`
+Packet: `WP-5-m1-direct-local-module-file-handoff-evidence-cap-redesign`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: one-file dormant implementation prerequisite before discovery composition
+Role: read-only evidence-budget correction before implementation retry
 Evidence: accepted direct `local_path_override` route,
 `HostRootModuleFileKey`, `HostRepositorySourceFileKey`, and the accepted
-direct-local handoff design in the owner plan.
+direct-local handoff design plus rejected-draft cap evidence in the owner plan.
 
-Change only `app/slug_bzlmod_v2/src/source_preparation.rs`, including inline
-tests. Add private `DirectLocalModuleFileKey` with identity exactly normalized
-workspace plus validated nonroot apparent repository. It computes
-`RootRepositoryRouteKey` first, then only on complete success computes
-`HostRepositorySourceFileKey` for literal `MODULE.bazel`.
+Do not edit Rust, tests, fixtures, tools, harnesses, or generated evidence.
+Preserve the accepted private `(workspace, apparent_repo)` route-then-source
+key/value/error contract, exact one-file boundary, 100-line production cap,
+unselected semantics, and all stop gates.
 
-The complete value retains the opaque complete route plus the existing Host
-source value, including Present bytes/requested logical path or complete
-Absent. Keep route/source/compute errors distinct and typed. Forward either
-child's Needs unchanged; equality is `complete_eq`, validity complete-only,
-and Need is invalid/self-unequal. Own no event data or bootstrap effect.
+Use the rejected correction only for mechanical accounting: it occupied 349
+net test lines after non-vacuous cold Evaluated/no-data and version-only warm
+Reused/no-data activation evidence. Freeze additional line allocations for
+exact outer-versus-child root-bootstrap Need equality, exact path-observation
+Need equality, and the complete materialization request including canonical
+repository, local logical root, and structural `RepoSpec`. Preserve the
+existing constructor, Present/Absent, distinct typed `RouteCompute`, `Route`,
+`SourceCompute`, and `Source` discriminators, create/edit/delete/recreate,
+same-outer-key reroute/recovery, version pruning, dependency order, and
+no-event assertions.
 
-Do not add or infer a version. This is an unselected source input, not
-`ModuleSourcePreparation`, evaluation, MVS, mapping, or discovery. A stable
-outer key must observe root override A-to-B-to-A through its tracked route and
-route-specific source child; a version-only root edit with unchanged route and
-source must retain the same complete value.
-
-Cap the one-file diff at 100 net production lines, 360 net test lines, and 460
-total. Required evidence is the exact dependency/Need chain, complete
-value/error semantics, requested-path provenance, create/edit/delete/recreate,
-reroute/recovery, version-only pruning, forbidden-key absence, and no event
-ownership. Run focused then full bzlmod tests/doctests, direct loading/core
-checks, bzlmod GNU-Windows no-run, formatting, archive, scope/cap/dependency/
-public-surface/consumer scans, and `git diff --check`, all Cargo commands
-serially. Do not run or edit an oracle.
-
-Stop with **REPLAN** on `ModuleSourcePreparationKey`, legacy root/registry or
-materialization-request keys, selected/hard-coded version, another route,
-registry/JVM transport, MVS/discovery/evaluation, root mapping as final nonroot
-mapping, event/bootstrap-effect ownership, direct IO, public export/caller,
-new dependency, second file, cap excess, configuration, analysis/actions/
-execution, Java bytecode, or Bazel delegation.
+Set the smallest honest test and total caps with explicit arithmetic and
+compaction slack; production remains at 100. No implementation starts before
+independent latest-text acceptance. Stop with **REPLAN** on a second file,
+oracle growth, production/API/semantic widening, removal of a mandatory
+discriminator, or any previously frozen stop.

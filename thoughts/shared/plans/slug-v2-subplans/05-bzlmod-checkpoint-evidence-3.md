@@ -17837,3 +17837,37 @@ registry/JVM transport, MVS/discovery/evaluation, event or bootstrap-effect
 ownership, direct filesystem IO, public export/caller, new dependency, second
 file, cap excess, configuration, analysis/actions/execution, Java bytecode, or
 Bazel delegation.
+
+### WP-5-m1 direct-local module-file handoff cap/evidence replan (2026-08-04)
+
+**Status: REPLAN; no Rust retained.** The one-file draft fit at 97 net
+production lines and 349 net test lines after correction. Its private key,
+route-then-source compute, unselected route/source value, typed errors,
+complete-only equality, and transient Need forwarding were structurally
+sound. Focused source-preparation tests passed. Integration tests, downstream
+checks, doctests, GNU-Windows linkage, formatting, archive, scope, and diff
+gates passed. The full 224-test library surface had 223 passes plus the exact
+pre-existing nonroot proxy-span failure, reproduced unchanged at clean
+`fbb0775d` in a detached worktree.
+
+Independent review rejected the evidence before acceptance. The original
+no-event assertion was vacuous and version-only equality did not prove reuse;
+the correction recorded nonempty cold Evaluated/no-data and version-only warm
+Reused/no-data activations. However, the frozen 360-line test cap could not
+also hold byte-for-byte root-bootstrap and path-observation Need forwarding
+plus full materialization request/`RepoSpec` equality without deleting
+mandatory lifecycle or distinct `RouteCompute`/`Route`/`SourceCompute`/`Source`
+error evidence. The cap stop fired. Root discarded the
+entire one-file draft with a reverse `apply_patch`; the worktree returned
+clean.
+
+Resume only the read-only
+`WP-5-m1-direct-local-module-file-handoff-evidence-cap-redesign`. Preserve the
+accepted production contract, exact one production/test file, 100-line
+production cap, no oracle, and every stop. Reconstruct exact retained test-line
+accounting from the rejected 349-line correction, allocate only the additional
+bootstrap/path/materialization-Need discriminators and any compaction slack,
+preserve all four typed compute/semantic-error discriminators, freeze a new
+test/total cap with hard arithmetic, and obtain independent
+latest-text acceptance before rebuilding Rust. Discarded code supplies
+negative/cap evidence only and receives no validation credit.
