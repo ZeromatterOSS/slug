@@ -1,36 +1,43 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-nonroot-source-preparation-handoff-design`
+Packet: `WP-5-m1-direct-local-module-file-handoff-implementation`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: read-only prerequisite design before discovery composition
+Role: one-file dormant implementation prerequisite before discovery composition
 Evidence: accepted direct `local_path_override` route,
-`HostRootModuleFileKey`, and `HostRepositorySourceFileKey`; live source
-preparation remains on legacy root/registry keys.
+`HostRootModuleFileKey`, `HostRepositorySourceFileKey`, and the accepted
+direct-local handoff design in the owner plan.
 
-Do not edit Rust, tests, fixtures, harnesses, tools, plans, or generated
-evidence. Reconcile the live Host root, direct route, source-preparation,
-registry, resolution, and graph identity owners. Record accepted/reusable,
-present-but-non-owning, and absent/terminally-blocked prerequisites.
+Change only `app/slug_bzlmod_v2/src/source_preparation.rs`, including inline
+tests. Add private `DirectLocalModuleFileKey` with identity exactly normalized
+workspace plus validated nonroot apparent repository. It computes
+`RootRepositoryRouteKey` first, then only on complete success computes
+`HostRepositorySourceFileKey` for literal `MODULE.bazel`.
 
-Decide exactly one question: can the existing direct local-override route
-provide a callerless DICE-owned nonroot preparation input without changing
-`ModuleSourcePreparationKey` or reaching its legacy root/registry branches?
-Freeze the narrow handoff's key identity, complete equality and transient Need
-semantics, requested/logical source provenance, local create/edit/delete/
-recreate and A-to-B-to-A recovery, exact implementation split, evidence, and
-independent review boundary. A successful design does not authorize full
-discovery implementation.
+The complete value retains the opaque complete route plus the existing Host
+source value, including Present bytes/requested logical path or complete
+Absent. Keep route/source/compute errors distinct and typed. Forward either
+child's Needs unchanged; equality is `complete_eq`, validity complete-only,
+and Need is invalid/self-unequal. Own no event data or bootstrap effect.
 
-The audit must account for the current facts: `ModuleSourcePreparationKey`
-expects an upstream selected module/version and computes legacy
-`RootModuleFilesKey`, `RegistryPolicyKey`, and `RegistryFileKey`;
-`ResolvedBzlmodGraphDiceKey` is not a DICE `Key`; no owner performs MVS,
-selected registry `source.json` to `RepoSpec`, final contextual mappings, or
-extension-generated routes.
+Do not add or infer a version. This is an unselected source input, not
+`ModuleSourcePreparation`, evaluation, MVS, mapping, or discovery. A stable
+outer key must observe root override A-to-B-to-A through its tracked route and
+route-specific source child; a version-only root edit with unchanged route and
+source must retain the same complete value.
 
-Stop with **REPLAN** on any legacy root/registry dependency, remote registry or
-JVM transport, MVS or hard-coded selected version, root mapping used as a final
-nonroot mapping, second route, root bootstrap/effect ownership, direct
-filesystem IO, public activation, copied evaluator, new dependency, or an
-unbounded discovery owner.
+Cap the one-file diff at 100 net production lines, 360 net test lines, and 460
+total. Required evidence is the exact dependency/Need chain, complete
+value/error semantics, requested-path provenance, create/edit/delete/recreate,
+reroute/recovery, version-only pruning, forbidden-key absence, and no event
+ownership. Run focused then full bzlmod tests/doctests, direct loading/core
+checks, bzlmod GNU-Windows no-run, formatting, archive, scope/cap/dependency/
+public-surface/consumer scans, and `git diff --check`, all Cargo commands
+serially. Do not run or edit an oracle.
+
+Stop with **REPLAN** on `ModuleSourcePreparationKey`, legacy root/registry or
+materialization-request keys, selected/hard-coded version, another route,
+registry/JVM transport, MVS/discovery/evaluation, root mapping as final nonroot
+mapping, event/bootstrap-effect ownership, direct IO, public export/caller,
+new dependency, second file, cap excess, configuration, analysis/actions/
+execution, Java bytecode, or Bazel delegation.

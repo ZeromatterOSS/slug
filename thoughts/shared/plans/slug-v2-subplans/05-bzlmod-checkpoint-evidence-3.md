@@ -17765,3 +17765,75 @@ gates before Rust. Stop with `REPLAN` on legacy root/registry keys, remote
 registry/JVM transport, MVS or hard-coded selection, a second route, root
 bootstrap effects, direct filesystem IO, public activation, or a copied
 evaluator.
+
+### WP-5-m1 direct-local nonroot source handoff design (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-5-m1-direct-local-module-file-handoff-implementation`.** The handoff is a
+raw unselected MODULE-file input, not `ModuleSourcePreparation` and not a
+discovery result. Add one crate-private
+`DirectLocalModuleFileKey { workspace: NormalizedAbsolutePath, apparent_repo:
+ApparentRepoName }`; its constructor rejects the root repository. Key identity
+is exactly that pair.
+
+The compute order is exact: first `RootRepositoryRouteKey`, then, only after a
+complete successful route, `HostRepositorySourceFileKey(route,
+"MODULE.bazel")`. Forward either child's `SourcePreparationNeeds` unchanged.
+Map DICE-compute, route, and source errors into distinct private typed variants
+without stringifying semantic errors. A complete value retains the opaque
+`RootRepositoryRoute` plus the existing `HostRepositorySourceFileValue`, so
+both `Present { bytes, logical_path }` and `Absent` remain complete source
+states. Equality is `complete_eq`; validity is complete-only; every Need is
+invalid and self-unequal.
+
+The outer key deliberately owns route selection. A stable apparent name whose
+root override changes A-to-B-to-A remains one outer key while its tracked
+route and route-specific source child change and restore. A full-route key
+would merely duplicate `HostRepositorySourceFileKey` and require an upstream
+caller to inject route state. Root-bootstrap Needs produced by the existing
+Host root owner may pass through, but this handoff never creates, applies, or
+owns an effect. It stores, copies, and replays no event batch; event ownership
+remains with `HostRootModuleFileKey`.
+
+`RootRepositoryRoute` intentionally has no version. Direct-local source
+acquisition precedes MVS/selection, so do not add a version, fabricate an empty
+version, or reuse `ModuleSourcePreparationKey` or
+`ModuleSourcePreparation::NonRegistry`. A later discovery/MVS owner must
+combine this unselected source with selected-version and contextual-mapping
+state. A root dependency version-only edit that leaves the direct-local route
+and source unchanged must retain the same handoff result.
+
+Implementation changes only
+`app/slug_bzlmod_v2/src/source_preparation.rs`, including inline tests. Keep
+the key, value, and errors crate-private; add no `lib.rs` reexport or production
+caller. Cap the diff at 100 net production lines, 360 net test lines, and 460
+total. Existing `Arc`, compact names, `NormalizedAbsolutePath`, route/source
+values, `Dupe` where pointer-cheap, and `Allocative` accounting are sufficient;
+do not import a V1/Buck2 utility, create a cache/interner/lock, or add a
+dependency. This follows the Stage 9 retained-evaluator/rewrite ledger row and
+adds no new extraction entry.
+
+Inline evidence must prove constructor/display identity and root rejection;
+the exact route-then-fixed-`MODULE.bazel` dependency chain; no legacy root,
+registry, snapshot, or legacy materialization-request key; byte-for-byte
+transient route/bootstrap/materialization/path Needs; Present route/bytes/
+requested-logical-path retention; complete Absent; typed route/source/compute
+errors; create/edit/delete/recreate and A-to-B-to-A under one retained engine;
+root override reroute/recovery under one outer key; version-only root edit
+pruning; unknown, nodep, and non-local route failures; and capture-enabled
+cold/warm evidence that the handoff owns no evaluation batch.
+
+Run Cargo serially: focused source-preparation tests, complete
+`slug_bzlmod_v2` unit/integration/doctests, direct `slug_loading_v2` and
+`slug_core_v2` checks, and `slug_bzlmod_v2` GNU-Windows no-run. Run formatting,
+archive, exact one-file/cap/dependency/public-surface/consumer/forbidden-key
+scans, and `git diff --check`. Reuse accepted direct-local Bazel 9.2 evidence;
+do not edit or run an oracle.
+
+Stop with `REPLAN` on `ModuleSourcePreparationKey`, legacy
+`RootModuleFilesKey`/`RegistryPolicyKey`/`RegistryFileKey`, a selected or
+hard-coded version, root mapping used as final nonroot mapping, another route,
+registry/JVM transport, MVS/discovery/evaluation, event or bootstrap-effect
+ownership, direct filesystem IO, public export/caller, new dependency, second
+file, cap excess, configuration, analysis/actions/execution, Java bytecode, or
+Bazel delegation.
