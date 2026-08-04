@@ -73,6 +73,7 @@ use crate::host_package::ExternalRepositoryPackageLookupKey;
 use crate::module_eval::NonrootIncludeRequest;
 use crate::module_eval::NonrootModuleFileInspection;
 use crate::module_eval::parse_root_include;
+use crate::module_eval::validate_root_module_source;
 use crate::registry_module_file_url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -1063,6 +1064,439 @@ impl fmt::Display for RepositorySourceFileKey {
             self.repo_relative_path.display()
         )
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct DirectLocalModulePreparationKey(NormalizedAbsolutePath, ApparentRepoName);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalModulePreparation {
+    Supported(DirectLocalModuleClosure),
+    Unsupported(DirectLocalIncludeCycleCapability),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalModuleClosure {
+    root: DirectLocalModuleInspection,
+    fragments: Arc<[DirectLocalIncludeFragment]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalIncludeFragment {
+    package: PackageIdentifier,
+    target: TargetName,
+    raw_label: CompactString,
+    location: crate::LogicalSpan,
+    logical_path: NormalizedAbsolutePath,
+    bytes: Arc<[u8]>,
+    inspection: NonrootModuleFileInspection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalIncludeCycleCapability {
+    package: PackageIdentifier,
+    target: TargetName,
+    repeated_raw_label: CompactString,
+    repeated_location: crate::LogicalSpan,
+    ancestor_raw_label: CompactString,
+    ancestor_location: crate::LogicalSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalModulePreparationError {
+    InspectionCompute {
+        message: Arc<str>,
+    },
+    Inspection(DirectLocalModuleInspectionError),
+    RootValidation {
+        logical_path: NormalizedAbsolutePath,
+        message: CompactString,
+    },
+    Package(DirectLocalIncludePackageHorizonError),
+    Fragment {
+        raw_label: CompactString,
+        location: crate::LogicalSpan,
+        repo_relative_path: Arc<PathBuf>,
+        failure: DirectLocalIncludeFragmentFailure,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalIncludeFragmentFailure {
+    SourceCompute {
+        message: Arc<str>,
+    },
+    Source(RepositorySourceFileError),
+    Absent,
+    Validation {
+        logical_path: NormalizedAbsolutePath,
+        message: CompactString,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalIncludeAncestryEntry {
+    package: PackageIdentifier,
+    target: TargetName,
+    raw_label: CompactString,
+    location: crate::LogicalSpan,
+}
+
+#[derive(Debug, Clone)]
+struct DirectLocalIncludeFrontierEntry {
+    request: NonrootIncludeRequest,
+    ancestry: Arc<[DirectLocalIncludeAncestryEntry]>,
+}
+
+impl DirectLocalModulePreparationKey {
+    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+        (!apparent_repo.is_root()).then_some(Self(workspace, apparent_repo))
+    }
+}
+
+impl fmt::Display for DirectLocalModulePreparationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("direct-local-module-preparation:")?;
+        self.0.fmt(f)?;
+        write!(f, ":@{}", self.1.as_str())
+    }
+}
+
+impl fmt::Display for DirectLocalModulePreparationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InspectionCompute { message } => {
+                write!(
+                    f,
+                    "failed to compute direct-local MODULE inspection: {message}"
+                )
+            }
+            Self::Inspection(error) => {
+                write!(f, "failed to inspect direct-local MODULE: {error}")
+            }
+            Self::RootValidation {
+                logical_path,
+                message,
+            } => write!(
+                f,
+                "failed to validate direct-local MODULE {}: {message}",
+                logical_path.as_path().display()
+            ),
+            Self::Package(error) => fmt::Display::fmt(error, f),
+            Self::Fragment {
+                raw_label,
+                location,
+                repo_relative_path,
+                failure,
+            } => write!(
+                f,
+                "include {raw_label:?} at {}:{}:{} for {} failed: {failure:?}",
+                location.file.0,
+                location.start_line,
+                location.start_column,
+                repo_relative_path.display()
+            ),
+        }
+    }
+}
+
+impl std::error::Error for DirectLocalModulePreparationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Inspection(error) => Some(error),
+            Self::Package(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for DirectLocalModulePreparationKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<DirectLocalModulePreparation, DirectLocalModulePreparationError>>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let inspection = match ctx
+            .compute(
+                &DirectLocalModuleInspectionKey::new(self.0.dupe(), self.1.clone())
+                    .expect("direct preparation key rejects root names"),
+            )
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(inspection)) => inspection,
+            Err(error) => {
+                return direct_local_preparation_error(
+                    DirectLocalModulePreparationError::InspectionCompute {
+                        message: Arc::from(error.to_string()),
+                    },
+                );
+            }
+        };
+        let root = match inspection.as_ref() {
+            Ok(inspection) => inspection.clone(),
+            Err(error) => {
+                return direct_local_preparation_error(
+                    DirectLocalModulePreparationError::Inspection(error.clone()),
+                );
+            }
+        };
+        prepare_direct_local_module(ctx, root).await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+async fn prepare_direct_local_module(
+    ctx: &mut DiceComputations<'_>,
+    root: DirectLocalModuleInspection,
+) -> <DirectLocalModulePreparationKey as Key>::Value {
+    let route = root.0.0.clone();
+    let root_requests = match &root.0.1 {
+        HostRepositorySourceFileValue::Absent => Arc::from([]),
+        HostRepositorySourceFileValue::Present {
+            bytes,
+            logical_path,
+        } => match validate_root_module_source(
+            crate::LogicalModuleFileId::new(logical_path.as_path().display().to_string()),
+            bytes,
+        ) {
+            Ok(inspection) => inspection.includes,
+            Err(message) => {
+                return direct_local_preparation_error(
+                    DirectLocalModulePreparationError::RootValidation {
+                        logical_path: logical_path.dupe(),
+                        message,
+                    },
+                );
+            }
+        },
+    };
+    let mut frontier = root_requests
+        .iter()
+        .cloned()
+        .map(|request| DirectLocalIncludeFrontierEntry {
+            request,
+            ancestry: Arc::from([]),
+        })
+        .collect::<Vec<_>>();
+    let mut fragments = Vec::new();
+    let mut pending_cycle = None;
+
+    while !frontier.is_empty() {
+        let requests = frontier
+            .iter()
+            .map(|entry| entry.request.clone())
+            .collect::<Vec<_>>();
+        let preflight =
+            preflight_direct_local_include_package_horizon(ctx, route.clone(), &requests).await;
+        let preflight = match preflight {
+            SourcePreparationOutcome::Need(need) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Ok(value) => value.clone(),
+                Err(error) => {
+                    return direct_local_preparation_error(
+                        DirectLocalModulePreparationError::Package(error.clone()),
+                    );
+                }
+            },
+        };
+        let paths = preflight
+            .occurrences
+            .iter()
+            .map(direct_local_fragment_relative_path)
+            .collect::<Vec<_>>();
+        let mut unique_paths = SmallSet::with_capacity(paths.len());
+        unique_paths.extend(paths.iter().cloned());
+        let computed = ctx
+            .compute_join(unique_paths, |ctx, repo_relative_path| {
+                let route = route.clone();
+                Box::pin(async move {
+                    let outcome = ctx
+                        .compute(&HostRepositorySourceFileKey::new(
+                            route,
+                            repo_relative_path.clone(),
+                        ))
+                        .await
+                        .map_err(|error| Arc::<str>::from(error.to_string()));
+                    (repo_relative_path, outcome)
+                })
+            })
+            .await;
+        let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
+        let all_need = union_direct_local_fragment_needs(&outcomes);
+
+        let mut next_frontier = Vec::new();
+        for ((entry, occurrence), repo_relative_path) in frontier
+            .iter()
+            .zip(preflight.occurrences.iter())
+            .zip(paths.iter())
+        {
+            let outcome = outcomes
+                .get(repo_relative_path)
+                .expect("every fragment path was computed");
+            let source = match outcome {
+                Err(message) => {
+                    return direct_local_fragment_error(
+                        occurrence,
+                        repo_relative_path,
+                        DirectLocalIncludeFragmentFailure::SourceCompute {
+                            message: message.dupe(),
+                        },
+                    );
+                }
+                Ok(SourcePreparationOutcome::Need(_)) => {
+                    return SourcePreparationOutcome::Need(
+                        all_need.expect("the current fragment contributed a Need"),
+                    );
+                }
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                    return direct_local_fragment_error(
+                        occurrence,
+                        repo_relative_path,
+                        DirectLocalIncludeFragmentFailure::Source(error.clone()),
+                    );
+                }
+                Ok(SourcePreparationOutcome::Complete(Ok(
+                    HostRepositorySourceFileValue::Absent,
+                ))) => {
+                    return direct_local_fragment_error(
+                        occurrence,
+                        repo_relative_path,
+                        DirectLocalIncludeFragmentFailure::Absent,
+                    );
+                }
+                Ok(SourcePreparationOutcome::Complete(Ok(
+                    HostRepositorySourceFileValue::Present {
+                        bytes,
+                        logical_path,
+                    },
+                ))) => (bytes, logical_path),
+            };
+            let logical_id =
+                crate::LogicalModuleFileId::new(source.1.as_path().display().to_string());
+            let inspection = match validate_root_module_source(logical_id, source.0) {
+                Ok(inspection) => inspection,
+                Err(message) => {
+                    return direct_local_fragment_error(
+                        occurrence,
+                        repo_relative_path,
+                        DirectLocalIncludeFragmentFailure::Validation {
+                            logical_path: source.1.dupe(),
+                            message,
+                        },
+                    );
+                }
+            };
+            fragments.push(DirectLocalIncludeFragment {
+                package: occurrence.package.clone(),
+                target: occurrence.target.clone(),
+                raw_label: occurrence.raw_label.clone(),
+                location: occurrence.location.clone(),
+                logical_path: source.1.dupe(),
+                bytes: source.0.dupe(),
+                inspection: inspection.clone(),
+            });
+
+            let repeated = entry.ancestry.iter().position(|ancestor| {
+                ancestor.package == occurrence.package && ancestor.target == occurrence.target
+            });
+            if let Some(index) = repeated {
+                if pending_cycle.is_none() {
+                    let ancestor = &entry.ancestry[index];
+                    pending_cycle = Some(DirectLocalIncludeCycleCapability {
+                        package: occurrence.package.clone(),
+                        target: occurrence.target.clone(),
+                        repeated_raw_label: occurrence.raw_label.clone(),
+                        repeated_location: occurrence.location.clone(),
+                        ancestor_raw_label: ancestor.raw_label.clone(),
+                        ancestor_location: ancestor.location.clone(),
+                    });
+                }
+                continue;
+            }
+
+            let ancestry = entry
+                .ancestry
+                .iter()
+                .cloned()
+                .chain([DirectLocalIncludeAncestryEntry {
+                    package: occurrence.package.clone(),
+                    target: occurrence.target.clone(),
+                    raw_label: occurrence.raw_label.clone(),
+                    location: occurrence.location.clone(),
+                }])
+                .collect::<Arc<[_]>>();
+            next_frontier.extend(inspection.includes.iter().cloned().map(|request| {
+                DirectLocalIncludeFrontierEntry {
+                    request,
+                    ancestry: ancestry.dupe(),
+                }
+            }));
+        }
+        frontier = next_frontier;
+    }
+
+    let preparation = match pending_cycle {
+        Some(cycle) => DirectLocalModulePreparation::Unsupported(cycle),
+        None => DirectLocalModulePreparation::Supported(DirectLocalModuleClosure {
+            root,
+            fragments: fragments.into(),
+        }),
+    };
+    SourcePreparationOutcome::Complete(Arc::new(Ok(preparation)))
+}
+
+fn direct_local_fragment_relative_path(
+    occurrence: &DirectLocalIncludePackageOccurrence,
+) -> PathBuf {
+    PathBuf::from(occurrence.package.package().as_str()).join(occurrence.target.as_str())
+}
+
+fn union_direct_local_fragment_needs(
+    outcomes: &SmallMap<PathBuf, Result<<HostRepositorySourceFileKey as Key>::Value, Arc<str>>>,
+) -> Option<SourcePreparationNeeds> {
+    outcomes.values().fold(None, |current, outcome| {
+        let Ok(SourcePreparationOutcome::Need(incoming)) = outcome else {
+            return current;
+        };
+        Some(match current {
+            Some(current) => current
+                .try_union(incoming)
+                .expect("one-route fragment Needs cannot conflict"),
+            None => incoming.dupe(),
+        })
+    })
+}
+
+fn direct_local_preparation_error(
+    error: DirectLocalModulePreparationError,
+) -> <DirectLocalModulePreparationKey as Key>::Value {
+    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
+}
+
+fn direct_local_fragment_error(
+    occurrence: &DirectLocalIncludePackageOccurrence,
+    repo_relative_path: &Path,
+    failure: DirectLocalIncludeFragmentFailure,
+) -> <DirectLocalModulePreparationKey as Key>::Value {
+    direct_local_preparation_error(DirectLocalModulePreparationError::Fragment {
+        raw_label: occurrence.raw_label.clone(),
+        location: occurrence.location.clone(),
+        repo_relative_path: Arc::new(repo_relative_path.to_path_buf()),
+        failure,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
@@ -2612,6 +3046,92 @@ mod tests {
             value.is_complete()
         }
     }
+    #[derive(Debug, Default)]
+    struct PreparationTracker {
+        preparation: Mutex<Vec<(ActivationKind, bool)>>,
+        lookups: Mutex<Vec<String>>,
+        sources: Mutex<Vec<String>>,
+        route_repo: Mutex<Vec<(ActivationKind, bool)>>,
+        downstream: AtomicUsize,
+    }
+    impl ActivationTracker for PreparationTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let event_free = activation.evaluation_data().is_none();
+            if key
+                .downcast_ref::<DirectLocalModulePreparationKey>()
+                .is_some()
+            {
+                self.preparation
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), event_free));
+            } else if let Some(key) = key.downcast_ref::<ExternalRepositoryPackageLookupKey>() {
+                self.lookups.lock().unwrap().push(key.to_string());
+            } else if let Some(key) = key.downcast_ref::<HostRepositorySourceFileKey>() {
+                self.sources.lock().unwrap().push(key.to_string());
+            } else if key
+                .downcast_ref::<crate::repo_file::HostRouteRepoFileKey>()
+                .is_some()
+            {
+                self.route_repo
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), event_free));
+            }
+        }
+    }
+    #[derive(Debug, Clone, Allocative)]
+    struct PreparationCounterKey(#[allocative(skip)] Arc<PreparationTracker>);
+    impl PartialEq for PreparationCounterKey {
+        fn eq(&self, other: &Self) -> bool {
+            Arc::ptr_eq(&self.0, &other.0)
+        }
+    }
+    impl Eq for PreparationCounterKey {}
+    impl Hash for PreparationCounterKey {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            Arc::as_ptr(&self.0).hash(state);
+        }
+    }
+    impl fmt::Display for PreparationCounterKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "direct-local-preparation-counter:{:p}", &self.0)
+        }
+    }
+    #[async_trait]
+    impl Key for PreparationCounterKey {
+        type Value = <DirectLocalModulePreparationKey as Key>::Value;
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _: &CancellationContext,
+        ) -> Self::Value {
+            let value = ctx
+                .compute(&preparation())
+                .await
+                .expect("preparation DICE invariant");
+            if matches!(&value, SourcePreparationOutcome::Complete(result) if result.is_ok()) {
+                self.0.downstream.fetch_add(1, Ordering::SeqCst);
+            }
+            value
+        }
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            x.complete_eq(y)
+        }
+        fn validity(value: &Self::Value) -> bool {
+            value.is_complete()
+        }
+    }
     fn local_route_with_path(path: &str) -> RootRepositoryRoute {
         RootRepositoryRoute::for_test(
             NormalizedAbsolutePath::new("/workspace").unwrap(),
@@ -3151,6 +3671,13 @@ mod tests {
         )
         .unwrap()
     }
+    fn preparation() -> DirectLocalModulePreparationKey {
+        DirectLocalModulePreparationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("dep_alias").unwrap(),
+        )
+        .unwrap()
+    }
     fn root(path: &str, version: &str) -> String {
         format!(
             "bazel_dep(name = \"dep\", version = \"{version}\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"{path}\")\n"
@@ -3219,6 +3746,8 @@ mod tests {
         ignore: Option<&[u8]>,
         packages: &[(&str, bool)],
         omitted: &[(&str, &str)],
+        fragments: &[(&str, Option<&[u8]>)],
+        fragment_needs: &[&str],
         variant: i64,
     ) -> PathObservationEpoch {
         let demand = |path: &str, operation| {
@@ -3285,10 +3814,15 @@ mod tests {
         }
         for (package, selected) in packages {
             let package_root = format!("{route_path}/{package}");
-            observations.insert(
-                demand(&package_root, PathObservationOperation::Lstat),
-                lstat(PathNodeKind::Directory),
-            );
+            let mut ancestor = route_path.to_owned();
+            for segment in package.split('/') {
+                ancestor.push('/');
+                ancestor.push_str(segment);
+                observations.insert(
+                    demand(&ancestor, PathObservationOperation::Lstat),
+                    lstat(PathNodeKind::Directory),
+                );
+            }
             for marker in ["BUILD.bazel", "BUILD"] {
                 if omitted.contains(&(*package, marker)) {
                     continue;
@@ -3303,6 +3837,32 @@ mod tests {
                     },
                 );
             }
+        }
+        for (relative, source) in fragments {
+            let path = format!("{route_path}/{relative}");
+            observations.insert(
+                demand(&path, PathObservationOperation::Lstat),
+                source
+                    .map(|_| lstat(PathNodeKind::RegularFile))
+                    .unwrap_or(PathObservationResult::Lstat(PathOperationResult::Missing)),
+            );
+            if let Some(source) = source {
+                observations.insert(
+                    demand(&path, PathObservationOperation::FileBytes),
+                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                        *source,
+                    ))),
+                );
+            }
+        }
+        for relative in fragment_needs {
+            observations.insert(
+                demand(
+                    &format!("{route_path}/{relative}"),
+                    PathObservationOperation::Lstat,
+                ),
+                lstat(PathNodeKind::RegularFile),
+            );
         }
         PathObservationEpoch::new(observations).unwrap()
     }
@@ -3343,6 +3903,8 @@ mod tests {
                     ignore,
                     packages,
                     omitted,
+                    &[],
+                    &[],
                     variant,
                 ),
             )])
@@ -3384,6 +3946,105 @@ mod tests {
                 .unwrap()
         } else {
             direct
+        }
+    }
+    async fn preparation_compute(
+        dice: &Arc<Dice>,
+        route_path: &str,
+        module: Option<&[u8]>,
+        repo: Option<&[u8]>,
+        packages: &[(&str, bool)],
+        fragments: &[(&str, Option<&[u8]>)],
+        fragment_needs: &[&str],
+        deleted: &[&str],
+        variant: i64,
+        capture: bool,
+        tracker: Option<Arc<PreparationTracker>>,
+    ) -> <DirectLocalModulePreparationKey as Key>::Value {
+        let mut data = UserComputationData {
+            activation_tracker: tracker
+                .clone()
+                .map(|tracker| tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        if capture {
+            data.data.set(CaptureEvaluationEvents);
+        }
+        let mut updater = dice.updater_with_data(data);
+        let relative = route_path.strip_prefix("/workspace/").unwrap();
+        let root_source = root(relative, &variant.to_string());
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                horizon_epoch(
+                    &root_source,
+                    route_path,
+                    module,
+                    repo,
+                    None,
+                    packages,
+                    &[],
+                    fragments,
+                    fragment_needs,
+                    variant,
+                ),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                material(relative),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                deleted,
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let direct = transaction.compute(&preparation()).await.unwrap();
+        if let Some(tracker) = tracker {
+            transaction
+                .compute(&PreparationCounterKey(tracker))
+                .await
+                .unwrap()
+        } else {
+            direct
+        }
+    }
+    fn preparation_success(
+        value: <DirectLocalModulePreparationKey as Key>::Value,
+    ) -> DirectLocalModulePreparation {
+        match value {
+            SourcePreparationOutcome::Complete(value) => value.as_ref().as_ref().unwrap().clone(),
+            SourcePreparationOutcome::Need(_) => panic!("complete direct-local preparation"),
+        }
+    }
+    fn preparation_failure(
+        value: <DirectLocalModulePreparationKey as Key>::Value,
+    ) -> DirectLocalModulePreparationError {
+        match value {
+            SourcePreparationOutcome::Complete(value) => {
+                value.as_ref().as_ref().unwrap_err().clone()
+            }
+            SourcePreparationOutcome::Need(_) => panic!("terminal direct-local preparation"),
         }
     }
     fn inputs(u: &mut dice::DiceTransactionUpdater) {
@@ -4788,6 +5449,1099 @@ mod tests {
         );
         assert!(tracker.horizon.lock().unwrap().last().unwrap().1);
     }
+    #[tokio::test]
+    async fn direct_module_preparation_root_gate_absence_and_equality_are_exact() {
+        assert_eq!(
+            preparation().to_string(),
+            "direct-local-module-preparation:\"/workspace\":@dep_alias"
+        );
+        assert!(
+            DirectLocalModulePreparationKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                ApparentRepoName::root(),
+            )
+            .is_none()
+        );
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let absent = preparation_success(
+            preparation_compute(
+                &dice,
+                "/workspace/dep",
+                None,
+                None,
+                &[],
+                &[],
+                &[],
+                &[],
+                200,
+                true,
+                None,
+            )
+            .await,
+        );
+        let DirectLocalModulePreparation::Supported(absent) = absent else {
+            panic!("absent root is supported")
+        };
+        assert!(matches!(
+            absent.root.0.1,
+            HostRepositorySourceFileValue::Absent
+        ));
+        assert!(absent.fragments.is_empty());
+
+        let tracker = Arc::new(PreparationTracker::default());
+        let invalid = preparation_failure(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(b"include(\"//p:a.MODULE.bazel\")\nunknown_identifier\n".as_slice()),
+                None,
+                &[("p", true)],
+                &[("p/a.MODULE.bazel", Some(b"".as_slice()))],
+                &[],
+                &[],
+                201,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        assert!(matches!(
+            invalid,
+            DirectLocalModulePreparationError::RootValidation { logical_path, ref message }
+                if logical_path.as_path() == Path::new("/workspace/dep/MODULE.bazel")
+                    && message.contains("unknown_identifier")
+        ));
+        assert!(tracker.lookups.lock().unwrap().is_empty());
+        assert_eq!(tracker.sources.lock().unwrap().len(), 1);
+        assert!(tracker.sources.lock().unwrap()[0].ends_with(":MODULE.bazel"));
+
+        let complete = SourcePreparationOutcome::Complete(Arc::new(Ok(
+            DirectLocalModulePreparation::Supported(absent.clone()),
+        )));
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+            NeedPathObservations::singleton(PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new("/workspace/dep/MODULE.bazel").unwrap(),
+                PathObservationOperation::FileBytes,
+            )),
+        ));
+        assert!(DirectLocalModulePreparationKey::equality(
+            &complete, &complete
+        ));
+        assert!(DirectLocalModulePreparationKey::validity(&complete));
+        assert!(!DirectLocalModulePreparationKey::equality(&need, &need));
+        assert!(!DirectLocalModulePreparationKey::validity(&need));
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_is_breadth_first_and_compiles_every_occurrence() {
+        crate::module_eval::clear_validated_root_module_logical_ids();
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(PreparationTracker::default());
+        let module = b"include(\"//p:a.MODULE.bazel\")\ninclude(\"//q:b.MODULE.bazel\")\ninclude(\"//p:a.MODULE.bazel\")\n";
+        let a = b"include(\"//r:c.MODULE.bazel\")\n";
+        let b = b"include(\"//r:c.MODULE.bazel\")\n";
+        let value = preparation_success(
+            preparation_compute(
+                &dice,
+                "/workspace/dep",
+                Some(module),
+                None,
+                &[("p", true), ("q", true), ("r", true)],
+                &[
+                    ("p/a.MODULE.bazel", Some(a.as_slice())),
+                    ("q/b.MODULE.bazel", Some(b.as_slice())),
+                    ("r/c.MODULE.bazel", Some(b"".as_slice())),
+                ],
+                &[],
+                &[],
+                202,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        let DirectLocalModulePreparation::Supported(value) = value else {
+            panic!("acyclic diamond is supported")
+        };
+        assert_eq!(
+            value
+                .fragments
+                .iter()
+                .map(|fragment| fragment.raw_label.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "//p:a.MODULE.bazel",
+                "//q:b.MODULE.bazel",
+                "//p:a.MODULE.bazel",
+                "//r:c.MODULE.bazel",
+                "//r:c.MODULE.bazel",
+                "//r:c.MODULE.bazel",
+            ]
+        );
+        assert_eq!(
+            crate::module_eval::take_validated_root_module_logical_ids()
+                .iter()
+                .map(|id| id.0.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "/workspace/MODULE.bazel",
+                "/workspace/dep/MODULE.bazel",
+                "/workspace/dep/p/a.MODULE.bazel",
+                "/workspace/dep/q/b.MODULE.bazel",
+                "/workspace/dep/p/a.MODULE.bazel",
+                "/workspace/dep/r/c.MODULE.bazel",
+                "/workspace/dep/r/c.MODULE.bazel",
+                "/workspace/dep/r/c.MODULE.bazel",
+            ]
+        );
+        let sources = tracker.sources.lock().unwrap();
+        assert_eq!(
+            sources
+                .iter()
+                .filter(|source| source.ends_with(":p/a.MODULE.bazel"))
+                .count(),
+            1
+        );
+        assert_eq!(
+            sources
+                .iter()
+                .filter(|source| source.ends_with(":r/c.MODULE.bazel"))
+                .count(),
+            1
+        );
+        assert_eq!(tracker.lookups.lock().unwrap().len(), 3);
+        assert_eq!(value.fragments[0].bytes.as_ref(), a);
+        assert_eq!(
+            value.fragments[0].logical_path.as_path(),
+            Path::new("/workspace/dep/p/a.MODULE.bazel")
+        );
+        assert_eq!(value.fragments[0].location.start_line, 1);
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_distinct_labels_keep_one_canonical_dependency() {
+        crate::module_eval::clear_validated_root_module_logical_ids();
+        let tracker = Arc::new(PreparationTracker::default());
+        let value = preparation_success(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(
+                    b"include(\"//p/a.MODULE.bazel\")\ninclude(\"//p/a.MODULE.bazel:a.MODULE.bazel\")\n",
+                ),
+                None,
+                &[("p/a.MODULE.bazel", true)],
+                &[(
+                    "p/a.MODULE.bazel/a.MODULE.bazel",
+                    Some(b"".as_slice()),
+                )],
+                &[],
+                &[],
+                232,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        let DirectLocalModulePreparation::Supported(value) = value else {
+            panic!("canonical-equivalent siblings are not a cycle")
+        };
+        assert_eq!(value.fragments.len(), 2);
+        assert_ne!(value.fragments[0].raw_label, value.fragments[1].raw_label);
+        assert_eq!(value.fragments[0].package, value.fragments[1].package);
+        assert_eq!(value.fragments[0].target, value.fragments[1].target);
+        assert_eq!(value.fragments[0].bytes, value.fragments[1].bytes);
+        assert_eq!(tracker.lookups.lock().unwrap().len(), 1);
+        assert_eq!(
+            tracker
+                .sources
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|source| { source.ends_with(":p/a.MODULE.bazel/a.MODULE.bazel") })
+                .count(),
+            1
+        );
+        assert_eq!(
+            crate::module_eval::take_validated_root_module_logical_ids()
+                .iter()
+                .filter(|id| { id.0.ends_with("/p/a.MODULE.bazel/a.MODULE.bazel") })
+                .count(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_fragment_precedence_and_need_union_are_exact() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let missing_first = preparation_failure(
+            preparation_compute(
+                &dice,
+                "/workspace/dep",
+                Some(
+                    b"include(\"//p:missing.MODULE.bazel\")\ninclude(\"//q:need.MODULE.bazel\")\n",
+                ),
+                None,
+                &[("p", true), ("q", true)],
+                &[("p/missing.MODULE.bazel", None)],
+                &["q/need.MODULE.bazel"],
+                &[],
+                203,
+                true,
+                None,
+            )
+            .await,
+        );
+        assert!(matches!(
+            missing_first,
+            DirectLocalModulePreparationError::Fragment {
+                raw_label,
+                location,
+                failure: DirectLocalIncludeFragmentFailure::Absent,
+                ..
+            } if raw_label == "//p:missing.MODULE.bazel" && location.start_line == 1
+        ));
+        let need_first = preparation_compute(
+            &dice,
+            "/workspace/dep",
+            Some(b"include(\"//q:need.MODULE.bazel\")\ninclude(\"//p:missing.MODULE.bazel\")\n"),
+            None,
+            &[("p", true), ("q", true)],
+            &[("p/missing.MODULE.bazel", None)],
+            &["q/need.MODULE.bazel"],
+            &[],
+            204,
+            true,
+            None,
+        )
+        .await;
+        let SourcePreparationOutcome::Need(need) = need_first else {
+            panic!("earlier fragment Need wins")
+        };
+        let demands = need.path_observations().unwrap().demands();
+        assert_eq!(demands.len(), 1);
+        assert_eq!(demands[0].operation(), PathObservationOperation::FileBytes);
+        assert!(demands[0].path().as_path().ends_with("q/need.MODULE.bazel"));
+
+        let path_need = SourcePreparationNeeds::path(NeedPathObservations::singleton(
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new("/workspace/dep/p/a.MODULE.bazel").unwrap(),
+                PathObservationOperation::FileBytes,
+            ),
+        ));
+        let repository_need =
+            SourcePreparationNeeds::repository(RepositoryMaterializationRequest {
+                id: RepositoryMaterializationRequestId {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+                },
+                repo_spec: local_route().repo_spec().clone(),
+                kind: RepositoryMaterializationKind::Local {
+                    logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
+                },
+            });
+        let mut outcomes = SmallMap::new();
+        outcomes.insert(
+            PathBuf::from("p/a.MODULE.bazel"),
+            Ok(SourcePreparationOutcome::Need(path_need)),
+        );
+        outcomes.insert(
+            PathBuf::from("q/b.MODULE.bazel"),
+            Ok(SourcePreparationOutcome::Need(repository_need)),
+        );
+        let union = union_direct_local_fragment_needs(&outcomes).unwrap();
+        assert!(union.path_observations().is_some());
+        assert_eq!(union.repository_materializations().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_cycle_waits_for_later_side_branch_failure_and_need() {
+        let module = b"include(\"//a:a.MODULE.bazel\")\ninclude(\"//x:x.MODULE.bazel\")\n";
+        let a = b"include(\"//a:a.MODULE.bazel\")\ninclude(\"//side:b.MODULE.bazel\")\n";
+        let x = b"include(\"//y:y.MODULE.bazel\")\n";
+        let side = b"include(\"//late:c.MODULE.bazel\")\n";
+        let packages = [
+            ("a", true),
+            ("x", true),
+            ("side", true),
+            ("y", true),
+            ("late", true),
+        ];
+        let base = [
+            ("a/a.MODULE.bazel", Some(a.as_slice())),
+            ("x/x.MODULE.bazel", Some(x.as_slice())),
+            ("side/b.MODULE.bazel", Some(side.as_slice())),
+            ("y/y.MODULE.bazel", Some(b"".as_slice())),
+        ];
+        let terminal = preparation_failure(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(module),
+                None,
+                &packages,
+                &[
+                    base[0],
+                    base[1],
+                    base[2],
+                    base[3],
+                    ("late/c.MODULE.bazel", None),
+                ],
+                &[],
+                &[],
+                205,
+                true,
+                None,
+            )
+            .await,
+        );
+        assert!(matches!(
+            terminal,
+            DirectLocalModulePreparationError::Fragment {
+                raw_label,
+                failure: DirectLocalIncludeFragmentFailure::Absent,
+                ..
+            } if raw_label == "//late:c.MODULE.bazel"
+        ));
+        let need = preparation_compute(
+            &Dice::builder().build(DetectCycles::Enabled),
+            "/workspace/dep",
+            Some(module),
+            None,
+            &packages,
+            &base,
+            &["late/c.MODULE.bazel"],
+            &[],
+            206,
+            true,
+            None,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+
+        let reversed = b"include(\"//x:x.MODULE.bazel\")\ninclude(\"//a:a.MODULE.bazel\")\n";
+        let a_reversed = b"include(\"//side:b.MODULE.bazel\")\ninclude(\"//a:a.MODULE.bazel\")\n";
+        let reversed_base = [
+            ("a/a.MODULE.bazel", Some(a_reversed.as_slice())),
+            base[1],
+            base[2],
+            base[3],
+        ];
+        let terminal = preparation_failure(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(reversed),
+                None,
+                &packages,
+                &[
+                    reversed_base[0],
+                    reversed_base[1],
+                    reversed_base[2],
+                    reversed_base[3],
+                    ("late/c.MODULE.bazel", None),
+                ],
+                &[],
+                &[],
+                224,
+                true,
+                None,
+            )
+            .await,
+        );
+        assert!(matches!(
+            terminal,
+            DirectLocalModulePreparationError::Fragment {
+                raw_label,
+                failure: DirectLocalIncludeFragmentFailure::Absent,
+                ..
+            } if raw_label == "//late:c.MODULE.bazel"
+        ));
+        let need = preparation_compute(
+            &Dice::builder().build(DetectCycles::Enabled),
+            "/workspace/dep",
+            Some(reversed),
+            None,
+            &packages,
+            &reversed_base,
+            &["late/c.MODULE.bazel"],
+            &[],
+            225,
+            true,
+            None,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_cycle_candidate_loses_to_same_horizon_terminal_and_need() {
+        let module = b"include(\"//a:a.MODULE.bazel\")\ninclude(\"//x:x.MODULE.bazel\")\n";
+        let a = b"include(\"//a:a.MODULE.bazel\")\n";
+        let x = b"include(\"//bad:b.MODULE.bazel\")\n";
+        let packages = [("a", true), ("x", true), ("bad", true)];
+        let terminal = preparation_failure(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(module),
+                None,
+                &packages,
+                &[
+                    ("a/a.MODULE.bazel", Some(a.as_slice())),
+                    ("x/x.MODULE.bazel", Some(x.as_slice())),
+                    ("bad/b.MODULE.bazel", None),
+                ],
+                &[],
+                &[],
+                209,
+                true,
+                None,
+            )
+            .await,
+        );
+        assert!(matches!(
+            terminal,
+            DirectLocalModulePreparationError::Fragment {
+                raw_label,
+                failure: DirectLocalIncludeFragmentFailure::Absent,
+                ..
+            } if raw_label == "//bad:b.MODULE.bazel"
+        ));
+        let need = preparation_compute(
+            &Dice::builder().build(DetectCycles::Enabled),
+            "/workspace/dep",
+            Some(module),
+            None,
+            &packages,
+            &[
+                ("a/a.MODULE.bazel", Some(a.as_slice())),
+                ("x/x.MODULE.bazel", Some(x.as_slice())),
+            ],
+            &["bad/b.MODULE.bazel"],
+            &[],
+            210,
+            true,
+            None,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_cycle_capability_uses_first_breadth_first_provenance() {
+        let module = b"include(\"//a:a.MODULE.bazel\")\ninclude(\"//x:x.MODULE.bazel\")\n";
+        let a = b"include(\"//a:a.MODULE.bazel\")\ninclude(\"//side:b.MODULE.bazel\")\n";
+        let x = b"include(\"//x:x.MODULE.bazel\")\n";
+        let value = preparation_success(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(module),
+                None,
+                &[("a", true), ("x", true), ("side", true)],
+                &[
+                    ("a/a.MODULE.bazel", Some(a.as_slice())),
+                    ("x/x.MODULE.bazel", Some(x.as_slice())),
+                    ("side/b.MODULE.bazel", Some(b"".as_slice())),
+                ],
+                &[],
+                &[],
+                207,
+                true,
+                None,
+            )
+            .await,
+        );
+        let DirectLocalModulePreparation::Unsupported(cycle) = value else {
+            panic!("active-ancestry repeat is unsupported")
+        };
+        assert_eq!(cycle.package.package().as_str(), "a");
+        assert_eq!(cycle.target.as_str(), "a.MODULE.bazel");
+        assert_eq!(cycle.ancestor_raw_label, "//a:a.MODULE.bazel");
+        assert_eq!(
+            cycle.ancestor_location.file.0,
+            "/workspace/dep/MODULE.bazel"
+        );
+        assert_eq!(cycle.ancestor_location.start_line, 1);
+        assert_eq!(cycle.repeated_raw_label, "//a:a.MODULE.bazel");
+        assert_eq!(
+            cycle.repeated_location.file.0,
+            "/workspace/dep/a/a.MODULE.bazel"
+        );
+        assert_eq!(cycle.repeated_location.start_line, 1);
+
+        let multi = preparation_success(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(b"include(\"//a:a.MODULE.bazel\")\n"),
+                None,
+                &[("a", true), ("b", true)],
+                &[
+                    (
+                        "a/a.MODULE.bazel",
+                        Some(b"include(\"//b:b.MODULE.bazel\")\n".as_slice()),
+                    ),
+                    (
+                        "b/b.MODULE.bazel",
+                        Some(b"include(\"//a:a.MODULE.bazel\")\n".as_slice()),
+                    ),
+                ],
+                &[],
+                &[],
+                208,
+                true,
+                None,
+            )
+            .await,
+        );
+        assert!(matches!(
+            multi,
+            DirectLocalModulePreparation::Unsupported(
+                DirectLocalIncludeCycleCapability { ref package, .. }
+            ) if package.package().as_str() == "a"
+        ));
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_package_barrier_and_fragment_validation_are_typed() {
+        let tracker = Arc::new(PreparationTracker::default());
+        let package_need = preparation_compute(
+            &Dice::builder().build(DetectCycles::Enabled),
+            "/workspace/dep",
+            Some(b"include(\"//p:a.MODULE.bazel\")\n"),
+            None,
+            &[],
+            &[("p/a.MODULE.bazel", Some(b"".as_slice()))],
+            &[],
+            &[],
+            211,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(matches!(package_need, SourcePreparationOutcome::Need(_)));
+        assert!(
+            !tracker
+                .sources
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|source| source.ends_with(":p/a.MODULE.bazel"))
+        );
+
+        let tracker = Arc::new(PreparationTracker::default());
+        let package_error = preparation_failure(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(b"include(\"//p:a.MODULE.bazel\")\ninclude(\"//missing:m.MODULE.bazel\")\n"),
+                None,
+                &[("p", true), ("missing", false)],
+                &[("p/a.MODULE.bazel", Some(b"".as_slice()))],
+                &[],
+                &[],
+                212,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        assert!(matches!(
+            package_error,
+            DirectLocalModulePreparationError::Package(
+                DirectLocalIncludePackageHorizonError::Package {
+                    raw_label,
+                    failure: DirectLocalIncludePackageFailure::NoBuildFile,
+                    ..
+                }
+            ) if raw_label == "//missing:m.MODULE.bazel"
+        ));
+        assert!(
+            !tracker
+                .sources
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|source| source.ends_with(":p/a.MODULE.bazel"))
+        );
+
+        let validation = preparation_failure(
+            preparation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                "/workspace/dep",
+                Some(b"include(\"//p:a.MODULE.bazel\")\n"),
+                None,
+                &[("p", true)],
+                &[("p/a.MODULE.bazel", Some(b"unknown_identifier\n".as_slice()))],
+                &[],
+                &[],
+                213,
+                true,
+                None,
+            )
+            .await,
+        );
+        assert!(matches!(
+            validation,
+            DirectLocalModulePreparationError::Fragment {
+                raw_label,
+                failure: DirectLocalIncludeFragmentFailure::Validation {
+                    logical_path,
+                    ref message,
+                },
+                ..
+            } if raw_label == "//p:a.MODULE.bazel"
+                && logical_path.as_path() == Path::new("/workspace/dep/p/a.MODULE.bazel")
+                && message.contains("unknown_identifier")
+        ));
+
+        for (variant, bytes, expected) in [
+            (233, &[0xff][..], "UTF-8"),
+            (
+                234,
+                b"for x in []:\n  pass\n".as_slice(),
+                "`for` cannot be used",
+            ),
+            (
+                235,
+                b"unknown_identifier\n".as_slice(),
+                "unknown_identifier",
+            ),
+        ] {
+            let validation = preparation_failure(
+                preparation_compute(
+                    &Dice::builder().build(DetectCycles::Enabled),
+                    "/workspace/dep",
+                    Some(b"include(\"//p:a.MODULE.bazel\")\n"),
+                    None,
+                    &[("p", true)],
+                    &[("p/a.MODULE.bazel", Some(bytes))],
+                    &[],
+                    &[],
+                    variant,
+                    true,
+                    None,
+                )
+                .await,
+            );
+            let DirectLocalModulePreparationError::Fragment {
+                raw_label,
+                location,
+                repo_relative_path,
+                failure:
+                    DirectLocalIncludeFragmentFailure::Validation {
+                        logical_path,
+                        message,
+                    },
+            } = &validation
+            else {
+                panic!("expected fragment validation, got {validation:?}")
+            };
+            assert_eq!(raw_label, "//p:a.MODULE.bazel");
+            assert_eq!(location.start_line, 1);
+            assert_eq!(repo_relative_path.as_path(), Path::new("p/a.MODULE.bazel"));
+            assert_eq!(
+                logical_path.as_path(),
+                Path::new("/workspace/dep/p/a.MODULE.bazel")
+            );
+            assert!(
+                message.contains(expected),
+                "expected {expected:?} in {message:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn direct_module_unsupported_equality_prunes_irrelevant_side_branch_edits() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(PreparationTracker::default());
+        let module = b"include(\"//a:a.MODULE.bazel\")\n";
+        let a = b"include(\"//a:a.MODULE.bazel\")\ninclude(\"//side:b.MODULE.bazel\")\n";
+        macro_rules! compute {
+            ($side:expr, $variant:expr) => {{
+                let side: &'static [u8] = $side;
+                preparation_compute(
+                    &dice,
+                    "/workspace/dep",
+                    Some(module),
+                    None,
+                    &[("a", true), ("side", true)],
+                    &[
+                        ("a/a.MODULE.bazel", Some(a.as_slice())),
+                        ("side/b.MODULE.bazel", Some(side)),
+                    ],
+                    &[],
+                    &[],
+                    $variant,
+                    true,
+                    Some(tracker.clone()),
+                )
+                .await
+            }};
+        }
+        let first = preparation_success(compute!(b"", 236));
+        let edited =
+            preparation_success(compute!(b"bazel_dep(name = 'side', version = '1')\n", 237));
+        assert_eq!(first, edited);
+        assert!(matches!(
+            first,
+            DirectLocalModulePreparation::Unsupported(_)
+        ));
+        assert_eq!(
+            tracker.downstream.load(Ordering::SeqCst),
+            1,
+            "equal unsupported capability prunes downstream recomputation"
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_lifecycle_route_reuse_and_events_are_exact() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(PreparationTracker::default());
+        let module = Some(b"include(\"//p:a.MODULE.bazel\")\n".as_slice());
+        macro_rules! compute {
+            ($route_path:expr, $bytes:expr, $variant:expr, $capture:expr $(,)?) => {{
+                let bytes: &'static [u8] = $bytes;
+                let fragments = [("p/a.MODULE.bazel", Some(bytes))];
+                preparation_compute(
+                    &dice,
+                    $route_path,
+                    module,
+                    Some(b"print('policy')\n"),
+                    &[("p", true)],
+                    &fragments,
+                    &[],
+                    &[],
+                    $variant,
+                    $capture,
+                    Some(tracker.clone()),
+                )
+                .await
+            }};
+        }
+        let cold = preparation_success(compute!("/workspace/dep-a", b"", 214, true));
+        let cold_child_activations = tracker.route_repo.lock().unwrap().len();
+        let warm = preparation_success(compute!("/workspace/dep-a", b"", 214, true));
+        assert_eq!(cold, warm);
+        assert_eq!(tracker.downstream.load(Ordering::SeqCst), 1);
+        let preparation_activations = tracker.preparation.lock().unwrap();
+        assert_eq!(
+            preparation_activations[0],
+            (ActivationKind::Evaluated, true)
+        );
+        assert_eq!(
+            preparation_activations.last().copied(),
+            Some((ActivationKind::Reused, true))
+        );
+        assert_eq!(
+            preparation_activations
+                .iter()
+                .filter(|(kind, _)| *kind == ActivationKind::Evaluated)
+                .count(),
+            1
+        );
+        drop(preparation_activations);
+        assert_eq!(
+            tracker.route_repo.lock().unwrap().len(),
+            cold_child_activations,
+            "warm preparation must not replay its child event batch"
+        );
+        assert_eq!(
+            tracker.route_repo.lock().unwrap()[0],
+            (ActivationKind::Evaluated, false)
+        );
+
+        let edited = preparation_success(compute!(
+            "/workspace/dep-a",
+            b"bazel_dep(name = 'edited', version = '1')\n",
+            215,
+            true,
+        ));
+        assert_ne!(cold, edited);
+        assert_eq!(tracker.downstream.load(Ordering::SeqCst), 2);
+        let b = preparation_success(compute!("/workspace/dep-b", b"", 216, true));
+        let restored = preparation_success(compute!("/workspace/dep-a", b"", 217, true));
+        assert_ne!(cold, b);
+        assert_eq!(cold, restored);
+        assert_eq!(tracker.downstream.load(Ordering::SeqCst), 4);
+
+        let uncaptured = preparation_success(compute!(
+            "/workspace/dep-a",
+            b"print('fragment')\n",
+            218,
+            false
+        ));
+        assert_ne!(restored, uncaptured);
+        assert!(
+            tracker
+                .preparation
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|(_, event_free)| *event_free)
+        );
+        assert_eq!(
+            tracker.route_repo.lock().unwrap().last().copied(),
+            Some((ActivationKind::Reused, true))
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_fragment_and_include_lifecycle_recovers_and_reorders() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let p_then_q = b"include(\"//p:a.MODULE.bazel\")\ninclude(\"//q:b.MODULE.bazel\")\n";
+        let q_then_p = b"include(\"//q:b.MODULE.bazel\")\ninclude(\"//p:a.MODULE.bazel\")\n";
+        macro_rules! compute {
+            ($module:expr, $p:expr, $variant:expr $(,)?) => {{
+                let p: Option<&'static [u8]> = $p;
+                let fragments = [
+                    ("p/a.MODULE.bazel", p),
+                    ("q/b.MODULE.bazel", Some(b"".as_slice())),
+                ];
+                preparation_compute(
+                    &dice,
+                    "/workspace/dep",
+                    Some($module),
+                    None,
+                    &[("p", true), ("q", true)],
+                    &fragments,
+                    &[],
+                    &[],
+                    $variant,
+                    true,
+                    None,
+                )
+                .await
+            }};
+        }
+        let initial = preparation_success(compute!(p_then_q, Some(b""), 219));
+        let edited = preparation_success(compute!(
+            p_then_q,
+            Some(b"bazel_dep(name = 'nested', version = '1')\n"),
+            220,
+        ));
+        assert_ne!(initial, edited);
+        let deleted = preparation_failure(compute!(p_then_q, None, 221));
+        assert!(matches!(
+            deleted,
+            DirectLocalModulePreparationError::Fragment {
+                failure: DirectLocalIncludeFragmentFailure::Absent,
+                ..
+            }
+        ));
+        let recreated = preparation_success(compute!(p_then_q, Some(b""), 222));
+        assert_eq!(initial, recreated);
+        let reordered = preparation_success(compute!(q_then_p, Some(b""), 223));
+        assert_ne!(initial, reordered);
+        let DirectLocalModulePreparation::Supported(reordered) = reordered else {
+            panic!("reordered acyclic closure")
+        };
+        assert_eq!(
+            reordered
+                .fragments
+                .iter()
+                .map(|fragment| fragment.package.package().as_str())
+                .collect::<Vec<_>>(),
+            ["q", "p"]
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_module_preparation_nested_include_lifecycle_is_occurrence_exact() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let root = b"include(\"//p:a.MODULE.bazel\")\n";
+        let r = b"include(\"//r:r.MODULE.bazel\")\n";
+        let s = b"include(\"//s:s.MODULE.bazel\")\n";
+        let rs = b"include(\"//r:r.MODULE.bazel\")\ninclude(\"//s:s.MODULE.bazel\")\n";
+        let sr = b"include(\"//s:s.MODULE.bazel\")\ninclude(\"//r:r.MODULE.bazel\")\n";
+        macro_rules! compute {
+            ($nested:expr, $r_source:expr, $s_source:expr, $variant:expr) => {{
+                let fragments = [
+                    ("p/a.MODULE.bazel", Some($nested.as_slice())),
+                    ("r/r.MODULE.bazel", $r_source),
+                    ("s/s.MODULE.bazel", $s_source),
+                ];
+                preparation_compute(
+                    &dice,
+                    "/workspace/dep",
+                    Some(root),
+                    None,
+                    &[("p", true), ("r", true), ("s", true)],
+                    &fragments,
+                    &[],
+                    &[],
+                    $variant,
+                    true,
+                    None,
+                )
+                .await
+            }};
+        }
+        let initial = preparation_success(compute!(r, Some(b"".as_slice()), None, 226));
+        let added = preparation_success(compute!(
+            rs,
+            Some(b"".as_slice()),
+            Some(b"".as_slice()),
+            227
+        ));
+        let edited = preparation_success(compute!(s, None, Some(b"".as_slice()), 228));
+        assert_ne!(initial, added);
+        assert_ne!(added, edited);
+        let deleted = preparation_failure(compute!(s, None, None, 229));
+        assert!(matches!(
+            deleted,
+            DirectLocalModulePreparationError::Fragment {
+                raw_label,
+                failure: DirectLocalIncludeFragmentFailure::Absent,
+                ..
+            } if raw_label == "//s:s.MODULE.bazel"
+        ));
+        let recreated = preparation_success(compute!(s, None, Some(b"".as_slice()), 230));
+        assert_eq!(edited, recreated);
+        let reordered = preparation_success(compute!(
+            sr,
+            Some(b"".as_slice()),
+            Some(b"".as_slice()),
+            231
+        ));
+        assert_ne!(added, reordered);
+        let DirectLocalModulePreparation::Supported(added) = added else {
+            panic!("nested add remains acyclic")
+        };
+        assert_eq!(
+            added
+                .fragments
+                .iter()
+                .map(|fragment| fragment.package.package().as_str())
+                .collect::<Vec<_>>(),
+            ["p", "r", "s"]
+        );
+        let DirectLocalModulePreparation::Supported(reordered) = reordered else {
+            panic!("nested reorder remains acyclic")
+        };
+        assert_eq!(
+            reordered
+                .fragments
+                .iter()
+                .map(|fragment| fragment.package.package().as_str())
+                .collect::<Vec<_>>(),
+            ["p", "s", "r"]
+        );
+    }
+
+    #[test]
+    fn direct_module_preparation_typed_fragment_failures_restore_context() {
+        let occurrence = horizon_occurrence("pkg", 7);
+        for (failure, expected, sourced) in [
+            (
+                DirectLocalIncludeFragmentFailure::SourceCompute {
+                    message: Arc::from("compute"),
+                },
+                "SourceCompute",
+                false,
+            ),
+            (
+                DirectLocalIncludeFragmentFailure::Source(RepositorySourceFileError::WrongKind {
+                    repo_relative_path: Arc::new(PathBuf::from("pkg/pkg.MODULE.bazel")),
+                    actual: PathNodeKind::Directory,
+                }),
+                "WrongKind",
+                false,
+            ),
+            (
+                DirectLocalIncludeFragmentFailure::Validation {
+                    logical_path: NormalizedAbsolutePath::new(
+                        "/workspace/dep/pkg/pkg.MODULE.bazel",
+                    )
+                    .unwrap(),
+                    message: "invalid".into(),
+                },
+                "Validation",
+                false,
+            ),
+        ] {
+            let error = match direct_local_fragment_error(
+                &occurrence,
+                Path::new("pkg/pkg.MODULE.bazel"),
+                failure,
+            ) {
+                SourcePreparationOutcome::Complete(value) => {
+                    value.as_ref().as_ref().unwrap_err().clone()
+                }
+                SourcePreparationOutcome::Need(_) => panic!("typed terminal"),
+            };
+            assert!(format!("{error:?}").contains(expected));
+            assert!(error.to_string().contains("dep/MODULE.bazel:7:3"));
+            assert_eq!(std::error::Error::source(&error).is_some(), sourced);
+        }
+        for error in [
+            DirectLocalModulePreparationError::InspectionCompute {
+                message: Arc::from("inspection"),
+            },
+            DirectLocalModulePreparationError::Inspection(
+                DirectLocalModuleInspectionError::InputCompute(Arc::from("input")),
+            ),
+        ] {
+            assert_eq!(
+                std::error::Error::source(&error).is_some(),
+                matches!(error, DirectLocalModulePreparationError::Inspection(_))
+            );
+        }
+    }
+
+    #[test]
+    fn direct_module_preparation_structural_boundary_is_private_and_event_free() {
+        let source = include_str!("source_preparation.rs");
+        let owner = source
+            .split("struct DirectLocalModulePreparationKey")
+            .nth(1)
+            .unwrap()
+            .split("pub struct RepositoryMaterializationGeneration")
+            .next()
+            .unwrap();
+        for required in [
+            "DirectLocalModuleInspectionKey",
+            "validate_root_module_source",
+            "preflight_direct_local_include_package_horizon",
+            "HostRepositorySourceFileKey",
+            "compute_join",
+            "try_union",
+            "DirectLocalModulePreparation::Unsupported",
+        ] {
+            assert!(owner.contains(required), "{required}");
+        }
+        for forbidden in [
+            "pub ",
+            "store_evaluation_data",
+            "CaptureEvaluationEvents",
+            "EventBatch",
+            "evaluate_nonroot_module_file",
+            "evaluate_root_module_closure",
+            "Evaluator",
+            "std::fs",
+            "compute(&DirectLocalModulePreparationKey",
+            "DirectLocalIncludePackageHorizonKey",
+            "RootRepositoryRouteKey",
+            "MAX_DEPTH",
+            "visited",
+            "seen",
+            "Mutex",
+        ] {
+            assert!(!owner.contains(forbidden), "{forbidden}");
+        }
+        let closure = owner
+            .split("struct DirectLocalModuleClosure")
+            .nth(1)
+            .unwrap()
+            .split("struct DirectLocalIncludeFragment")
+            .next()
+            .unwrap();
+        assert!(!closure.contains("Cycle"));
+    }
     #[test]
     fn direct_include_horizon_structural_boundary_is_private_and_fragment_free() {
         let source = include_str!("source_preparation.rs");
@@ -4795,7 +6549,7 @@ mod tests {
             .split("struct DirectLocalIncludePackageHorizonKey")
             .nth(1)
             .unwrap()
-            .split("impl fmt::Display for RepositorySourceFileKey")
+            .split("struct DirectLocalModulePreparationKey")
             .next()
             .unwrap();
         let (key_owner, _) = owner
