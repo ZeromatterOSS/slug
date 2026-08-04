@@ -45,6 +45,7 @@ use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::PathResolutionError;
 use slug_workspace_v2::PathResult;
+use slug_workspace_v2::ResolvedPath;
 use slug_workspace_v2::ResolvedPathKey;
 use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
@@ -482,6 +483,48 @@ pub struct RepositorySourceFileKey {
     pub workspace: PathBuf,
     pub module_name: CompactString,
     pub repo_relative_path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostRepositoryPathKey {
+    route: RootRepositoryRoute,
+    repo_relative_path: PathBuf,
+}
+
+impl HostRepositoryPathKey {
+    pub(crate) fn new(route: RootRepositoryRoute, repo_relative_path: PathBuf) -> Self {
+        Self {
+            route,
+            repo_relative_path,
+        }
+    }
+}
+
+impl Hash for HostRepositoryPathKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.route.hash(state);
+        self.repo_relative_path.hash(state);
+    }
+}
+
+impl fmt::Display for HostRepositoryPathKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-repository-path:{}:{}",
+            self.route.canonical_repo(),
+            self.repo_relative_path.display()
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct HostRepositoryPathValue(ResolvedPath);
+
+impl HostRepositoryPathValue {
+    pub(crate) fn resolved(&self) -> &ResolvedPath {
+        &self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1279,6 +1322,14 @@ async fn observed_repository_source_file(
             }));
         }
     };
+    observed_repository_source_file_from_resolved(ctx, resolved, repo_relative_path).await
+}
+
+async fn observed_repository_source_file_from_resolved(
+    ctx: &mut DiceComputations<'_>,
+    resolved: ResolvedPath,
+    repo_relative_path: Arc<PathBuf>,
+) -> PathResult<ObservedRepositorySourceFile, RepositorySourceFileError> {
     let lstat = match resolved.state() {
         ResolvedPathState::Missing => {
             return PathOutcome::Complete(Ok(ObservedRepositorySourceFile::Absent));
@@ -1299,7 +1350,7 @@ async fn observed_repository_source_file(
         }
     };
     let demand = PathObservationDemand::new(
-        namespace,
+        resolved.namespace(),
         resolved.real_path().dupe(),
         PathObservationOperation::FileBytes,
     );
@@ -1317,7 +1368,7 @@ async fn observed_repository_source_file(
         PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
             PathOutcome::Complete(Ok(ObservedRepositorySourceFile::Present {
                 bytes: bytes.dupe(),
-                logical_path,
+                logical_path: resolved.requested_path().dupe(),
             }))
         }
         PathObservationResult::FileBytes(PathOperationResult::Missing) => {
@@ -1340,6 +1391,70 @@ async fn observed_repository_source_file(
         | PathObservationResult::DirectoryEntries(_)
         | PathObservationResult::WindowsLongPath(_) => {
             unreachable!("FileBytes demand must return a FileBytes observation")
+        }
+    }
+}
+
+async fn resolved_repository_path_from_materialization(
+    ctx: &mut DiceComputations<'_>,
+    materialization: SourcePreparationOutcome<
+        Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>,
+    >,
+    relative: &Path,
+    repo_relative_path: Arc<PathBuf>,
+) -> SourcePreparationResult<HostRepositoryPathValue, RepositorySourceFileError> {
+    let materialization = match materialization {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(value) => value,
+    };
+    let materialization = match materialization.as_ref() {
+        Ok(value) => value,
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Err(
+                RepositorySourceFileError::Materialization {
+                    repo_relative_path,
+                    error: Arc::new(error.clone()),
+                },
+            ));
+        }
+    };
+    let (namespace, root) = match materialization {
+        RepositoryMaterialization::Local { source_root, .. } => {
+            (PathObservationNamespace::Host, source_root)
+        }
+        RepositoryMaterialization::Immutable {
+            generation_root,
+            observation_instance,
+            ..
+        } => (
+            PathObservationNamespace::Materialization(*observation_instance),
+            generation_root,
+        ),
+    };
+    let requested_path = match NormalizedAbsolutePath::new(root.join(relative)) {
+        Ok(path) => path,
+        Err(_) => {
+            return SourcePreparationOutcome::Complete(Err(
+                RepositorySourceFileError::InvalidMaterializedPath { repo_relative_path },
+            ));
+        }
+    };
+    match ctx
+        .compute(&ResolvedPathKey::new(namespace, requested_path))
+        .await
+    {
+        Ok(PathOutcome::Need(need)) => SourcePreparationOutcome::path_need(need),
+        Ok(PathOutcome::Complete(Ok(resolved))) => {
+            SourcePreparationOutcome::Complete(Ok(HostRepositoryPathValue(resolved)))
+        }
+        Ok(PathOutcome::Complete(Err(error))) => SourcePreparationOutcome::Complete(Err(
+            project_resolution_error(repo_relative_path, error),
+        )),
+        Err(error) => {
+            SourcePreparationOutcome::Complete(Err(RepositorySourceFileError::ResolutionCompute {
+                repo_relative_path,
+                message: Arc::from(error.to_string()),
+            }))
         }
     }
 }
@@ -1426,8 +1541,8 @@ fn host_repository_source_file_value(
 }
 
 #[async_trait]
-impl Key for HostRepositorySourceFileKey {
-    type Value = SourcePreparationResult<HostRepositorySourceFileValue, RepositorySourceFileError>;
+impl Key for HostRepositoryPathKey {
+    type Value = SourcePreparationResult<HostRepositoryPathValue, RepositorySourceFileError>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let relative = match checked_relative_path(&self.repo_relative_path) {
@@ -1474,15 +1589,68 @@ impl Key for HostRepositorySourceFileKey {
                 ));
             }
         };
-        host_repository_source_file_value(
-            observed_repository_source_file_from_materialization(
+        resolved_repository_path_from_materialization(
+            ctx,
+            materialization,
+            relative,
+            repo_relative_path,
+        )
+        .await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+
+    fn provide<'a>(&'a self, demand: &mut Demand<'a>) {
+        demand.provide_value_with(|| RepositorySourceScope {
+            workspace: self.route.workspace().dupe(),
+            module_name: CompactString::new(self.route.module_name()),
+        });
+    }
+}
+
+#[async_trait]
+impl Key for HostRepositorySourceFileKey {
+    type Value = SourcePreparationResult<HostRepositorySourceFileValue, RepositorySourceFileError>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let repo_relative_path = Arc::new(self.repo_relative_path.clone());
+        let path = match ctx
+            .compute(&HostRepositoryPathKey::new(
+                self.route.clone(),
+                self.repo_relative_path.clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(path))) => path,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    RepositorySourceFileError::ResolutionCompute {
+                        repo_relative_path,
+                        message: Arc::from(error.to_string()),
+                    },
+                ));
+            }
+        };
+        host_repository_source_file_value(source_outcome_from_path(
+            observed_repository_source_file_from_resolved(
                 ctx,
-                materialization,
-                relative,
+                path.resolved().dupe(),
                 repo_relative_path,
             )
             .await,
-        )
+        ))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1973,7 +2141,8 @@ mod tests {
 
     #[derive(Default)]
     struct HostSourceDependencyTracker {
-        dependencies: Mutex<Vec<String>>,
+        source_dependencies: Mutex<Vec<String>>,
+        path_dependencies: Mutex<Vec<String>>,
     }
 
     impl ActivationTracker for HostSourceDependencyTracker {
@@ -1984,7 +2153,12 @@ mod tests {
             _activation: ActivationData,
         ) {
             if key.downcast_ref::<HostRepositorySourceFileKey>().is_some() {
-                self.dependencies
+                self.source_dependencies
+                    .lock()
+                    .unwrap()
+                    .extend(deps.map(ToString::to_string));
+            } else if key.downcast_ref::<HostRepositoryPathKey>().is_some() {
+                self.path_dependencies
                     .lock()
                     .unwrap()
                     .extend(deps.map(ToString::to_string));
@@ -2065,6 +2239,25 @@ mod tests {
 
     fn local_route() -> RootRepositoryRoute {
         local_route_with_path("dep")
+    }
+
+    fn immutable_route() -> RootRepositoryRoute {
+        RootRepositoryRoute::for_test(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("dep_alias").unwrap(),
+            "dep".into(),
+            CanonicalRepoName::new("dep+").unwrap(),
+            RepoSpec {
+                rule_id: crate::RepoRuleId {
+                    bzl_file: CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "http_archive".into(),
+                },
+                attributes: Arc::default(),
+            },
+        )
     }
 
     fn host_source_value(path: &str, bytes: &[u8]) -> HostRepositorySourceFileValue {
@@ -2254,10 +2447,10 @@ mod tests {
             }
         );
 
-        let dependencies = tracker.dependencies.lock().unwrap().clone();
+        let dependencies = tracker.source_dependencies.lock().unwrap().clone();
         assert_eq!(
             dependencies,
-            ["repository-materialization-result:@@dep+".to_owned()]
+            ["host-repository-path:@@dep+:nested/BUILD.bazel".to_owned()]
         );
         assert!(dependencies.iter().all(|dependency| {
             !dependency.starts_with("repository-materialization:")
@@ -2265,6 +2458,10 @@ mod tests {
                 && !dependency.starts_with("root-module-files:")
                 && !dependency.starts_with("workspace-snapshot:")
         }));
+        assert_eq!(
+            *tracker.path_dependencies.lock().unwrap(),
+            ["repository-materialization-result:@@dep+".to_owned()]
+        );
     }
 
     #[tokio::test]
@@ -2723,6 +2920,327 @@ mod tests {
             }],
         )
         .unwrap()
+    }
+
+    fn immutable_material(
+        generation_root: &str,
+        observation_instance: PathObservationInstanceId,
+    ) -> RepositoryMaterializationResultEpoch {
+        let route = immutable_route();
+        RepositoryMaterializationResultEpoch::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            [RepositoryMaterializationEpochEntry {
+                request: Arc::new(RepositoryMaterializationRequest {
+                    id: RepositoryMaterializationRequestId {
+                        workspace: route.workspace().dupe(),
+                        canonical_repo: route.canonical_repo().clone(),
+                    },
+                    repo_spec: route.repo_spec().clone(),
+                    kind: RepositoryMaterializationKind::Immutable,
+                }),
+                result: RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Immutable {
+                        source_identity: Arc::from("fixed-content"),
+                        generation_root: PathBuf::from(generation_root),
+                        observation_instance,
+                    },
+                ),
+            }],
+        )
+        .unwrap()
+    }
+
+    fn host_path_epoch(
+        namespace: PathObservationNamespace,
+        requested: &str,
+        kind: Option<PathNodeKind>,
+        bytes: Option<&[u8]>,
+    ) -> PathObservationEpoch {
+        let requested = NormalizedAbsolutePath::new(requested).unwrap();
+        let demand = |path: NormalizedAbsolutePath, operation| {
+            PathObservationDemand::new(namespace, path, operation)
+        };
+        let lstat = |kind| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, 1, 2, 3, 4, 0o755,
+            )))
+        };
+        let mut observations = SmallMap::new();
+        for ancestor in requested.as_path().ancestors().skip(1) {
+            observations.insert(
+                demand(
+                    NormalizedAbsolutePath::new(ancestor.to_owned()).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                lstat(PathNodeKind::Directory),
+            );
+        }
+        observations.insert(
+            demand(requested.dupe(), PathObservationOperation::Lstat),
+            kind.map(lstat)
+                .unwrap_or(PathObservationResult::Lstat(PathOperationResult::Missing)),
+        );
+        if let Some(bytes) = bytes {
+            observations.insert(
+                demand(requested, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(bytes))),
+            );
+        }
+        PathObservationEpoch::new(observations).unwrap()
+    }
+
+    fn symlink_path_epoch(requested: &str, target: &str) -> PathObservationEpoch {
+        let requested = NormalizedAbsolutePath::new(requested).unwrap();
+        let target = NormalizedAbsolutePath::new(target).unwrap();
+        let demand = |path: NormalizedAbsolutePath, operation| {
+            PathObservationDemand::new(PathObservationNamespace::Host, path, operation)
+        };
+        let lstat = |kind| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, 1, 2, 3, 4, 0o755,
+            )))
+        };
+        let mut observations = SmallMap::new();
+        for path in [requested.as_path(), target.as_path()] {
+            for ancestor in path.ancestors().skip(1) {
+                observations.insert(
+                    demand(
+                        NormalizedAbsolutePath::new(ancestor.to_owned()).unwrap(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    lstat(PathNodeKind::Directory),
+                );
+            }
+        }
+        observations.insert(
+            demand(requested.dupe(), PathObservationOperation::Lstat),
+            lstat(PathNodeKind::Symlink),
+        );
+        observations.insert(
+            demand(requested, PathObservationOperation::ReadLink),
+            PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(
+                target.as_path().to_owned(),
+            ))),
+        );
+        observations.insert(
+            demand(target, PathObservationOperation::Lstat),
+            lstat(PathNodeKind::RegularFile),
+        );
+        PathObservationEpoch::new(observations).unwrap()
+    }
+
+    async fn host_path_transaction(
+        dice: &Arc<Dice>,
+        materialization: RepositoryMaterializationResultEpoch,
+        observations: PathObservationEpoch,
+    ) -> dice::DiceTransaction {
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, observations)])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                materialization,
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    fn resolved_kind(path: &HostRepositoryPathValue) -> Option<PathNodeKind> {
+        match path.resolved().state() {
+            ResolvedPathState::Missing => None,
+            ResolvedPathState::Present(lstat) => Some(lstat.kind()),
+        }
+    }
+
+    #[tokio::test]
+    async fn host_repository_path_completes_all_kinds_before_source_file_bytes() {
+        for kind in [
+            None,
+            Some(PathNodeKind::RegularFile),
+            Some(PathNodeKind::SpecialFile),
+            Some(PathNodeKind::Directory),
+        ] {
+            let dice = Dice::builder().build(DetectCycles::Enabled);
+            let mut transaction = host_path_transaction(
+                &dice,
+                material("dep"),
+                host_path_epoch(
+                    PathObservationNamespace::Host,
+                    "/workspace/dep/BUILD.bazel",
+                    kind,
+                    None,
+                ),
+            )
+            .await;
+            let route = local_route();
+            let path_key = HostRepositoryPathKey::new(route.clone(), PathBuf::from("BUILD.bazel"));
+            let SourcePreparationOutcome::Complete(Ok(path)) =
+                transaction.compute(&path_key).await.unwrap()
+            else {
+                panic!("path-only lookup must complete without FileBytes");
+            };
+            assert_eq!(path.resolved().namespace(), PathObservationNamespace::Host);
+            assert_eq!(
+                path.resolved().requested_path().as_path(),
+                Path::new("/workspace/dep/BUILD.bazel")
+            );
+            assert_eq!(resolved_kind(&path), kind);
+
+            let source = transaction
+                .compute(&HostRepositorySourceFileKey::new(
+                    route,
+                    PathBuf::from("BUILD.bazel"),
+                ))
+                .await
+                .unwrap();
+            match kind {
+                None => assert!(matches!(
+                    source,
+                    SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent))
+                )),
+                Some(PathNodeKind::RegularFile | PathNodeKind::SpecialFile) => {
+                    let needs = need(source);
+                    let demands = needs.path_observations().unwrap().demands();
+                    assert_eq!(demands.len(), 1);
+                    assert_eq!(demands[0].operation(), PathObservationOperation::FileBytes);
+                    assert_eq!(
+                        demands[0].path().as_path(),
+                        Path::new("/workspace/dep/BUILD.bazel")
+                    );
+                }
+                Some(actual) => assert!(matches!(
+                    source,
+                    SourcePreparationOutcome::Complete(Err(
+                        RepositorySourceFileError::WrongKind { actual: found, .. }
+                    )) if found == actual
+                )),
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn host_repository_path_tracks_symlink_retarget_and_create_delete_recovery() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let key = HostRepositoryPathKey::new(local_route(), PathBuf::from("link"));
+        for target in ["/physical/a", "/physical/b"] {
+            let mut transaction = host_path_transaction(
+                &dice,
+                material("dep"),
+                symlink_path_epoch("/workspace/dep/link", target),
+            )
+            .await;
+            let SourcePreparationOutcome::Complete(Ok(path)) =
+                transaction.compute(&key).await.unwrap()
+            else {
+                panic!("symlink path must resolve");
+            };
+            assert_eq!(path.resolved().real_path().as_path(), Path::new(target));
+            assert_eq!(resolved_kind(&path), Some(PathNodeKind::RegularFile));
+        }
+
+        let file_key = HostRepositoryPathKey::new(local_route(), PathBuf::from("created"));
+        for kind in [
+            Some(PathNodeKind::RegularFile),
+            None,
+            Some(PathNodeKind::RegularFile),
+        ] {
+            let mut transaction = host_path_transaction(
+                &dice,
+                material("dep"),
+                host_path_epoch(
+                    PathObservationNamespace::Host,
+                    "/workspace/dep/created",
+                    kind,
+                    None,
+                ),
+            )
+            .await;
+            let SourcePreparationOutcome::Complete(Ok(path)) =
+                transaction.compute(&file_key).await.unwrap()
+            else {
+                panic!("create/delete lifecycle must remain complete");
+            };
+            assert_eq!(resolved_kind(&path), kind);
+        }
+    }
+
+    #[tokio::test]
+    async fn host_repository_path_route_aba_and_immutable_identity_are_exact() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut seen = Vec::new();
+        for root in ["dep-a", "dep-b", "dep-a"] {
+            let route = local_route_with_path(root);
+            let key = HostRepositoryPathKey::new(route, PathBuf::from("BUILD.bazel"));
+            let expected = format!("/workspace/{root}/BUILD.bazel");
+            let mut transaction = host_path_transaction(
+                &dice,
+                material(root),
+                host_path_epoch(
+                    PathObservationNamespace::Host,
+                    &expected,
+                    Some(PathNodeKind::RegularFile),
+                    None,
+                ),
+            )
+            .await;
+            let SourcePreparationOutcome::Complete(Ok(path)) =
+                transaction.compute(&key).await.unwrap()
+            else {
+                panic!("local route path must complete");
+            };
+            assert_eq!(
+                path.resolved().requested_path().as_path(),
+                Path::new(&expected)
+            );
+            seen.push((key, path));
+        }
+        assert_ne!(seen[0].0, seen[1].0);
+        assert_eq!(seen[0].0, seen[2].0);
+        assert_ne!(seen[0].1, seen[1].1);
+        assert_eq!(seen[0].1, seen[2].1);
+
+        let route = immutable_route();
+        let key = HostRepositoryPathKey::new(route.clone(), PathBuf::from("BUILD.bazel"));
+        assert_eq!(
+            DynKey::from_key(key.clone()).request_value::<RepositorySourceScope>(),
+            Some(RepositorySourceScope {
+                workspace: route.workspace().dupe(),
+                module_name: "dep".into(),
+            })
+        );
+        let mut immutable_paths = Vec::new();
+        for (generation_root, instance_id) in [("/generation/41", 41), ("/generation/42", 42)] {
+            let instance = PathObservationInstanceId::new(instance_id);
+            let namespace = PathObservationNamespace::Materialization(instance);
+            let expected = format!("{generation_root}/BUILD.bazel");
+            let mut transaction = host_path_transaction(
+                &dice,
+                immutable_material(generation_root, instance),
+                host_path_epoch(namespace, &expected, Some(PathNodeKind::SpecialFile), None),
+            )
+            .await;
+            let SourcePreparationOutcome::Complete(Ok(path)) =
+                transaction.compute(&key).await.unwrap()
+            else {
+                panic!("immutable path must complete");
+            };
+            assert_eq!(path.resolved().namespace(), namespace);
+            assert_eq!(
+                path.resolved().requested_path().as_path(),
+                Path::new(&expected)
+            );
+            assert_eq!(
+                path.resolved().requested_path(),
+                path.resolved().real_path()
+            );
+            assert_eq!(resolved_kind(&path), Some(PathNodeKind::SpecialFile));
+            immutable_paths.push(path);
+        }
+        assert_ne!(immutable_paths[0], immutable_paths[1]);
     }
     async fn complete(
         dice: &Arc<Dice>,
