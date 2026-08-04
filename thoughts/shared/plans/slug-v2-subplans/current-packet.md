@@ -1,31 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-module-file-handoff-evidence-cap-redesign`
+Packet: `WP-5-m1-direct-local-module-file-handoff-corrected-implementation`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: read-only evidence-budget correction before implementation retry
+Role: corrected one-file dormant implementation before discovery composition
 Evidence: accepted direct `local_path_override` route,
 `HostRootModuleFileKey`, `HostRepositorySourceFileKey`, and the accepted
-direct-local handoff design plus rejected-draft cap evidence in the owner plan.
+direct-local handoff design/cap correction in the owner plan.
 
-Do not edit Rust, tests, fixtures, tools, harnesses, or generated evidence.
-Preserve the accepted private `(workspace, apparent_repo)` route-then-source
-key/value/error contract, exact one-file boundary, 100-line production cap,
-unselected semantics, and all stop gates.
+Rebuild the accepted private `(workspace, apparent_repo)` key from clean HEAD
+in only `app/slug_bzlmod_v2/src/source_preparation.rs`. It computes the existing
+route first and then only the fixed `MODULE.bazel` Host source child, retains
+an unselected opaque route plus Present/Absent source, forwards Needs exactly,
+uses complete-only equality/validity, and owns no event or bootstrap effect.
 
-Use the rejected correction only for mechanical accounting: it occupied 349
-net test lines after non-vacuous cold Evaluated/no-data and version-only warm
-Reused/no-data activation evidence. Freeze additional line allocations for
-exact outer-versus-child root-bootstrap Need equality, exact path-observation
-Need equality, and the complete materialization request including canonical
-repository, local logical root, and structural `RepoSpec`. Preserve the
-existing constructor, Present/Absent, distinct typed `RouteCompute`, `Route`,
-`SourceCompute`, and `Source` discriminators, create/edit/delete/recreate,
-same-outer-key reroute/recovery, version pruning, dependency order, and
-no-event assertions.
+Retain every accepted constructor, value/error, dependency-order, lifecycle,
+reroute, version-pruning, and non-vacuous cold/warm no-data discriminator. Add
+exact extracted outer-versus-child bootstrap and path Need equality plus full
+materialization request equality including workspace/id, canonical repository,
+Local logical root, and structural `RepoSpec`. Preserve distinct
+`RouteCompute`, `Route`, `SourceCompute`, and `Source` variants. Because real
+child infrastructure failure is not injectable without a forbidden hook,
+compute-error evidence is construction/equality plus a structural no-fault-hook
+scan; semantic route/source errors use real keys.
 
-Set the smallest honest test and total caps with explicit arithmetic and
-compaction slack; production remains at 100. No implementation starts before
-independent latest-text acceptance. Stop with **REPLAN** on a second file,
-oracle growth, production/API/semantic widening, removal of a mandatory
-discriminator, or any previously frozen stop.
+Caps are 100 production, 440 tests, and 540 total. The test arithmetic is 349
+retained + 68 mandatory additions + 23 compaction/rustfmt slack. Run the exact
+serial validation and all stops from the accepted design. Do not edit or run
+an oracle, add a second file, export/call the key, or widen semantics. Stop
+with **REPLAN** on any previous stop or cap excess.

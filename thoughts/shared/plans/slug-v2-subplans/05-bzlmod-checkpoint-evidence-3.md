@@ -17871,3 +17871,41 @@ preserve all four typed compute/semantic-error discriminators, freeze a new
 test/total cap with hard arithmetic, and obtain independent
 latest-text acceptance before rebuilding Rust. Discarded code supplies
 negative/cap evidence only and receives no validation credit.
+
+### WP-5-m1 direct-local handoff evidence-cap redesign (2026-08-04)
+
+**Status: ACCEPTED; retry only
+`WP-5-m1-direct-local-module-file-handoff-corrected-implementation`.** Preserve
+the accepted production design, one-file allowlist, 100-line production cap,
+and all semantic, API, activation, and architecture stops unchanged.
+
+The rejected corrected draft used 349 net test lines. Retain all of that
+evidence, including the four distinct error discriminators and non-vacuous
+cold Evaluated/no-data plus version-only warm Reused/no-data activations. Add
+at most 68 test lines: 22 for a missing-root fixture and exact extracted
+outer-versus-`RootRepositoryRouteKey` bootstrap Need equality, 28 for a
+complete root/materialization with incomplete source observation and exact
+extracted outer-versus-`HostRepositorySourceFileKey` path Need equality, eight
+to replace the materialization-count assertion with full request equality, and
+ten for shared helper/import plumbing. Compare extracted
+`SourcePreparationNeeds`, not heterogeneous enclosing outcome types.
+
+Full materialization equality covers workspace/request identity, canonical
+repository, Local logical root, and the complete structural `RepoSpec`.
+`RouteCompute` and `SourceCompute` remain distinct private variants, but the
+controlled real-child DICE fixture cannot inject infrastructure compute
+failure without a forbidden fault key/hook. Preserve their construction/
+equality discriminator and add an exact structural scan declaring no
+test-only child replacement; runtime fault injection is not authorized.
+`Route` and `Source` semantic errors remain real-key evidence.
+
+The corrected caps are 100 net production lines, 440 net test lines, and 540
+total: 349 retained + 68 mandatory additions + 23 compaction/rustfmt slack =
+440, and 100 + 440 = 540. The slack authorizes no new behavior, owner, hook,
+file, or discriminator. Independent cap review rejected both a tighter
+430-line test bound as fragile and a looser 450-line bound as unjustified.
+
+Rebuild from clean `fbb0775d`-descended HEAD; discarded Rust receives no
+validation credit. Run the exact validation and stops in the accepted design,
+record the known clean-baseline proxy-span failure separately if it recurs,
+and obtain independent latest-diff review before acceptance.
