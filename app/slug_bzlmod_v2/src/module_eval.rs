@@ -2732,6 +2732,81 @@ struct SuppliedNonrootModuleFile<'a> {
     source: &'a [u8],
 }
 
+pub(crate) struct DirectNonregistryIncludeFile<'a> {
+    pub(crate) raw_label: &'a str,
+    pub(crate) logical_id: LogicalModuleFileId,
+    pub(crate) source: &'a [u8],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum DirectNonregistryEvaluationError {
+    Preparation(CompactString),
+    Execution(CompactString),
+    Finalization(CompactString),
+    DeclaredNameMismatch {
+        expected: NonrootModuleKey,
+        declared: CompactString,
+    },
+    DeclaredVersionMismatch {
+        expected: NonrootModuleKey,
+        declared: CompactString,
+    },
+}
+
+impl fmt::Display for DirectNonregistryEvaluationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Preparation(message) => write!(f, "failed to prepare MODULE closure: {message}"),
+            Self::Execution(message) => write!(f, "failed to execute MODULE closure: {message}"),
+            Self::Finalization(message) => {
+                write!(f, "failed to finalize MODULE closure: {message}")
+            }
+            Self::DeclaredNameMismatch { expected, declared } => write!(
+                f,
+                "the MODULE.bazel file of {}@{} declares a different name ({declared})",
+                expected.name, expected.version
+            ),
+            Self::DeclaredVersionMismatch { expected, declared } => write!(
+                f,
+                "the MODULE.bazel file of {}@{} declares a different version ({declared})",
+                expected.name, expected.version
+            ),
+        }
+    }
+}
+
+impl std::error::Error for DirectNonregistryEvaluationError {}
+
+enum NonrootEvaluationFailure {
+    Preparation(anyhow::Error),
+    Execution(anyhow::Error),
+    Finalization(anyhow::Error),
+}
+
+impl NonrootEvaluationFailure {
+    fn into_anyhow(self) -> anyhow::Error {
+        match self {
+            Self::Preparation(error) | Self::Execution(error) | Self::Finalization(error) => error,
+        }
+    }
+}
+
+impl From<NonrootEvaluationFailure> for DirectNonregistryEvaluationError {
+    fn from(error: NonrootEvaluationFailure) -> Self {
+        match error {
+            NonrootEvaluationFailure::Preparation(error) => {
+                Self::Preparation(CompactString::new(error.to_string()))
+            }
+            NonrootEvaluationFailure::Execution(error) => {
+                Self::Execution(CompactString::new(error.to_string()))
+            }
+            NonrootEvaluationFailure::Finalization(error) => {
+                Self::Finalization(CompactString::new(error.to_string()))
+            }
+        }
+    }
+}
+
 #[allow(dead_code)]
 fn evaluate_nonroot_module_file_with_includes(
     expected_key: NonrootModuleKey,
@@ -2791,32 +2866,136 @@ fn evaluate_nonroot_module_file_with_includes(
         )
         .into());
     }
-    let source = std::str::from_utf8(source).context("MODULE file is not valid UTF-8")?;
-    let root_ast = AstModule::parse(
-        logical_id.0.as_str(),
-        source.to_owned(),
-        &nonroot_module_dialect(),
+    let reject_print = RejectPrint;
+    let evaluated = evaluate_nonroot_module_closure(
+        expected_key,
+        logical_id,
+        source,
+        supplied,
+        include_indices,
+        file_ids,
+        Some(&reject_print),
+        force_gc_after_eval,
+        true,
     )
-    .map_err(starlark::Error::into_anyhow)?;
-    let supplied_asts = supplied
-        .iter()
-        .map(|file| {
-            let source = std::str::from_utf8(file.source)
-                .context("included MODULE file is not valid UTF-8")?;
-            AstModule::parse(
-                file.logical_id.0.as_str(),
-                source.to_owned(),
-                &nonroot_module_dialect(),
-            )
-            .map_err(starlark::Error::into_anyhow)
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-    let builder = NonrootModuleBuilder::new(
-        expected_key.clone(),
-        expected_key.name.clone(),
-        expected_key.version.clone(),
-        expected_key.name.clone(),
-    );
+    .map_err(NonrootEvaluationFailure::into_anyhow)?;
+    Ok(evaluated)
+}
+
+pub(crate) fn evaluate_direct_nonregistry_module_closure_with_events(
+    expected_key: NonrootModuleKey,
+    logical_id: LogicalModuleFileId,
+    source: &[u8],
+    included: &[DirectNonregistryIncludeFile<'_>],
+    capture_events: bool,
+) -> (
+    Result<EvaluatedNonrootModule, DirectNonregistryEvaluationError>,
+    Option<EventBatch>,
+) {
+    let capture = capture_events.then(RootModulePrintCapture::default);
+    let value = (|| -> Result<_, NonrootEvaluationFailure> {
+        let supplied = included
+            .iter()
+            .map(|file| SuppliedNonrootModuleFile {
+                raw_label: file.raw_label,
+                logical_id: file.logical_id.clone(),
+                source: file.source,
+            })
+            .collect::<Vec<_>>();
+        let mut include_indices = SmallMap::with_capacity(supplied.len());
+        let mut file_ids = Vec::with_capacity(supplied.len() + 1);
+        file_ids.push(logical_id.clone());
+        for (index, file) in supplied.iter().enumerate() {
+            include_path(Path::new("."), file.raw_label)
+                .map_err(NonrootIncludeError::BadLabel)
+                .map_err(anyhow::Error::new)
+                .map_err(NonrootEvaluationFailure::Preparation)?;
+            include_indices.insert(CompactString::from(file.raw_label), index + 1);
+            file_ids.push(file.logical_id.clone());
+        }
+        let evaluated = evaluate_nonroot_module_closure(
+            expected_key.clone(),
+            logical_id,
+            source,
+            &supplied,
+            include_indices,
+            file_ids,
+            capture.as_ref().map(|capture| capture as &dyn PrintHandler),
+            false,
+            false,
+        )?;
+        Ok(evaluated)
+    })()
+    .map_err(DirectNonregistryEvaluationError::from)
+    .and_then(|evaluated| validate_nonroot_module_identity(expected_key, evaluated));
+    (value, capture.map(RootModulePrintCapture::into_batch))
+}
+
+fn validate_nonroot_module_identity(
+    expected: NonrootModuleKey,
+    evaluated: EvaluatedNonrootModule,
+) -> Result<EvaluatedNonrootModule, DirectNonregistryEvaluationError> {
+    if evaluated.base.declared_name != expected.name {
+        return Err(DirectNonregistryEvaluationError::DeclaredNameMismatch {
+            declared: evaluated.base.declared_name.clone(),
+            expected,
+        });
+    }
+    if !expected.version.is_empty() && evaluated.base.declared_version != expected.version {
+        return Err(DirectNonregistryEvaluationError::DeclaredVersionMismatch {
+            declared: evaluated.base.declared_version.clone(),
+            expected,
+        });
+    }
+    Ok(evaluated)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn evaluate_nonroot_module_closure(
+    expected_key: NonrootModuleKey,
+    logical_id: LogicalModuleFileId,
+    source: &[u8],
+    supplied: &[SuppliedNonrootModuleFile<'_>],
+    include_indices: SmallMap<CompactString, usize>,
+    file_ids: Vec<LogicalModuleFileId>,
+    print_handler: Option<&dyn PrintHandler>,
+    force_gc_after_eval: bool,
+    seed_expected_declaration: bool,
+) -> Result<EvaluatedNonrootModule, NonrootEvaluationFailure> {
+    let (root_ast, supplied_asts) = (|| {
+        let source = std::str::from_utf8(source).context("MODULE file is not valid UTF-8")?;
+        let root_ast = AstModule::parse(
+            logical_id.0.as_str(),
+            source.to_owned(),
+            &nonroot_module_dialect(),
+        )
+        .map_err(starlark::Error::into_anyhow)?;
+        let supplied_asts = supplied
+            .iter()
+            .map(|file| {
+                let source = std::str::from_utf8(file.source)
+                    .context("included MODULE file is not valid UTF-8")?;
+                AstModule::parse(
+                    file.logical_id.0.as_str(),
+                    source.to_owned(),
+                    &nonroot_module_dialect(),
+                )
+                .map_err(starlark::Error::into_anyhow)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        Ok::<_, anyhow::Error>((root_ast, supplied_asts))
+    })()
+    .map_err(NonrootEvaluationFailure::Preparation)?;
+    let builder = if seed_expected_declaration {
+        NonrootModuleBuilder::new(
+            expected_key.clone(),
+            expected_key.name.clone(),
+            expected_key.version.clone(),
+            expected_key.name.clone(),
+        )
+    } else {
+        NonrootModuleBuilder::new(expected_key, "", "", "")
+    };
     let context = NonrootEvalContext {
         state: RefCell::new(NonrootEvalState {
             logical_id: logical_id.clone(),
@@ -2834,10 +3013,9 @@ fn evaluate_nonroot_module_file_with_includes(
     let globals = GlobalsBuilder::extended_by(&[LibraryExtension::Print])
         .with(nonroot_module_globals)
         .build();
-    let reject_print = RejectPrint;
     let module = Module::new();
     let included_modules: Vec<_> = supplied.iter().map(|_| Box::new(Module::new())).collect();
-    let programs = {
+    let programs = (|| {
         let mut evaluator = Evaluator::new(&module);
         let mut programs = Vec::with_capacity(supplied.len() + 1);
         programs.push(
@@ -2852,19 +3030,23 @@ fn evaluate_nonroot_module_file_with_includes(
                     .map_err(starlark::Error::into_anyhow)?,
             );
         }
-        programs
-    };
-    {
-        let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&context);
-        evaluator.set_print_handler(&reject_print);
-        evaluator
-            .set_prepared_modules(programs)
-            .map_err(starlark::Error::into_anyhow)?;
-        evaluator
-            .eval_prepared_module_index(0)
-            .map_err(starlark::Error::into_anyhow)?;
+        Ok::<_, anyhow::Error>(programs)
+    })()
+    .map_err(NonrootEvaluationFailure::Preparation)?;
+    let mut evaluator = Evaluator::new(&module);
+    evaluator.extra = Some(&context);
+    if let Some(print_handler) = print_handler {
+        evaluator.set_print_handler(print_handler);
     }
+    evaluator
+        .set_prepared_modules(programs)
+        .map_err(starlark::Error::into_anyhow)
+        .map_err(NonrootEvaluationFailure::Preparation)?;
+    evaluator
+        .eval_prepared_module_index(0)
+        .map_err(starlark::Error::into_anyhow)
+        .map_err(NonrootEvaluationFailure::Execution)?;
+    drop(evaluator);
     let modules: Vec<&Module> = std::iter::once(&module)
         .chain(included_modules.iter().map(Box::as_ref))
         .collect();
@@ -2887,53 +3069,61 @@ fn evaluate_nonroot_module_file_with_includes(
                 "gc_probe = 1".to_owned(),
                 &nonroot_module_dialect(),
             )
-            .map_err(starlark::Error::into_anyhow)?;
+            .map_err(starlark::Error::into_anyhow)
+            .map_err(NonrootEvaluationFailure::Finalization)?;
             let mut evaluator = Evaluator::new(module);
             evaluator
                 .eval_module(probe, &globals)
-                .map_err(starlark::Error::into_anyhow)?;
-            anyhow::ensure!(
-                module.heap().allocated_bytes() < before / 2,
-                "non-root GC probe did not collect unreachable evaluator data for file {index}"
-            );
+                .map_err(starlark::Error::into_anyhow)
+                .map_err(NonrootEvaluationFailure::Finalization)?;
+            if module.heap().allocated_bytes() >= before / 2 {
+                return Err(NonrootEvaluationFailure::Finalization(anyhow::anyhow!(
+                    "non-root GC probe did not collect unreachable evaluator data for file {index}"
+                )));
+            }
         }
     }
-    let builtin_print = globals
-        .iter()
-        .find_map(|(name, value)| (name == "print").then_some(value.to_value().identity()))
-        .context("print global is absent")?;
-    let mut state = context.state.into_inner();
-    let mut proxy_ids = SmallSet::new();
-    for root in &state.roots {
-        if matches!(root.kind, NonrootRootKind::Proxy) {
-            proxy_ids.insert(
-                modules[root.file]
-                    .get(root.name.as_str())
-                    .context("missing hidden proxy root")?
-                    .identity(),
-            );
+    (|| {
+        let builtin_print = globals
+            .iter()
+            .find_map(|(name, value)| (name == "print").then_some(value.to_value().identity()))
+            .context("print global is absent")?;
+        let mut state = context.state.into_inner();
+        let mut proxy_ids = SmallSet::new();
+        for root in &state.roots {
+            if matches!(root.kind, NonrootRootKind::Proxy) {
+                proxy_ids.insert(
+                    modules[root.file]
+                        .get(root.name.as_str())
+                        .context("missing hidden proxy root")?
+                        .identity(),
+                );
+            }
         }
-    }
-    let identities = deferred_attribute_snapshot_identities(builtin_print, proxy_ids);
-    let roots: Vec<_> = state
-        .roots
-        .iter()
-        .filter_map(|root| match root.kind {
-            NonrootRootKind::Tag { usage, tag } => Some((root.file, root.name.clone(), usage, tag)),
-            _ => None,
-        })
-        .collect();
-    for (file, name, usage, tag) in roots {
-        let attrs = DictRef::from_value(
-            modules[file]
-                .get(name.as_str())
-                .context("missing hidden tag root")?,
-        )
-        .context("hidden tag root is not a dict")?;
-        let values = snapshot_deferred_attribute_values(attrs, &identities)?;
-        state.usages[usage].tags[tag].attributes = Some(values);
-    }
-    finalize_nonroot_state(state)
+        let identities = deferred_attribute_snapshot_identities(builtin_print, proxy_ids);
+        let roots: Vec<_> = state
+            .roots
+            .iter()
+            .filter_map(|root| match root.kind {
+                NonrootRootKind::Tag { usage, tag } => {
+                    Some((root.file, root.name.clone(), usage, tag))
+                }
+                _ => None,
+            })
+            .collect();
+        for (file, name, usage, tag) in roots {
+            let attrs = DictRef::from_value(
+                modules[file]
+                    .get(name.as_str())
+                    .context("missing hidden tag root")?,
+            )
+            .context("hidden tag root is not a dict")?;
+            let values = snapshot_deferred_attribute_values(attrs, &identities)?;
+            state.usages[usage].tags[tag].attributes = Some(values);
+        }
+        finalize_nonroot_state(state)
+    })()
+    .map_err(NonrootEvaluationFailure::Finalization)
 }
 
 #[allow(dead_code)]
@@ -3029,6 +3219,214 @@ mod nonroot_directive_evaluator_tests {
             supplied,
             true,
         )
+    }
+
+    fn evaluate_direct<'a>(
+        expected: NonrootModuleKey,
+        source: &str,
+        included: &[DirectNonregistryIncludeFile<'a>],
+        capture: bool,
+    ) -> (
+        Result<EvaluatedNonrootModule, DirectNonregistryEvaluationError>,
+        Option<EventBatch>,
+    ) {
+        evaluate_direct_nonregistry_module_closure_with_events(
+            expected,
+            LogicalModuleFileId::new("@@subject+//:MODULE.bazel"),
+            source.as_bytes(),
+            included,
+            capture,
+        )
+    }
+
+    #[test]
+    fn strict_supplied_file_seam_keeps_expected_seed_without_identity_validation() {
+        let omitted = evaluate("").unwrap();
+        assert_eq!(omitted.base.declared_name, "subject");
+        assert_eq!(omitted.base.declared_version, "1.0");
+        assert_eq!(omitted.base.repo_name, "subject");
+
+        let mismatched = evaluate("module(name='other', version='2.0')").unwrap();
+        assert_eq!(
+            mismatched.base.expected_key,
+            NonrootModuleKey::new("subject", "1.0")
+        );
+        assert_eq!(mismatched.base.declared_name, "other");
+        assert_eq!(mismatched.base.declared_version, "2.0");
+    }
+
+    #[test]
+    fn shared_core_installs_the_prepared_table_in_the_preparation_stage() {
+        let source = include_str!("module_eval.rs");
+        let core = source
+            .split("fn evaluate_nonroot_module_closure(")
+            .nth(1)
+            .unwrap()
+            .split("fn finalize_nonroot_state")
+            .next()
+            .unwrap();
+        let install = core.find(".set_prepared_modules(programs)").unwrap();
+        let execute = core.find(".eval_prepared_module_index(0)").unwrap();
+        assert!(install < execute);
+        assert!(core[install..execute].contains("NonrootEvaluationFailure::Preparation"));
+    }
+
+    #[test]
+    fn direct_adapter_separates_expected_identity_from_empty_declarations() {
+        let (omitted, batch) = evaluate_direct(
+            NonrootModuleKey::new("subject", ""),
+            "print('prefix')",
+            &[],
+            true,
+        );
+        assert!(matches!(
+            omitted,
+            Err(DirectNonregistryEvaluationError::DeclaredNameMismatch {
+                expected,
+                declared,
+            }) if expected == NonrootModuleKey::new("subject", "") && declared.is_empty()
+        ));
+        assert!(matches!(
+            batch.as_ref().map(EventBatch::events),
+            Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "prefix"
+        ));
+
+        let (name_first, _) = evaluate_direct(
+            NonrootModuleKey::new("subject", "1.0"),
+            "module(name='other', version='2.0')",
+            &[],
+            false,
+        );
+        assert!(matches!(
+            name_first,
+            Err(DirectNonregistryEvaluationError::DeclaredNameMismatch {
+                expected,
+                declared,
+            }) if expected.version == "1.0" && declared == "other"
+        ));
+
+        let (version, _) = evaluate_direct(
+            NonrootModuleKey::new("subject", "1.0"),
+            "module(name='subject', version='2.0')",
+            &[],
+            false,
+        );
+        assert!(matches!(
+            version,
+            Err(DirectNonregistryEvaluationError::DeclaredVersionMismatch {
+                expected,
+                declared,
+            }) if expected.version == "1.0" && declared == "2.0"
+        ));
+
+        let (accepted, batch) = evaluate_direct(
+            NonrootModuleKey::new("subject", ""),
+            "module(name='subject', version='2.0')",
+            &[],
+            false,
+        );
+        let accepted = accepted.unwrap();
+        assert_eq!(accepted.base.expected_key.version, "");
+        assert_eq!(accepted.base.declared_version, "2.0");
+        assert_eq!(accepted.base.repo_name, "subject");
+        assert!(batch.is_none());
+    }
+
+    #[test]
+    fn direct_adapter_prepares_every_occurrence_and_uses_last_raw_label() {
+        let included = [
+            DirectNonregistryIncludeFile {
+                raw_label: "//:same.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:first.MODULE.bazel"),
+                source: b"print('first')",
+            },
+            DirectNonregistryIncludeFile {
+                raw_label: "//:same.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:last.MODULE.bazel"),
+                source: b"print('last')",
+            },
+        ];
+        let (evaluated, batch) = evaluate_direct(
+            NonrootModuleKey::new("subject", ""),
+            "module(name='subject')\ninclude('//:same.MODULE.bazel')\ninclude('//:same.MODULE.bazel')",
+            &included,
+            true,
+        );
+        evaluated.unwrap();
+        let events = batch.unwrap();
+        assert!(matches!(
+            events.events(),
+            [
+                EvaluationEvent::StarlarkPrint { location: first, text: first_text },
+                EvaluationEvent::StarlarkPrint { location: second, text: second_text },
+            ] if first_text == "last"
+                && second_text == "last"
+                && first.to_string().contains("last.MODULE.bazel")
+                && second.to_string().contains("last.MODULE.bazel")
+        ));
+
+        let invalid = [
+            DirectNonregistryIncludeFile {
+                raw_label: "//:same.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:invalid.MODULE.bazel"),
+                source: b"value = undefined_earlier_occurrence",
+            },
+            DirectNonregistryIncludeFile {
+                raw_label: "//:same.MODULE.bazel",
+                logical_id: LogicalModuleFileId::new("@@subject+//:valid.MODULE.bazel"),
+                source: b"value = 1",
+            },
+        ];
+        let (error, batch) = evaluate_direct(
+            NonrootModuleKey::new("subject", ""),
+            "module(name='subject')\nprint('root-not-run')\ninclude('//:same.MODULE.bazel')",
+            &invalid,
+            true,
+        );
+        assert!(matches!(
+            error,
+            Err(DirectNonregistryEvaluationError::Preparation(message))
+                if message.contains("undefined_earlier_occurrence")
+        ));
+        assert!(batch.unwrap().events().is_empty());
+    }
+
+    #[test]
+    fn direct_adapter_prints_directly_or_captures_nested_prefix_before_failure() {
+        let (direct, batch) = evaluate_direct(
+            NonrootModuleKey::new("subject", ""),
+            "module(name='subject')\nprint('direct')",
+            &[],
+            false,
+        );
+        direct.unwrap();
+        assert!(batch.is_none());
+
+        let included = [DirectNonregistryIncludeFile {
+            raw_label: "//:child.MODULE.bazel",
+            logical_id: LogicalModuleFileId::new("@@subject+//:child.MODULE.bazel"),
+            source: b"print('child')\nfail('boom')",
+        }];
+        let (error, batch) = evaluate_direct(
+            NonrootModuleKey::new("subject", ""),
+            "module(name='subject')\nprint('root')\ninclude('//:child.MODULE.bazel')",
+            &included,
+            true,
+        );
+        assert!(matches!(
+            error,
+            Err(DirectNonregistryEvaluationError::Execution(message)) if message.contains("boom")
+        ));
+        assert!(matches!(
+            batch.unwrap().events(),
+            [
+                EvaluationEvent::StarlarkPrint { location: root, text: root_text },
+                EvaluationEvent::StarlarkPrint { location: child, text: child_text },
+            ] if root_text == "root"
+                && child_text == "child"
+                && root.to_string().contains(":MODULE.bazel")
+                && child.to_string().contains("child.MODULE.bazel")
+        ));
     }
 
     #[test]
