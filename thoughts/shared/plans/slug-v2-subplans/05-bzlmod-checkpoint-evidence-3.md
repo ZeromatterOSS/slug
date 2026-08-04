@@ -16882,3 +16882,70 @@ This satisfies the activation design's sole missing discriminator. Schedule
 only `WP-5-m1-external-bzl-package-query-activation-implementation`; its scope
 is the already-accepted activation architecture and residual stops above,
 with no implicit extension.
+
+### WP-5-m1 external Bzl package/query activation implementation closure (2026-08-04)
+
+**Status: REPLAN — the six-path activation core is accepted and retained
+uncommitted; the frozen Slug replay is blocked before query evaluation by one
+separate command-parser prerequisite.** The implementation remains exactly the
+accepted six paths at `+793/-21`. `RepositoryPackageLoadKey` stays the sole
+package owner, all direct loads are normalized before sequential child
+computes, raw-load/frozen-module pairs and retained manifest lifetime pass
+through the package attempt, loaded target kinds are gated exactly as designed,
+and external query provenance preserves the retained apparent owner while
+reusing the emitted external BUILD companion without root discovery.
+Independent latest-diff reviews returned **ACCEPT core** with no correction.
+
+The accepted three macro-query outputs are exact when invoked without
+`--noshow_progress`, but the byte-frozen Slug replay fails before query:
+`common.rs` already classifies `noshow_progress` as `IgnoredCompatible`, while
+loading-query validation rejects every flag outside its command-local
+allowlist. The frozen three Bazel 9.2 rows all carry bare
+`--noshow_progress`; no activation-core or fixture edit is authorized. Retain
+the six dirty core paths byte-for-byte as validation-only state and schedule
+only the exact parser prerequisite below. After it passes, rebuild the CLI,
+replay the unchanged macro rows, and terminally accept the retained core and
+prerequisite together. The full 20-row replay may retain only the pre-existing
+unrelated `build_dep_target` row failure.
+
+## WP-5-m1 bare query `--noshow_progress` compatibility design (2026-08-04)
+
+**Status: ACCEPTED — implement only
+`WP-5-m1-query-noshow-progress-compatibility-implementation`.** Reuse the
+accepted Bazel 9.2 macro-query oracle and independent Bazel 9.2 parser probe;
+do not run Bazel or change any fixture.
+
+The exact production behavior is one loading-query validation exception:
+accept a parsed flag only when its name is exactly `noshow_progress` and its
+value is `None`, and give it no effect on output, order, graph, query policy,
+Bzlmod policy, or evaluation. Preserve it in the existing `QueryRequest.flags`
+vector. Existing `split_args` semantics make flags position-independent and
+validation order-preserving, so bare `--noshow_progress` must work before or
+after the query expression, in any order with supported query flags, and when
+repeated.
+
+Reject `--noshow_progress=`, every valued form such as
+`--noshow_progress=true` or `--noshow_progress=false`, with Bazel's observed
+`Unexpected value after boolean option` diagnostic. Preserve rejection of
+bare or valued `--show_progress`, `--color`, `--keep_going`, and every other
+unsupported flag through the existing loading-query error. Do not generalize
+`IgnoredCompatible`, alter classification, add a helper/API, or change CLI or
+query evaluation. The exact allowlist is `app/slug_commands_v2/src/query.rs`
+and `app/slug_commands_v2/tests/commands.rs`, with at most `+40/-0` lines.
+
+Run the complete `slug_commands_v2 --test commands` target, the focused crate
+check, and its GNU-Windows no-run gate serially. Then build `slug_cli_v2`, clean
+stale `slugd`, run the exact three frozen macro commands with bare
+`--noshow_progress`, and replay the unchanged 20-row fixture against the
+absolute rebuilt binary on a fresh run root. Require the macro rows to pass
+with exact stdout and disappear completely from the failure list; the only
+permitted remaining row failure is the pre-existing `build_dep_target` build-
+stage gap. Remove the run root and clean `slugd` afterward. Finish with
+formatting, archive status, exact scope/cap and retained-byte checks, and
+`git diff --check`. Do not run Bazel or a workspace-wide Cargo suite.
+
+Stop with **REPLAN** rather than widening if the exact bare flag cannot be
+accepted in those two files; any valued, positive, or other compatibility flag
+must be accepted; a fixture/tool/CLI/evaluator/common-parser or retained-core
+edit is needed; the macro rows still fail; or the parser delta exceeds
+`+40/-0`.

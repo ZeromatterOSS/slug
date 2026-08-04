@@ -1,59 +1,60 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-external-bzl-package-query-activation-implementation`
+Packet: `WP-5-m1-query-noshow-progress-compatibility-implementation`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
 Role: implementation worker
-Evidence: accepted dormant external Bzl owner `0463cb17`, accepted
-request-local external query package identity `845e89b7`, accepted activation
-design in the owner tail, accepted direct missing/cycle/load evidence, and the
-accepted 20-row `module-local-override` macro-query oracle.
+Evidence: accepted Bazel 9.2 20-row `module-local-override` oracle, accepted
+six-path external Bzl package/query activation core retained uncommitted at
+`+793/-21`, and independent latest-diff **ACCEPT core** reviews. The exact
+three macro-query outputs pass without `--noshow_progress`; the frozen replay
+stops in loading-query flag validation before query evaluation.
 
-Implement only the previously accepted external Bzl package/query activation.
-`RepositoryPackageLoadKey` remains the sole package owner: normalize every
-direct same-package external load before computing any child, compute
-`ExternalBzlModuleEvalKey` children sequentially, and transfer the raw-load/
-frozen-module pairs through the existing package-attempt owner. Accept a
-nonempty-load package only when every produced target is `ExportedFile` or
-native `Filegroup`; all other kinds remain whole-package typed stops.
+Implement only one command-local compatibility exception: loading `query`
+accepts exact bare `--noshow_progress` as a no-op when the parsed flag value is
+`None`. It must not change output, order, graph, query policy, Bzlmod policy, or
+evaluation, and it remains in the existing `QueryRequest.flags` vector.
+Existing argument splitting makes flags position-independent and preserves
+flag order, so cover the bare flag before and after the expression, ordered
+with a supported flag, and repeated.
 
-The exact edit allowlist is `app/slug_loading_v2/src/bzl_module.rs`; a
-test-only retained-lifetime accessor in `app/slug_loading_v2/src/package.rs`;
-`app/slug_loading_v2/src/host_package_load_tests.rs`;
-`app/slug_query_v2/src/loading_environment.rs`;
-`app/slug_query_v2/tests/loading_query.rs`; and the existing direct-external
-lifecycle test in `app/slug_cli_v2/tests/cli.rs`. The four accepted
-`module-local-override` fixture paths are validation-only and byte-frozen.
-Total growth must remain at or below the accepted `+2100`-line cap. Do not add
-a source owner, DICE key, lock, public identity/API, graph/provenance/generic-
-traversal/output module change, or cycle-detector/Bzlmod/core-event change.
+The exact edit allowlist is `app/slug_commands_v2/src/query.rs` and
+`app/slug_commands_v2/tests/commands.rs`. Total parser-prerequisite growth is
+at most `+40/-0`. Reject empty or valued forms including
+`--noshow_progress=`, `--noshow_progress=true`, and
+`--noshow_progress=false` with `Unexpected value after boolean option`.
+Preserve rejection of `--show_progress`, `--color`, `--keep_going`, and every
+other unsupported loading-query flag. Do not change `common.rs`, flag
+classification, a public API, CLI/query evaluation, any fixture/tool, or the
+retained activation core.
 
-Query production may change only `loading_environment.rs`: expose the accepted
-external BUILD and reachable Bzl identities using the retained external
-`QueryPackageIdentity`; `loadfiles()` returns only Bzls, and `buildfiles()`
-reuses the already-emitted external BUILD companion without root discovery.
-Preserve apparent `@dep` rendering, printed-label dedupe, and existing fake
-source-file leaf behavior for all enabled consumers and formats.
+The six existing dirty activation paths are validation-only and must remain
+byte-for-byte unchanged: `app/slug_loading_v2/src/bzl_module.rs`,
+`app/slug_loading_v2/src/package.rs`,
+`app/slug_loading_v2/src/host_package_load_tests.rs`,
+`app/slug_query_v2/src/loading_environment.rs`,
+`app/slug_query_v2/tests/loading_query.rs`, and
+`app/slug_cli_v2/tests/cli.rs`. The four accepted fixture paths are also
+byte-frozen.
 
-Required focused coverage is manifest and frozen-lifetime transfer;
-validation of all direct loads before any child source request; typed missing/
-cycle preparation; Need/equality/validity; edit/delete/recreate and fresh-
-detector same-DICE recovery; evaluation-only event publication with no Reused
-replay/recapture; every enabled fake-candidate consumer; apparent output; and
-a real root BUILD proving no root companion fallback. Extend only the named
-existing tests. Rebuild `slug_cli_v2` before the accepted Slug fixture replay
-and clean stale `slugd` before and after. Run focused loading/query/CLI tests
-and direct checks, both affected loading/query GNU-Windows no-run gates,
-`cargo fmt --all -- --check`, `scripts/v2_archive_status.sh`, and
-`git diff --check`. Do not rerun a Bazel oracle or a workspace-wide Cargo
-suite; CLI GNU-Windows no-run remains excluded by the existing Unix-socket
-transport blocker.
+Run serially:
 
-Stop with **REPLAN** rather than widening if implementation needs cross-
-package/repository loads, mapping/discovery, non-local overrides, globs,
-external patterns, visibility content, target kinds beyond `ExportedFile`/
-`Filegroup`, tests/executables/suites/generated/Starlark rules, configuration,
-analysis/actions/execution, repository rules/extensions, another production
-file, source owner, DICE key, lock, public identity/API, graph/provenance/
-generic traversal/output/core-event/cycle-detector/Bzlmod changes, JVM, Java
-bytecode, Bazel delegation, a fixture edit, or more than `+2100` lines.
+- `cargo test -p slug_commands_v2 --test commands`
+- `cargo check -p slug_commands_v2`
+- `cargo test -p slug_commands_v2 --target x86_64-pc-windows-gnu --no-run`
+- `cargo build -p slug_cli_v2`
+
+Clean stale `slugd`, then run the exact three frozen macro commands with bare
+`--noshow_progress`. Run the unchanged 20-row `module-local-override` fixture
+against the absolute rebuilt `target/debug/slug` on a fresh run root. Require
+all three macro rows and their exact accepted stdout to pass and disappear
+from the failure list; only the pre-existing unrelated `build_dep_target` row
+may remain failed. Remove the run root and clean `slugd` afterward. Finish with
+`cargo fmt --all -- --check`, `scripts/v2_archive_status.sh`, exact two-file
+parser scope and `+40/-0` cap checks, retained-core/fixture byte checks, and
+`git diff --check`. Do not run Bazel or a workspace-wide Cargo suite.
+
+Stop with **REPLAN** rather than widening if the exact exception needs any
+third file; accepts a valued, positive, or other ignored-compatible flag;
+changes classification or evaluation; touches the retained activation core or
+frozen fixture; the macro rows still fail; or exceeds `+40/-0`.

@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus accepted Host-only external source, request-local external query package identity, the dormant route-keyed external Bzl owner, and the accepted 20-row external macro-created native filegroup/query-provenance oracle; full evidence is in the Stage 5 owner plan | External Starlark package/query activation remains dormant behind `RepositoryPackageLoadKey::LoadsUnsupported`; test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | implement the already-designed bounded external Bzl package/query activation against the accepted oracle |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, the accepted 20-row external macro-created native filegroup/query-provenance oracle, and an independently accepted uncommitted six-path activation core; full evidence is in the Stage 5 owner plan | The frozen Slug replay stops before query because loading-query parsing rejects bare `--noshow_progress`; test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | implement the exact two-file bare-query-flag compatibility prerequisite, then replay the frozen macro rows and terminally accept the retained activation core |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-bzl-package-query-activation-implementation`.
+`WP-5-m1-query-noshow-progress-compatibility-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -79,8 +79,10 @@ new rows pin macro-created native filegroup kind, Bzl-only `loadfiles()`, and
 external BUILD-first `buildfiles()` output. The full 107-test oracle harness,
 archive, structural, and diff gates passed, and independent latest-diff review
 accepted. No Rust, Cargo, tool, daemon, lifecycle, or activation surface
-changed. The current packet implements only the already-designed external Bzl
-package/query activation.
+changed. The six-path external Bzl package/query activation core is now
+independently accepted and retained uncommitted, but the frozen Slug replay
+stops in command parsing before those rows reach query evaluation. The current
+packet implements only the exact bare-`--noshow_progress` parser prerequisite.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of
