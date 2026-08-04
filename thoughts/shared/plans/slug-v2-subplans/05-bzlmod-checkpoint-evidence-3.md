@@ -17617,3 +17617,55 @@ request-local different-canonical-repository caller test against the single
 existing target route, with no second route/load/materialization, and an
 activation-based cold/warm discriminator using existing trackers. Preserve the
 typed API, five-file/cap boundary, all other evidence, comparator, and stops.
+
+### WP-5-m1 external Restricted-visibility caller/reuse redesign (2026-08-04)
+
+**Status: ACCEPTED.** Live audit proved the different-external caller
+cannot be expressed through the public integration-query surface without
+resolving a second route: textual `@other` necessarily routes and loads, while
+the request-local candidate/visibility seams are crate-private. The bounded
+discriminator therefore belongs in the already-allowlisted
+`loading_environment.rs` unit module.
+
+Build and cache one real `@dep -> dep+` Restricted target graph from a minimal
+Host observation epoch, existing root/module policy inputs, and only the
+existing `dep+` local materialization. In one `LoadingQueryEnvironment`, intern
+the real routed target and two fake callers whose consuming owners differ only
+in canonical repository: `dep+//viewer` and synthetic `other+//viewer`. The
+target remains in the dependency root package, keeping both callers outside
+the independent package-fragment/Java shortcut. Direct `visible()` must retain
+the target for the positive same-repository control and deny the different-
+repository caller. Preserve the accepted cross-repository Private and Java
+fragment behavior. This exercises the protected target's
+verified apparent-route group lookup and full canonical `PackageIdentifier`
+comparison without declaring, materializing, resolving, loading, or querying
+an `other` route. No public/test hook or new owner is permitted.
+
+For warm reuse, extend the existing integration `RootAnchorTracker` rather
+than adding a tracker or exposing a private graph key. Rich activation
+callbacks on public `RootQueryCommandKey` distinguish one cold Evaluated from
+one same-transaction warm Reused activation for the identical Restricted
+visibility query; retain per-compute typed-root and zero-forbidden assertions.
+Value equality alone is not reuse evidence.
+
+Exact rejected-draft accounting removes 34 lines from the prior 576-line test
+diff, leaving 542. Allocate at most 140 lines for the one-route source-unit
+setup/assertions and 30 for rich tracker/import/assertion changes: 712 worst-
+case lines. The corrected successor therefore keeps the exact five-file
+allowlist and 220 production cap but raises mechanically enforced test/total
+caps to 720/940, leaving eight test lines of slack. That increase authorizes
+only this no-hook setup and rich activation discriminator.
+All other typed API, semantics, evidence, six-row comparison, and stop gates
+remain unchanged.
+
+Resume only
+`WP-5-m1-external-restricted-visibility-single-route-typed-implementation`
+after independent latest-text acceptance. Reconstruct the implementation from
+live HEAD and accepted contracts; discarded drafts provide negative evidence
+only and receive no validation credit.
+
+Independent latest-text review first required hard cap arithmetic and explicit
+preservation of the accepted Private/Java fragment shortcut. The correction
+froze 542+140+30 test lines under 720, placed the Restricted target in the
+dependency root package with both callers in `viewer`, and was accepted on
+rereview.
