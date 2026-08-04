@@ -4106,7 +4106,7 @@ mod tests {
         .unwrap();
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\n",
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"})\n",
         )
         .unwrap();
         fs::write(workspace.path().join("dep/target.txt"), "target").unwrap();
@@ -4125,6 +4125,18 @@ mod tests {
                 LockfileMode::Update,
                 &[],
                 QueryOutputCompletion::Standard,
+            )
+        };
+        let query_label_kind = |expression: &str| {
+            runtime.query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+                expression,
+                QueryOrder::Auto,
+                QueryPolicy::default(),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                QueryOutputCompletion::LabelKind,
             )
         };
 
@@ -4205,6 +4217,36 @@ mod tests {
                 .stdout(),
             "@dep//:files\n@dep//:files_alias\n@dep//:missing_input.txt\n@dep//:target.txt\n"
         );
+        assert_eq!(
+            query("@dep//:is_k8")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:is_k8\n"
+        );
+        assert_eq!(
+            query("deps(@dep//:is_k8)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:is_k8\n"
+        );
+        assert_eq!(
+            query_label_kind("@dep//:is_k8")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .label_kind_stdout(),
+            "config_setting rule @dep//:is_k8\n"
+        );
         assert!(
             query("labels(visibility, @dep//:files)")
                 .unwrap()
@@ -4221,6 +4263,8 @@ mod tests {
         fs::write(workspace.path().join("dep/missing_input.txt"), "present").unwrap();
         let created = query("deps(@dep//:files)").unwrap();
         assert!(accepted_output_text(&created).is_empty());
+        let setting_after_source_create = query("@dep//:is_k8").unwrap();
+        assert!(accepted_output_text(&setting_after_source_create).is_empty());
         fs::write(workspace.path().join("dep/missing_input.txt"), "edited").unwrap();
         let edited_source = query("deps(@dep//:files)").unwrap();
         assert!(accepted_output_text(&edited_source).is_empty());
@@ -4234,7 +4278,7 @@ mod tests {
 
         for (build, expected) in [
             (
-                "config_setting(name = \"other\", values = {\"cpu\": \"k8\"})\n",
+                "test_suite(name = \"other\")\n",
                 "external repository rule graph is deferred",
             ),
             (
@@ -4250,7 +4294,15 @@ mod tests {
                 "external repository visibility edges are deferred",
             ),
             (
+                "filegroup(name = \"group\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"}, visibility = [\":group\"])\n",
+                "external repository visibility edges are deferred",
+            ),
+            (
                 "filegroup(name = \"BUILD.bazel\")\n",
+                "collides with active BUILD file",
+            ),
+            (
+                "config_setting(name = \"BUILD.bazel\", values = {\"cpu\": \"k8\"})\n",
                 "collides with active BUILD file",
             ),
             (
@@ -4293,7 +4345,7 @@ mod tests {
         }
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\n",
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\nalias(name = \"files_alias\", actual = \":files\")\nconfig_setting(name = \"is_k8\", values = {\"cpu\": \"k8\"})\n",
         )
         .unwrap();
         fs::write(

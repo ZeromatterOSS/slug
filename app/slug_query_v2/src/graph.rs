@@ -958,6 +958,12 @@ fn external_package_graph_from_targets(
                     }]),
                 )
             }
+            PackageTargetKind::ConfigSetting { .. } => (
+                QueryNodeKind::Rule(CompactString::new("config_setting rule")),
+                target.rule_capability().cloned(),
+                Arc::from([]),
+                Arc::from([]),
+            ),
             _ => {
                 return Err(QueryError::evaluation(format!(
                     "external repository rule graph is deferred: {}//{}:{}",
@@ -1619,6 +1625,20 @@ mod graph_tests {
                 },
                 visibility: VisibilitySource::PackageDefault,
             },
+            PackageTarget {
+                name: "is_k8".to_owned(),
+                kind: PackageTargetKind::ConfigSetting {
+                    values: Arc::from([("cpu".into(), "k8".into())]),
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
+            PackageTarget {
+                name: "public_k8".to_owned(),
+                kind: PackageTargetKind::ConfigSetting {
+                    values: Arc::from([("cpu".into(), "k8".into())]),
+                },
+                visibility: VisibilitySource::AlwaysPublic,
+            },
         ];
         let graph = external_package_graph_from_targets(
             &canonical_repo,
@@ -1706,6 +1726,32 @@ mod graph_tests {
                 .attributes
                 .iter()
                 .all(|attribute| attribute.name != "visibility")
+        );
+
+        let setting = graph.nodes.get(&label("is_k8")).unwrap();
+        assert_eq!(
+            setting.kind,
+            QueryNodeKind::Rule("config_setting rule".into())
+        );
+        assert_eq!(
+            setting
+                .rule_capability
+                .as_ref()
+                .map(|capability| capability.rule_class.as_str()),
+            Some("config_setting")
+        );
+        assert!(setting.edges.is_empty());
+        assert!(setting.attributes.is_empty());
+        assert_eq!(setting.effective_visibility, RuleVisibility::Private);
+        assert_eq!(setting.visibility_source, VisibilitySource::PackageDefault);
+        assert_eq!(setting.label.to_string(), "@@dep+//:is_k8");
+        assert_eq!(setting.label.output_label(), "@dep//:is_k8");
+
+        let public_setting = graph.nodes.get(&label("public_k8")).unwrap();
+        assert_eq!(public_setting.effective_visibility, RuleVisibility::Public);
+        assert_eq!(
+            public_setting.visibility_source,
+            VisibilitySource::AlwaysPublic
         );
 
         let existing = graph.nodes.get(&label("existing.txt")).unwrap();

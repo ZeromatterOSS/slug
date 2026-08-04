@@ -14979,3 +14979,46 @@ private graph-projection abstraction and needs no separate design packet:
 project the already retained native `config_setting` as a dependency-free
 query rule and prove its literal and `label_kind` output without activating
 configuration, analysis, discovery, or execution.
+
+### Direct external-repository native config-setting query accepted
+
+Status: **ACCEPT** for
+`WP-5-m1-external-repository-config-setting-query` on 2026-08-04.
+Independent terminal implementation review found no blocker. Residual risk is
+limited to intentionally deferred configuration matching, `select` resolution,
+analysis/execution, and external build.
+
+Production changed only `app/slug_query_v2/src/graph.rs`. The private external
+projector now maps the already retained `PackageTargetKind::ConfigSetting` to
+the accepted root graph shape: `config_setting rule`, retained native
+capability, no ordinary edge, and no query-visible attribute. It preserves
+canonical semantic identity, route-local apparent rendering, and accepted
+public/private visibility without interpreting retained `values`. No DICE key,
+owner, representation, public API, configuration, or analysis path changed.
+
+The `module-local-override` fixture grew by one `is_k8` declaration and exactly
+two commands, with no asset. Live Bazel 9.2 generation at
+`/tmp/slug-config-setting-oracle/runs/module-local-override/20260804-003523-1004982-bazel`
+and distinct-root replay at
+`/tmp/slug-config-setting-replay/runs/module-local-override/20260804-003635-1007891-bazel`
+both passed all eight rows. The new exact outputs are `@dep//:is_k8` and
+`config_setting rule @dep//:is_k8`. A rebuilt Slug replay matched both and
+proved self-only forward `deps`; all earlier normalized fixture semantics are
+unchanged. The older external-build row remains outside the explicit
+query-only boundary.
+
+Structural coverage proves exact kind, capability, empty edges/attributes,
+canonical/apparent labels, and public/private visibility. Focused core
+coverage proves literal, `label_kind`, self-only `deps`, source-change reuse,
+nontrivial-visibility and BUILD-name collision stops, and all accepted
+source/filegroup/alias behavior and stop gates. Formatting, the complete
+20-unit/43-integration/6-parser query suite, focused core, four-crate checks,
+GNU-Windows query/core no-run linkage, CLI/server external regressions, the
+CLI rebuild, archive, diff, no-Cargo, and forbidden-owner scans passed.
+
+The next packet is
+`WP-5-m1-external-repository-test-suite-query-design`. It is design-only
+because projecting `tests`/`$implicit_tests` automatically reaches existing
+attribute and `tests()` consumers, while the current external slice does not
+load Starlark test rules. The design must prove a useful exact Rust boundary
+before authorizing implementation.

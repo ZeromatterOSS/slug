@@ -1,60 +1,53 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-external-repository-config-setting-query`
+Packet: `WP-5-m1-external-repository-test-suite-query-design`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted direct local-override external source-file, native
-filegroup, and direct native alias queries; accepted root-package
-`config_setting` graph projection and Bazel 9.2 `label_kind` evidence;
-complete route hashing, native materialization/path retries, and end-to-end
-no-legacy guards
-Validation tier: one-file private query projection plus focused public
-query/core and exact Bazel/Slug oracle rows
+Evidence: accepted direct local-override external source-file, filegroup,
+direct alias, and config-setting queries; accepted root-package test-suite
+loading/query representation; Bazel 9.2 query oracle infrastructure; complete
+route hashing and end-to-end no-legacy guards
+Validation tier: design-only source/oracle reconciliation plus independent
+terminal design review
 
-Implement only the external native `config_setting` query projection in
-`app/slug_query_v2/src/graph.rs`. Reuse the ordinary `LoadedPackage`,
-`PackageTargetKind::ConfigSetting`, accepted external graph value/key, retained
-native capability, and existing query/render owners. Project one
-`QueryNodeKind::Rule("config_setting rule")` with no ordinary edge and no
-query-visible attribute, matching the accepted root unconfigured graph. The
-retained `values` remain loading metadata; this packet does not interpret
-configuration or activate analysis.
+Design only the next bounded external native `test_suite` query slice. Do not
+edit Rust, Cargo metadata, fixtures, generated oracle JSON, protocol, or any
+implementation file. Start from the live retained
+`PackageTargetKind::TestSuite`, `TestSuiteMembership`, native capability and
+metadata, root graph projection, and existing query `labels`, `deps`, `tests`,
+and `label_kind` consumers. Reproduce Bazel 9 semantics in Rust; do not add an
+external `.bzl` load or another rule family merely to populate a suite.
 
-Canonical semantic identity and route-specific apparent output remain
-unchanged. Accept only public/private visibility without a dependency label,
-and project no query-visible visibility attribute. The observable surface is
-the direct literal and existing `--output=label_kind` formatter. Forward
-`deps` is the node itself and may be proven in focused Rust evidence without
-adding a third fixture row.
+Collect exact Bazel 9.2 evidence for explicit-empty and omitted native suites
+in a direct local-override external package. Probe literal output,
+`--output=label_kind`, `labels(tests, ...)`, `deps(...)`, and `tests(...)`,
+including whether empty output and attribute explicitness provide a useful
+discriminating slice. Reconcile that evidence with accepted root test-suite
+fixtures and pinned Bazel source for explicit/implicit membership where the
+live oracle cannot expose retained provenance directly.
 
-Production allowlist: `app/slug_query_v2/src/graph.rs`. Tests may change only
-`app/slug_query_v2/src/graph.rs` and
-`app/slug_core_v2/src/runtime/dice.rs`. Oracle changes are limited to the
-existing `module-local-override` fixture TOML, `workspace/dep/BUILD.bazel`, and
-expected JSON; add no asset. Do not alter Cargo metadata, public APIs, DICE
-keys, repository routes, loading/source owners, CLI/server adapters, protocol,
-formatters, analysis, actions, execution, or another fixture.
+The proposed implementation contract must state:
 
-Extend the fixture with
-`config_setting(name = "is_k8", values = {"cpu": "k8"})` and exactly two
-Bazel/Slug commands: the literal `@dep//:is_k8` and
-`query --output=label_kind @dep//:is_k8`. Protect all existing normalized
-fixture semantics. Focused Rust evidence must prove exact rule kind and
-capability, no edges or attributes, canonical identity, apparent output,
-self-only forward `deps`, public/private visibility acceptance, nontrivial
-visibility rejection, BUILD-name collision, lifecycle reuse after unchanged
-source files, and all accepted filegroup/alias behavior and stop gates.
+- which explicit and implicit suite forms are accepted without external
+  Starlark/native test-rule breadth;
+- exact `tests` and `$implicit_tests` attributes, explicitness, ordinary-edge
+  order/deduplication, native rule capability, test metadata, and visibility;
+- canonical semantic labels, selected apparent rendering, and whether any
+  same-package member remapping or source synthesis is permitted;
+- the exact literal, `label_kind`, `labels`, `deps`, and `tests()` surface that
+  becomes active;
+- cold/warm/BUILD-edit invalidation and event publication, with source-file
+  changes remaining unobserved unless evidence proves otherwise;
+- stop gates for suite members, suite chaining/cycles, other rule kinds,
+  cross-package/repository labels, nontrivial visibility, patterns, loads,
+  globs, configuration, analysis, build, and execution; and
+- the exact production/test/fixture allowlist plus serial validation and
+  independent implementation-review requirements.
 
-Keep `test_suite`, `package_group`, generated files, and Starlark rules
-unsupported in the external projector. Stop and `REPLAN` on a need for
-configuration matching, select resolution, analysis, another retained
-representation or key, new package/repository discovery, source observation,
-external patterns or functions, external loads/globs, registry transport,
-repository rules/extensions, build/execution, JVM, Java bytecode, or Bazel
-delegation.
-
-Finish with serial focused query/core tests, the full query suite, quiet
-direct-dependent checks, the required `slug_cli_v2` rebuild before Slug oracle
-replay, GNU-Windows query/core no-run linkage, formatting, `git diff --check`,
-archive/scope/no-Cargo guards, fixture generation plus distinct-root replay,
-and one independent terminal implementation review.
+Prefer a useful one-file private graph projection. If Bazel parity requires a
+test-rule owner, external load, new retained representation/key, package or
+repository discovery, configuration/analysis, filesystem observation, or
+another architectural owner, record the exact unsupported boundary and
+`REPLAN` instead of broadening the packet. Finish by appending the proposed
+contract and evidence to the owner plan, advancing this manifest only after
+independent terminal design review, and making no implementation change.

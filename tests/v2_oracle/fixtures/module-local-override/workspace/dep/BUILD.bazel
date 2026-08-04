@@ -1,3 +1,4 @@
 exports_files(["target.txt"])
 filegroup(name = "files", srcs = ["target.txt", "missing_input.txt"])
 alias(name = "files_alias", actual = ":files")
+config_setting(name = "is_k8", values = {"cpu": "k8"})

@@ -45,3 +45,17 @@ argv = ["query", "labels(actual, @dep//:files_alias)"]
 compare = "semantic"
 expected_exit = 0
 stdout_contains = ["@dep//:files"]
+
+[[commands]]
+name = "query_dep_is_k8"
+argv = ["query", "@dep//:is_k8"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@dep//:is_k8"]
+
+[[commands]]
+name = "query_dep_is_k8_label_kind"
+argv = ["query", "--output=label_kind", "@dep//:is_k8"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["config_setting rule @dep//:is_k8"]
