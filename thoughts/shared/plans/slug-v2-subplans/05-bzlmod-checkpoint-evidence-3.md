@@ -18283,3 +18283,29 @@ occurrence-preserving direct-local closure acquisition, and empty-key evaluator
 defaults/nonregistry event ownership. The accepted direct local identity
 remains `NonrootModuleKey { name: route.module_name(), version: "" }`; these
 packets do not evaluate a module or acquire an include.
+
+### WP-5-m1 Host repository path-key implementation (2026-08-04)
+
+**Status: ACCEPTED in `00e85153`; implement only
+`WP-5-m1-route-policy-and-package-lookup-implementation`.** The exact one-file
+change to `source_preparation.rs` is 168 production lines, 350 test lines, and
+518 total net lines, within its accepted 170/360/530 caps. The private
+`HostRepositoryPathKey` is now the sole routed materialization/resolution seam;
+it retains terminal path state and operational namespace/instance identity,
+owns no events, and lets `HostRepositorySourceFileKey` read bytes only for
+regular or special results without changing that public source contract.
+
+Independent review required one correction: the immutable-materialization
+lifecycle now recomputes the same key across generation 41→42, rather than
+changing key identity, and proves the retained operational value changes even
+when the final path shape is otherwise stable. The corrected latest diff was
+accepted with exact Need/error/equality, source-compatibility, path-only
+no-`FileBytes`, symlink-retarget, local/immutable identity,
+missing/create/delete/recreate, route A-to-B-to-A, and structural-stop evidence.
+
+Formatting passed. The focused validation passed 27 `source_preparation` unit
+tests, 28 `source_preparation_dice` tests, and all 56 `slug_loading_v2` library
+tests. Output contained existing warnings only. No Bazel/oracle or fixture was
+changed. Resume the atomic four-file route policy and package lookup under its
+650 production/1350 test/2000 total caps; the public selected-BUILD source and
+loading migration remains the sole successor.
