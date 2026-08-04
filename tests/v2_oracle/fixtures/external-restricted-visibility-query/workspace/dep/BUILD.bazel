@@ -1,0 +1,14 @@
+package_group(
+    name = "leaf",
+    packages = ["//viewer"],
+)
+
+package_group(
+    name = "top",
+    includes = [":leaf"],
+)
+
+filegroup(
+    name = "restricted",
+    visibility = [":top"],
+)

@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, the accepted 20-row external macro-created native filegroup/query-provenance oracle, and accepted external Bzl package/query activation with bare query progress-flag compatibility; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure is unsupported under the current architecture; explicit same-package external Restricted visibility awaits its discriminating oracle; native Windows glob ordering, registry transports, and discovery composition remain | generate the isolated external Restricted-visibility query oracle |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure is unsupported under the current architecture; explicit same-package external Restricted visibility awaits its bounded Rust projection; native Windows glob ordering, registry transports, and discovery composition remain | implement the four-file external Restricted-visibility query projection |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-restricted-visibility-query-oracle`.
+`WP-5-m1-external-restricted-visibility-query-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -108,6 +108,13 @@ their own edges, and keeps both NODEP/implicit query flags deferred. The
 current evidence-first packet creates one isolated seven-row fixture; the
 existing 20-row `module-local-override` fixture remains frozen.
 
+The isolated external Restricted-visibility oracle is accepted at seven new
+files, five workspace assets, seven exact rows, zero links, and 278 lines.
+Bazel 9.2 generation and distinct-root replay passed; the first six rows are
+Slug acceptance evidence and the final `--nonodep_deps` row is Bazel-only
+edge-kind evidence. The current packet implements only the accepted four-file
+projection and does not add a dependency-filter flag.
+
 The external Bzl macro-query oracle is accepted in the exact four-path
 `+112`-line boundary. Bazel 9.2 generation and a distinct-root replay passed
 all 20 rows; the 17 protected records remained JSON-deep-equal, and the three
@@ -120,9 +127,9 @@ changed. The external Bzl package/query activation and exact bare-
 paths at `+829/-21`. All three macro rows now pass Slug exactly; only the
 pre-existing unrelated external-build row remains red. The dependency-free
 external Starlark-rule projection is accepted at five files and `+529/-0`
-without new oracle growth. The current packet generates only the external
-Restricted-visibility query oracle; it does not activate Restricted
-visibility, a dependency-filter flag, a test rule, or a suite.
+without new oracle growth. The current packet activates only the bounded
+external Restricted-visibility query projection; it does not add a dependency-
+filter flag, a test rule, or a suite.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of

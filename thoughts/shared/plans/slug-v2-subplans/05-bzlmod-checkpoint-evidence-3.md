@@ -17457,3 +17457,41 @@ cross-repository group loading/includes, an accepted NODEP/implicit flag,
 wildcard discovery or package enumeration, a new route/key/owner, direct
 filesystem observation, configuration, analysis/actions/execution, JVM, Java
 bytecode, or Bazel delegation.
+
+### WP-5-m1 external Restricted-visibility query oracle accepted (2026-08-04)
+
+**Status: ACCEPTED.** The isolated
+`external-restricted-visibility-query` fixture landed at exactly seven new
+regular files, zero links, five workspace assets, seven commands, and 278
+newline-counted text lines against the 350-line cap. No existing fixture byte,
+Rust file, Cargo metadata, tool, schema, or other production surface changed.
+
+`/usr/bin/bazel --version` reported exactly `bazel 9.2.0`. Fresh generation at
+`/tmp/slug-external-restricted-oracle.generation.cDCwM7` and distinct-root
+replay at `/tmp/slug-external-restricted-oracle.replay.RtdBna` both passed all
+seven exact rows. Their scoped Bazel servers were shut down and verified dead,
+and both exact temporary roots were removed afterward.
+
+The generated outputs are discriminating:
+
+1. raw `labels(visibility)` returns only `@dep//:top`;
+2. default `deps` returns `leaf`, `restricted`, and `top`;
+3. `same_pkg_direct_rdeps(@dep//:top)` returns only `restricted`;
+4. factored DOT contains exactly `restricted -> top` and `top -> leaf`;
+5. the root `//viewer` caller returns empty;
+6. the same-external `@dep//viewer` caller returns `restricted`; and
+7. final Bazel-only `--nonodep_deps` returns only `restricted`, proving the
+   rule edge is NODEP without authorizing Slug flag support.
+
+All commands exited 0 with empty output manifests. The full oracle harness
+passed 107 tests with only its pre-existing unknown-`asyncio_mode` warning;
+archive, exact scope/inventory/JSON-contract, cap, and whitespace/diff checks
+passed. Independent Terra cap/content review and an independent Terra latest-
+diff review both returned `ACCEPT`.
+
+Resume only
+`WP-5-m1-external-restricted-visibility-query-implementation` under the four-
+file and 490-line contract in the accepted consumer design above. Rebuild
+`slug_cli_v2` before replaying the first six rows against Slug; the seventh
+remains Bazel-only. Do not add either dependency-filter flag or broaden any
+other stop gate.

@@ -1,45 +1,51 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-external-restricted-visibility-query-oracle`
+Packet: `WP-5-m1-external-restricted-visibility-query-implementation`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: oracle implementation worker
-Evidence: the independently reviewed external Restricted-visibility consumer
-design, accepted root visibility/NODEP oracle, standalone external
-package-group projection, and external query package identity recorded in the
-owner plan.
+Role: implementation worker
+Evidence: accepted seven-row external Restricted-visibility oracle, complete
+consumer design, root visibility/NODEP oracle, standalone external package-
+group projection, and external query package identity recorded in the owner
+plan.
 
-Create only
-`tests/v2_oracle/fixtures/external-restricted-visibility-query` with exactly
-seven regular files, zero links, five workspace assets, and seven commands.
-Keep every existing fixture byte-identical, especially the frozen 20-command
-`module-local-override` fixture.
+Change exactly these four files:
 
-The five assets are root `MODULE.bazel`, root `viewer/BUILD.bazel`, dependency
-`MODULE.bazel`, dependency root `BUILD.bazel`, and dependency
-`viewer/BUILD.bazel`. Use a direct `local_path_override`; dependency root
-declares `leaf(packages = ["//viewer"])`, `top(includes = [":leaf"])`, and
-an empty native `filegroup` `restricted` with explicit
-`visibility = [":top"]`. Both viewer packages declare one caller filegroup.
+- `app/slug_loading_v2/src/visibility.rs`;
+- `app/slug_query_v2/src/graph.rs`;
+- `app/slug_query_v2/src/loading_environment.rs`; and
+- `app/slug_query_v2/tests/loading_query.rs`.
 
-Add exactly these commands in order: raw `labels(visibility)`, default `deps`,
-`same_pkg_direct_rdeps` of top, factored graph output for the dependency
-closure, root-viewer `visible()` rejection, same-external-viewer `visible()`
-acceptance, and final Bazel-only `--nonodep_deps deps(...)`. The last row proves
-NODEP edge kind only and is not a future Slug acceptance row. Generate all
-exact output/order/DOT evidence; do not handwrite it.
+Add pure provisional-root-to-selected-repository projection for
+`RuleVisibility` and `PackageGroupContents`, failing on retained nonroot
+inputs. Before the external graph target loop/source synthesis, admit exactly
+one explicitly Restricted native `filegroup` with at least one direct same-
+package already-loaded native group and no direct package pseudo-specs. Reject
+Restricted defaults, a second Restricted target, another protected kind, and
+named-repo/cross-package/missing/alias/wrong-kind groups.
 
-Require `/usr/bin/bazel` to report exactly `bazel 9.2.0`. Run one fresh
-generation, one distinct-root replay, the full oracle harness, archive/scope/
-cap checks, and `git diff --check`; clean scoped Bazel processes and obtain
-independent latest-diff review. Cap the fixture at 350 total text lines.
+Project raw declared top-level labels as one explicit route-aware
+`visibility` attribute; project effective top-level labels separately as
+`VisibilityNodep` edges before ordinary filegroup edges; retain includes only
+as existing `PackageGroupInclude` edges; contextualize group contents to the
+selected canonical repository. Make `visible()` recover each canonical group
+through the target's verified apparent route. Reuse existing DICE owners.
 
-Do not edit Rust, Cargo metadata, tools, schemas, plans beyond the terminal
-reviewed result, or any existing fixture. Do not run Slug or Cargo. Stop with
-**REPLAN** if exact evidence needs another file/row/asset, a second external
-repository or direct-local route, cross-package/repository group loading or
-includes, implicit/default or direct pseudo-label visibility, an accepted
-dependency-filter flag, wildcard discovery, a new key/route/owner, direct
-filesystem observation,
-configuration, analysis/actions/execution, JVM, Java bytecode, or Bazel
-delegation.
+Cap the change at 190 net production lines, 300 net test lines, and 490 total.
+Cover raw/effective/include separation, every rejection before source
+synthesis, exact/recursive positive and negative contents, public/private,
+include union/reallow/cycles, root/same-/different-external callers, every
+enabled consumer/output in the owner design, and cold/warm/edit/delete/
+recreate/route-remap lifecycle behavior. Run Cargo serially. Rebuild
+`slug_cli_v2`, clean `slugd` before/after, and replay only the first six oracle
+rows against Slug; row seven remains Bazel-only. Obtain independent latest-
+diff review.
+
+Do not edit fixtures, Cargo metadata, tools, schemas, plans beyond the
+terminal reviewed result, or another Rust file. Do not run Bazel. Stop with
+**REPLAN** on any extra path/line need, PackageRecorder-wide canonicalization,
+implicit/default/direct-pseudo visibility, permissive missing/wrong-kind
+fallback, direct named-repository specs, cross-package/repository group
+loading/includes, dependency-filter flag support, discovery/enumeration, a new
+key/route/owner, direct filesystem observation, configuration, analysis/
+actions/execution, JVM, Java bytecode, or Bazel delegation.

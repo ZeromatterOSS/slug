@@ -1,0 +1,58 @@
+[fixture]
+name = "external-restricted-visibility-query"
+description = "Bazel 9.2 exact query evidence for explicit restricted visibility in one direct-local external repository."
+comparison = "exact"
+oracle_notes = "The first six rows are future Slug acceptance evidence. The final Bazel-only row proves the external visibility edge is NODEP and does not authorize Slug dependency-filter flag support."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/packages/RuleVisibility.java",
+  "src/main/java/com/google/devtools/build/lib/packages/PackageSpecification.java",
+  "src/main/java/com/google/devtools/build/lib/packages/PackageGroup.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeTargetAccessor.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/BlazeQueryVisibility.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryVisibility.java",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/LabelsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/GraphOutputFormatter.java",
+  "src/main/java/com/google/devtools/build/lib/query2/common/CommonQueryOptions.java#nodep_deps",
+]
+translation_notes = "Ordinary package specifications bind to the package group's canonical repository. Raw visibility retains only the declared top group; the effective rule edge is NODEP, the included group remains a separate edge, and visible() compares canonical caller package identity."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture external-restricted-visibility-query --tool bazel --bazel /usr/bin/bazel --run-root <fresh-generation-root> --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture external-restricted-visibility-query --tool bazel --bazel /usr/bin/bazel --run-root <distinct-replay-root>"
+
+[[commands]]
+name = "labels_visibility_raw_top"
+argv = ["query", "labels(visibility, @dep//:restricted)"]
+expected_exit = 0
+
+[[commands]]
+name = "deps_restricted_visibility_closure"
+argv = ["query", "deps(@dep//:restricted)"]
+expected_exit = 0
+
+[[commands]]
+name = "same_pkg_direct_rdeps_top"
+argv = ["query", "same_pkg_direct_rdeps(@dep//:top)"]
+expected_exit = 0
+
+[[commands]]
+name = "deps_restricted_factored_graph"
+argv = ["query", "--output=graph", "--graph:factored", "deps(@dep//:restricted)"]
+expected_exit = 0
+
+[[commands]]
+name = "visible_root_viewer_rejected"
+argv = ["query", "visible(//viewer:caller, @dep//:restricted)"]
+expected_exit = 0
+
+[[commands]]
+name = "visible_external_viewer_accepted"
+argv = ["query", "visible(@dep//viewer:caller, @dep//:restricted)"]
+expected_exit = 0
+
+[[commands]]
+name = "bazel_only_nonodep_deps_restricted"
+argv = ["query", "--nonodep_deps", "deps(@dep//:restricted)"]
+expected_exit = 0

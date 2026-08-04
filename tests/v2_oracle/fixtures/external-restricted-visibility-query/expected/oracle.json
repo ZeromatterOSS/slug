@@ -1,0 +1,200 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "query",
+        "labels(visibility, @dep//:restricted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(visibility, @dep//:restricted)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "labels_visibility_raw_top",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded",
+      "normalized_stdout": "@dep//:top",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 688dd28d-0247-4829-8b1b-537ed71b2a46\n no actions running\n no actions running\n no actions running\n no actions running\nLoading: 0 packages loaded\n",
+      "stdout": "@dep//:top\n"
+    },
+    {
+      "argv": [
+        "query",
+        "deps(@dep//:restricted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "deps(@dep//:restricted)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_restricted_visibility_closure",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "@dep//:leaf\n@dep//:restricted\n@dep//:top",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: ad45fafe-3446-41ed-803a-9d2793eeda5d\nLoading: 0 packages loaded\n",
+      "stdout": "@dep//:leaf\n@dep//:restricted\n@dep//:top\n"
+    },
+    {
+      "argv": [
+        "query",
+        "same_pkg_direct_rdeps(@dep//:top)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "same_pkg_direct_rdeps(@dep//:top)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "same_pkg_direct_rdeps_top",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "@dep//:restricted",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 3e05f937-02e6-4690-a705-e09c6000b49e\nLoading: 0 packages loaded\n",
+      "stdout": "@dep//:restricted\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "deps(@dep//:restricted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--output=graph",
+        "--graph:factored",
+        "deps(@dep//:restricted)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_restricted_factored_graph",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"@dep//:restricted\"\n  \"@dep//:restricted\" -> \"@dep//:top\"\n  \"@dep//:top\"\n  \"@dep//:top\" -> \"@dep//:leaf\"\n  \"@dep//:leaf\"\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 5d4416f8-9497-4c75-bee4-852bafa8deef\nLoading: 0 packages loaded\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"@dep//:restricted\"\n  \"@dep//:restricted\" -> \"@dep//:top\"\n  \"@dep//:top\"\n  \"@dep//:top\" -> \"@dep//:leaf\"\n  \"@dep//:leaf\"\n}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "visible(//viewer:caller, @dep//:restricted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(//viewer:caller, @dep//:restricted)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_root_viewer_rejected",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 2bfcdbdc-2b10-42b5-b7fe-d9ce38463416\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "visible(@dep//viewer:caller, @dep//:restricted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "visible(@dep//viewer:caller, @dep//:restricted)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "visible_external_viewer_accepted",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "@dep//:restricted",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: b3bc31c6-ac2e-481e-a798-51b86d52afba\nLoading: 0 packages loaded\n",
+      "stdout": "@dep//:restricted\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--nonodep_deps",
+        "deps(@dep//:restricted)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--nonodep_deps",
+        "deps(@dep//:restricted)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "bazel_only_nonodep_deps_restricted",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "@dep//:restricted",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 0b07c43c-9791-468c-9845-f167ea432409\nLoading: 0 packages loaded\n",
+      "stdout": "@dep//:restricted\n"
+    }
+  ],
+  "fixture": "external-restricted-visibility-query",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
