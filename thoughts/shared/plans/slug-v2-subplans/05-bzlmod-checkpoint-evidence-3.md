@@ -15916,3 +15916,188 @@ visibility, or generic query consumers. The design must freshly audit those
 boundaries and obtain one independent reserved-boundary review before naming
 any implementation. The 17-row `module-local-override` fixture remains frozen;
 no Rust, oracle, or fixture edit is authorized by the redesign packet.
+
+## WP-5-m1 external repository Starlark-rule query redesign (2026-08-04)
+
+**Status: REPLAN — no Rust, fixture, oracle, or activation is authorized.**
+The dependency-free non-test external Starlark rule has a bounded future
+loading owner, but a rule-only projection would activate enabled generic query
+consumers whose current request-local ownership erases the external repository
+route. Returning a literal/kind/self-only `deps()` result while those consumers
+return root-package data is partial observable behavior, not a bounded Bazel-9
+slice.
+
+### Reused Bazel 9.2 evidence and complete enabled surface
+
+The prior direct-local-override root at `/tmp/slug-external-rule.DG0nHw`
+remains the evidence source: one same-repository `:defs.bzl` load, a second
+same-package `:helper.bzl` load, and `probe = rule(implementation = impl)`
+with `probe(name = "rule")`. Its already recorded success evidence fixes
+literal `@dep//:rule`, `probe rule @dep//:rule`, self-only
+`deps(@dep//:rule)`, empty `labels(tags, @dep//:rule)`, ordered
+`loadfiles()` (`defs.bzl`, then `helper.bzl`), ordered `buildfiles()`
+(`BUILD.bazel`, `defs.bzl`, then `helper.bzl`), missing-load diagnostic, and
+ordered same-repository load cycle.
+
+The same retained root supplied these additional Bazel 9.2 probes:
+
+| query | exact stdout/result |
+| --- | --- |
+| `siblings(@dep//:rule)` | `@dep//:BUILD.bazel`, then `@dep//:rule` |
+| `same_pkg_direct_rdeps(@dep//:rule)` | empty |
+| `rdeps(@dep//:rule, @dep//:rule)` | `@dep//:rule` |
+| `allpaths(@dep//:rule, @dep//:rule)` | `@dep//:rule` |
+| `somepath(@dep//:rule, @dep//:rule)` | `@dep//:rule` |
+| `some(@dep//:rule)` | `@dep//:rule` |
+| `executables(@dep//:rule)` | empty |
+| `tests(@dep//:rule)` | empty |
+| `visible(//pkg:private, @dep//:rule)` | `@dep//:rule` |
+| `visible(@dep//pkg:caller, //pkg:private)` | `//pkg:private` |
+| `visible(//pkg:private, @dep//pkg:caller)` | `@dep//pkg:caller` |
+| `labels(visibility, @dep//:rule)` | exit 7 while resolving missing `//visibility:public` |
+
+The last row is not a license to invent a visibility label or content model;
+it records the observable root's missing-special-target result. A future
+packet must either reproduce that input/diagnostic through the existing root
+owner or stop before it returns a partial `labels()` result.
+
+`app/slug_query_v2/src/expr.rs` lines 109-192 is the complete loading-query
+registry. The implemented set is `allpaths`, `buildfiles`, `deps`,
+`executables`, `labels`, `loadfiles`, `rdeps`, `same_pkg_direct_rdeps`,
+`siblings`, `some`, `somepath`, `tests`, and `visible`. `attr`, `filter`, and
+`kind` are registered-but-deferred and validation rejects them before query
+evaluation; `allrdeps` is not registered. Default `QueryOutputFormat::Text`
+is enabled and renders through the ordinary label stdout path, but an explicit
+`--output=text` is rejected. The flag-selected accepted modes are label,
+graph, label_kind, and package
+(`app/slug_commands_v2/src/query.rs` lines 94-116 and
+`app/slug_cli_v2/src/commands/query.rs` lines 71-78). External `:*` and
+`...` patterns already reject before graph evaluation
+(`loading_environment.rs` lines 761-812).
+
+### Exact audit and route-erasure blocker
+
+`QueryLabel` deliberately has canonical equality/hash identity while retaining
+an apparent repo only for `output_label()` rendering
+(`app/slug_query_v2/src/graph.rs` lines 63-164). Literal output, label_kind,
+package output, graph output, `deps`, `rdeps`, `allpaths`, `somepath`, and
+`some` can therefore remain bounded for the one explicitly-public,
+non-test, non-executable rule with no ordinary dependency edges. `tests()` is
+empty only while the package contains no test target or suite. `executables()`
+is empty only while the retained `RuleCapability.executable` is false
+(`loading_environment.rs` lines 1005-1025). `labels(tags, ...)` is empty only
+while the accepted Starlark schema has no dependency-reachable label
+attribute; a future public projection must also account for the explicit
+visibility attribute/result rather than silently omitting it.
+
+Three existing generic owners are not route-aware:
+
+1. `same_pkg_direct_rdeps()` groups targets by `CompactString` package text
+   and then calls root `package_graph()` (loading environment lines 837-879).
+   `siblings()` obtains the same string-only package set from
+   `QueryCandidate::owner_package()` and also calls root `package_graph()`
+   (lines 881-894; `provenance.rs` lines 78-87). For `@dep//:rule`, both use
+   package `""` and can load root `//` rather than `@dep//`. They cannot
+   return the recorded external siblings result or safely claim empty direct
+   reverse dependencies.
+2. `loading_files()` receives only that string owner and, in Host mode,
+   unconditionally computes `RootPackageLoadKey` (lines 250-283 and 911-917).
+   It then fabricates the BUILD label with `QueryLabel::parse_root`, converts
+   every reachable Bzl identity with `QueryLabel::from_canonical`, and uses
+   the root companion lookup (lines 919-954). This loses the apparent route
+   four times: `loadfiles()` can render canonical `@@dep+` instead of
+   `@dep`, while `buildfiles()` can report/inspect a root BUILD file.
+3. `visible_to()` reduces the caller to that same package string, compares it
+   before the visibility branch, and reconstructs a root `@@//pkg:__pkg__`
+   only for restricted visibility evaluation (lines 358-395). The
+   `visible(@dep//pkg:caller, //pkg:private)` probe demonstrates that Bazel
+   Private uses the same package fragment across repositories, matching the
+   current Private comparison. Explicit public visibility on the *external
+   target* makes only the forward public predicate independent of caller
+   identity. Restricted direct-package/package-group caller identity remains
+   unsettled because the implementation fabricates a root canonical caller;
+   do not change that branch without pinned Bazel source and a
+   restricted-visibility discriminator.
+
+Fake load/build provenance candidates make this a complete-consumer problem,
+not merely a literal one: the current fake form stores only a
+`consuming_package: CompactString` (`provenance.rs` lines 20-87), so
+`siblings(loadfiles(@dep//:rule))`, subsequent loading-file queries, and
+Restricted visibility processing can each lose the route even if the real
+target is fixed. The current external graph's empty
+visibility-dependency-label stop (`graph.rs` lines 887-915) remains necessary,
+but is not a substitute for
+repository-qualified ownership where graph/provenance lookup requires it; the
+Private visibility comparison remains the demonstrated package-fragment rule.
+
+### Replan decision and next bounded design
+
+Do not implement a Starlark rule projector in this packet. The only permitted
+continuation is the design-only
+`WP-5-m1-external-query-package-identity-design`. It must select one compact,
+private `QueryPackageIdentity`/candidate-owner representation carrying the
+canonical package identity plus the apparent render route, and prove all of:
+
+- real and fake candidate equality, hashing, ordering, retained-memory cost,
+  and label materialization preserve the established root behavior while
+  reattaching the same apparent route to external BUILD, Bzl, companion, and
+  fake candidates;
+- repository-qualified package dispatch covers `siblings`,
+  `same_pkg_direct_rdeps`, `loadfiles`, `buildfiles`, and Bzl companions. The
+  design must retain the current root-only behavior for root candidates and
+  never select a root graph for an external graph/provenance owner. It must
+  preserve the demonstrated cross-repository Private package-fragment
+  comparison; any Restricted direct-package/package-group caller change
+  requires pinned source and a discriminating Bazel probe first;
+- literal/kind/package/graph rendering, self-only traversal/path functions,
+  empty non-test/non-executable `tests`/`executables`, `labels` including its
+  visibility edge case, deferred external patterns, duplicate/order behavior,
+  and fake-candidate compositions are exact or fail before output;
+- DICE still owns every graph, package load, route, provenance, and companion
+  lookup, with no fresh graph or direct filesystem path; old candidate and
+  loaded-package values retain across warm requests and prune only when their
+  existing semantic inputs change; and
+- an exact production, focused-test, direct-dependent, lifecycle,
+  GNU-Windows, formatting, archive, and diff allowlist is independently
+  reviewed before Rust. The frozen `module-local-override` fixture remains at
+  17 rows and receives no oracle row in this design.
+
+The likely private consumers that the next design must audit are
+`app/slug_query_v2/src/{graph.rs,loading_environment.rs,provenance.rs}` and
+their direct tests (`graph.rs` unit tests,
+`app/slug_query_v2/tests/loading_query.rs`, and the existing CLI external
+query coverage). It must not name an implementation allowlist until the
+identity/equality decision is accepted.
+
+The external Bzl loading owner itself is bounded but remains deferred. Commit
+`980373f9` now gives `HostRepositorySourceFileKey` the requested normalized
+logical path required by `BzlModuleIdentity`, without changing legacy
+immutable equal-byte pruning. A later separate loading design can use that
+fact for one private route-plus-validated-canonical-external-Bzl-label key,
+with a matching private cycle guard/detector, in the two loading files
+`app/slug_loading_v2/src/bzl_module.rs` and
+`app/slug_loading_v2/src/cycle_detector.rs`. It must retain complete-only
+value/error equality, direct/reachable manifest order, frozen-module lifetime,
+event replay, and cold/warm/edit/delete/recreate/recovery behavior. That
+future two-file shape does not authorize an external Bzl key, loader,
+projection, fixture, or query behavior now.
+
+Residual stops are cross-package/repository loads, external patterns and
+discovery, visibility-content evaluation, non-public visibility traversal,
+implicit/user dependencies, executable/test rules, test suites, generated
+outputs, configuration, analysis/actions/execution, repository rules or
+extensions, `@bazel_tools`, JVM, Java bytecode, and Bazel delegation. An
+independent reserved-boundary review is required before scheduling either the
+package-identity design's implementation or the deferred external Bzl owner.
+
+### Independent query/representation review (2026-08-04): ACCEPT
+
+The independent review accepted this REPLAN. The focused correction preserves
+the demonstrated Bazel Private same-package-fragment behavior across
+repositories and confines the unresolved caller-identity question to
+Restricted direct-package/package-group visibility, which now requires pinned
+source plus a discriminating probe. It also records default Text rendering
+separately from rejected explicit `--output=text`, while retaining the four
+accepted flag-selected output modes. The final verdict remains **REPLAN** to
+`WP-5-m1-external-query-package-identity-design`; no Rust, fixture, oracle, or
+external Bzl-loader activation is authorized.
