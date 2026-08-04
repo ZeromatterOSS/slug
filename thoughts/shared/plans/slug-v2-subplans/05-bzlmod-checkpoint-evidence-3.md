@@ -18574,3 +18574,89 @@ visibility, public API/caller, fixture, or oracle changed. The successor may
 design only the private opaque support-gated acyclic preparation owner. Public
 unsupported-cycle publication remains frozen pending explicit user approval;
 evaluator/default/event work remains later.
+
+### WP-5-m1 direct-local support-gated acyclic closure design (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-5-m1-direct-local-support-gated-acyclic-closure-implementation`.** Parallel
+Terra audits of the accepted `source_preparation.rs` seams and the analogous
+root breadth-first closure found one necessary correction to the draft timing.
+Returning an unsupported-cycle capability after only the cycle candidate's
+successful current horizon is not exact: an acyclic sibling can contribute a
+later-horizon Need or real terminal that Bazel reaches before its cyclic
+worklist can terminate. This section supersedes the earlier current-horizon-
+only timing in the include-cycle boundary design.
+
+Implement one private, callerless `DirectLocalModulePreparationKey` and its
+private value, supported closure, fragment occurrence, cycle capability, and
+typed error carriers in exactly
+`app/slug_bzlmod_v2/src/source_preparation.rs`. The formatted net cap is
+**600 production lines, 1650 test lines, and 2250 total lines**. Key identity is
+normalized workspace plus nonroot apparent repository. Its value is
+`SourcePreparationOutcome<Arc<Result<DirectLocalModulePreparation,
+DirectLocalModulePreparationError>>>`; `DirectLocalModulePreparation` has a
+supported acyclic closure branch and a private unsupported include-cycle
+capability branch. The supported semantic closure itself has no cycle variant.
+
+Compute the accepted `DirectLocalModuleInspectionKey` once and seed a
+present root only after invoking `validate_root_module_source` on its logical
+path and bytes. A root prepare/identifier failure is a distinct typed
+preparation error and activates zero include-package lookup or fragment-source
+dependencies beyond the root inspection; root absence remains a supported empty
+preparation. Then seed a breadth-first
+frontier from the root requests. For each horizon, call only the accepted
+`preflight_direct_local_include_package_horizon(ctx, route, requests)`;
+derive canonical package-plus-target repository-relative fragment identities,
+deduplicate only that horizon's source dependencies, request the complete
+`HostRepositorySourceFileKey` group, union every `SourcePreparationNeeds`, and
+then inspect the original occurrences in source order. Preserve the accepted
+mixed rule: an earlier complete terminal beats a later Need, while an earlier
+Need returns the complete union and beats a later terminal. Invoke the existing
+validation/compile seam for every successful occurrence, even when its source
+dependency was deduplicated within the horizon, so compile order and
+occurrence-local failures remain exact. Retain every successful occurrence,
+shared bytes, route-derived logical identity, and inspection in breadth-first
+order; repeated siblings, diamonds, duplicate call sites, and distinct labels
+for one canonical path remain separate occurrences.
+
+Cycle handling is a support classifier, not Bazel closure semantics. Track
+route-canonical fragment identity and raw-label/span provenance on each
+occurrence's active ancestry. After a whole horizon's package preflight,
+grouped fragment acquisition, and source-order compile scan succeeds, record
+the first breadth-first ancestor repeat as a pending capability candidate. Do
+not enqueue that repeated occurrence's outgoing requests: they are the same
+deterministic source edges already expanded by its first active ancestor.
+Continue all other successful occurrences and later horizons until the cycle-
+pruned reachable worklist is exhausted. Any later Need or real terminal wins;
+only an otherwise-successful exhausted worklist returns the pending private
+capability with the repeated occurrence and first active ancestor provenance.
+This enumerates every cycle-free simple occurrence path and therefore reaches
+every finite side-branch failure without a global visited set, depth limit,
+invented retry, recursive DICE, or intentional hang.
+
+Keep inspection semantic/compute, root validation, package preflight, fragment
+missing, fragment source/source-compute, wrong-kind, UTF-8/parser/MODULE-syntax/
+compile, and logical-path failures typed with their source chains. Complete supported
+equality includes root presence/source and ordered fragment semantics but no
+temporary ancestry or cycle metadata; unsupported equality includes only the
+capability metadata. Every Need is invalid and self-unequal. The preparation
+owner stores no event batch and neither copies nor replays routed-REPO child
+events. Use existing `Arc<[u8]>`, `Arc<[T]>`, `CompactString`, compact
+collections, `Dupe`, and `Allocative`; add no interner, lock, direct IO, or
+second package/source graph.
+
+Tests must cover breadth-first versus depth-first order; package-before-source;
+horizon-local dependency dedupe versus retained occurrences; both mixed
+terminal/Need directions and multi-kind union; every typed failure with raw
+label/span; root absence; sibling and diamond repeats; self and multi-file
+cycles; root prepare/identifier failure with zero include-package lookup or
+fragment-source activations beyond root inspection; a cycle candidate plus a
+later-horizon sibling terminal and Need;
+multiple candidates with first breadth-first provenance; fragment and nested-
+include add/edit/delete/reorder/recreate; route A-to-B-to-A; warm reuse and
+downstream pruning; and captured/uncaptured child events with no owner-local
+data. No public export/caller/publication, evaluator/default/print change,
+semantic closure cycle variant, global visited truncation, recursive DICE,
+fixture/oracle, registry/MVS/mapping work, or file outside the one-file
+allowlist is authorized. `REPLAN` on any such expansion. Public unsupported-
+cycle publication remains frozen pending explicit user approval.

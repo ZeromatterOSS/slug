@@ -1,73 +1,108 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-support-gated-acyclic-closure-design`
+Packet: `WP-5-m1-direct-local-support-gated-acyclic-closure-implementation`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: read-only private support-gated occurrence-closure design
-Evidence: accepted source/inspection and package horizon; shared route+requests
-preflight in `34a2340e`; pinned Bazel 9.2 breadth-first acquisition; accepted
-repeated/nested include oracles; and the approved private cycle-capability
-boundary. Add no oracle unless the design proves one exact discriminator is
-missing.
+Role: private one-file support-gated occurrence preparation
+Evidence: accepted source/inspection/package horizon and shared preflight in
+`34a2340e`; pinned Bazel 9.2 breadth-first acquisition; accepted repeated/nested
+include oracles; root closure regressions; and the accepted private Slug cycle
+capability boundary. Add no oracle or fixture.
 
-Do not edit or format Rust. Design one private, callerless, opaque preparation
-owner that performs exact breadth-first direct-local fragment acquisition and
-returns either a supported complete acyclic preparation or typed Slug capability
-metadata for an active-ancestry include cycle. The semantic closure value inside
-the supported branch has no cycle variant. No public export, command caller, or
-observable unsupported-feature publication is authorized; those remain frozen
-pending explicit user approval.
+Edit exactly `app/slug_bzlmod_v2/src/source_preparation.rs`. The formatted net
+addition may not exceed **600 production lines, 1,650 test lines, or 2,250 total
+lines**. Add only private, callerless owners:
 
-Use the accepted `DirectLocalModuleInspectionKey` for the root and the shared
-`preflight_direct_local_include_package_horizon(ctx, route, requests)` for every
-horizon. Package preflight must finish before fragment demand. Derive each
-normalized repository-relative fragment path from the canonical package plus
-target, request the accepted `HostRepositorySourceFileKey` once per first-seen
-path within that horizon, union every `SourcePreparationNeeds`, then rewalk all
-occurrences in source order. Freeze exact missing, wrong-kind/source,
-source-compute, UTF-8/parser/MODULE-syntax/compile, and mixed terminal/Need
-precedence from pinned source.
+- `DirectLocalModulePreparationKey(NormalizedAbsolutePath, ApparentRepoName)`;
+- `DirectLocalModulePreparation::{Supported, Unsupported}`;
+- `DirectLocalModuleClosure`;
+- `DirectLocalIncludeFragment`;
+- `DirectLocalIncludeCycleCapability`;
+- `DirectLocalModulePreparationError`; and
+- `DirectLocalIncludeFragmentFailure`.
 
-Retain every occurrence in breadth-first order, including repeated identical
-raw labels and distinct labels for one canonical path. Dependency dedupe is
-horizon-local only. Inspect/compile successful unique fragment source once if
-that preserves all diagnostics; otherwise preserve Bazel's occurrence-local
-compile behavior. Every successful occurrence contributes its nested requests
-to the next horizon in occurrence order. Full reachable preparation completes
-before any module directive executes.
+The key identity is workspace plus nonroot apparent repository and it computes
+`DirectLocalModuleInspectionKey` once. Forward its Needs unchanged; distinguish
+typed inspection from inspection-compute failure. Preserve root absent versus
+present state in the supported closure through the accepted inspection carrier.
+For a present root, invoke `validate_root_module_source` on its logical path and
+bytes before seeding the first package horizon; map failure to a distinct root-
+validation error and request no package or fragment dependency. Root absence
+remains supported without validation. Use complete-only equality/validity:
+every Need is invalid and self-unequal.
 
-Cycle detection uses per-occurrence active ancestry of route-canonical fragment
-identity, never a global visited set. Repeated siblings, diamonds, duplicate
-call sites, and later finite reuse remain supported. A detected ancestor repeat
-is only a pending capability candidate: finish the current horizon's package
-preflight, grouped fragment acquisition, and source-order inspection/compile
-scan first. Any real terminal or Need retains Bazel precedence. Only an
-otherwise-successful whole current horizon may return the private typed Slug
-unsupported capability with the repeated occurrence and first active ancestor's
-raw label/`LogicalSpan` provenance.
+The supported closure retains the accepted root inspection plus
+`Arc<[DirectLocalIncludeFragment]>` in breadth-first occurrence order. Each
+fragment retains canonical package/target, raw label/`LogicalSpan`, the
+route-derived requested logical path, shared bytes, and
+`NonrootModuleFileInspection`. Preserve every occurrence, including identical
+raw labels, diamonds, siblings, and distinct labels for one canonical path.
+Dependency dedupe is horizon-local only and never deduplicates occurrence
+carriers or occurrence compilation.
 
-Freeze exact key/value/capability/error names, identity, display/source chains,
-complete-only equality, transient Need behavior, retained compact/shared
-representation, and event ownership. Supported equality excludes ancestry and
-cycle metadata. The preparation owner owns no event batch and does not copy
-routed-REPO child events. Use existing `Arc<[u8]>`, `Arc<[T]>`, `CompactString`,
-compact collections, `Dupe`, and `Allocative`; add no interner, cache, lock, or
-direct IO.
+For every frontier call the accepted
+`preflight_direct_local_include_package_horizon(ctx, route, requests)` and finish
+it before any fragment demand. Derive normalized repository-relative fragment
+paths from canonical package plus target. Request every first-seen
+`HostRepositorySourceFileKey` in one group, union all
+`SourcePreparationNeeds::try_union` results, then rewalk occurrences in source
+order. An earlier complete terminal beats a later Need; an earlier Need returns
+the full group union and beats every later terminal. Preserve outer source-
+compute failure separately from typed source failure and Absent. Use the
+existing `validate_root_module_source` seam for UTF-8, restricted syntax,
+MODULE/include inspection, and Starlark prepare/identifier validation. Invoke it
+for every successful occurrence, even when its source dependency was deduped,
+so occurrence compile order remains exact.
 
-Decide the smallest implementation file allowlist and evidence-backed
-production/test/total caps. Freeze tests for breadth-first versus depth-first
-order; package-before-fragment; horizon-local path dedupe versus repeated
-occurrences; both mixed terminal/Need directions; exact multi-kind Need union;
-raw label/span and all typed failures; sibling/diamond duplicates; self and
-multi-file active-ancestry cycles; pending-cycle versus later same-horizon
-terminal/Need;
-fragment/nested include add/edit/delete/reorder/recreate; root absence; route
-A-to-B-to-A; warm reuse/downstream pruning; and captured/uncaptured child events
-with no owner-local data.
+Every successful non-backedge occurrence appends its nested requests to the next
+horizon in occurrence order with an extended active ancestry. Active identity
+is route-canonical package plus canonical target. Only a repeat on that
+occurrence's active ancestry is a cycle candidate; never use a global visited
+set. Retain the first breadth-first candidate's repeated raw label/span and the
+first matching ancestor's raw label/span as private capability metadata.
 
-Stops: no Rust, public export/caller/activation/publication, Bazel-like cycle
-diagnostic, semantic closure cycle variant, global visited truncation, recursive
-DICE, intentional hang, evaluator/default/validation/print changes, contextual
-mappings, registry/MVS/JVM transport, fixture/oracle, direct filesystem IO, or
-speculative cap. Finish with an accepted bounded implementation packet or
-`REPLAN` in owner/canonical/manifest/routing records. Do not run Cargo or Bazel.
+A cycle candidate is pending, not terminal. Finish its current horizon normally,
+do not enqueue only that repeated occurrence's outgoing requests, and continue
+all other queued occurrences and descendants breadth-first. At every later
+horizon, real Needs and terminals retain normal precedence. This cycle-pruned
+capability analysis is not supported-closure occurrence truncation: it is used
+only to prove the unsupported domain. Return `Unsupported` only after the entire
+remaining cycle-pruned reachable worklist succeeds and exhausts. This ensures a
+cycle plus a finite side-branch terminal or Need returns the Bazel result rather
+than hiding it. No capability value may be returned merely because its first
+current horizon succeeded.
+
+Errors distinguish inspection/compute, root validation, package preflight,
+fragment source-compute, typed source, Absent, and fragment validation/compile
+failures, restoring root logical path or occurrence raw label/span and
+repository-relative/requested logical path. Typed inspection, package, and
+source errors expose their existing source chains where available; string
+compute, Absent, validation, and capability variants do not masquerade as Bazel
+errors. `Supported` equality includes root state and ordered fragment identities/
+bytes/inspections but excludes transient ancestry. `Unsupported` equality
+includes only typed capability provenance. The key owns no event batch and does
+not copy or replay routed-REPO child events.
+
+Tests must discriminate breadth-first versus depth-first compile order; package
+barrier before fragments; horizon-local path dedupe versus repeated occurrence
+compilation; both mixed terminal/Need directions; exact multi-kind Need union;
+all typed failures and raw-label/span sources; siblings, diamonds, same canonical
+path under distinct labels, and finite later reuse; self and multi-file cycles;
+same-horizon cycle candidate versus terminal/Need; cycle in H plus sibling H+1
+terminal and Need in both orders; a side branch emitted by the cyclic ancestor;
+deterministic first pending-cycle provenance after full pruned traversal; root
+absence; a root prepare/identifier failure with zero include-package lookup or
+fragment-source activations beyond root inspection; fragment and nested-include
+add/edit/delete/reorder/recreate; route A-to-B-to-A;
+warm reuse/downstream pruning; complete-only equality; and captured/uncaptured
+child events with no preparation-local data or warm replay.
+
+Use existing `Arc<[u8]>`, `Arc<[T]>`, `CompactString`, `SmallMap`/`SmallSet`,
+`Dupe`, and `Allocative`. Stops: no second file, public export/caller/activation/
+publication, Bazel-like cycle diagnostic, cycle variant in the supported closure,
+global visited set, cross-horizon dependency dedupe, recursive DICE, intentional
+hang, hard depth/node limit, evaluator execution, default/validation/print
+change, event storage, direct IO, lock/interner/cache, fixture/oracle, or cap
+breach. `REPLAN` on any such expansion. Run focused serial tests, formatting,
+GNU-Windows no-run, archive/scope/cap/diff gates, and independent latest-diff
+review; do not run Bazel.
