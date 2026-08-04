@@ -16604,6 +16604,96 @@ scripts/v2_archive_status.sh
 git diff --check
 ```
 
+## WP-5-m1 external Bzl package/query activation design (2026-08-04)
+
+**Status: REPLAN — obtain one bounded macro-produced-native oracle before any
+Rust activation.** Parallel loading/DICE, generic-consumer, and oracle audits
+found no architectural blocker after the accepted external module owner and
+query package identity, but the available evidence does not discriminate the
+package activation seam. The 17 protected `module-local-override` rows contain
+no `load()` or `.bzl` file, while the accepted ad-hoc Bazel 9.2 load probes
+create a custom `probe` rule rather than a native target from a macro.
+
+### Bounded activation architecture retained after the prerequisite
+
+`RepositoryPackageLoadKey` remains the sole package owner. After parsing the
+external BUILD source, it must normalize **all** direct loads through the
+existing same-package external resolver before computing any child, then
+compute `ExternalBzlModuleEvalKey` children sequentially with ordinary
+`ctx.compute`. The package key is not an external cycle node; only nested
+Bzl-to-Bzl waits use the existing external guard, poison key, and fresh
+request-detector recovery. Complete package errors add typed normalized-load
+and child wrappers, including the raw load, canonical child label, deepest
+typed external error, and BUILD origin for cycle rendering.
+
+The existing package attempt receives the raw-load/frozen-module pairs. On
+success it remains the sole transfer owner for first-seen direct roots,
+ordered reachable manifest identities, load fingerprint, and the flattened
+frozen lifetime closure. Bzl keys own only their local evaluation batches;
+the repository package key owns BUILD and invoked-macro events. Metadata is
+published only on evaluated Complete activations; DICE `Reused` carries no
+batch and causes no replay or recapture.
+
+Because a loaded macro can call the existing `native` module and
+`PackageTarget` has no macro-origin field, the first activation accepts a
+nonempty-load package only when every produced target is `ExportedFile` or
+native `Filegroup`. Any Alias, ConfigSetting, TestSuite, PackageGroup,
+GeneratedFile, or StarlarkRule returns a typed whole-package stop before query
+projection. Do not add origin state. Existing external filegroup projection
+continues to remap only root-context same-package labels through the verified
+route; all cross-package/repository labels and globs remain complete stops.
+
+Query production changes are limited to the existing loading environment:
+external package provenance returns the accepted build file and reachable Bzl
+identities instead of rejecting a nonempty manifest. Each Bzl fake candidate
+is constructed with the retained external `QueryPackageIdentity`, so apparent
+rendering and route verification remain intact. For same-package external
+loads, `buildfiles()` reuses the already emitted external BUILD label as the
+companion and never calls root companion discovery; printed-label dedupe leaves
+BUILD then ordered Bzl files, while `loadfiles()` contains only the Bzls.
+Existing fake semantics are sufficient for enabled generic consumers and
+formats: fakes are printable source-file leaves, `siblings()` dispatches by
+their external owner, `visible()` accepts them, and rule-only consumers return
+no result. No graph, provenance, generic traversal, output, core event,
+cycle-detector, bzlmod, source-owner, or public API change is authorized.
+
+### Evidence gap and smallest prerequisite
+
+The missing discriminator is one `.bzl` macro that calls
+`native.filegroup`; without it, an implementation could evaluate modules but
+fail to transfer them into BUILD evaluation and still satisfy all current
+evidence. Preserve all 17 existing `module-local-override` commands and
+`workspace/dep/BUILD.bazel` byte-for-byte. The recorded checkpoint metric is
+598 protected lines: 460 in `expected/oracle.json`, 123 in `fixture.toml`, and
+15 in the dependency BUILD file. A separate `dep/macro` subpackage avoids
+mixing loaded-target restrictions with the existing Alias, ConfigSetting,
+TestSuite, and PackageGroup rows.
+
+The next packet is design-only
+`WP-5-m1-external-bzl-macro-query-oracle-design`. It may specify only two new
+subpackage assets and three nonduplicative Bazel 9.2 query rows: macro-created
+native filegroup `label_kind`, `loadfiles()`, and `buildfiles()`. It must freeze
+exact contents, order, normalization, generation/replay procedure, fixture
+hygiene arithmetic, and implementation caps before any fixture edit. If Bazel
+9.2 differs, return to this activation design before Rust.
+
+After that oracle is accepted, the activation implementation may be bounded to
+`bzl_module.rs`, a test-only lifetime accessor in `package.rs`, the existing
+same-module loading tests, `loading_environment.rs`, loading-query tests, the
+existing direct external CLI lifecycle test, and the accepted fixture paths,
+with an audited cap no larger than +2100. Required coverage includes manifest
+and lifetime transfer, all-load prevalidation, missing/cycle preparation,
+Need/equality/validity, edit/delete/recreate and fresh-detector same-DICE
+recovery, evaluation-only events, every fake-candidate consumer, apparent
+output, and a real root BUILD proving no root companion fallback.
+
+Residual `REPLAN` stops are cross-package or cross-repository loads,
+mapping/discovery, non-local overrides, globs, loaded target kinds beyond
+ExportedFile/Filegroup, external patterns, visibility content, test,
+executable, suite, generated, or Starlark-rule projection, analysis/actions/
+execution, and any new source owner, DICE key, lock, public identity, JVM,
+Java bytecode, or Bazel delegation.
+
 If the direct-external CLI dependent is used, rebuild `slug_cli_v2` first and
 clean stale `slugd` before and after its smoke. CLI GNU-Windows no-run remains
 outside this cap because unconditional Unix-socket server imports are an

@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus accepted Host-only external source, request-local external query package identity, and the dormant route-keyed external Bzl owner; full evidence is in the Stage 5 owner plan | External Starlark package/query activation, test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | design the bounded external Bzl package/query activation without exposing unreviewed macro provenance |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus accepted Host-only external source, request-local external query package identity, and the dormant route-keyed external Bzl owner; full evidence is in the Stage 5 owner plan | External Starlark package/query activation lacks a macro-produced-native Bazel discriminator; test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | design the focused external Bzl macro-query oracle prerequisite while preserving the frozen 17-row fixture surface |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-bzl-package-query-activation-design`.
+`WP-5-m1-external-bzl-macro-query-oracle-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -63,6 +63,14 @@ three-file `+1205/-8` diff. `RepositoryPackageLoadKey::LoadsUnsupported`
 remains unchanged and no production caller reaches the private key, so
 macro-produced native targets and query provenance remain dormant pending the
 separate activation design.
+
+The external Bzl package/query activation audit reached `REPLAN` before Rust.
+The loading, lifetime, error, event, and query seams are bounded, but neither
+the frozen 17-row fixture nor the accepted ad-hoc custom-rule probes prove the
+automatically reachable case where a `.bzl` macro creates a native
+`filegroup`. The next packet designs a minimal Bazel 9.2 oracle addition in an
+isolated `dep/macro` subpackage; all existing rows and the existing dependency
+BUILD file remain protected.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of
