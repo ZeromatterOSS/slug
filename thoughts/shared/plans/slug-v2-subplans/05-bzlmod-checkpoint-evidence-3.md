@@ -16401,3 +16401,223 @@ Independent latest-diff review accepted the production implementation and,
 after the one tests-only visibility correction, accepted the discriminating
 Private/Restricted evidence. The next bounded prerequisite is design-only
 `WP-5-m1-external-bzl-module-owner-design`; the 17-row fixture remains frozen.
+
+## WP-5-m1 external Bzl-module owner design (2026-08-04)
+
+**Status: ACCEPTED — only the dormant implementation contract below is
+authorized.** This is a private, dormant loading-owner design
+only. `RepositoryPackageLoadKey::LoadsUnsupported` remains unchanged: an
+external `BUILD` `load()` must not evaluate yet, because the existing external
+native graph could otherwise expose macro-produced native targets before a
+separate query/provenance activation is accepted.
+
+### Private route-keyed module identity
+
+Any later implementation changes exactly two production files:
+`app/slug_loading_v2/src/bzl_module.rs` and
+`app/slug_loading_v2/src/cycle_detector.rs`. It adds no public API, Cargo
+dependency, source owner, query/CLI/bzlmod production change, cache, interner,
+direct filesystem observation, or fixture/oracle row. The sole permitted lock
+is the isolated per-guard asynchronous receiver mutex described below.
+
+The exact changed-file and addition cap is `bzl_module.rs` at most `+950`
+lines, `cycle_detector.rs` at most `+300`, and
+`host_package_load_tests.rs` at most `+800`, for at most `+2050` additions
+and no other diff. The `bzl_module.rs` allowance includes correcting the stale
+root-only `BzlModuleIdentity` documentation to describe the already-general
+canonical-label plus logical-path identity; it does not generalize that public
+type or add a public constructor.
+
+`HostBzlModuleEvalKey` is not reusable: it is keyed by normalized root
+workspace plus `HostRootBzlLabel`, reads `RootPackageSourceKey`, and its
+detector downcasts only the root-Host family. The dormant private key is
+`ExternalBzlModuleEvalKey { route: RootRepositoryRoute, label:
+RepositoryBzlLabel }`. `RepositoryBzlLabel` is private and frozen at this
+boundary: it is a validated same-route canonical external label (typed package
+and target), not an apparent string or a cross-crate identity. Its canonical
+repository comes only from `route.canonical_repo()`; apparent rendering is not
+part of manifest/value identity. `RootRepositoryRoute` equality and hashing
+already include apparent repository spelling, module, and repository
+specification, so route state necessarily remains part of the external **key**:
+it selects source/materialization. Route is a key input because it already
+owns route-specific materialization and source.
+
+Raw load resolution happens for **all** direct loads before any child source
+request. Use the existing typed parsers and retain raw text only for bounded
+diagnostics. Accept `:target.bzl` relative to the requesting package, and
+root-relative `//same/package:target.bzl` / `//:target.bzl` only when it
+normalizes to precisely that package. Construct the one canonical
+`@@canonical+//package:target.bzl` from the route. Before
+`HostRepositorySourceFileKey` is computed, reject malformed/escaping targets,
+target raw bytes containing `/`, cross-package inputs, every named-repository
+spelling (`@name//...`), and every canonical-repository spelling
+(`@@name+//...`). Equivalent accepted raw relative/absolute spellings must
+share one key, source request, and manifest identity. Build repository-relative
+source paths from the validated package and `RootPackageBzlTarget::raw_bytes`,
+using an exact platform conversion: on Unix,
+`OsStringExt::from_vec(raw_bytes.to_vec())`; on non-Unix, map each byte to its
+Latin-1 Unicode scalar before forming the path. Do not pass a lossy string
+through `PathBuf`, synthesize a host path, or accept a slash-bearing target as
+a path fragment. Do not infer mapping/discovery, non-local overrides,
+cross-repository loads, or a root fallback. If an exact new diagnostic lacks
+accepted Bazel evidence, retain a typed stop and **REPLAN**, rather than claim
+parity.
+
+### Dormant evaluator, provenance, lifetime, and events
+
+The later key reads only
+`HostRepositorySourceFileKey::new(route, repo_relative_path)`. Its `Present {
+bytes, logical_path }` supplies the input and honest
+`BzlModuleIdentity { label, workspace_path: logical_path }`; the synthetic
+`<output_base>/external/...` display path is never module identity or source.
+Absent, encoding, parse, evaluation, freeze, and child errors are complete
+terminal values. Evaluate normalized children in source order with the
+existing `LocalBzlLoader`, then freeze. `BzlLoadManifest::new` stays the sole
+provenance construction: direct children are label-first/source-order;
+reachable entries are flat, label-first/first-seen; fingerprints retain the
+existing ordered direct semantic roots. No external manifest form or second
+lifetime DAG is permitted.
+
+The private `ExternalBzlModuleError` derives `Debug`, `Clone`, `PartialEq`,
+`Eq`, and `Allocative`. Its typed variants are source-compute failure; source
+error; absent canonical label; input encoding; parse; normalized-load
+rejection; child `{ raw_load, canonical_label, Arc<ExternalBzlModuleError> }`;
+external cycle; evaluation; and freeze. Error equality contains only these
+typed semantic fields: no physical operational path, frozen/evaluator pointer,
+or untyped catch-all string is retained as equality state.
+
+`FrozenBzlModule` retains its frozen module and flattened
+`FrozenBzlLifetimeEntry` closure. A later package activation transfers that
+closure into `LoadedPackage::retained_bzl_modules`, so frozen Starlark rule
+implementations cannot outlive their heaps. Frozen pointers remain
+lifetime-only and excluded from equality; manifests, targets, and fingerprints
+remain semantic state.
+
+Each external Bzl key owns exactly one local complete `EventBatch` when
+`CaptureEvaluationEvents` is installed, as the root Bzl key does. A later
+package key owns only its BUILD/macro-local batch. Cold evaluation publishes
+the Bzl batch by storing it only when this key recomputes to Complete; warm
+cached reuse does not recompute or capture, but may expose the retained batch
+through rich activation metadata. User-visible silence is the command's
+selection rule ignoring `Reused`, not the absence of retained metadata. Direct
+tests prove evaluated versus reused activation and unchanged retained metadata,
+not aggregate output. Empty replacement and failure-prefix behavior remain
+key-local. This proposal does not claim an unproven aggregate or cross-key
+external print order.
+
+### Isolated cycle family and DICE contract
+
+`cycle_detector.rs` adds a third private node, guard, and cycle-value family
+for `ExternalBzlModuleEvalKey`, isolated from legacy and root-Host nodes.
+Edges are accepted only between the external guard and external child keys;
+families never downcast or coerce into one another. The repository package
+performs its initial child wait normally; nested Bzl-to-Bzl waits use the
+external guard. If such a later package activation reports a nested cycle, its
+existing error preparation may prepend the BUILD origin. This dormant owner
+does not test or claim the full BUILD-origin rendering.
+
+Every guard owns `tokio::sync::Mutex<oneshot::Receiver<_>>`. It acquires the
+mutex only in `guard_this` around one sequential `tokio::select!` child wait,
+then releases it on return. That select necessarily polls exactly one child
+DICE future while this private receiver mutex is held. This is the existing
+narrow safe exception: module children are sequential, the guard is not
+re-entered, and no broader state lock is taken while polling. It retains the
+one-outstanding-child proof and uses the poison-key path to release a recursive
+wait. Recovery means the same DICE engine in a new transaction with a fresh
+request-scoped detector; never reuse a detector, because its `CycleDetected`
+state is retained.
+The value shape is
+`SourcePreparationOutcome<Arc<Result<FrozenBzlModule,
+ExternalBzlModuleError>>>`: equality is
+`complete_eq`, validity is complete-only, Need is neither valid nor equal, and
+each complete success or failure has one local event-batch slot. No DICE key
+is added outside these two private loading files.
+
+### Evidence, direct tests, and validation cap
+
+Reuse the accepted Bazel 9.2 direct-local-override evidence only: one
+`:defs.bzl`, `defs -> helper`, dependency-free non-test `probe`, missing
+`:missing.bzl`, and the ordered same-package cycle. It fixes missing-load and
+cycle observations, but authorizes neither projection, print ordering, nor
+fixture growth.
+
+The exact future test-edit allowlist is:
+
+- inline private tests in `app/slug_loading_v2/src/bzl_module.rs` for route
+  identity, byte-level normalization, source/path ownership, manifest, frozen
+  lifetime, and key-local event semantics;
+- inline private tests in `app/slug_loading_v2/src/cycle_detector.rs` for the
+  third isolated node family and its sequential guard proof; and
+- `app/slug_loading_v2/src/host_package_load_tests.rs` for the direct private
+  evaluator/cycle seam that requires same-module access.
+
+No graph projector, CLI fixture, external rule query, or fixture edit is
+authorized. `bzl_invalidation`, `loading_query`, and the existing direct
+external CLI lifecycle are validation-only unchanged: while `LoadsUnsupported`
+remains, neither integration surface can receive a nonempty external package
+manifest or access this private dormant key.
+Required focused cases are relative/absolute equivalence; every named,
+canonical, and cross-package rejection before source; missing source; direct
+duplicate/diamond order; private recursive-cycle release; retained frozen
+modules; and capture/no-capture recomputation, evaluated versus reused
+activation, unchanged retained metadata, and no recapture. BUILD edits,
+BUILD-origin rendering, and external package lifecycle
+claims are reserved for the separate activation owner.
+
+After a later implementation, run serially:
+
+```
+cargo test -p slug_loading_v2 host_package_load
+cargo test -p slug_loading_v2 external_bzl_module_
+cargo test -p slug_loading_v2
+cargo test -p slug_query_v2 --test loading_query external_owner_dispatches_siblings_rdeps_and_loading_files_without_root_fallback
+cargo check -p slug_loading_v2
+cargo check -p slug_query_v2
+cargo test -p slug_loading_v2 --target x86_64-pc-windows-gnu --no-run
+cargo test -p slug_query_v2 --target x86_64-pc-windows-gnu --no-run
+cargo fmt --all -- --check
+scripts/v2_archive_status.sh
+git diff --check
+```
+
+If the direct-external CLI dependent is used, rebuild `slug_cli_v2` first and
+clean stale `slugd` before and after its smoke. CLI GNU-Windows no-run remains
+outside this cap because unconditional Unix-socket server imports are an
+existing transport blocker. Do not run a Bazel oracle or workspace-wide Cargo
+suite.
+
+### Explicit non-activation and stop gates
+
+`RepositoryPackageLoadKey::LoadsUnsupported` remains unchanged in this design
+and its first implementation. No external BUILD receives loaded modules, no
+macro-produced native target becomes observable through the external graph,
+and no `loadfiles`/`buildfiles` Bzl or companion candidate appears. The
+external Starlark-rule graph stop stays intact. A separate reviewed activation
+owner must decide how the package key invokes the dormant evaluator and audit
+every enabled query consumer first.
+
+Stop and **REPLAN** if work needs a third production file, public identity
+generalization, root-key/cycle reuse, another source owner or filesystem path,
+cache/interner, any lock other than the isolated per-guard asynchronous
+receiver mutex, query/provenance projection, fake Bzl/BUILD companions, changed
+graph acceptance, cross-package/repository loads, mapping/discovery, non-local
+overrides, globs, visibility content, test/executable rules or suites,
+implicit/user dependencies, generated outputs, `@bazel_tools`, configuration,
+analysis/actions/execution, repository rules/extensions, JVM, Java bytecode,
+or Bazel delegation. The `module-local-override` fixture stays frozen at 17
+rows and 598 lines; oracle allowlist is empty. An independent
+DICE/retained-lifetime review is required before an implementation packet.
+
+### Independent DICE/retained-lifetime review (2026-08-04): ACCEPT
+
+Independent review accepted the dormant two-production-file architecture and
+required one bounded wording correction cycle. The final contract explicitly
+keeps `RepositoryPackageLoadKey::LoadsUnsupported`, derives canonical identity
+only from the retained route, validates every raw load before any child source,
+uses byte-exact target-to-path conversion and the Host source logical path,
+freezes `ExternalBzlModuleError`, preserves manifest-only equality plus frozen
+lifetime ownership, and isolates a third cycle family. It also records the
+sole per-guard receiver-mutex exception, fresh-detector recovery, evaluated
+versus reused event metadata without claiming command replay, exact three-file
+caps, and the later activation stop. Final rereview returned **ACCEPT**; the
+fixture and oracle allowlist remain frozen.
