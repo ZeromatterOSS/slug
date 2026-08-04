@@ -18846,3 +18846,140 @@ No public export, caller, activation, or unsupported-cycle publication changed.
 The support gate and both serial owners remain private. The current schedule is
 a genuine stop: any product-visible consumer or `Unsupported` publication
 requires explicit user approval and receives no authority from this acceptance.
+
+### WP-5-m1 public unsupported-cycle boundary design (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-5-m1-direct-local-public-unsupported-cycle-boundary-implementation`.** The
+user explicitly approved a Slug-owned product limitation for
+the otherwise-nonterminating direct-local MODULE include-cycle boundary. This
+approval does not turn the capability into a Bazel diagnostic and does not
+authorize public exposure of the private preparation/evaluation representation.
+
+The bounded observable slice is query-only. A live dependency audit at clean
+`c69a9f93` found that `BuildCommandRootKey::new` rejects every nonroot target
+pattern before the build DICE root, while root-package loading rejects external
+repository `.bzl` labels. The only current product paths that select an
+external BUILD or its same-package external `.bzl` children are one-shot and
+daemon queries. Both flow through
+`RepositoryPackageLoadKey -> RepositoryPackageSourceKey`; the latter is
+therefore the narrow public activation gate. Do not alter
+`RootModuleLoadingAnchorKey`, root package loading, or build: doing so would
+eagerly activate direct-local MODULE evaluation on currently unsupported or
+unrelated command paths. Future external build activation requires a separate
+design.
+
+Keep `DirectLocalModuleEvaluationKey`,
+`DirectLocalModuleEvaluation::{Supported, Unsupported}`,
+`DirectLocalEvaluatedModule`, `DirectLocalIncludeCycleCapability`, and every
+route/module/provenance field private. Export none of them from bzlmod
+`lib.rs`. Add beside the private owner only one crate-private support
+result/helper consumed at the start of `RepositoryPackageSourceKey::compute`,
+before that key's own post-gate `ExternalRepositoryPackageLookupKey`
+computation and selected BUILD source read. The helper projects supported
+evaluation to an internal continue result, projects the private capability to
+a crate-private typed unsupported carrier containing the apparent repository,
+module name, repeated raw label/span, and ancestor raw label/span, and keeps
+ordinary module-evaluation failure distinct. It owns no event data and does not
+copy child events.
+
+The dependency direction is acyclic. Private direct-local evaluation prepares
+include packages through `ExternalRepositoryPackageLookupKey` and reads root
+and include MODULE bytes through `HostRepositorySourceFileKey`; it never
+computes `RepositoryPackageSourceKey`. The new graph is selected external
+package source to support helper/private evaluation to include-preflight
+lookup/MODULE source, then back only to the caller's post-gate selected BUILD
+lookup/read. Root/routed-REPO and include-preflight BUILD-marker activations can
+therefore occur before the unsupported result and remain legitimate
+child-owned effects. Unsupported must stop only the caller's post-gate selected
+BUILD selection/read and all subsequent BUILD or `.bzl` evaluation. Tests must
+not assert zero `ExternalRepositoryPackageLookupKey` activation.
+
+Propagate two separate typed paths. Ordinary module preparation, absence, or
+evaluation failure becomes an ordinary `RepositoryPackageSourceError`, then
+`RepositoryPackageLoadError`, then the existing non-unsupported query failure
+classification with its source chain intact. Only the cycle capability becomes
+the unsupported source error, unsupported load error, and
+`QueryErrorKind::UnsupportedFeature`; do not stringify away that discriminator
+between crates. The private evaluated module and capability never cross the
+crate boundary.
+
+The exact Slug-owned message is:
+
+`Slug does not support MODULE.bazel include cycles in direct local_path_override repository '@{apparent_repo}' for module '{module_name}': include {repeated_raw_label:?} at {repeated_file}:{repeated_line}:{repeated_column} repeats ancestor include {ancestor_raw_label:?} at {ancestor_file}:{ancestor_line}:{ancestor_column}`
+
+This message is a Slug capability statement, not an attempted Bazel failure.
+Query exits 7 with empty stdout. One-shot and daemon JSON use
+`"error":"unsupported_feature"`; the daemon retains its existing
+`invalidated_files` member. Unsupported does not receive the ordinary
+`Evaluation of query` suffix and adds no diagnostic event.
+
+The existing accepted-command event owner remains authoritative. Selected root
+MODULE, routed REPO, include-preflight child, and any other accepted child
+events precede the terminal JSON. Retry-only attempts publish nothing. The
+private evaluation owner continues to store or replace its own empty batch on
+every captured unsupported Complete. A repeated warm unsupported query returns
+the terminal again without event replay. Removing the cycle reevaluates the
+MODULE closure, executes its prints exactly once, and permits the selected
+BUILD/query path; reintroducing the cycle returns unsupported without replaying
+stale supported prints. Unsupported is a Complete terminal, not driver
+infrastructure failure, so selected path/repository demands are accepted and a
+retained daemon can observe the edit that removes the cycle.
+
+The later implementation packet may edit exactly:
+
+- `app/slug_bzlmod_v2/src/source_preparation.rs`;
+- `app/slug_bzlmod_v2/src/host_package.rs`;
+- `app/slug_loading_v2/src/bzl_module.rs`;
+- `app/slug_query_v2/src/graph.rs`;
+- `app/slug_query_v2/src/loading_environment.rs`;
+- `app/slug_query_v2/tests/loading_query.rs`;
+- `app/slug_cli_v2/src/commands/query.rs`;
+- `app/slug_cli_v2/tests/cli.rs`;
+- `app/slug_server_v2/src/lib.rs`; and
+- `app/slug_server_v2/src/tests.rs`.
+
+The formatted net cap is **260 production lines, 900 test lines, and 1160
+total lines**. No bzlmod or loading `lib.rs`, core-runtime production, build,
+root-loading, command parser, server transport, fixture, or oracle file is
+authorized.
+
+There are two current query-side load-error consumers. The external package
+graph in `graph.rs` and external `buildfiles()` / `loadfiles()` provenance in
+`loading_environment.rs` must each inspect the typed
+`RepositoryPackageLoadError` discriminator before any string conversion and
+map only Unsupported to `QueryErrorKind::UnsupportedFeature`. Every other load
+error keeps its existing classification and evaluation-context behavior.
+
+Required evidence is: exact key/helper identity and complete-only Need
+semantics; supported continuation; every ordinary evaluation-error mapping and
+source chain; typed Unsupported through source/load/query; exact message and
+both one-based start locations; no caller-owned selected BUILD lookup/read or BUILD/`.bzl`
+evaluation after the gate returns unsupported; allowed child lookup/event
+ownership; root-only query and all build/placeholder commands remaining free of
+the helper; one-shot/daemon exit, stdout, JSON, context-suffix, and
+`invalidated_files` parity; selected-event-before-terminal ordering with no
+diagnostic event; retry suppression; cold unsupported, warm no replay,
+cycle-removal success/one print, cycle reintroduction/no stale print; and
+retained-daemon selected-demand/invalidation recovery. Add discriminating
+external `buildfiles()` and `loadfiles()` coverage proving the provenance path
+retains the exact Unsupported kind, message, context-suffix rule, and public
+one-shot/daemon rendering. Reuse existing external query scaffolding and
+private pinned evidence. Add no Bazel oracle or fixture.
+
+`ExternalBzlModuleEvalKey` intrinsically reads `.bzl` bytes without depending
+on `RepositoryPackageSourceKey`, but the key is crate-private and every current
+non-test construction occurs either after package-source gating or recursively
+from that gated external `.bzl` root. The guarantee is therefore exact for
+current selected product paths, not a raw-key invariant. A future standalone
+caller requires its own reviewed gate.
+
+Stops: no raw private type or provenance export; no public evaluated module;
+no build/root-anchor/root-loader activation; no direct filesystem or second
+route/package graph; no registry, MVS, contextual mapping, JVM transport,
+evaluator semantics, event-owner semantics, fixture, oracle, or cap expansion.
+Reserved Sol pre-review found the external `buildfiles()` / `loadfiles()`
+provenance consumer that the draft omitted. The corrected design adds
+`loading_environment.rs`, preserves its typed discriminator, and mandates
+discriminating public coverage without expanding the cap. Sol correction
+rereview and independent Terra latest-text review returned `ACCEPT`.
