@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff, parser inspection, route package horizon, shared nested-horizon preflight, and the accepted private support-gated cycle-pruned closure implementation in `f2b626f2`, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | Trusted nonregistry evaluator defaults/validation/print and its later private DICE event owner remain missing; public unsupported-cycle publication is approval-gated; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | implement the private trusted nonregistry evaluator adapter |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff, parser inspection, route package horizon, shared nested-horizon preflight, the accepted private support-gated cycle-pruned closure implementation in `f2b626f2`, and the trusted nonregistry evaluator adapter in `c683c239`, plus the accepted 20-row macro and seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | The private preparation-consuming nonregistry DICE/event owner remains missing; public unsupported-cycle publication is approval-gated; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | implement the private nonregistry evaluation owner |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-direct-local-trusted-nonregistry-evaluator-adapter`.
+`WP-5-m1-direct-local-nonregistry-evaluation-owner`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -93,11 +93,16 @@ worklist returns the private unsupported-cycle capability. Public build/query/
 one-shot/daemon publication remains frozen pending explicit user approval of
 that product-visible limitation. The route-plus-requests package preflight
 refactor is accepted in `34a2340e` at 9 production/4 test/13 total net lines.
-The accepted two-packet successor first corrects the private trusted evaluator
-in `module_eval.rs` at 190 production/430 test/620 total lines, then adds the
-private preparation-consuming DICE/event owner in `source_preparation.rs` at
-230 production/720 test/950 total lines. Public unsupported-cycle publication
-remains frozen pending explicit user approval.
+The accepted two-packet successor first corrected the private trusted evaluator
+in `module_eval.rs`. Packet 1 is accepted in `c683c239` at 190 production/208
+test/398 total formatted net lines. Its focused result was 17/18 and the full
+library result was 270/271, both failing only the known clean-HEAD
+`records_exact_proxy_tag_and_innate_call_spans` baseline; GNU-Windows no-run,
+formatting, archive, and diff gates passed, and independent latest-diff review
+returned `ACCEPT`. The current Packet 2 adds only the private preparation-
+consuming DICE/event owner in `source_preparation.rs` at 230 production/720
+test/950 total lines. Public unsupported-cycle publication remains frozen
+pending explicit user approval.
 
 The external package-policy design is accepted as three serial implementation
 packets. First, the accepted private one-file `HostRepositoryPathKey` owns

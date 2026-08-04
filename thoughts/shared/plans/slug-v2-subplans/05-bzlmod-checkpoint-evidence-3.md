@@ -18792,3 +18792,34 @@ Public build/query/one-shot/daemon publication remains frozen pending explicit
 user approval. Any required public export, registry/MVS/contextual mapping,
 second production file in either packet, fixture/oracle, or cap expansion is
 `REPLAN`.
+
+### WP-5-m1 trusted direct-nonregistry evaluator adapter (2026-08-04)
+
+**Status: ACCEPTED in `c683c239`; implement only Packet 2,
+`WP-5-m1-direct-local-nonregistry-evaluation-owner`.** The exact one-file
+`module_eval.rs` adapter is 190 production lines, 208 test lines, and 398 total
+formatted net lines, within its accepted 190/430/620 caps. It starts declared
+name/version/repo empty beside the separate expected key, executes and
+finalizes before name-first and conditional-version validation, preserves a
+declared version for the direct empty expected key, and defaults repo name from
+the declaration.
+
+The trusted closure path prepares every ordered occurrence, uses last raw-label
+occurrence wins for program lookup, and executes repeated inline calls
+repeatedly. It does not apply or weaken the existing strict duplicate,
+unreachable, or `RejectPrint` test seam. Captured nonregistry prints retain
+ordered root/fragment events and the prefix before a failure; uncaptured prints
+retain the evaluator's direct path. Preparation, execution, finalization,
+declared-name mismatch, and declared-version mismatch remain distinct typed
+errors.
+
+Focused validation was 17/18 and the full `slug_bzlmod_v2` library result was
+270/271. Both failed only the untouched
+`records_exact_proxy_tag_and_innate_call_spans` expectation, whose exact failure
+reproduced at clean HEAD. GNU-Windows no-run, formatting, archive, and diff
+gates passed, and independent latest-diff review returned `ACCEPT`. No DICE key,
+source-preparation consumer, public export, registry/MVS/mapping behavior,
+fixture, oracle, or public unsupported capability changed. Packet 2 remains the
+already-accepted private 230 production/720 test/950 total
+`source_preparation.rs` evaluation owner; public unsupported-cycle publication
+remains frozen pending explicit user approval.
