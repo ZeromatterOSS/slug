@@ -1,53 +1,69 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-external-repository-test-suite-query-design`
+Packet: `WP-5-m1-external-repository-test-suite-query`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Evidence: accepted direct local-override external source-file, filegroup,
-direct alias, and config-setting queries; accepted root-package test-suite
-loading/query representation; Bazel 9.2 query oracle infrastructure; complete
-route hashing and end-to-end no-legacy guards
-Validation tier: design-only source/oracle reconciliation plus independent
-terminal design review
+Evidence: accepted corrected suite-only external test-suite design, live Bazel
+9.2 direct-override omitted/explicit-empty/parent/cycle probes, pinned Bazel
+membership and tests-function source, accepted root test-suite loading/query
+representation, and accepted external source/filegroup/alias/config-setting
+query spine
+Validation tier: one-file private query projection plus focused public
+query/core and exact Bazel/Slug oracle rows
 
-Design only the next bounded external native `test_suite` query slice. Do not
-edit Rust, Cargo metadata, fixtures, generated oracle JSON, protocol, or any
-implementation file. Start from the live retained
+Implement only the accepted same-package suite-only external native
+`test_suite` projection in `app/slug_query_v2/src/graph.rs`. Reuse
 `PackageTargetKind::TestSuite`, `TestSuiteMembership`, native capability and
-metadata, root graph projection, and existing query `labels`, `deps`, `tests`,
-and `label_kind` consumers. Reproduce Bazel 9 semantics in Rust; do not add an
-external `.bzl` load or another rule family merely to populate a suite.
+test metadata, the accepted external graph/key, and existing query/render
+consumers. Before generic source synthesis, require every nonempty explicit
+member to resolve in the loaded target batch to a same-package native
+`test_suite`. Accept omitted, explicit-empty, parent-to-suite chains, and
+suite-only cycles; do not add acyclicity logic.
 
-Collect exact Bazel 9.2 evidence for explicit-empty and omitted native suites
-in a direct local-override external package. Probe literal output,
-`--output=label_kind`, `labels(tests, ...)`, `deps(...)`, and `tests(...)`,
-including whether empty output and attribute explicitness provide a useful
-discriminating slice. Reconcile that evidence with accepted root test-suite
-fixtures and pinned Bazel source for explicit/implicit membership where the
-live oracle cannot expose retained provenance directly.
+Project `test_suite rule`, retained non-executable suite capability, sorted
+tags/manual metadata with no size, total `tests` and `$implicit_tests`
+attributes, and ordinary edges. `tests` preserves the loader's canonical
+stored order and `membership.tests_explicit()`; `$implicit_tests` is explicit
+true and empty for this accepted no-test-rule slice. Ordinary edges use first
+occurrence across `tests` then implicit members. Remap accepted members to
+canonical external identity with the selected apparent route spelling. Do not
+synthesize a suite member or observe a source path. Project no query-visible
+visibility attribute and retain existing public/private visibility policy.
 
-The proposed implementation contract must state:
+Production allowlist: `app/slug_query_v2/src/graph.rs`. Tests may change only
+that file and `app/slug_core_v2/src/runtime/dice.rs`. Oracle changes are
+limited to the existing `module-local-override` fixture TOML,
+`workspace/dep/BUILD.bazel`, and expected JSON; add no asset or fixture. Do not
+alter Cargo metadata, public APIs, DICE keys, repository routes,
+loading/source owners, CLI/server adapters, protocol, formatters,
+configuration, analysis, actions, execution, or another fixture.
 
-- which explicit and implicit suite forms are accepted without external
-  Starlark/native test-rule breadth;
-- exact `tests` and `$implicit_tests` attributes, explicitness, ordinary-edge
-  order/deduplication, native rule capability, test metadata, and visibility;
-- canonical semantic labels, selected apparent rendering, and whether any
-  same-package member remapping or source synthesis is permitted;
-- the exact literal, `label_kind`, `labels`, `deps`, and `tests()` surface that
-  becomes active;
-- cold/warm/BUILD-edit invalidation and event publication, with source-file
-  changes remaining unobserved unless evidence proves otherwise;
-- stop gates for suite members, suite chaining/cycles, other rule kinds,
-  cross-package/repository labels, nontrivial visibility, patterns, loads,
-  globs, configuration, analysis, build, and execution; and
-- the exact production/test/fixture allowlist plus serial validation and
-  independent implementation-review requirements.
+Extend the existing fixture with omitted, explicit-empty, parent-to-empty,
+and two cyclic suites. Add exactly five Bazel/Slug commands for the parent:
+literal, `--output=label_kind`, `labels(tests, ...)`, `deps(...)`, and
+`tests(...)`. Exact live evidence is parent literal, `test_suite rule`, empty
+leaf from `labels`, leaf then parent from `deps`, and empty successful
+`tests()`. Protect all existing normalized fixture semantics.
 
-Prefer a useful one-file private graph projection. If Bazel parity requires a
-test-rule owner, external load, new retained representation/key, package or
-repository discovery, configuration/analysis, filesystem observation, or
-another architectural owner, record the exact unsupported boundary and
-`REPLAN` instead of broadening the packet. Finish by appending the proposed
-contract and evidence to the owner plan, advancing this manifest only after
-independent terminal design review, and making no implementation change.
+Focused structural/public evidence must additionally prove omitted versus
+explicit-empty provenance, total empty `$implicit_tests`, member remapping,
+attribute and edge order/explicitness, capability, tags/manual metadata,
+canonical/apparent labels, empty/self closures, parent closure, finite cycle
+`deps` and empty `tests()`, accepted visibility, and no source synthesis.
+Preserve all accepted external source/filegroup/alias/config-setting behavior,
+lifecycle reuse, publication, and stop gates.
+
+Stop non-suite, unresolved, cross-package, and named-repository members;
+external test rules or nonempty implicit collection; nontrivial visibility;
+and other unsupported rule kinds. Stop and `REPLAN` on a need for external
+test-rule loading/metadata/discovery, source synthesis, a new target kind/key
+or owner, another package/repository route, loads/globs/patterns,
+configuration/select, analysis, build/execution, JVM, Java bytecode, or Bazel
+delegation.
+
+Finish with serial focused query/core tests, the full query suite, the
+unchanged root test-suite projection test, quiet direct-dependent checks, the
+required `slug_cli_v2` rebuild before Slug oracle replay, GNU-Windows
+query/core no-run linkage, formatting, `git diff --check`, archive/scope/
+no-Cargo guards, fixture generation plus distinct-root replay, and one
+independent terminal implementation review.

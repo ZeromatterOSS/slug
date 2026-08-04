@@ -15022,3 +15022,123 @@ because projecting `tests`/`$implicit_tests` automatically reaches existing
 attribute and `tests()` consumers, while the current external slice does not
 load Starlark test rules. The design must prove a useful exact Rust boundary
 before authorizing implementation.
+
+## WP-5-m1 external native `test_suite` query design (2026-08-04)
+
+**Status: ACCEPT AFTER CORRECTION; implementation remains a separate packet.**
+This is the bounded direct-`local_path_override` external contract only. The
+first independent review rejected an observable-proof overclaim for retained
+explicitness and an invalid root-test path. The corrected text attributes
+explicitness only to pinned source plus the retained Slug representation,
+uses the exact source/test paths, requires member validation before generic
+source synthesis, and narrows fixture scope. Correction rereview returned
+`ACCEPT` on 2026-08-04; no implementation change is part of this design.
+
+### Bazel 9.2 evidence
+
+Using `/tmp/slug-bazel-9.2-metrics-wrapper --batch --ignore_all_rc_files` with
+a fresh output-user root per command, a temporary root module declared
+`bazel_dep(name = "dep", version = "1.0.0")` and
+`local_path_override(module_name = "dep", path = "dep")`. Its direct external
+package declared:
+
+```starlark
+test_suite(name = "omitted")
+test_suite(name = "explicit_empty", tests = [])
+test_suite(name = "parent", tests = [":explicit_empty"])
+test_suite(name = "cycle_a", tests = [":cycle_b"])
+test_suite(name = "cycle_b", tests = [":cycle_a"])
+```
+
+All commands exited 0. Literal query returned respectively
+`@dep//:omitted` and `@dep//:explicit_empty`; `--output=label_kind` returned
+`test_suite rule` for each. Both
+`labels(tests, @dep//:omitted|explicit_empty)` and
+`labels($implicit_tests, @dep//:omitted|explicit_empty)` were empty; `deps`
+returned the target itself; and `tests()` was empty. For `parent`,
+`labels(tests, @dep//:parent)` returned `@dep//:explicit_empty`,
+`labels($implicit_tests, ...)` and `tests()` were empty, and `deps` returned
+the leaf then parent. The direct cycle returned empty from
+`tests(@dep//:cycle_a)` and `@dep//:cycle_a`, `@dep//:cycle_b` from `deps`.
+
+The live observables for omitted and explicit-empty are identical in this
+query subset. Their retained-explicitness distinction is established only by
+the pinned Bazel source below and Slug's retained-membership/root tests. The
+live evidence does establish that (a) a declared suite can be a nonempty member
+without external test-rule loading and (b) query's existing visited-suite
+behaviour, not a new external cycle rejection, is exact for this suite-only
+subset.
+
+Pinned source is `bazel@8220c6198837d5c13d53fea211cf3282aa12408a`:
+
+- `src/main/java/com/google/devtools/build/lib/rules/test/TestSuiteRule.java`
+  lines 83-110 defines `tests` and `$implicit_tests`; lines 94-96 define the
+  empty/omitted local non-manual test collection.
+- `src/main/java/com/google/devtools/build/lib/packages/AttributeProvider.java`
+  lines 379-395 installs a shared implicit list for native empty/undefined
+  `tests` and marks it explicit for query visibility.
+- `src/main/java/com/google/devtools/build/lib/query2/engine/TestsFunction.java`
+  lines 161-211 partitions direct members, uniquifies/recurse suites, then
+  consumes `$implicit_tests` as test rules.
+- Accepted Slug evidence: `app/slug_query_v2/tests/loading_query.rs` test
+  `graph_projects_test_suite_membership_scalars_edges_and_total_explicitness`
+  fixes the shared graph projection convention;
+  `app/slug_loading_v2/src/package.rs` owns `TestSuiteMembership` construction;
+  and `app/slug_loading_v2/tests/build_file_loading.rs` test
+  `test_metadata_retains_inherited_values_suite_provenance_and_bazel_ordering`
+  proves retained suite provenance/ordering.
+
+### Bounded implementation contract
+
+1. Extend only `external_package_graph_from_targets`. Before generic external
+   source synthesis, validate every nonempty `tests` member against the loaded
+   target batch: it must be a same-package native `test_suite` in that batch.
+   Accept omitted, `tests = []`, arbitrary suite-to-suite chains, and cycles.
+   Do not add acyclicity logic: generic query plus the existing `tests()` suite
+   uniquifier produces the observed finite closure.
+2. Stop/defer sources, generated files, filegroups, aliases, config_settings,
+   unresolved/cross-package/external labels, and future Starlark/native test
+   rules as members. Do not synthesize a source node or permissively reuse
+   filegroup/alias remapping; that would admit an `Other` target without exact
+   strict-`tests()` semantics.
+3. Project `QueryNodeKind::Rule("test_suite rule")`, retained native capability
+   (`test_suite`, non-executable, `TestRuleKind::Suite`), and existing native
+   metadata: sorted tags, `manual` derived from tags, no invented size. Tags
+   are retained only; with no test targets they cannot alter `tests()` output.
+4. Reuse `TestSuiteMembership`: `tests` preserves the loader's stored canonical
+   order (duplicate spellings have already been rejected by the loader) with
+   `membership.tests_explicit()` (false omitted, true empty/nonempty). Preserve
+   the root projection's total `$implicit_tests` attribute as explicit true; it
+   is `[]` for every accepted external form. Ordinary edges use
+   first-occurrence dedupe over `tests` then implicit members: none for empty
+   forms, one for the parent example.
+5. Remap accepted members to the direct external route-local label in the
+   attribute and edge. Do not change source-node synthesis. Retain canonical
+   identity/apparent `@dep//:name` rendering and existing direct-external
+   declared/default visibility policy; preserve its dependency-label stop.
+6. No new consumer is required: literal, `label_kind`, both `labels` forms,
+   `deps`, and `tests()` use existing node/attribute paths. No new DICE key or
+   owner, lifecycle event, source discovery, package lookup, Starlark load, or
+   protocol change is allowed.
+
+### Stop gates and validation allowlist
+
+Append `REPLAN` rather than widen if implementation needs external test-rule
+loading/metadata/discovery, non-suite member support, source synthesis, a new
+target kind/key/owner, visibility dependency resolution, another repository
+route, Starlark/macro/load/glob/package-pattern handling, select/configuration,
+analysis, build/execution, or an output formatter beyond these query surfaces.
+Implicit collection becomes a stop if external test rules are present: it needs
+exact candidate/tag/size/manual evidence.
+
+Permitted follow-on edits are only the direct external projector, focused tests,
+and rows in the existing `module-local-override` fixture files:
+`tests/v2_oracle/fixtures/module-local-override/workspace/dep/BUILD.bazel`,
+`tests/v2_oracle/fixtures/module-local-override/fixture.toml`, and
+`tests/v2_oracle/fixtures/module-local-override/expected/oracle.json`. Validate literal,
+`label_kind`, `labels(tests, ...)`, `labels($implicit_tests, ...)`, `deps`, and
+`tests()` for omitted, explicit-empty, parent-to-empty, and the cycle pair;
+assert canonical/apparent labels, kind, capability, tags/manual metadata,
+attributes plus explicitness, edge order/dedupe, and accepted visibility.
+Re-run the root test-suite projection test unchanged. Any production change
+outside this allowlist or a broader fixture/oracle family is a review stop.
