@@ -30,6 +30,8 @@ use sha2::Sha256;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::PackageIdentifier;
+use slug_identity_v2::TargetName;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathLstat;
@@ -49,6 +51,7 @@ use slug_workspace_v2::ResolvedPath;
 use slug_workspace_v2::ResolvedPathKey;
 use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
+use starlark_map::small_set::SmallSet;
 
 use crate::ModuleKey;
 use crate::OverrideAttributeValue;
@@ -64,7 +67,11 @@ use crate::RootModuleFilesKey;
 use crate::RootModuleOverride;
 use crate::RootRepositoryRoute;
 use crate::apply_unified_patch;
+use crate::host_package::ExternalRepositoryPackageLookup;
+use crate::host_package::ExternalRepositoryPackageLookupError;
+use crate::host_package::ExternalRepositoryPackageLookupKey;
 use crate::module_eval::NonrootModuleFileInspection;
+use crate::module_eval::parse_root_include;
 use crate::registry_module_file_url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -670,6 +677,14 @@ enum DirectLocalModuleInspectionError {
     Inspection(NormalizedAbsolutePath, Arc<str>),
 }
 
+impl fmt::Display for DirectLocalModuleInspectionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for DirectLocalModuleInspectionError {}
+
 impl DirectLocalModuleInspectionKey {
     fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
         (!apparent_repo.is_root()).then_some(Self(workspace, apparent_repo))
@@ -745,6 +760,289 @@ impl Key for DirectLocalModuleInspectionKey {
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct DirectLocalIncludePackageHorizonKey(NormalizedAbsolutePath, ApparentRepoName);
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalIncludePackageHorizon {
+    route: RootRepositoryRoute,
+    occurrences: Arc<[DirectLocalIncludePackageOccurrence]>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalIncludePackageOccurrence {
+    package: PackageIdentifier,
+    target: TargetName,
+    raw_label: CompactString,
+    location: crate::LogicalSpan,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalIncludePackageHorizonError {
+    InspectionCompute {
+        message: Arc<str>,
+    },
+    Inspection(DirectLocalModuleInspectionError),
+    BadLabel {
+        raw_label: CompactString,
+        location: crate::LogicalSpan,
+        message: CompactString,
+    },
+    Package {
+        raw_label: CompactString,
+        location: crate::LogicalSpan,
+        package: PackageIdentifier,
+        failure: DirectLocalIncludePackageFailure,
+    },
+}
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalIncludePackageFailure {
+    InvalidPackageName { message: Arc<str> },
+    Deleted,
+    NoBuildFile,
+    Lookup(ExternalRepositoryPackageLookupError),
+    LookupCompute { message: Arc<str> },
+}
+impl DirectLocalIncludePackageHorizonKey {
+    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+        (!apparent_repo.is_root()).then_some(Self(workspace, apparent_repo))
+    }
+}
+impl fmt::Display for DirectLocalIncludePackageHorizonKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("direct-local-include-package-horizon:")?;
+        self.0.fmt(f)?;
+        write!(f, ":@{}", self.1.as_str())
+    }
+}
+
+impl fmt::Display for DirectLocalIncludePackageHorizonError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InspectionCompute { message } => {
+                write!(
+                    f,
+                    "failed to compute direct-local MODULE inspection: {message}"
+                )
+            }
+            Self::Inspection(error) => {
+                write!(f, "failed to inspect direct-local MODULE: {error:?}")
+            }
+            Self::BadLabel {
+                raw_label,
+                location,
+                message,
+            } => write!(
+                f,
+                "bad include label {raw_label:?} at {}:{}:{}: {message}",
+                location.file.0, location.start_line, location.start_column
+            ),
+            Self::Package {
+                raw_label,
+                location,
+                package,
+                failure,
+            } => write!(
+                f,
+                "include {raw_label:?} at {}:{}:{} has package {package:?}: {failure:?}",
+                location.file.0, location.start_line, location.start_column
+            ),
+        }
+    }
+}
+
+impl std::error::Error for DirectLocalIncludePackageHorizonError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Inspection(error) => Some(error),
+            Self::Package {
+                failure: DirectLocalIncludePackageFailure::Lookup(error),
+                ..
+            } => Some(error),
+            _ => None,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for DirectLocalIncludePackageHorizonKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<DirectLocalIncludePackageHorizon, DirectLocalIncludePackageHorizonError>>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let inspection = match ctx
+            .compute(
+                &DirectLocalModuleInspectionKey::new(self.0.dupe(), self.1.clone())
+                    .expect("direct horizon key rejects root names"),
+            )
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(inspection)) => inspection,
+            Err(error) => {
+                return direct_local_include_inspection_error(Err(Arc::from(error.to_string())));
+            }
+        };
+        let inspection = match inspection.as_ref() {
+            Ok(inspection) => inspection,
+            Err(error) => {
+                return direct_local_include_inspection_error(Ok(error.clone()));
+            }
+        };
+        let route = inspection.0.0.clone();
+        let requests = inspection
+            .1
+            .as_ref()
+            .map_or(&[][..], |inspection| inspection.includes.as_ref());
+        let mut occurrences = Vec::with_capacity(requests.len());
+        for request in requests {
+            let parsed = match parse_root_include(request) {
+                Ok(parsed) => parsed,
+                Err(message) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        DirectLocalIncludePackageHorizonError::BadLabel {
+                            raw_label: request.path.clone(),
+                            location: request.location.clone(),
+                            message,
+                        },
+                    )));
+                }
+            };
+            occurrences.push(DirectLocalIncludePackageOccurrence {
+                package: PackageIdentifier::new(
+                    route.canonical_repo().clone(),
+                    parsed.package().package().clone(),
+                ),
+                target: parsed.target().clone(),
+                raw_label: request.path.clone(),
+                location: request.location.clone(),
+            });
+        }
+
+        let mut unique = SmallSet::with_capacity(occurrences.len());
+        for occurrence in &occurrences {
+            unique.insert(occurrence.package.clone());
+        }
+        let computed = ctx
+            .compute_join(unique, |ctx, package| {
+                let route = route.clone();
+                Box::pin(async move {
+                    let result = ctx
+                        .compute(
+                            &ExternalRepositoryPackageLookupKey::new(route, package.clone())
+                                .expect("occurrence package uses the inspection route"),
+                        )
+                        .await
+                        .map_err(|error| Arc::<str>::from(error.to_string()));
+                    (package, result)
+                })
+            })
+            .await;
+        let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
+        finish_direct_local_include_package_horizon(route, occurrences, outcomes)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn direct_local_include_inspection_error(
+    error: Result<DirectLocalModuleInspectionError, Arc<str>>,
+) -> <DirectLocalIncludePackageHorizonKey as Key>::Value {
+    let error = match error {
+        Ok(error) => DirectLocalIncludePackageHorizonError::Inspection(error),
+        Err(message) => DirectLocalIncludePackageHorizonError::InspectionCompute { message },
+    };
+    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
+}
+
+fn finish_direct_local_include_package_horizon(
+    route: RootRepositoryRoute,
+    occurrences: Vec<DirectLocalIncludePackageOccurrence>,
+    outcomes: SmallMap<
+        PackageIdentifier,
+        Result<<ExternalRepositoryPackageLookupKey as Key>::Value, Arc<str>>,
+    >,
+) -> SourcePreparationOutcome<
+    Arc<Result<DirectLocalIncludePackageHorizon, DirectLocalIncludePackageHorizonError>>,
+> {
+    let mut all_need: Option<SourcePreparationNeeds> = None;
+    for outcome in outcomes.values() {
+        if let Ok(SourcePreparationOutcome::Need(incoming)) = outcome {
+            all_need = Some(match all_need {
+                Some(current) => current
+                    .try_union(incoming)
+                    .expect("one-route package Needs cannot conflict"),
+                None => incoming.dupe(),
+            });
+        }
+    }
+
+    for occurrence in &occurrences {
+        let outcome = outcomes
+            .get(&occurrence.package)
+            .expect("every occurrence package was computed");
+        let value = match outcome {
+            Err(message) => {
+                return package_horizon_error(
+                    occurrence,
+                    DirectLocalIncludePackageFailure::LookupCompute {
+                        message: message.dupe(),
+                    },
+                );
+            }
+            Ok(SourcePreparationOutcome::Need(_)) => {
+                return SourcePreparationOutcome::Need(
+                    all_need.expect("the current occurrence contributed a Need"),
+                );
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => value,
+        };
+        let failure = match value.as_ref() {
+            Ok(ExternalRepositoryPackageLookup::Package(_)) => continue,
+            Ok(ExternalRepositoryPackageLookup::InvalidPackageName { message }) => {
+                DirectLocalIncludePackageFailure::InvalidPackageName {
+                    message: message.dupe(),
+                }
+            }
+            Ok(ExternalRepositoryPackageLookup::Deleted) => {
+                DirectLocalIncludePackageFailure::Deleted
+            }
+            Ok(ExternalRepositoryPackageLookup::NoBuildFile) => {
+                DirectLocalIncludePackageFailure::NoBuildFile
+            }
+            Err(error) => DirectLocalIncludePackageFailure::Lookup(error.clone()),
+        };
+        return package_horizon_error(occurrence, failure);
+    }
+
+    SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalIncludePackageHorizon {
+        route,
+        occurrences: occurrences.into(),
+    })))
+}
+
+fn package_horizon_error(
+    occurrence: &DirectLocalIncludePackageOccurrence,
+    failure: DirectLocalIncludePackageFailure,
+) -> SourcePreparationOutcome<
+    Arc<Result<DirectLocalIncludePackageHorizon, DirectLocalIncludePackageHorizonError>>,
+> {
+    SourcePreparationOutcome::Complete(Arc::new(Err(
+        DirectLocalIncludePackageHorizonError::Package {
+            raw_label: occurrence.raw_label.clone(),
+            location: occurrence.location.clone(),
+            package: occurrence.package.clone(),
+            failure,
+        },
+    )))
 }
 
 impl fmt::Display for RepositorySourceFileKey {
@@ -2119,6 +2417,8 @@ pub fn source_identity(bytes: &[u8]) -> Arc<str> {
 mod tests {
     use std::collections::hash_map::DefaultHasher;
     use std::sync::Mutex;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
 
     use dice::ActivationData;
     use dice::ActivationKind;
@@ -2214,7 +2514,95 @@ mod tests {
             }
         }
     }
-
+    #[derive(Debug, Default)]
+    struct HorizonTracker {
+        horizon: Mutex<Vec<(ActivationKind, bool)>>,
+        inspection: Mutex<Vec<ActivationKind>>,
+        lookups: Mutex<Vec<String>>,
+        route_repo: Mutex<Vec<(ActivationKind, bool)>>,
+        downstream: AtomicUsize,
+    }
+    impl ActivationTracker for HorizonTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let event_free = activation.evaluation_data().is_none();
+            if key
+                .downcast_ref::<DirectLocalIncludePackageHorizonKey>()
+                .is_some()
+            {
+                self.horizon
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), event_free));
+            } else if key
+                .downcast_ref::<DirectLocalModuleInspectionKey>()
+                .is_some()
+            {
+                self.inspection.lock().unwrap().push(activation.kind());
+            } else if let Some(key) = key.downcast_ref::<ExternalRepositoryPackageLookupKey>() {
+                self.lookups.lock().unwrap().push(key.to_string());
+            } else if key
+                .downcast_ref::<crate::repo_file::HostRouteRepoFileKey>()
+                .is_some()
+            {
+                self.route_repo
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), event_free));
+            }
+        }
+    }
+    #[derive(Debug, Clone, Allocative)]
+    struct HorizonCounterKey(#[allocative(skip)] Arc<HorizonTracker>);
+    impl PartialEq for HorizonCounterKey {
+        fn eq(&self, other: &Self) -> bool {
+            Arc::ptr_eq(&self.0, &other.0)
+        }
+    }
+    impl Eq for HorizonCounterKey {}
+    impl Hash for HorizonCounterKey {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            Arc::as_ptr(&self.0).hash(state);
+        }
+    }
+    impl fmt::Display for HorizonCounterKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "direct-local-include-horizon-counter:{:p}", &self.0)
+        }
+    }
+    #[async_trait]
+    impl Key for HorizonCounterKey {
+        type Value = <DirectLocalIncludePackageHorizonKey as Key>::Value;
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _: &CancellationContext,
+        ) -> Self::Value {
+            let value = ctx
+                .compute(&horizon())
+                .await
+                .expect("horizon DICE invariant");
+            if matches!(&value, SourcePreparationOutcome::Complete(result) if result.is_ok()) {
+                self.0.downstream.fetch_add(1, Ordering::SeqCst);
+            }
+            value
+        }
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            x.complete_eq(y)
+        }
+        fn validity(value: &Self::Value) -> bool {
+            value.is_complete()
+        }
+    }
     fn local_route_with_path(path: &str) -> RootRepositoryRoute {
         RootRepositoryRoute::for_test(
             NormalizedAbsolutePath::new("/workspace").unwrap(),
@@ -2747,6 +3135,13 @@ mod tests {
         )
         .unwrap()
     }
+    fn horizon() -> DirectLocalIncludePackageHorizonKey {
+        DirectLocalIncludePackageHorizonKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("dep_alias").unwrap(),
+        )
+        .unwrap()
+    }
     fn root(path: &str, version: &str) -> String {
         format!(
             "bazel_dep(name = \"dep\", version = \"{version}\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"{path}\")\n"
@@ -2806,6 +3201,181 @@ mod tests {
             );
         }
         PathObservationEpoch::new(e).unwrap()
+    }
+    fn horizon_epoch(
+        root_source: &str,
+        route_path: &str,
+        module: Option<&[u8]>,
+        repo: Option<&[u8]>,
+        ignore: Option<&[u8]>,
+        packages: &[(&str, bool)],
+        omitted: &[(&str, &str)],
+        variant: i64,
+    ) -> PathObservationEpoch {
+        let demand = |path: &str, operation| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                operation,
+            )
+        };
+        let lstat = |kind| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, variant, variant, variant, variant, 0o755,
+            )))
+        };
+        let mut observations = SmallMap::new();
+        for directory in ["/", "/workspace", route_path] {
+            observations.insert(
+                demand(directory, PathObservationOperation::Lstat),
+                lstat(PathNodeKind::Directory),
+            );
+        }
+        observations.insert(
+            demand("/workspace/MODULE.bazel", PathObservationOperation::Lstat),
+            lstat(PathNodeKind::RegularFile),
+        );
+        observations.insert(
+            demand(
+                "/workspace/MODULE.bazel",
+                PathObservationOperation::FileBytes,
+            ),
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                root_source.as_bytes(),
+            ))),
+        );
+        let module_path = format!("{route_path}/MODULE.bazel");
+        observations.insert(
+            demand(&module_path, PathObservationOperation::Lstat),
+            module
+                .map(|_| lstat(PathNodeKind::RegularFile))
+                .unwrap_or(PathObservationResult::Lstat(PathOperationResult::Missing)),
+        );
+        if let Some(module) = module {
+            observations.insert(
+                demand(&module_path, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(module))),
+            );
+        }
+        for (name, source) in [("REPO.bazel", repo), (".bazelignore", ignore)] {
+            let path = format!("{route_path}/{name}");
+            observations.insert(
+                demand(&path, PathObservationOperation::Lstat),
+                source
+                    .map(|_| lstat(PathNodeKind::RegularFile))
+                    .unwrap_or(PathObservationResult::Lstat(PathOperationResult::Missing)),
+            );
+            if let Some(source) = source {
+                observations.insert(
+                    demand(&path, PathObservationOperation::FileBytes),
+                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                        source,
+                    ))),
+                );
+            }
+        }
+        for (package, selected) in packages {
+            let package_root = format!("{route_path}/{package}");
+            observations.insert(
+                demand(&package_root, PathObservationOperation::Lstat),
+                lstat(PathNodeKind::Directory),
+            );
+            for marker in ["BUILD.bazel", "BUILD"] {
+                if omitted.contains(&(*package, marker)) {
+                    continue;
+                }
+                let path = format!("{package_root}/{marker}");
+                observations.insert(
+                    demand(&path, PathObservationOperation::Lstat),
+                    if *selected && marker == "BUILD.bazel" {
+                        lstat(PathNodeKind::RegularFile)
+                    } else {
+                        PathObservationResult::Lstat(PathOperationResult::Missing)
+                    },
+                );
+            }
+        }
+        PathObservationEpoch::new(observations).unwrap()
+    }
+
+    async fn horizon_compute(
+        dice: &Arc<Dice>,
+        route_path: &str,
+        module: Option<&[u8]>,
+        repo: Option<&[u8]>,
+        ignore: Option<&[u8]>,
+        packages: &[(&str, bool)],
+        omitted: &[(&str, &str)],
+        deleted: &[&str],
+        variant: i64,
+        capture: bool,
+        tracker: Option<Arc<HorizonTracker>>,
+    ) -> <DirectLocalIncludePackageHorizonKey as Key>::Value {
+        let mut data = UserComputationData {
+            activation_tracker: tracker
+                .clone()
+                .map(|tracker| tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        if capture {
+            data.data.set(CaptureEvaluationEvents);
+        }
+        let mut updater = dice.updater_with_data(data);
+        let relative = route_path.strip_prefix("/workspace/").unwrap();
+        let root_source = root(relative, &variant.to_string());
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                horizon_epoch(
+                    &root_source,
+                    route_path,
+                    module,
+                    repo,
+                    ignore,
+                    packages,
+                    omitted,
+                    variant,
+                ),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                material(relative),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                deleted,
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let direct = transaction.compute(&horizon()).await.unwrap();
+        if let Some(tracker) = tracker {
+            transaction
+                .compute(&HorizonCounterKey(tracker))
+                .await
+                .unwrap()
+        } else {
+            direct
+        }
     }
     fn inputs(u: &mut dice::DiceTransactionUpdater) {
         inject_root_package_policy_inputs(
@@ -3317,6 +3887,36 @@ mod tests {
             SourcePreparationOutcome::Need(need) => need,
             _ => panic!("source preparation Need"),
         }
+    }
+    fn horizon_success(
+        value: <DirectLocalIncludePackageHorizonKey as Key>::Value,
+    ) -> DirectLocalIncludePackageHorizon {
+        match value {
+            SourcePreparationOutcome::Complete(value) => value.as_ref().as_ref().unwrap().clone(),
+            _ => panic!("complete direct-local package horizon"),
+        }
+    }
+    fn horizon_occurrence(package: &str, line: u32) -> DirectLocalIncludePackageOccurrence {
+        DirectLocalIncludePackageOccurrence {
+            package: PackageIdentifier::new(
+                CanonicalRepoName::new("dep+").unwrap(),
+                slug_identity_v2::PackagePath::parse(package).unwrap(),
+            ),
+            target: TargetName::parse("nested.MODULE.bazel").unwrap(),
+            raw_label: format!("//{package}:nested.MODULE.bazel").into(),
+            location: crate::LogicalSpan {
+                file: crate::LogicalModuleFileId::new("dep/MODULE.bazel"),
+                start_line: line,
+                start_column: 3,
+                end_line: line,
+                end_column: 20,
+            },
+        }
+    }
+    fn lookup_complete(
+        value: Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>,
+    ) -> Result<<ExternalRepositoryPackageLookupKey as Key>::Value, Arc<str>> {
+        Ok(SourcePreparationOutcome::Complete(Arc::new(value)))
     }
 
     #[test]
@@ -3850,6 +4450,351 @@ mod tests {
                 (ActivationKind::Reused, true)
             ]
         );
+    }
+    #[test]
+    fn direct_include_horizon_finish_maps_every_result_and_unions_need_kinds() {
+        assert_eq!(
+            horizon().to_string(),
+            "direct-local-include-package-horizon:\"/workspace\":@dep_alias"
+        );
+        assert!(
+            DirectLocalIncludePackageHorizonKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                ApparentRepoName::root()
+            )
+            .is_none()
+        );
+        let p = horizon_occurrence("p", 1);
+        let q = horizon_occurrence("q", 2);
+        let finish = |occurrences, outcomes| {
+            finish_direct_local_include_package_horizon(local_route(), occurrences, outcomes)
+        };
+        let complete = finish(Vec::new(), SmallMap::new());
+        assert!(DirectLocalIncludePackageHorizonKey::validity(&complete));
+        assert!(DirectLocalIncludePackageHorizonKey::equality(
+            &complete, &complete
+        ));
+        let failure = |value: <DirectLocalIncludePackageHorizonKey as Key>::Value| match value {
+            SourcePreparationOutcome::Complete(value) => {
+                value.as_ref().as_ref().unwrap_err().clone()
+            }
+            SourcePreparationOutcome::Need(_) => panic!("expected terminal"),
+        };
+        for (error, sourced) in [
+            (Err(Arc::from("compute")), false),
+            (
+                Ok(DirectLocalModuleInspectionError::InputCompute(Arc::from(
+                    "input",
+                ))),
+                true,
+            ),
+        ] {
+            let SourcePreparationOutcome::Complete(mapped) =
+                direct_local_include_inspection_error(error)
+            else {
+                panic!("inspection mapping")
+            };
+            let mapped = mapped.as_ref().as_ref().unwrap_err();
+            assert_eq!(std::error::Error::source(mapped).is_some(), sourced);
+        }
+        let typed = ExternalRepositoryPackageLookupError::Path(RepositorySourceFileError::Cycle {
+            repo_relative_path: Arc::new(PathBuf::from("p/BUILD.bazel")),
+        });
+        for (outcome, kind, source) in [
+            (
+                Err(Arc::from("lookup compute failed")),
+                "LookupCompute",
+                false,
+            ),
+            (
+                lookup_complete(Ok(ExternalRepositoryPackageLookup::InvalidPackageName {
+                    message: Arc::from("invalid"),
+                })),
+                "InvalidPackageName",
+                false,
+            ),
+            (lookup_complete(Err(typed)), "Lookup", true),
+        ] {
+            let mut outcomes = SmallMap::new();
+            outcomes.insert(p.package.clone(), outcome);
+            let error = failure(finish(vec![p.clone()], outcomes));
+            assert!(format!("{error:?}").contains(kind));
+            assert!(error.to_string().contains("dep/MODULE.bazel:1:3"));
+            assert_eq!(std::error::Error::source(&error).is_some(), source);
+        }
+        let mut outcomes = SmallMap::new();
+        outcomes.insert(
+            q.package.clone(),
+            lookup_complete(Ok(ExternalRepositoryPackageLookup::Deleted)),
+        );
+        outcomes.insert(
+            p.package.clone(),
+            lookup_complete(Ok(ExternalRepositoryPackageLookup::NoBuildFile)),
+        );
+        assert!(matches!(
+            failure(finish(vec![p.clone(), q.clone()], outcomes)),
+            DirectLocalIncludePackageHorizonError::Package { raw_label, failure: DirectLocalIncludePackageFailure::NoBuildFile, .. }
+                if raw_label == p.raw_label
+        ));
+        let path_need = SourcePreparationNeeds::path(NeedPathObservations::singleton(
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new("/workspace/dep/p/BUILD.bazel").unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+        ));
+        let bootstrap_need =
+            SourcePreparationNeeds::root_module_bootstrap(RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            });
+        let mut outcomes = SmallMap::new();
+        outcomes.insert(
+            p.package.clone(),
+            Ok(SourcePreparationOutcome::Need(path_need)),
+        );
+        outcomes.insert(
+            q.package.clone(),
+            Ok(SourcePreparationOutcome::Need(bootstrap_need)),
+        );
+        let SourcePreparationOutcome::Need(union) = finish(vec![p, q], outcomes) else {
+            panic!("expected union")
+        };
+        assert_eq!(union.path_observations().unwrap().demands().len(), 1);
+        assert!(union.root_module_bootstrap_request().is_some());
+    }
+    #[tokio::test]
+    async fn direct_include_horizon_parses_first_deduplicates_and_preserves_occurrences() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(HorizonTracker::default());
+        let module = b"include(\"//p:first.MODULE.bazel\")\ninclude(\"//p:second.MODULE.bazel\")\ninclude(\"//q:third.MODULE.bazel\")\n";
+        let value = horizon_success(
+            horizon_compute(
+                &dice,
+                "/workspace/dep",
+                Some(module),
+                None,
+                None,
+                &[("p", true), ("q", true)],
+                &[],
+                &[],
+                100,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        assert_eq!(
+            value
+                .occurrences
+                .iter()
+                .map(|occurrence| occurrence.raw_label.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "//p:first.MODULE.bazel",
+                "//p:second.MODULE.bazel",
+                "//q:third.MODULE.bazel"
+            ]
+        );
+        assert!(value.occurrences.iter().all(|occurrence| {
+            occurrence.package.repo() == &CanonicalRepoName::new("dep+").unwrap()
+                && occurrence.location.file.0.as_str() == "/workspace/dep/MODULE.bazel"
+        }));
+        assert_eq!(value.occurrences[1].target.as_str(), "second.MODULE.bazel");
+        assert_eq!(tracker.lookups.lock().unwrap().len(), 2);
+        tracker.lookups.lock().unwrap().clear();
+        let malformed = horizon_compute(
+            &dice,
+            "/workspace/dep",
+            Some(b"include(\"//p:first.MODULE.bazel\")\ninclude(\"@bad//:x.MODULE.bazel\")\n"),
+            None,
+            None,
+            &[("p", true)],
+            &[("p", "BUILD.bazel")],
+            &[],
+            101,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(matches!(
+            malformed,
+            SourcePreparationOutcome::Complete(error)
+                if matches!(error.as_ref(), Err(DirectLocalIncludePackageHorizonError::BadLabel { raw_label, location, .. }) if raw_label == "@bad//:x.MODULE.bazel" && location.start_line == 2)
+        ));
+        assert!(tracker.lookups.lock().unwrap().is_empty());
+    }
+    #[tokio::test]
+    async fn direct_include_horizon_module_and_route_lifecycle_prunes_empty_presence() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(HorizonTracker::default());
+        let p = b"include(\"//p:a.MODULE.bazel\")\n".as_slice();
+        let pq = b"include(\"//p:a.MODULE.bazel\")\ninclude(\"//q:q.MODULE.bazel\")\n".as_slice();
+        let qp = b"include(\"//q:q.MODULE.bazel\")\ninclude(\"//p:a.MODULE.bazel\")\n".as_slice();
+        let mut values = Vec::new();
+        let mut downstream = Vec::new();
+        for (variant, route, module, packages) in [
+            (130, "dep-a", None, &[][..]),
+            (131, "dep-a", Some(b"".as_slice()), &[][..]),
+            (132, "dep-a", Some(p), &[("p", true)][..]),
+            (133, "dep-a", Some(pq), &[("p", true), ("q", true)][..]),
+            (134, "dep-a", Some(qp), &[("p", true), ("q", true)][..]),
+            (135, "dep-a", None, &[][..]),
+            (136, "dep-a", Some(p), &[("p", true)][..]),
+            (137, "dep-b", Some(p), &[("p", true)][..]),
+            (138, "dep-a", Some(p), &[("p", true)][..]),
+        ] {
+            values.push(horizon_success(
+                horizon_compute(
+                    &dice,
+                    &format!("/workspace/{route}"),
+                    module,
+                    None,
+                    None,
+                    packages,
+                    &[],
+                    &[],
+                    variant,
+                    true,
+                    Some(tracker.clone()),
+                )
+                .await,
+            ));
+            downstream.push(tracker.downstream.load(Ordering::SeqCst));
+        }
+        assert_eq!(values[0], values[1]);
+        assert_ne!(values[2], values[3]);
+        assert_ne!(values[3], values[4]);
+        assert_ne!(values[2], values[5]);
+        assert_eq!(values[2], values[6]);
+        assert_ne!(values[6].route, values[7].route);
+        assert_eq!(values[6], values[8]);
+        assert!(tracker.inspection.lock().unwrap().len() >= 9);
+        assert!(tracker.horizon.lock().unwrap().len() >= 9);
+        assert_eq!(downstream, [1, 1, 2, 3, 4, 5, 6, 7, 8]);
+    }
+    #[tokio::test]
+    async fn direct_include_horizon_policy_marker_and_event_lifecycle() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(HorizonTracker::default());
+        let module = Some(b"include(\"//pkg:nested.MODULE.bazel\")\n".as_slice());
+        let _success = horizon_compute(
+            &dice,
+            "/workspace/dep",
+            module,
+            Some(b"print('captured')\n"),
+            None,
+            &[("pkg", true)],
+            &[],
+            &[],
+            140,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        assert_eq!(
+            *tracker.route_repo.lock().unwrap(),
+            [(ActivationKind::Evaluated, false)]
+        );
+        assert_eq!(
+            tracker.horizon.lock().unwrap()[0],
+            (ActivationKind::Evaluated, true)
+        );
+        let _warm = horizon_compute(
+            &dice,
+            "/workspace/dep",
+            module,
+            Some(b"print('captured')\n"),
+            None,
+            &[("pkg", true)],
+            &[],
+            &[],
+            140,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        assert_eq!(tracker.downstream.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            tracker.horizon.lock().unwrap().last().copied(),
+            Some((ActivationKind::Reused, true))
+        );
+        for (variant, repo, ignore, selected, deleted, expected) in [
+            (141, None, None, true, &["@dep+//pkg"][..], "Deleted"),
+            (
+                142,
+                Some(b"ignore_directories(['pkg'])\n".as_slice()),
+                None,
+                true,
+                &[][..],
+                "Deleted",
+            ),
+            (
+                143,
+                None,
+                Some(b"pkg\n".as_slice()),
+                true,
+                &[][..],
+                "Deleted",
+            ),
+            (144, None, None, false, &[][..], "NoBuildFile"),
+        ] {
+            let outcome = horizon_compute(
+                &dice,
+                "/workspace/dep",
+                module,
+                repo,
+                ignore,
+                &[("pkg", selected)],
+                &[],
+                deleted,
+                variant,
+                true,
+                None,
+            )
+            .await;
+            assert!(matches!(
+                outcome,
+                SourcePreparationOutcome::Complete(error)
+                    if matches!(error.as_ref(), Err(DirectLocalIncludePackageHorizonError::Package { failure, .. }) if format!("{failure:?}").starts_with(expected))
+            ));
+        }
+        let recovered = horizon_compute(
+            &dice,
+            "/workspace/dep",
+            module,
+            Some(b"print('direct')\n"),
+            None,
+            &[("pkg", true)],
+            &[],
+            &[],
+            145,
+            false,
+            Some(tracker.clone()),
+        )
+        .await;
+        horizon_success(recovered);
+        assert_eq!(
+            tracker.route_repo.lock().unwrap().last().copied(),
+            Some((ActivationKind::Evaluated, true))
+        );
+        assert!(tracker.horizon.lock().unwrap().last().unwrap().1);
+    }
+    #[test]
+    fn direct_include_horizon_structural_boundary_is_private_and_fragment_free() {
+        let source = include_str!("source_preparation.rs");
+        let owner = source
+            .split("struct DirectLocalIncludePackageHorizonKey")
+            .nth(1)
+            .unwrap()
+            .split("impl fmt::Display for RepositorySourceFileKey")
+            .next()
+            .unwrap();
+        assert!(owner.contains("DirectLocalModuleInspectionKey"));
+        assert!(owner.contains("ExternalRepositoryPackageLookupKey"));
+        assert!(owner.contains("parse_root_include"));
+        for forbidden in "HostRepositorySourceFileKey,FileBytes,std::fs,evaluate_nonroot_module_file,store_evaluation_data,pub ,fragment".split(',') {
+            assert!(!owner.contains(forbidden), "{forbidden}");
+        }
     }
 
     #[test]
