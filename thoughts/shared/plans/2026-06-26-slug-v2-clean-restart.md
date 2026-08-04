@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure is unsupported under the current architecture; explicit same-package external Restricted visibility awaits its bounded Rust projection; native Windows glob ordering, registry transports, and discovery composition remain | implement the four-file external Restricted-visibility query projection |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure is unsupported under the current architecture; explicit same-package external Restricted visibility awaits its typed five-file projection; native Windows glob ordering, registry transports, and discovery composition remain | implement the typed external Restricted-visibility projection |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-restricted-visibility-query-implementation`.
+`WP-5-m1-external-restricted-visibility-query-typed-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -114,6 +114,18 @@ Bazel 9.2 generation and distinct-root replay passed; the first six rows are
 Slug acceptance evidence and the final `--nonodep_deps` row is Bazel-only
 edge-kind evidence. The current packet implements only the accepted four-file
 projection and does not add a dependency-filter flag.
+
+The attempted four-file Restricted-visibility implementation reached its caps
+and passed focused/full Rust tests, but terminal review required REPLAN. The
+accepted pure projection forbids parsing, while `CanonicalLabel` has no typed
+repository-rebind API inside the four-file allowlist. The saturated test
+boundary also omitted dedicated warm, visibility/include edit, route-remap,
+different-external caller, and pre-synthesis sentinel discriminators. No Rust
+from that attempt was retained. The successor design adds one narrow typed
+identity rebind, clears stale mapping provenance, expands the exact boundary
+to five files and 820 net lines, and requires every missing lifecycle/caller/
+ordering discriminator. Independent latest-text review accepted the typed API,
+mapping-provenance policy, caps, evidence matrix, oracle comparison, and stops.
 
 The external Bzl macro-query oracle is accepted in the exact four-path
 `+112`-line boundary. Bazel 9.2 generation and a distinct-root replay passed

@@ -17495,3 +17495,100 @@ file and 490-line contract in the accepted consumer design above. Rebuild
 `slug_cli_v2` before replaying the first six rows against Slug; the seventh
 remains Bazel-only. Do not add either dependency-filter flag or broaden any
 other stop gate.
+
+### WP-5-m1 external Restricted-visibility implementation replan (2026-08-04)
+
+**Status: REPLAN; no implementation retained.** A four-file prototype reached
+189 net production lines, 300 net test lines, and 489 total lines. It kept raw
+visibility attributes, effective `VisibilityNodep` edges, and existing
+`PackageGroupInclude` edges separate; validated the bounded slice before the
+external target loop; contextualized package-group contents; recovered groups
+through the target's apparent route; and rejected defaults, a second target,
+non-filegroups, direct pseudo-specs, and named/cross-package/missing/alias/
+wrong-kind groups. Formatting, focused projection and integration tests, the
+full 84-test `slug_query_v2` target, and the CLI build passed. A six-row Slug
+probe matched expected exits, stdout, and empty manifests, but the generic
+oracle comparison still returned failure because Bazel progress stderr was
+compared with Slug stderr; that comparison policy was not accepted or changed.
+
+The implementation cannot satisfy the accepted representation contract in the
+four-file boundary. `CanonicalLabel` exposes no typed constructor or
+repository-rebind operation, so the prototype rebuilt projected labels with
+`CanonicalLabel::parse`. Although the spelling was assembled only from
+validated typed repository, package, and target components and an independent
+focused audit found it injection-safe, the accepted design explicitly says the
+pure projection does not parse. Correcting it requires an identity API in a
+fifth production file and therefore triggers the packet's mandatory REPLAN.
+
+Independent latest-diff review also found that the saturated test cap did not
+directly discriminate warm equality, protected-target visibility-label edits,
+include-list edits, route remapping, a real different-external `visible()`
+caller, or validation-before-source-synthesis sentinels. Generic adjacent tests
+cannot substitute for those representation-specific obligations. The root
+discarded exactly the rejected four-file prototype; the accepted oracle and
+all prior production behavior remain unchanged.
+
+Resume only the read-only
+`WP-5-m1-external-restricted-visibility-query-typed-projection-redesign`.
+Inspect the live identity representation and freeze a narrow typed repository-
+rebind API including mapping-provenance behavior, the complete successor file
+allowlist and realistic caps, every missing lifecycle/caller/rejection
+discriminator, and an exact existing-tool policy for comparing the first six
+Slug rows without treating Bazel-only progress noise as semantic diagnostics.
+Do not run Bazel or Cargo or edit Rust, fixtures, tools, schemas, Cargo metadata,
+or generated evidence. Preserve every prior semantic and architectural stop.
+
+### WP-5-m1 external Restricted-visibility typed projection redesign (2026-08-04)
+
+**Status: ACCEPTED.** The rejected prototype proves the accepted graph
+slice fits existing DICE and query owners; only typed label reconstruction and
+complete discriminating evidence require a wider boundary. The successor adds
+exactly `app/slug_identity_v2/src/label.rs` to the prior four-file allowlist.
+
+Add one narrow public identity operation,
+`CanonicalLabel::rebind_provisional_root_repository(&CanonicalRepoName)`. It
+rejects a nonroot source and root destination, constructs the result directly
+from cloned typed package and target components, and never formats, parses,
+resolves, or normalizes a label. It clears `mapping_id`: that provenance
+describes the mapping which resolved the provisional apparent spelling and is
+stale after selected-route contextualization. Inline identity evidence must
+prove mapped-root input becomes equal to the corresponding parsed canonical
+external label, serializes without stale mapping provenance, preserves package
+and target, and rejects both invalid repository directions. Global label
+equality, hashing, ordering, serialization, parsing, and mapping remain
+unchanged.
+
+The implementation then reuses the reviewed prototype shape: pure loading-
+value projection; complete validation before the external target loop and
+source synthesis; separate raw declared `visibility` attributes, effective
+top-level `VisibilityNodep` edges, and existing `PackageGroupInclude` edges;
+repository-context group contents; and visible-group lookup through the
+protected target's verified apparent route. The exact five-file cap is 220 net
+production lines, 600 net test lines, and 820 total against the pre-packet
+HEAD.
+
+Unlike the rejected cap, direct evidence must discriminate every rejection
+against a competing source/alias synthesis error; exact/recursive positive and
+negative contents; separate public-only/private-only behavior; include union,
+reallow and cycles; real root, same-external and different-external callers;
+every accepted consumer/output; cold plus same-transaction warm equality;
+separate contents, protected-target visibility-label and include-list edits;
+delete/recreate and A-to-B-to-A recovery; and apparent `repo_name` remapping
+over the same canonical dependency/local override with new-route output and
+stale-route rejection.
+
+The checked-in oracle and harness remain byte-frozen. After rebuilding Slug,
+an out-of-tree temporary comparator runs only rows one through six in stored
+order and compares each generated Bazel command object's exit code, normalized
+stdout, and manifest exactly. Bazel server/progress stderr is tool-specific,
+so it is not used as Slug expected stderr; Slug normalized stderr must instead
+be exactly empty. Row seven remains Bazel-only and is never invoked. This uses
+the existing fixture loader/runner data without changing a tool or schema.
+
+Resume only
+`WP-5-m1-external-restricted-visibility-query-typed-implementation` after an
+independent identity-boundary pre-review. Run Cargo serially, clean `slugd`
+before and after the rebuilt-CLI replay, run focused and complete identity/
+loading/query checks plus direct dependents and applicable GNU-Windows no-run
+gates, and obtain independent latest-diff review. Preserve every stop in the
+current-packet manifest; a sixth file or wider identity operation is REPLAN.
