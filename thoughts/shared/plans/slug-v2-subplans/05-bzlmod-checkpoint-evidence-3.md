@@ -17909,3 +17909,33 @@ Rebuild from clean `fbb0775d`-descended HEAD; discarded Rust receives no
 validation credit. Run the exact validation and stops in the accepted design,
 record the known clean-baseline proxy-span failure separately if it recurs,
 and obtain independent latest-diff review before acceptance.
+
+### WP-5-m1 corrected direct-local handoff cap replan and final cap (2026-08-04)
+
+**Status: REPLAN; no Rust retained.** A fresh worker independently rebuilt the
+one-file implementation and all eight mandatory evidence families. Seven
+focused tests first closed the exact bootstrap, materialization, path, request,
+semantic-error, compute-error-structure, identity, and complete-value gaps.
+The eighth then proved same-outer-key route A-to-B-to-A recovery, version-only
+pruning, delete/recreate bootstrap recovery, and non-vacuous cold Evaluated/
+warm Reused activations with no evaluation batch. All eight passed, as did
+formatting and diff checks.
+
+The measured complete diff was exactly 100 production lines, 472 test lines,
+and 572 total. It exceeded the accepted 440/540 caps by 32 lines, so the cap
+stop fired. Root retained none of the passing draft; the worker reversed the
+exact one-file patch and verified a clean worktree.
+
+**Final cap redesign: ACCEPTED.** Retry only
+`WP-5-m1-direct-local-module-file-handoff-final-implementation`. Freeze the
+measured 100 production and 472 mandatory test lines. The final caps are 100
+production, 480 tests, and 580 total: 472 required test lines plus eight lines
+of compaction/rustfmt-only slack, and 100 + 480 = 580. Independent cap review
+selected this tight bound because the complete eight-family suite is already
+measured and needs no speculative correction budget. The eight slack lines
+authorize no new behavior, evidence family, owner, hook, file, or semantic
+surface.
+
+Rebuild once more from clean HEAD. Preserve the exact accepted design, eight
+evidence families, validation, and stops. Discarded drafts provide only
+mechanical cap evidence and no implementation or validation credit.

@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-module-file-handoff-corrected-implementation`
+Packet: `WP-5-m1-direct-local-module-file-handoff-final-implementation`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
 Role: corrected one-file dormant implementation before discovery composition
@@ -24,8 +24,9 @@ child infrastructure failure is not injectable without a forbidden hook,
 compute-error evidence is construction/equality plus a structural no-fault-hook
 scan; semantic route/source errors use real keys.
 
-Caps are 100 production, 440 tests, and 540 total. The test arithmetic is 349
-retained + 68 mandatory additions + 23 compaction/rustfmt slack. Run the exact
-serial validation and all stops from the accepted design. Do not edit or run
-an oracle, add a second file, export/call the key, or widen semantics. Stop
-with **REPLAN** on any previous stop or cap excess.
+Caps are 100 production, 480 tests, and 580 total. The test arithmetic is the
+measured complete 472-line eight-family suite plus eight lines of compaction/
+rustfmt-only slack. Run the exact serial validation and all stops from the
+accepted design. Do not edit or run an oracle, add a second file, export/call
+the key, widen semantics, or add an evidence family. Stop with **REPLAN** on
+any previous stop or cap excess.
