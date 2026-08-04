@@ -14856,8 +14856,10 @@ Focused evidence must prove:
 5. cold MODULE-before-BUILD publication, warm silence, BUILD edit and
    restoration, source create/edit/delete/recreate non-invalidation, and no
    activation of any forbidden legacy/root/snapshot owner; and
-6. the rebuilt Slug binary exactly replays both protected existing commands
-   and the two new Bazel 9.2 external-filegroup oracle rows.
+6. Bazel 9.2 generates and replays both protected existing rows plus the two
+   new external-filegroup rows, while the rebuilt Slug binary directly replays
+   the protected source query and both new query rows. The older external
+   build row remains outside this packet's explicit no-build boundary.
 
 Run focused query/core/CLI/server tests serially, the full query suite, quiet
 checks for changed direct dependents, the required `slug_cli_v2` rebuild before
@@ -14872,3 +14874,57 @@ external function/pattern breadth, external `.bzl` load, glob traversal,
 registry transport, repository rule/extension, build/execution behavior, JVM,
 Java bytecode, or Bazel delegation. After independent terminal review,
 implement only `WP-5-m1-external-repository-rule-query` under this contract.
+
+### Direct external-repository native filegroup query accepted
+
+Status: **ACCEPT AFTER CORRECTION** for
+`WP-5-m1-external-repository-rule-query` on 2026-08-04. The first independent
+implementation review found an overclaim that Slug would protect the older
+external-build row and a missing direct structural assertion for filegroup
+projection. The corrected contract keeps external build explicitly out of
+scope, and a private projector test now proves exact `srcs` order and
+explicitness, ordinary-edge order, exported-source reuse, absent-source
+synthesis, and visibility-attribute exclusion. Correction rereview returned
+`ACCEPT`.
+
+Production changed only `app/slug_query_v2/src/graph.rs`. The private external
+projector now accepts `ExportedFile` and `Filegroup`, remaps only root-context
+same-package source labels to the selected route's canonical repository,
+retains apparent spelling solely as render provenance, and projects the
+stored `srcs` attribute and ordinary edges. It synthesizes otherwise
+undeclared same-package source nodes without observing their paths. Existing
+exported sources retain their accepted visibility provenance. No DICE key,
+loading or source owner, public API, retained representation, or query-visible
+`visibility` attribute changed.
+
+The `module-local-override` fixture grew by one native filegroup declaration
+and exactly two query commands, with no asset. A live Bazel 9.2 generation and
+a distinct-root replay both produced the protected source/build rows and the
+new exact outputs for `@dep//:files` and
+`labels(srcs, @dep//:files)`. A rebuilt Slug binary directly replayed the
+protected source query and both new query rows exactly; the fixture as a whole
+still stops only at the pre-existing external-build row, which this packet
+does not implement. Direct Slug checks also proved exact forward `deps`
+output.
+
+Focused core lifecycle evidence proves cold MODULE-before-BUILD publication,
+warm silence, BUILD edit/restoration, and no accepted event after absent-source
+create/edit/delete/recreate. It also retains the alias/other-rule,
+cross-package, named-repository, nontrivial-visibility, and BUILD-name
+collision stop gates. The complete query suite passed 68 tests; focused core,
+CLI, and server external-query tests passed; the CLI rebuilt; direct-dependent
+checks, GNU-Windows query/core no-run linkage, formatting, diff, archive,
+scope, and no-Cargo guards passed. Scans found no new filesystem, legacy
+snapshot/root-graph, JVM, Java-bytecode, or Bazel-delegation owner.
+
+External build/execution remains unsupported. External alias and other native
+rule projection, cross-package or cross-repository edges, patterns, reverse
+and provenance functions, external loads/globs, registry transport, repository
+rules, and extensions remain deferred.
+
+The next packet is
+`WP-5-m1-external-repository-alias-query`. It stays at the accepted private
+graph-projection abstraction and needs no separate design packet: project one
+direct same-package native alias whose `actual` resolves within the already
+loaded external package, and prove its literal, node-local `labels(actual,
+...)`, and forward `deps` behavior without adding discovery or ownership.

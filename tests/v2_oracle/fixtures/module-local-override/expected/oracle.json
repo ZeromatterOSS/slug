@@ -23,7 +23,7 @@
       "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@dep+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: <output_base>/external/dep+/BUILD.bazel:1:14: @@dep+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
       "normalized_stdout": "",
       "startup_argv": [],
-      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: aa351a23-0b6e-45f5-a1dd-9291c15d866d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/aa351a23-0b6e-45f5-a1dd-9291c15d866d\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@dep+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: /run/media/system/Colossus/dev/slug/target/v2o/ob/module-local-override/bazel/external/dep+/BUILD.bazel:1:14: @@dep+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: 4.362s, Critical Path: 0.01s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/aa351a23-0b6e-45f5-a1dd-9291c15d866d\n",
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 7e889670-5e83-4cb5-ad48-71c185caddb7\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/7e889670-5e83-4cb5-ad48-71c185caddb7\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 6 targets configured)\nAnalyzing: target @@dep+//:target.txt (5 packages loaded, 7 targets configured)\n\nINFO: Analyzed target @@dep+//:target.txt (5 packages loaded, 7 targets configured).\nWARNING: /tmp/slug-filegroup-oracle-generation/ob/module-local-override/bazel/external/dep+/BUILD.bazel:1:14: @@dep+//:target.txt is a source file, nothing will be built for it. If you want to build a target that consumes this file, try --compile_one_dependency\nINFO: Found 1 target...\nINFO: Elapsed time: 4.326s, Critical Path: 0.01s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/7e889670-5e83-4cb5-ad48-71c185caddb7\n",
       "stdout": ""
     },
     {
@@ -49,8 +49,60 @@
       "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
       "normalized_stdout": "@dep//:target.txt",
       "startup_argv": [],
-      "stderr": "INFO: Invocation ID: a6ea175d-7808-47a4-b358-71cfb96d6c58\nLoading: 0 packages loaded\n",
+      "stderr": "INFO: Invocation ID: 953cee14-9832-452c-bfdb-2f00e20eb58d\nLoading: 0 packages loaded\n",
       "stdout": "@dep//:target.txt\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@dep//:files"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@dep//:files"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "query_dep_files",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "@dep//:files",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: e1fdd0e9-d332-4268-9f10-23e5cb2c9fd3\nLoading: 0 packages loaded\n",
+      "stdout": "@dep//:files\n"
+    },
+    {
+      "argv": [
+        "query",
+        "labels(srcs, @dep//:files)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "labels(srcs, @dep//:files)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "query_dep_filegroup_srcs",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded",
+      "normalized_stdout": "@dep//:missing_input.txt\n@dep//:target.txt",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: ad40103d-c76d-4fdb-83bf-c99f8b26d725\nLoading: 0 packages loaded\n",
+      "stdout": "@dep//:missing_input.txt\n@dep//:target.txt\n"
     }
   ],
   "fixture": "module-local-override",

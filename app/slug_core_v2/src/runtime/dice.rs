@@ -4106,7 +4106,7 @@ mod tests {
         .unwrap();
         fs::write(
             workspace.path().join("dep/BUILD.bazel"),
-            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\n",
         )
         .unwrap();
         fs::write(workspace.path().join("dep/target.txt"), "target").unwrap();
@@ -4143,6 +4143,150 @@ mod tests {
         assert_eq!(
             accepted_output_text(&first),
             ["MODULE_EVENT", "EXTERNAL_BUILD_EVENT"]
+        );
+
+        let files = query("@dep//:files").unwrap();
+        assert_eq!(
+            files
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:files\n"
+        );
+        assert_eq!(
+            query("labels(srcs, @dep//:files)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:missing_input.txt\n@dep//:target.txt\n"
+        );
+        assert_eq!(
+            query("deps(@dep//:files)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            "@dep//:files\n@dep//:missing_input.txt\n@dep//:target.txt\n"
+        );
+        assert!(
+            query("labels(visibility, @dep//:files)")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout()
+                .is_empty()
+        );
+
+        // An attribute-created external source is semantic loading state, not
+        // a source-file observation. It remains addressable while absent.
+        fs::write(workspace.path().join("dep/missing_input.txt"), "present").unwrap();
+        let created = query("deps(@dep//:files)").unwrap();
+        assert!(accepted_output_text(&created).is_empty());
+        fs::write(workspace.path().join("dep/missing_input.txt"), "edited").unwrap();
+        let edited_source = query("deps(@dep//:files)").unwrap();
+        assert!(accepted_output_text(&edited_source).is_empty());
+        fs::remove_file(workspace.path().join("dep/missing_input.txt")).unwrap();
+        let deleted_source = query("deps(@dep//:files)").unwrap();
+        assert!(accepted_output_text(&deleted_source).is_empty());
+        fs::write(workspace.path().join("dep/missing_input.txt"), "recreated").unwrap();
+        let recreated_source = query("deps(@dep//:files)").unwrap();
+        assert!(accepted_output_text(&recreated_source).is_empty());
+        fs::remove_file(workspace.path().join("dep/missing_input.txt")).unwrap();
+
+        for (build, expected) in [
+            (
+                "alias(name = \"other\", actual = \":files\")\n",
+                "external repository rule graph is deferred",
+            ),
+            (
+                "filegroup(name = \"files\", srcs = [\"//other:item\"])\n",
+                "external repository filegroup cross-package srcs are deferred",
+            ),
+            (
+                "filegroup(name = \"group\")\nfilegroup(name = \"files\", visibility = [\":group\"])\n",
+                "external repository visibility edges are deferred",
+            ),
+            (
+                "filegroup(name = \"BUILD.bazel\")\n",
+                "collides with active BUILD file",
+            ),
+        ] {
+            fs::write(workspace.path().join("dep/BUILD.bazel"), build).unwrap();
+            let stopped = WorkspaceRuntime::new(workspace.path()).unwrap();
+            let error = stopped
+                .query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+                    "@dep//:files",
+                    QueryOrder::Auto,
+                    QueryPolicy::default(),
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[],
+                    QueryOutputCompletion::Standard,
+                )
+                .unwrap();
+            assert!(
+                error
+                    .terminal_for_test()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap_err()
+                    .to_string()
+                    .contains(expected),
+                "{error:?}"
+            );
+        }
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\", srcs = [\"target.txt\", \"missing_input.txt\"])\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "filegroup(name = \"files\", srcs = [\"@other//:item\"])\n",
+        )
+        .unwrap();
+        let stopped = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let named_repository = stopped
+            .query_command_with_policy_and_bzlmod_inputs_and_output_completion(
+                "@dep//:files",
+                QueryOrder::Auto,
+                QueryPolicy::default(),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                QueryOutputCompletion::Standard,
+            )
+            .unwrap();
+        assert!(
+            named_repository
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("external repository dependency labels are not supported"),
+            "{named_repository:?}"
+        );
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
+        )
+        .unwrap();
+        let restored_after_stop_gates = query("@dep//:target.txt").unwrap();
+        assert_eq!(
+            accepted_output_text(&restored_after_stop_gates),
+            ["EXTERNAL_BUILD_EVENT"]
         );
         let phase = activation_audit.checkpoint();
         let warm = query("@dep//:target.txt").unwrap();

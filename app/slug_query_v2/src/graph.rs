@@ -847,75 +847,138 @@ fn external_package_graph_from_loaded(
     package: &PackagePath,
     loaded: &LoadedPackage,
 ) -> Result<UnconfiguredPackageGraph, QueryError> {
-    let build_basename = loaded
-        .build_file
+    external_package_graph_from_targets(
+        route.canonical_repo(),
+        route.apparent_repo(),
+        package,
+        &loaded.build_file,
+        &loaded.default_visibility,
+        &loaded.targets,
+    )
+}
+
+fn external_package_graph_from_targets(
+    canonical_repo: &CanonicalRepoName,
+    apparent_repo: &ApparentRepoName,
+    package: &PackagePath,
+    build_path: &Path,
+    default_visibility: &RuleVisibility,
+    targets: &[slug_loading_v2::PackageTarget],
+) -> Result<UnconfiguredPackageGraph, QueryError> {
+    let build_basename = build_path
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| {
             QueryError::evaluation("loaded external BUILD file has no UTF-8 basename")
         })?;
-    let build_file = CompactString::new(loaded.build_file.to_string_lossy());
-    let mut nodes = SmallMap::with_capacity(loaded.targets.len() + 1);
+    let build_file = CompactString::new(build_path.to_string_lossy());
+    let mut nodes = SmallMap::with_capacity(targets.len() + 1);
 
-    for target in &loaded.targets {
-        if !matches!(target.kind, PackageTargetKind::ExportedFile) {
-            return Err(QueryError::evaluation(format!(
-                "external repository rule graph is deferred: {}//{}:{}",
-                route.canonical_repo(),
-                package,
-                target.name
-            )));
-        }
-        let effective_visibility = effective_visibility(loaded, target)?;
+    for target in targets {
+        let effective_visibility = match &target.visibility {
+            VisibilitySource::Declared(visibility) => visibility.clone(),
+            VisibilitySource::PackageDefault => default_visibility.clone(),
+            VisibilitySource::AlwaysPublic => RuleVisibility::Public,
+            VisibilitySource::GeneratingRule => {
+                return Err(QueryError::evaluation(format!(
+                    "target '{}' has invalid visibility provenance",
+                    target.name
+                )));
+            }
+        };
         if !effective_visibility.dependency_labels().is_empty() {
             return Err(QueryError::evaluation(format!(
                 "external repository visibility edges are deferred: {}//{}:{}",
-                route.canonical_repo(),
-                package,
-                target.name
+                canonical_repo, package, target.name
             )));
         }
-        let label = QueryLabel::in_external_package(
-            route.canonical_repo(),
-            route.apparent_repo(),
-            package,
-            &target.name,
-        )?;
-        let kind = if target.name == build_basename {
-            QueryNodeKind::BuildFile
-        } else {
-            QueryNodeKind::SourceFile
+        let label =
+            QueryLabel::in_external_package(canonical_repo, apparent_repo, package, &target.name)?;
+        let (kind, rule_capability, edges, attributes) = match &target.kind {
+            PackageTargetKind::ExportedFile if target.name == build_basename => {
+                (QueryNodeKind::BuildFile, None, Arc::from([]), Arc::from([]))
+            }
+            PackageTargetKind::ExportedFile => (
+                QueryNodeKind::SourceFile,
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            ),
+            PackageTargetKind::Filegroup {
+                srcs,
+                srcs_explicit,
+            } => {
+                let labels = srcs
+                    .iter()
+                    .map(|source| {
+                        external_filegroup_source_label(
+                            canonical_repo,
+                            apparent_repo,
+                            package,
+                            source,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let mut seen = SmallSet::new();
+                let ordinary = labels
+                    .iter()
+                    .filter(|label| seen.insert((*label).dupe()))
+                    .map(QueryLabel::dupe)
+                    .map(|target| QueryEdge {
+                        kind: QueryEdgeKind::Ordinary,
+                        target,
+                    })
+                    .collect::<Vec<_>>();
+                (
+                    QueryNodeKind::Rule(CompactString::new("filegroup rule")),
+                    target.rule_capability().cloned(),
+                    ordinary.into(),
+                    vec![QueryAttribute {
+                        name: CompactString::new("srcs"),
+                        labels: labels.into(),
+                        explicit: *srcs_explicit,
+                    }]
+                    .into(),
+                )
+            }
+            _ => {
+                return Err(QueryError::evaluation(format!(
+                    "external repository rule graph is deferred: {}//{}:{}",
+                    canonical_repo, package, target.name
+                )));
+            }
+        };
+        if target.name == build_basename && !matches!(kind, QueryNodeKind::BuildFile) {
+            return Err(QueryError::evaluation(format!(
+                "target '{}' collides with active BUILD file",
+                label
+            )));
         };
         nodes.insert(
             label.dupe(),
             QueryNode {
                 label,
                 kind,
-                rule_capability: None,
+                rule_capability,
                 test_metadata: None,
                 build_file: build_file.clone(),
                 effective_visibility,
                 visibility_source: target.visibility.clone(),
                 package_group_contents: None,
-                edges: Arc::from([]),
-                attributes: Arc::from([]),
+                edges,
+                attributes,
             },
         );
     }
 
-    if !loaded.default_visibility.dependency_labels().is_empty() {
+    if !default_visibility.dependency_labels().is_empty() {
         return Err(QueryError::evaluation(format!(
             "external repository default visibility edges are deferred: {}//{}",
-            route.canonical_repo(),
-            package
+            canonical_repo, package
         )));
     }
-    let build_label = QueryLabel::in_external_package(
-        route.canonical_repo(),
-        route.apparent_repo(),
-        package,
-        build_basename,
-    )?;
+    let build_label =
+        QueryLabel::in_external_package(canonical_repo, apparent_repo, package, build_basename)?;
     if nodes.get(&build_label).is_none() {
         nodes.insert(
             build_label.dupe(),
@@ -924,8 +987,38 @@ fn external_package_graph_from_loaded(
                 kind: QueryNodeKind::BuildFile,
                 rule_capability: None,
                 test_metadata: None,
-                build_file,
-                effective_visibility: loaded.default_visibility.clone(),
+                build_file: build_file.clone(),
+                effective_visibility: default_visibility.clone(),
+                visibility_source: VisibilitySource::PackageDefault,
+                package_group_contents: None,
+                edges: Arc::from([]),
+                attributes: Arc::from([]),
+            },
+        );
+    }
+
+    // Native filegroup attributes create same-package source targets during
+    // loading. This query projection deliberately retains that semantic
+    // result without observing the source path.
+    let referenced_sources = nodes
+        .values()
+        .flat_map(|node| node.edges.iter())
+        .filter(|edge| edge.kind == QueryEdgeKind::Ordinary)
+        .map(|edge| &edge.target)
+        .filter(|label| !label.is_root_repository() && label.package() == package.as_str())
+        .filter(|label| nodes.get(*label).is_none())
+        .map(QueryLabel::dupe)
+        .collect::<SmallSet<_>>();
+    for label in referenced_sources {
+        nodes.insert(
+            label.dupe(),
+            QueryNode {
+                label,
+                kind: QueryNodeKind::SourceFile,
+                rule_capability: None,
+                test_metadata: None,
+                build_file: build_file.clone(),
+                effective_visibility: default_visibility.clone(),
                 visibility_source: VisibilitySource::PackageDefault,
                 package_group_contents: None,
                 edges: Arc::from([]),
@@ -938,6 +1031,31 @@ fn external_package_graph_from_loaded(
         package: CompactString::new(package.as_str()),
         nodes,
     })
+}
+
+fn external_filegroup_source_label(
+    canonical_repo: &CanonicalRepoName,
+    apparent_repo: &ApparentRepoName,
+    package: &PackagePath,
+    source: &CanonicalLabel,
+) -> Result<QueryLabel, QueryError> {
+    let source_package = source.package();
+    if source_package.repo().is_root() && source_package.package() == package {
+        return QueryLabel::in_external_package(
+            canonical_repo,
+            apparent_repo,
+            package,
+            source.target().as_str(),
+        );
+    }
+    let deferred = if source_package.repo().is_root() {
+        "cross-package"
+    } else {
+        "named-repository"
+    };
+    Err(QueryError::evaluation(format!(
+        "external repository filegroup {deferred} srcs are deferred: {source}"
+    )))
 }
 
 fn effective_visibility(
@@ -1338,15 +1456,27 @@ fn label_in_package(package: &str, target: &str) -> Result<QueryLabel, QueryErro
 }
 
 #[cfg(test)]
-mod label_tests {
+mod graph_tests {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hash;
     use std::hash::Hasher;
+    use std::path::Path;
+    use std::sync::Arc;
 
     use slug_identity_v2::ApparentLabel;
+    use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
+    use slug_identity_v2::PackagePath;
+    use slug_loading_v2::PackageTarget;
+    use slug_loading_v2::PackageTargetKind;
+    use slug_loading_v2::RuleVisibility;
+    use slug_loading_v2::VisibilitySource;
 
+    use super::QueryEdgeKind;
     use super::QueryLabel;
+    use super::QueryNodeKind;
+    use super::external_package_graph_from_targets;
 
     #[test]
     fn external_label_identity_is_canonical_while_output_is_apparent() {
@@ -1374,5 +1504,105 @@ mod label_tests {
         assert_eq!(alias.to_string(), "@@dep+//pkg:target");
         assert_eq!(dep.output_label(), "@dep//pkg:target");
         assert_eq!(alias.output_label(), "@alias//pkg:target");
+    }
+
+    #[test]
+    fn external_filegroup_projection_retains_srcs_and_synthesizes_sources() {
+        let canonical_repo = CanonicalRepoName::new("dep+").unwrap();
+        let apparent_repo = ApparentRepoName::new("dep").unwrap();
+        let package = PackagePath::parse("").unwrap();
+        let source = |target| CanonicalLabel::parse(&format!("@@//:{target}")).unwrap();
+        let targets = vec![
+            PackageTarget {
+                name: "existing.txt".to_owned(),
+                kind: PackageTargetKind::ExportedFile,
+                visibility: VisibilitySource::AlwaysPublic,
+            },
+            PackageTarget {
+                name: "files".to_owned(),
+                kind: PackageTargetKind::Filegroup {
+                    srcs: Arc::from([
+                        source("z.txt"),
+                        source("existing.txt"),
+                        source("absent.txt"),
+                    ]),
+                    srcs_explicit: true,
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
+            PackageTarget {
+                name: "omitted".to_owned(),
+                kind: PackageTargetKind::Filegroup {
+                    srcs: Arc::from([]),
+                    srcs_explicit: false,
+                },
+                visibility: VisibilitySource::PackageDefault,
+            },
+        ];
+        let graph = external_package_graph_from_targets(
+            &canonical_repo,
+            &apparent_repo,
+            &package,
+            Path::new("/external/dep+/BUILD.bazel"),
+            &RuleVisibility::Private,
+            &targets,
+        )
+        .unwrap();
+        let label = |target| {
+            QueryLabel::in_external_package(&canonical_repo, &apparent_repo, &package, target)
+                .unwrap()
+        };
+
+        let files = graph.nodes.get(&label("files")).unwrap();
+        assert_eq!(files.kind, QueryNodeKind::Rule("filegroup rule".into()));
+        assert_eq!(files.attributes.len(), 1);
+        assert_eq!(files.attributes[0].name, "srcs");
+        assert!(files.attributes[0].explicit);
+        assert_eq!(
+            files.attributes[0]
+                .labels
+                .iter()
+                .map(QueryLabel::output_label)
+                .collect::<Vec<_>>(),
+            ["@dep//:z.txt", "@dep//:existing.txt", "@dep//:absent.txt"]
+        );
+        assert_eq!(
+            files
+                .edges
+                .iter()
+                .map(|edge| (edge.kind, edge.target.output_label()))
+                .collect::<Vec<_>>(),
+            [
+                (QueryEdgeKind::Ordinary, "@dep//:z.txt".into()),
+                (QueryEdgeKind::Ordinary, "@dep//:existing.txt".into()),
+                (QueryEdgeKind::Ordinary, "@dep//:absent.txt".into()),
+            ]
+        );
+        assert!(
+            files
+                .attributes
+                .iter()
+                .all(|attribute| attribute.name != "visibility")
+        );
+
+        let omitted = graph.nodes.get(&label("omitted")).unwrap();
+        assert_eq!(omitted.attributes.len(), 1);
+        assert!(omitted.attributes[0].labels.is_empty());
+        assert!(!omitted.attributes[0].explicit);
+
+        let existing = graph.nodes.get(&label("existing.txt")).unwrap();
+        assert_eq!(existing.kind, QueryNodeKind::SourceFile);
+        assert_eq!(existing.effective_visibility, RuleVisibility::Public);
+        assert_eq!(existing.visibility_source, VisibilitySource::AlwaysPublic);
+
+        // This pure projection receives only loaded target metadata. The
+        // undeclared source exists because `srcs` names it, with no source-path
+        // observation or filesystem discovery.
+        let absent = graph.nodes.get(&label("absent.txt")).unwrap();
+        assert_eq!(absent.kind, QueryNodeKind::SourceFile);
+        assert_eq!(absent.effective_visibility, RuleVisibility::Private);
+        assert_eq!(absent.visibility_source, VisibilitySource::PackageDefault);
+        assert!(absent.edges.is_empty());
+        assert!(absent.attributes.is_empty());
     }
 }
