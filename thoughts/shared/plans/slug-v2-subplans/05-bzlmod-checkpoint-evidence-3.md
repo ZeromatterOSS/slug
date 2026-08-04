@@ -16101,3 +16101,265 @@ separately from rejected explicit `--output=text`, while retaining the four
 accepted flag-selected output modes. The final verdict remains **REPLAN** to
 `WP-5-m1-external-query-package-identity-design`; no Rust, fixture, oracle, or
 external Bzl-loader activation is authorized.
+
+## WP-5-m1 external query package-identity design (2026-08-04)
+
+**Status: ACCEPTED — implementation may proceed only under the exact bounded
+contract below.** This packet repairs the private request-local package owner that
+already exists behind `QueryCandidate`; it does not activate an external
+Starlark rule or external Bzl loading. The 17-row, 598-line
+`module-local-override` fixture remains frozen and the oracle allowlist is
+empty.
+
+### Evidence and representation decision
+
+The accepted REPLAN established the three concrete route losses:
+`same_pkg_direct_rdeps()` and `siblings()` discard everything except a package
+string before root `package_graph()` (loading environment lines 837-894);
+`loading_files()` then computes `RootPackageLoadKey`, fabricates a root BUILD
+label, converts a Bzl label without its apparent route, and uses root companion
+discovery (lines 250-283 and 896-965); and fake candidates retain only that
+string in `consuming_package` (`provenance.rs` lines 20-87, 245-253). The
+recorded Bazel 9.2 `siblings(@dep//:rule)` result is ordered
+`@dep//:BUILD.bazel`, `@dep//:rule`, while
+`same_pkg_direct_rdeps(@dep//:rule)` is empty. A future external projection
+cannot claim those results while its generic package owner still selects `//`.
+
+Choose one private, `Allocative` and `Dupe`-cheap
+`QueryPackageIdentity` in `app/slug_query_v2/src/provenance.rs`, exactly
+`struct QueryPackageIdentity(Arc<QueryPackageIdentityData>);`, over the
+following V2-owned data:
+
+```text
+QueryPackageIdentityData::Root { package: PackagePath }
+QueryPackageIdentityData::External {
+  canonical_repo: CanonicalRepoName,
+  apparent_repo: ApparentRepoName,
+  package: PackagePath,
+}
+```
+
+The data enum owns typed `CanonicalRepoName`, `ApparentRepoName`, and
+`PackagePath` values. Constructing it may clone those types' existing owned
+string buffers; cloning the completed identity is one pointer-sized `Dupe`.
+"One Arc" means one new shared allocation and no raw-string owner, interner,
+cache, map, lock, or second shared route object, not zero underlying
+string-buffer allocations. A real candidate derives this transient owner from
+its `QueryLabel` at the consumer boundary; a fake retains one shared identity
+because it has no real evaluation label. This needs no Stage 9 utility import
+or ledger row. `QueryLabel` remains the public label surface and keeps its
+existing canonical-label equality/order and apparent rendering.
+
+The wrapper has only private `root(package)` and
+`external(canonical_repo, apparent_repo, package)` constructors, reached
+through `QueryLabel::owner_identity()`. `owner_identity()` accepts exactly a
+root-canonical label plus no apparent route, or a nonroot-canonical label plus
+a nonroot apparent route. Root-with-apparent, external-without-apparent, and
+either root/nonroot mismatch are complete query errors. The same-package
+rewrite helper accepts an already verified owner, preserves its apparent
+route, and rejects every canonical repo/package mismatch before constructing a
+label.
+
+Manual `Eq`, `Hash`, and `Ord` use **only** the full canonical package
+identity (root/nonroot discriminant, then canonical repo plus package path).
+`apparent_repo` is excluded from semantic equality/hash/order, but is retained
+by the first surviving external candidate as the route used for DICE recovery
+and printed labels. This preserves existing canonical graph/materialization
+identity and avoids turning an apparent spelling into a second semantic
+package. Callback/delivery owner order is the first encounter order already
+preserved by `SmallSet` and candidate batches; output text remains the selected
+labels' existing canonical sort or full graph order, never identity-map
+iteration order. Its private `canonical_package()` accessor clones the
+retained typed components into a full typed `PackageIdentifier` without
+parsing a string; Restricted visibility alone consumes that accessor.
+
+For a real candidate, `owner_identity()` is derived from its real label. A fake
+candidate changes from `consuming_package: CompactString` to
+`consuming_owner: QueryPackageIdentity`; real/fake remains a distinct enum
+variant, and fake equality/hash includes both printed-label canonical identity
+and consuming-owner canonical identity. Thus a real and a fake never intern as
+the same candidate, two fake candidates with different consuming canonical
+packages do not intern together, and first-representative label materialization
+continues to choose the existing first callback candidate. A fake's apparent
+route is retained only to recover the owner route after that provenance-sensitive
+boundary. The arena stays request-local; `QueryCandidateId` and batch `Arc`
+slices remain unchanged, so this is neither a DICE key nor a cross-request
+retained value.
+
+The separate Restricted audit supplies the required exact visibility rule from
+pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`:
+`VisibleFunction` lines 27-37 and 76-121 with `BlazeTargetAccessor` lines
+140-175 use same package fragments for Private; `QueryVisibility` lines 49-92,
+`BlazeQueryVisibility` lines 21-33, and `PackageSpecification` lines 85-100,
+124-220, 270-334, and 453-590 use full canonical `PackageIdentifier` for
+Restricted direct packages and groups. Fresh direct and group discriminators
+returned only root-same and `@dep`-same targets, never cross targets. Therefore
+`visible_to()` must preserve its current Private/java fragment comparison, but
+change its Restricted direct-package/package-group checks to pass the
+identity's full canonical `PackageIdentifier`. This is source-backed rather
+than an inference from the earlier same-fragment probe. Visibility-content
+evaluation does not enter this packet.
+
+### One-owner route-aware dispatch
+
+No new DICE key, observation, cache, lock, direct filesystem access, or fresh
+graph is permitted. `LoadingQueryEnvironment` receives the private identity and
+uses existing owners only:
+
+- root identity dispatches exactly as today to
+  `RootUnconfiguredPackageGraphKey`, `RootPackageLoadKey`, and the existing
+  Host root BUILD-companion path;
+- external identity obtains its route through existing `RootRepositoryRouteKey`
+  from `apparent_repo`, verifies its canonical repo equals the retained
+  `canonical_repo`, then dispatches to existing
+  `ExternalUnconfiguredPackageGraphKey` and `RepositoryPackageLoadKey` using
+  its typed package. A missing route, root/nonroot mismatch, or canonical
+  mismatch is a complete query error before output; and
+- an external BUILD/Bzl/companion label is rewritten from the owner identity
+  only after verifying its canonical package. It reuses the owner's apparent
+  route for `@dep//...` rendering. In this design's existing no-Bzl external
+  package surface, the loaded BUILD basename supplies the one companion.
+  Future Bzl manifests remain same-repository/same-package only and may reuse
+  that same loaded BUILD label; cross-package/repository Bzl companions remain
+  a stop, never a root fallback.
+
+`siblings()` deduplicates identity owners in callback order and uses the
+corresponding graph dispatcher. `same_pkg_direct_rdeps()` groups target labels
+by canonical package identity, scans only that identity's graph, and records
+only its existing edges. `loading_files()` deduplicates owners by canonical
+identity but preserves the first candidate's apparent route for build/Bzl/fake
+labels and subsequent provenance consumers. `visible_to()` receives the full
+identity: Private and java aliases compare package fragments as Bazel does;
+Restricted checks use a retained full canonical `PackageIdentifier`; a fake
+target remains the existing visible, non-loadable candidate. These changes are
+private to the query crate and do not change `RootRepositoryRoute`,
+`BzlModuleIdentity`, `LoadedPackage`, any DICE key/value equality, or public
+wire/API type.
+
+Restricted direct-package membership always receives the caller's full
+canonical `PackageIdentifier`. Every package-group label is resolved through
+the target graph label's already verified owner route: root groups remain
+root; an external group label must match that owner's canonical repository and
+package before receiving its apparent route. This packet continues to reject
+external visibility dependency labels, so its group discriminator covers an
+external caller against the existing root group path; activating external
+restricted-group traversal requires separate accepted visibility-content
+evidence.
+
+### Generic functions, output, and activation boundary
+
+For the future one-rule slice, literal, default Text/label, label_kind,
+package, graph, `deps`, `rdeps`, `allpaths`, `somepath`, and `some` remain
+exactly the recorded self-only result only for an explicitly-public,
+dependency-free, non-test, non-executable rule with no unsupported package
+companions. `tests` and `executables` are empty under those same retained
+capability gates. `labels(tags, ...)` is empty only with no dependency-
+reachable label attribute; `labels(visibility, ...)` retains the recorded
+missing-`//visibility:public` complete error unless a future projection has
+accepted source evidence for its visibility attribute. `attr`, `filter`, and
+`kind` remain validation-time deferred; `allrdeps` remains unregistered;
+external `:*` and `...` patterns remain pre-evaluation errors.
+Existing `union`, `intersect`, `except`, `set`, and `let` retain their current
+label-materialization boundary and first-surviving route-bearing
+representative.
+
+Default `QueryOutputFormat::Text` continues to render ordinary label stdout;
+explicit `--output=text` remains rejected. The only accepted flag-selected
+formats remain label, graph, label_kind, and package. Canonical internal graph
+identity and apparent output spellings are unchanged; selected label sorting,
+full order, DOT edge order, package de-duplication, fake zero-dependency
+behavior, and first-representative materialization remain owned by their
+existing evaluator/output paths.
+
+### Equality, replay, and focused implementation contract
+
+The identity is request-local and has no `Need`, Complete, error, validity, or
+event value of its own. Existing DICE keys remain their sole semantic owners:
+route changes select a distinct `RootRepositoryRouteKey`/external graph/package
+load key; unchanged route plus unchanged loaded-package semantics retains the
+old graph/output; upstream package/source edits, delete/recreate, missing-route
+failure/recovery, and route remap recompute through current tracked DICE edges.
+Cold publication, warm silence, fake provenance replay, and recovery must not
+consult the filesystem directly. The design forbids a mutex across any DICE
+compute; DICE's existing key de-duplication supplies serialization.
+
+After independent review, implementation may change only:
+
+- `app/slug_query_v2/src/graph.rs` for private label/package identity and
+  route-preserving rewrite helpers;
+- `app/slug_query_v2/src/provenance.rs` for the compact owner, real/fake
+  equality/hash/order, arena, and unit tests; and
+- `app/slug_query_v2/src/loading_environment.rs` for one route-aware graph,
+  package-load, companion, and visibility dispatcher plus its unit tests; and
+- `app/slug_query_v2/tests/loading_query.rs` for named host-DICE lifecycle and
+  generic-consumer integration coverage; and
+- `app/slug_cli_v2/tests/cli.rs` only by extending
+  `direct_external_query_matches_one_shot_and_retained_daemon_output_and_events`
+  for the direct downstream output/replay check.
+
+No loading, bzlmod, CLI production, server, fixture, oracle, Cargo metadata,
+protocol, canonical scheduling, or external Bzl owner file may change. The
+exact focused-test allowlist is: add
+`query_package_identity_canonical_equality_retains_first_apparent_route` and
+`fake_candidate_owner_identity_is_symmetric_and_route_preserving` to
+`provenance.rs`; add
+`external_owner_visible_private_uses_fragment_and_restricted_uses_canonical`
+to `loading_environment.rs`; add
+`external_owner_dispatches_siblings_rdeps_and_loading_files_without_root_fallback`
+and `external_owner_route_lifecycle_reuses_edits_deletes_recreates_and_recovers`
+to `app/slug_query_v2/tests/loading_query.rs`; and extend only the named CLI
+test above. Together they must exercise root and external real/fake
+combinations, identical canonical package through two apparent spellings, the
+recorded siblings/order and same-package-rdeps results, external BUILD output
+and empty current external loadfiles, plus root/synthetic-unit fake-owner route
+preservation; no test may claim an external Bzl or fake Bzl-companion result
+before the deferred external Bzl owner lands. They must also cover Private and
+Restricted discriminators, default Text and each enabled output format, route
+remap, cold/warm,
+edit/delete/recreate/error/recovery, and no external pattern activation. They
+must not add a fixture row.
+
+Run serially after Rust exists:
+`cargo test -p slug_query_v2 provenance`,
+`cargo test -p slug_query_v2 loading_query`,
+`cargo test -p slug_cli_v2 direct_external_query_matches_one_shot_and_retained_daemon_output_and_events`,
+`cargo check -p slug_cli_v2`,
+`cargo test -p slug_query_v2 --target x86_64-pc-windows-gnu --no-run`,
+`cargo test -p slug_cli_v2 --target x86_64-pc-windows-gnu --no-run`,
+`cargo fmt --check`, `scripts/v2_archive_status.sh`, and `git diff --check`.
+Clean stale `slugd` before/after the CLI smoke. No Cargo or Bazel command is
+authorized in this design packet.
+
+### Deferred owner and stop gates
+
+The later external Bzl owner remains the separately bounded private two-file
+design in `app/slug_loading_v2/src/bzl_module.rs` and
+`app/slug_loading_v2/src/cycle_detector.rs`. It may consume the accepted
+Host-source logical path and own route-plus-validated-canonical-label module
+identity, load manifests, frozen lifetime, cycles, events, and lifecycle; it
+does not become a dependency or implementation file here.
+
+**REPLAN** if the identity needs a second shared allocation, retained duplicate
+owner/route, interner, cache, lock, or key, apparent-route semantic equality, public
+cross-crate API, a second owner or filesystem path, a root fallback for
+external provenance, unbounded discovery, a cross-package/repository Bzl
+companion, visibility-content evaluation, or a generic function that can emit
+partial output. Test/executable rules, suites, implicit/user dependencies,
+generated outputs, external patterns/discovery, configuration,
+analysis/actions/execution, repository rules/extensions, `@bazel_tools`, JVM,
+Java bytecode, and Bazel delegation remain out of scope. Obtain one independent
+retained-representation/query review before any implementation packet.
+
+### Independent retained-representation/query review (2026-08-04): ACCEPT
+
+The first review accepted the one-Arc request-local architecture but required
+four bounded text corrections before implementation: distinguish the one new
+shared allocation from cloned typed-string buffers, freeze private
+root/external constructor invariants, make Restricted package-group routing and
+the external visibility-content deferral explicit, and remove an impossible
+external fake-Bzl-companion test claim while enumerating the retained set
+operators. The corrected design now requires canonical-only equality/order,
+first apparent-route retention, verified route-before-load dispatch, Private
+fragment versus Restricted canonical-package semantics, exact three-production
+and two-test-file scope, and no external Bzl activation. Independent rereview
+returned **ACCEPT** with no remaining contradiction.

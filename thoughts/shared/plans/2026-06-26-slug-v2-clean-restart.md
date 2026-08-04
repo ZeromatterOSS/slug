@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus the accepted Host-only external source-identity implementation; full evidence is in the Stage 5 owner plan | Starlark loads/rules, external query package/provenance identity, test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | design compact private external query package/candidate ownership before retrying the dependency-free non-test external Starlark-rule slice |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, and standalone `package_group` queries, plus the accepted Host-only external source identity and external query package-identity design; full evidence is in the Stage 5 owner plan | Starlark loads/rules, external query package/provenance identity implementation, test-base dependency closure and test-rule/member query breadth, package-group visibility/content evaluation, native Windows glob ordering, registry transports, and discovery composition remain | implement the accepted compact private external query package/candidate owner before retrying the dependency-free non-test external Starlark-rule slice |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,10 +35,19 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-query-package-identity-design`.
+`WP-5-m1-external-query-package-identity`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
+
+The external query package-identity design is accepted. One private
+request-local Arc owner retains full canonical package identity plus the first
+apparent repository route, uses canonical-only equality/order, and dispatches
+external graph/package provenance only after route-to-canonical verification.
+Pinned Bazel 9.2 source and fresh probes preserve fragment-only Private/java
+visibility while Restricted membership uses the full canonical package. The
+implementation is limited to three query production files and two direct test
+files; the 17-row fixture and deferred external Bzl owner remain frozen.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of
