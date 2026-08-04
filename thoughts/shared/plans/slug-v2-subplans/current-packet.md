@@ -1,108 +1,80 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-support-gated-acyclic-closure-implementation`
+Packet: `WP-5-m1-direct-local-trusted-nonregistry-evaluator-adapter`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: private one-file support-gated occurrence preparation
-Evidence: accepted source/inspection/package horizon and shared preflight in
-`34a2340e`; pinned Bazel 9.2 breadth-first acquisition; accepted repeated/nested
-include oracles; root closure regressions; and the accepted private Slug cycle
-capability boundary. Add no oracle or fixture.
+Role: private one-file trusted direct-nonregistry evaluator correction
+Evidence: accepted support-gated direct-local preparation in `f2b626f2`;
+pinned Bazel 9.2 `ModuleFileFunction`, `ModuleThreadContext`, and
+`InterimModule` defaults/validation/include-map behavior; accepted empty-key
+nonregistry identity evidence; and the existing private supplied-file evaluator
+regressions. Add no oracle or fixture.
 
-Edit exactly `app/slug_bzlmod_v2/src/source_preparation.rs`. The formatted net
-addition may not exceed **600 production lines, 1,650 test lines, or 2,250 total
-lines**. Add only private, callerless owners:
+Edit exactly `app/slug_bzlmod_v2/src/module_eval.rs`. The formatted net addition
+may not exceed **190 production lines, 430 test lines, or 620 total lines**.
+Add one crate-private trusted direct-nonregistry adapter over the existing
+private evaluator machinery:
 
-- `DirectLocalModulePreparationKey(NormalizedAbsolutePath, ApparentRepoName)`;
-- `DirectLocalModulePreparation::{Supported, Unsupported}`;
-- `DirectLocalModuleClosure`;
-- `DirectLocalIncludeFragment`;
-- `DirectLocalIncludeCycleCapability`;
-- `DirectLocalModulePreparationError`; and
-- `DirectLocalIncludeFragmentFailure`.
+- `DirectNonregistryIncludeFile<'a>` retaining raw label, logical file ID, and
+  borrowed source bytes;
+- `DirectNonregistryEvaluationError`, with distinct preparation, execution,
+  finalization, declared-name mismatch, and declared-version mismatch variants;
+  and
+- `evaluate_direct_nonregistry_module_closure_with_events`, returning the
+  evaluated module or typed error plus a marker-conditional local `EventBatch`.
 
-The key identity is workspace plus nonroot apparent repository and it computes
-`DirectLocalModuleInspectionKey` once. Forward its Needs unchanged; distinguish
-typed inspection from inspection-compute failure. Preserve root absent versus
-present state in the supported closure through the accepted inspection carrier.
-For a present root, invoke `validate_root_module_source` on its logical path and
-bytes before seeding the first package horizon; map failure to a distinct root-
-validation error and request no package or fragment dependency. Root absence
-remains supported without validation. Use complete-only equality/validity:
-every Need is invalid and self-unequal.
+Keep the expected `NonrootModuleKey` separate from initially empty declaration
+state. Construct `NonrootModuleBuilder` with the expected key but empty declared
+name, declared version, and repo name. The `module()` directive alone populates
+those fields and retains its existing repo-name default from the declared name.
+After successful execution and finalization, validate the declared name first.
+Only if it matches and the expected version is nonempty may declared-version
+validation run. An empty expected version skips that comparison and preserves
+the normalized declared version in the successful output. Error carriers retain
+the expected key and declared field needed for exact later diagnostics.
 
-The supported closure retains the accepted root inspection plus
-`Arc<[DirectLocalIncludeFragment]>` in breadth-first occurrence order. Each
-fragment retains canonical package/target, raw label/`LogicalSpan`, the
-route-derived requested logical path, shared bytes, and
-`NonrootModuleFileInspection`. Preserve every occurrence, including identical
-raw labels, diamonds, siblings, and distinct labels for one canonical path.
-Dependency dedupe is horizon-local only and never deduplicates occurrence
-carriers or occurrence compilation.
+The adapter consumes only an already-supported, fully acquired closure. Insert
+every ordered include occurrence into the execution map and prepare every
+occurrence. Repeated raw labels are **last occurrence wins** in that map: pinned
+Bazel compiles every horizon occurrence and unconditionally calls
+`includeLabelToCompiledModuleFile.put(raw_label, compiled_file)`, so later
+values replace earlier ones before execution. Every inline `include()` call
+still executes the selected prepared program, including repeated calls. Do not
+apply the old supplied-file duplicate or unreachable rejection seam to the
+trusted closure. Preserve those checks unchanged for the existing strict test
+adapter.
 
-For every frontier call the accepted
-`preflight_direct_local_include_package_horizon(ctx, route, requests)` and finish
-it before any fragment demand. Derive normalized repository-relative fragment
-paths from canonical package plus target. Request every first-seen
-`HostRepositorySourceFileKey` in one group, union all
-`SourcePreparationNeeds::try_union` results, then rewalk occurrences in source
-order. An earlier complete terminal beats a later Need; an earlier Need returns
-the full group union and beats every later terminal. Preserve outer source-
-compute failure separately from typed source failure and Absent. Use the
-existing `validate_root_module_source` seam for UTF-8, restricted syntax,
-MODULE/include inspection, and Starlark prepare/identifier validation. Invoke it
-for every successful occurrence, even when its source dependency was deduped,
-so occurrence compile order remains exact.
+Parse and prepare the root plus every supplied occurrence before executing the
+root. Any parser, restricted-syntax, scope, identifier, or prepare failure in
+the full supplied closure therefore precedes every directive effect. Set the
+prepared-program table once, execute the root, preserve nested logical source
+locations and hidden evaluator roots, and finalize only after evaluation. Keep
+the existing force-GC test coverage without making GC part of the production
+adapter contract.
 
-Every successful non-backedge occurrence appends its nested requests to the next
-horizon in occurrence order with an extended active ancestry. Active identity
-is route-canonical package plus canonical target. Only a repeat on that
-occurrence's active ancestry is a cycle candidate; never use a global visited
-set. Retain the first breadth-first candidate's repeated raw label/span and the
-first matching ancestor's raw label/span as private capability metadata.
+Nonregistry print is allowed. When event capture is requested, install the
+existing recording print handler and return its ordered batch, including prints
+emitted before an execution or post-execution identity failure. When capture is
+not requested, leave the evaluator's direct/default print behavior installed.
+Do not use `RejectPrint` for this adapter. The existing strict private test seam
+may retain its rejection behavior; registry no-op print and DICE ownership are
+outside this packet.
 
-A cycle candidate is pending, not terminal. Finish its current horizon normally,
-do not enqueue only that repeated occurrence's outgoing requests, and continue
-all other queued occurrences and descendants breadth-first. At every later
-horizon, real Needs and terminals retain normal precedence. This cycle-pruned
-capability analysis is not supported-closure occurrence truncation: it is used
-only to prove the unsupported domain. Return `Unsupported` only after the entire
-remaining cycle-pruned reachable worklist succeeds and exhausts. This ensures a
-cycle plus a finite side-branch terminal or Need returns the Bazel result rather
-than hiding it. No capability value may be returned merely because its first
-current horizon succeeded.
+Tests must discriminate initially empty declarations and omitted `module()`;
+name mismatch before simultaneous version mismatch; the retained nonempty-key
+version mismatch seam; empty expected-version skip plus preserved declared
+version; repo-name defaulting; parse/prepare of every occurrence before root
+effects; duplicate raw-label last-wins selection while every occurrence is
+prepared; repeated inline execution; nested locations; uncaptured print
+success; ordered captured root/fragment prints; and print-before-failure batch
+retention. Keep the existing strict duplicate, unreachable, `RejectPrint`, GC,
+deferred-value, and directive regressions passing.
 
-Errors distinguish inspection/compute, root validation, package preflight,
-fragment source-compute, typed source, Absent, and fragment validation/compile
-failures, restoring root logical path or occurrence raw label/span and
-repository-relative/requested logical path. Typed inspection, package, and
-source errors expose their existing source chains where available; string
-compute, Absent, validation, and capability variants do not masquerade as Bazel
-errors. `Supported` equality includes root state and ordered fragment identities/
-bytes/inspections but excludes transient ancestry. `Unsupported` equality
-includes only typed capability provenance. The key owns no event batch and does
-not copy or replay routed-REPO child events.
-
-Tests must discriminate breadth-first versus depth-first compile order; package
-barrier before fragments; horizon-local path dedupe versus repeated occurrence
-compilation; both mixed terminal/Need directions; exact multi-kind Need union;
-all typed failures and raw-label/span sources; siblings, diamonds, same canonical
-path under distinct labels, and finite later reuse; self and multi-file cycles;
-same-horizon cycle candidate versus terminal/Need; cycle in H plus sibling H+1
-terminal and Need in both orders; a side branch emitted by the cyclic ancestor;
-deterministic first pending-cycle provenance after full pruned traversal; root
-absence; a root prepare/identifier failure with zero include-package lookup or
-fragment-source activations beyond root inspection; fragment and nested-include
-add/edit/delete/reorder/recreate; route A-to-B-to-A;
-warm reuse/downstream pruning; complete-only equality; and captured/uncaptured
-child events with no preparation-local data or warm replay.
-
-Use existing `Arc<[u8]>`, `Arc<[T]>`, `CompactString`, `SmallMap`/`SmallSet`,
-`Dupe`, and `Allocative`. Stops: no second file, public export/caller/activation/
-publication, Bazel-like cycle diagnostic, cycle variant in the supported closure,
-global visited set, cross-horizon dependency dedupe, recursive DICE, intentional
-hang, hard depth/node limit, evaluator execution, default/validation/print
-change, event storage, direct IO, lock/interner/cache, fixture/oracle, or cap
-breach. `REPLAN` on any such expansion. Run focused serial tests, formatting,
+Stops: no second file, DICE key, source-preparation consumer, public export,
+registry/MVS/contextual mapping, public unsupported-cycle publication, event
+storage or replay, direct IO, fixture/oracle, dependency, or cap breach. Do not
+weaken or remove the existing strict evaluator seam merely to fit the adapter.
+`REPLAN` if exact behavior requires a second production file or a public type.
+Run the focused nonroot evaluator tests, the owning library tests, formatting,
 GNU-Windows no-run, archive/scope/cap/diff gates, and independent latest-diff
 review; do not run Bazel.

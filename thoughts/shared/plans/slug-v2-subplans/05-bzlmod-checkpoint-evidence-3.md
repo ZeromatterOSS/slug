@@ -18660,3 +18660,135 @@ semantic closure cycle variant, global visited truncation, recursive DICE,
 fixture/oracle, registry/MVS/mapping work, or file outside the one-file
 allowlist is authorized. `REPLAN` on any such expansion. Public unsupported-
 cycle publication remains frozen pending explicit user approval.
+
+### WP-5-m1 direct-local support-gated acyclic closure implementation (2026-08-04)
+
+**Status: ACCEPTED in `f2b626f2`; implement only
+`WP-5-m1-direct-local-trusted-nonregistry-evaluator-adapter`.** The private
+one-file `source_preparation.rs` implementation is 434 production lines, 1320
+test lines, and 1754 total formatted net lines, within its accepted
+600/1650/2250 caps. `DirectLocalModulePreparationKey` now consumes the accepted
+inspection once, validates a present root before any package or fragment
+activation, preflights and acquires complete breadth-first horizons, retains
+every successful occurrence, and returns only a supported acyclic closure or
+the private support capability.
+
+The implementation preserves whole-group Need union plus source-order mixed
+terminal/Need precedence, horizon-local dependency dedupe without occurrence
+dedupe, per-occurrence validation/compile, route-derived logical identities,
+and typed inspection/root/package/source/Absent/validation failures. Active
+ancestry classifies only ancestor repeats. A candidate prunes only its repeated
+outgoing replay, remains pending while all cycle-free side branches finish, and
+cannot hide any later Need or real terminal. The supported closure has no cycle
+variant; neither temporary ancestry nor events enter its semantic equality.
+The owner stores no event batch and does not copy or replay routed-REPO child
+data. The capability and every owner remain private and callerless, so no build,
+query, one-shot, daemon, or public unsupported-feature behavior changed.
+
+Thirteen focused tests, all 46 `source_preparation` tests, and all 30
+`host_package` tests passed. GNU-Windows no-run, archive, formatting, and diff
+gates passed. The full `slug_bzlmod_v2` library result was 265/266: the sole
+failure was the untouched `records_exact_proxy_tag_and_innate_call_spans`
+expectation, and that exact failure reproduced at clean HEAD. Independent
+latest-diff review accepted the final implementation. No Bazel/oracle, fixture,
+public API, evaluator, registry/MVS, mapping, or publication surface changed.
+
+### WP-5-m1 direct-local nonregistry evaluator and event-owner design (2026-08-04)
+
+**Status: ACCEPTED as two serial private packets; implement only Packet 1,
+`WP-5-m1-direct-local-trusted-nonregistry-evaluator-adapter`.** Pinned Bazel 9.2
+`InterimModule.builder()` starts declared name and version empty and defaults
+repo name from the declaration, while `ModuleThreadContext` installs the
+requested key separately. After execution/build, `ModuleFileFunction` validates
+declared name first and compares declared version only when the requested
+version is nonempty. Direct nonregistry selection supplies route module name
+plus `Version.EMPTY`, so the evaluator must skip version equality and preserve
+the normalized declared version.
+
+Pinned include execution also resolves the remaining occurrence question.
+`advanceHorizon` reads, parses, and compiles every occurrence, then
+unconditionally inserts it with
+`includeLabelToCompiledModuleFile.put(raw_label, compiled_file)`. A later equal
+raw label therefore replaces the mapped value. The completed map is installed
+before execution, and every inline `include()` call executes its mapped program.
+The exact adapter must consequently prepare every occurrence, use last raw-label
+occurrence wins for program lookup, and execute repeated inline calls repeatedly.
+First-seen dedupe remains correct only for package/file dependency requests.
+
+#### Packet 1 — `WP-5-m1-direct-local-trusted-nonregistry-evaluator-adapter`
+
+Edit exactly `app/slug_bzlmod_v2/src/module_eval.rs`. The formatted net cap is
+**190 production lines, 430 test lines, and 620 total lines**. Add one
+crate-private `DirectNonregistryIncludeFile<'a>`, one crate-private typed
+`DirectNonregistryEvaluationError`, and
+`evaluate_direct_nonregistry_module_closure_with_events`. Keep expected
+`NonrootModuleKey` separate from initially empty declared name/version/repo.
+Parse and prepare root plus every ordered supplied occurrence before executing
+the root; insert every occurrence into a last-wins raw-label program map; and do
+not apply the old duplicate/unreachable supplied-file rejection seam to this
+trusted preparation-owned closure. Preserve the existing strict private test
+adapter and its checks separately.
+
+After execution and finalization, validate declared name first, then declared
+version only for a nonempty expected version. Preserve the normalized declared
+version when the expected version is empty. Distinguish preparation, execution,
+finalization, declared-name mismatch, and declared-version mismatch errors.
+When capture is enabled, record ordered local prints and return the batch even
+on execution or post-execution validation failure. Otherwise retain the
+evaluator's direct/default print path. `RejectPrint` is forbidden for the
+trusted nonregistry adapter; registry print policy and DICE storage remain out
+of this packet.
+
+Tests discriminate omitted `module()` and initially empty declarations;
+name-before-version mismatch; the retained nonempty expected-version mismatch
+seam; empty-version skip and declared-version preservation; repo-name default;
+full occurrence preparation before root effects; duplicate raw-label last-wins
+mapping while all occurrences prepare; repeated execution; nested locations;
+uncaptured print; captured root/fragment order; and print-before-failure. Keep
+the strict duplicate/unreachable/print-rejection, GC, deferred-value, and
+directive regressions intact. Add no DICE key, second file, public type, source
+consumer, registry/MVS/mapping, fixture, oracle, or public capability behavior.
+
+#### Packet 2 — `WP-5-m1-direct-local-nonregistry-evaluation-owner`
+
+Run only after Packet 1 is accepted. Edit exactly
+`app/slug_bzlmod_v2/src/source_preparation.rs`. The formatted net cap is
+**230 production lines, 720 test lines, and 950 total lines**. Add private
+`DirectLocalModuleEvaluationKey(workspace, apparent_repo)`, private
+`DirectLocalModuleEvaluation::{Supported, Unsupported}`, a private evaluated
+route-plus-module value, and typed preparation-compute, preparation, root-
+Absent, and evaluator error carriers. Its value remains
+`SourcePreparationOutcome<Arc<Result<...>>>` with complete-only equality and
+validity; every Need is invalid and self-unequal.
+
+The key must consume exactly `DirectLocalModulePreparationKey`. It forwards a
+Need without local event data, retains preparation compute versus semantic
+errors, maps supported root absence to the private module-not-found boundary,
+and never invokes the evaluator for `Unsupported`. A supported present closure
+constructs `NonrootModuleKey { name: route.module_name(), version: "" }` and
+passes root plus every ordered fragment occurrence to Packet 1 only after the
+whole preparation has completed. Success retains route provenance plus the
+compact evaluated module.
+
+The key owns exactly one marker-conditional local batch on every Complete,
+including empty batches for pre-evaluation error, root absence, and unsupported
+capability. Captured evaluation stores only its own prints, including a prefix
+before failure. Uncaptured fresh evaluation prints directly. Warm reuse neither
+prints again nor carries evaluation data. Routed-REPO and all other child event
+batches remain child-owned and are neither copied nor replayed. Events and
+activation data never enter semantic values or equality.
+
+Tests cover typed Need/error/absence/supported/unsupported results, empty-key
+identity and declared-version preservation, no execution for Unsupported,
+complete-only equality, captured and uncaptured print, print-before-failure,
+cold Evaluated versus warm Reused activation, source edit and downstream
+pruning, and distinct child-versus-owner event batches. Structural checks keep
+the key and support gate private, prohibit any `lib.rs` export or command caller,
+and shorten the preparation-owner scan before this evaluator owner so the
+preparation key remains independently evaluator- and event-free.
+
+No public consumer or unsupported-cycle status is authorized by either packet.
+Public build/query/one-shot/daemon publication remains frozen pending explicit
+user approval. Any required public export, registry/MVS/contextual mapping,
+second production file in either packet, fixture/oracle, or cap expansion is
+`REPLAN`.
