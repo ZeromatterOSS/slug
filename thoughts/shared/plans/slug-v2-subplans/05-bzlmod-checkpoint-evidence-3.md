@@ -18153,3 +18153,133 @@ and errors, BUILD marker-kind precedence, future shared consumption by external
 package loading, implementation file allowlist/caps, and lifecycle matrix.
 The accepted nonroot package-policy and path-state fixtures already supply the
 discriminators; add no oracle unless that design proves a specific gap.
+
+### WP-5-m1 direct-local external package-policy/selected-BUILD implementation design (2026-08-04)
+
+**Status: ACCEPTED; implement only the first serial packet,**
+`WP-5-m1-host-repository-path-key-implementation`. Pinned Bazel 9.2 source and
+the live DICE owners close the old path-state premise: sparse observation,
+symlink resolution, whole-command Need retry, route-derived materialization,
+and routed source reads are already present. The missing bounded sequence is a
+bytes-free route path owner, then external policy/lookup, then one public
+selected-BUILD source used by external loading. No new oracle is authorized.
+
+#### Packet 1 — `WP-5-m1-host-repository-path-key-implementation`
+
+Edit exactly `app/slug_bzlmod_v2/src/source_preparation.rs`; cap the formatted
+net addition at **170 production lines, 360 test lines, and 530 total lines**.
+Introduce crate-private, not publicly re-exported,
+`HostRepositoryPathKey { route: RootRepositoryRoute, repo_relative_path }` and
+the crate-private constructor/value access needed by sibling bzlmod modules as
+the sole route-keyed, byte-free adapter over the accepted
+`RepositoryMaterializationResultKey` and `ResolvedPathKey`. Its key identity is
+the complete route plus a validated normalized repository-relative path, never
+an apparent label, raw include spelling, physical root, or bytes.
+Its complete value retains the existing resolved-path namespace/instance,
+requested and real paths, and resolved state/lstat/kind. That operational
+identity must change across immutable materialization generations and symlink
+retargets even when later bytes happen to compare equal.
+
+Validate first, then request the existing materialization result and existing
+resolved path; propagate their `SourcePreparationNeeds` unchanged. Invalid
+relative path, materialization, resolution-cycle/expansion/observation,
+inconsistent-state, and compute failures remain typed. Missing and every
+terminal resolved kind, including directory/non-file, remain complete path
+states. Complete results/errors compare with the retained operational identity;
+every transient Need is invalid and self-unequal. The key owns no event or
+event batch.
+
+Refactor `HostRepositorySourceFileKey` in the same file to consume this key and
+request `FileBytes` only after a regular or special resolved result. Both keys
+provide the existing `RepositorySourceScope`; source bytes, requested logical
+path, error mapping, and Need behavior remain byte-for-byte compatible. Only
+this byte-reading source consumer maps a terminal non-file state to its existing
+typed `WrongKind` error. Tests
+must discriminate absence, regular/special/non-file kinds, symlink retarget,
+local and immutable operational identity, route A-to-B-to-A,
+missing/create/delete/recreate, exact materialization/path Needs, and that a
+path-only request has no `FileBytes` dependency. Do not introduce IO or a
+second path/materialization owner, publicly re-export the key, add policy/BUILD behavior,
+alter a fixture, or run a new oracle. `REPLAN` on any such expansion. Run only
+focused serial Cargo tests plus formatting and structural scope/cap/diff gates;
+do not run Bazel.
+
+#### Packet 2 — `WP-5-m1-route-policy-and-package-lookup-implementation`
+
+Run only after Packet 1 is accepted. Edit exactly these four files:
+
+- `app/slug_bzlmod_v2/src/host_package.rs`
+- `app/slug_bzlmod_v2/src/package_policy.rs`
+- `app/slug_bzlmod_v2/src/repo_file.rs`
+- `app/slug_bzlmod_v2/src/repository_ignore.rs`
+
+Its formatted net cap is **650 production lines, 1350 test lines, and 2000
+total lines**. It is atomic: private route policy and private external package
+lookup must land together, rather than leaving a parallel include-only policy
+graph. Lookup identity is `RootRepositoryRoute` plus a canonical external
+`PackageIdentifier` whose repository equals `route.canonical_repo()`; adapter
+spelling and spans remain diagnostics only. Add a minimal root-policy
+projection containing only canonical deleted packages—no root package roots,
+vendor policy, root `REPO.bazel`, or root `.bazelignore` equality.
+
+The exact compute order is fixed. Validate the package name first. Then obtain
+the minimal deleted-package projection; a canonical deletion returns the typed
+Deleted outcome before materialization, `HostRepositoryPathKey`, source bytes,
+route `REPO.bazel`, `.bazelignore`, Need, or route-policy event. An apparent
+`@name//pkg` does not match direct-local canonical `@@name+//pkg`. Only a
+non-deleted package may evaluate routed `REPO.bazel`, then apply that
+repository's `.bazelignore`, then inspect routed `BUILD.bazel` and, only after
+a complete non-file/missing primary result, `BUILD`. Regular and special
+resolved files are markers; directory and other non-file states are not; a Need
+or typed failure from the primary path stops without requesting fallback.
+Marker inspection is path state only: no BUILD bytes in this packet.
+
+Route policy owns the complete child event batch for `REPO.bazel` evaluation,
+including print/error behavior; lookup and ignore add none, child batches are
+selected only by the activated parent, and events never enter value equality.
+Needs are forwarded unchanged. Retain typed validation, materialization/path,
+source, and REPO/ignore failures; retain typed `Deleted` and `NoBuildFile`
+outcomes rather than strings. Complete-only semantic equality applies to
+values/errors and every Need is self-unequal. Exercise global deleted
+short-circuit with no route request/event, canonical-versus-apparent deletion,
+REPO and ignore edits, BUILD priority, directory/symlink/error/fallback,
+route A-to-B-to-A, and create/delete/recovery. Do not change root-only owners,
+read marker bytes, add public API/loading callers/horizon/closure/evaluator or
+mapping/registry behavior, use direct IO, add an oracle, or loosen this
+four-file boundary; replan instead.
+
+#### Packet 3 — `WP-5-m1-public-selected-build-source-loading-migration`
+
+Run only after Packet 2 is accepted. Edit exactly these four files:
+
+- `app/slug_bzlmod_v2/src/host_package.rs`
+- `app/slug_bzlmod_v2/src/lib.rs`
+- `app/slug_loading_v2/src/bzl_module.rs`
+- `app/slug_loading_v2/src/host_package_load_tests.rs`
+
+Its formatted net cap is **260 production lines, 650 test lines, and 910
+total lines**. Expose one public route/package selected-BUILD source owner and
+complete value from bzlmod. It consumes the private Packet 2 lookup first and
+only then reads the selected `BUILD.bazel` or `BUILD` through the accepted
+routed source owner. Its public semantic value retains the selected logical
+path/name and shared bytes required by loading, not root physical state,
+unselected marker bytes, raw labels, policy event batches, or activation data.
+It forwards lookup/source Needs unchanged and keeps typed lookup/source errors
+and complete-only equality.
+
+Migrate `RepositoryPackageLoadKey` to that public owner; it must no longer
+choose or read BUILD markers directly. Preserve the selected BUILD logical
+origin and existing loading evaluation/event ownership: policy events remain
+with their child policy computation and are neither copied nor replayed by the
+loader. Test public consumption, BUILD.bazel-before-BUILD selection, policy
+short-circuit before marker bytes, selected source edit/delete/recovery, route
+A-to-B-to-A, and warm reuse without evaluation data. Do not alter private
+policy order, root loading, fragment horizon/closure, evaluator declarations
+or print behavior, mappings, registry/JVM transport, fixture/oracle, or any
+file outside the four-file allowlist; replan on a needed expansion.
+
+After these packets, resume the already serial route-aware package horizon,
+occurrence-preserving direct-local closure acquisition, and empty-key evaluator
+defaults/nonregistry event ownership. The accepted direct local identity
+remains `NonrootModuleKey { name: route.module_name(), version: "" }`; these
+packets do not evaluate a module or acquire an include.

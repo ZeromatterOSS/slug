@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff and parser inspection, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | Direct-local evaluation still lacks route-aware external package policy/preflight, exact omitted-declaration evaluator defaults, and nonregistry evaluation-only event capture; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | design route-aware external package policy and lookup before the direct-local include horizon |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff and parser inspection, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | Direct-local evaluation still lacks route-aware external package policy/preflight, exact omitted-declaration evaluator defaults, and nonregistry evaluation-only event capture; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | implement the one-file `HostRepositoryPathKey` prerequisite, then the atomic route-policy/lookup and public selected-BUILD/loading packets |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-direct-local-nonregistry-external-package-policy-design`.
+`WP-5-m1-host-repository-path-key-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -64,9 +64,22 @@ The parser-backed inspection projection is accepted in `8aae11d6`. The first
 closure/evaluation design reached `REPLAN`: the live sparse path/retry owner is
 already sufficient, but direct include reads lack route-aware external package
 policy/preflight; the private evaluator also prepopulates declarations from the
-expected key and rejects nonregistry print. The current packet designs only the
-external package-policy/lookup prerequisite. Package horizon, occurrence-
-preserving closure, and corrected evaluation/event ownership remain serial.
+expected key and rejects nonregistry print. The current packet implements only
+the one-file `HostRepositoryPathKey` prerequisite. External package policy and
+lookup, selected-BUILD loading migration, package horizon, occurrence-preserving
+closure, and corrected evaluation/event ownership remain serial.
+
+The external package-policy design is accepted as three serial implementation
+packets. First, a private one-file `HostRepositoryPathKey` prerequisite owns
+route materialization plus resolved path state only (170 production/360 test/
+530 total). Second, an atomic four-file route policy and lookup packet owns
+canonical global deletion, route-local `REPO.bazel` and `.bazelignore`, and
+`BUILD.bazel`-before-`BUILD` selection without marker bytes (650/1350/2000).
+Third, a four-file public selected-BUILD source and loading migration consumes
+that lookup before reading the selected BUILD file (260/650/910). The existing
+path/retry substrate remains accepted; these packets add no oracle. Package
+horizon, occurrence-preserving closure, and corrected evaluation/event
+ownership remain serial after them.
 
 The external query package-identity implementation is accepted in five files.
 One private request-local Arc owner retains full canonical package identity
