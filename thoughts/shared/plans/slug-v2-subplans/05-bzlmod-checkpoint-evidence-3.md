@@ -16855,3 +16855,30 @@ needed; or the evidence reaches MODULE changes, visibility, sources,
 cross-package/repository loads, globs, another target kind, lifecycle,
 missing/cycle diagnostics, daemon observation, Rust, CLI, JVM, Java bytecode,
 or Bazel delegation.
+
+### WP-5-m1 external Bzl macro-query oracle implementation acceptance (2026-08-04)
+
+**Status: ACCEPTED.** The exact four-path oracle landed at `+112` lines:
+fixture TOML `+21`, generated record `+86`, and the two new macro assets
+`+3/+2`. The fixture now has 20 commands, seven workspace assets, nine files,
+710 protected-metric lines, and 713 whole-fixture lines. The protected first
+17 TOML rows and dependency BUILD remained byte-identical; expected command
+objects 0 through 16 remained JSON-deep-equal. Exact new normalized stdout is
+`filegroup rule @dep//macro:macro_files`, `@dep//macro:defs.bzl`, and
+`@dep//macro:BUILD.bazel\n@dep//macro:defs.bzl`.
+
+`/usr/bin/bazel` reported exactly `bazel 9.2.0`. Generation at
+`/tmp/slug-macro-oracle.generation.c2Y5fY` and distinct-root replay at
+`/tmp/slug-macro-oracle.replay.3nUE9s` each passed all 20 rows; both servers
+shut down and all snapshot/run roots were removed. `uv run --with pytest
+pytest -q tests/v2_oracle/test_v2_oracle.py
+tests/v2_oracle/test_v2_packet_validate.py` passed 107 tests with only the
+pre-existing unknown-`asyncio_mode` warning. Archive status, structural/cap
+checks, and `git diff --check` passed; independent latest-diff review returned
+`ACCEPT`. No Rust, Cargo, tool, startup-RC, daemon, mutation, lifecycle, or
+activation change landed.
+
+This satisfies the activation design's sole missing discriminator. Schedule
+only `WP-5-m1-external-bzl-package-query-activation-implementation`; its scope
+is the already-accepted activation architecture and residual stops above,
+with no implicit extension.

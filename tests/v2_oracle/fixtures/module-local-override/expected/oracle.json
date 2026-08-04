@@ -447,6 +447,92 @@
       "startup_argv": [],
       "stderr": "INFO: Invocation ID: de3482a2-71fb-4578-8bb4-db578511a577\nLoading: 0 packages loaded\n",
       "stdout": "@dep//:pg_cycle_a\n@dep//:pg_cycle_b\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--noshow_progress",
+        "--output=label_kind",
+        "@dep//macro:macro_files"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--noshow_progress",
+        "--output=label_kind",
+        "@dep//macro:macro_files"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "query_dep_macro_files_label_kind",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "filegroup rule @dep//macro:macro_files",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 704648be-5cc6-4886-9bb6-146a35d82c9f\n",
+      "stdout": "filegroup rule @dep//macro:macro_files\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--noshow_progress",
+        "loadfiles(@dep//macro:macro_files)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--noshow_progress",
+        "loadfiles(@dep//macro:macro_files)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "query_dep_macro_files_loadfiles",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "@dep//macro:defs.bzl",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 9a6aba35-1c42-4fc8-a193-1e6fd1f9a2b8\n",
+      "stdout": "@dep//macro:defs.bzl\n"
+    },
+    {
+      "argv": [
+        "query",
+        "--noshow_progress",
+        "buildfiles(@dep//macro:macro_files)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "--noshow_progress",
+        "buildfiles(@dep//macro:macro_files)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "query_dep_macro_files_buildfiles",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>",
+      "normalized_stdout": "@dep//macro:BUILD.bazel\n@dep//macro:defs.bzl",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 0122b3dc-fb0d-4a67-a6b7-9403f5993f24\n",
+      "stdout": "@dep//macro:BUILD.bazel\n@dep//macro:defs.bzl\n"
     }
   ],
   "fixture": "module-local-override",

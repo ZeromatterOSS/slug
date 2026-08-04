@@ -121,3 +121,24 @@ argv = ["query", "deps(@dep//:pg_cycle_a)"]
 compare = "semantic"
 expected_exit = 0
 stdout_contains = ["@dep//:pg_cycle_a", "@dep//:pg_cycle_b"]
+
+[[commands]]
+name = "query_dep_macro_files_label_kind"
+argv = ["query", "--noshow_progress", "--output=label_kind", "@dep//macro:macro_files"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\Afilegroup rule @dep//macro:macro_files\\Z"]
+
+[[commands]]
+name = "query_dep_macro_files_loadfiles"
+argv = ["query", "--noshow_progress", "loadfiles(@dep//macro:macro_files)"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\A@dep//macro:defs\\.bzl\\Z"]
+
+[[commands]]
+name = "query_dep_macro_files_buildfiles"
+argv = ["query", "--noshow_progress", "buildfiles(@dep//macro:macro_files)"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\A@dep//macro:BUILD\\.bazel\\n@dep//macro:defs\\.bzl\\Z"]
