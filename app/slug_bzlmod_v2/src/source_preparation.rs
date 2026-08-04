@@ -27,6 +27,8 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_events_v2::CaptureEvaluationEvents;
+use slug_events_v2::EventBatch;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
@@ -53,7 +55,9 @@ use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::EvaluatedNonrootModule;
 use crate::ModuleKey;
+use crate::NonrootModuleKey;
 use crate::OverrideAttributeValue;
 use crate::RegistryBaseUrl;
 use crate::RegistryFileError;
@@ -70,8 +74,11 @@ use crate::apply_unified_patch;
 use crate::host_package::ExternalRepositoryPackageLookup;
 use crate::host_package::ExternalRepositoryPackageLookupError;
 use crate::host_package::ExternalRepositoryPackageLookupKey;
+use crate::module_eval::DirectNonregistryEvaluationError;
+use crate::module_eval::DirectNonregistryIncludeFile;
 use crate::module_eval::NonrootIncludeRequest;
 use crate::module_eval::NonrootModuleFileInspection;
+use crate::module_eval::evaluate_direct_nonregistry_module_closure_with_events;
 use crate::module_eval::parse_root_include;
 use crate::module_eval::validate_root_module_source;
 use crate::registry_module_file_url;
@@ -1499,6 +1506,192 @@ fn direct_local_fragment_error(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct DirectLocalModuleEvaluationKey(NormalizedAbsolutePath, ApparentRepoName);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalModuleEvaluation {
+    Supported(DirectLocalEvaluatedModule),
+    Unsupported(DirectLocalIncludeCycleCapability),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalEvaluatedModule {
+    route: RootRepositoryRoute,
+    module: EvaluatedNonrootModule,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalModuleEvaluationError {
+    PreparationCompute { message: Arc<str> },
+    Preparation(DirectLocalModulePreparationError),
+    RootAbsent { canonical_repo: CanonicalRepoName },
+    Evaluation(DirectNonregistryEvaluationError),
+}
+
+impl DirectLocalModuleEvaluationKey {
+    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+        (!apparent_repo.is_root()).then_some(Self(workspace, apparent_repo))
+    }
+}
+
+impl fmt::Display for DirectLocalModuleEvaluationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("direct-local-module-evaluation:")?;
+        self.0.fmt(f)?;
+        write!(f, ":@{}", self.1.as_str())
+    }
+}
+
+impl fmt::Display for DirectLocalModuleEvaluationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PreparationCompute { message } => {
+                write!(
+                    f,
+                    "failed to compute direct-local MODULE preparation: {message}"
+                )
+            }
+            Self::Preparation(error) => error.fmt(f),
+            Self::RootAbsent { canonical_repo } => {
+                write!(f, "MODULE.bazel expected but not found in {canonical_repo}")
+            }
+            Self::Evaluation(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for DirectLocalModuleEvaluationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Preparation(error) => Some(error),
+            Self::Evaluation(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for DirectLocalModuleEvaluationKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<DirectLocalModuleEvaluation, DirectLocalModuleEvaluationError>>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let outcome = async {
+            let preparation = match ctx
+                .compute(
+                    &DirectLocalModulePreparationKey::new(self.0.dupe(), self.1.clone())
+                        .expect("direct evaluation key rejects root names"),
+                )
+                .await
+            {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                Ok(SourcePreparationOutcome::Complete(preparation)) => preparation,
+                Err(error) => {
+                    return direct_local_evaluation_error(
+                        DirectLocalModuleEvaluationError::PreparationCompute {
+                            message: Arc::from(error.to_string()),
+                        },
+                    );
+                }
+            };
+            let preparation = match preparation.as_ref() {
+                Ok(preparation) => preparation,
+                Err(error) => {
+                    return direct_local_evaluation_error(
+                        DirectLocalModuleEvaluationError::Preparation(error.clone()),
+                    );
+                }
+            };
+            let closure = match preparation {
+                DirectLocalModulePreparation::Unsupported(capability) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Ok(
+                        DirectLocalModuleEvaluation::Unsupported(capability.clone()),
+                    )));
+                }
+                DirectLocalModulePreparation::Supported(closure) => closure,
+            };
+            let route = closure.root.0.0.clone();
+            let root_bytes = match (&closure.root.0.1, &closure.root.1) {
+                (HostRepositorySourceFileValue::Present { bytes, .. }, Some(_)) => bytes,
+                (HostRepositorySourceFileValue::Absent, None) => {
+                    return direct_local_evaluation_error(
+                        DirectLocalModuleEvaluationError::RootAbsent {
+                            canonical_repo: route.canonical_repo().clone(),
+                        },
+                    );
+                }
+                _ => panic!("direct preparation preserves root source and inspection together"),
+            };
+            let root_logical_id = crate::LogicalModuleFileId::new(format!(
+                "{}//:MODULE.bazel",
+                route.canonical_repo()
+            ));
+            let included = closure
+                .fragments
+                .iter()
+                .map(|fragment| DirectNonregistryIncludeFile {
+                    raw_label: fragment.raw_label.as_str(),
+                    logical_id: crate::LogicalModuleFileId::new(format!(
+                        "{}:{}",
+                        fragment.package, fragment.target
+                    )),
+                    source: fragment.bytes.as_ref(),
+                })
+                .collect::<Vec<_>>();
+            let expected_key = NonrootModuleKey::new(route.module_name(), "");
+            let (evaluation, captured) = evaluate_direct_nonregistry_module_closure_with_events(
+                expected_key,
+                root_logical_id,
+                root_bytes.as_ref(),
+                &included,
+                capture_events,
+            );
+            event_batch = captured;
+            match evaluation {
+                Ok(module) => SourcePreparationOutcome::Complete(Arc::new(Ok(
+                    DirectLocalModuleEvaluation::Supported(DirectLocalEvaluatedModule {
+                        route,
+                        module,
+                    }),
+                ))),
+                Err(error) => direct_local_evaluation_error(
+                    DirectLocalModuleEvaluationError::Evaluation(error),
+                ),
+            }
+        }
+        .await;
+        if capture_events && outcome.is_complete() {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("direct-local MODULE evaluation stores exactly one event batch");
+        }
+        outcome
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn direct_local_evaluation_error(
+    error: DirectLocalModuleEvaluationError,
+) -> <DirectLocalModuleEvaluationKey as Key>::Value {
+    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub struct RepositoryMaterializationGeneration(pub u64);
 
@@ -2871,7 +3064,7 @@ mod tests {
     use dice::DynKey;
     use dice::RichActivation;
     use dice::UserComputationData;
-    use slug_events_v2::CaptureEvaluationEvents;
+    use slug_events_v2::EvaluationEvent;
     use slug_identity_v2::ApparentRepoName;
     use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochKey;
@@ -3120,6 +3313,97 @@ mod tests {
                 .compute(&preparation())
                 .await
                 .expect("preparation DICE invariant");
+            if matches!(&value, SourcePreparationOutcome::Complete(result) if result.is_ok()) {
+                self.0.downstream.fetch_add(1, Ordering::SeqCst);
+            }
+            value
+        }
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            x.complete_eq(y)
+        }
+        fn validity(value: &Self::Value) -> bool {
+            value.is_complete()
+        }
+    }
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct EvaluationActivation {
+        kind: ActivationKind,
+        batch: Option<EventBatch>,
+    }
+    #[derive(Debug, Default)]
+    struct EvaluationTracker {
+        evaluation: Mutex<Vec<EvaluationActivation>>,
+        preparation: Mutex<Vec<EvaluationActivation>>,
+        route_repo: Mutex<Vec<EvaluationActivation>>,
+        downstream: AtomicUsize,
+    }
+    impl ActivationTracker for EvaluationTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let record = || EvaluationActivation {
+                kind: activation.kind(),
+                batch: activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe),
+            };
+            if key
+                .downcast_ref::<DirectLocalModuleEvaluationKey>()
+                .is_some()
+            {
+                self.evaluation.lock().unwrap().push(record());
+            } else if key
+                .downcast_ref::<DirectLocalModulePreparationKey>()
+                .is_some()
+            {
+                self.preparation.lock().unwrap().push(record());
+            } else if key
+                .downcast_ref::<crate::repo_file::HostRouteRepoFileKey>()
+                .is_some()
+            {
+                self.route_repo.lock().unwrap().push(record());
+            }
+        }
+    }
+    #[derive(Debug, Clone, Allocative)]
+    struct EvaluationCounterKey(#[allocative(skip)] Arc<EvaluationTracker>);
+    impl PartialEq for EvaluationCounterKey {
+        fn eq(&self, other: &Self) -> bool {
+            Arc::ptr_eq(&self.0, &other.0)
+        }
+    }
+    impl Eq for EvaluationCounterKey {}
+    impl Hash for EvaluationCounterKey {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            Arc::as_ptr(&self.0).hash(state);
+        }
+    }
+    impl fmt::Display for EvaluationCounterKey {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "direct-local-evaluation-counter:{:p}", &self.0)
+        }
+    }
+    #[async_trait]
+    impl Key for EvaluationCounterKey {
+        type Value = <DirectLocalModuleEvaluationKey as Key>::Value;
+        async fn compute(
+            &self,
+            ctx: &mut DiceComputations,
+            _: &CancellationContext,
+        ) -> Self::Value {
+            let value = ctx
+                .compute(&evaluation())
+                .await
+                .expect("evaluation DICE invariant");
             if matches!(&value, SourcePreparationOutcome::Complete(result) if result.is_ok()) {
                 self.0.downstream.fetch_add(1, Ordering::SeqCst);
             }
@@ -3678,6 +3962,13 @@ mod tests {
         )
         .unwrap()
     }
+    fn evaluation() -> DirectLocalModuleEvaluationKey {
+        DirectLocalModuleEvaluationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("dep_alias").unwrap(),
+        )
+        .unwrap()
+    }
     fn root(path: &str, version: &str) -> String {
         format!(
             "bazel_dep(name = \"dep\", version = \"{version}\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"{path}\")\n"
@@ -4029,6 +4320,84 @@ mod tests {
             direct
         }
     }
+    async fn evaluation_compute(
+        dice: &Arc<Dice>,
+        module: Option<&[u8]>,
+        repo: Option<&[u8]>,
+        packages: &[(&str, bool)],
+        fragments: &[(&str, Option<&[u8]>)],
+        fragment_needs: &[&str],
+        variant: i64,
+        capture: bool,
+        tracker: Option<Arc<EvaluationTracker>>,
+    ) -> <DirectLocalModuleEvaluationKey as Key>::Value {
+        let mut data = UserComputationData {
+            activation_tracker: tracker
+                .clone()
+                .map(|tracker| tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        if capture {
+            data.data.set(CaptureEvaluationEvents);
+        }
+        let mut updater = dice.updater_with_data(data);
+        let root_source = root("dep", &variant.to_string());
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                horizon_epoch(
+                    &root_source,
+                    "/workspace/dep",
+                    module,
+                    repo,
+                    None,
+                    packages,
+                    &[],
+                    fragments,
+                    fragment_needs,
+                    variant,
+                ),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                material("dep"),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let direct = transaction.compute(&evaluation()).await.unwrap();
+        if let Some(tracker) = tracker {
+            transaction
+                .compute(&EvaluationCounterKey(tracker))
+                .await
+                .unwrap()
+        } else {
+            direct
+        }
+    }
     fn preparation_success(
         value: <DirectLocalModulePreparationKey as Key>::Value,
     ) -> DirectLocalModulePreparation {
@@ -4045,6 +4414,24 @@ mod tests {
                 value.as_ref().as_ref().unwrap_err().clone()
             }
             SourcePreparationOutcome::Need(_) => panic!("terminal direct-local preparation"),
+        }
+    }
+    fn evaluation_success(
+        value: <DirectLocalModuleEvaluationKey as Key>::Value,
+    ) -> DirectLocalModuleEvaluation {
+        match value {
+            SourcePreparationOutcome::Complete(value) => value.as_ref().as_ref().unwrap().clone(),
+            SourcePreparationOutcome::Need(_) => panic!("complete direct-local evaluation"),
+        }
+    }
+    fn evaluation_failure(
+        value: <DirectLocalModuleEvaluationKey as Key>::Value,
+    ) -> DirectLocalModuleEvaluationError {
+        match value {
+            SourcePreparationOutcome::Complete(value) => {
+                value.as_ref().as_ref().unwrap_err().clone()
+            }
+            SourcePreparationOutcome::Need(_) => panic!("terminal direct-local evaluation"),
         }
     }
     fn inputs(u: &mut dice::DiceTransactionUpdater) {
@@ -5450,6 +5837,349 @@ mod tests {
         assert!(tracker.horizon.lock().unwrap().last().unwrap().1);
     }
     #[tokio::test]
+    async fn direct_module_evaluation_typed_boundaries_and_equality_are_exact() {
+        assert_eq!(
+            evaluation().to_string(),
+            "direct-local-module-evaluation:\"/workspace\":@dep_alias"
+        );
+        assert!(
+            DirectLocalModuleEvaluationKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                ApparentRepoName::root(),
+            )
+            .is_none()
+        );
+        let tracker = Arc::new(EvaluationTracker::default());
+        let absent = evaluation_failure(
+            evaluation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                None,
+                None,
+                &[],
+                &[],
+                &[],
+                300,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        assert!(matches!(
+            absent,
+            DirectLocalModuleEvaluationError::RootAbsent { canonical_repo }
+                if canonical_repo.as_str() == "dep+"
+        ));
+        assert!(tracker
+            .evaluation
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|activation| matches!(activation.batch.as_ref(), Some(batch) if batch.events().is_empty())));
+
+        let invalid_tracker = Arc::new(EvaluationTracker::default());
+        let invalid = evaluation_failure(
+            evaluation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                Some(b"unknown_identifier\n"),
+                None,
+                &[],
+                &[],
+                &[],
+                301,
+                true,
+                Some(invalid_tracker.clone()),
+            )
+            .await,
+        );
+        assert!(matches!(
+            invalid,
+            DirectLocalModuleEvaluationError::Preparation(
+                DirectLocalModulePreparationError::RootValidation { .. }
+            )
+        ));
+        assert!(invalid_tracker
+            .evaluation
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|activation| matches!(activation.batch.as_ref(), Some(batch) if batch.events().is_empty())));
+
+        let need_tracker = Arc::new(EvaluationTracker::default());
+        let need = evaluation_compute(
+            &Dice::builder().build(DetectCycles::Enabled),
+            Some(b"include('//missing:a.MODULE.bazel')\n"),
+            None,
+            &[],
+            &[],
+            &[],
+            302,
+            true,
+            Some(need_tracker.clone()),
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!DirectLocalModuleEvaluationKey::validity(&need));
+        assert!(!DirectLocalModuleEvaluationKey::equality(&need, &need));
+        assert!(
+            need_tracker
+                .evaluation
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|activation| activation.batch.is_none())
+        );
+
+        let compute = evaluation_failure(direct_local_evaluation_error(
+            DirectLocalModuleEvaluationError::PreparationCompute {
+                message: Arc::from("structural compute failure"),
+            },
+        ));
+        assert!(compute.to_string().contains("structural compute failure"));
+        assert!(std::error::Error::source(&compute).is_none());
+    }
+
+    #[tokio::test]
+    async fn direct_module_evaluation_owns_only_canonical_local_prints() {
+        let tracker = Arc::new(EvaluationTracker::default());
+        let module =
+            b"module(name='dep', version='7.0')\nprint('root')\ninclude('//p:a.MODULE.bazel')\n";
+        let fragment = b"print('fragment')\n";
+        let value = evaluation_success(
+            evaluation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                Some(module),
+                Some(b"print('policy')\n"),
+                &[("p", true)],
+                &[("p/a.MODULE.bazel", Some(fragment.as_slice()))],
+                &[],
+                303,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        let DirectLocalModuleEvaluation::Supported(value) = value else {
+            panic!("acyclic module evaluates")
+        };
+        assert_eq!(value.route.canonical_repo().as_str(), "dep+");
+        assert_eq!(
+            value.module.base.expected_key,
+            NonrootModuleKey::new("dep", "")
+        );
+        assert_eq!(value.module.base.declared_version, "7.0");
+        let batches = tracker.evaluation.lock().unwrap();
+        let batch = batches
+            .iter()
+            .find_map(|activation| activation.batch.as_ref())
+            .unwrap();
+        assert!(matches!(
+            batch.events(),
+            [
+                EvaluationEvent::StarlarkPrint { location: root, text: root_text },
+                EvaluationEvent::StarlarkPrint { location: fragment, text: fragment_text },
+            ] if root_text == "root"
+                && fragment_text == "fragment"
+                && root.to_string().starts_with("@@dep+//:MODULE.bazel:")
+                && fragment.to_string().starts_with("@@dep+//p:a.MODULE.bazel:")
+        ));
+        drop(batches);
+        assert!(
+            tracker
+                .preparation
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|a| a.batch.is_none())
+        );
+        assert!(
+            tracker
+                .route_repo
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|activation| matches!(
+                    activation.batch.as_ref().map(EventBatch::events),
+                    Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "policy"
+                ))
+        );
+
+        let uncaptured = Arc::new(EvaluationTracker::default());
+        let value = evaluation_success(
+            evaluation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                Some(b"module(name='dep')\nprint('direct')\n"),
+                None,
+                &[],
+                &[],
+                &[],
+                304,
+                false,
+                Some(uncaptured.clone()),
+            )
+            .await,
+        );
+        assert!(matches!(value, DirectLocalModuleEvaluation::Supported(_)));
+        assert!(
+            uncaptured
+                .evaluation
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|a| a.batch.is_none())
+        );
+
+        let failed = Arc::new(EvaluationTracker::default());
+        let error = evaluation_failure(
+            evaluation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                Some(b"module(name='dep')\nprint('prefix')\nfail('boom')\n"),
+                None,
+                &[],
+                &[],
+                &[],
+                305,
+                true,
+                Some(failed.clone()),
+            )
+            .await,
+        );
+        assert!(matches!(
+            error,
+            DirectLocalModuleEvaluationError::Evaluation(
+                DirectNonregistryEvaluationError::Execution(ref message)
+            ) if message.contains("boom")
+        ));
+        assert!(
+            failed
+                .evaluation
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|activation| matches!(
+                    activation.batch.as_ref().map(EventBatch::events),
+                    Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "prefix"
+                ))
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_module_evaluation_support_gate_reuse_and_event_pruning_are_exact() {
+        let unsupported_tracker = Arc::new(EvaluationTracker::default());
+        let unsupported = evaluation_success(
+            evaluation_compute(
+                &Dice::builder().build(DetectCycles::Enabled),
+                Some(b"module(name='dep')\nprint('must-not-run')\nfail('must-not-run')\ninclude('//a:a.MODULE.bazel')\n"),
+                None,
+                &[("a", true)],
+                &[(
+                    "a/a.MODULE.bazel",
+                    Some(b"include('//a:a.MODULE.bazel')\n".as_slice()),
+                )],
+                &[],
+                306,
+                true,
+                Some(unsupported_tracker.clone()),
+            )
+            .await,
+        );
+        assert!(matches!(
+            unsupported,
+            DirectLocalModuleEvaluation::Unsupported(_)
+        ));
+        assert!(
+            unsupported_tracker
+                .evaluation
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|activation| matches!(
+                    activation.batch.as_ref(),
+                    Some(batch) if batch.events().is_empty()
+                ))
+        );
+
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(EvaluationTracker::default());
+        let first = evaluation_success(
+            evaluation_compute(
+                &dice,
+                Some(b"module(name='dep', version='1.0')\nprint('A')\n"),
+                None,
+                &[],
+                &[],
+                &[],
+                307,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        let warm = evaluation_success(
+            evaluation_compute(
+                &dice,
+                Some(b"module(name='dep', version='1.0')\nprint('A')\n"),
+                None,
+                &[],
+                &[],
+                &[],
+                307,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        let edited = evaluation_success(
+            evaluation_compute(
+                &dice,
+                Some(b"module(name='dep', version='1.0')\nprint('B')\n"),
+                None,
+                &[],
+                &[],
+                &[],
+                308,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        let semantic_edit = evaluation_success(
+            evaluation_compute(
+                &dice,
+                Some(b"module(name='dep', version='2.0')\nprint('C')\n"),
+                None,
+                &[],
+                &[],
+                &[],
+                309,
+                true,
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        assert_eq!(first, warm);
+        assert_eq!(first, edited, "events are excluded from semantic equality");
+        assert_ne!(first, semantic_edit);
+        assert_eq!(tracker.downstream.load(Ordering::SeqCst), 2);
+        let activations = tracker.evaluation.lock().unwrap();
+        assert!(
+            activations
+                .iter()
+                .any(|a| a.kind == ActivationKind::Reused && a.batch.is_none())
+        );
+        assert!(activations.iter().any(|a| matches!(
+            (a.kind, a.batch.as_ref().map(EventBatch::events)),
+            (
+                ActivationKind::Evaluated,
+                Some([EvaluationEvent::StarlarkPrint { text, .. }])
+            ) if text == "A"
+        )));
+        assert!(activations.iter().any(|a| matches!(
+            a.batch.as_ref().map(EventBatch::events),
+            Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "B"
+        )));
+    }
+
+    #[tokio::test]
     async fn direct_module_preparation_root_gate_absence_and_equality_are_exact() {
         assert_eq!(
             preparation().to_string(),
@@ -6500,7 +7230,7 @@ mod tests {
             .split("struct DirectLocalModulePreparationKey")
             .nth(1)
             .unwrap()
-            .split("pub struct RepositoryMaterializationGeneration")
+            .split("struct DirectLocalModuleEvaluationKey")
             .next()
             .unwrap();
         for required in [
@@ -6541,6 +7271,46 @@ mod tests {
             .next()
             .unwrap();
         assert!(!closure.contains("Cycle"));
+    }
+    #[test]
+    fn direct_module_evaluation_structural_boundary_is_private_and_support_gated() {
+        let source = include_str!("source_preparation.rs");
+        let owner = source
+            .split("struct DirectLocalModuleEvaluationKey")
+            .nth(1)
+            .unwrap()
+            .split("pub struct RepositoryMaterializationGeneration")
+            .next()
+            .unwrap();
+        for required in [
+            "DirectLocalModulePreparationKey",
+            "CaptureEvaluationEvents",
+            "evaluate_direct_nonregistry_module_closure_with_events",
+            "NonrootModuleKey::new(route.module_name(), \"\")",
+            "store_evaluation_data",
+            "complete_eq",
+            "is_complete",
+        ] {
+            assert!(owner.contains(required), "{required}");
+        }
+        for forbidden in [
+            "pub ",
+            "RootModuleFilesKey",
+            "ModuleSourcePreparationKey",
+            "RegistryFileKey",
+            "std::fs",
+            "ctx.compute(&DirectLocalModuleInspectionKey",
+        ] {
+            assert!(!owner.contains(forbidden), "{forbidden}");
+        }
+        let unsupported = owner
+            .find("DirectLocalModulePreparation::Unsupported")
+            .unwrap();
+        let evaluator = owner
+            .find("evaluate_direct_nonregistry_module_closure_with_events")
+            .unwrap();
+        assert!(unsupported < evaluator);
+        assert!(!include_str!("lib.rs").contains("DirectLocalModuleEvaluationKey"));
     }
     #[test]
     fn direct_include_horizon_structural_boundary_is_private_and_fragment_free() {
