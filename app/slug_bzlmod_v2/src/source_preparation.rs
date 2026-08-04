@@ -27,6 +27,7 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NeedPathObservations;
@@ -62,6 +63,7 @@ use crate::RootModuleFilesKey;
 use crate::RootModuleOverride;
 use crate::RootRepositoryRoute;
 use crate::apply_unified_patch;
+use crate::module_eval::NonrootModuleFileInspection;
 use crate::registry_module_file_url;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -603,6 +605,96 @@ impl Key for DirectLocalModuleFileKey {
                 DirectLocalModuleFileError::SourceCompute(Arc::from(error.to_string())),
             ))),
         }
+    }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct DirectLocalModuleInspectionKey(NormalizedAbsolutePath, ApparentRepoName);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalModuleInspection(DirectLocalModuleFile, Option<NonrootModuleFileInspection>);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalModuleInspectionError {
+    InputCompute(Arc<str>),
+    Input(DirectLocalModuleFileError),
+    Inspection(NormalizedAbsolutePath, Arc<str>),
+}
+
+impl DirectLocalModuleInspectionKey {
+    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+        (!apparent_repo.is_root()).then_some(Self(workspace, apparent_repo))
+    }
+}
+
+impl fmt::Display for DirectLocalModuleInspectionKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("direct-local-module-inspection:")?;
+        self.0.fmt(f)?;
+        write!(f, ":@{}", self.1.as_str())
+    }
+}
+
+#[async_trait]
+impl Key for DirectLocalModuleInspectionKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<DirectLocalModuleInspection, DirectLocalModuleInspectionError>>,
+    >;
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let input = match ctx
+            .compute(
+                &DirectLocalModuleFileKey::new(self.0.dupe(), self.1.clone())
+                    .expect("direct inspection key rejects root names"),
+            )
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(input)) => input,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    DirectLocalModuleInspectionError::InputCompute(Arc::from(error.to_string())),
+                )));
+            }
+        };
+        let input = match input.as_ref() {
+            Ok(input) => input.clone(),
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    DirectLocalModuleInspectionError::Input(error.clone()),
+                )));
+            }
+        };
+        let inspection = match &input.1 {
+            HostRepositorySourceFileValue::Absent => None,
+            HostRepositorySourceFileValue::Present {
+                bytes,
+                logical_path,
+            } => match crate::inspect_nonroot_module_file(
+                crate::LogicalModuleFileId::new(logical_path.as_path().display().to_string()),
+                bytes,
+            ) {
+                Ok(inspection) => Some(inspection),
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        DirectLocalModuleInspectionError::Inspection(
+                            logical_path.dupe(),
+                            Arc::from(error.to_string()),
+                        ),
+                    )));
+                }
+            },
+        };
+        SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalModuleInspection(
+            input, inspection,
+        ))))
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x.complete_eq(y)
@@ -1923,6 +2015,32 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct InspectionTracker(Mutex<Vec<(ActivationKind, bool)>>);
+    impl ActivationTracker for InspectionTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+        fn key_activated_rich(&self, key: &DynKey, a: RichActivation<'_>) {
+            if key
+                .downcast_ref::<DirectLocalModuleInspectionKey>()
+                .is_some()
+            {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((a.kind(), a.evaluation_data().is_none()));
+            }
+        }
+    }
+
     fn local_route_with_path(path: &str) -> RootRepositoryRoute {
         RootRepositoryRoute::for_test(
             NormalizedAbsolutePath::new("/workspace").unwrap(),
@@ -2425,6 +2543,13 @@ mod tests {
         )
         .unwrap()
     }
+    fn inspection() -> DirectLocalModuleInspectionKey {
+        DirectLocalModuleInspectionKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("dep_alias").unwrap(),
+        )
+        .unwrap()
+    }
     fn root(path: &str, version: &str) -> String {
         format!(
             "bazel_dep(name = \"dep\", version = \"{version}\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"{path}\")\n"
@@ -2631,6 +2756,48 @@ mod tests {
         match v {
             SourcePreparationOutcome::Complete(value) => value.as_ref().as_ref().unwrap().clone(),
             _ => panic!("complete direct local source"),
+        }
+    }
+    async fn inspect_complete(
+        dice: &Arc<Dice>,
+        root_source: &str,
+        path: &str,
+        file: Option<&[u8]>,
+        tracker: Option<Arc<InspectionTracker>>,
+    ) -> <DirectLocalModuleInspectionKey as Key>::Value {
+        let mut data = UserComputationData {
+            activation_tracker: tracker.map(|t| t as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut u = dice.updater_with_data(data);
+        u.changed_to(vec![(
+            PathObservationEpochKey,
+            epoch(root_source, path, file),
+        )])
+        .unwrap();
+        u.changed_to(vec![(
+            (RepositoryMaterializationResultEpochKey {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            }),
+            material(path),
+        )])
+        .unwrap();
+        inputs(&mut u);
+        u.commit().await.compute(&inspection()).await.unwrap()
+    }
+    fn inspection_success(
+        value: <DirectLocalModuleInspectionKey as Key>::Value,
+    ) -> DirectLocalModuleInspection {
+        match value {
+            SourcePreparationOutcome::Complete(value) => value.as_ref().as_ref().unwrap().clone(),
+            _ => panic!("complete direct local inspection"),
+        }
+    }
+    fn need<T>(value: SourcePreparationOutcome<T>) -> SourcePreparationNeeds {
+        match value {
+            SourcePreparationOutcome::Need(need) => need,
+            _ => panic!("source preparation Need"),
         }
     }
 
@@ -2925,5 +3092,278 @@ mod tests {
         assert!(
             matches!(source,SourcePreparationOutcome::Complete(x) if matches!(x.as_ref(),Err(DirectLocalModuleFileError::Source(_))))
         );
+    }
+
+    #[test]
+    fn direct_inspection_identity_errors_and_complete_only_equality() {
+        assert_eq!(
+            inspection().to_string(),
+            "direct-local-module-inspection:\"/workspace\":@dep_alias"
+        );
+        assert!(
+            DirectLocalModuleInspectionKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                ApparentRepoName::root(),
+            )
+            .is_none()
+        );
+        assert_ne!(
+            DirectLocalModuleInspectionError::InputCompute(Arc::from("input")),
+            DirectLocalModuleInspectionError::Input(DirectLocalModuleFileError::RouteCompute(
+                Arc::from("route"),
+            )),
+        );
+        let input = DirectLocalModuleFile(local_route(), HostRepositorySourceFileValue::Absent);
+        let complete = SourcePreparationOutcome::Complete(Arc::new(Ok(
+            DirectLocalModuleInspection(input.clone(), None),
+        )));
+        let equal = SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalModuleInspection(
+            input, None,
+        ))));
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::root_module_bootstrap(
+            RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+        ));
+        assert!(DirectLocalModuleInspectionKey::equality(&complete, &equal));
+        assert!(DirectLocalModuleInspectionKey::validity(&complete));
+        assert!(!DirectLocalModuleInspectionKey::validity(&need));
+        assert!(!DirectLocalModuleInspectionKey::equality(&need, &need));
+    }
+
+    #[tokio::test]
+    async fn direct_inspection_retains_input_and_inspects_present_only() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let present = inspection_success(
+            inspect_complete(
+                &dice,
+                &root("dep", "1.0"),
+                "dep",
+                Some(b"include(\"//:nested.MODULE.bazel\")"),
+                None,
+            )
+            .await,
+        );
+        assert!(matches!(
+            &present.0.1,
+            HostRepositorySourceFileValue::Present { bytes, logical_path }
+                if bytes.as_ref() == b"include(\"//:nested.MODULE.bazel\")"
+                    && logical_path == &NormalizedAbsolutePath::new("/workspace/dep/MODULE.bazel").unwrap()
+        ));
+        let inspection = present.1.expect("present source is inspected");
+        assert_eq!(
+            inspection.logical_id.0.as_str(),
+            "/workspace/dep/MODULE.bazel"
+        );
+        assert_eq!(inspection.includes.len(), 1);
+        assert_eq!(
+            inspection.includes[0].path.as_str(),
+            "//:nested.MODULE.bazel"
+        );
+        assert_eq!(inspection.includes[0].location.file, inspection.logical_id);
+        let absent = inspection_success(
+            inspect_complete(&dice, &root("dep", "1.0"), "dep", None, None).await,
+        );
+        assert!(matches!(absent.0.1, HostRepositorySourceFileValue::Absent));
+        assert!(absent.1.is_none());
+    }
+
+    #[tokio::test]
+    async fn direct_inspection_projects_input_and_parser_errors() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let unknown = inspect_complete(
+            &dice,
+            "bazel_dep(name = \"dep\", repo_name = \"other\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+            "dep",
+            Some(b"x"),
+            None,
+        )
+        .await;
+        assert!(matches!(
+            unknown,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(DirectLocalModuleInspectionError::Input(DirectLocalModuleFileError::Route(_))))
+        ));
+        let source = inspect_complete(
+            &dice,
+            "bazel_dep(name = \"dep\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"../dep\")\n",
+            "dep",
+            Some(b"x"),
+            None,
+        )
+        .await;
+        assert!(matches!(
+            source,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(DirectLocalModuleInspectionError::Input(DirectLocalModuleFileError::Source(_))))
+        ));
+        let parser = inspect_complete(&dice, &root("dep", "1.0"), "dep", Some(&[0xff]), None).await;
+        assert!(matches!(
+            parser,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(DirectLocalModuleInspectionError::Inspection(logical_path, message)) if logical_path == &NormalizedAbsolutePath::new("/workspace/dep/MODULE.bazel").unwrap() && message.as_ref() == "MODULE file is not valid UTF-8")
+        ));
+        let malformed =
+            inspect_complete(&dice, &root("dep", "1.0"), "dep", Some(b"module("), None).await;
+        assert!(matches!(
+            malformed,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(DirectLocalModuleInspectionError::Inspection(logical_path, _)) if logical_path == &NormalizedAbsolutePath::new("/workspace/dep/MODULE.bazel").unwrap())
+        ));
+    }
+
+    #[tokio::test]
+    async fn direct_inspection_forwards_direct_needs_exactly() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut u = dice.updater();
+        u.changed_to(vec![(PathObservationEpochKey, missing_root())])
+            .unwrap();
+        inputs(&mut u);
+        let mut t = u.commit().await;
+        assert_eq!(
+            need(t.compute(&inspection()).await.unwrap()),
+            need(t.compute(&direct()).await.unwrap())
+        );
+        let source = root("dep", "1");
+        let mut u = t.into_updater();
+        u.changed_to(vec![(PathObservationEpochKey, root_only(&source))])
+            .unwrap();
+        inputs(&mut u);
+        let mut t = u.commit().await;
+        assert_eq!(
+            need(t.compute(&inspection()).await.unwrap()),
+            need(t.compute(&direct()).await.unwrap())
+        );
+        let mut u = t.into_updater();
+        u.changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+            material("dep"),
+        )])
+        .unwrap();
+        let mut t = u.commit().await;
+        assert_eq!(
+            need(t.compute(&inspection()).await.unwrap()),
+            need(t.compute(&direct()).await.unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_inspection_lifecycle_and_capture_stay_callerless() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(InspectionTracker::default());
+        let a = inspection_success(
+            inspect_complete(
+                &dice,
+                &root("dep-a", "1.0"),
+                "dep-a",
+                Some(b"bazel_dep(name = 'one', version = '1.0')"),
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        let warm = inspection_success(
+            inspect_complete(
+                &dice,
+                &root("dep-a", "2.0"),
+                "dep-a",
+                Some(b"bazel_dep(name = 'one', version = '1.0')"),
+                Some(tracker.clone()),
+            )
+            .await,
+        );
+        let b = inspection_success(
+            inspect_complete(
+                &dice,
+                &root("dep-b", "1.0"),
+                "dep-b",
+                Some(b"bazel_dep(name = 'two', version = '1.0')"),
+                None,
+            )
+            .await,
+        );
+        let replayed = inspection_success(
+            inspect_complete(
+                &dice,
+                &root("dep-a", "1.0"),
+                "dep-a",
+                Some(b"bazel_dep(name = 'one', version = '1.0')"),
+                None,
+            )
+            .await,
+        );
+        let edited = inspection_success(
+            inspect_complete(
+                &dice,
+                &root("dep-a", "1.0"),
+                "dep-a",
+                Some(b"bazel_dep(name = 'edited', version = '1.0')"),
+                None,
+            )
+            .await,
+        );
+        let absent = inspection_success(
+            inspect_complete(&dice, &root("dep-a", "2.0"), "dep-a", None, None).await,
+        );
+        let recreated = inspection_success(
+            inspect_complete(
+                &dice,
+                &root("dep-a", "2.0"),
+                "dep-a",
+                Some(b"bazel_dep(name = 'recreated', version = '1.0')"),
+                None,
+            )
+            .await,
+        );
+        assert_eq!(a, warm);
+        assert_ne!(a.0, b.0);
+        assert_eq!(a, replayed);
+        assert_ne!(a.0, edited.0);
+        assert!(a.1.is_some() && edited.1.is_some() && recreated.1.is_some());
+        assert!(matches!(absent.0.1, HostRepositorySourceFileValue::Absent));
+        assert!(absent.1.is_none());
+        assert_ne!(a.0, absent.0);
+        assert_ne!(absent.0, recreated.0);
+        assert_eq!(
+            *tracker.0.lock().unwrap(),
+            [
+                (ActivationKind::Evaluated, true),
+                (ActivationKind::Reused, true)
+            ]
+        );
+    }
+
+    #[test]
+    fn direct_inspection_structural_scan() {
+        let s = include_str!("source_preparation.rs");
+        let inspection = s
+            .split("struct DirectLocalModuleInspectionKey")
+            .nth(1)
+            .unwrap()
+            .split("impl fmt::Display for RepositorySourceFileKey")
+            .next()
+            .unwrap();
+        assert!(inspection.contains("DirectLocalModuleFileKey"));
+        assert!(inspection.contains("inspect_nonroot_module_file"));
+        for forbidden in [
+            "NonrootModuleKey",
+            "EvaluatedNonrootModule",
+            "evaluate_nonroot_module_file",
+            "RootRepositoryRouteKey",
+            "HostRepositorySourceFileKey",
+            "HostInclude",
+            "ModuleSourcePreparationKey",
+            "RootModuleFilesKey",
+            "RegistryPolicyKey",
+            "RegistryFileKey",
+            "WorkspaceSnapshotKey",
+            "RepositoryMaterializationRequestKey",
+            "store_evaluation_data",
+            "std::fs",
+            "fault",
+        ] {
+            assert!(!inspection.contains(forbidden), "{forbidden}");
+        }
     }
 }
