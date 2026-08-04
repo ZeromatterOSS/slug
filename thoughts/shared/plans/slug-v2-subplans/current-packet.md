@@ -1,60 +1,36 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-nonregistry-evaluation-owner`
+Packet: `WP-5-m1-direct-local-public-unsupported-cycle-approval-stop`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: private one-file preparation-consuming DICE/event owner
-Evidence: accepted support-gated direct-local preparation in `f2b626f2`;
-accepted trusted nonregistry evaluator adapter in `c683c239`; pinned Bazel 9.2
-empty-key identity and fresh-only nonregistry print behavior; and existing DICE
-activation/event regressions. Add no oracle or fixture.
+Role: explicit-user-approval stop; no active implementation or design authority
+Evidence: accepted private support-gated preparation in `f2b626f2`; accepted
+trusted nonregistry evaluator adapter in `c683c239`; and accepted private
+preparation-consuming DICE/event owner in `3cf0e441`.
 
-Edit exactly `app/slug_bzlmod_v2/src/source_preparation.rs`. The formatted net
-addition may not exceed **230 production lines, 720 test lines, or 950 total
-lines**. Add only private, callerless owners:
+Both accepted private serial packets are complete. They remain callerless and
+publish no product-visible unsupported-cycle result. The private support gate,
+`Unsupported` capability, semantic values, and event ownership do not authorize
+a build, query, one-shot, daemon, CLI, server, or other public consumer.
 
-- `DirectLocalModuleEvaluationKey(NormalizedAbsolutePath, ApparentRepoName)`;
-- `DirectLocalModuleEvaluation::{Supported, Unsupported}`;
-- one private evaluated route-plus-module value; and
-- typed preparation-compute, preparation, root-`Absent`, and evaluator error
-  carriers.
+Stop pending explicit user approval of the product-visible unsupported-cycle
+boundary. Do not infer approval from the private implementation, this manifest,
+the canonical plan, prior oracle evidence, or ordinary `/goal resume` wording.
+Without that approval, do not design, implement, export, activate, format, test,
+or publish a public consumer or diagnostic, and do not select a representation,
+message, exit status, command surface, retry behavior, or event-publication
+contract for it.
 
-The key value remains `SourcePreparationOutcome<Arc<Result<...>>>`. Key identity
-is workspace plus nonroot apparent repository. Use complete-only equality and
-validity: every Need is invalid and self-unequal. Events and activation data
-never enter semantic values or equality.
+If the user explicitly approves the limitation, the next action is a separate
+read-only public-boundary design packet. That future design must enumerate every
+build/query/one-shot/daemon activation path, preserve the distinction between a
+Slug unsupported capability and a Bazel diagnostic, and freeze exact public
+status, rendering, event ordering, retry, lifecycle, and parity scope before any
+Rust or fixture authority. This paragraph is sequencing guidance only and does
+not grant that approval or packet authority.
 
-Consume exactly `DirectLocalModulePreparationKey`. Forward a Need without local
-event data and keep preparation-compute failure distinct from typed preparation
-failure. Map supported root absence to the private module-not-found boundary;
-never invoke the evaluator for `Unsupported`. For a supported present closure,
-construct `NonrootModuleKey { name: route.module_name(), version: "" }` and pass
-the root plus every ordered fragment occurrence to
-`evaluate_direct_nonregistry_module_closure_with_events` only after the whole
-preparation has completed. Success retains route provenance plus the compact
-evaluated module and preserves the evaluator's declared version.
-
-Own exactly one marker-conditional local batch on every Complete, including an
-empty batch for preparation error, root absence, or unsupported capability.
-Captured evaluation stores only its own ordered prints, including a prefix
-before failure. Uncaptured fresh evaluation prints directly. Warm reuse neither
-prints again nor carries evaluation data. Routed-REPO and every other child
-batch remain child-owned and are neither copied nor replayed.
-
-Tests must discriminate typed Need, preparation-compute, preparation,
-root-absence, supported, unsupported, and evaluator outcomes; empty-key identity
-and declared-version preservation; no evaluator activation for `Unsupported`;
-complete-only equality; captured and uncaptured print; print-before-failure;
-cold `Evaluated` versus warm `Reused`; source edit and downstream pruning; and
-distinct child-versus-owner event batches. Structural checks keep the key and
-support gate private, prohibit any `lib.rs` export or command caller, and
-shorten the preparation-owner structural scan before this evaluator owner so
-the preparation key remains independently evaluator- and event-free.
-
-Stops: no second production file, public export/caller/activation/publication,
-public unsupported-cycle status, registry/MVS/contextual mapping, fixture/
-oracle, direct IO, evaluator semantic change, child-event copying/replay, or cap
-breach. Public build/query/one-shot/daemon publication remains frozen pending
-explicit user approval. `REPLAN` on any such expansion. Run focused serial
-tests, formatting, GNU-Windows no-run, archive/scope/cap/diff gates, and an
-independent latest-diff review; do not run Bazel.
+Stops: no Rust, Cargo, Bazel, fixture/oracle, public export/caller/activation,
+`Unsupported` publication, diagnostic text, status/exit-code selection, command
+or server change, event ownership change, contextual mapping, registry/MVS/JVM
+transport, or speculative cap. The terminal condition is explicit user approval
+or an explicit user-directed pivot to another bounded packet.

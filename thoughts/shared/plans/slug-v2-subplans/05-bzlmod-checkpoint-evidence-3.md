@@ -18823,3 +18823,26 @@ fixture, oracle, or public unsupported capability changed. Packet 2 remains the
 already-accepted private 230 production/720 test/950 total
 `source_preparation.rs` evaluation owner; public unsupported-cycle publication
 remains frozen pending explicit user approval.
+
+### WP-5-m1 direct-local nonregistry evaluation owner (2026-08-04)
+
+**Status: ACCEPTED in `3cf0e441`; both private serial packets are complete.**
+The exact one-file `source_preparation.rs` change is 193 production lines, 577
+test lines, and 770 total net lines, within its accepted 230/720/950 caps. The
+private evaluation key consumes only the accepted preparation, preserves typed
+Need/error/absence/supported/unsupported results and empty-key declared-version
+semantics, never evaluates `Unsupported`, and owns only its marker-conditional
+local print batch. Routed-REPO and every other child batch remain child-owned;
+warm reuse neither prints nor carries evaluation data.
+
+Focused evaluation-owner tests passed 4/4, and all 50 `source_preparation`
+tests passed. The full `slug_bzlmod_v2` library result was 274/275, failing only
+the untouched `records_exact_proxy_tag_and_innate_call_spans` expectation whose
+exact failure is the known clean-HEAD baseline. GNU-Windows no-run, formatting,
+archive, diff, and scope gates passed, and independent latest-diff review
+returned `ACCEPT`.
+
+No public export, caller, activation, or unsupported-cycle publication changed.
+The support gate and both serial owners remain private. The current schedule is
+a genuine stop: any product-visible consumer or `Unsupported` publication
+requires explicit user approval and receives no authority from this acceptance.
