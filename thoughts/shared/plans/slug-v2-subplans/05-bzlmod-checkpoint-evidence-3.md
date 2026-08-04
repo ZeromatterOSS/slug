@@ -17592,3 +17592,28 @@ before and after the rebuilt-CLI replay, run focused and complete identity/
 loading/query checks plus direct dependents and applicable GNU-Windows no-run
 gates, and obtain independent latest-diff review. Preserve every stop in the
 current-packet manifest; a sixth file or wider identity operation is REPLAN.
+
+### WP-5-m1 typed external visibility implementation route-conflict replan (2026-08-04)
+
+**Status: REPLAN; no implementation retained.** The corrected five-file draft
+fit at 207 net production lines, 576 net test lines, and 783 total. Focused
+identity/loading/query tests, 211 complete identity/loading/query tests, direct
+dependents, three GNU-Windows no-run checks, formatting, archive, scope, cap,
+and diff checks passed. Typed reconstruction, mapping-provenance clearing,
+graph separation/order, validation-before-synthesis, edit/recovery coverage,
+and route-aware lookup all survived independent inspection.
+
+Terminal review found a contract contradiction in the added caller evidence.
+The manifest required an actual different-external caller while also stopping
+on a second repository route. The draft satisfied the former by declaring and
+materializing `other`, directly violating the latter. Its warm assertion also
+proved only result equality, not DICE reuse activation. These cannot be waived
+inside an implementation packet. Root discarded exactly the rejected five-
+file draft; no Rust or oracle byte remains changed.
+
+Resume only the read-only
+`WP-5-m1-external-restricted-visibility-caller-reuse-redesign`. Freeze a direct
+request-local different-canonical-repository caller test against the single
+existing target route, with no second route/load/materialization, and an
+activation-based cold/warm discriminator using existing trackers. Preserve the
+typed API, five-file/cap boundary, all other evidence, comparator, and stops.
