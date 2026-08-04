@@ -17939,3 +17939,31 @@ surface.
 Rebuild once more from clean HEAD. Preserve the exact accepted design, eight
 evidence families, validation, and stops. Discarded drafts provide only
 mechanical cap evidence and no implementation or validation credit.
+
+### WP-5-m1 final direct-local handoff evidence correction (2026-08-04)
+
+**Status: REPLAN; no Rust retained.** Independent latest-diff review of the
+clean-HEAD 100-production/472-test reconstruction disproved three claims in the
+prior cap record. The cold/warm tracker did not enable
+`CaptureEvaluationEvents` and completed with a non-local route error rather
+than a successful direct-local source. The version-only root edit compared
+equal materialization requests but never required a rich `Reused` activation.
+The same outer key requested A-to-B-to-A materializations but never completed a
+materialized external `MODULE.bazel` through Present, edited Present, Absent,
+and recreated Present values. Passing focused tests therefore did not make the
+suite evidence-complete, and the 100/480/580 cap is revoked. Root discarded the
+entire one-file Rust diff before validation; it supplies no implementation or
+validation credit.
+
+Resume only
+`WP-5-m1-direct-local-module-file-handoff-completion-evidence-redesign`.
+Preserve the accepted production contract, 100-line production cap, exact
+one-file boundary, exact Need/error/identity/value evidence, and every existing
+stop. Replace only the two weak lifecycle/activation tests plus shared fixture
+plumbing. The corrected evidence must complete a successful Local source,
+retain route plus source across A-to-B-to-A and
+Present/edit/Absent/recreate, and prove capture-enabled cold `Evaluated` plus a
+version-only warm `Reused`, both nonempty and without evaluation data. The
+rejected 472 lines and a read-only compact repair estimate of 521 test lines
+are design inputs, not an accepted cap. Freeze the smallest reviewed formatted
+test/total caps before another clean-HEAD implementation retry.
