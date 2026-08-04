@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff and parser inspection, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | Direct-local evaluation still lacks route-aware external package policy/preflight, exact omitted-declaration evaluator defaults, and nonregistry evaluation-only event capture; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | implement the atomic four-file route policy and package lookup, then the public selected-BUILD/loading packet |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff and parser inspection, and the accepted 20-row macro plus seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | Direct-local evaluation still lacks route-aware external package policy/preflight, exact omitted-declaration evaluator defaults, and nonregistry evaluation-only event capture; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | implement the public selected-BUILD source and external loading migration before the direct-local package horizon |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-route-policy-and-package-lookup-implementation`.
+`WP-5-m1-public-selected-build-source-loading-migration`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -66,19 +66,21 @@ already sufficient, but direct include reads lack route-aware external package
 policy/preflight; the private evaluator also prepopulates declarations from the
 expected key and rejects nonregistry print. The one-file
 `HostRepositoryPathKey` prerequisite is accepted in `00e85153` at 168
-production/350 test/518 total net lines. The current packet implements the
-atomic route policy and package lookup. Selected-BUILD loading migration,
-package horizon, occurrence-preserving closure, and corrected evaluation/event
-ownership remain serial.
+production/350 test/518 total net lines. The atomic route policy and package
+lookup is accepted in `42ef64cd` at 449 production/739 test/1188 total lines.
+The current packet implements its public selected-BUILD source and atomically
+migrates external package loading. Package horizon, occurrence-preserving
+closure, and corrected evaluation/event ownership remain serial.
 
 The external package-policy design is accepted as three serial implementation
 packets. First, the accepted private one-file `HostRepositoryPathKey` owns
 route materialization plus resolved path state only (168 production/350 test/
-518 total in `00e85153`). Second, the current atomic four-file route policy and
-lookup packet owns
+518 total in `00e85153`). Second, the accepted atomic four-file route policy and
+lookup in `42ef64cd` owns
 canonical global deletion, route-local `REPO.bazel` and `.bazelignore`, and
-`BUILD.bazel`-before-`BUILD` selection without marker bytes (650/1350/2000).
-Third, a four-file public selected-BUILD source and loading migration consumes
+`BUILD.bazel`-before-`BUILD` selection without marker bytes (449 production/
+739 test/1188 total). Third, the current four-file public selected-BUILD source
+and loading migration consumes
 that lookup before reading the selected BUILD file (260/650/910). The existing
 path/retry substrate remains accepted; these packets add no oracle. Package
 horizon, occurrence-preserving closure, and corrected evaluation/event

@@ -18265,7 +18265,10 @@ routed source owner. Its public semantic value retains the selected logical
 path/name and shared bytes required by loading, not root physical state,
 unselected marker bytes, raw labels, policy event batches, or activation data.
 It forwards lookup/source Needs unchanged and keeps typed lookup/source errors
-and complete-only equality.
+and complete-only equality. Keep lookup semantic failure distinct from lookup
+compute failure. After selection, keep source semantic failure, source compute
+failure, and a selected source that becomes `Absent` as three distinct typed
+errors carrying the selected logical path; do not flatten one into another.
 
 Migrate `RepositoryPackageLoadKey` to that public owner; it must no longer
 choose or read BUILD markers directly. Preserve the selected BUILD logical
@@ -18309,3 +18312,32 @@ tests. Output contained existing warnings only. No Bazel/oracle or fixture was
 changed. Resume the atomic four-file route policy and package lookup under its
 650 production/1350 test/2000 total caps; the public selected-BUILD source and
 loading migration remains the sole successor.
+
+### WP-5-m1 routed external package-policy/lookup implementation (2026-08-04)
+
+**Status: ACCEPTED in `42ef64cd`; implement only
+`WP-5-m1-public-selected-build-source-loading-migration`.** The exact four-file
+change is 449 production lines, 739 test lines, and 1188 total lines, within
+its accepted 650/1350/2000 caps. It changes only `host_package.rs`,
+`package_policy.rs`, `repo_file.rs`, and `repository_ignore.rs`. The private
+graph validates first, short-circuits canonical global deletion before routed
+work, then owns routed REPO policy, repository ignore, and
+`BUILD.bazel`-before-`BUILD` path-state selection without reading marker bytes.
+
+Independent review required two event corrections: the retained lifecycle now
+exercises the exact routed `REPO.bazel` event owner, and the present
+uncaptured-print case now takes a direct branch rather than relying on a
+captured or absent-policy surrogate. Corrected rereview accepted the private
+identity/order, global-deletion no-route/no-event stop, exact typed errors and
+Needs, complete-only equality, marker-kind priority/fallback, REPO/ignore and
+route A-to-B-to-A lifecycle, create/delete/recovery, and no-public/no-loading/
+no-horizon structural stops.
+
+Formatting passed. Focused validation passed 21 `host_package` tests, 9
+`repo_file` tests, 17 `repository_ignore` tests, and 8 retained
+`HostRepository` path/source tests. GNU-Windows `cargo check` and the archive,
+diff, and scope gates passed; output contained existing warnings only. No
+Bazel/oracle or fixture changed. Resume the opaque public
+`RepositoryPackageSourceKey` and atomic loading migration under its 260
+production/650 test/910 total caps; package horizon, closure, and evaluator
+work remain forbidden in that packet.
