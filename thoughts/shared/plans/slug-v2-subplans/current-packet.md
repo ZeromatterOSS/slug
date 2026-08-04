@@ -1,16 +1,18 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-module-file-handoff-completion-evidence-redesign`
+Packet: `WP-5-m1-direct-local-module-file-handoff-completion-implementation`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: read-only completion-evidence and cap correction before a final retry
+Role: corrected one-file dormant implementation before discovery composition
 Evidence: accepted direct `local_path_override` route,
 `HostRootModuleFileKey`, `HostRepositorySourceFileKey`, and the accepted
 direct-local handoff design/cap correction in the owner plan.
 
-Do not edit Rust. Preserve the accepted private `(workspace, apparent_repo)`
-key contract, but replace the disproved 472-test-line measurement with an exact
-line allocation for successful materialized completion evidence.
+Rebuild the accepted private `(workspace, apparent_repo)` key from clean HEAD
+in only `app/slug_bzlmod_v2/src/source_preparation.rs`. It computes the existing
+route first and then only the fixed `MODULE.bazel` Host source child, retains
+an unselected opaque route plus Present/Absent source, forwards Needs exactly,
+uses complete-only equality/validity, and owns no event or bootstrap effect.
 
 Freeze a fixture that completes the same direct key against a successful Local
 materialization and Host source observation. It must prove the retained opaque
@@ -23,9 +25,15 @@ value. Retain the exact route-first bootstrap/materialization/path Need,
 complete-value, identity, real semantic-error, four typed error-variant, and
 structural no-fault/no-legacy evidence already required.
 
-The rejected draft was 100 production/472 tests/572 total. Replacing its two
-weak tests is provisionally estimated at 521 test lines. Independently review
-the exact fixture and formatted line accounting, then freeze the smallest
-justified cap; 100 production remains immutable. Do not implement, format
-Rust, run Cargo/Bazel, edit an oracle, add a second file, export/call the key,
-widen semantics, or add an evidence family in this design packet.
+Preserve the real unknown, nodep, and non-local route errors plus a real Source
+semantic error. Preserve the four typed error variants, treating compute-error
+projection as structural because no fault hook is authorized. Preserve all
+exact bootstrap/materialization/path Need comparisons and full request/RepoSpec
+equality; do not add a captured-child-event or new materialization-error family.
+
+Caps are 100 production, 545 tests, and 645 total. The reviewed arithmetic is
+525 mandatory test lines plus 20 lines of compaction/rustfmt-only slack. Run
+the exact serial validation and every stop from the accepted design. Do not
+edit or run an oracle, add a second file, export/call the key, widen semantics,
+or add an evidence family. Stop with **REPLAN** on any previous stop or cap
+excess.

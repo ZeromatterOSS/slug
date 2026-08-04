@@ -17967,3 +17967,35 @@ version-only warm `Reused`, both nonempty and without evaluation data. The
 rejected 472 lines and a read-only compact repair estimate of 521 test lines
 are design inputs, not an accepted cap. Freeze the smallest reviewed formatted
 test/total caps before another clean-HEAD implementation retry.
+
+### WP-5-m1 direct-local completion-evidence redesign (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-5-m1-direct-local-module-file-handoff-completion-implementation`.** Preserve
+the 100-line production contract, exact one-file boundary, all prior stops, and
+every accepted evidence family. Replace only the two disproved lifecycle and
+activation tests plus their shared fixture plumbing.
+
+The successful Local fixture uses existing root/path/materialization epochs;
+it adds no production hook, dependency, caller, event owner, or filesystem IO.
+One retained DICE engine and the same outer key must return the retained opaque
+route/source tuple through route A-to-B-to-A and external source Present,
+edited Present, Absent, and recreated Present. A separate capture-enabled
+successful path must record nonempty rich cold `Evaluated` and, after changing
+only the root dependency version from 1.0 to 2.0, warm `Reused`; both direct-key
+activations carry no evaluation data and both complete values are equal.
+
+Retain exact route-first bootstrap/materialization/path Need forwarding, full
+materialization request/`RepoSpec` equality, constructor/value/validity
+evidence, real unknown/nodep/non-local route errors, a real Source semantic
+error, all four typed error variants, and the structural no-fault/no-legacy
+scan. Do not add a bootstrap rewrite, captured-child-event proof, or selected
+materialization-error family: review found no demonstrated gap in those
+existing claims.
+
+The reviewed caps are 100 production lines, 545 test lines, and 645 total:
+525 mandatory formatted test lines plus 20 compaction/rustfmt-only slack. The
+slack authorizes no new behavior, evidence family, hook, file, or semantic
+surface. Rebuild from clean HEAD; discarded Rust and validation receive no
+credit. Run the accepted serial suite and obtain independent latest-diff
+acceptance before committing Rust.
