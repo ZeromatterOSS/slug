@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, the accepted 20-row external macro-created native filegroup/query-provenance oracle, and accepted external Bzl package/query activation with bare query progress-flag compatibility; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure is unsupported under the current architecture; external Restricted visibility requires a complete shared-query consumer contract; native Windows glob ordering, registry transports, and discovery composition remain | design the complete generic-query consumer surface for explicit same-package external Restricted visibility |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, and sole explicit-public dependency-free non-test external Starlark-rule queries, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, the accepted 20-row external macro-created native filegroup/query-provenance oracle, and accepted external Bzl package/query activation with bare query progress-flag compatibility; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure is unsupported under the current architecture; explicit same-package external Restricted visibility awaits its discriminating oracle; native Windows glob ordering, registry transports, and discovery composition remain | generate the isolated external Restricted-visibility query oracle |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-external-restricted-visibility-query-consumer-design`.
+`WP-5-m1-external-restricted-visibility-query-oracle`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -77,8 +77,8 @@ unconfigured implicit edges are finite and source-pinned, but their transitive
 packages require the built-in installed `@bazel_tools` repository, contextual
 rules_shell/rules_java/platforms mappings, and an extension-generated remote
 coverage repository that the current direct-local route cannot own. The
-current packet designs only that DICE-owned repository-closure prerequisite;
-external test rules and suites remain frozen.
+next packet designed only that DICE-owned repository-closure prerequisite;
+external test rules and suites remained frozen.
 
 The repository-closure ownership audit also reached terminal `REPLAN`.
 Installed tools bytes can be source-pinned, but the exact selected-module,
@@ -86,7 +86,7 @@ registry, contextual mapping, extension-generated repository, and complete
 package/query semantics have no bounded Rust owner; the exact Host registry
 byte surface already has an accepted JVM/process-state impossibility result.
 The external test-base/tools branch is therefore unsupported under the current
-architecture. The current packet returns to an existing-owner vertical slice:
+architecture. The next attempted existing-owner vertical slice was
 same-package external package-group visibility for `visible()` only.
 
 That `visible()`-only package-group visibility design also reached `REPLAN`.
@@ -96,9 +96,17 @@ the Restricted target to their shared graph also exposes Bazel's raw
 `visibility` attribute and effective `VisibilityNodep` edge. Omitting those
 surfaces makes `labels(visibility)`, dependency/reverse/path traversal, and
 graph output observably partial; adding them violates the completed packet's
-explicit other-consumer stop. The current packet is read-only design for the
-complete already-enabled generic-query consumer surface, with raw and
-effective visibility kept distinct.
+explicit other-consumer stop. The superseding design packet was read-only and
+covered the complete already-enabled generic-query consumer surface, with raw
+and effective visibility kept distinct.
+
+The complete external Restricted-visibility consumer design is accepted. It
+limits the protected target to one native `filegroup`, reuses the existing
+route/package/graph owners, route-remaps raw declared visibility separately
+from effective top-level `VisibilityNodep` edges, preserves group includes as
+their own edges, and keeps both NODEP/implicit query flags deferred. The
+current evidence-first packet creates one isolated seven-row fixture; the
+existing 20-row `module-local-override` fixture remains frozen.
 
 The external Bzl macro-query oracle is accepted in the exact four-path
 `+112`-line boundary. Bazel 9.2 generation and a distinct-root replay passed
@@ -112,9 +120,9 @@ changed. The external Bzl package/query activation and exact bare-
 paths at `+829/-21`. All three macro rows now pass Slug exactly; only the
 pre-existing unrelated external-build row remains red. The dependency-free
 external Starlark-rule projection is accepted at five files and `+529/-0`
-without new oracle growth. The current packet is read-only design for the
-complete external Restricted-visibility consumer surface; it does not activate
-Restricted visibility, a test rule, or a suite.
+without new oracle growth. The current packet generates only the external
+Restricted-visibility query oracle; it does not activate Restricted
+visibility, a dependency-filter flag, a test rule, or a suite.
 
 Latest M1 accepted evidence: the corrected Host RegistryFunction oracle passed
 one pinned Bazel 9.2 generation and two distinct fresh-root replays for each of

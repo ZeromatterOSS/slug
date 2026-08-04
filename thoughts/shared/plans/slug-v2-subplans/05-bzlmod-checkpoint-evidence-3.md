@@ -17300,3 +17300,160 @@ visibility, direct package pseudo-labels, missing/wrong-kind groups, direct
 named-repository package specifications, cross-package/repository group
 loading or includes, discovery, a new key/route/owner, configuration,
 analysis/actions/execution, JVM, Java bytecode, or Bazel delegation.
+
+### WP-5-m1 external Restricted-visibility query consumer design (2026-08-04)
+
+**Status: ACCEPTED; discriminating oracle evidence remains a separate packet.**
+One explicitly Restricted native `filegroup` and its already-loaded
+same-package native `package_group`s form a bounded exact shared-graph slice.
+No other protected target kind enters this contract.
+
+#### Source and representation contract
+
+Pinned Bazel 9.2 source at
+`8220c6198837d5c13d53fea211cf3282aa12408a` fixes three distinct values:
+
+1. `PackageSpecification.fromString` interprets ordinary exact and recursive
+   package specifications in the package group's repository. Exact/subtree
+   negatives veto positives within one contents value; separate direct or
+   included contents remain OR alternatives. `public` is repository-global,
+   `private` matches nothing, and the caller is tested as a full canonical
+   `PackageIdentifier`.
+2. A rule's stored raw declared `visibility` attribute contains only its
+   declared top-level labels. `labels(visibility, rule)` reads that raw value;
+   included groups are not flattened into it.
+3. The rule's effective loadable top-level group labels are NODEP dependency
+   edges. A package group's own includes are separate unconditional traversal
+   edges. They are neither copied into the rule edge list nor filtered as
+   visibility attributes.
+
+Slug may derive the contextual external values purely from the selected
+`RootRepositoryRoute` and the retained `LoadedPackage`. A narrow loading-value
+operation replaces only provisional-root repositories in
+`RuleVisibility`/`PackageGroupContents` with the selected canonical repository
+and fails on a retained nonroot input. It preserves declared group order and
+duplicates, exact/subtree positive and negative collections, `positive_all`,
+and `has_private`; it does not parse, resolve, load, discover, or enumerate.
+
+The external graph must validate the whole new slice before its target loop or
+source synthesis. Admit exactly one `PackageTargetKind::Filegroup` whose
+`VisibilitySource::Declared` is Restricted, has at least one group label, and
+has no direct `__pkg__`/`__subpackages__` contents. Every top-level label must
+be provisional-root, same-package, present in the retained target batch, and
+native `PackageGroup`. Reject named-repository, cross-package, missing, alias,
+or wrong-kind labels and every Restricted package default. Existing same-
+package include validation remains unchanged. Other already-supported
+public/private native targets may coexist, but a second Restricted target or a
+Restricted non-filegroup is outside this slice.
+
+After validation, project these surfaces separately:
+
+- one explicit raw `visibility` `QueryAttribute` containing only the
+  route-aware apparent/canonical top-level labels;
+- effective `VisibilityNodep` edges to those same top-level groups, before the
+  filegroup's ordinary source edges;
+- existing ordered `PackageGroupInclude` edges between group nodes; and
+- package-group contents contextualized to the selected canonical repository.
+
+`visible()` reconstructs each canonical external top-level group with the
+protected target's verified apparent route before request-local lookup. The
+existing iterative per-top-level seen set owns include cycles, and
+`QueryPackageIdentity::canonical_package()` already distinguishes root,
+same-external, and different-external callers. The unconditional Bazel
+same-package/java predicate remains independent; evidence therefore places
+the protected target and callers in different package fragments.
+
+#### Complete enabled consumer and output surface
+
+| Surface | Contract or reused evidence |
+| --- | --- |
+| `labels(visibility)` | Reads only the route-remapped raw top-level group labels. |
+| default/depth-limited `deps` | Traverses the top-level `VisibilityNodep`, then group include edges. |
+| `same_pkg_direct_rdeps` | Scans the same shared graph and returns the restricted rule for its top group; an included group may return its includer. |
+| bounded/unbounded `rdeps`, `allpaths`, `somepath` | Reuse the generic dependency callback and therefore the same rule/group/include topology. |
+| graph output | Records the traversed shared edges; existing auto/full and factored/unfactored formatters remain unchanged. |
+| `visible()` | Evaluates canonical repository-relative contents independently of dependency filtering. |
+| literal, set/let/binary, `some`, `siblings` | Observe the already-loaded mixed filegroup/group/BUILD package without a new graph mode. |
+| default text, `label`, `label_kind`, `package` | Reuse accepted external apparent rendering and kind/package projection. Explicit `--output=text` remains rejected. |
+| `labels(srcs)`, `buildfiles`, `loadfiles`, `tests`, `executables` | Reuse accepted filegroup metadata/provenance/capability behavior; smoke coverage must prove no collateral change. |
+
+Slug currently rejects both `--[no]nodep_deps` and
+`--[no]implicit_deps`; `QueryPolicy` owns only strict test-suite behavior. This
+packet does **not** add either flag, a policy bit, protocol field, or graph
+filter. Default accepted queries continue to traverse every retained edge.
+The accepted root visibility fixture's two final Bazel-only rows remain the
+structural source of flag semantics: `--nonodep_deps` removes rule visibility
+edges while keeping group includes, and `--noimplicit_deps` distinguishes
+explicit from inherited visibility. The new oracle repeats only the external
+NODEP discriminator as a final Bazel-only row; it is not a future Slug
+acceptance row. Exact global `--noimplicit_deps` would additionally require
+explicit/implicit provenance absent from `QueryEdge`, while even bounded
+`--nonodep_deps` would widen command, server, retained-policy, and root-query
+surfaces outside this slice.
+
+#### Required evidence-first packet
+
+Keep `module-local-override` frozen at 20 commands and seven workspace assets.
+Create only `tests/v2_oracle/fixtures/external-restricted-visibility-query`
+with exactly seven regular files, zero links, five workspace assets, and seven
+commands:
+
+- root `MODULE.bazel` declares `dep` with a direct `local_path_override`;
+- `dep/MODULE.bazel` declares `dep@1.0.0`;
+- `dep/BUILD.bazel` declares `leaf(packages = ["//viewer"])`,
+  `top(includes = [":leaf"])`, and an empty native `filegroup` named
+  `restricted` with explicit `visibility = [":top"]`;
+- root and dependency `viewer/BUILD.bazel` files each declare one caller
+  `filegroup`; and
+- fixture TOML plus generated expected JSON complete the seven-file boundary.
+
+The exact command order is:
+
+1. `labels(visibility, @dep//:restricted)` — raw top only;
+2. `deps(@dep//:restricted)` — restricted, effective top, and included leaf;
+3. `same_pkg_direct_rdeps(@dep//:top)` — restricted;
+4. factored graph output for `deps(@dep//:restricted)` — exact
+   restricted-to-top and top-to-leaf edges;
+5. root `//viewer:caller` visibility — empty;
+6. same-external `@dep//viewer:caller` visibility — restricted; and
+7. Bazel-only `--nonodep_deps deps(@dep//:restricted)` — restricted only.
+
+Generate every exact order and DOT byte with `/usr/bin/bazel` reporting
+exactly `bazel 9.2.0`; do not handwrite expected evidence. Cap the new fixture
+at seven files, seven commands, five workspace assets, zero links, and 350
+total text lines. Run one fresh generation and one distinct-root exact replay,
+the full oracle harness, archive/scope/cap checks, and `git diff --check`, then
+obtain independent latest-diff review. No existing fixture byte may change.
+No Rust, Cargo, Slug replay, daemon, lifecycle, tool, or generated schema
+change is permitted in the oracle packet.
+
+#### Later implementation boundary
+
+Only after that oracle is accepted may implementation change exactly:
+
+- `app/slug_loading_v2/src/visibility.rs`;
+- `app/slug_query_v2/src/graph.rs`;
+- `app/slug_query_v2/src/loading_environment.rs`; and
+- `app/slug_query_v2/tests/loading_query.rs`.
+
+Cap the later implementation at 190 net production lines, 300 net test lines,
+and 490 total. It must pass the first six oracle rows after rebuilding
+`slug_cli_v2`; the seventh remains Bazel-only. Structural/integration evidence
+must cover raw/effective/include separation, every pre-synthesis rejection,
+exact/recursive positive and negative contents, `public`/`private`, include
+union/reallow/cycles, same- and cross-repository callers, every enabled
+consumer/output above, cold/warm reuse, content/visibility/include edits,
+delete/recreate recovery, and route remapping. Existing
+`ExternalUnconfiguredPackageGraphKey(route, package)` and
+`RepositoryPackageLoadKey(route, package)` retain all DICE equality and
+invalidation ownership; no new key, owner, lock, or filesystem observation is
+allowed.
+
+Stop and **REPLAN** if either packet needs another path/row/asset beyond its
+cap, another protected target kind, PackageRecorder-wide canonicalization,
+implicit/default or direct pseudo-label visibility, a missing/wrong-kind
+fallback, direct named-repository package specifications, cross-package or
+cross-repository group loading/includes, an accepted NODEP/implicit flag,
+wildcard discovery or package enumeration, a new route/key/owner, direct
+filesystem observation, configuration, analysis/actions/execution, JVM, Java
+bytecode, or Bazel delegation.
