@@ -70,6 +70,7 @@ use crate::apply_unified_patch;
 use crate::host_package::ExternalRepositoryPackageLookup;
 use crate::host_package::ExternalRepositoryPackageLookupError;
 use crate::host_package::ExternalRepositoryPackageLookupKey;
+use crate::module_eval::NonrootIncludeRequest;
 use crate::module_eval::NonrootModuleFileInspection;
 use crate::module_eval::parse_root_include;
 use crate::registry_module_file_url;
@@ -896,52 +897,7 @@ impl Key for DirectLocalIncludePackageHorizonKey {
             .1
             .as_ref()
             .map_or(&[][..], |inspection| inspection.includes.as_ref());
-        let mut occurrences = Vec::with_capacity(requests.len());
-        for request in requests {
-            let parsed = match parse_root_include(request) {
-                Ok(parsed) => parsed,
-                Err(message) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        DirectLocalIncludePackageHorizonError::BadLabel {
-                            raw_label: request.path.clone(),
-                            location: request.location.clone(),
-                            message,
-                        },
-                    )));
-                }
-            };
-            occurrences.push(DirectLocalIncludePackageOccurrence {
-                package: PackageIdentifier::new(
-                    route.canonical_repo().clone(),
-                    parsed.package().package().clone(),
-                ),
-                target: parsed.target().clone(),
-                raw_label: request.path.clone(),
-                location: request.location.clone(),
-            });
-        }
-
-        let mut unique = SmallSet::with_capacity(occurrences.len());
-        for occurrence in &occurrences {
-            unique.insert(occurrence.package.clone());
-        }
-        let computed = ctx
-            .compute_join(unique, |ctx, package| {
-                let route = route.clone();
-                Box::pin(async move {
-                    let result = ctx
-                        .compute(
-                            &ExternalRepositoryPackageLookupKey::new(route, package.clone())
-                                .expect("occurrence package uses the inspection route"),
-                        )
-                        .await
-                        .map_err(|error| Arc::<str>::from(error.to_string()));
-                    (package, result)
-                })
-            })
-            .await;
-        let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
-        finish_direct_local_include_package_horizon(route, occurrences, outcomes)
+        preflight_direct_local_include_package_horizon(ctx, route, requests).await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -951,6 +907,59 @@ impl Key for DirectLocalIncludePackageHorizonKey {
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
     }
+}
+
+async fn preflight_direct_local_include_package_horizon(
+    ctx: &mut DiceComputations<'_>,
+    route: RootRepositoryRoute,
+    requests: &[NonrootIncludeRequest],
+) -> <DirectLocalIncludePackageHorizonKey as Key>::Value {
+    let mut occurrences = Vec::with_capacity(requests.len());
+    for request in requests {
+        let parsed = match parse_root_include(request) {
+            Ok(parsed) => parsed,
+            Err(message) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    DirectLocalIncludePackageHorizonError::BadLabel {
+                        raw_label: request.path.clone(),
+                        location: request.location.clone(),
+                        message,
+                    },
+                )));
+            }
+        };
+        occurrences.push(DirectLocalIncludePackageOccurrence {
+            package: PackageIdentifier::new(
+                route.canonical_repo().clone(),
+                parsed.package().package().clone(),
+            ),
+            target: parsed.target().clone(),
+            raw_label: request.path.clone(),
+            location: request.location.clone(),
+        });
+    }
+
+    let mut unique = SmallSet::with_capacity(occurrences.len());
+    for occurrence in &occurrences {
+        unique.insert(occurrence.package.clone());
+    }
+    let computed = ctx
+        .compute_join(unique, |ctx, package| {
+            let route = route.clone();
+            Box::pin(async move {
+                let result = ctx
+                    .compute(
+                        &ExternalRepositoryPackageLookupKey::new(route, package.clone())
+                            .expect("occurrence package uses the inspection route"),
+                    )
+                    .await
+                    .map_err(|error| Arc::<str>::from(error.to_string()));
+                (package, result)
+            })
+        })
+        .await;
+    let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
+    finish_direct_local_include_package_horizon(route, occurrences, outcomes)
 }
 
 fn direct_local_include_inspection_error(
@@ -4789,6 +4798,10 @@ mod tests {
             .split("impl fmt::Display for RepositorySourceFileKey")
             .next()
             .unwrap();
+        let (key_owner, _) = owner
+            .split_once("async fn preflight_direct_local_include_package_horizon")
+            .unwrap();
+        assert!(key_owner.contains("preflight_direct_local_include_package_horizon(ctx"));
         assert!(owner.contains("DirectLocalModuleInspectionKey"));
         assert!(owner.contains("ExternalRepositoryPackageLookupKey"));
         assert!(owner.contains("parse_root_include"));
