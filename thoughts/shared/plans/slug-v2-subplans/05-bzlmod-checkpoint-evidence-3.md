@@ -14691,3 +14691,184 @@ Design next only `WP-5-m1-external-repository-rule-query-design`: freeze the
 smallest same-package native-rule query slice, beginning with `filegroup`,
 without crossing into external loads, glob traversal, patterns, transitive
 mapping, build/execution, JVM, Java bytecode, or Bazel delegation.
+
+### Direct external-repository native filegroup query design
+
+Status: **ACCEPT AFTER CORRECTION** for
+`WP-5-m1-external-repository-rule-query-design` on 2026-08-03. The first
+independent review found that the proposed `srcs` attribute necessarily
+activates the existing node-local `labels()` consumer and that the route-keyed
+graph cache is not canonical across apparent aliases. Both claims are
+corrected below without changing the one-file production boundary; correction
+rereview returned `ACCEPT`.
+
+This packet is design-only. It adds no Rust or fixture change and authorizes
+one native `filegroup` in the already supported direct local-override external
+package. The implementation reuses every accepted route, source-preparation,
+loading, query, retry, publication, identity, and rendering owner.
+
+#### Accepted Bazel 9.2 evidence and exact observable slice
+
+No new broad oracle is needed. The accepted
+`query-loading-thin-vertical` Bazel 9.2 fixture already proves that a native
+`filegroup` owns ordered ordinary edges to an exported source, a present
+implicit source, and an absent attribute-created source; the absent source is
+query-addressable and `deps(...)` traverses it without a filesystem error.
+Its default text output is canonical-label sorted. The accepted
+`module-local-override` fixture separately proves that one direct apparent
+external label renders as `@dep`, while the accepted external-query negative
+rows prove canonical `@@dep+` missing-target and missing-package diagnostics.
+
+Pinned Bazel 9.2 source at commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`,
+`src/main/java/com/google/devtools/build/lib/packages/Package.java` in the
+assumed-input creation path, proves that an otherwise undeclared same-package
+label in a rule attribute creates an `InputFile` target without statting its
+physical path. `Rule.getSortedLabels` and the accepted root fixture provide
+the ordinary dependency-label behavior; the existing query output/order
+implementation is unchanged.
+
+The implementation extends `module-local-override` without a new asset:
+`dep/BUILD.bazel` retains `exports_files(["target.txt"])` and adds
+`filegroup(name = "files", srcs = ["target.txt", "missing_input.txt"])`.
+Add exactly two Bazel/Slug oracle commands:
+
+- `query @dep//:files` exits 0 and writes exactly `@dep//:files\n`; and
+- `query 'labels(srcs, @dep//:files)'` exits 0 and writes exactly
+  `@dep//:missing_input.txt\n@dep//:target.txt\n`.
+
+The existing direct-source row remains byte-for-byte semantically protected.
+Focused Rust tests, backed by the accepted root oracle and pinned source, prove
+`deps(@dep//:files)` contains exactly the canonical graph nodes for the rule,
+the exported source, and the physically absent implicit source while rendering
+their selected apparent `@dep` spelling. A local Bazel replay attempt on
+2026-08-03 produced no evidence because the cached 9.2 binary either crashed
+in `NetworkMetricsCollector` or hung after collection was disabled; do not
+record that environment failure as parity evidence.
+
+#### Projection and identity contract
+
+Change only `external_package_graph_from_loaded` and private helpers in
+`app/slug_query_v2/src/graph.rs`. `RepositoryPackageLoadKey` already returns
+the ordinary `LoadedPackage`, and `PackageTargetKind::Filegroup` already owns
+canonicalized `srcs`, exact `srcs_explicit` provenance, duplicate rejection,
+native rule capability, and visibility. Do not add or alter a loading value,
+DICE key, repository route, source key, or public API.
+
+The external projector accepts only `ExportedFile` and `Filegroup`. It remaps
+each filegroup source from the loader's root package-context spelling to the
+route's canonical repository only when the source repository is root and its
+package equals the currently loaded external package. Any cross-package or
+named-repository source is an explicit unsupported error for this slice; it
+must never fall back to the root workspace or trigger another package or
+repository route.
+
+For an accepted filegroup, reuse the root graph's core rule/source
+representation, with query-visible visibility explicitly excluded below:
+
+- one `QueryNodeKind::Rule("filegroup rule")` with the retained native
+  `RuleCapability`;
+- one `srcs` `QueryAttribute` preserving stored order and explicitness;
+- ordinary edges in stored order with first-canonical-occurrence
+  deduplication; and
+- one `SourceFile` node for each otherwise undeclared same-package source
+  edge, regardless of physical existence.
+
+Every rule, edge, exported source, implicit source, and BUILD node has
+canonical `@@dep+` semantic identity. The selected route's `@dep` spelling is
+retained only in `QueryLabel` render provenance. Equality, hashing, ordering,
+lookup, traversal, and diagnostics remain canonical within a graph, so two
+apparent spellings for the same canonical label compare equal as
+`QueryLabel`s and cannot create two semantic nodes in one graph. The accepted
+`ExternalUnconfiguredPackageGraphKey` remains route-specific: because
+`RootRepositoryRoute` includes the apparent repository, two aliases use
+distinct DICE graph/load keys and retain their own render provenance. No new
+canonical graph cache or render projection is introduced. Default `query`
+text alone uses `output_label()` and renders apparent labels. Existing
+`QueryLabel::Display` remains canonical for errors.
+
+The current no-visibility-edge restriction remains: public/private visibility
+with no dependency label is accepted, while package-group or other visibility
+edges stop as unsupported. Retain effective visibility and provenance on the
+node but do not project a query-visible `visibility` attribute in this slice,
+so `labels(visibility, ...)` is not activated. The accepted `srcs` attribute
+does make the existing node-local `labels(srcs, @dep//:files)` operator part
+of this slice; it performs no package or repository discovery beyond the same
+accepted graph. Other native rules, aliases, Starlark rules, generated files,
+external loads, globs, and package groups remain deferred. Reverse-dependency,
+sibling, loading-file, external pattern, and visibility-function breadth
+remain stopped; the accepted observable rule surface is the literal target,
+the node-local `srcs` projection, and forward ordinary dependency traversal
+within this one package.
+
+#### Diagnostics, invalidation, and publication
+
+`srcs = ["missing_input.txt"]` is not a missing edge: it creates a source
+node, and both its literal query after the package is loaded and its traversal
+from the filegroup succeed. An unreferenced `@dep//:missing` retains the
+accepted canonical exit-7 diagnostic:
+`no such target '@@dep+//:missing': target 'missing' not declared in package '' defined by <output_base>/external/dep+/BUILD.bazel`.
+Missing packages retain the accepted canonical external-package diagnostic.
+Cross-package or named-repository filegroup sources return the explicit Slug
+unsupported error before traversal; this packet makes no Bazel-parity claim
+for that stopped surface.
+
+The filegroup graph depends on the existing complete route and
+`RepositoryPackageLoadKey` result. A BUILD edit that changes the filegroup or
+its `srcs` recomputes the external graph and publishes only the changed
+external BUILD event; an unchanged warm query reuses the graph and publishes
+nothing. Creating, editing, deleting, or recreating `target.txt` or
+`missing_input.txt` while BUILD bytes are unchanged neither invalidates the
+loading-query graph nor publishes an event, because Bazel query does not stat
+attribute-created source targets and this packet adds no source-file demand.
+Route or root-MODULE changes retain the accepted mapping invalidation.
+
+`RootQueryCommandKey` remains the sole semantic owner. Existing
+materialization/path Needs still flow unchanged to the one retained
+retry/accept/publication driver. No event selector, terminal envelope, CLI or
+daemon adapter, filesystem owner, snapshot, analysis, action, or execution
+path changes.
+
+#### Exact implementation scope and acceptance
+
+Production changes are limited to
+`app/slug_query_v2/src/graph.rs`. Focused tests may change
+`app/slug_query_v2/tests/loading_query.rs`,
+`app/slug_core_v2/src/runtime/dice.rs`, `app/slug_cli_v2/tests/cli.rs`, and
+`app/slug_server_v2/src/tests.rs`. Oracle changes are limited to
+`tests/v2_oracle/fixtures/module-local-override/{fixture.toml,workspace/dep/BUILD.bazel,expected/oracle.json}`.
+No Cargo, bzlmod, loading, protocol, parser, formatter, analysis, execution,
+REAPI, materializer, registry, extension, or other fixture file may change.
+
+Focused evidence must prove:
+
+1. canonical rule/source/BUILD uniqueness and apparent-only rendering,
+   including equal/hash/order `QueryLabel` identity under two apparent aliases
+   and distinct route-keyed graph caches;
+2. exact filegroup rule capability, `srcs` order/explicitness, ordinary-edge
+   order/deduplication, exported-source reuse, and absent implicit-source
+   synthesis;
+3. rejection of another native rule, a same-package collision, a
+   cross-package source, a named-repository source, and nontrivial visibility;
+4. exact literal, `labels(srcs, ...)`, and `deps` output, accepted canonical
+   missing diagnostics, and the unchanged pattern/load/glob/canonical-label
+   stop gates;
+5. cold MODULE-before-BUILD publication, warm silence, BUILD edit and
+   restoration, source create/edit/delete/recreate non-invalidation, and no
+   activation of any forbidden legacy/root/snapshot owner; and
+6. the rebuilt Slug binary exactly replays both protected existing commands
+   and the two new Bazel 9.2 external-filegroup oracle rows.
+
+Run focused query/core/CLI/server tests serially, the full query suite, quiet
+checks for changed direct dependents, the required `slug_cli_v2` rebuild before
+the Slug oracle, GNU-Windows no-run query/core linkage, formatting,
+`git diff --check`, archive/scope/no-Cargo guards, the protected and new
+fixture rows, and scans for direct filesystem access, legacy snapshot/root
+graph owners, JVM, Java bytecode, or Bazel delegation in the new path.
+
+Stop and `REPLAN` on a need for a new retained representation, DICE key,
+loader/source owner, source-path observation, cross-package/repository route,
+external function/pattern breadth, external `.bzl` load, glob traversal,
+registry transport, repository rule/extension, build/execution behavior, JVM,
+Java bytecode, or Bazel delegation. After independent terminal review,
+implement only `WP-5-m1-external-repository-rule-query` under this contract.
