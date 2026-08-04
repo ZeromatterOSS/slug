@@ -201,6 +201,17 @@ pub struct RootPackageLookupInputs {
     deleted_packages: SmallSet<PackageIdentifier>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct CanonicalDeletedPackages {
+    packages: Arc<SmallSet<PackageIdentifier>>,
+}
+
+impl CanonicalDeletedPackages {
+    pub(crate) fn contains(&self, package: &PackageIdentifier) -> bool {
+        self.packages.contains(package)
+    }
+}
+
 impl RootPackageLookupInputs {
     pub fn package_roots(&self) -> &[NormalizedAbsolutePath] {
         &self.package_roots
@@ -321,6 +332,34 @@ impl fmt::Display for RootPackageLookupInputsProjection {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+struct CanonicalDeletedPackagesProjection;
+
+impl fmt::Display for CanonicalDeletedPackagesProjection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("canonical-deleted-packages-projection")
+    }
+}
+
+impl ProjectionKey for CanonicalDeletedPackagesProjection {
+    type DeriveFromKey = RootPackagePolicyInputsKey;
+    type Value = CanonicalDeletedPackages;
+
+    fn compute(
+        &self,
+        inputs: &Arc<RootPackagePolicyInputs>,
+        _ctx: &DiceProjectionComputations,
+    ) -> Self::Value {
+        CanonicalDeletedPackages {
+            packages: Arc::new(inputs.deleted_packages.clone()),
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 impl ProjectionKey for RootPackageLookupInputsProjection {
     type DeriveFromKey = RootPackagePolicyInputsKey;
     type Value = Arc<RootPackageLookupInputs>;
@@ -434,6 +473,12 @@ root_package_policy_projection_key!(
     RootRepoFileSemantics,
     RootRepoFileSemanticsProjection,
     "root-repo-file-semantics"
+);
+root_package_policy_projection_key!(
+    pub(crate) CanonicalDeletedPackagesProjectionKey,
+    CanonicalDeletedPackages,
+    CanonicalDeletedPackagesProjection,
+    "canonical-deleted-packages"
 );
 root_package_policy_projection_key!(
     pub RootRepositoryIgnoreInputsProjectionKey,

@@ -57,9 +57,14 @@ use starlark::values::tuple::TupleRef;
 use crate::RootPackagePolicyProjectionError;
 use crate::RootRepoFileSemanticsProjectionKey;
 use crate::RootRepoFileUtf8Mode;
+use crate::RootRepositoryRoute;
 use crate::host_file::HostFileBytes;
 use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileError;
+use crate::source_preparation::HostRepositorySourceFileKey;
+use crate::source_preparation::HostRepositorySourceFileValue;
+use crate::source_preparation::RepositorySourceFileError;
+use crate::source_preparation::SourcePreparationOutcome;
 
 const INVALID_UTF8: &str = "not a valid UTF-8 encoded file; this can lead to inconsistent behavior and will be disallowed in a future version of Bazel";
 const INVALID_UTF8_ERROR_SUFFIX: &str =
@@ -857,6 +862,131 @@ impl Key for HostRepoFileKey {
                 .expect("Host REPO key stores exactly one event batch");
         }
         PathOutcome::Complete(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostRouteRepoFileError {
+    PolicyProjection(RootPackagePolicyProjectionError),
+    Source(RepositorySourceFileError),
+    Evaluation(HostRepoFileError),
+}
+
+impl fmt::Display for HostRouteRepoFileError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PolicyProjection(error) => error.fmt(f),
+            Self::Source(error) => write!(f, "failed to read routed REPO.bazel: {error:?}"),
+            Self::Evaluation(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for HostRouteRepoFileError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostRouteRepoFileKey {
+    route: RootRepositoryRoute,
+}
+
+impl HostRouteRepoFileKey {
+    pub(crate) fn new(route: RootRepositoryRoute) -> Self {
+        Self { route }
+    }
+}
+
+impl std::hash::Hash for HostRouteRepoFileKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.route.hash(state);
+    }
+}
+
+impl fmt::Display for HostRouteRepoFileKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "host-route-repo-file:{}", self.route.canonical_repo())
+    }
+}
+
+fn store_route_repo_batch(ctx: &mut DiceComputations<'_>, capture_events: bool, batch: EventBatch) {
+    if capture_events {
+        ctx.store_evaluation_data(batch)
+            .expect("routed REPO key stores exactly one event batch");
+    }
+}
+
+#[async_trait]
+impl Key for HostRouteRepoFileKey {
+    type Value = SourcePreparationOutcome<Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let semantics = match dice_invariant(
+            ctx.compute(&RootRepoFileSemanticsProjectionKey::new(
+                self.route.workspace().dupe(),
+            ))
+            .await,
+        ) {
+            Ok(semantics) => semantics,
+            Err(error) => {
+                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostRouteRepoFileError::PolicyProjection(error),
+                )));
+            }
+        };
+        let source = match dice_invariant(
+            ctx.compute(&HostRepositorySourceFileKey::new(
+                self.route.clone(),
+                "REPO.bazel".into(),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostRouteRepoFileError::Source(error),
+                )));
+            }
+            SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent)) => {
+                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
+                return SourcePreparationOutcome::Complete(Arc::new(
+                    Ok(HostRepoFileValue::empty()),
+                ));
+            }
+            SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Present {
+                bytes,
+                logical_path,
+            })) => (bytes, logical_path),
+        };
+
+        let recording = capture_events.then(RecordingRepoEventReporter::default);
+        let direct = DirectRepoEventReporter;
+        let reporter: &dyn RepoEventReporter = recording
+            .as_ref()
+            .map_or(&direct, |recording| recording as &dyn RepoEventReporter);
+        let value = evaluate_repo_file(&source.1, &source.0, semantics.utf8_mode, reporter)
+            .map_err(HostRouteRepoFileError::Evaluation);
+        store_route_repo_batch(
+            ctx,
+            capture_events,
+            recording.map_or_else(EventBatch::empty, RecordingRepoEventReporter::into_batch),
+        );
+        SourcePreparationOutcome::Complete(Arc::new(value))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

@@ -12,6 +12,8 @@
 #[cfg(unix)]
 use std::ffi::OsString;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
@@ -37,11 +39,16 @@ use slug_workspace_v2::ResolvedPathState;
 
 use crate::RootPackageLookupInputsProjectionKey;
 use crate::RootPackagePolicyProjectionError;
+use crate::RootRepositoryRoute;
 use crate::host_file::HostFileBytes;
 use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileError;
+use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
 use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::HostRepositoryIgnoreKey;
+use crate::repository_ignore::HostRouteRepositoryIgnoreKey;
+use crate::source_preparation::HostRepositoryPathKey;
+use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationOutcome;
 
@@ -267,6 +274,158 @@ impl Key for HostRootPackageLookupKey {
         }
 
         PathOutcome::Complete(Arc::new(Ok(HostRootPackageLookup::NoBuildFile)))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) enum ExternalRepositoryPackageLookup {
+    Package(HostBuildFileName),
+    NoBuildFile,
+    Deleted,
+    InvalidPackageName { message: Arc<str> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum ExternalRepositoryPackageLookupError {
+    PolicyInput(RootPackagePolicyProjectionError),
+    RepositoryIgnore(HostRepositoryIgnoreError),
+    Path(RepositorySourceFileError),
+}
+
+impl fmt::Display for ExternalRepositoryPackageLookupError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PolicyInput(error) => error.fmt(f),
+            Self::RepositoryIgnore(error) => error.fmt(f),
+            Self::Path(error) => write!(f, "failed to inspect routed package marker: {error:?}"),
+        }
+    }
+}
+
+impl std::error::Error for ExternalRepositoryPackageLookupError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct ExternalRepositoryPackageLookupKey {
+    route: RootRepositoryRoute,
+    package: PackageIdentifier,
+}
+
+impl ExternalRepositoryPackageLookupKey {
+    pub(crate) fn new(route: RootRepositoryRoute, package: PackageIdentifier) -> Option<Self> {
+        (package.repo() == route.canonical_repo()).then_some(Self { route, package })
+    }
+}
+
+impl Hash for ExternalRepositoryPackageLookupKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.route.hash(state);
+        self.package.hash(state);
+    }
+}
+
+impl fmt::Display for ExternalRepositoryPackageLookupKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "external-repository-package-lookup:{:?}", self.package)
+    }
+}
+
+#[async_trait]
+impl Key for ExternalRepositoryPackageLookupKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        if let Some(message) = invalid_package_name(self.package.package()) {
+            return SourcePreparationOutcome::Complete(Arc::new(Ok(
+                ExternalRepositoryPackageLookup::InvalidPackageName { message },
+            )));
+        }
+        let deleted = match dice_invariant(
+            ctx.compute(&CanonicalDeletedPackagesProjectionKey::new(
+                self.route.workspace().dupe(),
+            ))
+            .await,
+        ) {
+            Ok(deleted) => deleted,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    ExternalRepositoryPackageLookupError::PolicyInput(error),
+                )));
+            }
+        };
+        if deleted.contains(&self.package) {
+            return SourcePreparationOutcome::Complete(Arc::new(Ok(
+                ExternalRepositoryPackageLookup::Deleted,
+            )));
+        }
+        let repository_ignore = match dice_invariant(
+            ctx.compute(&HostRouteRepositoryIgnoreKey::new(self.route.clone()))
+                .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Ok(value) => value.dupe(),
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        ExternalRepositoryPackageLookupError::RepositoryIgnore(error.clone()),
+                    )));
+                }
+            },
+        };
+        if repository_ignore
+            .matching_entry(self.package.package())
+            .is_some()
+        {
+            return SourcePreparationOutcome::Complete(Arc::new(Ok(
+                ExternalRepositoryPackageLookup::Deleted,
+            )));
+        }
+
+        for build_file_name in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
+            let marker =
+                PathBuf::from(self.package.package().as_str()).join(build_file_name.as_str());
+            let path = match dice_invariant(
+                ctx.compute(&HostRepositoryPathKey::new(self.route.clone(), marker))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        ExternalRepositoryPackageLookupError::Path(error),
+                    )));
+                }
+                SourcePreparationOutcome::Complete(Ok(path)) => path,
+            };
+            match path.resolved().state() {
+                ResolvedPathState::Present(lstat)
+                    if matches!(
+                        lstat.kind(),
+                        PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                    ) =>
+                {
+                    return SourcePreparationOutcome::Complete(Arc::new(Ok(
+                        ExternalRepositoryPackageLookup::Package(build_file_name),
+                    )));
+                }
+                ResolvedPathState::Missing | ResolvedPathState::Present(_) => {}
+            }
+        }
+        SourcePreparationOutcome::Complete(Arc::new(Ok(
+            ExternalRepositoryPackageLookup::NoBuildFile,
+        )))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -772,6 +931,8 @@ mod tests {
     #[cfg(unix)]
     use std::sync::Arc;
     #[cfg(unix)]
+    use std::sync::Mutex;
+    #[cfg(unix)]
     use std::sync::atomic::AtomicUsize;
     #[cfg(unix)]
     use std::sync::atomic::Ordering;
@@ -781,6 +942,14 @@ mod tests {
     #[cfg(unix)]
     use async_trait::async_trait;
     #[cfg(unix)]
+    use compact_str::CompactString;
+    #[cfg(unix)]
+    use dice::ActivationData;
+    #[cfg(unix)]
+    use dice::ActivationKind;
+    #[cfg(unix)]
+    use dice::ActivationTracker;
+    #[cfg(unix)]
     use dice::DetectCycles;
     #[cfg(unix)]
     use dice::Dice;
@@ -789,11 +958,31 @@ mod tests {
     #[cfg(unix)]
     use dice::DiceTransaction;
     #[cfg(unix)]
+    use dice::DynKey;
+    #[cfg(unix)]
     use dice::Key;
+    #[cfg(unix)]
+    use dice::RichActivation;
+    #[cfg(unix)]
+    use dice::UserComputationData;
     #[cfg(unix)]
     use dice_futures::cancellation::CancellationContext;
     #[cfg(unix)]
     use dupe::Dupe;
+    #[cfg(unix)]
+    use slug_events_v2::CaptureEvaluationEvents;
+    #[cfg(unix)]
+    use slug_events_v2::EvaluationEvent;
+    #[cfg(unix)]
+    use slug_events_v2::EventBatch;
+    #[cfg(unix)]
+    use slug_identity_v2::ApparentRepoName;
+    #[cfg(unix)]
+    use slug_identity_v2::CanonicalLabel;
+    #[cfg(unix)]
+    use slug_identity_v2::CanonicalRepoName;
+    #[cfg(unix)]
+    use slug_identity_v2::PackageIdentifier;
     #[cfg(unix)]
     use slug_identity_v2::PackagePath;
     #[cfg(unix)]
@@ -822,7 +1011,13 @@ mod tests {
     use slug_workspace_v2::PathOperationResult;
     #[cfg(unix)]
     use slug_workspace_v2::PathOutcome;
+    #[cfg(unix)]
+    use starlark_map::small_map::SmallMap;
 
+    #[cfg(unix)]
+    use super::ExternalRepositoryPackageLookup;
+    #[cfg(unix)]
+    use super::ExternalRepositoryPackageLookupKey;
     #[cfg(unix)]
     use super::HostBuildFileName;
     #[cfg(unix)]
@@ -838,9 +1033,33 @@ mod tests {
     #[cfg(unix)]
     use super::RootPackageSourceKey;
     #[cfg(unix)]
+    use crate::OverrideAttributeValue;
+    #[cfg(unix)]
+    use crate::RepoSpec;
+    #[cfg(unix)]
     use crate::RootPackagePolicyInputs;
     #[cfg(unix)]
+    use crate::RootRepositoryRoute;
+    #[cfg(unix)]
     use crate::inject_root_package_policy_inputs;
+    #[cfg(unix)]
+    use crate::repo_file::HostRouteRepoFileKey;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationEpochEntry;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationKind;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationRequest;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationRequestId;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResult;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResultEpoch;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResultEpochKey;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationSuccess;
     #[cfg(unix)]
     use crate::source_preparation::SourcePreparationOutcome;
 
@@ -927,6 +1146,685 @@ mod tests {
             Some("warning"),
         )
         .unwrap()
+    }
+
+    #[cfg(unix)]
+    fn local_route(root: &str) -> RootRepositoryRoute {
+        RootRepositoryRoute::for_test(
+            path("/workspace"),
+            ApparentRepoName::new("dep").unwrap(),
+            "dep".into(),
+            CanonicalRepoName::new("dep+").unwrap(),
+            RepoSpec {
+                rule_id: crate::RepoRuleId {
+                    bzl_file: CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "local_repository".into(),
+                },
+                attributes: Arc::new(SmallMap::from_iter([(
+                    CompactString::new("path"),
+                    OverrideAttributeValue::String(root.into()),
+                )])),
+            },
+        )
+    }
+
+    #[cfg(unix)]
+    fn route_materialization(root: &str) -> RepositoryMaterializationResultEpoch {
+        let route = local_route(root);
+        RepositoryMaterializationResultEpoch::new(
+            path("/workspace"),
+            [RepositoryMaterializationEpochEntry {
+                request: Arc::new(RepositoryMaterializationRequest {
+                    id: RepositoryMaterializationRequestId {
+                        workspace: path("/workspace"),
+                        canonical_repo: route.canonical_repo().clone(),
+                    },
+                    repo_spec: route.repo_spec().clone(),
+                    kind: RepositoryMaterializationKind::Local {
+                        logical_root: path(&format!("/workspace/{root}")),
+                    },
+                }),
+                result: RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Local,
+                ),
+            }],
+        )
+        .unwrap()
+    }
+
+    #[cfg(unix)]
+    fn route_prelude(
+        root: &str,
+        repo: Option<&'static [u8]>,
+        ignore: Option<&'static [u8]>,
+        variant: i64,
+    ) -> Vec<ScriptEntry> {
+        let root = format!("/workspace/{root}");
+        let mut entries = vec![
+            present("/", PathNodeKind::Directory, variant),
+            present("/workspace", PathNodeKind::Directory, variant),
+            present(&root, PathNodeKind::Directory, variant),
+        ];
+        for (name, source) in [("REPO.bazel", repo), (".bazelignore", ignore)] {
+            let logical = format!("{root}/{name}");
+            match source {
+                Some(source) => {
+                    entries.push(present(&logical, PathNodeKind::RegularFile, variant));
+                    entries.push(bytes(&logical, source));
+                }
+                None => entries.push(missing(&logical)),
+            }
+        }
+        entries
+    }
+
+    #[cfg(unix)]
+    fn external_key(root: &str, package: &str) -> ExternalRepositoryPackageLookupKey {
+        let route = local_route(root);
+        ExternalRepositoryPackageLookupKey::new(
+            route.clone(),
+            PackageIdentifier::new(
+                route.canonical_repo().clone(),
+                PackagePath::parse(package).unwrap(),
+            ),
+        )
+        .unwrap()
+    }
+
+    #[cfg(unix)]
+    async fn external_transaction(
+        dice: &Arc<Dice>,
+        root: &str,
+        deleted: &[&str],
+        entries: Vec<ScriptEntry>,
+        tracker: Option<Arc<RouteRepoEventTracker>>,
+    ) -> DiceTransaction {
+        let mut data = UserComputationData {
+            activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        inject_root_package_policy_inputs(&mut updater, inputs(&[], deleted, None)).unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch(&entries))])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: path("/workspace"),
+                },
+                route_materialization(root),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    #[cfg(unix)]
+    async fn route_repo_value(
+        dice: &Arc<Dice>,
+        entries: Vec<ScriptEntry>,
+        materialized: bool,
+        capture: bool,
+        tracker: Arc<RouteRepoEventTracker>,
+    ) -> <HostRouteRepoFileKey as Key>::Value {
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        if capture {
+            data.data.set(CaptureEvaluationEvents);
+        }
+        let mut updater = dice.updater_with_data(data);
+        inject_root_package_policy_inputs(&mut updater, inputs(&[], &[], None)).unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch(&entries))])
+            .unwrap();
+        let materialization = if materialized {
+            route_materialization("dep")
+        } else {
+            RepositoryMaterializationResultEpoch::new(path("/workspace"), []).unwrap()
+        };
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: path("/workspace"),
+                },
+                materialization,
+            )])
+            .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&HostRouteRepoFileKey::new(local_route("dep")))
+            .await
+            .unwrap()
+    }
+
+    #[cfg(unix)]
+    fn external_value(
+        outcome: SourcePreparationOutcome<
+            Arc<
+                Result<
+                    ExternalRepositoryPackageLookup,
+                    super::ExternalRepositoryPackageLookupError,
+                >,
+            >,
+        >,
+    ) -> ExternalRepositoryPackageLookup {
+        let SourcePreparationOutcome::Complete(value) = outcome else {
+            panic!("external lookup returned Need");
+        };
+        value.as_ref().as_ref().unwrap().dupe()
+    }
+
+    #[cfg(unix)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct RouteRepoActivation {
+        kind: ActivationKind,
+        batch: Option<EventBatch>,
+    }
+
+    #[cfg(unix)]
+    #[derive(Default)]
+    struct RouteRepoEventTracker(Mutex<Vec<RouteRepoActivation>>);
+
+    #[cfg(unix)]
+    impl RouteRepoEventTracker {
+        fn take(&self) -> Vec<RouteRepoActivation> {
+            std::mem::take(&mut *self.0.lock().unwrap())
+        }
+    }
+
+    #[cfg(unix)]
+    impl ActivationTracker for RouteRepoEventTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key.downcast_ref::<HostRouteRepoFileKey>().is_some() {
+                self.0.lock().unwrap().push(RouteRepoActivation {
+                    kind: activation.kind(),
+                    batch: activation
+                        .evaluation_data()
+                        .and_then(|data| data.downcast_ref::<EventBatch>())
+                        .map(Dupe::dupe),
+                });
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn route_repo_event_lifecycle_is_exact() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(RouteRepoEventTracker::default());
+        let source = Some(b"print('captured')\n".as_slice());
+
+        let value = route_repo_value(
+            &dice,
+            route_prelude("dep", source, None, 50),
+            true,
+            true,
+            tracker.clone(),
+        )
+        .await;
+        assert!(matches!(value, SourcePreparationOutcome::Complete(value) if value.is_ok()));
+        let activations = tracker.take();
+        assert!(matches!(
+            activations.as_slice(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: Some(batch),
+            }] if matches!(
+                batch.events(),
+                [EvaluationEvent::StarlarkPrint { text, .. }] if text == "captured"
+            )
+        ));
+
+        route_repo_value(
+            &dice,
+            route_prelude("dep", source, None, 50),
+            true,
+            true,
+            tracker.clone(),
+        )
+        .await;
+        assert_eq!(
+            tracker.take(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Reused,
+                batch: None,
+            }]
+        );
+
+        let absent = route_repo_value(
+            &dice,
+            route_prelude("dep", None, None, 51),
+            true,
+            true,
+            tracker.clone(),
+        )
+        .await;
+        assert!(matches!(absent, SourcePreparationOutcome::Complete(value) if value.is_ok()));
+        let activations = tracker.take();
+        assert!(matches!(
+            activations.as_slice(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: Some(batch),
+            }] if batch.events().is_empty()
+        ));
+
+        let repo_path = path("/workspace/dep/REPO.bazel");
+        let mut entries = route_prelude("dep", None, None, 52);
+        entries.retain(|(demand, _)| demand.path() != &repo_path);
+        entries.push(present(
+            "/workspace/dep/REPO.bazel",
+            PathNodeKind::Directory,
+            52,
+        ));
+        let failed = route_repo_value(&dice, entries, true, true, tracker.clone()).await;
+        assert!(matches!(
+            failed,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(crate::repo_file::HostRouteRepoFileError::Source(_)))
+        ));
+        let activations = tracker.take();
+        assert!(matches!(
+            activations.as_slice(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: Some(batch),
+            }] if batch.events().is_empty()
+        ));
+
+        let need = route_repo_value(&dice, Vec::new(), false, true, tracker.clone()).await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert_eq!(
+            tracker.take(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: None,
+            }]
+        );
+
+        let uncaptured = route_repo_value(
+            &dice,
+            route_prelude("dep", Some(b"print('DIRECT')\n"), None, 53),
+            true,
+            false,
+            tracker.clone(),
+        )
+        .await;
+        assert!(matches!(uncaptured, SourcePreparationOutcome::Complete(value) if value.is_ok()));
+        assert_eq!(
+            tracker.take(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: None,
+            }]
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn external_lookup_validates_and_canonically_deletes_without_route_or_event() {
+        let route = local_route("dep");
+        assert!(
+            ExternalRepositoryPackageLookupKey::new(
+                route.clone(),
+                PackageIdentifier::new(
+                    CanonicalRepoName::new("other+").unwrap(),
+                    PackagePath::parse("pkg").unwrap(),
+                ),
+            )
+            .is_none()
+        );
+
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = dice.updater().commit().await;
+        let invalid = external_key("dep", "bad:name");
+        assert!(matches!(
+            external_value(transaction.compute(&invalid).await.unwrap()),
+            ExternalRepositoryPackageLookup::InvalidPackageName { .. }
+        ));
+
+        let tracker = Arc::new(RouteRepoEventTracker::default());
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        inject_root_package_policy_inputs(&mut updater, inputs(&[], &["@dep+//pkg"], None))
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        assert_eq!(
+            external_value(
+                transaction
+                    .compute(&external_key("dep", "pkg"))
+                    .await
+                    .unwrap()
+            ),
+            ExternalRepositoryPackageLookup::Deleted
+        );
+        assert!(tracker.take().is_empty());
+
+        let mut updater = transaction.into_updater();
+        inject_root_package_policy_inputs(&mut updater, inputs(&[], &["@dep//pkg"], None)).unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: path("/workspace"),
+                },
+                RepositoryMaterializationResultEpoch::new(path("/workspace"), []).unwrap(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let outcome = transaction
+            .compute(&external_key("dep", "pkg"))
+            .await
+            .unwrap();
+        assert!(matches!(outcome, SourcePreparationOutcome::Need(_)));
+        assert!(!ExternalRepositoryPackageLookupKey::validity(&outcome));
+        assert!(!ExternalRepositoryPackageLookupKey::equality(
+            &outcome, &outcome
+        ));
+        assert_eq!(
+            tracker.take(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: None,
+            }]
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn external_lookup_reacts_to_repo_and_bazelignore_edits_with_child_events() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(RouteRepoEventTracker::default());
+        let mut entries = route_prelude(
+            "dep",
+            Some(b"print('one')\nignore_directories(['repo_deleted'])\n"),
+            Some(b"file_deleted\n"),
+            1,
+        );
+        let mut transaction = external_transaction(
+            &dice,
+            "dep",
+            &[],
+            std::mem::take(&mut entries),
+            Some(tracker.clone()),
+        )
+        .await;
+        for package in ["repo_deleted", "file_deleted"] {
+            assert_eq!(
+                external_value(
+                    transaction
+                        .compute(&external_key("dep", package))
+                        .await
+                        .unwrap()
+                ),
+                ExternalRepositoryPackageLookup::Deleted
+            );
+        }
+        let activations = tracker.take();
+        assert!(matches!(
+            activations.as_slice(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: Some(batch),
+            }] if matches!(
+                batch.events(),
+                [EvaluationEvent::StarlarkPrint { text, .. }] if text == "one"
+            )
+        ));
+
+        let mut entries = route_prelude(
+            "dep",
+            Some(b"print('two')\nignore_directories(['other'])\n"),
+            Some(b"also_other\n"),
+            2,
+        );
+        for package in ["repo_deleted", "file_deleted"] {
+            entries.extend([
+                present(
+                    &format!("/workspace/dep/{package}"),
+                    PathNodeKind::Directory,
+                    2,
+                ),
+                present(
+                    &format!("/workspace/dep/{package}/BUILD.bazel"),
+                    PathNodeKind::RegularFile,
+                    2,
+                ),
+            ]);
+        }
+        let mut transaction =
+            external_transaction(&dice, "dep", &[], entries, Some(tracker.clone())).await;
+        for package in ["repo_deleted", "file_deleted"] {
+            assert_eq!(
+                external_value(
+                    transaction
+                        .compute(&external_key("dep", package))
+                        .await
+                        .unwrap()
+                ),
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel)
+            );
+        }
+        let activations = tracker.take();
+        assert!(
+            matches!(
+                activations.as_slice(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: Some(batch),
+            }, RouteRepoActivation {
+                kind: ActivationKind::Reused,
+                batch: None,
+            }] if matches!(
+                batch.events(),
+                [EvaluationEvent::StarlarkPrint { text, .. }] if text == "two"
+            )
+            ),
+            "{activations:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn external_lookup_build_priority_kinds_symlink_errors_and_lifecycle() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let key = external_key("dep", "pkg");
+        let cases = [
+            (
+                Some(PathNodeKind::RegularFile),
+                Some(PathNodeKind::RegularFile),
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel),
+            ),
+            (
+                Some(PathNodeKind::Directory),
+                Some(PathNodeKind::SpecialFile),
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
+            ),
+            (
+                None,
+                Some(PathNodeKind::RegularFile),
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::Build),
+            ),
+            (None, None, ExternalRepositoryPackageLookup::NoBuildFile),
+            (
+                Some(PathNodeKind::RegularFile),
+                None,
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel),
+            ),
+        ];
+        let mut observed = Vec::new();
+        for (variant, (primary, fallback, expected)) in cases.into_iter().enumerate() {
+            let variant = variant as i64 + 10;
+            let mut entries = route_prelude("dep", None, None, variant);
+            entries.push(present(
+                "/workspace/dep/pkg",
+                PathNodeKind::Directory,
+                variant,
+            ));
+            for (name, kind) in [("BUILD.bazel", primary), ("BUILD", fallback)] {
+                let marker = format!("/workspace/dep/pkg/{name}");
+                entries.push(match kind {
+                    Some(kind) => present(&marker, kind, variant),
+                    None => missing(&marker),
+                });
+            }
+            let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+            let value = external_value(transaction.compute(&key).await.unwrap());
+            assert_eq!(value, expected);
+            observed.push(value);
+        }
+        assert_eq!(observed[0], observed[4]);
+
+        let mut entries = route_prelude("dep", None, None, 20);
+        entries.extend([
+            present("/workspace/dep/pkg", PathNodeKind::Directory, 20),
+            present("/workspace/dep/pkg/BUILD.bazel", PathNodeKind::Symlink, 20),
+            read_link("/workspace/dep/pkg/BUILD.bazel", "/physical/selected"),
+            present("/physical", PathNodeKind::Directory, 20),
+            present("/physical/selected", PathNodeKind::RegularFile, 20),
+        ]);
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        assert_eq!(
+            external_value(transaction.compute(&key).await.unwrap()),
+            ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel)
+        );
+
+        let mut entries = route_prelude("dep", None, None, 21);
+        entries.extend([
+            present("/workspace/dep/pkg", PathNodeKind::Directory, 21),
+            lstat_error("/workspace/dep/pkg/BUILD.bazel"),
+            present("/workspace/dep/pkg/BUILD", PathNodeKind::RegularFile, 21),
+        ]);
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        assert!(matches!(
+            transaction.compute(&key).await.unwrap(),
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(super::ExternalRepositoryPackageLookupError::Path(_)))
+        ));
+
+        let mut entries = route_prelude("dep", None, None, 22);
+        entries.extend([
+            present("/workspace/dep/pkg", PathNodeKind::Directory, 22),
+            present("/workspace/dep/pkg/BUILD", PathNodeKind::RegularFile, 22),
+        ]);
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        let SourcePreparationOutcome::Need(needs) = transaction.compute(&key).await.unwrap() else {
+            panic!("missing primary observation must stop before fallback");
+        };
+        let demands = needs.path_observations().unwrap().demands();
+        assert!(
+            demands
+                .iter()
+                .any(|demand| demand.path() == &path("/workspace/dep/pkg/BUILD.bazel"))
+        );
+        assert!(
+            demands
+                .iter()
+                .all(|demand| demand.path() != &path("/workspace/dep/pkg/BUILD"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn external_lookup_retains_typed_repo_and_ignore_errors() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let key = external_key("dep", "pkg");
+        let tracker = Arc::new(RouteRepoEventTracker::default());
+        let entries = route_prelude("dep", Some(b"x =\n"), None, 40);
+        let mut transaction =
+            external_transaction(&dice, "dep", &[], entries, Some(tracker.clone())).await;
+        assert!(matches!(
+            transaction.compute(&key).await.unwrap(),
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(super::ExternalRepositoryPackageLookupError::RepositoryIgnore(
+                        crate::repository_ignore::HostRepositoryIgnoreError::RouteRepoFile(
+                            crate::repo_file::HostRouteRepoFileError::Evaluation(
+                                crate::repo_file::HostRepoFileError::Syntax { .. }
+                            )
+                        )
+                    ))
+                )
+        ));
+        let activations = tracker.take();
+        assert!(matches!(
+            activations.as_slice(),
+            [RouteRepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: Some(batch),
+            }] if matches!(batch.events(), [EvaluationEvent::Diagnostic { .. }])
+        ));
+
+        let entries = route_prelude("dep", None, Some(b"/absolute\n"), 41);
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        assert!(matches!(
+            transaction.compute(&key).await.unwrap(),
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(super::ExternalRepositoryPackageLookupError::RepositoryIgnore(
+                        crate::repository_ignore::HostRepositoryIgnoreError::InvalidAbsolute { .. }
+                    ))
+                )
+        ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn external_lookup_route_identity_is_a_to_b_to_a() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut seen = Vec::new();
+        for root in ["dep-a", "dep-b", "dep-a"] {
+            let key = external_key(root, "pkg");
+            let mut entries = route_prelude(root, None, None, 30);
+            entries.extend([
+                present(
+                    &format!("/workspace/{root}/pkg"),
+                    PathNodeKind::Directory,
+                    30,
+                ),
+                present(
+                    &format!("/workspace/{root}/pkg/BUILD.bazel"),
+                    PathNodeKind::RegularFile,
+                    30,
+                ),
+            ]);
+            let mut transaction = external_transaction(&dice, root, &[], entries, None).await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            assert_eq!(
+                external_value(outcome.clone()),
+                ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel)
+            );
+            seen.push((key, outcome));
+        }
+        assert_ne!(seen[0].0, seen[1].0);
+        assert_eq!(seen[0].0, seen[2].0);
+        assert!(ExternalRepositoryPackageLookupKey::equality(
+            &seen[0].1, &seen[2].1
+        ));
     }
 
     #[cfg(unix)]
