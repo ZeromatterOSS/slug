@@ -28,8 +28,8 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod_v2::HostRepositorySourceFileKey;
+use slug_bzlmod_v2::HostRepositorySourceFileValue;
 use slug_bzlmod_v2::RepositorySourceFileError;
-use slug_bzlmod_v2::RepositorySourceFileValue;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorError;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
@@ -1651,10 +1651,12 @@ impl Key for RepositoryPackageLoadKey {
                 Ok(SourcePreparationOutcome::Need(need)) => {
                     return SourcePreparationOutcome::Need(need);
                 }
-                Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(
-                    bytes,
-                )))) => (primary_path, bytes),
-                Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))) => {
+                Ok(SourcePreparationOutcome::Complete(Ok(
+                    HostRepositorySourceFileValue::Present { bytes, .. },
+                ))) => (primary_path, bytes),
+                Ok(SourcePreparationOutcome::Complete(Ok(
+                    HostRepositorySourceFileValue::Absent,
+                ))) => {
                     let fallback_path = fallback;
                     let fallback_value = ctx
                         .compute(&HostRepositorySourceFileKey::new(
@@ -1667,10 +1669,10 @@ impl Key for RepositoryPackageLoadKey {
                             return SourcePreparationOutcome::Need(need);
                         }
                         Ok(SourcePreparationOutcome::Complete(Ok(
-                            RepositorySourceFileValue::Present(bytes),
+                            HostRepositorySourceFileValue::Present { bytes, .. },
                         ))) => (fallback_path, bytes),
                         Ok(SourcePreparationOutcome::Complete(Ok(
-                            RepositorySourceFileValue::Absent,
+                            HostRepositorySourceFileValue::Absent,
                         ))) => {
                             return repository_package_complete(Err(
                                 RepositoryPackageLoadError::new(

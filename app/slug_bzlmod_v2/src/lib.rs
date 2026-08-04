@@ -240,6 +240,7 @@ pub use root_bootstrap::RootModuleBootstrapCreateError;
 pub use root_bootstrap::RootModuleBootstrapRequest;
 pub use root_bootstrap::RootModuleBootstrapWarning;
 pub use source_preparation::HostRepositorySourceFileKey;
+pub use source_preparation::HostRepositorySourceFileValue;
 pub use source_preparation::ModuleSourcePreparation;
 pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;

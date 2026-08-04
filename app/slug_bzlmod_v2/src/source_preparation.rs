@@ -619,6 +619,19 @@ pub enum RepositorySourceFileValue {
     Absent,
 }
 
+/// The Host-only source result retains the requested normalized logical path
+/// submitted to resolution alongside the observed source bytes. The path can
+/// name a symlink; resolver namespace, real path, and provenance stay below
+/// this DICE boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum HostRepositorySourceFileValue {
+    Present {
+        bytes: Arc<[u8]>,
+        logical_path: NormalizedAbsolutePath,
+    },
+    Absent,
+}
+
 /// Semantic failure from reading a repository source file. Operational resolver
 /// paths, namespaces, and symlink provenance deliberately remain below this
 /// DICE boundary.
@@ -1037,13 +1050,22 @@ fn project_resolution_error(
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum ObservedRepositorySourceFile {
+    Present {
+        bytes: Arc<[u8]>,
+        logical_path: NormalizedAbsolutePath,
+    },
+    Absent,
+}
+
 async fn observed_repository_source_file(
     ctx: &mut DiceComputations<'_>,
     namespace: PathObservationNamespace,
     materialized_root: &Path,
     relative: &Path,
     repo_relative_path: Arc<PathBuf>,
-) -> PathResult<RepositorySourceFileValue, RepositorySourceFileError> {
+) -> PathResult<ObservedRepositorySourceFile, RepositorySourceFileError> {
     let logical_path = match NormalizedAbsolutePath::new(materialized_root.join(relative)) {
         Ok(path) => path,
         Err(_) => {
@@ -1053,7 +1075,7 @@ async fn observed_repository_source_file(
         }
     };
     let resolved = match ctx
-        .compute(&ResolvedPathKey::new(namespace, logical_path))
+        .compute(&ResolvedPathKey::new(namespace, logical_path.dupe()))
         .await
     {
         Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
@@ -1070,7 +1092,7 @@ async fn observed_repository_source_file(
     };
     let lstat = match resolved.state() {
         ResolvedPathState::Missing => {
-            return PathOutcome::Complete(Ok(RepositorySourceFileValue::Absent));
+            return PathOutcome::Complete(Ok(ObservedRepositorySourceFile::Absent));
         }
         ResolvedPathState::Present(lstat)
             if matches!(
@@ -1104,7 +1126,10 @@ async fn observed_repository_source_file(
     };
     match observed.as_ref() {
         PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
-            PathOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes.dupe())))
+            PathOutcome::Complete(Ok(ObservedRepositorySourceFile::Present {
+                bytes: bytes.dupe(),
+                logical_path,
+            }))
         }
         PathObservationResult::FileBytes(PathOperationResult::Missing) => {
             PathOutcome::Complete(Err(RepositorySourceFileError::InconsistentState {
@@ -1130,14 +1155,14 @@ async fn observed_repository_source_file(
     }
 }
 
-async fn repository_source_file_from_materialization(
+async fn observed_repository_source_file_from_materialization(
     ctx: &mut DiceComputations<'_>,
     materialization: SourcePreparationOutcome<
         Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>,
     >,
     relative: &Path,
     repo_relative_path: Arc<PathBuf>,
-) -> SourcePreparationResult<RepositorySourceFileValue, RepositorySourceFileError> {
+) -> SourcePreparationResult<ObservedRepositorySourceFile, RepositorySourceFileError> {
     let materialization = match materialization {
         SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
         SourcePreparationOutcome::Complete(value) => value,
@@ -1181,9 +1206,39 @@ async fn repository_source_file_from_materialization(
     }
 }
 
+fn legacy_repository_source_file_value(
+    outcome: SourcePreparationResult<ObservedRepositorySourceFile, RepositorySourceFileError>,
+) -> SourcePreparationResult<RepositorySourceFileValue, RepositorySourceFileError> {
+    outcome.map(|result| {
+        result.map(|observed| match observed {
+            ObservedRepositorySourceFile::Present { bytes, .. } => {
+                RepositorySourceFileValue::Present(bytes)
+            }
+            ObservedRepositorySourceFile::Absent => RepositorySourceFileValue::Absent,
+        })
+    })
+}
+
+fn host_repository_source_file_value(
+    outcome: SourcePreparationResult<ObservedRepositorySourceFile, RepositorySourceFileError>,
+) -> SourcePreparationResult<HostRepositorySourceFileValue, RepositorySourceFileError> {
+    outcome.map(|result| {
+        result.map(|observed| match observed {
+            ObservedRepositorySourceFile::Present {
+                bytes,
+                logical_path,
+            } => HostRepositorySourceFileValue::Present {
+                bytes,
+                logical_path,
+            },
+            ObservedRepositorySourceFile::Absent => HostRepositorySourceFileValue::Absent,
+        })
+    })
+}
+
 #[async_trait]
 impl Key for HostRepositorySourceFileKey {
-    type Value = SourcePreparationResult<RepositorySourceFileValue, RepositorySourceFileError>;
+    type Value = SourcePreparationResult<HostRepositorySourceFileValue, RepositorySourceFileError>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let relative = match checked_relative_path(&self.repo_relative_path) {
@@ -1230,13 +1285,15 @@ impl Key for HostRepositorySourceFileKey {
                 ));
             }
         };
-        repository_source_file_from_materialization(
-            ctx,
-            materialization,
-            relative,
-            repo_relative_path,
+        host_repository_source_file_value(
+            observed_repository_source_file_from_materialization(
+                ctx,
+                materialization,
+                relative,
+                repo_relative_path,
+            )
+            .await,
         )
-        .await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1288,13 +1345,15 @@ impl Key for RepositorySourceFileKey {
                 ));
             }
         };
-        repository_source_file_from_materialization(
-            ctx,
-            materialization,
-            relative,
-            repo_relative_path,
+        legacy_repository_source_file_value(
+            observed_repository_source_file_from_materialization(
+                ctx,
+                materialization,
+                relative,
+                repo_relative_path,
+            )
+            .await,
         )
-        .await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1711,6 +1770,8 @@ mod tests {
     use dice::DynKey;
     use dice::UserComputationData;
     use slug_identity_v2::ApparentRepoName;
+    use slug_workspace_v2::PathObservationEpoch;
+    use slug_workspace_v2::PathObservationEpochKey;
 
     use super::*;
 
@@ -1735,7 +1796,7 @@ mod tests {
         }
     }
 
-    fn local_route() -> RootRepositoryRoute {
+    fn local_route_with_path(path: &str) -> RootRepositoryRoute {
         RootRepositoryRoute::for_test(
             NormalizedAbsolutePath::new("/workspace").unwrap(),
             ApparentRepoName::new("dep_alias").unwrap(),
@@ -1751,10 +1812,21 @@ mod tests {
                 },
                 attributes: Arc::new(SmallMap::from_iter([(
                     CompactString::new("path"),
-                    OverrideAttributeValue::String("dep".into()),
+                    OverrideAttributeValue::String(path.into()),
                 )])),
             },
         )
+    }
+
+    fn local_route() -> RootRepositoryRoute {
+        local_route_with_path("dep")
+    }
+
+    fn host_source_value(path: &str, bytes: &[u8]) -> HostRepositorySourceFileValue {
+        HostRepositorySourceFileValue::Present {
+            bytes: Arc::from(bytes),
+            logical_path: NormalizedAbsolutePath::new(path).unwrap(),
+        }
     }
 
     fn immutable(root: &str, instance: u64) -> RepositoryMaterialization {
@@ -1785,6 +1857,18 @@ mod tests {
         assert!(!RepositoryMaterializationKey::equality(
             &SourcePreparationOutcome::Complete(left),
             &SourcePreparationOutcome::Complete(right),
+        ));
+
+        let same_bytes = SourcePreparationOutcome::Complete(Ok(
+            RepositorySourceFileValue::Present(Arc::from(&b"same"[..])),
+        ));
+        let changed_bytes = SourcePreparationOutcome::Complete(Ok(
+            RepositorySourceFileValue::Present(Arc::from(&b"changed"[..])),
+        ));
+        assert!(RepositorySourceFileKey::equality(&same_bytes, &same_bytes));
+        assert!(!RepositorySourceFileKey::equality(
+            &same_bytes,
+            &changed_bytes,
         ));
     }
 
@@ -1904,6 +1988,7 @@ mod tests {
             .unwrap();
         let mut transaction = updater.commit().await;
         let outcome = transaction.compute(&key).await.unwrap();
+        assert!(!HostRepositorySourceFileKey::validity(&outcome));
         let SourcePreparationOutcome::Need(needs) = outcome else {
             panic!("an uninjected native repository result must request materialization");
         };
@@ -1935,6 +2020,232 @@ mod tests {
                 && !dependency.starts_with("root-module-files:")
                 && !dependency.starts_with("workspace-snapshot:")
         }));
+    }
+
+    #[tokio::test]
+    async fn host_repository_source_value_retains_requested_logical_path_and_bytes() {
+        let route = local_route();
+        let key = HostRepositorySourceFileKey::new(route.clone(), PathBuf::from("BUILD.bazel"));
+        let request = Arc::new(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: route.repo_spec().clone(),
+            kind: RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
+            },
+        });
+        let logical_path = NormalizedAbsolutePath::new("/workspace/dep/BUILD.bazel").unwrap();
+        let physical_path = NormalizedAbsolutePath::new("/resolved/BUILD.bazel").unwrap();
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    [RepositoryMaterializationEpochEntry {
+                        request,
+                        result: RepositoryMaterializationResult::Success(
+                            RepositoryMaterializationSuccess::Local,
+                        ),
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let mut observations = Vec::new();
+
+        for _ in 0..16 {
+            let outcome = transaction.compute(&key).await.unwrap();
+            match outcome {
+                SourcePreparationOutcome::Complete(Ok(
+                    HostRepositorySourceFileValue::Present {
+                        bytes,
+                        logical_path: observed_path,
+                    },
+                )) => {
+                    assert_eq!(bytes.as_ref(), b"source");
+                    assert_eq!(observed_path, logical_path);
+                    return;
+                }
+                SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent)) => {
+                    panic!("the injected source file must be present");
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    panic!("the injected source file must not error: {error:?}");
+                }
+                SourcePreparationOutcome::Need(needs) => {
+                    let demands = needs
+                        .path_observations()
+                        .expect("materialization is injected, so only path observations remain");
+                    for demand in demands.demands() {
+                        assert_eq!(demand.namespace(), PathObservationNamespace::Host);
+                        let result = match demand.operation() {
+                            PathObservationOperation::Lstat if demand.path() == &logical_path => {
+                                PathObservationResult::Lstat(PathOperationResult::Present(
+                                    PathLstat::new(PathNodeKind::Symlink, 1, 2, 3, 4, 0o777),
+                                ))
+                            }
+                            PathObservationOperation::Lstat if demand.path() == &physical_path => {
+                                PathObservationResult::Lstat(PathOperationResult::Present(
+                                    PathLstat::new(PathNodeKind::RegularFile, 6, 2, 3, 5, 0o644),
+                                ))
+                            }
+                            PathObservationOperation::Lstat => {
+                                PathObservationResult::Lstat(PathOperationResult::Present(
+                                    PathLstat::new(PathNodeKind::Directory, 0, 2, 3, 6, 0o755),
+                                ))
+                            }
+                            PathObservationOperation::ReadLink => {
+                                assert_eq!(demand.path(), &logical_path);
+                                PathObservationResult::ReadLink(PathOperationResult::Present(
+                                    Arc::new(physical_path.as_path().to_owned()),
+                                ))
+                            }
+                            PathObservationOperation::FileBytes => {
+                                assert_eq!(demand.path(), &physical_path);
+                                PathObservationResult::FileBytes(PathOperationResult::Present(
+                                    Arc::from(&b"source"[..]),
+                                ))
+                            }
+                            operation => panic!("unexpected source observation: {operation:?}"),
+                        };
+                        observations.push((demand.dupe(), result));
+                    }
+                    let mut updater = transaction.into_updater();
+                    updater
+                        .changed_to(vec![(
+                            PathObservationEpochKey,
+                            PathObservationEpoch::new(observations.clone()).unwrap(),
+                        )])
+                        .unwrap();
+                    transaction = updater.commit().await;
+                }
+            }
+        }
+        panic!("the injected source file did not resolve");
+    }
+
+    #[test]
+    fn host_repository_source_value_equality_requires_equal_bytes_and_logical_path() {
+        let same = SourcePreparationOutcome::Complete(Ok(host_source_value(
+            "/workspace/dep/BUILD.bazel",
+            b"same",
+        )));
+        let equal = SourcePreparationOutcome::Complete(Ok(host_source_value(
+            "/workspace/dep/BUILD.bazel",
+            b"same",
+        )));
+        let different_path = SourcePreparationOutcome::Complete(Ok(host_source_value(
+            "/workspace/other/BUILD.bazel",
+            b"same",
+        )));
+        let different_bytes = SourcePreparationOutcome::Complete(Ok(host_source_value(
+            "/workspace/dep/BUILD.bazel",
+            b"changed",
+        )));
+
+        assert!(HostRepositorySourceFileKey::equality(&same, &equal));
+        assert!(!HostRepositorySourceFileKey::equality(
+            &same,
+            &different_path
+        ));
+        assert!(!HostRepositorySourceFileKey::equality(
+            &same,
+            &different_bytes
+        ));
+    }
+
+    #[test]
+    fn host_repository_source_value_need_and_error_have_no_logical_path() {
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::repository(
+            RepositoryMaterializationRequest {
+                id: RepositoryMaterializationRequestId {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+                },
+                repo_spec: local_route().repo_spec().clone(),
+                kind: RepositoryMaterializationKind::Local {
+                    logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
+                },
+            },
+        ));
+        let error = RepositorySourceFileError::InvalidRepoRelativePath {
+            requested_path: Arc::new(PathBuf::from("../BUILD.bazel")),
+        };
+
+        assert!(matches!(
+            host_repository_source_file_value(need),
+            SourcePreparationOutcome::Need(_),
+        ));
+        assert!(matches!(
+            host_repository_source_file_value(SourcePreparationOutcome::Complete(Ok(
+                ObservedRepositorySourceFile::Absent,
+            ))),
+            SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent)),
+        ));
+        let SourcePreparationOutcome::Complete(Err(actual)) = host_repository_source_file_value(
+            SourcePreparationOutcome::Complete(Err(error.clone())),
+        ) else {
+            panic!("a source error must remain path-free and complete");
+        };
+        assert_eq!(actual, error);
+    }
+
+    #[test]
+    fn legacy_immutable_repository_source_value_remains_bytes_only() {
+        let first = SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(
+            Arc::from(&b"same"[..]),
+        )));
+        let same_bytes_after_new_generation = SourcePreparationOutcome::Complete(Ok(
+            RepositorySourceFileValue::Present(Arc::from(&b"same"[..])),
+        ));
+        let changed_bytes = SourcePreparationOutcome::Complete(Ok(
+            RepositorySourceFileValue::Present(Arc::from(&b"changed"[..])),
+        ));
+
+        assert!(RepositorySourceFileKey::equality(
+            &first,
+            &same_bytes_after_new_generation,
+        ));
+        assert!(!RepositorySourceFileKey::equality(&first, &changed_bytes));
+    }
+
+    #[test]
+    fn host_repository_source_local_override_root_change_is_distinct_key() {
+        let first = HostRepositorySourceFileKey::new(
+            local_route_with_path("dep"),
+            PathBuf::from("BUILD.bazel"),
+        );
+        let second = HostRepositorySourceFileKey::new(
+            local_route_with_path("other-dep"),
+            PathBuf::from("BUILD.bazel"),
+        );
+        let first_value = SourcePreparationOutcome::Complete(Ok(host_source_value(
+            "/workspace/dep/BUILD.bazel",
+            b"same",
+        )));
+        let second_value = SourcePreparationOutcome::Complete(Ok(host_source_value(
+            "/workspace/other-dep/BUILD.bazel",
+            b"same",
+        )));
+
+        assert_ne!(first, second);
+        assert!(!HostRepositorySourceFileKey::equality(
+            &first_value,
+            &second_value,
+        ));
     }
 
     #[test]
