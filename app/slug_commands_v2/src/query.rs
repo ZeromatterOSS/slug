@@ -158,6 +158,14 @@ fn validate_query_flags(
             "nostrict_test_suite" => {
                 policy.strict_test_suite = parse_bool_flag(flag, true)?;
             }
+            "noshow_progress" => {
+                if flag.value.is_some() {
+                    return Err(CommandParseError::InvalidFlagValue {
+                        flag: flag.raw.clone(),
+                        message: "Unexpected value after boolean option".to_owned(),
+                    });
+                }
+            }
             _ => {
                 return Err(CommandParseError::InvalidFlagValue {
                     flag: flag.raw.clone(),

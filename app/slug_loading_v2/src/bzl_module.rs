@@ -88,6 +88,7 @@ use crate::package::HostGlobAttemptControl;
 use crate::package::HostGlobAttemptError;
 use crate::package::LoadedPackage;
 use crate::package::PackageRecorder;
+use crate::package::PackageTargetKind;
 use crate::package::loading_globals;
 use crate::provider::BzlEvaluationContext;
 
@@ -1279,7 +1280,6 @@ impl fmt::Display for ExternalBzlModuleError {
 
 impl std::error::Error for ExternalBzlModuleError {}
 
-#[cfg(all(test, unix))]
 impl ExternalBzlModuleError {
     fn cycle(&self) -> Option<&ExternalBzlLoadCycle> {
         match self {
@@ -1291,6 +1291,21 @@ impl ExternalBzlModuleError {
             | Self::Encoding { .. }
             | Self::Parse { .. }
             | Self::LoadLabel { .. }
+            | Self::Evaluation { .. }
+            | Self::Freeze { .. } => None,
+        }
+    }
+
+    fn missing_label(&self) -> Option<&CanonicalLabel> {
+        match self {
+            Self::Absent { label } => Some(label),
+            Self::Child { error, .. } => error.missing_label(),
+            Self::SourceCompute { .. }
+            | Self::Source { .. }
+            | Self::Encoding { .. }
+            | Self::Parse { .. }
+            | Self::LoadLabel { .. }
+            | Self::Cycle(_)
             | Self::Evaluation { .. }
             | Self::Freeze { .. } => None,
         }
@@ -1406,9 +1421,22 @@ enum RepositoryPackageLoadErrorInner {
         package: PackagePath,
         message: Arc<str>,
     },
-    LoadsUnsupported {
+    LoadLabel {
         canonical_repo: CompactString,
         package: PackagePath,
+        error: ExternalLoadLabelError,
+    },
+    Bzl {
+        origin: Arc<str>,
+        raw_load: Arc<str>,
+        canonical_label: CanonicalLabel,
+        error: Arc<ExternalBzlModuleError>,
+    },
+    LoadedTargetKind {
+        canonical_repo: CompactString,
+        package: PackagePath,
+        target: Arc<str>,
+        kind: Arc<str>,
     },
     GlobUnsupported {
         canonical_repo: CompactString,
@@ -1467,12 +1495,46 @@ impl fmt::Display for RepositoryPackageLoadError {
                 f,
                 "parsing BUILD file for @@{canonical_repo}//{package}: {message}"
             ),
-            RepositoryPackageLoadErrorInner::LoadsUnsupported {
+            RepositoryPackageLoadErrorInner::LoadLabel {
                 canonical_repo,
                 package,
+                error,
             } => write!(
                 f,
-                "external repository BUILD loads are deferred: @@{canonical_repo}//{package}"
+                "resolving a load in @@{canonical_repo}//{package}: {error}"
+            ),
+            RepositoryPackageLoadErrorInner::Bzl {
+                origin,
+                raw_load,
+                canonical_label: _,
+                error,
+            } => {
+                if let Some(cycle) = error.cycle() {
+                    let path = cycle
+                        .path
+                        .iter()
+                        .map(|key| key.canonical_label().to_string())
+                        .collect::<Vec<_>>();
+                    let keys = cycle
+                        .keys
+                        .iter()
+                        .map(|key| key.canonical_label().to_string())
+                        .collect::<Vec<_>>();
+                    f.write_str(&render_bzl_cycle(origin, &path, &keys))
+                } else if let Some(missing) = error.missing_label() {
+                    write!(f, "cannot load '{missing}': no such file")
+                } else {
+                    write!(f, "loading `{raw_load}`: {error}")
+                }
+            }
+            RepositoryPackageLoadErrorInner::LoadedTargetKind {
+                canonical_repo,
+                package,
+                target,
+                kind,
+            } => write!(
+                f,
+                "loaded external package @@{canonical_repo}//{package} produced unsupported target `{target}` of kind {kind}"
             ),
             RepositoryPackageLoadErrorInner::GlobUnsupported {
                 canonical_repo,
@@ -2139,6 +2201,18 @@ fn repository_package_complete(
     SourcePreparationOutcome::Complete(Arc::new(result))
 }
 
+fn loaded_external_target_kind(kind: &PackageTargetKind) -> Option<&'static str> {
+    match kind {
+        PackageTargetKind::ExportedFile | PackageTargetKind::Filegroup { .. } => None,
+        PackageTargetKind::Alias { .. } => Some("alias"),
+        PackageTargetKind::ConfigSetting { .. } => Some("config_setting"),
+        PackageTargetKind::TestSuite { .. } => Some("test_suite"),
+        PackageTargetKind::PackageGroup { .. } => Some("package_group"),
+        PackageTargetKind::GeneratedFile { .. } => Some("generated file"),
+        PackageTargetKind::StarlarkRule(_) => Some("Starlark rule"),
+    }
+}
+
 #[async_trait]
 impl Key for RepositoryPackageLoadKey {
     type Value = SourcePreparationOutcome<Arc<Result<LoadedPackage, RepositoryPackageLoadError>>>;
@@ -2279,13 +2353,79 @@ impl Key for RepositoryPackageLoadKey {
                     )));
                 }
             };
-            if !ast.loads().is_empty() {
-                return repository_package_complete(Err(RepositoryPackageLoadError::new(
-                    RepositoryPackageLoadErrorInner::LoadsUnsupported {
-                        canonical_repo,
-                        package: self.package.clone(),
+            let loads = ast
+                .loads()
+                .into_iter()
+                .map(|load| load.module_id.to_owned())
+                .collect::<Vec<_>>();
+            let resolved_loads = match loads
+                .iter()
+                .map(|load| {
+                    resolve_external_load_label(&self.package, load)
+                        .map(|label| (load.clone(), label))
+                })
+                .collect::<Result<Vec<_>, _>>()
+            {
+                Ok(loads) => loads,
+                Err(error) => {
+                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
+                        RepositoryPackageLoadErrorInner::LoadLabel {
+                            canonical_repo,
+                            package: self.package.clone(),
+                            error,
+                        },
+                    )));
+                }
+            };
+            let build_basename = relative_build_file
+                .file_name()
+                .expect("BUILD candidate has a basename")
+                .to_string_lossy();
+            let build_origin: Arc<str> = Arc::from(format!(
+                "@@{canonical_repo}//{}/{}",
+                self.package, build_basename
+            ));
+            let mut loaded_modules = Vec::with_capacity(resolved_loads.len());
+            for (raw_load, label) in resolved_loads {
+                let child = ExternalBzlModuleEvalKey::new(self.route.clone(), label);
+                let canonical_label = child.canonical_label();
+                let child_value = match ctx.compute(&child).await {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return repository_package_complete(Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::Bzl {
+                                origin: build_origin.clone(),
+                                raw_load: Arc::from(raw_load.as_str()),
+                                canonical_label: canonical_label.clone(),
+                                error: Arc::new(ExternalBzlModuleError::SourceCompute {
+                                    label: canonical_label,
+                                    message: Arc::from(error.to_string()),
+                                }),
+                            },
+                        )));
+                    }
+                };
+                let module = match child_value {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                        Ok(module) => module.clone(),
+                        Err(error) => {
+                            return repository_package_complete(Err(
+                                RepositoryPackageLoadError::new(
+                                    RepositoryPackageLoadErrorInner::Bzl {
+                                        origin: build_origin.clone(),
+                                        raw_load: Arc::from(raw_load.as_str()),
+                                        canonical_label,
+                                        error: Arc::new(error.clone()),
+                                    },
+                                ),
+                            ));
+                        }
                     },
-                )));
+                };
+                loaded_modules.push((raw_load, module));
             }
             let input = HostPackageAttemptInput {
                 workspace: self.route.workspace().dupe(),
@@ -2295,7 +2435,7 @@ impl Key for RepositoryPackageLoadKey {
                 build_file: logical_build_file,
                 source,
                 package_label: CompactString::new(self.package.as_str()),
-                loaded_modules: &[],
+                loaded_modules: &loaded_modules,
                 capture_events,
             };
             match evaluate_host_package_attempt(&input, Arc::new(SmallMap::new())) {
@@ -2312,11 +2452,31 @@ impl Key for RepositoryPackageLoadKey {
                 }
                 HostPackageAttemptStep::Terminal(terminal) => {
                     event_batch = Some(terminal.event_batch);
-                    repository_package_complete(terminal.result.map_err(|error| {
+                    let result = terminal.result.map_err(|error| {
                         RepositoryPackageLoadError::new(RepositoryPackageLoadErrorInner::Attempt(
                             error,
                         ))
-                    }))
+                    });
+                    let result = result.and_then(|loaded| {
+                        if loads.is_empty() {
+                            return Ok(loaded);
+                        }
+                        if let Some((target, kind)) = loaded.targets.iter().find_map(|target| {
+                            loaded_external_target_kind(&target.kind)
+                                .map(|kind| (target.name.as_str(), kind))
+                        }) {
+                            return Err(RepositoryPackageLoadError::new(
+                                RepositoryPackageLoadErrorInner::LoadedTargetKind {
+                                    canonical_repo,
+                                    package: self.package.clone(),
+                                    target: Arc::from(target),
+                                    kind: Arc::from(kind),
+                                },
+                            ));
+                        }
+                        Ok(loaded)
+                    });
+                    repository_package_complete(result)
                 }
             }
         }

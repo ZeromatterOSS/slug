@@ -3732,6 +3732,26 @@ impl RootQueryEpochBuilder {
         builder
     }
 
+    fn external_macro_package(variant: i64) -> Self {
+        let mut builder = Self::external_package(variant);
+        builder.directory("/workspace/dep/macro", variant);
+        builder.directory_entries("/workspace/dep/macro", &[]);
+        builder.file(
+            "/workspace/dep/macro/BUILD.bazel",
+            "load(\":defs.bzl\", \"make_filegroup\")\nmake_filegroup(name = \"macro_files\")\n",
+            variant,
+        );
+        builder.file(
+            "/workspace/dep/macro/defs.bzl",
+            "def make_filegroup(name):\n    native.filegroup(name = name)\n",
+            variant,
+        );
+        // A same-path root package makes accidental root companion discovery
+        // observable without participating in the external package owner.
+        builder.package("macro", "filegroup(name = \"root_sentinel\")\n", variant);
+        builder
+    }
+
     fn package(&mut self, name: &str, source: &str, variant: i64) {
         self.package_at("/workspace", name, "BUILD.bazel", source, variant);
     }
@@ -4007,6 +4027,150 @@ async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root
             "{source}"
         );
     }
+}
+
+#[tokio::test]
+async fn external_macro_loading_files_preserve_owner_fake_consumers_and_output_seams() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootAnchorTracker::default());
+    let mut transaction = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_macro_package(5).build(),
+        tracker,
+    )
+    .await;
+
+    for (source, expected) in [
+        ("@dep//macro:macro_files", &["@dep//macro:macro_files"][..]),
+        (
+            "loadfiles(@dep//macro:macro_files)",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "buildfiles(@dep//macro:macro_files)",
+            &["@dep//macro:BUILD.bazel", "@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "deps(loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "rdeps(loadfiles(@dep//macro:macro_files), loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "allpaths(loadfiles(@dep//macro:macro_files), loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "somepath(loadfiles(@dep//macro:macro_files), loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "some(loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "siblings(loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:BUILD.bazel", "@dep//macro:macro_files"][..],
+        ),
+        (
+            "visible(@dep//macro:macro_files, loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "loadfiles(loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "buildfiles(loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:BUILD.bazel", "@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "loadfiles(@dep//macro:macro_files) union loadfiles(@dep//macro:macro_files)",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "same_pkg_direct_rdeps(loadfiles(@dep//macro:macro_files))",
+            &[][..],
+        ),
+        ("labels(srcs, loadfiles(@dep//macro:macro_files))", &[][..]),
+        ("executables(loadfiles(@dep//macro:macro_files))", &[][..]),
+        ("tests(loadfiles(@dep//macro:macro_files))", &[][..]),
+    ] {
+        let value = transaction.compute(&root_query_key(source)).await.unwrap();
+        let QueryPreparationOutcome::Complete(result) = value else {
+            panic!("{source} requested unexpected preparation: {value:?}")
+        };
+        assert_eq!(
+            result.as_ref().as_ref().unwrap().labels.as_ref(),
+            expected,
+            "{source}"
+        );
+    }
+
+    let literal_kind = RootQueryCommandKey::new(
+        root_query_workspace(),
+        "@dep//macro:macro_files",
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+        QueryOutputCompletion::LabelKind,
+    )
+    .unwrap();
+    let QueryPreparationOutcome::Complete(literal_kind) =
+        transaction.compute(&literal_kind).await.unwrap()
+    else {
+        panic!("external macro label_kind requested preparation")
+    };
+    assert_eq!(
+        literal_kind.as_ref().as_ref().unwrap().label_kind_stdout(),
+        "filegroup rule @dep//macro:macro_files\n"
+    );
+
+    let fake_kind = RootQueryCommandKey::new(
+        root_query_workspace(),
+        "loadfiles(@dep//macro:macro_files)",
+        QueryOrder::Auto,
+        QueryPolicy::default(),
+        QueryOutputCompletion::LabelKind,
+    )
+    .unwrap();
+    let QueryPreparationOutcome::Complete(fake_kind) =
+        transaction.compute(&fake_kind).await.unwrap()
+    else {
+        panic!("external fake label_kind requested preparation")
+    };
+    let fake = fake_kind.as_ref().as_ref().unwrap();
+    assert_eq!(
+        fake.label_kind_stdout(),
+        "source file @dep//macro:defs.bzl\n"
+    );
+    assert_eq!(fake.package_stdout(), "@dep//macro\n");
+    assert_eq!(
+        fake.graph_stdout(false, true),
+        concat!(
+            "digraph mygraph {\n",
+            "  node [shape=box];\n",
+            "  \"@dep//macro:defs.bzl\"\n",
+            "}\n",
+        )
+    );
+
+    let full = RootQueryCommandKey::new(
+        root_query_workspace(),
+        "buildfiles(@dep//macro:macro_files)",
+        QueryOrder::Full,
+        QueryPolicy::default(),
+        QueryOutputCompletion::Standard,
+    )
+    .unwrap();
+    let QueryPreparationOutcome::Complete(full) = transaction.compute(&full).await.unwrap() else {
+        panic!("external full buildfiles requested preparation")
+    };
+    assert_eq!(
+        full.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//macro:defs.bzl"]
+    );
 }
 
 #[tokio::test]

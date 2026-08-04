@@ -16949,3 +16949,44 @@ accepted in those two files; any valued, positive, or other compatibility flag
 must be accepted; a fixture/tool/CLI/evaluator/common-parser or retained-core
 edit is needed; the macro rows still fail; or the parser delta exceeds
 `+40/-0`.
+
+### WP-5-m1 external Bzl activation and progress compatibility acceptance (2026-08-04)
+
+**Status: ACCEPTED.** The retained six-path activation core and two-file parser
+prerequisite land together in exactly eight paths at `+829/-21`: the activation
+core remains `+793/-21` with review hash
+`8ace134f42e9b1397ad6bdf428ef5d6d16f864d95f70c9be9586481a00261511`,
+and the parser delta is `+36/-0`. No fixture changed.
+
+`RepositoryPackageLoadKey` now prevalidates every direct load, computes the
+route-keyed external Bzl children sequentially, transfers raw/frozen pairs
+through the sole package attempt, retains manifest/fingerprint/frozen lifetime,
+and owns BUILD/macro events separately from Bzl-key events. Nonempty loaded
+packages accept only `ExportedFile` and native `Filegroup`. External loading
+provenance retains apparent route identity, emits owner-routed Bzl fake leaves,
+and reuses the emitted external BUILD companion without root discovery. Typed
+missing/cycle errors, Need/equality/validity, fresh-detector recovery, target
+gating, event reuse, fake consumers/formats, and daemon edit/delete/recreate
+are covered. Independent DICE and query-consumer latest-diff reviews returned
+**ACCEPT core** without correction.
+
+Loading `query` now accepts only exact bare `--noshow_progress` as a retained
+no-op flag. Empty and valued equals forms return Bazel's observed `Unexpected
+value after boolean option`; positive and other unsupported flags remain
+rejected. The parser target passed 16 tests, crate check, GNU-Windows no-run,
+and independent rereview. Focused loading/query/CLI tests, both affected
+loading/query GNU-Windows gates, rebuilt `slug_cli_v2`, formatting, archive,
+scope, and diff checks passed. Exact direct macro commands and a fresh frozen
+fixture replay passed all three macro rows with their accepted stdout; the only
+remaining row failure is the pre-existing unrelated `build_dep_target` build-
+stage gap. Replay roots were removed, the probe Bazel server was shut down, and
+no stale `slugd` remains.
+
+The next packet is design-only:
+`WP-5-m1-external-dependency-free-starlark-rule-projection-design`. It may
+reuse the accepted source identity, external module owner, activation,
+route-aware query identity, generic consumers, and prior Bazel 9.2 non-test
+rule evidence. It must freeze the exact whole-package gate and graph projection
+for one explicitly public, same-package loaded, dependency-free, non-test,
+non-executable `StarlarkRule`, decide whether permanent oracle growth is
+necessary, and obtain independent reserved-boundary review before Rust.

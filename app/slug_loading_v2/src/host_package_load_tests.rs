@@ -56,6 +56,7 @@ use starlark_map::small_map::SmallMap;
 use super::ExternalBzlModuleError;
 use super::ExternalBzlModuleEvalKey;
 use super::RepositoryBzlLabel;
+use super::RepositoryPackageLoadKey;
 use super::resolve_external_load_label;
 use super::resolve_host_load_label;
 use crate::LoadingPreparationOutcome;
@@ -206,6 +207,7 @@ impl ActivationTracker for EventTracker {
             && !name.starts_with("host-bzl-module:")
             && !name.starts_with("host-package-load:")
             && !name.starts_with("external-bzl-module:")
+            && !name.starts_with("repository-package-load:")
         {
             return;
         }
@@ -714,6 +716,21 @@ async fn host_package_retained_graph_replays_all_input_lifecycles() {
 }
 
 type ExternalBzlOutcome = <ExternalBzlModuleEvalKey as Key>::Value;
+type RepositoryPackageOutcome = <RepositoryPackageLoadKey as Key>::Value;
+
+fn repository_package_terminal(outcome: &RepositoryPackageOutcome) -> &crate::LoadedPackage {
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("complete external source epoch returned Need");
+    };
+    value.as_ref().as_ref().unwrap()
+}
+
+fn repository_package_error(outcome: &RepositoryPackageOutcome) -> String {
+    let LoadingPreparationOutcome::Complete(value) = outcome else {
+        panic!("complete external source epoch returned Need");
+    };
+    value.as_ref().as_ref().unwrap_err().to_string()
+}
 
 fn external_terminal(outcome: &ExternalBzlOutcome) -> &super::FrozenBzlModule {
     let LoadingPreparationOutcome::Complete(value) = outcome else {
@@ -1167,4 +1184,320 @@ async fn external_bzl_module_cycle_releases_and_recovers_with_fresh_detector() {
         .await
         .unwrap();
     assert_eq!(external_terminal(&fixed_value).manifest.reachable.len(), 3);
+}
+
+#[tokio::test]
+async fn repository_package_load_activates_external_macro_manifest_lifetime_and_local_events() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(\":defs.bzl\", \"make_filegroup\")\nprint(\"BUILD_TOP\")\nmake_filegroup(name = \"macro_files\")\n",
+        ),
+        (
+            "defs.bzl",
+            b"print(\"DEFS_TOP\")\ndef make_filegroup(name):\n    print(\"MACRO_BODY\")\n    native.filegroup(name = name)\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let epoch = EpochBuilder::external_sources(files, 70).build();
+    let tracker = Arc::new(EventTracker::default());
+    let mut cold = transaction(&dice, epoch.clone(), true, Some(tracker.dupe())).await;
+    let route = external_route(&mut cold).await;
+    let key = RepositoryPackageLoadKey::new(route, PackagePath::parse("").unwrap());
+    let cold_value = cold.compute(&key).await.unwrap();
+    let loaded = repository_package_terminal(&cold_value);
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["macro_files"]
+    );
+    assert_eq!(
+        loaded
+            .direct_load_roots
+            .iter()
+            .map(|identity| identity.label.to_string())
+            .collect::<Vec<_>>(),
+        ["@@dep+//:defs.bzl"]
+    );
+    assert_eq!(
+        loaded
+            .reachable_loads
+            .iter()
+            .map(|identity| identity.label.to_string())
+            .collect::<Vec<_>>(),
+        ["@@dep+//:defs.bzl"]
+    );
+    assert_eq!(loaded.retained_bzl_module_count(), 1);
+    assert_ne!(loaded.load_fingerprint, [0; 32]);
+    assert!(RepositoryPackageLoadKey::validity(&cold_value));
+    assert!(RepositoryPackageLoadKey::equality(&cold_value, &cold_value));
+
+    let batches = tracker.take();
+    let bzl = batches
+        .iter()
+        .find(|entry| entry.key == "external-bzl-module:@@dep+//:defs.bzl")
+        .unwrap();
+    assert_eq!(bzl.kind, ActivationKind::Evaluated);
+    assert_eq!(event_texts(bzl.batch.as_ref().unwrap()), ["DEFS_TOP"]);
+    let package = batches
+        .iter()
+        .find(|entry| entry.key.starts_with("repository-package-load:"))
+        .unwrap();
+    assert_eq!(package.kind, ActivationKind::Evaluated);
+    assert_eq!(
+        event_texts(package.batch.as_ref().unwrap()),
+        ["BUILD_TOP", "MACRO_BODY"]
+    );
+
+    let warm_tracker = Arc::new(EventTracker::default());
+    let mut warm = transaction(&dice, epoch, true, Some(warm_tracker.dupe())).await;
+    let route = external_route(&mut warm).await;
+    let warm_value = warm
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(RepositoryPackageLoadKey::equality(&cold_value, &warm_value));
+    let warm_batches = warm_tracker.take();
+    assert!(
+        warm_batches
+            .iter()
+            .all(|entry| { entry.kind == ActivationKind::Reused && entry.batch.is_none() })
+    );
+}
+
+#[tokio::test]
+async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_kinds() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let mut invalid = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[(
+                "BUILD.bazel",
+                b"load(\":unobserved.bzl\", \"FIRST\")\nload(\"@other//:bad.bzl\", \"SECOND\")\n",
+            )],
+            71,
+        )
+        .build(),
+        false,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let route = external_route(&mut invalid).await;
+    let invalid_key = RepositoryPackageLoadKey::new(route.clone(), PackagePath::parse("").unwrap());
+    let invalid_value = invalid.compute(&invalid_key).await.unwrap();
+    assert!(
+        repository_package_error(&invalid_value)
+            .contains("repository-qualified external load is deferred: @other//:bad.bzl")
+    );
+    assert!(
+        tracker
+            .take()
+            .iter()
+            .all(|entry| !entry.key.starts_with("external-bzl-module:"))
+    );
+    assert!(RepositoryPackageLoadKey::validity(&invalid_value));
+    assert!(RepositoryPackageLoadKey::equality(
+        &invalid_value,
+        &invalid_value
+    ));
+
+    let sequential_tracker = Arc::new(EventTracker::default());
+    let mut sequential_need = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[
+                (
+                    "BUILD.bazel",
+                    b"load(\":first.bzl\", \"FIRST\")\nload(\":second.bzl\", \"SECOND\")\n",
+                ),
+                ("second.bzl", b"SECOND = 2\n"),
+            ],
+            711,
+        )
+        .build(),
+        false,
+        Some(sequential_tracker.dupe()),
+    )
+    .await;
+    let route = external_route(&mut sequential_need).await;
+    let sequential_need = sequential_need
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(matches!(
+        sequential_need,
+        LoadingPreparationOutcome::Need(_)
+    ));
+    assert!(
+        sequential_tracker
+            .take()
+            .iter()
+            .all(|entry| entry.key != "external-bzl-module:@@dep+//:second.bzl")
+    );
+
+    let mut need = transaction(&dice, EpochBuilder::default().build(), false, None).await;
+    let need_value = need.compute(&invalid_key).await.unwrap();
+    assert!(matches!(need_value, LoadingPreparationOutcome::Need(_)));
+    assert!(!RepositoryPackageLoadKey::validity(&need_value));
+    assert!(!RepositoryPackageLoadKey::equality(
+        &need_value,
+        &need_value
+    ));
+
+    let mut rejected = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[
+                (
+                    "BUILD.bazel",
+                    b"load(\":defs.bzl\", \"make_alias\")\nmake_alias(name = \"blocked\")\n",
+                ),
+                (
+                    "defs.bzl",
+                    b"def make_alias(name):\n    native.alias(name = name, actual = \":missing\")\n",
+                ),
+            ],
+            72,
+        )
+        .build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut rejected).await;
+    let rejected = rejected
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        repository_package_error(&rejected)
+            .contains("produced unsupported target `blocked` of kind alias")
+    );
+
+    let mut unloaded = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[(
+                "BUILD.bazel",
+                b"alias(name = \"accepted\", actual = \":missing\")\n",
+            )],
+            73,
+        )
+        .build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut unloaded).await;
+    let unloaded = unloaded
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        repository_package_terminal(&unloaded).targets[0].name,
+        "accepted"
+    );
+}
+
+#[tokio::test]
+async fn repository_package_load_renders_missing_and_cycle_and_recovers_on_same_dice() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut missing_epoch = EpochBuilder::external_sources(
+        &[(
+            "BUILD.bazel",
+            b"load(\":missing.bzl\", \"make\")\nmake(name = \"x\")\n",
+        )],
+        74,
+    );
+    missing_epoch.missing("/workspace/dep/missing.bzl");
+    let mut missing = transaction(&dice, missing_epoch.build(), false, None).await;
+    let route = external_route(&mut missing).await;
+    let missing = missing
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        repository_package_error(&missing),
+        "cannot load '@@dep+//:missing.bzl': no such file"
+    );
+
+    let cycle_files: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(\":defs.bzl\", \"make\")\nmake(name = \"x\")\n",
+        ),
+        (
+            "defs.bzl",
+            b"load(\":helper.bzl\", \"HELPER\")\ndef make(name):\n    native.filegroup(name = name)\n",
+        ),
+        (
+            "helper.bzl",
+            b"load(\":defs.bzl\", \"make\")\nHELPER = make\n",
+        ),
+    ];
+    let mut cycle = transaction(
+        &dice,
+        EpochBuilder::external_sources(cycle_files, 75).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut cycle).await;
+    let cycle = tokio::time::timeout(
+        Duration::from_secs(5),
+        cycle.compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        )),
+    )
+    .await
+    .expect("external BUILD cycle detector must release the recursive DICE wait")
+    .unwrap();
+    let rendered = repository_package_error(&cycle);
+    assert!(rendered.starts_with("cycle detected in extension files:"));
+    assert!(rendered.contains("@@dep+///BUILD.bazel"));
+    assert!(rendered.contains(".-> @@dep+//:defs.bzl"));
+    assert!(rendered.contains("|   @@dep+//:helper.bzl"));
+    assert!(rendered.contains("`-- @@dep+//:defs.bzl"));
+
+    let fixed_files: &[(&str, &[u8])] = &[
+        cycle_files[0],
+        cycle_files[1],
+        ("helper.bzl", b"HELPER = 1\n"),
+    ];
+    let mut fixed = transaction(
+        &dice,
+        EpochBuilder::external_sources(fixed_files, 76).build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut fixed).await;
+    let fixed = fixed
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(repository_package_terminal(&fixed).targets[0].name, "x");
 }

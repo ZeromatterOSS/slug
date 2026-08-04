@@ -333,13 +333,7 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                     .as_ref()
                     .as_ref()
                     .map_err(|error| QueryError::evaluation(error.to_string()))?;
-                if !loaded.reachable_loads.is_empty() {
-                    return Err(QueryError::evaluation(format!(
-                        "external repository Bzl loading is deferred for {}",
-                        owner.canonical_package()
-                    )));
-                }
-                Ok((loaded.build_file.clone(), Arc::from([])))
+                Ok((loaded.build_file.clone(), loaded.reachable_loads.clone()))
             }
         }
     }
@@ -978,6 +972,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                 let (build_file, reachable_loads) =
                     self.package_load_provenance_for_owner(&owner).await?;
 
+                let mut package_build_label = None;
                 if include_buildfiles {
                     let basename = build_file
                         .file_name()
@@ -986,6 +981,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                             QueryError::evaluation("loaded BUILD file has no UTF-8 basename")
                         })?;
                     let label = QueryLabel::in_owner_package(&owner, basename)?;
+                    package_build_label = Some(label.clone());
                     if seen_output_labels.insert(label.clone()) {
                         delivered.push(QueryCandidate::real(label));
                     }
@@ -1004,7 +1000,9 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                         delivered.push(QueryCandidate::fake(label.clone(), owner.dupe()));
                     }
                     if include_buildfiles {
-                        let companion = if self.root_workspace.is_some() {
+                        let companion = if owner.canonical_repo().is_some() {
+                            package_build_label.clone()
+                        } else if self.root_workspace.is_some() {
                             self.root_build_file_companion(load.label.package().package())
                                 .await?
                         } else {

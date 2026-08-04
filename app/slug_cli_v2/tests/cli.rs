@@ -2852,6 +2852,18 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         "print(\"EXTERNAL_BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
     );
     write(workspace.join("dep/target.txt"), "target\n");
+    write(
+        workspace.join("dep/macro/BUILD.bazel"),
+        "load(\":defs.bzl\", \"make_filegroup\")\nprint(\"EXTERNAL_MACRO_BUILD\")\nmake_filegroup(name = \"macro_files\")\n",
+    );
+    write(
+        workspace.join("dep/macro/defs.bzl"),
+        "print(\"EXTERNAL_DEFS_EVENT\")\ndef make_filegroup(name):\n    print(\"EXTERNAL_MACRO_BODY\")\n    native.filegroup(name = name)\n",
+    );
+    write(
+        workspace.join("macro/BUILD.bazel"),
+        "filegroup(name = \"root_sentinel\")\n",
+    );
 
     let one_shot = slug()
         .current_dir(&workspace)
@@ -2867,6 +2879,22 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
     let module_index = one_shot_stderr.find("MODULE_EVENT").unwrap();
     let build_index = one_shot_stderr.find("EXTERNAL_BUILD_EVENT").unwrap();
     assert!(module_index < build_index, "{one_shot_stderr}");
+
+    let one_shot_macro = slug()
+        .current_dir(&workspace)
+        .args(["query", "--output=label_kind", "@dep//macro:macro_files"])
+        .output()
+        .unwrap();
+    assert!(one_shot_macro.status.success(), "{one_shot_macro:?}");
+    assert_eq!(
+        String::from_utf8(one_shot_macro.stdout).unwrap(),
+        "filegroup rule @dep//macro:macro_files\n"
+    );
+    let one_shot_macro_stderr = String::from_utf8(one_shot_macro.stderr).unwrap();
+    let defs_index = one_shot_macro_stderr.find("EXTERNAL_DEFS_EVENT").unwrap();
+    let macro_build_index = one_shot_macro_stderr.find("EXTERNAL_MACRO_BUILD").unwrap();
+    let macro_body_index = one_shot_macro_stderr.find("EXTERNAL_MACRO_BODY").unwrap();
+    assert!(defs_index < macro_build_index && macro_build_index < macro_body_index);
 
     let output_base_arg = format!("--output_base={}", output_base.display());
     let first = slug()
@@ -2899,6 +2927,26 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
         pid
     );
+
+    let macro_cold = slug()
+        .current_dir(&workspace)
+        .args([
+            output_base_arg.as_str(),
+            "query",
+            "--output=label_kind",
+            "@dep//macro:macro_files",
+        ])
+        .output()
+        .unwrap();
+    assert!(macro_cold.status.success(), "{macro_cold:?}");
+    assert_eq!(
+        String::from_utf8(macro_cold.stdout).unwrap(),
+        "filegroup rule @dep//macro:macro_files\n"
+    );
+    let macro_cold_stderr = String::from_utf8(macro_cold.stderr).unwrap();
+    assert!(macro_cold_stderr.contains("EXTERNAL_DEFS_EVENT"));
+    assert!(macro_cold_stderr.contains("EXTERNAL_MACRO_BUILD"));
+    assert!(macro_cold_stderr.contains("EXTERNAL_MACRO_BODY"));
 
     for (args, expected) in [
         (
@@ -2935,6 +2983,18 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
                 "}\n",
             ),
         ),
+        (
+            vec!["query", "--output=label_kind", "@dep//macro:macro_files"],
+            "filegroup rule @dep//macro:macro_files\n",
+        ),
+        (
+            vec!["query", "loadfiles(@dep//macro:macro_files)"],
+            "@dep//macro:defs.bzl\n",
+        ),
+        (
+            vec!["query", "buildfiles(@dep//macro:macro_files)"],
+            "@dep//macro:BUILD.bazel\n@dep//macro:defs.bzl\n",
+        ),
     ] {
         let output = slug()
             .current_dir(&workspace)
@@ -2946,6 +3006,57 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         assert!(output.stderr.is_empty(), "{output:?}");
         assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
     }
+
+    write(
+        workspace.join("dep/macro/defs.bzl"),
+        "print(\"EXTERNAL_DEFS_EDITED\")\ndef make_filegroup(name):\n    native.filegroup(name = name)\n",
+    );
+    let macro_edited = slug()
+        .current_dir(&workspace)
+        .args([
+            output_base_arg.as_str(),
+            "query",
+            "loadfiles(@dep//macro:macro_files)",
+        ])
+        .output()
+        .unwrap();
+    assert!(macro_edited.status.success(), "{macro_edited:?}");
+    assert_eq!(
+        String::from_utf8(macro_edited.stdout).unwrap(),
+        "@dep//macro:defs.bzl\n"
+    );
+    assert!(String::from_utf8_lossy(&macro_edited.stderr).contains("EXTERNAL_DEFS_EDITED"));
+
+    std::fs::remove_file(workspace.join("dep/macro/defs.bzl")).unwrap();
+    let macro_deleted = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "query", "@dep//macro:macro_files"])
+        .output()
+        .unwrap();
+    assert_eq!(macro_deleted.status.code(), Some(7), "{macro_deleted:?}");
+    assert!(
+        String::from_utf8_lossy(&macro_deleted.stderr)
+            .contains("cannot load '@@dep+//macro:defs.bzl': no such file")
+    );
+
+    write(
+        workspace.join("dep/macro/defs.bzl"),
+        "def make_filegroup(name):\n    native.filegroup(name = name)\n",
+    );
+    let macro_recreated = slug()
+        .current_dir(&workspace)
+        .args([output_base_arg.as_str(), "query", "@dep//macro:macro_files"])
+        .output()
+        .unwrap();
+    assert!(macro_recreated.status.success(), "{macro_recreated:?}");
+    assert_eq!(
+        String::from_utf8(macro_recreated.stdout).unwrap(),
+        "@dep//macro:macro_files\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        pid
+    );
 
     let external_pattern = slug()
         .current_dir(&workspace)

@@ -234,6 +234,29 @@ fn query_request_parses_expression_and_output_format() {
     assert_eq!(request.expression.to_string(), "deps(//pkg:bin)");
     assert_eq!(request.output, QueryOutputFormat::Label);
     assert_eq!(request.order, slug_query_v2::QueryOrder::Full);
+    let compatible = QueryRequest::parse(&[
+        "--noshow_progress",
+        "--output=label",
+        "//pkg:bin",
+        "--noshow_progress",
+    ])
+    .unwrap();
+    assert_eq!(compatible.expression, "//pkg:bin");
+    assert_eq!(
+        compatible
+            .flags
+            .iter()
+            .map(|flag| flag.raw.as_str())
+            .collect::<Vec<_>>(),
+        ["--noshow_progress", "--output=label", "--noshow_progress"]
+    );
+    assert!(
+        compatible
+            .flags
+            .iter()
+            .filter(|flag| flag.name == "noshow_progress")
+            .all(|flag| flag.disposition == FlagDisposition::IgnoredCompatible)
+    );
 }
 
 #[test]
@@ -349,6 +372,7 @@ fn query_request_accepts_label_label_kind_and_package_and_rejects_deferred_or_te
 
 #[test]
 fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
+    let boolean_value = "Unexpected value after boolean option";
     for (flag, expected) in [
         ("--output", "expected label, graph, label_kind, or package"),
         ("--output=", "expected label, graph, label_kind, or package"),
@@ -363,6 +387,10 @@ fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
         ("--ignore_dev_dependency", "not supported by loading query"),
         ("--lockfile_mode=off", "not supported by loading query"),
         ("--config=dbg", "not supported by loading query"),
+        ("--keep_going", "not supported by loading query"),
+        ("--noshow_progress=", boolean_value),
+        ("--noshow_progress=true", boolean_value),
+        ("--noshow_progress=false", boolean_value),
         ("--color=no", "not supported by loading query"),
         ("--show_progress", "not supported by loading query"),
         (

@@ -114,6 +114,12 @@ impl PartialEq for LoadedPackage {
 impl Eq for LoadedPackage {}
 
 impl LoadedPackage {
+    #[cfg(test)]
+    #[allow(dead_code)] // Unix-only Host owner test coverage.
+    pub(crate) fn retained_bzl_module_count(&self) -> usize {
+        self.retained_bzl_modules.len()
+    }
+
     pub fn effective_visibility(&self, target: &PackageTarget) -> Option<RuleVisibility> {
         match &target.visibility {
             VisibilitySource::Declared(visibility) => Some(visibility.clone()),
