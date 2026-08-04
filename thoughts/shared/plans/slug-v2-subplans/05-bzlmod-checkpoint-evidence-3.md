@@ -18341,3 +18341,35 @@ Bazel/oracle or fixture changed. Resume the opaque public
 `RepositoryPackageSourceKey` and atomic loading migration under its 260
 production/650 test/910 total caps; package horizon, closure, and evaluator
 work remain forbidden in that packet.
+
+### WP-5-m1 public selected-BUILD source/loading migration (2026-08-04)
+
+**Status: ACCEPTED in `9b5246af`; resume only the read-only
+`WP-5-m1-direct-local-nonregistry-route-package-horizon-design`.** The exact
+four-file change is 211 production lines, 368 test lines, and 579 total net
+lines, within its accepted 260/650/910 caps. It changes only
+`host_package.rs`, bzlmod `lib.rs`, loading `bzl_module.rs`, and
+`host_package_load_tests.rs`. The opaque public
+`RepositoryPackageSourceKey`/value/error composes the private package lookup
+with only its selected `HostRepositorySourceFileKey`; external package loading
+now consumes that owner and no longer probes BUILD markers itself.
+
+Independent review corrected three evidence boundaries. If the selected file
+disappears atomically at `FileBytes`, the real path reports typed
+`Source::InconsistentState`; `SelectedSourceAbsent` remains a structural-only
+error discriminator because the accepted path/source owner cannot produce it
+in that race. UTF-8 failures display the selected repository-relative logical
+path. Captured and uncaptured activation evidence now separates routed REPO
+policy print from the loader's local BUILD evaluation event exactly, proving
+neither owner copies, suppresses, or replays the other's batch. Corrected
+rereview accepted all typed lookup/source/compute mappings and source chains,
+exact Needs, BUILD priority/fallback, route and selected-source lifecycle, warm
+reuse, public opacity, and structural stops.
+
+Formatting passed. Focused validation passed 30 bzlmod `host_package` tests and
+all 57 `slug_loading_v2` library tests. The GNU-Windows loading check and
+archive, diff, and scope gates passed; output contained existing warnings only.
+No Bazel/oracle or fixture changed. The next design may add only one
+breadth-first route package-preflight horizon over accepted direct-local include
+occurrences and the private lookup. Fragment reads, recursive occurrence
+closure, evaluator changes, and public activation remain deferred.
