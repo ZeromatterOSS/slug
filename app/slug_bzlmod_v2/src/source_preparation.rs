@@ -515,6 +515,103 @@ impl fmt::Display for HostRepositorySourceFileKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct DirectLocalModuleFileKey {
+    workspace: NormalizedAbsolutePath,
+    apparent_repo: slug_identity_v2::ApparentRepoName,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct DirectLocalModuleFile(RootRepositoryRoute, HostRepositorySourceFileValue);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalModuleFileError {
+    RouteCompute(Arc<str>),
+    Route(crate::RootRepositoryRouteError),
+    SourceCompute(Arc<str>),
+    Source(RepositorySourceFileError),
+}
+
+impl DirectLocalModuleFileKey {
+    fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: slug_identity_v2::ApparentRepoName,
+    ) -> Result<Self, String> {
+        (!apparent_repo.is_root())
+            .then_some(Self {
+                workspace,
+                apparent_repo,
+            })
+            .ok_or_else(|| "direct local module file requires a nonroot apparent name".to_owned())
+    }
+}
+
+impl fmt::Display for DirectLocalModuleFileKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("direct-local-module-file:")?;
+        self.workspace.fmt(f)?;
+        write!(f, ":@{}", self.apparent_repo.as_str())
+    }
+}
+
+#[async_trait]
+impl Key for DirectLocalModuleFileKey {
+    type Value =
+        SourcePreparationOutcome<Arc<Result<DirectLocalModuleFile, DirectLocalModuleFileError>>>;
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let route_key =
+            crate::RootRepositoryRouteKey::new(self.workspace.dupe(), self.apparent_repo.clone())
+                .expect("direct key rejects root names");
+        let route = match ctx.compute(&route_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(route)) => route,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    DirectLocalModuleFileError::RouteCompute(Arc::from(error.to_string())),
+                )));
+            }
+        };
+        let route = match route.as_ref() {
+            Ok(route) => route.clone(),
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    DirectLocalModuleFileError::Route(error.clone()),
+                )));
+            }
+        };
+        match ctx
+            .compute(&HostRepositorySourceFileKey::new(
+                route.clone(),
+                PathBuf::from("MODULE.bazel"),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Ok(source))) => {
+                SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalModuleFile(
+                    route, source,
+                ))))
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                SourcePreparationOutcome::Complete(Arc::new(Err(
+                    DirectLocalModuleFileError::Source(error),
+                )))
+            }
+            Err(error) => SourcePreparationOutcome::Complete(Arc::new(Err(
+                DirectLocalModuleFileError::SourceCompute(Arc::from(error.to_string())),
+            ))),
+        }
+    }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 impl fmt::Display for RepositorySourceFileKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -1764,16 +1861,23 @@ mod tests {
     use std::sync::Mutex;
 
     use dice::ActivationData;
+    use dice::ActivationKind;
     use dice::ActivationTracker;
     use dice::DetectCycles;
     use dice::Dice;
     use dice::DynKey;
+    use dice::RichActivation;
     use dice::UserComputationData;
+    use slug_events_v2::CaptureEvaluationEvents;
     use slug_identity_v2::ApparentRepoName;
     use slug_workspace_v2::PathObservationEpoch;
     use slug_workspace_v2::PathObservationEpochKey;
 
     use super::*;
+    use crate::RootPackagePolicyInputs;
+    use crate::RootRepositoryRouteKey;
+    use crate::inject_root_module_request_inputs;
+    use crate::inject_root_package_policy_inputs;
 
     #[derive(Default)]
     struct HostSourceDependencyTracker {
@@ -1792,6 +1896,29 @@ mod tests {
                     .lock()
                     .unwrap()
                     .extend(deps.map(ToString::to_string));
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct DirectTracker(Mutex<Vec<(ActivationKind, bool)>>);
+    impl ActivationTracker for DirectTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+        fn key_activated_rich(&self, key: &DynKey, a: RichActivation<'_>) {
+            if key.downcast_ref::<DirectLocalModuleFileKey>().is_some() {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((a.kind(), a.evaluation_data().is_none()));
             }
         }
     }
@@ -2289,5 +2416,514 @@ mod tests {
         assert_eq!(hash(&key), hash(&equal));
         assert_ne!(key, distinct);
         assert_eq!(hash(&key), hash(&distinct));
+    }
+
+    fn direct() -> DirectLocalModuleFileKey {
+        DirectLocalModuleFileKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("dep_alias").unwrap(),
+        )
+        .unwrap()
+    }
+    fn root(path: &str, version: &str) -> String {
+        format!(
+            "bazel_dep(name = \"dep\", version = \"{version}\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"{path}\")\n"
+        )
+    }
+    fn epoch(root: &str, path: &str, file: Option<&[u8]>) -> PathObservationEpoch {
+        let d = |p, o| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(p).unwrap(),
+                o,
+            )
+        };
+        let n = |k| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                k, 1, 1, 1, 1, 0o755,
+            )))
+        };
+        let file_path = format!("/workspace/{path}/MODULE.bazel");
+        let dir = format!("/workspace/{path}");
+        let mut e = SmallMap::from_iter([
+            (
+                d("/", PathObservationOperation::Lstat),
+                n(PathNodeKind::Directory),
+            ),
+            (
+                d("/workspace", PathObservationOperation::Lstat),
+                n(PathNodeKind::Directory),
+            ),
+            (
+                d("/workspace/MODULE.bazel", PathObservationOperation::Lstat),
+                n(PathNodeKind::RegularFile),
+            ),
+            (
+                d(
+                    "/workspace/MODULE.bazel",
+                    PathObservationOperation::FileBytes,
+                ),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                    root.as_bytes(),
+                ))),
+            ),
+            (
+                d(&dir, PathObservationOperation::Lstat),
+                n(PathNodeKind::Directory),
+            ),
+        ]);
+        e.insert(
+            d(&file_path, PathObservationOperation::Lstat),
+            file.map(|_| n(PathNodeKind::RegularFile))
+                .unwrap_or(PathObservationResult::Lstat(PathOperationResult::Missing)),
+        );
+        if let Some(bytes) = file {
+            e.insert(
+                d(&file_path, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(bytes))),
+            );
+        }
+        PathObservationEpoch::new(e).unwrap()
+    }
+    fn inputs(u: &mut dice::DiceTransactionUpdater) {
+        inject_root_package_policy_inputs(
+            u,
+            RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            u,
+            Path::new("/workspace"),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+    }
+    fn root_only(root: &str) -> PathObservationEpoch {
+        let d = |p, o| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(p).unwrap(),
+                o,
+            )
+        };
+        let n = |k| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                k, 1, 1, 1, 1, 0o755,
+            )))
+        };
+        PathObservationEpoch::new([
+            (
+                d("/", PathObservationOperation::Lstat),
+                n(PathNodeKind::Directory),
+            ),
+            (
+                d("/workspace", PathObservationOperation::Lstat),
+                n(PathNodeKind::Directory),
+            ),
+            (
+                d("/workspace/MODULE.bazel", PathObservationOperation::Lstat),
+                n(PathNodeKind::RegularFile),
+            ),
+            (
+                d(
+                    "/workspace/MODULE.bazel",
+                    PathObservationOperation::FileBytes,
+                ),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                    root.as_bytes(),
+                ))),
+            ),
+        ])
+        .unwrap()
+    }
+    fn missing_root() -> PathObservationEpoch {
+        let d = |p| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(p).unwrap(),
+                PathObservationOperation::Lstat,
+            )
+        };
+        let n = |p| {
+            (
+                d(p),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::Directory,
+                    1,
+                    1,
+                    1,
+                    1,
+                    0o755,
+                ))),
+            )
+        };
+        PathObservationEpoch::new([
+            n("/"),
+            n("/workspace"),
+            (
+                d("/workspace/MODULE.bazel"),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            ),
+        ])
+        .unwrap()
+    }
+    fn material(path: &str) -> RepositoryMaterializationResultEpoch {
+        let route = local_route_with_path(path);
+        let request = Arc::new(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: route.repo_spec().clone(),
+            kind: RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new(format!("/workspace/{path}")).unwrap(),
+            },
+        });
+        RepositoryMaterializationResultEpoch::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            [RepositoryMaterializationEpochEntry {
+                request,
+                result: RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Local,
+                ),
+            }],
+        )
+        .unwrap()
+    }
+    async fn complete(
+        dice: &Arc<Dice>,
+        root_source: &str,
+        path: &str,
+        file: Option<&[u8]>,
+        tracker: Option<Arc<DirectTracker>>,
+    ) -> <DirectLocalModuleFileKey as Key>::Value {
+        let mut data = UserComputationData {
+            activation_tracker: tracker.map(|t| t as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut u = dice.updater_with_data(data);
+        u.changed_to(vec![(
+            PathObservationEpochKey,
+            epoch(root_source, path, file),
+        )])
+        .unwrap();
+        u.changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+            material(path),
+        )])
+        .unwrap();
+        inputs(&mut u);
+        u.commit().await.compute(&direct()).await.unwrap()
+    }
+    fn success(v: <DirectLocalModuleFileKey as Key>::Value) -> DirectLocalModuleFile {
+        match v {
+            SourcePreparationOutcome::Complete(value) => value.as_ref().as_ref().unwrap().clone(),
+            _ => panic!("complete direct local source"),
+        }
+    }
+
+    #[test]
+    fn direct_identity_and_typed_errors() {
+        assert_eq!(
+            direct().to_string(),
+            "direct-local-module-file:\"/workspace\":@dep_alias"
+        );
+        assert!(
+            DirectLocalModuleFileKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                ApparentRepoName::root()
+            )
+            .is_err()
+        );
+        assert_ne!(
+            DirectLocalModuleFileError::RouteCompute(Arc::from("r")),
+            DirectLocalModuleFileError::SourceCompute(Arc::from("s"))
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_local_success_lifecycle_a_b_a() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let a = success(complete(&dice, &root("dep-a", "1.0"), "dep-a", Some(b"one"), None).await);
+        let b = success(complete(&dice, &root("dep-b", "1.0"), "dep-b", Some(b"two"), None).await);
+        let edited =
+            success(complete(&dice, &root("dep-a", "1.0"), "dep-a", Some(b"edited"), None).await);
+        let absent = success(complete(&dice, &root("dep-a", "1.0"), "dep-a", None, None).await);
+        let recreated = success(
+            complete(
+                &dice,
+                &root("dep-a", "1.0"),
+                "dep-a",
+                Some(b"recreated"),
+                None,
+            )
+            .await,
+        );
+        assert_eq!(a.0, edited.0);
+        assert_ne!(a.0, b.0);
+        assert!(
+            matches!(&a.1, HostRepositorySourceFileValue::Present { bytes, logical_path } if bytes.as_ref()==b"one" && logical_path==&NormalizedAbsolutePath::new("/workspace/dep-a/MODULE.bazel").unwrap())
+        );
+        assert!(matches!(
+            &edited.1,
+            HostRepositorySourceFileValue::Present { bytes, .. } if bytes.as_ref()==b"edited"
+        ));
+        assert!(matches!(absent.1, HostRepositorySourceFileValue::Absent));
+        assert_eq!(a.0, absent.0);
+        assert!(matches!(
+            &recreated.1,
+            HostRepositorySourceFileValue::Present { bytes, .. } if bytes.as_ref()==b"recreated"
+        ));
+        assert_eq!(a.0, recreated.0);
+    }
+
+    #[tokio::test]
+    async fn direct_local_success_version_edit_reuses_without_event_data() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let t = Arc::new(DirectTracker::default());
+        let first = success(
+            complete(
+                &dice,
+                &root("dep-a", "1.0"),
+                "dep-a",
+                Some(b"one"),
+                Some(t.clone()),
+            )
+            .await,
+        );
+        let second = success(
+            complete(
+                &dice,
+                &root("dep-a", "2.0"),
+                "dep-a",
+                Some(b"one"),
+                Some(t.clone()),
+            )
+            .await,
+        );
+        assert_eq!(first, second);
+        assert_eq!(
+            *t.0.lock().unwrap(),
+            [
+                (ActivationKind::Evaluated, true),
+                (ActivationKind::Reused, true)
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_local_real_errors_and_exact_need() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut u = dice.updater();
+        u.changed_to(vec![(
+            PathObservationEpochKey,
+            epoch(&root("dep", "1"), "dep", Some(b"x")),
+        )])
+        .unwrap();
+        inputs(&mut u);
+        let mut x = u.commit().await;
+        let need = x.compute(&direct()).await.unwrap();
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        let unknown=complete(&dice,"bazel_dep(name = \"dep\", repo_name = \"other\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n","dep",Some(b"x"),None).await;
+        assert!(
+            matches!(unknown,SourcePreparationOutcome::Complete(v) if matches!(v.as_ref(),Err(DirectLocalModuleFileError::Route(_))))
+        );
+        let source=complete(&dice,"bazel_dep(name = \"dep\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"../dep\")\n","dep",Some(b"x"),None).await;
+        assert!(
+            matches!(source,SourcePreparationOutcome::Complete(v) if matches!(v.as_ref(),Err(DirectLocalModuleFileError::Source(_))))
+        );
+    }
+
+    #[test]
+    fn direct_structural_scan() {
+        let s = include_str!("source_preparation.rs");
+        let d = s
+            .split("struct DirectLocalModuleFileKey")
+            .nth(1)
+            .unwrap()
+            .split("impl fmt::Display for RepositorySourceFileKey")
+            .next()
+            .unwrap();
+        for x in [
+            "ModuleSourcePreparationKey",
+            "RootModuleFilesKey",
+            "RegistryPolicyKey",
+            "RegistryFileKey",
+            "WorkspaceSnapshotKey",
+            "RepositoryMaterializationRequestKey",
+            "fault",
+        ] {
+            assert!(!d.contains(x));
+        }
+        assert!(
+            d.contains("RootRepositoryRouteKey")
+                && d.contains("HostRepositorySourceFileKey")
+                && d.contains("MODULE.bazel")
+        );
+    }
+
+    #[test]
+    fn direct_value_complete_only_equality_and_need_identity() {
+        let a = SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalModuleFile(
+            local_route(),
+            host_source_value("/workspace/dep/MODULE.bazel", b"one"),
+        ))));
+        let b = SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalModuleFile(
+            local_route(),
+            host_source_value("/workspace/dep/MODULE.bazel", b"one"),
+        ))));
+        let absent = SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalModuleFile(
+            local_route(),
+            HostRepositorySourceFileValue::Absent,
+        ))));
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::root_module_bootstrap(
+            RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+        ));
+        assert!(DirectLocalModuleFileKey::equality(&a, &b));
+        assert!(!DirectLocalModuleFileKey::equality(&a, &absent));
+        assert!(DirectLocalModuleFileKey::validity(&absent));
+        assert!(!DirectLocalModuleFileKey::validity(&need));
+        assert!(!DirectLocalModuleFileKey::equality(&need, &need));
+    }
+
+    #[tokio::test]
+    async fn direct_forwards_bootstrap_and_exact_route_source_needs() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut u = dice.updater();
+        u.changed_to(vec![(PathObservationEpochKey, missing_root())])
+            .unwrap();
+        inputs(&mut u);
+        let mut t = u.commit().await;
+        let outer = t.compute(&direct()).await.unwrap();
+        let route = t
+            .compute(
+                &RootRepositoryRouteKey::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    ApparentRepoName::new("dep_alias").unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        let (SourcePreparationOutcome::Need(outer), SourcePreparationOutcome::Need(route)) =
+            (outer, route)
+        else {
+            panic!("bootstrap Need")
+        };
+        assert_eq!(outer, route);
+        let source = root("dep", "1");
+        let mut u = t.into_updater();
+        u.changed_to(vec![(PathObservationEpochKey, root_only(&source))])
+            .unwrap();
+        inputs(&mut u);
+        let mut t = u.commit().await;
+        let r = t
+            .compute(
+                &RootRepositoryRouteKey::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    ApparentRepoName::new("dep_alias").unwrap(),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(r) = r else {
+            panic!("route")
+        };
+        let r = r.as_ref().as_ref().unwrap().clone();
+        let outer = t.compute(&direct()).await.unwrap();
+        let child = t
+            .compute(&HostRepositorySourceFileKey::new(
+                r.clone(),
+                PathBuf::from("MODULE.bazel"),
+            ))
+            .await
+            .unwrap();
+        let (SourcePreparationOutcome::Need(outer), SourcePreparationOutcome::Need(child)) =
+            (outer, child)
+        else {
+            panic!("materialization Need")
+        };
+        assert_eq!(outer, child);
+        let request = outer
+            .repository_materializations()
+            .values()
+            .next()
+            .unwrap()
+            .dupe();
+        assert_eq!(
+            request.id.workspace,
+            NormalizedAbsolutePath::new("/workspace").unwrap()
+        );
+        assert_eq!(
+            request.id.canonical_repo,
+            CanonicalRepoName::new("dep+").unwrap()
+        );
+        assert_eq!(
+            request.kind,
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap()
+            }
+        );
+        assert_eq!(request.repo_spec, r.repo_spec().clone());
+        let mut u = t.into_updater();
+        u.changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+            material("dep"),
+        )])
+        .unwrap();
+        let mut t = u.commit().await;
+        let outer = t.compute(&direct()).await.unwrap();
+        let child = t
+            .compute(&HostRepositorySourceFileKey::new(
+                r,
+                PathBuf::from("MODULE.bazel"),
+            ))
+            .await
+            .unwrap();
+        let (SourcePreparationOutcome::Need(outer), SourcePreparationOutcome::Need(child)) =
+            (outer, child)
+        else {
+            panic!("path Need")
+        };
+        assert_eq!(outer, child);
+    }
+
+    #[tokio::test]
+    async fn direct_projects_unknown_nodep_nonlocal_and_source_errors() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let check = |v: <DirectLocalModuleFileKey as Key>::Value| matches!(v,SourcePreparationOutcome::Complete(x) if matches!(x.as_ref(),Err(DirectLocalModuleFileError::Route(_))));
+        assert!(check(complete(&dice,"bazel_dep(name = \"dep\", repo_name = \"other\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n","dep",Some(b"x"),None).await));
+        assert!(check(complete(&dice,"bazel_dep(name = \"dep\", repo_name = \"dep_alias\", nodep = True)\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n","dep",Some(b"x"),None).await));
+        assert!(check(
+            complete(
+                &dice,
+                "bazel_dep(name = \"dep\", repo_name = \"dep_alias\")\n",
+                "dep",
+                Some(b"x"),
+                None
+            )
+            .await
+        ));
+        let source=complete(&dice,"bazel_dep(name = \"dep\", repo_name = \"dep_alias\")\nlocal_path_override(module_name = \"dep\", path = \"../dep\")\n","dep",Some(b"x"),None).await;
+        assert!(
+            matches!(source,SourcePreparationOutcome::Complete(x) if matches!(x.as_ref(),Err(DirectLocalModuleFileError::Source(_))))
+        );
     }
 }
