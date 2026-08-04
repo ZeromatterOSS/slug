@@ -56,6 +56,7 @@ use starlark_map::small_map::SmallMap;
 use super::ExternalBzlModuleError;
 use super::ExternalBzlModuleEvalKey;
 use super::RepositoryBzlLabel;
+use super::RepositoryPackageLoadError;
 use super::RepositoryPackageLoadKey;
 use super::resolve_external_load_label;
 use super::resolve_host_load_label;
@@ -144,6 +145,7 @@ impl EpochBuilder {
             variant,
         );
         builder.missing("/workspace/dep/REPO.bazel");
+        builder.missing("/workspace/dep/.bazelignore");
         for (name, source) in bzl {
             builder.file(&format!("/workspace/dep/{name}"), source, variant);
         }
@@ -207,6 +209,8 @@ impl ActivationTracker for EventTracker {
             && !name.starts_with("host-bzl-module:")
             && !name.starts_with("host-package-load:")
             && !name.starts_with("external-bzl-module:")
+            && !name.starts_with("host-route-repo-file:")
+            && !name.starts_with("repository-package-source:")
             && !name.starts_with("repository-package-load:")
         {
             return;
@@ -726,10 +730,16 @@ fn repository_package_terminal(outcome: &RepositoryPackageOutcome) -> &crate::Lo
 }
 
 fn repository_package_error(outcome: &RepositoryPackageOutcome) -> String {
+    repository_package_typed_error(outcome).to_string()
+}
+
+fn repository_package_typed_error(
+    outcome: &RepositoryPackageOutcome,
+) -> &RepositoryPackageLoadError {
     let LoadingPreparationOutcome::Complete(value) = outcome else {
         panic!("complete external source epoch returned Need");
     };
-    value.as_ref().as_ref().unwrap_err().to_string()
+    value.as_ref().as_ref().unwrap_err()
 }
 
 fn external_terminal(outcome: &ExternalBzlOutcome) -> &super::FrozenBzlModule {
@@ -1199,7 +1209,9 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
         ),
     ];
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    let epoch = EpochBuilder::external_sources(files, 70).build();
+    let mut epoch = EpochBuilder::external_sources(files, 70);
+    epoch.file("/workspace/dep/REPO.bazel", b"print(\"REPO_TOP\")\n", 70);
+    let epoch = epoch.build();
     let tracker = Arc::new(EventTracker::default());
     let mut cold = transaction(&dice, epoch.clone(), true, Some(tracker.dupe())).await;
     let route = external_route(&mut cold).await;
@@ -1251,6 +1263,48 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
         event_texts(package.batch.as_ref().unwrap()),
         ["BUILD_TOP", "MACRO_BODY"]
     );
+    let selected_source = batches
+        .iter()
+        .find(|entry| entry.key.starts_with("repository-package-source:"))
+        .unwrap();
+    assert_eq!(selected_source.kind, ActivationKind::Evaluated);
+    assert!(selected_source.batch.is_none());
+    let route_policy = batches
+        .iter()
+        .find(|entry| entry.key.starts_with("host-route-repo-file:"))
+        .unwrap();
+    assert_eq!(route_policy.kind, ActivationKind::Evaluated);
+    assert_eq!(
+        event_texts(route_policy.batch.as_ref().unwrap()),
+        ["REPO_TOP"]
+    );
+
+    let uncaptured_dice = Dice::builder().build(DetectCycles::Enabled);
+    let uncaptured_tracker = Arc::new(EventTracker::default());
+    let mut uncaptured = transaction(
+        &uncaptured_dice,
+        epoch.clone(),
+        false,
+        Some(uncaptured_tracker.dupe()),
+    )
+    .await;
+    let route = external_route(&mut uncaptured).await;
+    repository_package_terminal(
+        &uncaptured
+            .compute(&RepositoryPackageLoadKey::new(
+                route,
+                PackagePath::parse("").unwrap(),
+            ))
+            .await
+            .unwrap(),
+    );
+    let uncaptured_batches = uncaptured_tracker.take();
+    assert!(uncaptured_batches.iter().all(|entry| entry.batch.is_none()));
+    assert!(
+        uncaptured_batches
+            .iter()
+            .any(|entry| entry.key.starts_with("host-route-repo-file:"))
+    );
 
     let warm_tracker = Arc::new(EventTracker::default());
     let mut warm = transaction(&dice, epoch, true, Some(warm_tracker.dupe())).await;
@@ -1269,6 +1323,31 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
             .iter()
             .all(|entry| { entry.kind == ActivationKind::Reused && entry.batch.is_none() })
     );
+}
+
+#[tokio::test]
+async fn repository_package_load_preserves_selected_source_error_display_and_chain() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut epoch = EpochBuilder::external_sources(&[], 79);
+    epoch.missing("/workspace/dep/BUILD.bazel");
+    epoch.missing("/workspace/dep/BUILD");
+    let mut transaction = transaction(&dice, epoch.build(), false, None).await;
+    let route = external_route(&mut transaction).await;
+    let outcome = transaction
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    let error = repository_package_typed_error(&outcome);
+    let expected = "no such package '@@dep+//': BUILD file not found in directory '' of external repository @@dep+. Add a BUILD file to a directory to mark it as a package.";
+    assert_eq!(error.to_string(), expected);
+    assert_eq!(
+        std::error::Error::source(error).unwrap().to_string(),
+        expected
+    );
+    assert!(RepositoryPackageLoadKey::validity(&outcome));
 }
 
 #[tokio::test]

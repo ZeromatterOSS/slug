@@ -48,6 +48,8 @@ use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::HostRepositoryIgnoreKey;
 use crate::repository_ignore::HostRouteRepositoryIgnoreKey;
 use crate::source_preparation::HostRepositoryPathKey;
+use crate::source_preparation::HostRepositorySourceFileKey;
+use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationOutcome;
@@ -435,6 +437,273 @@ impl Key for ExternalRepositoryPackageLookupKey {
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
     }
+}
+
+/// DICE identity for the selected BUILD source of one routed external package.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepositoryPackageSourceKey {
+    route: RootRepositoryRoute,
+    package: PackageIdentifier,
+}
+
+impl RepositoryPackageSourceKey {
+    pub fn new(route: RootRepositoryRoute, package: PackageIdentifier) -> Option<Self> {
+        (package.repo() == route.canonical_repo()).then_some(Self { route, package })
+    }
+}
+
+impl Hash for RepositoryPackageSourceKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.route.hash(state);
+        self.package.hash(state);
+    }
+}
+
+impl fmt::Display for RepositoryPackageSourceKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "repository-package-source:{}", self.package)
+    }
+}
+
+/// The selected BUILD identity and bytes required by external package loading.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct RepositoryPackageSource {
+    logical_path: NormalizedAbsolutePath,
+    build_file_name: HostBuildFileName,
+    bytes: Arc<[u8]>,
+}
+
+impl RepositoryPackageSource {
+    pub fn logical_path(&self) -> &NormalizedAbsolutePath {
+        &self.logical_path
+    }
+
+    pub fn build_file_name(&self) -> &'static str {
+        self.build_file_name.as_str()
+    }
+
+    pub fn bytes(&self) -> &Arc<[u8]> {
+        &self.bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum RepositoryPackageSourceErrorInner {
+    InvalidPackageName {
+        package: PackageIdentifier,
+        message: Arc<str>,
+    },
+    Deleted {
+        package: PackageIdentifier,
+    },
+    NoBuildFile {
+        package: PackageIdentifier,
+    },
+    Lookup {
+        package: PackageIdentifier,
+        error: ExternalRepositoryPackageLookupError,
+    },
+    LookupCompute {
+        package: PackageIdentifier,
+        message: Arc<str>,
+    },
+    Source {
+        logical_path: Arc<PathBuf>,
+        error: RepositorySourceFileError,
+    },
+    SourceCompute {
+        logical_path: Arc<PathBuf>,
+        message: Arc<str>,
+    },
+    SelectedSourceAbsent {
+        logical_path: Arc<PathBuf>,
+    },
+}
+
+/// Opaque typed failure while selecting or reading an external BUILD source.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepositoryPackageSourceError {
+    inner: RepositoryPackageSourceErrorInner,
+}
+
+impl RepositoryPackageSourceError {
+    fn new(inner: RepositoryPackageSourceErrorInner) -> Self {
+        Self { inner }
+    }
+}
+
+impl fmt::Display for RepositoryPackageSourceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.inner {
+            RepositoryPackageSourceErrorInner::InvalidPackageName { package, message } => {
+                write!(f, "invalid external package {package}: {message}")
+            }
+            RepositoryPackageSourceErrorInner::Deleted { package } => {
+                write!(f, "external package {package} is deleted")
+            }
+            RepositoryPackageSourceErrorInner::NoBuildFile { package } => write!(
+                f,
+                "no such package '{package}': BUILD file not found in directory '{}' of external repository {}. Add a BUILD file to a directory to mark it as a package.",
+                package.package(),
+                package.repo()
+            ),
+            RepositoryPackageSourceErrorInner::Lookup { package, error } => {
+                write!(f, "selecting BUILD source for {package}: {error}")
+            }
+            RepositoryPackageSourceErrorInner::LookupCompute { package, message } => {
+                write!(f, "computing BUILD selection for {package}: {message}")
+            }
+            RepositoryPackageSourceErrorInner::Source {
+                logical_path,
+                error,
+            } => write!(
+                f,
+                "reading selected BUILD source {}: {error:?}",
+                logical_path.display()
+            ),
+            RepositoryPackageSourceErrorInner::SourceCompute {
+                logical_path,
+                message,
+            } => write!(
+                f,
+                "computing selected BUILD source {}: {message}",
+                logical_path.display()
+            ),
+            RepositoryPackageSourceErrorInner::SelectedSourceAbsent { logical_path } => write!(
+                f,
+                "selected BUILD source {} became absent",
+                logical_path.display()
+            ),
+        }
+    }
+}
+
+impl std::error::Error for RepositoryPackageSourceError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.inner {
+            RepositoryPackageSourceErrorInner::Lookup { error, .. } => Some(error),
+            _ => None,
+        }
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryPackageSourceKey {
+    type Value = SourcePreparationOutcome<
+        Arc<Result<RepositoryPackageSource, RepositoryPackageSourceError>>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let lookup = match ctx
+            .compute(
+                &ExternalRepositoryPackageLookupKey::new(self.route.clone(), self.package.clone())
+                    .expect("public source key enforces route/package identity"),
+            )
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => value,
+            Err(error) => {
+                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
+                    RepositoryPackageSourceErrorInner::LookupCompute {
+                        package: self.package.clone(),
+                        message: Arc::from(error.to_string()),
+                    },
+                )));
+            }
+        };
+        let build_file_name = match lookup.as_ref() {
+            Ok(ExternalRepositoryPackageLookup::Package(name)) => *name,
+            Ok(ExternalRepositoryPackageLookup::InvalidPackageName { message }) => {
+                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
+                    RepositoryPackageSourceErrorInner::InvalidPackageName {
+                        package: self.package.clone(),
+                        message: message.clone(),
+                    },
+                )));
+            }
+            Ok(ExternalRepositoryPackageLookup::Deleted) => {
+                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
+                    RepositoryPackageSourceErrorInner::Deleted {
+                        package: self.package.clone(),
+                    },
+                )));
+            }
+            Ok(ExternalRepositoryPackageLookup::NoBuildFile) => {
+                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
+                    RepositoryPackageSourceErrorInner::NoBuildFile {
+                        package: self.package.clone(),
+                    },
+                )));
+            }
+            Err(error) => {
+                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
+                    RepositoryPackageSourceErrorInner::Lookup {
+                        package: self.package.clone(),
+                        error: error.clone(),
+                    },
+                )));
+            }
+        };
+        let logical_path =
+            Arc::new(PathBuf::from(self.package.package().as_str()).join(build_file_name.as_str()));
+        match ctx
+            .compute(&HostRepositorySourceFileKey::new(
+                self.route.clone(),
+                logical_path.as_ref().clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Ok(
+                HostRepositorySourceFileValue::Present {
+                    bytes,
+                    logical_path,
+                },
+            ))) => repository_package_source_complete(Ok(RepositoryPackageSource {
+                logical_path,
+                build_file_name,
+                bytes,
+            })),
+            Ok(SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent))) => {
+                repository_package_source_complete(Err(RepositoryPackageSourceError::new(
+                    RepositoryPackageSourceErrorInner::SelectedSourceAbsent { logical_path },
+                )))
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                repository_package_source_complete(Err(RepositoryPackageSourceError::new(
+                    RepositoryPackageSourceErrorInner::Source {
+                        logical_path,
+                        error,
+                    },
+                )))
+            }
+            Err(error) => {
+                repository_package_source_complete(Err(RepositoryPackageSourceError::new(
+                    RepositoryPackageSourceErrorInner::SourceCompute {
+                        logical_path,
+                        message: Arc::from(error.to_string()),
+                    },
+                )))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn repository_package_source_complete(
+    value: Result<RepositoryPackageSource, RepositoryPackageSourceError>,
+) -> SourcePreparationOutcome<Arc<Result<RepositoryPackageSource, RepositoryPackageSourceError>>> {
+    SourcePreparationOutcome::Complete(Arc::new(value))
 }
 
 /// A validated root-repository `.bzl` target in Bazel's internal byte shape.
@@ -1017,6 +1286,8 @@ mod tests {
     #[cfg(unix)]
     use super::ExternalRepositoryPackageLookup;
     #[cfg(unix)]
+    use super::ExternalRepositoryPackageLookupError;
+    #[cfg(unix)]
     use super::ExternalRepositoryPackageLookupKey;
     #[cfg(unix)]
     use super::HostBuildFileName;
@@ -1024,6 +1295,12 @@ mod tests {
     use super::HostRootPackageLookup;
     #[cfg(unix)]
     use super::HostRootPackageLookupKey;
+    #[cfg(unix)]
+    use super::RepositoryPackageSourceError;
+    #[cfg(unix)]
+    use super::RepositoryPackageSourceErrorInner;
+    #[cfg(unix)]
+    use super::RepositoryPackageSourceKey;
     #[cfg(unix)]
     use super::RootPackageBzlTarget;
     #[cfg(unix)]
@@ -1036,6 +1313,8 @@ mod tests {
     use crate::OverrideAttributeValue;
     #[cfg(unix)]
     use crate::RepoSpec;
+    #[cfg(unix)]
+    use crate::RepositorySourceFileError;
     #[cfg(unix)]
     use crate::RootPackagePolicyInputs;
     #[cfg(unix)]
@@ -1115,6 +1394,14 @@ mod tests {
         (
             demand(value, PathObservationOperation::FileBytes),
             PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(contents))),
+        )
+    }
+
+    #[cfg(unix)]
+    fn missing_bytes(value: &str) -> ScriptEntry {
+        (
+            demand(value, PathObservationOperation::FileBytes),
+            PathObservationResult::FileBytes(PathOperationResult::Missing),
         )
     }
 
@@ -1225,6 +1512,19 @@ mod tests {
     fn external_key(root: &str, package: &str) -> ExternalRepositoryPackageLookupKey {
         let route = local_route(root);
         ExternalRepositoryPackageLookupKey::new(
+            route.clone(),
+            PackageIdentifier::new(
+                route.canonical_repo().clone(),
+                PackagePath::parse(package).unwrap(),
+            ),
+        )
+        .unwrap()
+    }
+
+    #[cfg(unix)]
+    fn external_source_key(root: &str, package: &str) -> RepositoryPackageSourceKey {
+        let route = local_route(root);
+        RepositoryPackageSourceKey::new(
             route.clone(),
             PackageIdentifier::new(
                 route.canonical_repo().clone(),
@@ -1825,6 +2125,264 @@ mod tests {
         assert!(ExternalRepositoryPackageLookupKey::equality(
             &seen[0].1, &seen[2].1
         ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn repository_package_source_selects_one_marker_and_replays_its_lifecycle() {
+        let route = local_route("dep");
+        assert!(
+            RepositoryPackageSourceKey::new(
+                route,
+                PackageIdentifier::new(
+                    CanonicalRepoName::new("other+").unwrap(),
+                    PackagePath::parse("pkg").unwrap(),
+                ),
+            )
+            .is_none()
+        );
+
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let key = external_source_key("dep", "pkg");
+        for (variant, primary, fallback, expected_name, expected_bytes) in [
+            (
+                60,
+                Some(b"primary".as_slice()),
+                Some(b"fallback".as_slice()),
+                "BUILD.bazel",
+                b"primary".as_slice(),
+            ),
+            (
+                61,
+                Some(b"edited".as_slice()),
+                Some(b"fallback".as_slice()),
+                "BUILD.bazel",
+                b"edited".as_slice(),
+            ),
+            (
+                62,
+                None,
+                Some(b"fallback".as_slice()),
+                "BUILD",
+                b"fallback".as_slice(),
+            ),
+            (
+                63,
+                Some(b"restored".as_slice()),
+                None,
+                "BUILD.bazel",
+                b"restored".as_slice(),
+            ),
+        ] {
+            let mut entries = route_prelude("dep", None, None, variant);
+            entries.push(present(
+                "/workspace/dep/pkg",
+                PathNodeKind::Directory,
+                variant,
+            ));
+            for (name, source) in [("BUILD.bazel", primary), ("BUILD", fallback)] {
+                let marker = format!("/workspace/dep/pkg/{name}");
+                if let Some(source) = source {
+                    entries.push(present(&marker, PathNodeKind::RegularFile, variant));
+                    entries.push(bytes(&marker, source));
+                } else {
+                    entries.push(missing(&marker));
+                }
+            }
+            let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            let SourcePreparationOutcome::Complete(value) = &outcome else {
+                panic!("complete selected source epoch returned Need");
+            };
+            let source = value.as_ref().as_ref().unwrap();
+            assert_eq!(source.build_file_name(), expected_name);
+            assert_eq!(source.bytes().as_ref(), expected_bytes);
+            assert_eq!(
+                source.logical_path(),
+                &path(&format!("/workspace/dep/pkg/{expected_name}"))
+            );
+            assert!(RepositoryPackageSourceKey::validity(&outcome));
+            assert!(RepositoryPackageSourceKey::equality(&outcome, &outcome));
+        }
+
+        let mut entries = route_prelude("dep", None, None, 64);
+        entries.extend([
+            present("/workspace/dep/pkg", PathNodeKind::Directory, 64),
+            present(
+                "/workspace/dep/pkg/BUILD.bazel",
+                PathNodeKind::RegularFile,
+                64,
+            ),
+        ]);
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        let need = transaction.compute(&key).await.unwrap();
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!RepositoryPackageSourceKey::validity(&need));
+        assert!(!RepositoryPackageSourceKey::equality(&need, &need));
+
+        let mut entries = route_prelude("dep", None, None, 65);
+        entries.extend([
+            present("/workspace/dep/pkg", PathNodeKind::Directory, 65),
+            present(
+                "/workspace/dep/pkg/BUILD.bazel",
+                PathNodeKind::RegularFile,
+                65,
+            ),
+            missing_bytes("/workspace/dep/pkg/BUILD.bazel"),
+        ]);
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        let absent = transaction.compute(&key).await.unwrap();
+        assert!(matches!(
+            &absent,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    &value.as_ref().as_ref().unwrap_err().inner,
+                    RepositoryPackageSourceErrorInner::Source {
+                        logical_path,
+                        error: RepositorySourceFileError::InconsistentState { .. },
+                    } if logical_path.as_path() == PathBuf::from("pkg/BUILD.bazel")
+                )
+        ));
+
+        let mut entries = route_prelude("dep", None, None, 66);
+        entries.extend([
+            present("/workspace/dep/pkg", PathNodeKind::Directory, 66),
+            missing("/workspace/dep/pkg/BUILD.bazel"),
+            missing("/workspace/dep/pkg/BUILD"),
+        ]);
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        let deleted = transaction.compute(&key).await.unwrap();
+        assert!(matches!(
+            deleted,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    &value.as_ref().as_ref().unwrap_err().inner,
+                    RepositoryPackageSourceErrorInner::NoBuildFile { .. }
+                )
+        ));
+
+        let mut entries = route_prelude("dep", None, None, 67);
+        entries.extend([
+            present("/workspace/dep/pkg", PathNodeKind::Directory, 67),
+            present(
+                "/workspace/dep/pkg/BUILD.bazel",
+                PathNodeKind::RegularFile,
+                67,
+            ),
+            bytes("/workspace/dep/pkg/BUILD.bazel", b"recreated"),
+        ]);
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        let recreated = transaction.compute(&key).await.unwrap();
+        assert!(matches!(
+            recreated,
+            SourcePreparationOutcome::Complete(value)
+                if value.as_ref().as_ref().unwrap().bytes().as_ref() == b"recreated"
+        ));
+
+        let tracker = Arc::new(RouteRepoEventTracker::default());
+        let mut transaction = external_transaction(
+            &dice,
+            "dep",
+            &["@dep+//pkg"],
+            Vec::new(),
+            Some(tracker.clone()),
+        )
+        .await;
+        let deleted = transaction.compute(&key).await.unwrap();
+        assert!(matches!(
+            deleted,
+            SourcePreparationOutcome::Complete(value)
+                if value.as_ref().as_ref().unwrap_err().to_string().contains("is deleted")
+        ));
+        assert!(tracker.take().is_empty());
+
+        let mut routed = Vec::new();
+        for (variant, root) in [(68, "dep-a"), (69, "dep-b"), (68, "dep-a")] {
+            let key = external_source_key(root, "pkg");
+            let marker = format!("/workspace/{root}/pkg/BUILD.bazel");
+            let mut entries = route_prelude(root, None, None, variant);
+            entries.extend([
+                present(
+                    &format!("/workspace/{root}/pkg"),
+                    PathNodeKind::Directory,
+                    variant,
+                ),
+                present(&marker, PathNodeKind::RegularFile, variant),
+                bytes(&marker, b"same"),
+            ]);
+            let mut transaction = external_transaction(&dice, root, &[], entries, None).await;
+            routed.push((key.clone(), transaction.compute(&key).await.unwrap()));
+        }
+        assert_ne!(routed[0].0, routed[1].0);
+        assert_eq!(routed[0].0, routed[2].0);
+        assert!(!RepositoryPackageSourceKey::equality(
+            &routed[0].1,
+            &routed[1].1
+        ));
+        assert!(RepositoryPackageSourceKey::equality(
+            &routed[0].1,
+            &routed[2].1
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repository_package_source_errors_preserve_structural_classes_and_chain() {
+        let package = PackageIdentifier::new(
+            CanonicalRepoName::new("dep+").unwrap(),
+            PackagePath::parse("pkg").unwrap(),
+        );
+        let marker = Arc::new(PathBuf::from("pkg/BUILD.bazel"));
+        let lookup = RepositoryPackageSourceError::new(RepositoryPackageSourceErrorInner::Lookup {
+            package: package.clone(),
+            error: ExternalRepositoryPackageLookupError::Path(
+                RepositorySourceFileError::InvalidRepoRelativePath {
+                    requested_path: marker.clone(),
+                },
+            ),
+        });
+        assert_eq!(lookup, lookup.clone());
+        assert!(lookup.to_string().contains("selecting BUILD source"));
+        assert!(std::error::Error::source(&lookup).is_some());
+
+        let errors = [
+            RepositoryPackageSourceError::new(
+                RepositoryPackageSourceErrorInner::InvalidPackageName {
+                    package: package.clone(),
+                    message: Arc::from("bad name"),
+                },
+            ),
+            RepositoryPackageSourceError::new(RepositoryPackageSourceErrorInner::Deleted {
+                package: package.clone(),
+            }),
+            RepositoryPackageSourceError::new(RepositoryPackageSourceErrorInner::NoBuildFile {
+                package: package.clone(),
+            }),
+            RepositoryPackageSourceError::new(RepositoryPackageSourceErrorInner::LookupCompute {
+                package,
+                message: Arc::from("lookup compute"),
+            }),
+            RepositoryPackageSourceError::new(RepositoryPackageSourceErrorInner::Source {
+                logical_path: marker.clone(),
+                error: RepositorySourceFileError::InvalidRepoRelativePath {
+                    requested_path: marker.clone(),
+                },
+            }),
+            RepositoryPackageSourceError::new(RepositoryPackageSourceErrorInner::SourceCompute {
+                logical_path: marker.clone(),
+                message: Arc::from("source compute"),
+            }),
+            RepositoryPackageSourceError::new(
+                RepositoryPackageSourceErrorInner::SelectedSourceAbsent {
+                    logical_path: marker,
+                },
+            ),
+        ];
+        for error in errors {
+            assert_eq!(error, error.clone());
+            assert!(!error.to_string().is_empty());
+            assert!(std::error::Error::source(&error).is_none());
+        }
     }
 
     #[cfg(unix)]

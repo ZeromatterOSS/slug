@@ -32,6 +32,8 @@ use sha2::Digest;
 use sha2::Sha256;
 use slug_bzlmod_v2::HostRepositorySourceFileKey;
 use slug_bzlmod_v2::HostRepositorySourceFileValue;
+use slug_bzlmod_v2::RepositoryPackageSourceError;
+use slug_bzlmod_v2::RepositoryPackageSourceKey;
 use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorError;
@@ -49,6 +51,7 @@ use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark::PrintHandler;
@@ -1404,16 +1407,12 @@ pub struct RootPackageLoadKey {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum RepositoryPackageLoadErrorInner {
     Source {
-        path: PathBuf,
-        error: RepositorySourceFileError,
+        error: RepositoryPackageSourceError,
     },
     SourceCompute {
-        path: PathBuf,
-        message: Arc<str>,
-    },
-    MissingBuild {
         canonical_repo: CompactString,
         package: PackagePath,
+        message: Arc<str>,
     },
     Encoding {
         path: PathBuf,
@@ -1494,26 +1493,14 @@ impl RepositoryPackageLoadError {
 impl fmt::Display for RepositoryPackageLoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.inner {
-            RepositoryPackageLoadErrorInner::Source { path, error } => {
-                write!(
-                    f,
-                    "reading external repository source {}: {error:?}",
-                    path.display()
-                )
-            }
-            RepositoryPackageLoadErrorInner::SourceCompute { path, message } => {
-                write!(
-                    f,
-                    "computing external repository source {}: {message}",
-                    path.display()
-                )
-            }
-            RepositoryPackageLoadErrorInner::MissingBuild {
+            RepositoryPackageLoadErrorInner::Source { error } => error.fmt(f),
+            RepositoryPackageLoadErrorInner::SourceCompute {
                 canonical_repo,
                 package,
+                message,
             } => write!(
                 f,
-                "no such package '@@{canonical_repo}//{package}': BUILD file not found in directory '{package}' of external repository @@{canonical_repo}. Add a BUILD file to a directory to mark it as a package."
+                "computing external repository BUILD source for @@{canonical_repo}//{package}: {message}"
             ),
             RepositoryPackageLoadErrorInner::Encoding { path } => {
                 write!(
@@ -1592,7 +1579,14 @@ impl fmt::Display for RepositoryPackageLoadError {
     }
 }
 
-impl std::error::Error for RepositoryPackageLoadError {}
+impl std::error::Error for RepositoryPackageLoadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.inner {
+            RepositoryPackageLoadErrorInner::Source { error } => Some(error),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct RepositoryPackageLoadKey {
@@ -2328,94 +2322,39 @@ impl Key for RepositoryPackageLoadKey {
             .is_ok();
         let mut event_batch = None;
         let value = async {
-            let primary = PathBuf::from(self.package.as_str()).join("BUILD.bazel");
-            let fallback = PathBuf::from(self.package.as_str()).join("BUILD");
-            let primary_path = primary;
-            let primary_value = ctx
-                .compute(&HostRepositorySourceFileKey::new(
-                    self.route.clone(),
-                    primary_path.clone(),
-                ))
-                .await;
-            let source = match primary_value {
+            let package =
+                PackageIdentifier::new(self.route.canonical_repo().clone(), self.package.clone());
+            let source_key = RepositoryPackageSourceKey::new(self.route.clone(), package)
+                .expect("repository package load route and package agree");
+            let source = match ctx.compute(&source_key).await {
                 Ok(SourcePreparationOutcome::Need(need)) => {
                     return SourcePreparationOutcome::Need(need);
                 }
-                Ok(SourcePreparationOutcome::Complete(Ok(
-                    HostRepositorySourceFileValue::Present { bytes, .. },
-                ))) => (primary_path, bytes),
-                Ok(SourcePreparationOutcome::Complete(Ok(
-                    HostRepositorySourceFileValue::Absent,
-                ))) => {
-                    let fallback_path = fallback;
-                    let fallback_value = ctx
-                        .compute(&HostRepositorySourceFileKey::new(
-                            self.route.clone(),
-                            fallback_path.clone(),
-                        ))
-                        .await;
-                    match fallback_value {
-                        Ok(SourcePreparationOutcome::Need(need)) => {
-                            return SourcePreparationOutcome::Need(need);
-                        }
-                        Ok(SourcePreparationOutcome::Complete(Ok(
-                            HostRepositorySourceFileValue::Present { bytes, .. },
-                        ))) => (fallback_path, bytes),
-                        Ok(SourcePreparationOutcome::Complete(Ok(
-                            HostRepositorySourceFileValue::Absent,
-                        ))) => {
-                            return repository_package_complete(Err(
-                                RepositoryPackageLoadError::new(
-                                    RepositoryPackageLoadErrorInner::MissingBuild {
-                                        canonical_repo: CompactString::new(
-                                            self.route.canonical_repo().as_str(),
-                                        ),
-                                        package: self.package.clone(),
-                                    },
-                                ),
-                            ));
-                        }
-                        Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                            return repository_package_complete(Err(
-                                RepositoryPackageLoadError::new(
-                                    RepositoryPackageLoadErrorInner::Source {
-                                        path: fallback_path,
-                                        error,
-                                    },
-                                ),
-                            ));
-                        }
-                        Err(error) => {
-                            return repository_package_complete(Err(
-                                RepositoryPackageLoadError::new(
-                                    RepositoryPackageLoadErrorInner::SourceCompute {
-                                        path: fallback_path,
-                                        message: Arc::from(error.to_string()),
-                                    },
-                                ),
-                            ));
-                        }
+                Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                    Ok(source) => source.dupe(),
+                    Err(error) => {
+                        return repository_package_complete(Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::Source {
+                                error: error.clone(),
+                            },
+                        )));
                     }
-                }
-                Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
-                        RepositoryPackageLoadErrorInner::Source {
-                            path: primary_path,
-                            error,
-                        },
-                    )));
-                }
+                },
                 Err(error) => {
                     return repository_package_complete(Err(RepositoryPackageLoadError::new(
                         RepositoryPackageLoadErrorInner::SourceCompute {
-                            path: primary_path,
+                            canonical_repo: CompactString::new(
+                                self.route.canonical_repo().as_str(),
+                            ),
+                            package: self.package.clone(),
                             message: Arc::from(error.to_string()),
                         },
                     )));
                 }
             };
-            let (relative_build_file, bytes) = source;
-            let source = match std::str::from_utf8(bytes.as_ref()) {
+            let relative_build_file =
+                PathBuf::from(self.package.as_str()).join(source.build_file_name());
+            let source = match std::str::from_utf8(source.bytes().as_ref()) {
                 Ok(source) => Arc::new(source.to_owned()),
                 Err(_) => {
                     return repository_package_complete(Err(RepositoryPackageLoadError::new(
