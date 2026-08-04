@@ -17066,3 +17066,35 @@ pattern, configuration, analysis/action/execution, repository rule/extension,
 `@bazel_tools`, JVM, Java bytecode, Bazel delegation, new owner/key/lock/API,
 sixth file, or cap excess. The external Starlark test-rule packet remains
 blocked on its test-base/tool-repository closure.
+
+### WP-5-m1 dependency-free external Starlark-rule projection acceptance (2026-08-04)
+
+**Status: ACCEPTED.** The exact five-file implementation is applied at `+529/-0`.
+It preserves the native loaded-package gate and admits only one sole
+`StarlarkRule` with exact declared Public visibility, non-test/non-executable
+capability, empty ordinary dependencies, and zero labels across every
+dependency-reachable schema/value pair. Private typed errors distinguish
+visibility, capability, ordinary dependency, reachable output/other label,
+schema/value, and additional-target stops. The external graph independently
+revalidates the boundary and projects one route-aware `Rule("rule")` node with
+retained class capability, no edges/test metadata, existing attributes, and an
+explicit empty visibility attribute.
+
+Focused loading, graph, query-consumer/formatter, and direct one-shot/retained-
+daemon lifecycle tests passed, including output-label versus additional-target
+discriminators and edit/delete/recreate recovery. Host owner passed 13 tests,
+external loading query 4, external graph/unit 9, direct CLI lifecycle 1, both
+affected checks and GNU-Windows no-run gates, rebuilt CLI, formatting, archive,
+scope, and diff hygiene passed. Independent loading and consumer latest-diff
+reviews returned `ACCEPT`; no fixture, Cargo, public API, representation,
+owner, DICE, event/lifetime ownership, or lock changed.
+
+The next packet is read-only design:
+`WP-5-m1-external-starlark-test-base-query-closure-design`. Decide whether the
+already observed Bazel 9 implicit dependency closure for one explicit-public
+external `test = True` rule can be frozen as a finite source-proven
+unconfigured DICE graph under existing route/package owners, including verbatim
+`@bazel_tools` test attributes plus required platforms, rules_java,
+rules_shell, and coverage routes, or whether any edge requires general
+repository discovery/configuration and therefore `REPLAN`. Do not activate the
+test rule, suite membership, analysis, or execution.

@@ -928,6 +928,7 @@ fn external_package_graph_from_targets(
     let build_file = CompactString::new(build_path.to_string_lossy());
     let mut nodes = SmallMap::with_capacity(targets.len() + 1);
 
+    validate_external_starlark_rule(targets)?;
     // Validate native test-suite membership before the generic same-package
     // source synthesis below. A test_suite may name only another loaded native
     // test_suite in this external slice, so it never causes a source node to
@@ -1109,6 +1110,15 @@ fn external_package_graph_from_targets(
                     Arc::from([]),
                 )
             }
+            PackageTargetKind::StarlarkRule(implementation) => {
+                let mut attributes = project_attributes(implementation).to_vec();
+                attributes.push(project_visibility_attribute(target));
+                (
+                    QueryNodeKind::Rule(CompactString::new("rule")),
+                    Arc::from([]),
+                    attributes.into(),
+                )
+            }
             _ => {
                 return Err(QueryError::evaluation(format!(
                     "external repository rule graph is deferred: {}//{}:{}",
@@ -1234,6 +1244,64 @@ fn external_package_graph_from_targets(
         package: CompactString::new(package.as_str()),
         nodes,
     })
+}
+
+fn validate_external_starlark_rule(
+    targets: &[slug_loading_v2::PackageTarget],
+) -> Result<(), QueryError> {
+    let Some(target) = targets
+        .iter()
+        .find(|target| matches!(target.kind, PackageTargetKind::StarlarkRule(_)))
+    else {
+        return Ok(());
+    };
+    let fail = |reason| {
+        QueryError::evaluation(format!(
+            "external Starlark rule graph is deferred for '{}': {reason}",
+            target.name
+        ))
+    };
+    let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
+        unreachable!()
+    };
+    if !matches!(
+        &target.visibility,
+        VisibilitySource::Declared(RuleVisibility::Public)
+    ) {
+        return Err(fail("visibility is not explicitly public"));
+    }
+    let capability = target
+        .rule_capability()
+        .expect("Starlark rule retains its exported capability");
+    if capability.test_kind.is_some() || capability.executable {
+        return Err(fail("test or executable capability is deferred"));
+    }
+    if !implementation.dependencies().is_empty() {
+        return Err(fail("ordinary dependencies are deferred"));
+    }
+    if implementation.schema().len() != implementation.values().len()
+        || implementation
+            .schema()
+            .iter()
+            .zip(implementation.values())
+            .any(|(schema, value)| schema.declaration_name() != value.declaration_name)
+    {
+        return Err(fail("schema/value relationship is malformed"));
+    }
+    for (schema, value) in implementation.schema().iter().zip(implementation.values()) {
+        if !schema.dependency_reachable() {
+            continue;
+        }
+        let mut labels = Vec::new();
+        value.value.labels(&mut labels);
+        if !labels.is_empty() {
+            return Err(fail("dependency-reachable attribute contains a label"));
+        }
+    }
+    if targets.len() != 1 {
+        return Err(fail("package contains additional targets"));
+    }
+    Ok(())
 }
 
 fn validate_external_package_group_includes(
@@ -1886,6 +1954,21 @@ mod graph_tests {
         assert_eq!(alias.to_string(), "@@dep+//pkg:target");
         assert_eq!(dep.output_label(), "@dep//pkg:target");
         assert_eq!(alias.output_label(), "@alias//pkg:target");
+    }
+
+    #[test]
+    fn explicit_public_visibility_projects_an_explicit_empty_attribute() {
+        let attribute = super::project_visibility_attribute(&PackageTarget {
+            name: "probe".to_owned(),
+            kind: PackageTargetKind::Filegroup {
+                srcs: Arc::from([]),
+                srcs_explicit: false,
+            },
+            visibility: VisibilitySource::Declared(RuleVisibility::Public),
+        });
+        assert_eq!(attribute.name, "visibility");
+        assert!(attribute.explicit);
+        assert!(attribute.labels.is_empty());
     }
 
     #[test]

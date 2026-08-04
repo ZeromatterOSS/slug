@@ -3752,6 +3752,23 @@ impl RootQueryEpochBuilder {
         builder
     }
 
+    fn external_starlark_package(variant: i64) -> Self {
+        let mut builder = Self::external_package(variant);
+        builder.directory("/workspace/dep/rule", variant);
+        builder.directory_entries("/workspace/dep/rule", &[]);
+        builder.file(
+            "/workspace/dep/rule/BUILD.bazel",
+            "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\", empty = [], visibility = [\"//visibility:public\"])\n",
+            variant,
+        );
+        builder.file(
+            "/workspace/dep/rule/defs.bzl",
+            "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"empty\": attr.label_list()})\n",
+            variant,
+        );
+        builder
+    }
+
     fn package(&mut self, name: &str, source: &str, variant: i64) {
         self.package_at("/workspace", name, "BUILD.bazel", source, variant);
     }
@@ -4171,6 +4188,95 @@ async fn external_macro_loading_files_preserve_owner_fake_consumers_and_output_s
         full.as_ref().as_ref().unwrap().labels.as_ref(),
         ["@dep//macro:defs.bzl"]
     );
+}
+
+#[tokio::test]
+async fn external_dependency_free_starlark_rule_projects_all_enabled_consumers_and_formats() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut transaction = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_starlark_package(6).build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    for (source, expected) in [
+        ("@dep//rule:probe", &["@dep//rule:probe"][..]),
+        ("deps(@dep//rule:probe)", &["@dep//rule:probe"][..]),
+        ("some(@dep//rule:probe)", &["@dep//rule:probe"][..]),
+        (
+            "rdeps(@dep//rule:probe, @dep//rule:probe)",
+            &["@dep//rule:probe"][..],
+        ),
+        (
+            "allpaths(@dep//rule:probe, @dep//rule:probe)",
+            &["@dep//rule:probe"][..],
+        ),
+        (
+            "somepath(@dep//rule:probe, @dep//rule:probe)",
+            &["@dep//rule:probe"][..],
+        ),
+        (
+            "siblings(@dep//rule:probe)",
+            &["@dep//rule:BUILD.bazel", "@dep//rule:probe"][..],
+        ),
+        ("same_pkg_direct_rdeps(@dep//rule:probe)", &[][..]),
+        ("labels(empty, @dep//rule:probe)", &[][..]),
+        ("labels(visibility, @dep//rule:probe)", &[][..]),
+        ("tests(@dep//rule:probe)", &[][..]),
+        ("executables(@dep//rule:probe)", &[][..]),
+        (
+            "visible(@dep//rule:probe, @dep//rule:probe)",
+            &["@dep//rule:probe"][..],
+        ),
+        ("loadfiles(@dep//rule:probe)", &["@dep//rule:defs.bzl"][..]),
+        (
+            "buildfiles(@dep//rule:probe)",
+            &["@dep//rule:BUILD.bazel", "@dep//rule:defs.bzl"][..],
+        ),
+    ] {
+        let QueryPreparationOutcome::Complete(result) =
+            transaction.compute(&root_query_key(source)).await.unwrap()
+        else {
+            panic!("{source} requested preparation")
+        };
+        assert_eq!(
+            result.as_ref().as_ref().unwrap().labels.as_ref(),
+            expected,
+            "{source}"
+        );
+    }
+    for (completion, expected) in [
+        (
+            QueryOutputCompletion::LabelKind,
+            "probe rule @dep//rule:probe\n",
+        ),
+        (QueryOutputCompletion::Standard, "@dep//rule:probe\n"),
+    ] {
+        let key = RootQueryCommandKey::new(
+            root_query_workspace(),
+            "@dep//rule:probe",
+            QueryOrder::Auto,
+            QueryPolicy::default(),
+            completion,
+        )
+        .unwrap();
+        let QueryPreparationOutcome::Complete(result) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("format requested preparation")
+        };
+        let result = result.as_ref().as_ref().unwrap();
+        let actual = if completion == QueryOutputCompletion::LabelKind {
+            result.label_kind_stdout()
+        } else {
+            result.stdout()
+        };
+        assert_eq!(actual, expected);
+        assert_eq!(result.package_stdout(), "@dep//rule\n");
+        assert_eq!(
+            result.graph_stdout(false, true),
+            "digraph mygraph {\n  node [shape=box];\n  \"@dep//rule:probe\"\n}\n"
+        );
+    }
 }
 
 #[tokio::test]

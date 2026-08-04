@@ -91,6 +91,8 @@ use crate::package::PackageRecorder;
 use crate::package::PackageTargetKind;
 use crate::package::loading_globals;
 use crate::provider::BzlEvaluationContext;
+use crate::visibility::RuleVisibility;
+use crate::visibility::VisibilitySource;
 
 /// Local-root loading operations over a caller-owned DICE transaction.
 ///
@@ -1438,11 +1440,44 @@ enum RepositoryPackageLoadErrorInner {
         target: Arc<str>,
         kind: Arc<str>,
     },
+    LoadedStarlarkRule {
+        canonical_repo: CompactString,
+        package: PackagePath,
+        target: Arc<str>,
+        reason: LoadedStarlarkRuleReason,
+    },
     GlobUnsupported {
         canonical_repo: CompactString,
         package: PackagePath,
     },
     Attempt(HostPackageAttemptError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum LoadedStarlarkRuleReason {
+    AdditionalTargets(usize),
+    Visibility,
+    Test,
+    Executable,
+    OrdinaryDependencies,
+    SchemaValues,
+    ReachableLabels(Arc<str>),
+}
+
+impl fmt::Display for LoadedStarlarkRuleReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AdditionalTargets(count) => write!(f, "package contains {count} targets"),
+            Self::Visibility => f.write_str("visibility is not explicitly public"),
+            Self::Test => f.write_str("test rules are deferred"),
+            Self::Executable => f.write_str("executable rules are deferred"),
+            Self::OrdinaryDependencies => f.write_str("ordinary dependencies are deferred"),
+            Self::SchemaValues => f.write_str("schema/value relationship is malformed"),
+            Self::ReachableLabels(attribute) => {
+                write!(f, "attribute `{attribute}` contains a reachable label")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1535,6 +1570,15 @@ impl fmt::Display for RepositoryPackageLoadError {
             } => write!(
                 f,
                 "loaded external package @@{canonical_repo}//{package} produced unsupported target `{target}` of kind {kind}"
+            ),
+            RepositoryPackageLoadErrorInner::LoadedStarlarkRule {
+                canonical_repo,
+                package,
+                target,
+                reason,
+            } => write!(
+                f,
+                "loaded external Starlark rule @@{canonical_repo}//{package}:{target} is deferred: {reason}"
             ),
             RepositoryPackageLoadErrorInner::GlobUnsupported {
                 canonical_repo,
@@ -2213,6 +2257,61 @@ fn loaded_external_target_kind(kind: &PackageTargetKind) -> Option<&'static str>
     }
 }
 
+fn loaded_external_starlark_rule_reason(
+    targets: &[crate::package::PackageTarget],
+) -> Option<(&str, LoadedStarlarkRuleReason)> {
+    let target = targets
+        .iter()
+        .find(|target| matches!(target.kind, PackageTargetKind::StarlarkRule(_)))?;
+    let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
+        unreachable!()
+    };
+    let reason = if !matches!(
+        &target.visibility,
+        VisibilitySource::Declared(RuleVisibility::Public)
+    ) {
+        Some(LoadedStarlarkRuleReason::Visibility)
+    } else if target
+        .rule_capability()
+        .is_some_and(|capability| capability.test_kind.is_some())
+    {
+        Some(LoadedStarlarkRuleReason::Test)
+    } else if target
+        .rule_capability()
+        .is_some_and(|capability| capability.executable)
+    {
+        Some(LoadedStarlarkRuleReason::Executable)
+    } else if !implementation.dependencies().is_empty() {
+        Some(LoadedStarlarkRuleReason::OrdinaryDependencies)
+    } else if implementation.schema().len() != implementation.values().len()
+        || implementation
+            .schema()
+            .iter()
+            .zip(implementation.values())
+            .any(|(schema, value)| schema.declaration_name() != value.declaration_name)
+    {
+        Some(LoadedStarlarkRuleReason::SchemaValues)
+    } else {
+        implementation
+            .schema()
+            .iter()
+            .zip(implementation.values())
+            .filter(|(schema, _)| schema.dependency_reachable())
+            .find_map(|(schema, value)| {
+                let mut labels = Vec::new();
+                value.value.labels(&mut labels);
+                (!labels.is_empty()).then(|| {
+                    LoadedStarlarkRuleReason::ReachableLabels(Arc::from(schema.query_name()))
+                })
+            })
+    };
+    reason
+        .or_else(|| {
+            (targets.len() != 1).then(|| LoadedStarlarkRuleReason::AdditionalTargets(targets.len()))
+        })
+        .map(|reason| (target.name.as_str(), reason))
+}
+
 #[async_trait]
 impl Key for RepositoryPackageLoadKey {
     type Value = SourcePreparationOutcome<Arc<Result<LoadedPackage, RepositoryPackageLoadError>>>;
@@ -2459,6 +2558,27 @@ impl Key for RepositoryPackageLoadKey {
                     });
                     let result = result.and_then(|loaded| {
                         if loads.is_empty() {
+                            return Ok(loaded);
+                        }
+                        if let Some((target, reason)) =
+                            loaded_external_starlark_rule_reason(&loaded.targets)
+                        {
+                            return Err(RepositoryPackageLoadError::new(
+                                RepositoryPackageLoadErrorInner::LoadedStarlarkRule {
+                                    canonical_repo,
+                                    package: self.package.clone(),
+                                    target: Arc::from(target),
+                                    reason,
+                                },
+                            ));
+                        }
+                        if matches!(
+                            loaded.targets.as_slice(),
+                            [crate::package::PackageTarget {
+                                kind: PackageTargetKind::StarlarkRule(_),
+                                ..
+                            }]
+                        ) {
                             return Ok(loaded);
                         }
                         if let Some((target, kind)) = loaded.targets.iter().find_map(|target| {

@@ -1272,6 +1272,172 @@ async fn repository_package_load_activates_external_macro_manifest_lifetime_and_
 }
 
 #[tokio::test]
+async fn repository_package_load_accepts_only_dependency_free_public_starlark_rule_shape() {
+    let valid: &[(&str, &[u8])] = &[
+        (
+            "BUILD.bazel",
+            b"load(\":defs.bzl\", \"probe\")\nprint(\"RULE_BUILD\")\nprobe(name = \"probe\", empty = [], visibility = [\"//visibility:public\"])\n",
+        ),
+        (
+            "defs.bzl",
+            b"print(\"RULE_BZL\")\ndef _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"empty\": attr.label_list()})\n",
+        ),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let epoch = EpochBuilder::external_sources(valid, 80).build();
+    let mut cold = transaction(&dice, epoch.clone(), true, Some(tracker.dupe())).await;
+    let route = external_route(&mut cold).await;
+    let key = RepositoryPackageLoadKey::new(route, PackagePath::parse("").unwrap());
+    let cold_value = cold.compute(&key).await.unwrap();
+    let loaded = repository_package_terminal(&cold_value);
+    assert_eq!(loaded.targets.len(), 1);
+    assert!(matches!(
+        loaded.targets[0].kind,
+        crate::PackageTargetKind::StarlarkRule(_)
+    ));
+    let capability = loaded.targets[0].rule_capability().unwrap();
+    assert_eq!(capability.rule_class, "probe");
+    assert!(!capability.executable);
+    assert!(capability.test_kind.is_none());
+    assert_eq!(loaded.retained_bzl_module_count(), 1);
+    let batches = tracker.take();
+    assert_eq!(
+        event_texts(
+            batches
+                .iter()
+                .find(|entry| entry.key == "external-bzl-module:@@dep+//:defs.bzl")
+                .unwrap()
+                .batch
+                .as_ref()
+                .unwrap()
+        ),
+        ["RULE_BZL"]
+    );
+    assert_eq!(
+        event_texts(
+            batches
+                .iter()
+                .find(|entry| entry.key.starts_with("repository-package-load:"))
+                .unwrap()
+                .batch
+                .as_ref()
+                .unwrap()
+        ),
+        ["RULE_BUILD"]
+    );
+    let warm_tracker = Arc::new(EventTracker::default());
+    let mut warm = transaction(&dice, epoch, true, Some(warm_tracker.dupe())).await;
+    let route = external_route(&mut warm).await;
+    repository_package_terminal(
+        &warm
+            .compute(&RepositoryPackageLoadKey::new(
+                route,
+                PackagePath::parse("").unwrap(),
+            ))
+            .await
+            .unwrap(),
+    );
+    assert!(
+        warm_tracker
+            .take()
+            .iter()
+            .all(|entry| entry.kind == ActivationKind::Reused && entry.batch.is_none())
+    );
+
+    let cases = [
+        (
+            "probe(name = \"bad\")",
+            "visibility is not explicitly public",
+        ),
+        (
+            "probe(name = \"bad\", visibility = [\"//visibility:private\"])",
+            "visibility is not explicitly public",
+        ),
+        (
+            "probe(name = \"bad\", visibility = [\"//pkg:__pkg__\"])",
+            "visibility is not explicitly public",
+        ),
+        (
+            "probe(name = \"bad\", dep = \":dep.txt\", visibility = [\"//visibility:public\"])",
+            "ordinary dependencies are deferred",
+        ),
+        (
+            "probe(name = \"bad\", out = \"out.txt\", visibility = [\"//visibility:public\"])",
+            "attribute `out` contains a reachable label",
+        ),
+        (
+            "exports_files([\"extra.txt\"])\nprobe(name = \"bad\", visibility = [\"//visibility:public\"])",
+            "package contains 2 targets",
+        ),
+    ];
+    for (index, (invocation, expected)) in cases.into_iter().enumerate() {
+        let build = format!("load(\":defs.bzl\", \"probe\")\n{invocation}\n");
+        let defs = b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"dep\": attr.label(), \"out\": attr.output()})\n";
+        let mut transaction = transaction(
+            &dice,
+            EpochBuilder::external_sources(
+                &[("BUILD.bazel", build.as_bytes()), ("defs.bzl", defs)],
+                81 + index as i64,
+            )
+            .build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut transaction).await;
+        let outcome = transaction
+            .compute(&RepositoryPackageLoadKey::new(
+                route,
+                PackagePath::parse("").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert!(
+            repository_package_error(&outcome).contains(expected),
+            "{expected}"
+        );
+    }
+    for (source, symbol, expected) in [
+        (
+            b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe_test = rule(implementation = _impl, test = True)\n".as_slice(),
+            "probe_test",
+            "test rules are deferred",
+        ),
+        (
+            b"def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, executable = True)\n".as_slice(),
+            "probe",
+            "executable rules are deferred",
+        ),
+    ] {
+        let build = format!(
+            "load(\":defs.bzl\", \"{symbol}\")\n{symbol}(name = \"bad\", visibility = [\"//visibility:public\"])\n"
+        );
+        let mut transaction = transaction(
+            &dice,
+            EpochBuilder::external_sources(
+                &[("BUILD.bazel", build.as_bytes()), ("defs.bzl", source)],
+                90,
+            )
+            .build(),
+            false,
+            None,
+        )
+        .await;
+        let route = external_route(&mut transaction).await;
+        let outcome = transaction
+            .compute(&RepositoryPackageLoadKey::new(
+                route,
+                PackagePath::parse("").unwrap(),
+            ))
+            .await
+            .unwrap();
+        let error = repository_package_error(&outcome);
+        assert!(error.contains(expected), "{expected}: {error}");
+    }
+}
+
+#[tokio::test]
 async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_kinds() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let tracker = Arc::new(EventTracker::default());

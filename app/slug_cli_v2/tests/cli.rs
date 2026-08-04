@@ -2864,6 +2864,14 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         workspace.join("macro/BUILD.bazel"),
         "filegroup(name = \"root_sentinel\")\n",
     );
+    write(
+        workspace.join("dep/rule/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\", visibility = [\"//visibility:public\"])\n",
+    );
+    write(
+        workspace.join("dep/rule/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+    );
 
     let one_shot = slug()
         .current_dir(&workspace)
@@ -2895,8 +2903,26 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
     let macro_build_index = one_shot_macro_stderr.find("EXTERNAL_MACRO_BUILD").unwrap();
     let macro_body_index = one_shot_macro_stderr.find("EXTERNAL_MACRO_BODY").unwrap();
     assert!(defs_index < macro_build_index && macro_build_index < macro_body_index);
+    let one_shot_rule = slug()
+        .current_dir(&workspace)
+        .args(["query", "--output=label_kind", "@dep//rule:probe"])
+        .output()
+        .unwrap();
+    assert!(one_shot_rule.status.success(), "{one_shot_rule:?}");
+    assert_eq!(
+        String::from_utf8(one_shot_rule.stdout).unwrap(),
+        "probe rule @dep//rule:probe\n"
+    );
 
     let output_base_arg = format!("--output_base={}", output_base.display());
+    let daemon_query = |args: &[&str]| {
+        slug()
+            .current_dir(&workspace)
+            .arg(output_base_arg.as_str())
+            .args(args)
+            .output()
+            .unwrap()
+    };
     let first = slug()
         .current_dir(&workspace)
         .args([output_base_arg.as_str(), "query", "@dep//:target.txt"])
@@ -2947,6 +2973,13 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
     assert!(macro_cold_stderr.contains("EXTERNAL_DEFS_EVENT"));
     assert!(macro_cold_stderr.contains("EXTERNAL_MACRO_BUILD"));
     assert!(macro_cold_stderr.contains("EXTERNAL_MACRO_BODY"));
+
+    let rule_cold = daemon_query(&["query", "--output=label_kind", "@dep//rule:probe"]);
+    assert!(rule_cold.status.success(), "{rule_cold:?}");
+    assert_eq!(
+        String::from_utf8(rule_cold.stdout).unwrap(),
+        "probe rule @dep//rule:probe\n"
+    );
 
     for (args, expected) in [
         (
@@ -3056,6 +3089,27 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
     assert_eq!(
         std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
         pid
+    );
+
+    write(
+        workspace.join("dep/rule/defs.bzl"),
+        "print(\"RULE_EDITED\")\ndef _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+    );
+    let rule_edited = daemon_query(&["query", "@dep//rule:probe"]);
+    assert!(rule_edited.status.success(), "{rule_edited:?}");
+    assert!(String::from_utf8_lossy(&rule_edited.stderr).contains("RULE_EDITED"));
+    std::fs::remove_file(workspace.join("dep/rule/defs.bzl")).unwrap();
+    let rule_deleted = daemon_query(&["query", "@dep//rule:probe"]);
+    assert_eq!(rule_deleted.status.code(), Some(7), "{rule_deleted:?}");
+    write(
+        workspace.join("dep/rule/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+    );
+    let rule_recreated = daemon_query(&["query", "@dep//rule:probe"]);
+    assert!(rule_recreated.status.success(), "{rule_recreated:?}");
+    assert_eq!(
+        String::from_utf8(rule_recreated.stdout).unwrap(),
+        "@dep//rule:probe\n"
     );
 
     let external_pattern = slug()
