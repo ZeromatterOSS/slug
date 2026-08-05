@@ -3917,6 +3917,33 @@ separate complete option-path fact projection. Add no Host read, DICE,
 configuration, request, wire, or activation behavior. Configured-target
 dependency cycles remain explicitly deferred.
 
+### Host input observation contract retry REPLAN (2026-08-05)
+
+`WP-6-m2-host-input-observation-contract-design-retry` stops before selecting
+a schema. The pinned-source/lifetime audit disproves its proposed single
+immutable process snapshot: `user.home` is read for every eligible leading
+`~/` option conversion, while OS, architecture, and `LocalHostCapacity`
+CPU/RAM have independent lazy evaluation, failure, and timing behavior. Those
+facts cannot be atomically captured once without changing Bazel-observable
+lifetime semantics. The already accepted `WindowsOptionPathLongName` outcome
+is a separate request-scoped fact and must retain its success/fallback branch
+until later pure conversion.
+
+No Host snapshot, producer, DICE key, configuration schema, converter,
+request/daemon activation, Rust, probe, dependency, or runtime behavior was
+added. Process facts must not be recaptured by a workspace runtime; the future
+configuration boundary remains pure and can depend only one way from core to
+configuration. Configured-target cycle semantics remain user-deferred.
+
+Run next only `WP-6-m2-host-input-lifetime-partition-design`, docs-only.
+Design an explicit process owner with lazy, independently fallible per-source
+result cells, plus separate request/eligible-conversion option facts. Freeze
+their exact ownership, capture timing, structural identity, DICE handoff, and
+one-shot/daemon lifetimes before authorizing any Host or configuration work.
+Stop on any proposed global/static, atomic snapshot, configuration IO,
+cross-request option fact reuse, config -> core/workspace edge, new cycle, or
+configured-target semantics.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
