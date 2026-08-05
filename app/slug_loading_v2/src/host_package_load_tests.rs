@@ -182,21 +182,32 @@ struct TrackedBatch {
 #[derive(Default)]
 struct EventTracker {
     batches: Mutex<Vec<TrackedBatch>>,
+    package_dependencies: Mutex<Vec<Vec<String>>>,
 }
 
 impl EventTracker {
     fn take(&self) -> Vec<TrackedBatch> {
         std::mem::take(&mut *self.batches.lock().unwrap())
     }
+
+    fn take_package_dependencies(&self) -> Vec<Vec<String>> {
+        std::mem::take(&mut *self.package_dependencies.lock().unwrap())
+    }
 }
 
 impl ActivationTracker for EventTracker {
     fn key_activated(
         &self,
-        _key: &DynKey,
-        _deps: &mut dyn Iterator<Item = &DynKey>,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
         _activation: ActivationData,
     ) {
+        if key.downcast_ref::<RootPackageLoadKey>().is_some() {
+            self.package_dependencies
+                .lock()
+                .unwrap()
+                .push(deps.map(ToString::to_string).collect());
+        }
     }
 
     fn tracks_rich_activations(&self) -> bool {
@@ -484,6 +495,158 @@ async fn host_package_loads_bzl_and_owns_only_local_complete_events() {
     assert_eq!(batch("host-root-module-file:"), ["ROOT"]);
     assert_eq!(batch("host-bzl-module:"), ["BZL"]);
     assert_eq!(batch("host-package-load:"), ["BUILD", "MACRO"]);
+}
+
+#[tokio::test]
+async fn host_native_toolchain_targets_preserve_root_load_lifecycle_and_ownership() {
+    let build = |event: &str, constraint: &str| {
+        format!(
+            concat!(
+                "print(\"{event}\")\n",
+                "constraint_setting(name = \"setting\")\n",
+                "constraint_value(name = \"first\", constraint_setting = \":setting\")\n",
+                "constraint_value(name = \"second\", constraint_setting = \":setting\")\n",
+                "platform(name = \"exec\", constraint_values = [\":{constraint}\"])\n",
+                "toolchain_type(name = \"type\")\n",
+                "toolchain(name = \"registered\", exec_compatible_with = [\":{constraint}\"], ",
+                "toolchain = \":implementation\", toolchain_type = \":type\")\n",
+            ),
+            event = event,
+            constraint = constraint,
+        )
+    };
+    let epoch = |source: Option<&str>, build_variant| {
+        let mut epoch = EpochBuilder::workspace_sources(
+            "print(\"ROOT\")\n",
+            source.unwrap_or_default(),
+            &[],
+            1,
+        );
+        match source {
+            Some(source) => epoch.file("/workspace/pkg/BUILD.bazel", source, build_variant),
+            None => {
+                epoch.missing("/workspace/pkg/BUILD.bazel");
+                epoch.missing("/workspace/pkg/BUILD");
+            }
+        }
+        epoch.build()
+    };
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = package_key();
+    let build_a = build("BUILD_A", "first");
+    let build_b = build("BUILD_B", "second");
+
+    let cold_tracker = Arc::new(EventTracker::default());
+    let mut cold_tx = transaction(
+        &dice,
+        epoch(Some(&build_a), 10),
+        true,
+        Some(cold_tracker.dupe()),
+    )
+    .await;
+    let cold = cold_tx.compute(&key).await.unwrap();
+    assert_eq!(
+        target_names(&cold),
+        ["setting", "first", "second", "exec", "type", "registered"]
+    );
+    assert!(RootPackageLoadKey::validity(&cold));
+    let cold_batches = cold_tracker.take();
+    assert_eq!(cold_batches.len(), 2);
+    assert_eq!(
+        event_texts(
+            cold_batches
+                .iter()
+                .find(|entry| entry.key.starts_with("host-root-module-file:"))
+                .unwrap()
+                .batch
+                .as_ref()
+                .unwrap()
+        ),
+        ["ROOT"]
+    );
+    assert_eq!(
+        event_texts(
+            cold_batches
+                .iter()
+                .find(|entry| entry.key.starts_with("host-package-load:"))
+                .unwrap()
+                .batch
+                .as_ref()
+                .unwrap()
+        ),
+        ["BUILD_A"]
+    );
+    let cold_dependencies = cold_tracker.take_package_dependencies();
+    assert_eq!(cold_dependencies.len(), 1);
+    assert_eq!(
+        cold_dependencies[0].first().map(String::as_str),
+        Some("root-module-loading-anchor:\"/workspace\"")
+    );
+
+    let warm_tracker = Arc::new(EventTracker::default());
+    let mut warm_tx = transaction(
+        &dice,
+        epoch(Some(&build_a), 10),
+        true,
+        Some(warm_tracker.dupe()),
+    )
+    .await;
+    let warm = warm_tx.compute(&key).await.unwrap();
+    assert!(RootPackageLoadKey::equality(&cold, &warm));
+    assert!(
+        warm_tracker
+            .take()
+            .iter()
+            .all(|entry| { entry.kind == ActivationKind::Reused && entry.batch.is_none() })
+    );
+
+    let changed_tracker = Arc::new(EventTracker::default());
+    let mut changed_tx = transaction(
+        &dice,
+        epoch(Some(&build_b), 11),
+        true,
+        Some(changed_tracker.dupe()),
+    )
+    .await;
+    let changed = changed_tx.compute(&key).await.unwrap();
+    assert!(!RootPackageLoadKey::equality(&cold, &changed));
+    let changed_batches = changed_tracker.take();
+    assert!(
+        changed_batches
+            .iter()
+            .all(|entry| { entry.key.starts_with("host-package-load:") || entry.batch.is_none() })
+    );
+    assert_eq!(
+        event_texts(
+            changed_batches
+                .iter()
+                .find(|entry| entry.key.starts_with("host-package-load:"))
+                .unwrap()
+                .batch
+                .as_ref()
+                .unwrap()
+        ),
+        ["BUILD_B"]
+    );
+    let changed_dependencies = changed_tracker.take_package_dependencies();
+    assert_eq!(changed_dependencies.len(), 1);
+    assert_eq!(
+        changed_dependencies[0].first(),
+        cold_dependencies[0].first()
+    );
+
+    let restored = compute_package(&dice, epoch(Some(&build_a), 12), package_policy()).await;
+    assert!(RootPackageLoadKey::equality(&cold, &restored));
+
+    let deleted = compute_package(&dice, epoch(None, 13), package_policy()).await;
+    assert_eq!(
+        terminal_error(&deleted),
+        "no BUILD.bazel or BUILD file in package //pkg"
+    );
+    assert!(RootPackageLoadKey::validity(&deleted));
+
+    let recreated = compute_package(&dice, epoch(Some(&build_a), 14), package_policy()).await;
+    assert!(RootPackageLoadKey::equality(&cold, &recreated));
 }
 
 #[tokio::test]
@@ -1630,6 +1793,30 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
     assert!(
         repository_package_error(&rejected)
             .contains("produced unsupported target `blocked` of kind alias")
+    );
+
+    let mut native = transaction(
+        &dice,
+        EpochBuilder::external_sources(
+            &[("BUILD.bazel", b"toolchain_type(name = \"type\")\n")],
+            721,
+        )
+        .build(),
+        false,
+        None,
+    )
+    .await;
+    let route = external_route(&mut native).await;
+    let native = native
+        .compute(&RepositoryPackageLoadKey::new(
+            route,
+            PackagePath::parse("").unwrap(),
+        ))
+        .await
+        .unwrap();
+    assert!(
+        repository_package_error(&native)
+            .contains("produced unsupported target `type` of kind toolchain_type")
     );
 
     let mut unloaded = transaction(

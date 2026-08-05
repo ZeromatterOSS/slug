@@ -4157,6 +4157,68 @@ async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root
 }
 
 #[tokio::test]
+async fn native_toolchain_targets_defer_root_and_external_query_graphs_without_projection() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+
+    let mut root_epoch = RootQueryEpochBuilder::base(80);
+    root_epoch.package(
+        "native",
+        concat!(
+            "filegroup(name = \"ordinary_before\")\n",
+            "toolchain_type(name = \"type\")\n",
+            "filegroup(name = \"ordinary_after\")\n",
+        ),
+        80,
+    );
+    let mut root = root_query_transaction(
+        &dice,
+        root_epoch.build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    let value = root.compute(&root_query_key("//native:*")).await.unwrap();
+    let QueryPreparationOutcome::Complete(result) = value else {
+        panic!("root native query requested preparation: {value:?}")
+    };
+    let error = result.as_ref().as_ref().unwrap_err();
+    assert_eq!(error.error_kind(), "unsupported_feature");
+    assert_eq!(
+        error.to_string(),
+        "Slug does not support query graph projection for native toolchain_type target '//native:type'"
+    );
+
+    let mut external_epoch = RootQueryEpochBuilder::external_package(81);
+    external_epoch.file(
+        "/workspace/dep/BUILD.bazel",
+        concat!(
+            "filegroup(name = \"ordinary_before\")\n",
+            "toolchain_type(name = \"type\")\n",
+            "filegroup(name = \"ordinary_after\")\n",
+        ),
+        81,
+    );
+    let mut external = root_query_transaction(
+        &dice,
+        external_epoch.build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    let value = external
+        .compute(&root_query_key("@dep//:ordinary_before"))
+        .await
+        .unwrap();
+    let QueryPreparationOutcome::Complete(result) = value else {
+        panic!("external native query requested preparation: {value:?}")
+    };
+    let error = result.as_ref().as_ref().unwrap_err();
+    assert_eq!(error.error_kind(), "query_error");
+    assert_eq!(
+        error.to_string(),
+        "loaded external package @@dep+// produced unsupported target `type` of kind toolchain_type"
+    );
+}
+
+#[tokio::test]
 async fn external_module_cycle_is_typed_for_graph_and_loading_file_provenance() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let mut transaction = root_query_transaction(

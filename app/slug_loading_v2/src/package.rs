@@ -43,6 +43,7 @@ use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
+use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
@@ -206,6 +207,31 @@ static CONFIG_SETTING_RULE_CAPABILITY: RuleCapability = RuleCapability {
     executable: false,
     test_kind: None,
 };
+static CONSTRAINT_SETTING_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("constraint_setting"),
+    executable: false,
+    test_kind: None,
+};
+static CONSTRAINT_VALUE_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("constraint_value"),
+    executable: false,
+    test_kind: None,
+};
+static PLATFORM_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("platform"),
+    executable: false,
+    test_kind: None,
+};
+static TOOLCHAIN_TYPE_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("toolchain_type"),
+    executable: false,
+    test_kind: None,
+};
+static TOOLCHAIN_RULE_CAPABILITY: RuleCapability = RuleCapability {
+    rule_class: CompactString::const_new("toolchain"),
+    executable: false,
+    test_kind: None,
+};
 static TEST_SUITE_RULE_CAPABILITY: RuleCapability = RuleCapability {
     rule_class: CompactString::const_new("test_suite"),
     executable: false,
@@ -269,6 +295,7 @@ pub enum PackageTargetKind {
     ConfigSetting {
         values: Arc<[(CompactString, CompactString)]>,
     },
+    NativeToolchain(NativeToolchainTarget),
     TestSuite {
         membership: TestSuiteMembership,
         tags: Arc<[CompactString]>,
@@ -298,6 +325,7 @@ impl PackageTargetKind {
             Self::Filegroup { .. } => Some(&FILEGROUP_RULE_CAPABILITY),
             Self::Alias { .. } => Some(&ALIAS_RULE_CAPABILITY),
             Self::ConfigSetting { .. } => Some(&CONFIG_SETTING_RULE_CAPABILITY),
+            Self::NativeToolchain(target) => Some(target.rule_capability()),
             Self::TestSuite { .. } => Some(&TEST_SUITE_RULE_CAPABILITY),
             Self::StarlarkRule(rule) => Some(&rule.capability),
             Self::ExportedFile | Self::GeneratedFile { .. } | Self::PackageGroup { .. } => None,
@@ -332,6 +360,48 @@ impl PackageTargetKind {
                 })
             }
             _ => None,
+        }
+    }
+}
+
+/// Loading-owned representation of the exact native target classes needed by
+/// the accepted first-compatible toolchain fixture. Resolution remains a
+/// later analysis-stage owner.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum NativeToolchainTarget {
+    ConstraintSetting,
+    ConstraintValue {
+        constraint_setting: CanonicalLabel,
+    },
+    Platform {
+        constraint_values: Arc<[CanonicalLabel]>,
+    },
+    ToolchainType,
+    Toolchain {
+        toolchain_type: CanonicalLabel,
+        implementation: CanonicalLabel,
+        exec_compatible_with: Arc<[CanonicalLabel]>,
+    },
+}
+
+impl NativeToolchainTarget {
+    pub fn rule_class(&self) -> &'static str {
+        match self {
+            Self::ConstraintSetting => "constraint_setting",
+            Self::ConstraintValue { .. } => "constraint_value",
+            Self::Platform { .. } => "platform",
+            Self::ToolchainType => "toolchain_type",
+            Self::Toolchain { .. } => "toolchain",
+        }
+    }
+
+    fn rule_capability(&self) -> &'static RuleCapability {
+        match self {
+            Self::ConstraintSetting => &CONSTRAINT_SETTING_RULE_CAPABILITY,
+            Self::ConstraintValue { .. } => &CONSTRAINT_VALUE_RULE_CAPABILITY,
+            Self::Platform { .. } => &PLATFORM_RULE_CAPABILITY,
+            Self::ToolchainType => &TOOLCHAIN_TYPE_RULE_CAPABILITY,
+            Self::Toolchain { .. } => &TOOLCHAIN_RULE_CAPABILITY,
         }
     }
 }
@@ -635,6 +705,35 @@ impl PackageRecorder {
             },
             self.visibility_source(visibility, VisibilitySource::AlwaysPublic)?,
         )
+    }
+
+    fn native_toolchain_target(
+        &self,
+        name: String,
+        target: NativeToolchainTarget,
+    ) -> anyhow::Result<()> {
+        self.record_target(
+            name,
+            PackageTargetKind::NativeToolchain(target),
+            VisibilitySource::PackageDefault,
+        )
+    }
+
+    fn native_toolchain_label(&self, value: &str) -> anyhow::Result<CanonicalLabel> {
+        let target = value.rsplit_once(':').map(|(_, target)| target);
+        let recursive = target.is_none() && (value == "..." || value.ends_with("/..."));
+        if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
+            anyhow::bail!("native toolchain declarations require direct target labels")
+        }
+        self.dependency_label(value)
+    }
+
+    fn native_toolchain_labels(&self, values: &[&str]) -> anyhow::Result<Arc<[CanonicalLabel]>> {
+        values
+            .iter()
+            .map(|value| self.native_toolchain_label(value))
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map(Arc::from)
     }
 
     fn package_group(
@@ -2173,6 +2272,68 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             name.to_owned(),
             values,
             visibility.map(list),
+        )?;
+        Ok(NoneType)
+    }
+
+    fn constraint_setting(name: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
+        PackageRecorder::from_evaluator(eval)?
+            .native_toolchain_target(name.to_owned(), NativeToolchainTarget::ConstraintSetting)?;
+        Ok(NoneType)
+    }
+
+    fn constraint_value(
+        name: &str,
+        constraint_setting: &str,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target(
+            name.to_owned(),
+            NativeToolchainTarget::ConstraintValue {
+                constraint_setting: recorder.native_toolchain_label(constraint_setting)?,
+            },
+        )?;
+        Ok(NoneType)
+    }
+
+    fn platform(
+        name: &str,
+        constraint_values: UnpackList<&str>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target(
+            name.to_owned(),
+            NativeToolchainTarget::Platform {
+                constraint_values: recorder.native_toolchain_labels(&constraint_values.items)?,
+            },
+        )?;
+        Ok(NoneType)
+    }
+
+    fn toolchain_type(name: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
+        PackageRecorder::from_evaluator(eval)?
+            .native_toolchain_target(name.to_owned(), NativeToolchainTarget::ToolchainType)?;
+        Ok(NoneType)
+    }
+
+    fn toolchain(
+        name: &str,
+        exec_compatible_with: UnpackList<&str>,
+        toolchain: &str,
+        toolchain_type: &str,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target(
+            name.to_owned(),
+            NativeToolchainTarget::Toolchain {
+                toolchain_type: recorder.native_toolchain_label(toolchain_type)?,
+                implementation: recorder.native_toolchain_label(toolchain)?,
+                exec_compatible_with: recorder
+                    .native_toolchain_labels(&exec_compatible_with.items)?,
+            },
         )?;
         Ok(NoneType)
     }

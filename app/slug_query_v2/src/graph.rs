@@ -653,6 +653,17 @@ fn package_graph_from_loaded(
     loaded: &LoadedPackage,
 ) -> Result<UnconfiguredPackageGraph, QueryError> {
     let package_name = path_to_package(package)?;
+    if let Some((target, native)) = loaded.targets.iter().find_map(|target| match &target.kind {
+        PackageTargetKind::NativeToolchain(native) => Some((target, native)),
+        _ => None,
+    }) {
+        return Err(QueryError::unsupported_feature(format!(
+            "Slug does not support query graph projection for native {} target '//{}:{}'",
+            native.rule_class(),
+            package_name,
+            target.name
+        )));
+    }
     let build_basename = loaded
         .build_file
         .file_name()
@@ -753,6 +764,9 @@ fn package_graph_from_loaded(
                 visibility_edges,
                 Vec::new(),
             ),
+            PackageTargetKind::NativeToolchain(_) => {
+                unreachable!("native toolchain targets are rejected before graph projection")
+            }
             PackageTargetKind::TestSuite { membership, .. } => {
                 let tests = membership
                     .tests()

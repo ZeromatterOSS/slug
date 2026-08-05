@@ -48,6 +48,7 @@ use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_loading_v2::package::NativeToolchainTarget;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
@@ -575,6 +576,160 @@ fn config_setting_retains_values_and_rejects_unmodeled_arguments() {
         .unwrap_err()
         .to_string();
     assert!(error.contains("define_values"), "{error}");
+}
+
+#[test]
+fn native_toolchain_targets_retain_fixture_order_labels_and_capabilities() {
+    let workspace = scratch("native-toolchain-targets");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+constraint_setting(name = "selection")
+constraint_value(name = "first", constraint_setting = ":selection")
+constraint_value(name = "second", constraint_setting = ":selection")
+platform(name = "exec", constraint_values = [":second", ":first"])
+toolchain_type(name = "demo_type")
+toolchain(
+    name = "demo_toolchain",
+    exec_compatible_with = [":first", ":second"],
+    toolchain = ":implementation",
+    toolchain_type = ":demo_type",
+)
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "selection",
+            "first",
+            "second",
+            "exec",
+            "demo_type",
+            "demo_toolchain",
+        ]
+    );
+    assert!(matches!(
+        loaded.targets[0].kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting)
+    ));
+    assert!(matches!(
+        &loaded.targets[1].kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
+            constraint_setting,
+        }) if constraint_setting == &CanonicalLabel::parse("@@//pkg:selection").unwrap()
+    ));
+    assert!(matches!(
+        &loaded.targets[2].kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
+            constraint_setting,
+        }) if constraint_setting == &CanonicalLabel::parse("@@//pkg:selection").unwrap()
+    ));
+    assert!(matches!(
+        &loaded.targets[3].kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
+            constraint_values,
+        }) if constraint_values.as_ref() == [
+            CanonicalLabel::parse("@@//pkg:second").unwrap(),
+            CanonicalLabel::parse("@@//pkg:first").unwrap(),
+        ]
+    ));
+    assert!(matches!(
+        loaded.targets[4].kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)
+    ));
+    assert!(matches!(
+        &loaded.targets[5].kind,
+        PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+            toolchain_type,
+            implementation,
+            exec_compatible_with,
+        }) if toolchain_type == &CanonicalLabel::parse("@@//pkg:demo_type").unwrap()
+            && implementation == &CanonicalLabel::parse("@@//pkg:implementation").unwrap()
+            && exec_compatible_with.as_ref() == [
+                CanonicalLabel::parse("@@//pkg:first").unwrap(),
+                CanonicalLabel::parse("@@//pkg:second").unwrap(),
+            ]
+    ));
+    assert_eq!(
+        loaded
+            .targets
+            .iter()
+            .map(|target| target.rule_capability().unwrap().rule_class.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "constraint_setting",
+            "constraint_value",
+            "constraint_value",
+            "platform",
+            "toolchain_type",
+            "toolchain",
+        ]
+    );
+    assert!(loaded.targets.iter().all(|target| {
+        let capability = target.rule_capability().unwrap();
+        target.visibility == VisibilitySource::PackageDefault
+            && !capability.executable
+            && capability.test_kind.is_none()
+    }));
+}
+
+#[test]
+fn native_toolchain_targets_fail_closed_for_wrong_shapes_and_name_collisions() {
+    let cases = [
+        (
+            "constraint_value(name = 'bad', constraint_setting = 1)",
+            "constraint_setting",
+        ),
+        (
+            "platform(name = 'bad', constraint_values = ':one')",
+            "constraint_values",
+        ),
+        (
+            "platform(name = 'bad', constraint_values = (':one',))",
+            "constraint_values",
+        ),
+        (
+            "platform(name = 'bad', constraint_values = ['//pkg/...'])",
+            "direct target labels",
+        ),
+        (
+            "toolchain(name = 'bad', exec_compatible_with = ['//pkg:*'], toolchain = ':impl', toolchain_type = ':type')",
+            "direct target labels",
+        ),
+        (
+            "toolchain(name = 'bad', exec_compatible_with = [], toolchain = '@repo//:impl', toolchain_type = ':type')",
+            "external repository dependency labels are not supported",
+        ),
+        (
+            "toolchain_type(name = 'bad', visibility = ['//visibility:public'])",
+            "visibility",
+        ),
+        (
+            "constraint_setting(name = 'same')\nplatform(name = 'same', constraint_values = [])",
+            "declared more than once",
+        ),
+    ];
+    for (index, (source, expected)) in cases.into_iter().enumerate() {
+        let workspace = scratch(&format!("native-toolchain-bad-{index}"));
+        let package = workspace.join("pkg");
+        fs::create_dir_all(&package).unwrap();
+        fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+        fs::write(package.join(BUILD_FILE_PRIMARY), source).unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{source}: {error}");
+    }
 }
 
 #[test]
