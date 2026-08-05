@@ -3515,6 +3515,39 @@ Terra writer implement the private kernel. Any new material correction is
 downstream, and user-approved configured-target-cycle deferrals remain
 unchanged.
 
+### Pure native kernel retry 7 accepted (2026-08-05)
+
+Commit `e7067bfc` accepts the private context-free value/default/cache kernel.
+Its literal matrix binds all 287 pure descriptors to exact registry tuples,
+attachment ordinals, families, routes, materialized defaults, and cache bytes;
+it separately proves the exact `8 + 5 + 41` exclusions and the default-only
+Runs seed. Phase-1 source review corrected the Dotted discriminator before any
+production was retained: a descriptive component is case-insensitive but may
+terminate only after at least one numeric component, so `1.A`,
+`1.A_internal`, and `1.A_internal.!` accept while bare `A`/`A_internal` do not.
+The accepted implementation also distinguishes scalar list values from repeat
+occurrence lists, implements the general TestTimeout `.limit(6)` path, retains
+signed-long durations as seconds plus nanos, and recognizes only exact
+lowercase Fission `yes`/`no` specials.
+
+The algebra uses `CompactString`, `Arc<[NativeValue]>`, and
+`Arc<[(NativeValue, NativeValue)]>`, derives `Allocative`, and limits `Dupe` to
+the two pointer-cheap aggregate newtypes. It is child-private and contains no
+runtime registry map, hash, interner, static cache, mutable global, command
+accumulation, normalization, DICE, wire, or configured-target edge. Validation
+passed 13 focused tests, crate check, formatting, GNU-Windows no-run, archive,
+scope, cap, and diff checks at 734 production/1,234 test/1,968 total net lines.
+Two independent Terra terminal reviews returned `ACCEPT`.
+
+Run next only `WP-6-m2-host-and-repository-conversion-context-design`, a
+docs-only design for the smallest immutable input boundary shared by the five
+Host and 41 repository/package/loading descriptors. It must assign every
+required fact to an existing layer, preserve conversion-before-normalization,
+and stop rather than invent a DICE key, filesystem bypass, repository loader,
+configured target, or cycle edge. Java-regex, command flattening, checksum/wire,
+normalization, activation, and user-approved configured-target dependency
+cycles remain deferred.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
