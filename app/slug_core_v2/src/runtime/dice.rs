@@ -387,6 +387,10 @@ fn read_file_observations(
 /// The sole DICE owner for one canonical workspace identity.
 pub struct WorkspaceRuntime {
     workspace: PathBuf,
+    // Retained now so the request-projection packet cannot accidentally create
+    // a second process owner at observation time.
+    #[allow(dead_code)]
+    process_host: Arc<super::ProcessHostOwner>,
     dice: Arc<Dice>,
     demand_owner: Arc<WorkspaceDemandOwner>,
     loader: BzlModuleEvaluator,
@@ -2558,7 +2562,10 @@ fn evaluate_workspace_source(path: &Path, source: &str, is_module: bool) -> Eval
 }
 
 impl WorkspaceRuntime {
-    pub fn new(workspace: impl Into<PathBuf>) -> anyhow::Result<Self> {
+    pub fn new(
+        workspace: impl Into<PathBuf>,
+        process_host: Arc<super::ProcessHostOwner>,
+    ) -> anyhow::Result<Self> {
         let workspace = workspace.into();
         let workspace = workspace
             .canonicalize()
@@ -2581,6 +2588,7 @@ impl WorkspaceRuntime {
         let demand_owner = WorkspaceDemandOwner::new(&dice, normalized_workspace);
         Ok(Self {
             workspace,
+            process_host,
             dice,
             demand_owner,
             loader,
@@ -2597,6 +2605,11 @@ impl WorkspaceRuntime {
 
     pub fn workspace(&self) -> &Path {
         &self.workspace
+    }
+
+    #[cfg(test)]
+    pub(crate) fn process_host(&self) -> &Arc<super::ProcessHostOwner> {
+        &self.process_host
     }
 
     fn user_computation_data(
@@ -4204,7 +4217,7 @@ pub fn evaluate_workspace(workspace: impl Into<PathBuf>) -> anyhow::Result<Works
     let workspace = workspace
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
-    let runtime = WorkspaceRuntime::new(&workspace)?;
+    let runtime = WorkspaceRuntime::new(&workspace, super::ProcessHostOwner::unsupported())?;
     let evaluation = runtime.evaluate_observations(observe_workspace(&workspace)?, &[])?;
     Ok(evaluation.workspace)
 }
@@ -4243,7 +4256,7 @@ pub fn evaluate_workspace_targets_with_bzlmod_inputs(
     let workspace = workspace
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
-    let runtime = WorkspaceRuntime::new(&workspace)?;
+    let runtime = WorkspaceRuntime::new(&workspace, super::ProcessHostOwner::unsupported())?;
     runtime.evaluate_observations_with_bzlmod_inputs(
         observe_workspace(&workspace)?,
         targets,
@@ -4303,7 +4316,21 @@ mod tests {
     use slug_workspace_v2::PathOutcome;
 
     use super::*;
+    use crate::runtime::ProcessHostOwner;
     use crate::runtime::events::CommandEffectOwner;
+
+    fn test_runtime(workspace: impl Into<PathBuf>) -> anyhow::Result<WorkspaceRuntime> {
+        WorkspaceRuntime::new(workspace, ProcessHostOwner::unsupported())
+    }
+
+    #[test]
+    fn runtime_keeps_the_explicit_process_host_arc() {
+        let workspace = tempfile::tempdir().unwrap();
+        let owner = ProcessHostOwner::unsupported();
+        let runtime = WorkspaceRuntime::new(workspace.path(), owner.clone()).unwrap();
+        assert!(Arc::ptr_eq(runtime.process_host(), &owner));
+        assert_eq!(Arc::strong_count(&owner), 2);
+    }
 
     #[derive(Debug, Clone, Allocative)]
     struct NativeDemandHandshakeKey {
@@ -4581,7 +4608,7 @@ mod tests {
             "load(\":defs.bzl\", \"NAME\")\nprint(\"BUILD_EVENT\")\nfilegroup(name = NAME)\n",
         )
         .unwrap();
-        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
         let query = |runtime: &WorkspaceRuntime, expression: &str| {
             runtime.query_command_with_policy_and_bzlmod_inputs_and_output_completion(
                 expression,
@@ -4625,7 +4652,7 @@ mod tests {
             ""
         );
 
-        let missing_runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let missing_runtime = test_runtime(workspace.path()).unwrap();
         let missing = query(&missing_runtime, "//pkg:missing").unwrap();
         let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
         assert_eq!(
@@ -4660,7 +4687,7 @@ mod tests {
         fs::write(workspace.path().join("dep/target.txt"), "target").unwrap();
 
         let activation_audit = Arc::new(ExternalQueryActivationAudit::default());
-        let runtime = WorkspaceRuntime::new(workspace.path())
+        let runtime = test_runtime(workspace.path())
             .unwrap()
             .with_activation_audit(activation_audit.clone());
         let query = |expression: &str| {
@@ -5049,7 +5076,7 @@ mod tests {
             ),
         ] {
             fs::write(workspace.path().join("dep/BUILD.bazel"), build).unwrap();
-            let stopped = WorkspaceRuntime::new(workspace.path()).unwrap();
+            let stopped = test_runtime(workspace.path()).unwrap();
             let error = stopped
                 .query_command_with_policy_and_bzlmod_inputs_and_output_completion(
                     "@dep//:files",
@@ -5083,7 +5110,7 @@ mod tests {
             "alias(name = \"files_alias\", actual = \"@other//:item\")\n",
         )
         .unwrap();
-        let stopped = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let stopped = test_runtime(workspace.path()).unwrap();
         let named_repository = stopped
             .query_command_with_policy_and_bzlmod_inputs_and_output_completion(
                 "@dep//:files",
@@ -5296,7 +5323,7 @@ mod tests {
             "load(\":defs.bzl\", \"probe\")\nprint(\"BUILD_EVENT\")\nprobe(name = \"probe\")\n",
         )
         .unwrap();
-        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
         let target = TargetPattern::parse("//pkg:probe").unwrap();
         let build = |runtime: &WorkspaceRuntime, targets: &[TargetPattern]| {
             runtime.build_command_with_bzlmod_inputs(
@@ -5327,7 +5354,7 @@ mod tests {
         assert_eq!(evaluation.loaded_package_count(), 0);
         assert_eq!(evaluation.analyzed_target_count(), 0);
 
-        let missing_runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let missing_runtime = test_runtime(workspace.path()).unwrap();
         let missing_target = TargetPattern::parse("//pkg:missing").unwrap();
         let missing = build(&missing_runtime, &[missing_target]).unwrap();
         let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
@@ -5368,7 +5395,7 @@ mod tests {
         )
         .unwrap();
         let activation_audit = Arc::new(ExternalQueryActivationAudit::default());
-        let runtime = WorkspaceRuntime::new(workspace.path())
+        let runtime = test_runtime(workspace.path())
             .unwrap()
             .with_activation_audit(activation_audit.clone());
         let run = |target: &TargetPattern| {
@@ -5585,7 +5612,7 @@ mod tests {
             Ok(SyntheticCommandValue::Build("built".into())),
         );
         let root_key = SyntheticCommandRoot::Build(SyntheticBuildRootKey { plan });
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
 
         let first = runtime
             .drive_synthetic_command(
@@ -5649,7 +5676,7 @@ mod tests {
         fs::create_dir(root.join("vendor")).unwrap();
         fs::create_dir(root.join("vendor-next")).unwrap();
         let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let first_request = local_native_request(&normalized, "dep+", "vendor");
         let first_plan = synthetic_plan(
             105,
@@ -5709,7 +5736,7 @@ mod tests {
             fs::write(&path, index.to_string()).unwrap();
             paths.push(native_host_file_demand(path));
         }
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let long_plan = synthetic_plan(
             110,
             &normalized,
@@ -5809,7 +5836,7 @@ mod tests {
         let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
         let request = local_native_request(&normalized, "dep+", "vendor");
         let path = native_host_file_demand(root.join("probe.txt"));
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let accepted_inputs = NativeDemandRequestInputBundle {
             command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
@@ -5972,7 +5999,7 @@ mod tests {
         let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
         let request = local_native_request(&normalized, "dep+", "vendor");
         let path = native_host_file_demand(root.join("probe.txt"));
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let accepted_inputs = NativeDemandRequestInputBundle {
             command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
@@ -6038,7 +6065,7 @@ mod tests {
         let workspace = tempfile::tempdir().unwrap();
         let root = workspace.path().canonicalize().unwrap();
         let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let accepted_plan = synthetic_plan(
             130,
             &normalized,
@@ -6099,7 +6126,7 @@ mod tests {
             let workspace = tempfile::tempdir().unwrap();
             let root = workspace.path().canonicalize().unwrap();
             let normalized = NormalizedAbsolutePath::new(root.clone()).unwrap();
-            let runtime = WorkspaceRuntime::new(&root).unwrap();
+            let runtime = test_runtime(&root).unwrap();
             if fail_close {
                 runtime.native_demand_sessions.force_next_close_failure();
             } else {
@@ -6157,7 +6184,7 @@ mod tests {
     #[test]
     fn runtime_user_data_factory_installs_one_passive_or_eventful_tracker() {
         let workspace = tempfile::tempdir().unwrap();
-        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
         runtime.runtime.block_on(async {
             let passive = runtime.user_computation_data(None).unwrap();
             assert!(passive.activation_tracker.is_some());
@@ -6193,8 +6220,8 @@ mod tests {
     #[test]
     fn workspace_runtime_owns_distinct_exact_repository_materializers() {
         let workspace = tempfile::tempdir().unwrap();
-        let first = WorkspaceRuntime::new(workspace.path()).unwrap();
-        let second = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let first = test_runtime(workspace.path()).unwrap();
+        let second = test_runtime(workspace.path()).unwrap();
         let expected =
             NormalizedAbsolutePath::new(workspace.path().canonicalize().unwrap()).unwrap();
 
@@ -6229,7 +6256,7 @@ mod tests {
             NormalizedAbsolutePath::new(root.join("unprocessed.txt")).unwrap(),
             PathObservationOperation::FileBytes,
         );
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let preflight = runtime.begin_native_demand_command().unwrap();
         assert_eq!(
             preflight.generations(),
@@ -6496,7 +6523,7 @@ mod tests {
             NormalizedAbsolutePath::new(root.join("probe.txt")).unwrap(),
             PathObservationOperation::FileBytes,
         );
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
 
         let mut initial = NativeDemandAbortGuard::new(
             runtime
@@ -6572,7 +6599,7 @@ mod tests {
     #[test]
     fn native_demand_restoration_failure_keeps_lease_and_materializer_fail_closed() {
         let workspace = tempfile::tempdir().unwrap();
-        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
         let mut command = NativeDemandAbortGuard::new(
             runtime
                 .begin_native_demand_command()
@@ -6597,7 +6624,7 @@ mod tests {
     #[test]
     fn native_demand_materializer_begin_conflict_keeps_workspace_lease_fail_closed() {
         let workspace = tempfile::tempdir().unwrap();
-        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
         let foreign = runtime.repository_materializer.begin().unwrap();
         assert!(matches!(
             runtime.begin_native_demand_command(),
@@ -6615,8 +6642,8 @@ mod tests {
     #[test]
     fn native_demand_closure_selection_failure_discards_then_reopens_lease() {
         let workspace = tempfile::tempdir().unwrap();
-        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
-        let foreign_runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let foreign_runtime = test_runtime(workspace.path()).unwrap();
         let mut command = NativeDemandAbortGuard::new(
             runtime
                 .begin_native_demand_command()
@@ -6652,8 +6679,8 @@ mod tests {
     #[test]
     fn native_demand_accept_rejects_foreign_command_sidecars_and_restores() {
         let workspace = tempfile::tempdir().unwrap();
-        let runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
-        let foreign_runtime = WorkspaceRuntime::new(workspace.path()).unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let foreign_runtime = test_runtime(workspace.path()).unwrap();
         let mut foreign = NativeDemandAbortGuard::new(
             foreign_runtime
                 .begin_native_demand_command()
@@ -6788,7 +6815,7 @@ mod tests {
             "filegroup(name = \"probe\")\n",
         )
         .unwrap();
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
 
         runtime
             .query_observations(
@@ -6836,7 +6863,7 @@ mod tests {
             "filegroup(name = \"probe\")\n",
         )
         .unwrap();
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let query = |registry_urls: &[String]| {
             runtime.query_observations_with_policy_and_bzlmod_inputs(
                 observe_workspace(&root).unwrap(),
@@ -6885,7 +6912,7 @@ mod tests {
             WorkspaceDirectoryValue::Absent
         );
 
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let (evaluation, directories) = runtime
             .evaluate_observations_with_directory_probes(
                 WorkspaceObservation {
@@ -6937,7 +6964,7 @@ mod tests {
         fs::write(root.join("BUILD.bazel"), "").unwrap();
         fs::create_dir(&package).unwrap();
         fs::create_dir(&unrelated).unwrap();
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let probes = [package.clone(), unrelated.clone()];
 
         let (empty_evaluation, empty_directories) = runtime
@@ -7034,7 +7061,7 @@ mod tests {
             "filegroup(name = \"probe\")\n",
         )
         .unwrap();
-        let runtime = WorkspaceRuntime::new(&root).unwrap();
+        let runtime = test_runtime(&root).unwrap();
         let query = |command, environment, mode| {
             runtime
                 .query_observations_with_policy_and_bzlmod_inputs(

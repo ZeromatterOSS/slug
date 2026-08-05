@@ -21,6 +21,7 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::WorkspaceObservation;
 use slug_core_v2::runtime::WorkspaceRuntime;
@@ -44,6 +45,8 @@ pub struct Daemon {
     observations: FilesystemObservationAdapter,
     #[cfg(test)]
     forwarded_bzlmod_inputs: Vec<crate::server::BzlmodRequestInputs>,
+    #[cfg(test)]
+    process_host_for_test: std::sync::Arc<ProcessHostOwner>,
 }
 
 impl Daemon {
@@ -51,10 +54,14 @@ impl Daemon {
     /// an empty digest cache, so every file is treated as new (no invalidation
     /// needed on the first build).
     pub fn new(workspace: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let runtime = WorkspaceRuntime::new(workspace.as_ref().to_path_buf())?;
+        let process_host = ProcessHostOwner::unsupported();
+        let runtime =
+            WorkspaceRuntime::new(workspace.as_ref().to_path_buf(), process_host.clone())?;
         let workspace = runtime.workspace().to_path_buf();
         Ok(Self {
             workspace,
+            #[cfg(test)]
+            process_host_for_test: process_host,
             runtime,
             observations: FilesystemObservationAdapter::default(),
             #[cfg(test)]

@@ -4116,6 +4116,48 @@ isolation, runtime Arc identity, and daemon ownership. Later native capture
 remains REPLAN; only a later request bridge may add core -> configuration.
 Configured-target cycle deferral remains unchanged.
 
+### Process Host owner state and injection ACCEPT (2026-08-05)
+
+`WP-6-m2-process-host-owner-state-and-injection` is **ACCEPT**. Core now owns
+the private injected source/state machine and only exposes an Arc-backed,
+non-reading `ProcessHostOwner::unsupported()` constructor. Its OS/CPU/resource
+class cells latch first failure versus erroneous reuse, reject same-thread
+reentry, recover poisoned publication to a typed failure and wake waiters; the
+capacity cell caches only a successful pre-ceil resource sample, restores
+`Vacant` after retryable pre-assignment failure, and releases poisoned state.
+Home remains fresh, lossless UTF-16, and terminal for absence/read/invalid
+surrogate errors. The AutoCPU routes retain the pinned 15-token behavior and
+conditional CPU read. No native Host API, DICE key/compute, configuration
+dependency, request scan, converter, command activation, or configured-target
+edge was added.
+
+Exactly the four `runtime/mod.rs` and two `runtime/dice.rs` one-shot runtime
+paths create an owner before runtime construction. `WorkspaceRuntime` accepts
+the explicit Arc; `Daemon::new` remains the sole daemon constructor and
+`serve` is unchanged. Tests prove source/error/resource order, retry/latch,
+fresh home, unsupported isolation, runtime Arc identity, daemon strong count,
+and a poisoned lock with an actual Condvar waiter that is not stranded. Two
+independent reviews accepted the packet after the poison-recovery correction.
+
+Validation passed: focused process-host 5/5, runtime Arc 1/1, daemon Arc 1/1,
+integration runtime 13/13, core/server `cargo check`, formatting, archive,
+scope, cap, no-Cargo, and diff gates; GNU-Windows core no-run also passed. The
+combined core/server GNU-Windows no-run stops at the pre-existing server
+`UnixListener`/`UnixStream` portability error. Full core has 138 passing tests
+and one known stale `runtime::dice` external-visibility diagnostic assertion
+(`dice.rs:5098`: expected `external repository visibility edges are deferred`,
+actual `external repository visibility wrong-kind group is deferred`),
+unaffected by this packet. The bounded Rust/doc scope stays within the 600
+production, 620 test, 160 documentation, and 1,380 total net line caps. Native
+capture remains **REPLAN**. User-approved configured-target cycle deferral
+remains unchanged.
+
+Run next only `WP-6-m2-host-request-observation-projection-design`, docs-only.
+It freezes request pre-scan and fresh-home/Windows-fact projection, the one-way
+core-to-configuration dependency, and DICE epoch/lifetime/error/order
+contracts. It adds no Rust, Host capture, converter, activation, command, or
+configured-target behavior.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the

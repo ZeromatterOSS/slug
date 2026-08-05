@@ -64,6 +64,16 @@ fn target(label: &str) -> TargetPattern {
 }
 
 #[test]
+fn daemon_new_retains_only_its_runtime_and_test_process_host_arcs() {
+    let workspace = scratch("process-host-owner");
+    let daemon = Daemon::new(&workspace).unwrap();
+    assert_eq!(
+        std::sync::Arc::strong_count(&daemon.process_host_for_test),
+        2
+    );
+}
+
+#[test]
 fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
     let workspace = scratch("bzlmod-request-local");
     write(

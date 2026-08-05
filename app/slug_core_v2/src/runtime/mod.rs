@@ -12,6 +12,7 @@ mod demands;
 pub mod dice;
 mod events;
 mod path_observation;
+mod process_host;
 pub mod reapi;
 mod registry_io;
 mod repository_io;
@@ -39,6 +40,7 @@ pub use events::AcceptedCommand;
 pub use events::CommandOutput;
 pub use events::PublishedCommand;
 pub use events::TerminalOutput;
+pub use process_host::ProcessHostOwner;
 pub use slug_query_v2::QueryError;
 pub use slug_query_v2::QueryOutputCompletion;
 
@@ -55,7 +57,7 @@ pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
     AcceptedCommand<std::sync::Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
     BuildCommandError,
 > {
-    let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::unsupported())
         .map_err(BuildCommandError::infrastructure)?;
     runtime.build_command_with_bzlmod_inputs(
         targets,
@@ -77,7 +79,7 @@ pub fn evaluate_workspace_cquery_starlark_label_command_with_bzlmod_inputs(
     AcceptedCommand<std::sync::Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
     CqueryCommandError,
 > {
-    let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::unsupported())
         .map_err(CqueryCommandError::infrastructure)?;
     runtime.cquery_starlark_label_command_with_bzlmod_inputs(
         target,
@@ -104,7 +106,7 @@ pub fn evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output
     AcceptedCommand<std::sync::Arc<Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError>>>,
     slug_query_v2::QueryError,
 > {
-    let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::unsupported())
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
     runtime.query_command_with_policy_and_bzlmod_inputs_and_output_completion(
         expression,
@@ -187,7 +189,7 @@ pub fn evaluate_workspace_query_with_policy_and_bzlmod_inputs_and_output_complet
     registry_urls: &[String],
     completion: slug_query_v2::QueryOutputCompletion,
 ) -> Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError> {
-    let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::unsupported())
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
     let observations = observe_workspace(workspace)
         .map_err(|error| slug_query_v2::QueryError::evaluation(error.to_string()))?;
