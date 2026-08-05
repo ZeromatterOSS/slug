@@ -1,49 +1,42 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-root-configured-target-command-boundary-design`
+Packet: `WP-6-m2-root-cquery-label-output-evidence`
 Milestone: M2 analysis graph with the first M4 cquery consumer
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: read-only reserved cross-stage command/identity design
-Evidence: accepted recursive `ConfiguredTargetAnalysisKey` implementation in
-`4f4599e0`; generated Bazel 9.2 `recursive-custom-rule-providers-actions`
-cquery/aquery evidence in `9e6a4450`; accepted command driver/event ownership.
+Role: evidence-only retained Bazel 9.2 literal cquery discriminator
+Evidence: accepted recursive configured-analysis oracle/implementation;
+Terra ownership/evidence audits and reserved Sol review of the missing output
+contract.
 
-Do not edit Rust, tests, fixtures, oracle records, or harness code. Audit the
-live `cquery` parser/placeholder, configured-target key/result, runtime command
-driver, CLI/server command surfaces, and existing oracle rows. Obtain reserved
-Sol review before authorizing any implementation.
+Do not edit Rust, tests, fixtures, generated oracle records, or harness code.
+Copy the existing `recursive-custom-rule-providers-actions` workspace into an
+isolated temporary root and use one retained Bazel 9.2 output base. Run these
+commands serially:
 
-The candidate observable slice is one root-repository
-`TargetPattern::Single` naming an already-supported Starlark rule under the
-default target configuration, with default or explicit `--output=label`.
-Decide whether a retained cquery command root can compute exactly the existing
-`ConfiguredTargetAnalysisKey { workspace, configured_target }`, project the
-requested configured label, and reuse accepted command Need/error/event
-publication without a second analysis graph or evaluator call.
+1. `cquery //parent:parent`
+2. `cquery //parent:parent --output=label`
+3. `cquery //parent:missing`
+4. `cquery //parent:parent --output=label`
 
-The design must enumerate:
+Use `/usr/bin/bazel` only after confirming 9.2.0, with ordinary RC discovery;
+never inspect or copy `~/.bazelrc`. Capture each exact exit code, raw stdout,
+raw relevant stderr, and command order. Explicitly record whether default and
+label stdout are byte-identical, whether either includes a configuration hash
+or mnemonic, the stable missing-target diagnostic shape, and successful
+recovery in the same server. Do not normalize configuration identifiers in raw
+evidence. No analysis-error probe is authorized.
 
-- request and configured-label identity, canonical order, equality, validity,
-  and default configuration naming;
-- root MODULE/package/analysis Need and failure precedence;
-- whether only the requested configured target or its ordered dependency
-  results are part of the command value and output;
-- exact Bazel 9.2 default/explicit label text, stdout/stderr, exit status, and
-  one-shot/daemon JSON or text boundary;
-- cold, warm, provider edit, unrelated edit, declaration deletion/recreation,
-  and event/retry behavior; and
-- the exact implementation allowlist, downstream tests, platform gate, and
-  formatted net caps.
+Shut down the retained Bazel server and remove the temporary workspace/output
+base. Compare successful analysis with the frozen Starlark cquery rows but do
+not regenerate or edit them.
 
-Reuse `recursive-custom-rule-providers-actions` evidence if its existing cquery
-rows discriminate the literal-label result. Add no oracle merely for command
-wiring. If exact default configuration/output or error behavior is absent, the
-only successor may be one isolated evidence packet before Rust.
+At `ACCEPT`, record exact evidence/provenance in the Stage 6 owner plan and
+resume `WP-6-m2-root-configured-target-command-boundary-redesign`. That design
+must retain the accepted no-new-key route: drive
+`RootConfiguredTargetAnalysisKey` directly through `NativeCommandRoot`, with no
+second analysis graph or evaluator call. At contradiction, record `REPLAN`.
 
-Stops: no implementation; no new configuration representation, transition,
-select, toolchain/platform, repository mapping, external target, pattern
-breadth, query-function/formatter breadth beyond label, provider rendering,
-action/aquery surface, execution, REAPI, new DICE key, second command-owned
-analysis graph, direct evaluator call, filesystem discovery, CLI/server
-production edit, fixture/oracle growth without a demonstrated gap, or M1
-external build expansion.
+Stops: no checkout asset or production change; no fixture/oracle growth;
+no analysis-error, external label, pattern, transition, toolchain, provider,
+aquery, action, execution, REAPI, or cycle probe; no credentials; no parallel
+Bazel command or second output base.

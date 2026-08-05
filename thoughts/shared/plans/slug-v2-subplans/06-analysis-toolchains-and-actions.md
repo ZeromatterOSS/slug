@@ -612,7 +612,8 @@ injecting immutable inputs; analysis itself performs no filesystem discovery.
 
 ### WP-6-m2 root configured-target command boundary design (2026-08-04)
 
-**Status: ACTIVE, read-only.** Decide whether the first root-only literal
+**Status: REPLAN; run only
+`WP-6-m2-root-cquery-label-output-evidence`.** Decide whether the first root-only literal
 `cquery` result can consume the existing sole
 `ConfiguredTargetAnalysisKey { workspace, configured_target }` and its ordered
 dependency results without a second command graph, new configuration
@@ -621,3 +622,20 @@ representation, or analysis re-evaluation. Reuse the accepted
 literal-label discriminator is genuinely absent. No Rust, test, fixture, or
 oracle edit is authorized until reserved Sol review accepts a complete
 identity/ownership/error/output/lifecycle boundary.
+
+Live ownership is bounded without a new key: the later command may drive the
+existing `RootConfiguredTargetAnalysisKey` directly through
+`NativeCommandRoot`. That key already owns root loading, recursive configured
+analysis, complete-only equality/validity, typed Needs/errors, and captured
+events. Formatting can project the accepted `AnalysisResult` after terminal
+selection; no command-owned graph or evaluator call is required.
+
+The accepted Bazel 9.2 fixture nevertheless contains only Starlark-formatted
+cquery rows. It does not pin default or explicit label output, configuration
+suffix, missing-target failure, or same-server recovery; old literal label rows
+are Bazel 9.1.1 and are not authority. Two Terra audits independently found
+this evidence gap. Reserved Sol review accepted exactly one isolated retained
+Bazel 9.2 sequence: default literal, explicit label literal, missing literal,
+then explicit label recovery. Record raw exit/stdout/stderr separately and do
+not normalize away configuration identifiers. No analysis-error row is needed
+unless later implementation reveals distinct translation.
