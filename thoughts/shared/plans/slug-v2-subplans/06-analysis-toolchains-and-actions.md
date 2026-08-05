@@ -2853,6 +2853,28 @@ separate finite-enum routes, String special-null, runs default/deferred `+2`,
 scope, and cap. The next family-contract retry must cite this accepted source
 closure rather than rediscover or broaden any owner.
 
+### Pure native family byte-contract ledger retry 2 REPLAN (2026-08-04)
+
+The unaccepted 64-line retry-2 ledger was discarded after terminal review found
+materially incomplete default/null, repeat/whole-field cache, timeout, forced
+radix/rendering, fission, and ordinary-enum substitutions. It made no source,
+probe, Rust, descriptor, or runtime change.
+
+Run only `WP-6-m2-pure-native-family-byte-contract-ledger-retry-3`, as a
+docs-only synthesis of accepted `[R]` renderer, `[I]` identity, and `[S]`
+source-route evidence. Freeze Bool `null→false`/concrete `D`, Tri
+`null→AUTO`/concrete `D`, Text/Dotted `N=None`, and Void `N=None` plus
+`E("null")=None`; list/Entry/Env `N=[]`, ordered post-conversion `A`, and
+whole-field bytes; StringSet `D(s)` plus reverse UTF-16; timeout `D("-1")`,
+mixed `3661,61,900,3600`, and split cases; nonnegative `Integer.decode`
+decimal/`0x`/`#`/octal shard input with decimal `forced=N` rendering/structural
+identity; fission `no` and `[dbg, fastbuild]`; all 16 explicit enum
+substitutions; and runs `D("1")`/`U("+2")`. Preserve `287 + 8 + 5 + 41` and
+defer raw parser, contextual, normalization, checksum/wire, DICE, and
+user-approved later configured-target dependency cycles. Stop again on any
+undefined route, byte, identity, scope, or cap fact; after acceptance, run
+only mechanical 287-descriptor attachment.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
