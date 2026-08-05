@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::num::NonZeroI32;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -18,6 +19,7 @@ pub(super) enum NativeValue {
     Env(EnvValue),
     Shard(ShardValue),
     Runs(RunsPerTestSeed),
+    RegexFilterDefault(RegexFilterDefaultSeed),
     List(NativeValues),
     OrderedMap(NativePairs),
 }
@@ -73,6 +75,51 @@ impl RunsPerTestSeed {
     }
     pub(super) fn positive_runs(self) -> NonZeroI32 {
         self.0
+    }
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Allocative)]
+pub(super) enum RegexFilterDefaultSemantic {
+    ExcludeAll,
+    InstrumentationDefault,
+}
+#[derive(Clone, Debug, Allocative)]
+pub(super) struct RegexFilterDefaultSeed {
+    pub(super) original_input: CompactString,
+    pub(super) semantic: RegexFilterDefaultSemantic,
+}
+impl RegexFilterDefaultSeed {
+    pub(super) fn new(
+        original_input: impl Into<CompactString>,
+        semantic: RegexFilterDefaultSemantic,
+    ) -> Self {
+        Self {
+            original_input: original_input.into(),
+            semantic,
+        }
+    }
+    pub(super) fn canonical_text(&self) -> &'static str {
+        match self.semantic {
+            RegexFilterDefaultSemantic::ExcludeAll => "-(?:(?>.*))",
+            RegexFilterDefaultSemantic::InstrumentationDefault => {
+                "-(?:(?>/javatests[/:])|(?>/test/java[/:]))"
+            }
+        }
+    }
+}
+impl PartialEq for RegexFilterDefaultSeed {
+    fn eq(&self, other: &Self) -> bool {
+        self.semantic == other.semantic
+    }
+}
+impl Eq for RegexFilterDefaultSeed {}
+impl PartialOrd for RegexFilterDefaultSeed {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for RegexFilterDefaultSeed {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.semantic.cmp(&other.semantic)
     }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Allocative)]

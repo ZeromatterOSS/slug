@@ -1095,6 +1095,8 @@ mod retry7_private_kernel_contract {
     use super::super::value::NativePairs;
     use super::super::value::NativeValue;
     use super::super::value::NativeValues;
+    use super::super::value::RegexFilterDefaultSeed;
+    use super::super::value::RegexFilterDefaultSemantic;
     use super::super::value::RunsPerTestSeed;
     use super::super::value::TriState;
     use super::*;
@@ -1190,6 +1192,94 @@ mod retry7_private_kernel_contract {
             convert_occurrence(runs, "+2"),
             Err(ConvertError::Unsupported)
         );
+    }
+
+    #[test]
+    fn regex_filter_defaults_are_private_exact_seeds() {
+        let platform = "com.google.devtools.build.lib.analysis.PlatformOptions";
+        let core = "com.google.devtools.build.lib.analysis.config.CoreOptions";
+        let cases = [
+            (
+                option(platform, "toolchain_resolution_debug"),
+                "-.*",
+                "-(?:(?>.*))",
+                RegexFilterDefaultSemantic::ExcludeAll,
+            ),
+            (
+                option(core, "archived_tree_artifact_mnemonics_filter"),
+                "-.*",
+                "-(?:(?>.*))",
+                RegexFilterDefaultSemantic::ExcludeAll,
+            ),
+            (
+                option(core, "instrumentation_filter"),
+                "-/javatests[/:],-/test/java[/:]",
+                "-(?:(?>/javatests[/:])|(?>/test/java[/:]))",
+                RegexFilterDefaultSemantic::InstrumentationDefault,
+            ),
+        ];
+        let mut seeds = Vec::new();
+        for (descriptor, original, rendered, semantic) in cases {
+            assert_eq!(descriptor.field_type, "RegexFilter");
+            assert_eq!(
+                descriptor.converter,
+                Some("RegexFilter.RegexFilterConverter.class")
+            );
+            assert_eq!(descriptor.raw_default, format!("\"{original}\""));
+            assert!(!descriptor.allow_multiple);
+            assert_eq!(classify(descriptor), None);
+            let mut repeated = *descriptor;
+            repeated.allow_multiple = true;
+            assert_eq!(
+                materialize_default(&repeated),
+                Err(ConvertError::Unsupported)
+            );
+            let Some(NativeValue::RegexFilterDefault(seed)) =
+                materialize_default(descriptor).unwrap()
+            else {
+                panic!("expected fixed RegexFilter seed")
+            };
+            assert_eq!(seed.original_input.as_str(), original);
+            assert_eq!(seed.canonical_text(), rendered);
+            assert_eq!(
+                field(
+                    descriptor,
+                    Some(&NativeValue::RegexFilterDefault(seed.clone()))
+                ),
+                format!("{}=\"{rendered}\", ", descriptor.canonical_name)
+            );
+            for explicit in [original, "", ".*", "-other", "+other"] {
+                assert_eq!(
+                    convert_occurrence(descriptor, explicit),
+                    Err(ConvertError::Unsupported)
+                );
+            }
+            assert_eq!(seed.semantic, semantic);
+            seeds.push(seed);
+        }
+        assert_eq!(seeds[0], seeds[1]);
+        assert_eq!(seeds[0].cmp(&seeds[1]), std::cmp::Ordering::Equal);
+        assert_ne!(seeds[0], seeds[2]);
+        assert!(seeds[0] < seeds[2]);
+        let changed_original = RegexFilterDefaultSeed::new(
+            "different spelling",
+            RegexFilterDefaultSemantic::ExcludeAll,
+        );
+        assert_eq!(seeds[0], changed_original);
+        assert_eq!(seeds[0].cmp(&changed_original), std::cmp::Ordering::Equal);
+        fn allocative<T: Allocative>() {}
+        allocative::<RegexFilterDefaultSeed>();
+        let source = include_str!("value.rs");
+        let derive = source
+            .split("pub(super) struct RegexFilterDefaultSeed")
+            .next()
+            .unwrap();
+        let derive = derive
+            .lines()
+            .rev()
+            .find(|line| line.starts_with("#[derive("))
+            .unwrap();
+        assert_eq!(derive, "#[derive(Clone, Debug, Allocative)]");
     }
 
     #[test]
@@ -1806,6 +1896,12 @@ mod retry7_private_kernel_contract {
             "Interner",
             "from_utf8_lossy",
             "from_utf16_lossy",
+            "regex::",
+            "Pattern::",
+            "Matcher::",
+            "coverage",
+            "to_original",
+            "is_included",
             "�",
         ] {
             assert!(

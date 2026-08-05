@@ -28,6 +28,7 @@ pub(super) fn native_cache_text(v: &NativeValue) -> Result<String, ()> {
         NativeValue::Shard(ShardValue::Disabled) => "DISABLED".into(),
         NativeValue::Shard(ShardValue::Forced(x)) => format!("forced={x}"),
         NativeValue::Runs(x) => format!("(?:(?>.*)) Options: [{}]", x.positive_runs()),
+        NativeValue::RegexFilterDefault(x) => x.canonical_text().into(),
         NativeValue::List(x) => format!(
             "[{}]",
             x.iter()

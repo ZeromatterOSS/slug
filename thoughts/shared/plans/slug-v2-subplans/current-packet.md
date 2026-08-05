@@ -1,58 +1,51 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-fixed-regex-default-seed-implementation`
-Milestone: M2 authoritative target configuration
-Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: exact private value/default/cache seeds for the three annotated
-RegexFilter defaults without admitting a general regex route.
+Packet: `WP-10-m8-bazel-developer-graph-boundary-design`
+Milestone: M8 Bazel developer graph
+Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
+Result: a bounded implementation design for the first Bazel 9 Rust target
+closure, without starting self-hosting or changing repository metadata.
 
 ## Goal
 
-Materialize exactly the two `-.*` defaults and the one
-`-/javatests[/:],-/test/java[/:]` default as finite private RegexFilter seeds.
-Retain raw original input separately from semantic equality, render the exact
-canonical generated patterns, and leave every explicit regex occurrence
-Unsupported.
+Inspect the live Cargo workspace and pinned Bazel 9.2/rules_rust requirements.
+Freeze the smallest `slug_cli_v2` transitive developer graph: package/target
+ownership, focused test mapping, toolchain and dependency pins, Cargo/Bazel
+synchronization, and generated/build-script/proc-macro treatment. Select an
+exact implementation allowlist and validation boundary.
 
 ## Required design record
 
-Use `RegexFilterDefaultSeed { original_input, semantic }`, where the finite
-semantic discriminator alone owns equality/order/cache identity. `ExcludeAll`
-renders `-(?:(?>.*))`; `InstrumentationDefault` renders
-`-(?:(?>/javatests[/:])|(?>/test/java[/:]))`. Derive `Allocative`; retain owned
-`CompactString`; add no Arc, Dupe, interner, map, cache storage/integration, or
-regex dependency.
+Pin Bazel at `9.2.0`/`8220c619` and select a Bazel-9-compatible rules_rust
+boundary without writing it. Keep Cargo supported and define a reviewed lock/
+dependency synchronization policy. Record only a credential-safe BuildBuddy
+boundary; do not open either repository or home `.bazelrc`, and claim no remote
+cache/RBE evidence. The developer graph is independent of M2 configuration;
+self-hosting remains gated on M5/M6.
 
 ## Allowed paths
 
-- `app/slug_configuration_v2/src/native/value.rs`
-- `app/slug_configuration_v2/src/native/defaults.rs`
-- `app/slug_configuration_v2/src/native/cache_grammar.rs`
-- `app/slug_configuration_v2/src/native/tests.rs`
-- the canonical, Stage 6, and current-packet scheduling documents for terminal
-  disposition only
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `thoughts/shared/plans/slug-v2-subplans/10-bazel-build-and-bootstrap.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
 
 ## Required tests and validation
 
-Test exact three-descriptor selection; original retention separate from
-semantic equality/order; both exact scalar cache texts and outer escaping; all
-explicit values remaining Unsupported; the unchanged Runs seed/cache and
-287/8/5/41 partition; `Allocative`; and forbidden source surfaces. Run focused
-crate tests/check, GNU-Windows tests check, formatting, archive, scope, cap,
-no-Cargo, and diff gates.
+Record a complete live Cargo workspace/`slug_cli_v2` closure inventory, pinned
+primary source for Bazel/rules_rust choices, target/test ownership, dependency
+synchronization, and the credential-safe local/BuildBuddy split. Run source,
+archive, scope, cap, no-Cargo, and `git diff --check` gates only.
 
 ## Stop conditions
 
-Stop with REPLAN on dynamic RegexFilter construction, arbitrary explicit input,
-Pattern/Matcher/compiler/matching/diagnostics, public reversal or predicate
-activation, coverage replacement, normalization/configuration/checksum/DICE,
-Host/context/loader/wire ownership, a new dependency/utility, or equality that
-requires original input. Do not edit registry, convert, Cargo/lockfiles,
-fixtures, generated data, or create probes/artifacts.
+Stop with REPLAN on credential or user-rc inspection, an unbounded Bazel-9/
+rules_rust mapping, unresolved generated/proc-macro/dependency-sync ownership
+beyond one CLI closure, or coupling to M2/M5/M6 semantics. Do not edit or add
+MODULE/BUILD/.bazelversion/.bazelrc files, Rust, Cargo/lockfiles, dependencies,
+fixtures, CI, or generated data; do not run Bazel/Cargo, BuildBuddy/RBE, query,
+cquery, aquery, execution, materialization, or self-hosting.
 
 ## Diff budget
 
-- Production Rust: at most 150 net lines.
-- Test Rust: at most 240 net lines.
-- Documentation: at most 100 net lines.
-- Total: at most 490 formatted net lines.
+- Documentation and total: at most 220 net lines. No code, metadata, fixture,
+  generated, dependency, lockfile, or unrelated changes.

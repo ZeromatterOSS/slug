@@ -4766,6 +4766,35 @@ configuration/checksum/DICE, Host, loader, wire, or configured-cycle work.
 Keep the Runs seed and 287/8/5/41 partition unchanged. Caps are 150 production,
 240 test, 100 documentation, and 490 total formatted net lines.
 
+### Fixed RegexFilter default seed implementation ACCEPT (2026-08-05)
+
+`WP-6-m2-fixed-regex-default-seed-implementation` is **ACCEPT**. Exactly the
+two `-.*` descriptors and the one instrumentation descriptor materialize before
+generic classification. The selector pins class, canonical name, field type,
+converter, raw default, and nonrepeat shape; a mutated repeat descriptor falls
+through to Unsupported. Every explicit occurrence remains Unsupported.
+
+The private seed retains original text in `CompactString` but implements Eq/Ord
+only through `ExcludeAll` versus `InstrumentationDefault`, matching normalized
+RegexFilter identity. Its exact cache strings are `-(?:(?>.*))` and
+`-(?:(?>/javatests[/:])|(?>/test/java[/:]))`. It derives `Allocative`, not
+`Dupe`; no Arc, utility import, interner, map, cache storage, or dependency is
+added. The existing Runs seed and 287/8/5/41 partition remain unchanged.
+
+The four authorized Rust files add 89 production and 96 test lines, 185 total.
+Focused validation passes 31/31 tests, crate check, GNU-Windows tests check,
+formatting, archive, scope, cap, no-Cargo, and diff gates. Arbitrary explicit
+regex, JDK Pattern/Matcher and diagnostics, reversal/predicate/coverage
+activation, Host capture, exact RunUnder rendering/full Java Strings, and
+configured-target cycles remain excluded or REPLAN.
+
+M2 is now parked: no exact configuration equality/cache/checksum substrate can
+omit the terminal Host and regex values, and another private schema would lack
+a complete producer/consumer. Run next only the independent Stage 10 packet
+`WP-10-m8-bazel-developer-graph-boundary-design`, docs-only. Inventory the live
+Cargo workspace and pin the smallest Bazel 9.2/rules_rust developer graph for
+the `slug_cli_v2` transitive closure before any Bazel metadata is written.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
