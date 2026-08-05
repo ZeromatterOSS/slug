@@ -1,62 +1,46 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-toolchain-rule-provider-loading-implementation`
+Packet: `WP-6-m2-integrated-toolchain-resolution-context-design`
 Milestone: M2 successful toolchain/platform selection
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: retain fixture-bounded rule toolchain requirements and load the
-`platform_common.ToolchainInfo` symbol without implementing its provider
-Predecessor: accepted native toolchain target loading `6a457406` and the
-accepted two-packet declaration-loading design.
+Role: design one real DICE-owned selection and prepared `ctx.toolchains`
+vertical
+Predecessor: accepted Bazel 9.2 first-compatible evidence `ed4baf08`, ordered
+root registrations `4a3af8df`, native declarations `6a457406`, and frozen rule
+requirements/load-only ToolchainInfo `1d6106bd`.
 
-Add `required_toolchains: Arc<[CanonicalLabel]>` to both the frozen rule
-definition and `StarlarkRuleImplementation`, including structural equality and
-one read-only accessor. The field is separate from ordinary rule dependencies
-and must never create a package/query dependency edge.
+This packet is read-only design. Inspect the live root registration anchor,
+root package-loading value, native declaration representation, frozen
+`required_toolchains`, configured-analysis recursion, provider decoder, rule
+context preparation, and dormant toolchain scaffolding. Read
+`docs/developers/dice.md` before proposing DICE ownership or locking.
 
-Extend `rule()` with the exact accepted fixture subset for `toolchains`: an
-omitted or empty list retains an empty slice, while a one-element list of a
-plain string label retains exactly one canonical toolchain-type label. Resolve
-that label relative to the package containing the defining `.bzl` file, not
-the package instantiating the rule. Preserve canonical identity and input
-order. Reject wrong element/container types, patterns, external labels,
-duplicates, and more than one requirement without claiming Bazel diagnostic
-text.
+The design must specify one bounded vertical that:
 
-Bind a frozen `platform_common` namespace in the existing loading globals. Its
-`ToolchainInfo` attribute must be the existing analysis-builtin callable shape
-so the accepted `defs.bzl` function body can freeze. Calling that symbol during
-loading must fail explicitly as an unsupported analysis builtin. Do not add a
-ToolchainInfo value, provider identity, returned-provider decoder, or user
-provider surrogate.
+- maps ordered root execution-platform and registered-toolchain labels to
+  canonical root package targets without losing MODULE order;
+- validates the exact accepted declaration kinds and constraint references;
+- selects the first compatible execution platform and matching registered
+  toolchain for the one mandatory requested type;
+- analyzes the selected implementation through the existing configured target
+  owner;
+- decodes one dedicated builtin ToolchainInfo value without masquerading as a
+  user provider; and
+- prepares the requesting Starlark context so
+  `ctx.toolchains["//:demo_type"].marker` observes the accepted marker.
 
-Tests must load the exact accepted `defs.bzl`/BUILD shape and prove that the
-requesting `probe_rule` retains only `@@//:demo_type`, while the implementation
-rule retains none. Prove definition-package-relative resolution with a rule
-instantiated from another package, structural package equality, warm reuse,
-requirement edit and A-to-B-to-A restoration, marker edit/restoration, and
-load/freeze success for an uncalled `platform_common.ToolchainInfo`. Prove
-wrong shapes, external labels, multiple requirements, and direct loading-time
-invocation fail closed.
+Freeze exact DICE key/value ownership, dependency direction, semantic equality,
+Need/error/event precedence, canonical/apparent identity handling, first-match
+ordering, implementation allowlist, line caps, and discriminating cold/warm,
+reorder/edit/A-to-B-to-A/delete/recreate tests. Reuse the six accepted oracle
+rows; request new Bazel evidence only for a demonstrated semantic gap.
 
-Production allowlist:
+Reject a dormant resolver-only key, the existing digest-string
+`RegisteredToolchainsKey` as owner, a second package/source graph, lock held
+across DICE compute, user-provider ToolchainInfo, configuration checksum,
+query/cquery/aquery expansion, public failure diagnostics, optional/multiple
+types, aliases, external repositories, host fallback, target-platform
+constraints, exec groups, actions, execution, REAPI, or JVM/Bazel delegation.
 
-- `app/slug_loading_v2/src/package.rs`
-
-Test allowlist:
-
-- `app/slug_loading_v2/tests/build_file_loading.rs`
-- `app/slug_loading_v2/tests/bzl_invalidation.rs`
-
-Caps are 340 formatted production net lines, 310 test lines, and 650 total.
-
-Stop and return `REPLAN` for changes to `provider.rs`, ProviderValue or
-ProviderCollection, ToolchainInfo invocation/decoding, selected implementation
-analysis, registered-target lookup, target existence/kind/provider validation,
-constraint normalization or selection, `ctx.toolchains`, query graph
-projection, public commands, configuration identity, actions, REAPI, external
-mapping/materialization, optional/multiple required types, exec groups, a new
-DICE key/digest/cache/interner, or process-global state.
-
-After acceptance, design one integrated real DICE selection/prepared-context
-vertical that consumes the root registration anchor and both accepted loading
-values. Do not create a dormant resolver-only key.
+No Rust, fixture, oracle, or generated evidence change is authorized until the
+design and an independent reserved-boundary review return `ACCEPT`.

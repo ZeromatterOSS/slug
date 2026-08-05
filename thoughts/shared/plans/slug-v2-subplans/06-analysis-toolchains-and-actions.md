@@ -1327,3 +1327,39 @@ fixture-bounded `rule(toolchains=)` requirements relative to the defining
 freeze-capable `platform_common.ToolchainInfo` load symbol whose invocation is
 explicitly unsupported. Do not add a ToolchainInfo provider/value, decoder,
 selected implementation analysis, resolver key, or `ctx.toolchains`.
+
+### Toolchain rule-requirement/provider-symbol loading (2026-08-04)
+
+**Status: ACCEPTED in `1d6106bd`.** The exact three-file implementation is 67
+production lines, 269 test lines, and 336 total formatted net lines, within the
+accepted 340/310/650 caps. Frozen rule definitions and instantiated
+`StarlarkRuleImplementation` values retain an ordered immutable slice of zero
+or one definition-package-relative canonical toolchain-type requirement.
+Structural equality includes the slice, while ordinary dependencies and query
+edges remain unchanged.
+
+The existing loading globals now bind a frozen `platform_common` namespace
+whose `ToolchainInfo` attribute uses the existing analysis-builtin callable
+shape. The accepted oracle implementation body freezes unchanged, while a
+loading-time invocation fails explicitly as unsupported. No ToolchainInfo
+provider/value, user-provider surrogate, decoder, ProviderCollection change,
+selection, resolver key, or `ctx.toolchains` was added.
+
+Review corrections replaced a close substitute with the verbatim accepted
+`toolchain-resolution-first-platform` definitions and BUILD declaration
+shape, added cross-package definition-relative and explicit-empty coverage,
+and asserted zero ordinary dependencies. Full loading first exposed an
+unnecessary external-source parse for omitted requirements; returning the
+empty slice before source-label parsing restored the existing external rule
+path. All 117 loading tests, 53 query-loading integrations, and 16 analysis
+tests then passed. Four direct checks, three GNU-Windows no-run builds,
+formatting, archive, diff, scope, and cap gates passed. Independent Terra final
+rereview returned `ACCEPT`.
+
+Design next only `WP-6-m2-integrated-toolchain-resolution-context-design`.
+The design must consume ordered root registrations, native declarations, and
+frozen rule requirements in one real DICE-owned selection and prepared-context
+vertical. It must decide canonical lookup/mapping, first-compatible ordering,
+selected implementation analysis, a dedicated builtin ToolchainInfo value,
+and `ctx.toolchains` access together. Do not create a dormant resolver-only key
+or infer authority for Rust implementation from this acceptance.
