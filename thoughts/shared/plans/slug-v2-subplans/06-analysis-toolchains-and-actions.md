@@ -1293,3 +1293,37 @@ exec groups, public query projection, cquery, diagnostics, configuration
 identity, actions, REAPI, a new key/digest/cache/interner, or process-global
 state. No new oracle is needed: `ed4baf08` pins the successful syntax and
 pinned Bazel 9.2 rule definitions pin attribute kinds and NODEP ownership.
+
+### Native toolchain target-loading implementation (2026-08-04)
+
+**Status: ACCEPTED in `6a457406`.** The six-file implementation is 193
+production lines, 404 test lines, and 597 total formatted net lines, within
+the accepted 360/520/880 caps. `NativeToolchainTarget` retains the five exact
+fixture classes as real ordered package targets with canonical labels,
+immutable ordered label slices, fixed native capabilities, ordinary duplicate
+name behavior, and a NODEP implementation label. It adds no declaration side
+table, dependency edge, registration join, resolver, provider, or DICE key.
+
+Root package graph construction now fails closed before any projection when a
+native declaration is present. External package loading classifies the same
+targets through its existing unsupported-kind error before its dependency-free
+early return. Loading lifecycle coverage proves cold/warm semantic equality,
+declaration edit and A-to-B-to-A restoration, deletion/recreation, sole Host
+event ownership, and the unchanged first root-anchor dependency.
+
+All 114 `slug_loading_v2` tests passed. The 53 loading-query integrations and
+six query parser tests passed; the query library result was 27/28 only because
+the untouched
+`external_restricted_visible_uses_canonical_fake_caller_without_a_second_route`
+test returns the same `PreparationRestart` failure at clean `f9f3c3d8`.
+Loading, query, and core checks, both GNU-Windows no-run builds, formatting,
+archive, diff, scope, and cap gates passed. Independent Terra latest-diff
+review returned `ACCEPT`.
+
+Implement next only
+`WP-6-m2-toolchain-rule-provider-loading-implementation`. Retain ordered
+fixture-bounded `rule(toolchains=)` requirements relative to the defining
+`.bzl` package, separate from ordinary dependencies, and add only a
+freeze-capable `platform_common.ToolchainInfo` load symbol whose invocation is
+explicitly unsupported. Do not add a ToolchainInfo provider/value, decoder,
+selected implementation analysis, resolver key, or `ctx.toolchains`.

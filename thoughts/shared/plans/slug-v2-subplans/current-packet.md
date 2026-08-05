@@ -1,67 +1,62 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-native-toolchain-target-loading-implementation`
+Packet: `WP-6-m2-toolchain-rule-provider-loading-implementation`
 Milestone: M2 successful toolchain/platform selection
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: retain the fixture's five native platform/toolchain target classes
-Predecessor: accepted ordered root registration retention `4a3af8df` and
-accepted serial declaration-loading design.
+Role: retain fixture-bounded rule toolchain requirements and load the
+`platform_common.ToolchainInfo` symbol without implementing its provider
+Predecessor: accepted native toolchain target loading `6a457406` and the
+accepted two-packet declaration-loading design.
 
-Implement exactly one `Allocative`, structurally equal
-`NativeToolchainTarget` enum behind `PackageTargetKind::NativeToolchain`:
+Add `required_toolchains: Arc<[CanonicalLabel]>` to both the frozen rule
+definition and `StarlarkRuleImplementation`, including structural equality and
+one read-only accessor. The field is separate from ordinary rule dependencies
+and must never create a package/query dependency edge.
 
-- `ConstraintSetting`;
-- `ConstraintValue { constraint_setting: CanonicalLabel }`;
-- `Platform { constraint_values: Arc<[CanonicalLabel]> }`;
-- `ToolchainType`; and
-- `Toolchain { toolchain_type: CanonicalLabel, implementation: CanonicalLabel,
-  exec_compatible_with: Arc<[CanonicalLabel]> }`.
+Extend `rule()` with the exact accepted fixture subset for `toolchains`: an
+omitted or empty list retains an empty slice, while a one-element list of a
+plain string label retains exactly one canonical toolchain-type label. Resolve
+that label relative to the package containing the defining `.bzl` file, not
+the package instantiating the rule. Preserve canonical identity and input
+order. Reject wrong element/container types, patterns, external labels,
+duplicates, and more than one requirement without claiming Bazel diagnostic
+text.
 
-Add fixture-bounded BUILD globals for `constraint_setting`, `constraint_value`,
-`platform`, `toolchain_type`, and `toolchain`. Accept only the attributes and
-string/root-label shapes used by the accepted fixture. Resolve through the
-existing BUILD package context; reject patterns and external labels. Preserve
-ordinary package target order and duplicate-name behavior plus input list order.
-The toolchain implementation is retained as NODEP data and must not enter
-ordinary dependencies. Give every subtype its exact fixed native rule
-capability name.
+Bind a frozen `platform_common` namespace in the existing loading globals. Its
+`ToolchainInfo` attribute must be the existing analysis-builtin callable shape
+so the accepted `defs.bzl` function body can freeze. Calling that symbol during
+loading must fail explicitly as an unsupported analysis builtin. Do not add a
+ToolchainInfo value, provider identity, returned-provider decoder, or user
+provider surrogate.
 
-Use the existing `RootPackageLoadKey` without a new key, digest, cache, scanner,
-or filesystem owner. Tests must prove exact declaration values/order,
-capabilities, canonical labels, list order, duplicate-name behavior,
-wrong-type/pattern/external/unmodeled rejection, cold/warm semantic reuse,
-declaration edit and A→B→A restoration, delete/recreate, sole Host event
-ownership, and the unchanged anchor dependency.
-
-Root query graph construction must return one explicit Slug-owned deferred
-boundary before projecting any package graph containing the new native targets.
-It must never silently omit or partially project them. External loading must
-classify them through its existing unsupported-kind boundary.
+Tests must load the exact accepted `defs.bzl`/BUILD shape and prove that the
+requesting `probe_rule` retains only `@@//:demo_type`, while the implementation
+rule retains none. Prove definition-package-relative resolution with a rule
+instantiated from another package, structural package equality, warm reuse,
+requirement edit and A-to-B-to-A restoration, marker edit/restoration, and
+load/freeze success for an uncalled `platform_common.ToolchainInfo`. Prove
+wrong shapes, external labels, multiple requirements, and direct loading-time
+invocation fail closed.
 
 Production allowlist:
 
 - `app/slug_loading_v2/src/package.rs`
-- `app/slug_loading_v2/src/bzl_module.rs`
-- `app/slug_query_v2/src/graph.rs`
 
 Test allowlist:
 
 - `app/slug_loading_v2/tests/build_file_loading.rs`
-- inline tests in `app/slug_loading_v2/src/host_package_load_tests.rs`
-- inline tests in `app/slug_query_v2/src/graph.rs`
-- `app/slug_query_v2/tests/loading_query.rs`
+- `app/slug_loading_v2/tests/bzl_invalidation.rs`
 
-Caps are 360 formatted production net lines, 520 test lines, and 880 total.
+Caps are 340 formatted production net lines, 310 test lines, and 650 total.
 
-Stop and return `REPLAN` for Starlark `rule(toolchains=)`, `platform_common`,
-ToolchainInfo, registered-target lookup, target existence/kind/provider
-validation, duplicate constraint-setting validation, constraint normalization
-or resolution, command-line registration, external mapping/materialization,
-aliases, host fallback, optional/multiple types, target constraints/settings,
-exec groups, public query projection, cquery formatting, Bazel diagnostic
-claims, configuration identity, actions, REAPI, a new DICE key/digest/cache/
-interner, or process-global state.
+Stop and return `REPLAN` for changes to `provider.rs`, ProviderValue or
+ProviderCollection, ToolchainInfo invocation/decoding, selected implementation
+analysis, registered-target lookup, target existence/kind/provider validation,
+constraint normalization or selection, `ctx.toolchains`, query graph
+projection, public commands, configuration identity, actions, REAPI, external
+mapping/materialization, optional/multiple required types, exec groups, a new
+DICE key/digest/cache/interner, or process-global state.
 
-After acceptance, implement the separately reviewed frozen rule-requirement and
-load-only `platform_common.ToolchainInfo` symbol packet before designing the
-integrated real DICE resolution/prepared-context vertical.
+After acceptance, design one integrated real DICE selection/prepared-context
+vertical that consumes the root registration anchor and both accepted loading
+values. Do not create a dormant resolver-only key.
