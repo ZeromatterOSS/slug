@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-3`
+Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-4`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Result: implement the closed context-free native value/default/cache kernel for
@@ -22,6 +22,16 @@ behavior, and full-original-input identity; ordered maps use exactly
 `false`, Tri annotation `null` materializes `AUTO`, and reference/repeat
 special-null remains distinct; Runs uses a positive typed private seed rather
 than pre-rendered text. These are frozen predecessor facts, not new evidence.
+
+Retry 3 was also discarded cleanly: its passing tests omitted frozen empty
+comma/set, Env, shard, Fission, privacy, and positive-Runs discriminators, and
+production violated each omitted route. Retry 4 therefore has a mandatory
+serial gate. First add a test-only matrix, mechanically checked against all 17
+family rows, 16 enum rows, 287 attachments, exact 8/5/41 exclusions, and every
+retry-2/3 discriminator; obtain independent source review of that matrix before
+adding production code. Then implement only the reviewed tests. Tests may use
+parent-module access to child-private items, but no new kernel symbol may be
+publicly re-exported.
 
 Implement one closed `NativeValue` algebra, source-default materializer,
 per-occurrence converter, and exact Java cache projection inside
@@ -97,6 +107,7 @@ formatting, applicable GNU-Windows no-run check, `scripts/v2_archive_status.sh`,
 Stop and `REPLAN` on a route/count/byte disagreement, Java-regex need, lone
 surrogate or lossy conversion, Host/repository/loading context, command-layer
 behavior including repeat merging, whole P/C/T normalization, runtime registry/interner/hash, new
-identity issue, dependency/lockfile expansion, cap breach, or any new material
-correction beyond the retry-2 correction set frozen above. Defer normalization, checksum/wire integration, DICE, downstream
+identity issue, dependency/lockfile expansion, cap breach, a production edit
+before test-matrix review, or any new material correction beyond the frozen
+retry-2/3 set above. Defer normalization, checksum/wire integration, DICE, downstream
 activation, and user-approved later configured-target dependency cycles.

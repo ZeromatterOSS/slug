@@ -3386,6 +3386,35 @@ Preserve all Java-regex, Host, repository/loading, command/repeat,
 normalization, checksum/wire, DICE, downstream activation, and user-approved
 configured-target-cycle deferrals.
 
+### Pure native kernel retry 3 REPLAN (2026-08-05)
+
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-3` stopped at its
+zero-new-correction rule. One Terra writer produced a seven-file draft that
+passed crate test/check, formatting, and GNU-Windows check, but root and an
+independent Terra review found direct contradictions with the accepted retry-7
+ledger: the private kernel was publicly re-exported; empty comma/set input
+became a singleton empty string instead of `Ø`; Env rejected `=N`, mapped `N=`
+to Unset, and rendered raw strings instead of exact Set/Inherit/Unset record
+text; Explicit/Disabled shard cache text was lowercase; the Runs seed permitted
+public/nonpositive construction; and Fission comma input retained case and
+duplicates instead of ordered-distinct typed compilation modes. The passing
+tests omitted those discriminators. The entire unaccepted crate diff was
+discarded with `apply_patch`; HEAD returned cleanly to `fdb5fdb5`.
+
+Run next only
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-4` with the same
+seven files and 1,550 production/1,250 test/2,800 total caps, but enforce a
+serial two-phase gate. Phase 1 changes tests only: mechanically cover every 17
+family and 16 enum ledger row, all 287 attachments and exact 8/5/41 exclusions,
+every retry-2 correction, and the retry-3 privacy/empty/Env/shard/Runs/Fission
+misses; independent source review must accept this matrix before Phase 2 writes
+production. Tests may reach child-private items from the parent test module;
+no kernel item is publicly re-exported. Phase 2 implements exactly that matrix.
+Any production-before-review or new material correction is `REPLAN`. Add no
+source/oracle evidence, registry/lockfile change, public API, command merge,
+contextual converter, normalization, checksum/wire, DICE, downstream
+activation, or user-deferred configured-target-cycle behavior.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
