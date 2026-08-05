@@ -2564,6 +2564,32 @@ new representation/context/oracle needs, count changes, or cap breach are
 normalization, checksum, wire, DICE, and configured-cycle semantics remain
 deferred.
 
+### Java/Guava renderer authority evidence REPLAN (2026-08-04)
+
+`WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
+25.0.2 runtime, Java SE 21 renderer contracts, and Guava `33.5.0-jre` source to
+the pinned JAR SHA. Its temporary probes matched record punctuation, immutable
+list/entry and map text, outer escaping, lowercase timeout keys, durations, and
+the CompilationMode, StripMode, PlatformType, and TestTimeout overrides. The
+terminal correction review nevertheless found the UTF-16 ordering evidence
+non-discriminating: the purported sorted list inserted U+10000 before U+E000,
+which was already Java UTF-16 order, rather than proving a reverse-order input
+passed through the required `distinct().sorted()` path. The entire unaccepted
+Stage 6 matrix was discarded and all temporary Java, JAR, and source artifacts
+were deleted.
+
+Run next only `WP-6-m2-java-guava-renderer-authority-evidence-retry`. Rebuild
+the same documentation-only matrix at no more than 240 Stage 6/300 total net
+lines, reusing the already observed runtime/source/hash facts but claiming only
+freshly recorded evidence. Its UTF-16 probe must start with actual U+E000 then
+U+10000 scalars, apply the production-equivalent distinct-then-natural-sort
+path, and record code units plus exact bracketed cache bytes showing U+10000
+then U+E000. Any disagreement, already-ordered/non-list shortcut, persistent
+fixture need, second correction, or Java/JVM production implication is
+`REPLAN`. Preserve 287/8/5/41; descriptor/family grammar, Rust, contextual and
+regex conversion, normalization, checksum, wire, DICE, and configured-target
+cycles remain deferred.
+
 ### Pure native converter source-closure ledger REPLAN (2026-08-04)
 
 The combined `WP-6-m2-pure-native-converter-source-closure-ledger` produced a
