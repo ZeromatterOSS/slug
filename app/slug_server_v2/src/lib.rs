@@ -334,7 +334,8 @@ fn query_error_message(error: &slug_query_v2::QueryError) -> String {
 
 fn query_error_json(error: &slug_query_v2::QueryError, invalidated_files: usize) -> String {
     format!(
-        "{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
+        "{{\"error\":\"{}\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
+        error.error_kind(),
         json_escape(&query_error_message(error)),
     )
 }

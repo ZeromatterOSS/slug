@@ -329,10 +329,13 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         {
             LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
             LoadingPreparationOutcome::Complete(value) => {
-                let loaded = value
-                    .as_ref()
-                    .as_ref()
-                    .map_err(|error| QueryError::evaluation(error.to_string()))?;
+                let loaded = value.as_ref().as_ref().map_err(|error| {
+                    if error.is_unsupported_feature() {
+                        QueryError::unsupported_feature(error.to_string())
+                    } else {
+                        QueryError::evaluation(error.to_string())
+                    }
+                })?;
                 Ok((loaded.build_file.clone(), loaded.reachable_loads.clone()))
             }
         }

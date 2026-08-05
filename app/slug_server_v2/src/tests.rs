@@ -934,6 +934,108 @@ fn retained_daemon_direct_external_query_replays_only_changed_external_build() {
 }
 
 #[test]
+fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
+    let workspace = scratch("external-module-cycle");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "print(\"ROOT_EVENT\")\nmodule(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    );
+    write(
+        &workspace.join("dep/MODULE.bazel"),
+        "print(\"DEP_EVENT\")\nmodule(name = \"dep\", version = \"1.0.0\")\ninclude(\"//cycle:a.MODULE.bazel\")\n",
+    );
+    write(
+        &workspace.join("dep/cycle/a.MODULE.bazel"),
+        "print(\"A_EVENT\")\ninclude(\"//cycle:b.MODULE.bazel\")\n",
+    );
+    let repeated = "print(\"B_EVENT\")\ninclude(\"//cycle:a.MODULE.bazel\")\n";
+    write(&workspace.join("dep/cycle/b.MODULE.bazel"), repeated);
+    write(&workspace.join("dep/cycle/BUILD.bazel"), "");
+    write(
+        &workspace.join("dep/BUILD.bazel"),
+        "print(\"BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
+    );
+    write(&workspace.join("dep/target.txt"), "target\n");
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let message = format!(
+        "Slug does not support MODULE.bazel include cycles in direct local_path_override repository '@dep' for module 'dep': include \"//cycle:a.MODULE.bazel\" at {}:2:1 repeats ancestor include \"//cycle:a.MODULE.bazel\" at {}:3:1",
+        workspace.join("dep/cycle/b.MODULE.bazel").display(),
+        workspace.join("dep/MODULE.bazel").display(),
+    );
+    let terminal = |invalidated_files: usize| {
+        format!(
+            "{{\"error\":\"unsupported_feature\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
+            slug_core_v2::error::json_escape(&message),
+        )
+    };
+
+    let cold = daemon.query("@dep//:target.txt", QueryOrder::Auto);
+    assert_eq!(cold.exit_code, 7, "{cold:?}");
+    assert!(cold.stdout.is_empty(), "{cold:?}");
+    assert!(
+        cold.stderr.contains("DEBUG:") && cold.stderr.contains("ROOT_EVENT"),
+        "{cold:?}"
+    );
+    assert_eq!(cold.stderr.matches("ROOT_EVENT").count(), 1, "{cold:?}");
+    assert!(cold.stderr.contains("\"error\":\"unsupported_feature\""));
+    assert!(cold.stderr.contains("/dep/cycle/b.MODULE.bazel:2:1"));
+    assert!(cold.stderr.contains("/dep/MODULE.bazel:3:1"));
+    assert!(cold.stderr.ends_with(&terminal(0)), "{cold:?}");
+    assert!(!cold.stderr.contains("DEP_EVENT"), "{cold:?}");
+    assert!(!cold.stderr.contains("A_EVENT"), "{cold:?}");
+    assert!(!cold.stderr.contains("B_EVENT"), "{cold:?}");
+    assert!(!cold.stderr.contains("BUILD_EVENT"), "{cold:?}");
+    assert!(!cold.stderr.contains("Evaluation of query"), "{cold:?}");
+    assert_eq!(cold.invalidated_files, 0);
+
+    let warm = daemon.query("buildfiles(@dep//:target.txt)", QueryOrder::Auto);
+    assert_eq!(warm.exit_code, 7, "{warm:?}");
+    assert!(warm.stdout.is_empty(), "{warm:?}");
+    assert!(
+        warm.stderr
+            .starts_with("{\"error\":\"unsupported_feature\"")
+    );
+    assert_eq!(warm.stderr, terminal(0));
+    assert!(!warm.stderr.contains("DEBUG:"), "{warm:?}");
+    assert!(!warm.stderr.contains("Evaluation of query"), "{warm:?}");
+    assert_eq!(warm.invalidated_files, 0);
+
+    write(
+        &workspace.join("dep/cycle/b.MODULE.bazel"),
+        "print(\"B_EVENT\")\n",
+    );
+    let recovered = daemon.query("@dep//:target.txt", QueryOrder::Auto);
+    assert_eq!(recovered.exit_code, 0, "{recovered:?}");
+    assert_eq!(recovered.stdout, "@dep//:target.txt\n");
+    for event in ["DEP_EVENT", "A_EVENT", "B_EVENT", "BUILD_EVENT"] {
+        assert_eq!(recovered.stderr.matches(event).count(), 1, "{recovered:?}");
+    }
+    assert_eq!(recovered.invalidated_files, 1);
+
+    let supported_warm = daemon.query("@dep//:target.txt", QueryOrder::Auto);
+    assert_eq!(supported_warm.exit_code, 0, "{supported_warm:?}");
+    assert!(supported_warm.stderr.is_empty(), "{supported_warm:?}");
+    assert_eq!(supported_warm.invalidated_files, 0);
+
+    write(&workspace.join("dep/cycle/b.MODULE.bazel"), repeated);
+    let reintroduced = daemon.query("loadfiles(@dep//:target.txt)", QueryOrder::Auto);
+    assert_eq!(reintroduced.exit_code, 7, "{reintroduced:?}");
+    assert!(reintroduced.stdout.is_empty(), "{reintroduced:?}");
+    assert!(
+        reintroduced
+            .stderr
+            .contains("\"error\":\"unsupported_feature\"")
+    );
+    assert_eq!(reintroduced.stderr, terminal(1));
+    assert!(!reintroduced.stderr.contains("DEBUG:"), "{reintroduced:?}");
+    assert!(
+        !reintroduced.stderr.contains("Evaluation of query"),
+        "{reintroduced:?}"
+    );
+    assert_eq!(reintroduced.invalidated_files, 1);
+}
+
+#[test]
 fn daemon_query_preflight_error_has_one_terminal_newline() {
     let workspace = scratch("query-preflight-error");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

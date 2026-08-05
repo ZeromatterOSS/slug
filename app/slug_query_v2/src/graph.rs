@@ -418,6 +418,7 @@ enum QueryErrorKind {
     Evaluation,
     TargetMissing,
     PackageLoading,
+    UnsupportedFeature,
     PreparationRestart,
 }
 
@@ -446,6 +447,14 @@ impl QueryError {
         }
     }
 
+    pub(crate) fn unsupported_feature(message: impl Into<String>) -> Self {
+        Self {
+            message: Arc::from(message.into()),
+            exit_code: 7,
+            kind: QueryErrorKind::UnsupportedFeature,
+        }
+    }
+
     pub(crate) fn target_missing(message: impl Into<String>) -> Self {
         Self {
             message: Arc::from(message.into()),
@@ -458,8 +467,16 @@ impl QueryError {
         matches!(self.kind, QueryErrorKind::PackageLoading)
     }
 
+    pub fn error_kind(&self) -> &'static str {
+        match self.kind {
+            QueryErrorKind::UnsupportedFeature => "unsupported_feature",
+            _ => "query_error",
+        }
+    }
+
     pub fn with_message(mut self, message: impl Into<String>) -> Self {
-        if self.is_preparation_restart() {
+        if self.is_preparation_restart() || matches!(self.kind, QueryErrorKind::UnsupportedFeature)
+        {
             return self;
         }
         self.message = Arc::from(message.into());
@@ -585,7 +602,13 @@ impl Key for ExternalUnconfiguredPackageGraphKey {
                     loaded
                         .as_ref()
                         .as_ref()
-                        .map_err(|error| QueryError::package_loading(error.to_string()))
+                        .map_err(|error| {
+                            if error.is_unsupported_feature() {
+                                QueryError::unsupported_feature(error.to_string())
+                            } else {
+                                QueryError::package_loading(error.to_string())
+                            }
+                        })
                         .and_then(|loaded| {
                             external_package_graph_from_loaded(&self.route, &self.package, loaded)
                                 .map(Arc::new)
@@ -2040,9 +2063,22 @@ mod graph_tests {
     use slug_workspace_v2::WorkspaceSnapshotKey;
 
     use super::QueryEdgeKind;
+    use super::QueryError;
     use super::QueryLabel;
     use super::QueryNodeKind;
     use super::external_package_graph_from_targets;
+
+    #[test]
+    fn unsupported_feature_message_survives_composed_external_label_context() {
+        let message = "Slug does not support MODULE.bazel include cycles in direct local_path_override repository '@dep'";
+        let error = QueryError::unsupported_feature(message).with_message(format!(
+            "couldn't expand 'tests' attribute of test_suite //bridge:bridge: {message}"
+        ));
+
+        assert_eq!(error.to_string(), message);
+        assert_eq!(error.error_kind(), "unsupported_feature");
+        assert!(!error.needs_evaluation_context());
+    }
 
     #[test]
     fn external_label_identity_is_canonical_while_output_is_apparent() {

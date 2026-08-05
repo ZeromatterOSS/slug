@@ -148,12 +148,17 @@ fn query_error_json(error: &QueryError, runtime_mode: &str) -> String {
     if error.needs_evaluation_context() {
         message.push_str("\nEvaluation of query");
     }
-    query_error_json_message(&message, runtime_mode)
+    query_error_json_message_with_kind(error.error_kind(), &message, runtime_mode)
 }
 
 fn query_error_json_message(message: &str, runtime_mode: &str) -> String {
+    query_error_json_message_with_kind("query_error", message, runtime_mode)
+}
+
+fn query_error_json_message_with_kind(kind: &str, message: &str, runtime_mode: &str) -> String {
     format!(
-        "{{\"error\":\"query_error\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"{}\"}}\n",
+        "{{\"error\":\"{}\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"{}\"}}\n",
+        kind,
         json_escape(message),
         runtime_mode,
     )

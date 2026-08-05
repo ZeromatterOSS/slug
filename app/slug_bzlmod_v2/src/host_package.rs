@@ -47,12 +47,16 @@ use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
 use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::HostRepositoryIgnoreKey;
 use crate::repository_ignore::HostRouteRepositoryIgnoreKey;
+use crate::source_preparation::DirectLocalModuleSupport;
+use crate::source_preparation::DirectLocalModuleSupportError;
+use crate::source_preparation::DirectLocalUnsupportedCycle;
 use crate::source_preparation::HostRepositoryPathKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationOutcome;
+use crate::source_preparation::direct_local_module_support;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 pub(crate) enum HostBuildFileName {
@@ -489,6 +493,12 @@ impl RepositoryPackageSource {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum RepositoryPackageSourceErrorInner {
+    ModuleEvaluation {
+        error: DirectLocalModuleSupportError,
+    },
+    Unsupported {
+        cycle: DirectLocalUnsupportedCycle,
+    },
     InvalidPackageName {
         package: PackageIdentifier,
         message: Arc<str>,
@@ -530,11 +540,20 @@ impl RepositoryPackageSourceError {
     fn new(inner: RepositoryPackageSourceErrorInner) -> Self {
         Self { inner }
     }
+
+    pub fn is_unsupported_feature(&self) -> bool {
+        matches!(
+            self.inner,
+            RepositoryPackageSourceErrorInner::Unsupported { .. }
+        )
+    }
 }
 
 impl fmt::Display for RepositoryPackageSourceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.inner {
+            RepositoryPackageSourceErrorInner::ModuleEvaluation { error } => error.fmt(f),
+            RepositoryPackageSourceErrorInner::Unsupported { cycle } => cycle.fmt(f),
             RepositoryPackageSourceErrorInner::InvalidPackageName { package, message } => {
                 write!(f, "invalid external package {package}: {message}")
             }
@@ -581,6 +600,7 @@ impl fmt::Display for RepositoryPackageSourceError {
 impl std::error::Error for RepositoryPackageSourceError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match &self.inner {
+            RepositoryPackageSourceErrorInner::ModuleEvaluation { error } => Some(error),
             RepositoryPackageSourceErrorInner::Lookup { error, .. } => Some(error),
             _ => None,
         }
@@ -594,6 +614,30 @@ impl Key for RepositoryPackageSourceKey {
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match direct_local_module_support(ctx, &self.route).await {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Ok(DirectLocalModuleSupport::Supported) => {}
+                Ok(DirectLocalModuleSupport::Unsupported(cycle)) => {
+                    return repository_package_source_complete(Err(
+                        RepositoryPackageSourceError::new(
+                            RepositoryPackageSourceErrorInner::Unsupported {
+                                cycle: cycle.clone(),
+                            },
+                        ),
+                    ));
+                }
+                Err(error) => {
+                    return repository_package_source_complete(Err(
+                        RepositoryPackageSourceError::new(
+                            RepositoryPackageSourceErrorInner::ModuleEvaluation {
+                                error: error.clone(),
+                            },
+                        ),
+                    ));
+                }
+            },
+        }
         let lookup = match ctx
             .compute(
                 &ExternalRepositoryPackageLookupKey::new(self.route.clone(), self.package.clone())
@@ -1310,6 +1354,12 @@ mod tests {
     #[cfg(unix)]
     use super::RootPackageSourceKey;
     #[cfg(unix)]
+    use crate::BzlmodCommandPolicyKey;
+    #[cfg(unix)]
+    use crate::BzlmodEnvironmentPolicyKey;
+    #[cfg(unix)]
+    use crate::LockfileMode;
+    #[cfg(unix)]
     use crate::OverrideAttributeValue;
     #[cfg(unix)]
     use crate::RepoSpec;
@@ -1319,6 +1369,8 @@ mod tests {
     use crate::RootPackagePolicyInputs;
     #[cfg(unix)]
     use crate::RootRepositoryRoute;
+    #[cfg(unix)]
+    use crate::inject_root_module_request_inputs;
     #[cfg(unix)]
     use crate::inject_root_package_policy_inputs;
     #[cfg(unix)]
@@ -1495,6 +1547,33 @@ mod tests {
             present("/workspace", PathNodeKind::Directory, variant),
             present(&root, PathNodeKind::Directory, variant),
         ];
+        entries.extend([
+            present(
+                "/workspace/MODULE.bazel",
+                PathNodeKind::RegularFile,
+                variant,
+            ),
+            bytes(
+                "/workspace/MODULE.bazel",
+                Box::leak(
+                    format!(
+                        "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"{}\")\n",
+                        root.strip_prefix("/workspace/").unwrap()
+                    )
+                    .into_bytes()
+                    .into_boxed_slice(),
+                ),
+            ),
+            present(
+                &format!("{root}/MODULE.bazel"),
+                PathNodeKind::RegularFile,
+                variant,
+            ),
+            bytes(
+                &format!("{root}/MODULE.bazel"),
+                b"module(name = \"dep\", version = \"1.0.0\")\n",
+            ),
+        ]);
         for (name, source) in [("REPO.bazel", repo), (".bazelignore", ignore)] {
             let logical = format!("{root}/{name}");
             match source {
@@ -1549,6 +1628,14 @@ mod tests {
         data.data.set(CaptureEvaluationEvents);
         let mut updater = dice.updater_with_data(data);
         inject_root_package_policy_inputs(&mut updater, inputs(&[], deleted, None)).unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            std::path::Path::new("/workspace"),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
         updater
             .changed_to(vec![(PathObservationEpochKey, epoch(&entries))])
             .unwrap();
@@ -2284,7 +2371,7 @@ mod tests {
             &dice,
             "dep",
             &["@dep+//pkg"],
-            Vec::new(),
+            route_prelude("dep", None, None, 68),
             Some(tracker.clone()),
         )
         .await;
@@ -2323,6 +2410,39 @@ mod tests {
             &routed[0].1,
             &routed[2].1
         ));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn repository_package_source_retains_complete_module_evaluation_error_chain() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let key = external_source_key("dep", "pkg");
+        let mut entries = route_prelude("dep", None, None, 72);
+        let module_bytes = demand(
+            "/workspace/dep/MODULE.bazel",
+            PathObservationOperation::FileBytes,
+        );
+        entries.retain(|(incoming, _)| incoming != &module_bytes);
+        entries.push(bytes(
+            "/workspace/dep/MODULE.bazel",
+            b"module(name = 'dep', version = '1.0.0')\nfail('ordinary-module-error')\n",
+        ));
+        let mut transaction = external_transaction(&dice, "dep", &[], entries, None).await;
+        let SourcePreparationOutcome::Complete(value) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("ordinary module failure must be Complete")
+        };
+        let error = value.as_ref().as_ref().unwrap_err();
+        assert!(!error.is_unsupported_feature());
+        assert!(error.to_string().contains("ordinary-module-error"));
+        let support = std::error::Error::source(error).expect("source retains support error");
+        assert!(support.to_string().contains("ordinary-module-error"));
+        let evaluation = support.source().expect("support retains evaluation owner");
+        assert!(evaluation.to_string().contains("ordinary-module-error"));
+        assert!(
+            evaluation.source().is_some(),
+            "evaluation owner retains the interpreter error"
+        );
     }
 
     #[cfg(unix)]

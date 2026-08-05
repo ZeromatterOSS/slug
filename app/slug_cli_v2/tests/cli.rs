@@ -2835,6 +2835,89 @@ fn output_base_query_reuses_one_daemon_across_build_edits() {
 }
 
 #[test]
+fn direct_external_module_cycle_is_public_only_for_query() {
+    let workspace = scratch("external-module-cycle");
+    write(
+        workspace.join("MODULE.bazel"),
+        "print(\"ROOT_EVENT\")\nmodule(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    );
+    write(
+        workspace.join("dep/MODULE.bazel"),
+        "print(\"DEP_EVENT\")\nmodule(name = \"dep\", version = \"1.0.0\")\ninclude(\"//cycle:a.MODULE.bazel\")\n",
+    );
+    write(
+        workspace.join("dep/cycle/a.MODULE.bazel"),
+        "include(\"//cycle:b.MODULE.bazel\")\n",
+    );
+    write(
+        workspace.join("dep/cycle/b.MODULE.bazel"),
+        "include(\"//cycle:a.MODULE.bazel\")\n",
+    );
+    write(workspace.join("dep/cycle/BUILD.bazel"), "");
+    write(
+        workspace.join("dep/BUILD.bazel"),
+        "print(\"BUILD_EVENT\")\nexports_files([\"target.txt\"])\n",
+    );
+    write(workspace.join("dep/target.txt"), "target\n");
+
+    let query = slug()
+        .current_dir(&workspace)
+        .args(["query", "@dep//:target.txt"])
+        .output()
+        .unwrap();
+    assert_eq!(query.status.code(), Some(7), "{query:?}");
+    assert!(query.stdout.is_empty(), "{query:?}");
+    let stderr = String::from_utf8(query.stderr).unwrap();
+    let event = stderr.find("ROOT_EVENT").unwrap();
+    let terminal = stderr.find("{\"error\":\"unsupported_feature\"").unwrap();
+    let message = format!(
+        "Slug does not support MODULE.bazel include cycles in direct local_path_override repository '@dep' for module 'dep': include \"//cycle:a.MODULE.bazel\" at {}:1:1 repeats ancestor include \"//cycle:a.MODULE.bazel\" at {}:3:1",
+        workspace.join("dep/cycle/b.MODULE.bazel").display(),
+        workspace.join("dep/MODULE.bazel").display(),
+    );
+    let expected_terminal = format!(
+        "{{\"error\":\"unsupported_feature\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}\n",
+        slug_core_v2::error::json_escape(&message),
+    );
+    assert!(event < terminal, "{stderr}");
+    assert_eq!(&stderr[terminal..], expected_terminal);
+    assert!(stderr.contains("/dep/cycle/b.MODULE.bazel:1:1"), "{stderr}");
+    assert!(stderr.contains("/dep/MODULE.bazel:3:1"), "{stderr}");
+    assert!(stderr.contains("\"runtime_mode\":\"one-shot\""), "{stderr}");
+    assert!(!stderr.contains("DEP_EVENT"), "{stderr}");
+    assert!(!stderr.contains("BUILD_EVENT"), "{stderr}");
+    assert!(!stderr.contains("Evaluation of query"), "{stderr}");
+
+    let build = slug()
+        .current_dir(&workspace)
+        .args(["build", "@dep//:target.txt"])
+        .output()
+        .unwrap();
+    let build_stderr = String::from_utf8(build.stderr).unwrap();
+    assert!(
+        !build_stderr.contains("unsupported_feature"),
+        "{build_stderr}"
+    );
+    assert!(!build_stderr.contains("DEP_EVENT"), "{build_stderr}");
+    assert!(!build_stderr.contains("BUILD_EVENT"), "{build_stderr}");
+
+    write(
+        workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\nunknown_symbol()\n",
+    );
+    let ordinary = slug()
+        .current_dir(&workspace)
+        .args(["query", "@dep//:target.txt"])
+        .output()
+        .unwrap();
+    assert_eq!(ordinary.status.code(), Some(7), "{ordinary:?}");
+    let ordinary_stderr = String::from_utf8(ordinary.stderr).unwrap();
+    assert!(ordinary_stderr.contains("\"error\":\"query_error\""));
+    assert!(!ordinary_stderr.contains("unsupported_feature"));
+    assert!(ordinary_stderr.contains("Evaluation of query"));
+}
+
+#[test]
 fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events() {
     let workspace = scratch("external-query-workspace");
     let output_base = scratch("external-query-output-base");

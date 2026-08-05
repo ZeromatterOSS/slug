@@ -3659,6 +3659,10 @@ impl RootQueryEpochBuilder {
         );
     }
 
+    fn omit(&mut self, path: &str, operation: PathObservationOperation) {
+        self.entries.shift_remove(&Self::demand(path, operation));
+    }
+
     fn file(&mut self, path: &str, source: &str, variant: i64) {
         self.node(path, PathNodeKind::RegularFile, variant);
         self.entries.insert(
@@ -3704,6 +3708,7 @@ impl RootQueryEpochBuilder {
             variant,
         );
         builder.missing("/workspace/dep/REPO.bazel");
+        builder.missing("/workspace/dep/.bazelignore");
         builder.file(
             "/workspace/dep/BUILD.bazel",
             "filegroup(name = \"rule\")\n",
@@ -3772,6 +3777,41 @@ impl RootQueryEpochBuilder {
         // A same-path root package makes accidental root companion discovery
         // observable without participating in the external package owner.
         builder.package("macro", "filegroup(name = \"root_sentinel\")\n", variant);
+        builder
+    }
+
+    fn external_module_cycle(variant: i64) -> Self {
+        let mut builder = Self::external_macro_package(variant);
+        builder.file(
+            "/workspace/dep/MODULE.bazel",
+            "module(name = \"dep\", version = \"1.0.0\")\ninclude(\"//cycle:a.MODULE.bazel\")\n",
+            variant,
+        );
+        builder.directory("/workspace/dep/cycle", variant);
+        builder.directory_entries("/workspace/dep/cycle", &[]);
+        builder.file("/workspace/dep/cycle/BUILD.bazel", "", variant);
+        builder.file(
+            "/workspace/dep/cycle/a.MODULE.bazel",
+            "include(\"//cycle:b.MODULE.bazel\")\n",
+            variant,
+        );
+        builder.file(
+            "/workspace/dep/cycle/b.MODULE.bazel",
+            "include(\"//cycle:a.MODULE.bazel\")\n",
+            variant,
+        );
+        for path in [
+            "/workspace/dep/macro",
+            "/workspace/dep/macro/BUILD.bazel",
+            "/workspace/dep/macro/defs.bzl",
+        ] {
+            builder.omit(path, PathObservationOperation::Lstat);
+            builder.omit(path, PathObservationOperation::FileBytes);
+        }
+        builder.omit(
+            "/workspace/dep/macro",
+            PathObservationOperation::DirectoryEntries,
+        );
         builder
     }
 
@@ -4113,6 +4153,43 @@ async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root
             expected,
             "{source}"
         );
+    }
+}
+
+#[tokio::test]
+async fn external_module_cycle_is_typed_for_graph_and_loading_file_provenance() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut transaction = root_query_transaction(
+        &dice,
+        RootQueryEpochBuilder::external_module_cycle(70).build(),
+        Arc::new(RootAnchorTracker::default()),
+    )
+    .await;
+    let expected = concat!(
+        "Slug does not support MODULE.bazel include cycles in direct local_path_override ",
+        "repository '@dep' for module 'dep': include \"//cycle:a.MODULE.bazel\" at ",
+        "/workspace/dep/cycle/b.MODULE.bazel:1:1 repeats ancestor include ",
+        "\"//cycle:a.MODULE.bazel\" at /workspace/dep/MODULE.bazel:2:1",
+    );
+
+    for source in [
+        "@dep//macro:macro_files",
+        "buildfiles(@dep//macro:defs.bzl)",
+        "loadfiles(@dep//macro:defs.bzl)",
+    ] {
+        let value = transaction.compute(&root_query_key(source)).await.unwrap();
+        let QueryPreparationOutcome::Complete(result) = value else {
+            panic!("{source} requested preparation: {value:?}")
+        };
+        let error = result.as_ref().as_ref().unwrap_err();
+        assert_eq!(error.exit_code, 7, "{source}");
+        assert_eq!(
+            error.error_kind(),
+            "unsupported_feature",
+            "{source}: {error:?}"
+        );
+        assert!(!error.needs_evaluation_context(), "{source}");
+        assert_eq!(error.to_string(), expected, "{source}");
     }
 }
 

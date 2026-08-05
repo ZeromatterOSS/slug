@@ -1488,6 +1488,14 @@ impl RepositoryPackageLoadError {
     fn new(inner: RepositoryPackageLoadErrorInner) -> Self {
         Self { inner }
     }
+
+    pub fn is_unsupported_feature(&self) -> bool {
+        matches!(
+            &self.inner,
+            RepositoryPackageLoadErrorInner::Source { error }
+                if error.is_unsupported_feature()
+        )
+    }
 }
 
 impl fmt::Display for RepositoryPackageLoadError {

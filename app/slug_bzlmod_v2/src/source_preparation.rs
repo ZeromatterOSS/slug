@@ -1692,6 +1692,117 @@ fn direct_local_evaluation_error(
     SourcePreparationOutcome::Complete(Arc::new(Err(error)))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum DirectLocalModuleSupport {
+    Supported,
+    Unsupported(DirectLocalUnsupportedCycle),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct DirectLocalUnsupportedCycle {
+    apparent_repo: ApparentRepoName,
+    module_name: CompactString,
+    repeated_raw_label: CompactString,
+    repeated_location: crate::LogicalSpan,
+    ancestor_raw_label: CompactString,
+    ancestor_location: crate::LogicalSpan,
+}
+
+impl fmt::Display for DirectLocalUnsupportedCycle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Slug does not support MODULE.bazel include cycles in direct local_path_override repository '@{}' for module '{}': include {:?} at {}:{}:{} repeats ancestor include {:?} at {}:{}:{}",
+            self.apparent_repo.as_str(),
+            self.module_name,
+            self.repeated_raw_label,
+            self.repeated_location.file.0,
+            self.repeated_location.start_line,
+            self.repeated_location.start_column,
+            self.ancestor_raw_label,
+            self.ancestor_location.file.0,
+            self.ancestor_location.start_line,
+            self.ancestor_location.start_column,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct DirectLocalModuleSupportError {
+    inner: DirectLocalModuleSupportErrorInner,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum DirectLocalModuleSupportErrorInner {
+    Compute { message: Arc<str> },
+    Evaluation(DirectLocalModuleEvaluationError),
+}
+
+impl fmt::Display for DirectLocalModuleSupportError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.inner {
+            DirectLocalModuleSupportErrorInner::Compute { message } => {
+                write!(
+                    f,
+                    "failed to compute direct-local MODULE evaluation: {message}"
+                )
+            }
+            DirectLocalModuleSupportErrorInner::Evaluation(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for DirectLocalModuleSupportError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.inner {
+            DirectLocalModuleSupportErrorInner::Evaluation(error) => Some(error),
+            DirectLocalModuleSupportErrorInner::Compute { .. } => None,
+        }
+    }
+}
+
+pub(crate) async fn direct_local_module_support(
+    ctx: &mut DiceComputations<'_>,
+    route: &RootRepositoryRoute,
+) -> SourcePreparationOutcome<Arc<Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>>>
+{
+    let key = DirectLocalModuleEvaluationKey::new(
+        route.workspace().dupe(),
+        route.apparent_repo().clone(),
+    )
+    .expect("repository source routes are nonroot");
+    match ctx.compute(&key).await {
+        Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+        Err(error) => {
+            SourcePreparationOutcome::Complete(Arc::new(Err(DirectLocalModuleSupportError {
+                inner: DirectLocalModuleSupportErrorInner::Compute {
+                    message: Arc::from(error.to_string()),
+                },
+            })))
+        }
+        Ok(SourcePreparationOutcome::Complete(value)) => {
+            SourcePreparationOutcome::Complete(Arc::new(match value.as_ref() {
+                Err(error) => Err(DirectLocalModuleSupportError {
+                    inner: DirectLocalModuleSupportErrorInner::Evaluation(error.clone()),
+                }),
+                Ok(DirectLocalModuleEvaluation::Supported(_)) => {
+                    Ok(DirectLocalModuleSupport::Supported)
+                }
+                Ok(DirectLocalModuleEvaluation::Unsupported(capability)) => Ok(
+                    DirectLocalModuleSupport::Unsupported(DirectLocalUnsupportedCycle {
+                        apparent_repo: route.apparent_repo().clone(),
+                        module_name: CompactString::new(route.module_name()),
+                        repeated_raw_label: capability.repeated_raw_label.clone(),
+                        repeated_location: capability.repeated_location.clone(),
+                        ancestor_raw_label: capability.ancestor_raw_label.clone(),
+                        ancestor_location: capability.ancestor_location.clone(),
+                    }),
+                ),
+            }))
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub struct RepositoryMaterializationGeneration(pub u64);
 
@@ -1984,6 +2095,19 @@ fn request_kind(
     Err(RepositoryMaterializationError::Spec(
         "unsupported repository override rule".into(),
     ))
+}
+
+fn host_repository_materialization_request(
+    route: &RootRepositoryRoute,
+) -> Result<Arc<RepositoryMaterializationRequest>, RepositoryMaterializationError> {
+    Ok(Arc::new(RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace: route.workspace().dupe(),
+            canonical_repo: route.canonical_repo().clone(),
+        },
+        repo_spec: route.repo_spec().clone(),
+        kind: request_kind(route.workspace(), route.repo_spec())?,
+    }))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -2490,8 +2614,8 @@ impl Key for HostRepositoryPathKey {
             }
         };
         let repo_relative_path = Arc::new(relative.to_owned());
-        let kind = match request_kind(self.route.workspace(), self.route.repo_spec()) {
-            Ok(kind) => kind,
+        let request = match host_repository_materialization_request(&self.route) {
+            Ok(request) => request,
             Err(error) => {
                 return SourcePreparationOutcome::Complete(Err(
                     RepositorySourceFileError::Materialization {
@@ -2501,14 +2625,6 @@ impl Key for HostRepositoryPathKey {
                 ));
             }
         };
-        let request = Arc::new(RepositoryMaterializationRequest {
-            id: RepositoryMaterializationRequestId {
-                workspace: self.route.workspace().dupe(),
-                canonical_repo: self.route.canonical_repo().clone(),
-            },
-            repo_spec: self.route.repo_spec().clone(),
-            kind,
-        });
         let materialization = match ctx
             .compute(&RepositoryMaterializationResultKey { request })
             .await
@@ -2577,6 +2693,16 @@ impl Key for HostRepositorySourceFileKey {
                 ));
             }
         };
+        // `HostRepositoryPathKey` remains the sole validation/materialization
+        // owner. Once it succeeds, retain the same exact request as a direct
+        // provenance dependency of this selected byte-source anchor.
+        let request = host_repository_materialization_request(&self.route)
+            .expect("a successful HostRepositoryPathKey has a valid materialization request");
+        let materialization = ctx
+            .compute(&RepositoryMaterializationResultKey { request })
+            .await
+            .expect("the successful HostRepositoryPathKey computed materialization");
+        debug_assert!(materialization.is_complete());
         host_repository_source_file_value(source_outcome_from_path(
             observed_repository_source_file_from_resolved(
                 ctx,
@@ -3666,6 +3792,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn host_repository_source_rejects_invalid_relative_path_before_materialization() {
+        let invalid_key =
+            HostRepositorySourceFileKey::new(local_route(), PathBuf::from("../escape"));
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = dice.updater().commit().await;
+        let value = transaction.compute(&invalid_key).await.unwrap();
+        assert!(matches!(
+            value,
+            SourcePreparationOutcome::Complete(Err(
+                RepositorySourceFileError::InvalidRepoRelativePath { requested_path }
+            )) if requested_path.as_path() == Path::new("../escape")
+        ));
+    }
+
+    #[tokio::test]
     async fn host_repository_source_value_retains_requested_logical_path_and_bytes() {
         let route = local_route();
         let key = HostRepositorySourceFileKey::new(route.clone(), PathBuf::from("BUILD.bazel"));
@@ -4320,7 +4461,7 @@ mod tests {
             direct
         }
     }
-    async fn evaluation_compute(
+    async fn evaluation_transaction(
         dice: &Arc<Dice>,
         module: Option<&[u8]>,
         repo: Option<&[u8]>,
@@ -4330,7 +4471,7 @@ mod tests {
         variant: i64,
         capture: bool,
         tracker: Option<Arc<EvaluationTracker>>,
-    ) -> <DirectLocalModuleEvaluationKey as Key>::Value {
+    ) -> dice::DiceTransaction {
         let mut data = UserComputationData {
             activation_tracker: tracker
                 .clone()
@@ -4387,7 +4528,31 @@ mod tests {
             crate::LockfileMode::Update,
         )
         .unwrap();
-        let mut transaction = updater.commit().await;
+        updater.commit().await
+    }
+    async fn evaluation_compute(
+        dice: &Arc<Dice>,
+        module: Option<&[u8]>,
+        repo: Option<&[u8]>,
+        packages: &[(&str, bool)],
+        fragments: &[(&str, Option<&[u8]>)],
+        fragment_needs: &[&str],
+        variant: i64,
+        capture: bool,
+        tracker: Option<Arc<EvaluationTracker>>,
+    ) -> <DirectLocalModuleEvaluationKey as Key>::Value {
+        let mut transaction = evaluation_transaction(
+            dice,
+            module,
+            repo,
+            packages,
+            fragments,
+            fragment_needs,
+            variant,
+            capture,
+            tracker.clone(),
+        )
+        .await;
         let direct = transaction.compute(&evaluation()).await.unwrap();
         if let Some(tracker) = tracker {
             transaction
@@ -4397,6 +4562,31 @@ mod tests {
         } else {
             direct
         }
+    }
+    async fn support_compute(
+        dice: &Arc<Dice>,
+        module: Option<&[u8]>,
+        packages: &[(&str, bool)],
+        fragments: &[(&str, Option<&[u8]>)],
+        fragment_needs: &[&str],
+        variant: i64,
+        tracker: Option<Arc<EvaluationTracker>>,
+    ) -> SourcePreparationOutcome<
+        Arc<Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>>,
+    > {
+        let mut transaction = evaluation_transaction(
+            dice,
+            module,
+            None,
+            packages,
+            fragments,
+            fragment_needs,
+            variant,
+            true,
+            tracker,
+        )
+        .await;
+        direct_local_module_support(&mut transaction, &local_route()).await
     }
     fn preparation_success(
         value: <DirectLocalModulePreparationKey as Key>::Value,
@@ -5936,6 +6126,84 @@ mod tests {
         ));
         assert!(compute.to_string().contains("structural compute failure"));
         assert!(std::error::Error::source(&compute).is_none());
+    }
+
+    #[tokio::test]
+    async fn direct_module_support_projects_need_supported_and_ordinary_error_exactly() {
+        let need_tracker = Arc::new(EvaluationTracker::default());
+        let need = support_compute(
+            &Dice::builder().build(DetectCycles::Enabled),
+            Some(b"include('//missing:a.MODULE.bazel')\n"),
+            &[],
+            &[],
+            &[],
+            320,
+            Some(need_tracker.clone()),
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(
+            need_tracker
+                .evaluation
+                .lock()
+                .unwrap()
+                .iter()
+                .all(|activation| activation.batch.is_none())
+        );
+
+        let supported_tracker = Arc::new(EvaluationTracker::default());
+        let supported = support_compute(
+            &Dice::builder().build(DetectCycles::Enabled),
+            Some(b"module(name='dep')\nprint('supported-once')\n"),
+            &[],
+            &[],
+            &[],
+            321,
+            Some(supported_tracker.clone()),
+        )
+        .await;
+        assert!(matches!(
+            supported,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Ok(DirectLocalModuleSupport::Supported))
+        ));
+        let event_count = supported_tracker
+            .evaluation
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|activation| activation.batch.as_ref())
+            .flat_map(|batch| batch.events())
+            .filter(|event| {
+                matches!(
+                    event,
+                    EvaluationEvent::StarlarkPrint { text, .. } if text == "supported-once"
+                )
+            })
+            .count();
+        assert_eq!(event_count, 1);
+
+        let ordinary = support_compute(
+            &Dice::builder().build(DetectCycles::Enabled),
+            Some(b"module(name='dep')\nfail('ordinary-error')\n"),
+            &[],
+            &[],
+            &[],
+            322,
+            None,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(ordinary) = ordinary else {
+            panic!("ordinary evaluation failure is complete")
+        };
+        let error = ordinary.as_ref().as_ref().unwrap_err();
+        assert!(error.to_string().contains("ordinary-error"));
+        let evaluation = std::error::Error::source(error).expect("support error retains owner");
+        assert!(evaluation.to_string().contains("ordinary-error"));
+        assert!(
+            evaluation.source().is_some(),
+            "evaluation owner retains the interpreter error"
+        );
     }
 
     #[tokio::test]
