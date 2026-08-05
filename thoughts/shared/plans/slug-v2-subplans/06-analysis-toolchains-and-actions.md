@@ -761,3 +761,103 @@ the exact single-root-literal, explicit formatter/expression boundary and the
 existing `RootConfiguredTargetAnalysisKey`; default/explicit `label`, arbitrary
 Starlark, files, patterns, external labels, and configuration identity remain
 outside the packet.
+
+### Root cquery Starlark-label boundary design (2026-08-04)
+
+**Status: ACCEPT; implement only
+`WP-6-m2-root-cquery-starlark-label-implementation`.** The bounded public command is exactly one
+root `TargetPattern::Single` plus explicit `--output=starlark` and exactly one
+`--starlark:expr=str(target.label)`. The parser admits only those formatter
+flags, one optional output base, and the already-normalized bzlmod policy,
+environment, lockfile, and registry inputs. It rejects missing/duplicate
+formatter values, passthrough, multiple positionals, patterns, external labels,
+query functions/order/graph flags, Starlark files, and every alternate output
+or expression before analysis as a structured exit-2 unsupported/parse error.
+
+Core defines a private non-DICE `CqueryCommandRoot { requested,
+analysis_key }` implementing `NativeCommandRoot`. Its compute calls exactly the
+existing `RootConfiguredTargetAnalysisKey` in the accepted command transaction,
+so the native-demand driver continues to own Needs, retries, terminal
+selection, events, publication, and repository/path acceptance. It adds no
+configured graph/key, package preflight, evaluator call, or second identity.
+The internal `first-build` configuration remains unobservable and unchanged.
+
+Success retains the returned `AnalysisResult` through acceptance and projects
+only `result.key().label()` plus one newline. Pinned Bazel source confirms the
+general formatter evaluates per configured target, but the accepted expression
+reads only the configured node's canonical label and appends the line
+terminator. The exact output is `@@//parent:parent\n`; progress/event UI is not
+formatter stdout. Every other expression remains unsupported, including the
+configuration/provider/build-options surfaces of Bazel's general formatter.
+
+For an exact missing terminal, change `AnalysisError` from a string-only value
+to an `AnalysisErrorKind::{TargetNotFound { label, build_file }, Message}`
+owner. `starlark_rule_implementation` already has the loaded package, build
+path, and configured label and constructs the typed variant there. Existing
+display text remains stable; all other errors remain `Message`. The cquery root
+maps only a matching requested-root miss to its own typed terminal. A dependency
+miss or other analysis failure remains a generic analysis error. There is no
+new load and no display-text parsing.
+
+Supported root missing exits 1 with empty stdout and the three accepted Bazel
+9.2 stderr lines: the `Skipping ... no such target` line, the repeated
+`ERROR: no such target ...` line, and unsuccessful completion. Success has no
+cquery JSON envelope. Pre-terminal parse/unsupported/transport failures retain
+Slug's structured exit-2 JSON convention; cquery has no prior non-placeholder
+runtime contract, so this does not change an accepted semantic terminal.
+
+One-shot and daemon normalize the same request. The additive daemon wire is a
+dedicated `CqueryRequest { target, bzlmod }` and
+`DaemonRequest::Cquery`; it does not reuse loading-query expression, ordering,
+graph, or strict-suite fields. The daemon response retains the existing
+out-of-band `invalidated_files` metric, while CLI stdout/stderr remain the
+semantic terminal bytes. Missing followed by recovery without a filesystem
+edit reports zero invalidated files.
+
+Exact production allowlist:
+
+- `app/slug_analysis_v2/src/dice.rs`;
+- `app/slug_analysis_v2/src/lib.rs`;
+- `app/slug_commands_v2/src/cquery.rs`;
+- `app/slug_core_v2/src/runtime/dice.rs`;
+- `app/slug_core_v2/src/runtime/mod.rs`;
+- `app/slug_cli_v2/src/commands/cquery.rs`;
+- `app/slug_server_v2/src/lib.rs`; and
+- `app/slug_server_v2/src/server.rs`.
+
+Exact test allowlist:
+
+- `app/slug_analysis_v2/tests/root_analysis.rs` for the typed direct-missing
+  variant and preserved display;
+- `app/slug_commands_v2/tests/commands.rs` for the exact positive request and
+  rejection matrix;
+- the existing test module in `app/slug_core_v2/src/runtime/dice.rs` for direct
+  native-root Needs/terminal ownership, cold/warm activation, BUILD and `.bzl`
+  invalidation, and zero action/REAPI execution;
+- `app/slug_cli_v2/tests/cli.rs` for exact one-shot and daemon success/missing
+  bytes and unsupported arguments; and
+- `app/slug_server_v2/src/tests.rs` for additive schema round trips, malformed
+  wire, retained missing/recovery, and invalidated-file counts.
+
+Caps are 650 formatted net production lines, 600 formatted net test lines, and
+1,250 total. The retained-error representation keeps existing owned values and
+`Allocative`; it adds no default hash collection, interner, duplicate identity,
+or new utility import. Validate serially after cleaning stale `slugd`: focused
+analysis/commands/core/server/CLI tests; full affected crates; `cargo build -p
+slug_cli_v2` before binary daemon tests; GNU-Windows no-run checks for affected
+library crates; formatting, archive, scope/cap, forbidden graph/evaluator/error
+parse/REAPI greps, and `git diff --check`.
+
+Stop and `REPLAN` on any ninth production file, new DICE key, analysis-crate
+filesystem read, display-text parsing, second package/analysis evaluation,
+general Starlark execution, observable configuration token, altered fixture,
+or cap breach.
+
+Reserved review accepted the exact eight-production/five-test allowlists and
+650/600/1,250 caps. It additionally requires exact
+`RootConfiguredTargetAnalysisKey` activation identities and counts across cold,
+warm, missing, recovery, BUILD edit, and `.bzl` edit; explicit zero action and
+zero REAPI counters; dependency misses that cannot masquerade as the requested
+root-missing terminal; and forbidden evaluator/key/error-parse greps. No new
+retained utility, hashing, interning, compact collection, DICE ownership, or
+lock-across-compute work is authorized.
