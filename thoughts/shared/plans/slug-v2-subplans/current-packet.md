@@ -1,53 +1,65 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-native-value-cohort-and-rendering-design`
+Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: freeze the exact pure native-value boundary before executing converters
-or retaining dynamic configuration values.
-Predecessor: accepted metadata/cache grammar `b043d54d` and the complete Bazel
-9.2 target-configuration input ledger `0887d2b2`.
+Role: implement only the pure native value/default/rendering kernel; every
+contextual or Java-regex path must refuse explicitly.
+Predecessor: accepted 17-class/341-option metadata/cache grammar `b043d54d`
+and `WP-6-m2-native-value-cohort-and-rendering-design`.
 
-This is pinned-source/documentation design only. It must:
+Within `slug_configuration_v2`, add:
 
-- route all 341 descriptors into disjoint converter cohorts and reconcile the
-  audited 288 pure / 7 unsupported Java-regex / 5 Host-dependent / 41
-  repository-package-loading split, recording every exception;
-- separately inventory the command-owned occurrence metadata—45 repeatable,
-  13 old-name, six expansion, and two implicit-requirement rows—and freeze that
-  `slug_configuration_v2` consumes only command-flattened ordered occurrences;
-  it never expands RC/`--config`, old names, boolean negation, repeats,
-  expansions, implicit requirements, or aliases;
-- define special annotation `"null"` behavior, repeatable empty defaults,
-  `runs_per_test`'s converted default, and the six symbolic label defaults;
-- define a closed structural value algebra and exact Java `value.toString()`
-  projection for every admitted pure family, including list/entry/map/env/enum/
-  duration behavior, `NULL` versus empty-list `EMPTY`, escaping, equality, and
-  deterministic Java UTF-16 ordering; and
-- separate pure P/C/T members from label-bearing `platforms` and `flag_alias`
-  while preserving Bazel's convert-every-occurrence-before-normalize errors.
+- a closed structurally equal `NativeValue` algebra for primitive/text/enum/
+  dotted-version/list/entry/ordered-map/environment/fission values and the
+  dedicated numeric `RunsPerTestSeed` default;
+- source-default materialization with exact annotation `"null"` semantics,
+  repeatable empty behavior, all literal categories, and a private pinned table
+  for the six symbolic label expressions, without resolving labels;
+- descriptor-directed one-occurrence conversion for exactly the 287 pure
+  descriptor paths and explicit typed refusal for eight Java-regex, five Host,
+  and 41 repository/package/loading descriptors; and
+- exact source-backed Java `value.toString()` projection into the existing
+  outer cache-field grammar, including list/entry/map/env/duration/dotted-
+  version text, valid-Unicode Java UTF-16 ordering, and
+  `[(?:(?>.*)) Options: [1]]` for the numeric `runs_per_test` default seed.
 
-Apply `.codex/skills/slug-buck2-utility-reuse/SKILL.md`. Decide, with source
-and size evidence, whether dynamic values use `CompactString`, immutable
-`Arc<[T]>`, `Dupe`, and `Allocative`; prohibit a runtime descriptor map, global
-interner, cache, weak identity hash, accidental deep cloning, or Rust-derived
-`Debug`/`Display` cache bytes.
+Apply `.codex/skills/slug-buck2-utility-reuse/SKILL.md`. Use `CompactString`
+for retained dynamic scalar text, immutable `Arc<[T]>`/`Arc<[(T,T)]>` slices,
+and `Allocative`. Use `Dupe` only if an introduced aggregate is demonstrably
+pointer-cheap; never mark owned leaves cheap. Preserve structural equality and
+null-versus-empty identity. No runtime descriptor map, interner, cache, global,
+hash, generic unordered map, or derived Rust `Debug`/`Display` cache text.
 
-Documentation allowlist:
+Allowlist:
 
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-- scheduling synchronization in this manifest and the canonical plan
-- one terminal routing row and required bounded-history rotation
+- `app/slug_configuration_v2/Cargo.toml`
+- `app/slug_configuration_v2/src/native/mod.rs`
+- `app/slug_configuration_v2/src/native/cache_grammar.rs`
+- `app/slug_configuration_v2/src/native/tests.rs`
+- `app/slug_configuration_v2/src/native/value.rs`
+- `app/slug_configuration_v2/src/native/defaults.rs`
+- `app/slug_configuration_v2/src/native/convert.rs`
 
-Cap the design at 720 formatted documentation lines. No Rust, tests, fixtures,
-oracle, dependency, generated data, command/wire, DICE, checksum, analysis,
-configured-path/platform/ActionKey/aquery, execution, or lockfile change is
-authorized.
+Caps: 1,550 production, 1,250 test, and 2,800 total formatted net lines across
+seven files. Add only demonstrated retained workspace dependencies; no external
+dependency/version, registry, root workspace, ignored lockfile, generated
+source/data, fixture, oracle, scheduling, or downstream crate change.
 
-Stop on unresolved Java regex generation/rendering; a silent Rust UTF-8/lone-
-surrogate substitution; any converter whose Host or repository context is
-ambiguous; partial normalization that can hide an invalid later occurrence;
-generic map/record rendering without source-backed order; configuration-owned
-argv expansion/repeat/alias logic; an incomplete cohort; retained-state
-ownership ambiguity; or cap breach. Configured-target dependency cycles remain
+Acceptance requires source-pinned tests for all 341 routing results and exact
+287/8/5/41 counts; all default families and six symbolic values; special-null
+versus explicit `null`; repeatable empty versus scalar/list empty; every pure
+converter identifier and enum spelling; the numeric-only `runs_per_test="1"`
+seed and exact cache text; list/entry/ordered-map/env/duration/dotted-version
+rendering; `NULL`/`EMPTY`/escaping; structural equality; Java UTF-16 ordering
+with valid non-BMP inputs; and typed refusal of every contextual/unsupported
+family. Reuse the independent 341-row metadata table rather than duplicate it.
+
+Stop on Java pattern generation/rendering or a general `PerLabelOptions`;
+lone-surrogate/lossy UTF-8 behavior; Host access; label/repository/package/
+loading/Starlark resolution; argv/RC/repeat/expansion/implicit/alias behavior;
+whole or partial P/C/T normalization; generic map/record rendering; class or
+mixed checksum; command/wire/DICE/analysis/path/platform/ActionKey/aquery/
+execution work; retained-state ambiguity; cap breach; or a second material
+source/rendering correction. Configured-target dependency cycles remain
 deferred with user approval.

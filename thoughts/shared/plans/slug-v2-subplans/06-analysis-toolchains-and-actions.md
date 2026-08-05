@@ -2244,7 +2244,7 @@ and measured 446 production/600 test/1,047 total formatted net lines against
 
 **Status: design before Rust.** The proposed combined context-free converters,
 typed defaults, and whole P/C/T normalization packet was not truthful. The 341
-rows partition into 288 apparently pure rows, seven Java-regex-dependent rows,
+rows partition into 287 pure rows, eight Java-regex-dependent rows,
 five Host-dependent rows, and 41 repository/package/loading-dependent rows.
 `AutoCpuConverter`, path handling, and test resource macros observe Host state;
 label families require package/repository context; six symbolic label defaults
@@ -2283,3 +2283,203 @@ global interner. It must return a bounded pure-codec implementation packet or
 routing row at 720 formatted documentation lines. No Rust, test, fixture,
 dependency, oracle, generated data, command/wire, DICE, checksum, or downstream
 work is authorized. Configured-target cycles remain user-deferred.
+
+### Native value cohort and rendering design (2026-08-04)
+
+**Decision: ACCEPT a smaller pure value/default/rendering kernel; defer all
+whole-fragment P/C/T normalization and every dynamic-context converter.** This
+is a pinned-source design for Bazel `8220c6198837d5c13d53fea211cf3282aa12408a`.
+It supersedes the broad converter proposal in the preceding REPLAN without
+changing its metadata/cache-grammar acceptance. The existing static registry is
+the complete routing source: all 341 rows are classified below, and no source
+generation, runtime descriptor map, interner, cache, global, or hash is needed.
+
+#### Cohort-complete converter and default routing
+
+The counts are deliberately by descriptor, not merely by converter class. They
+are disjoint and sum to `287 + 8 + 5 + 41 = 341`. An identifier with a
+conditional branch is placed in the first cohort that cannot be implemented
+exactly by a context-free native value kernel.
+
+| Cohort | Count | Descriptor routing and pinned reason |
+|---|---:|---|
+| Pure now | 287 | `Converter.class` for the 227 built-in field-type rows (`boolean` 167, `int` 5, `String` 25, `TriState` 4, `Void` 6, repeated `List<String>` 20); plus the 60 rows in the explicit pure families below. `Converter.Contextless` is necessary but not by itself sufficient; the Java-regex exception remains separate. |
+| Java-regex unsupported | 8 | `RegexFilter.RegexFilterConverter` 3 (`toolchain_resolution_debug`, `archived_tree_artifact_mnemonics_filter`, `instrumentation_filter`); `ExecutionInfoModifier.Converter` 1 (`modify_execution_info`); `PerLabelOptions.PerLabelOptionsConverter` 3 (`host_per_file_copt`, `per_file_copt`, `per_file_ltobackendopt`); and `RunsPerTestConverter` 1 (`runs_per_test`). Each can compile a Java pattern; `RegexFilter` sorts/deduplicates components and renders the generated union, not the input. |
+| Host | 5 | `AutoCpuConverter` 2 (`cpu`, `host_cpu`); `PathFragmentConverter` 1 (`shell_executable`); `PlatformMappingKeyConverter` 1 (`platform_mappings` explicit-path branch); `TestResourcesConverter` 1 (`default_test_resources`). `AutoCpuConverter` reads OS/CPU; `OptionsUtils.PathFragmentConverter` expands `~/` through `user.home` and uses the host path policy; resources resolve `HOST_CPUS`/`HOST_RAM`. |
+| Repository/package/Starlark/loading | 41 | The label-bearing and conditional-label families listed below. `CoreOptionConverters.convertOptionsLabel` uses either `Label.PackageContext`, `RepositoryMapping`, or its first-round null context. No future generic parser may substitute a source-string label for that ownership. |
+
+The 60 explicit pure rows are completely covered by this family table. A count
+of one means one descriptor uses the identifier; adjacent qualified and
+unqualified comma families have the same source behavior but remain distinct
+metadata identifiers.
+
+| Pure converter identifier(s) | Count | Typed family |
+|---|---:|---|
+| `AndroidManifestMergerConverter`, `ApkSigningMethodConverter`, `CancelConcurrentTests.Converter`, `ExecConfigurationDistinguisherSchemeConverter`, `IncludeConfigFragmentsEnumConverter`, `JavaClasspathModeConverter`, `ManifestMergerOrderConverter`, `OneVersionEnforcementLevelConverter`, `OutputDirectoryNamingSchemeConverter`, `OutputPathsConverter`, `PlatformTypeConverter`, `ShardingStrategyConverter`, `StrictDepsConverter`, `StripModeConverter` | 14 | Finite enum, case/alias rules pinned per declaring class. |
+| `BooleanConverter` | 2 | Same boolean spelling family as the built-in boolean converter. |
+| `CompilationMode.Converter`, `ConfigurationDistinguisherConverter`, `DynamicModeConverter` | 6 | Finite enum. |
+| `CommaSeparatedOptionListConverter`, `Converters.CommaSeparatedOptionListConverter` | 15 | Ordered string list; empty members retained. |
+| `CommaSeparatedOptionSetConverter`, `Converters.CommaSeparatedOptionSetConverter` | 4 | Lexically sorted, deduplicated string list. |
+| `Converters.AssignmentConverter` | 1 | One ordered `String=String` entry. |
+| `Converters.EnvVarsConverter` | 3 | `Set`, `Inherit`, or `Unset` environment occurrence. |
+| `CoreOptionConverters.StrictDepsConverter` | 2 | Finite enum. |
+| `DottedVersionConverter` | 10 | Parsed dotted-version option retaining Bazel's canonical string. |
+| `EmptyListConverter` | 1 | The one typed empty string list. |
+| `FissionOptionConverter` | 1 | Ordered list of distinct compilation-mode enum values. |
+| `TestTimeout.TestTimeoutConverter` | 1 | Ordered four-key timeout/duration map. |
+
+The repository/loading cohort is complete: `LabelConverter` 16,
+`LabelListConverter` 6, `LabelOrderedSetConverter` 1, `LabelMapConverter` 1,
+`LabelToStringEntryConverter` 1, `EmptyToNullLabelConverter` 5,
+`CoreOptionConverters.LabelConverter` 2,
+`CoreOptionConverters.EmptyToNullLabelConverter` 3, `HostPlatformConverter` 1,
+`LibcTopLabelConverter` 2, `RunUnderConverter` 1,
+`CoreOptionConverters.CustomFlagConverter` 1, and
+`CoreOptionConverters.FlagAliasConverter` 1. `RunUnderConverter` is a command
+only for a non-label first token, and `CustomFlagConverter` is a raw define for
+a non-label value; their label branches make their descriptor family deferred.
+
+`RunsPerTestConverter` belongs wholly to the unsupported descriptor cohort
+because an explicit `regex@N` occurrence delegates to `PerLabelOptions`. Its
+annotated default `"1"` nevertheless has a source-pinned numeric branch that the
+default materializer may admit as one `PerLabelOptions` seed without exposing a
+general occurrence converter. This exception does not move the descriptor into
+the pure cohort or authorize Java-pattern parsing.
+
+The default source families are also exhaustive: 97 `"null"` annotations,
+six symbolic label expressions, and 238 Java string literals. The symbolic
+expressions are `PlatformOptions.DEFAULT_HOST_PLATFORM` plus the five
+`ProtoConstants.DEFAULT_{PROTOC,CC_PROTO,J2OBJC_PROTO,JAVA_PROTO,JAVA_LITE_PROTO}_LABEL`
+values. Their exact pinned texts must be retained in a private source-default
+table, not passed to a command converter as the identifier spelling. Literal
+label defaults (coverage tools, `xcode_version_config`, and `crosstool_top`)
+remain in the repository cohort even though their default text is absolute.
+`experimental_exec_config` is a pure `String` conversion only: resolving its
+`@_builtins//...%...` value is later Starlark/loading work.
+
+#### Command occurrence boundary and defaults
+
+`slug_configuration_v2` accepts an already command-flattened, canonically named,
+ordered sequence of individual occurrences. `slug_commands_v2` alone expands RC
+sections/imports and `--config`, applies old-name warnings/canonicalization,
+boolean `--no` spelling, flag aliases, repetitions, the six expansion flags,
+and the two implicit requirements, then hands the ordered occurrences to this
+crate. The descriptor metadata proves the independent counts: 45 repeatable,
+13 old-name, 6 expansion, and 2 implicit-requirement rows. They are orthogonal
+to the four conversion cohorts and must never be reinterpreted by a value
+decoder.
+
+For a field default, `FieldOptionDefinition#getDefaultValue` first recognizes
+the exact Java annotation string `"null"`: it invokes no converter and yields
+`None` for a nonrepeatable reference field or `[]` for a repeatable field. An
+explicit command value `null` is ordinary converter input. A non-null default
+is converted exactly once; for an `allowMultiple` field it is then wrapped if
+the converter returned a scalar and left flat if it returned a list. Thus all
+repeat defaults are empty except `runs_per_test="1"`, whose successful numeric
+conversion is a one-element `List<PerLabelOptions>` default. Empty scalar,
+empty nonrepeatable list, null, and repeatable empty list are not conflated.
+
+The command layer must convert every flattened occurrence before it applies a
+repeat merge or this crate receives a completed fragment. This preserves a
+Bazel error in a discarded later occurrence: normalization is never permitted
+to hide an invalid label, Host form, regex, or otherwise invalid duplicate.
+The value kernel therefore parses one admitted occurrence/default only; it has
+no argv grammar, priority, expansion, implicit-requirement, old-name, alias,
+or merge API.
+
+#### Closed admitted value algebra and cache rendering
+
+The first implementation uses a closed `NativeValue` algebra, not `Debug`,
+Rust `Display`, serde, or a generic map formatter. `NULL` is represented by
+the enclosing optional field, not as a scalar value. The table fixes structural
+equality and the Java `value.toString()` input to the already accepted outer
+`OptionsBase.mapToCacheKey` grammar.
+
+| Variant | Equality / retained order | Exact Java cache text before outer quoting |
+|---|---|---|
+| `Bool`, `Int`, `Text`, `TriState`, finite `Enum`, `DottedVersion` | Exact variant/value equality. | Java primitive/string spelling; `TriState` renders `AUTO`, `YES`, `NO`; enums render their declared Java name; dotted version renders its canonical `stringRepresentation`. |
+| `List(Arc<[NativeValue]>)` | Length and element equality, insertion order. | Java list form: `[` + element cache text joined by `, ` + `]`. Only a zero-length list routes to outer `EMPTY`; `[""]` renders `[]`-style element text rather than `EMPTY`. |
+| `Entry { key, value }` | Both fields equal. | `key=value`, matching Java map-entry rendering. This is used by `--define`. |
+| `OrderedMap(Arc<[(NativeValue, NativeValue)]>)` | Length, pair order, and pair equality. | `{` + entry texts joined by `, ` + `}`. It is admitted only where the source fixes construction order: the `TestTimeout` enum order is `short`, `moderate`, `long`, `eternal`. No generic unordered-map adapter is admitted. |
+| `Env::{Set, Inherit, Unset}` | Variant plus fields equal. | Pin the Java record strings individually: `Set[name=N, value=V]`, `Inherit[name=N]`, `Unset[name=N]`; do not depend on a Rust derived formatter. |
+| `Fission(Arc<[CompilationMode]>)` | Ordered distinct enum members. | Java list rendering of enum spellings. |
+| `RunsPerTestSeed { positive_runs: NonZeroI32 }` | Java positive-`int` equality and bounds; constructible only by the source-default materializer. | `(?:(?>.*)) Options: [N]`, matching the pinned singleton catch-all union from `RegexFilter#takeUnionOfRegexes` plus `PerLabelOptions#toString`; a surrounding list renders `[(?:(?>.*)) Options: [N]]`. |
+| `Void` | Singleton equality. | This has no admitted explicit scalar path; the expansion-owned rows default through special-null. |
+
+`OptionsBase.mapToCacheKey` routes only an empty typed list to `EMPTY`, a null
+field to `NULL`, and every other `java_to_string()` result to a quoted scalar.
+It escapes precisely backslash as `\\` and double quote as `\"`, then appends
+`, `. A class key is `FQCN + "{" + ordered fields + "}"`; mixed checksums,
+Starlark maps, and scope maps remain out of scope. List/map ordering is the
+source-defined construction ordering, never Rust hash order.
+
+Java `String` and Java lexical sorting are UTF-16-code-unit semantics. Rust
+`str` is acceptable only after the input boundary proves a lossless valid-Unicode
+domain and a helper implements Java UTF-16 comparison for the two admitted
+sort/dedup families. A lone surrogate, a request to replace it with U+FFFD/NUL,
+or any use of a Rust Unicode-code-point/byte ordering is a hard stop. The
+existing Stage 9 rejection of `java_regex` is direct evidence that this is not a
+small dependency substitution.
+
+#### P/C/T normalizer routing and retained representation
+
+`FragmentOptions#getNormalized` runs only after every field has converted.
+Consequently this successor implements no whole P/C/T normalizer; it records
+the exact later split instead of applying an unsafe partial normalization.
+
+| Normalizer | Context-free members / future operation | Deferred members / reason |
+|---|---|---|
+| P | `extra_toolchains`: deduplicate while keeping each final occurrence's relative order. | `platforms`: label list truncated to first only after every label converts. `host_platform` is label, `platform_mappings` is Host, and `toolchain_resolution_debug` is Java-regex. Full P waits for all of them. |
+| C | `allowed_cpu_values`: Java UTF-16 sort/dedup; `define`: final value per key then UTF-16 key sort; `features`: sorted enables followed by sorted disables, with disable winning; `action_env` and `host_action_env`: first-key position, last value. | `flag_alias` is label-bearing and must convert before its final-value/key-sort step. `cpu`/`host_cpu` are Host; `instrumentation_filter`/`modify_execution_info` are Java-regex; all remaining C fields are clone/identity members. Full C waits for all fields. |
+| T | `test_env`: first-key position, last value. | `coverage_support` is label, `default_test_resources` is Host, and `runs_per_test` has its explicit regex branch. All other T fields are clone/identity members. Full T waits for all fields. |
+
+For long-lived configuration values, use `CompactString` for dynamic valid
+Unicode scalar text and `Arc<[NativeValue]>`/`Arc<[(NativeValue, NativeValue)]>`
+for immutable repeated values and ordered maps. This matches existing V2
+retained-string/slice practice and makes aggregate clones pointer-cheap. Derive
+`Allocative` on retained value/container types. Use `Dupe` only for an
+aggregate newtype proven pointer-cheap through its `Arc` members; do not label a
+`CompactString`-carrying leaf as cheap to clone. The static descriptor registry
+continues to use borrowed `&'static str`. No global interner, weak identity,
+runtime map, or hash is justified: the 341 lookup/order remains a caller-owned
+linear/static-slice concern until command routing supplies an ordered request.
+
+#### Serial successor packet
+
+Run next only `WP-6-m2-pure-native-value-default-and-rendering-kernel`.
+
+- Owner/result: one `slug_configuration_v2` private pure value algebra, source
+  default materializer, per-occurrence conversion for the 287 admitted paths,
+  the one numeric `runs_per_test` default seed, and explicit Java cache
+  projection. It must reject—not approximate—the eight Java-regex paths, five
+  Host paths, 41 repository/loading paths, and the `runs_per_test` regex branch.
+- Allowlist: `app/slug_configuration_v2/Cargo.toml`,
+  `src/native/{mod.rs,cache_grammar.rs,tests.rs,value.rs,defaults.rs,convert.rs}`.
+  No registry edit, root/workspace edit, external dependency/version, generated
+  source, fixture/oracle growth, or scheduling/documentation edit.
+- Caps: 1,550 production, 1,250 test, 2,800 formatted net lines over the seven
+  existing/new crate files. `compact_str`, `allocative`, and `dupe` are already
+  retained workspace utilities; add only the dependencies demonstrated by the
+  selected representation, not a regex, map, or interner crate.
+- Acceptance: source-pinned tests must cover all default families and all six
+  symbolic texts; 287/8/5/41 routing totals; special-null versus explicit
+  `null`; repeatable empty versus scalar/list empty; `runs_per_test="1"` and its
+  exact `[(?:(?>.*)) Options: [1]]` cache seed;
+  every admitted converter identifier and enum spelling; list/entry/map/env/
+  duration/dotted-version cache text; `NULL`/`EMPTY`/escaping; equality and
+  UTF-16 ordering on valid non-BMP inputs; and explicit refusal tests for every
+  deferred family. Reuse the existing 341 independent metadata table rather
+  than duplicating it.
+- Stops: Java pattern generation/rendering, a lone surrogate or lossy UTF-8
+  conversion, Host access, label/repository/package conversion, loading or
+  Starlark resolution, any argv/RC/repeat/expansion/implicit/alias behavior,
+  whole P/C/T normalization, generic unordered-map/record rendering, cache
+  checksums, DICE/wire work, a runtime registry map/interner/hash, cap breach,
+  or a second material source/rendering correction. Any stop is `REPLAN`, not a
+  broadened packet.
+
+After this kernel, a dedicated Host/repository conversion-context design must
+first define ownership and exact value types. Only after all fields of a
+fragment are valid and typed may a small full-fragment P/C/T normalization
+packet run; it must prove convert-before-normalize errors and does not belong
+in the pure kernel.
