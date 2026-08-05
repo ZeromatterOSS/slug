@@ -4681,6 +4681,91 @@ activation, loading, DICE, normalization, checksum, wire, and user-deferred
 configured cycles excluded; only the three scheduling docs may change, at 260
 documentation/total net lines.
 
+### Java regex route source closure ACCEPT (2026-08-05)
+
+`WP-6-m2-java-regex-route-source-closure-evidence` is **ACCEPT** as complete
+source closure; every general explicit route is **REPLAN**. Within the 341-row
+native registry, the inventory is `3 + 1 + 3 + 1 = 8`; its RegexFilter rows are
+`toolchain_resolution_debug`, `archived_tree_artifact_mnemonics_filter`, and
+`instrumentation_filter`; `ExecutionInfoModifier` owns
+`modify_execution_info`; `PerLabelOptions` owns `host_per_file_copt`,
+`per_file_copt`, and `per_file_ltobackendopt`; `RunsPerTest` owns `runs_per_test`.
+
+Pinned Bazel 9.2 `8220c619` fixes the converter boundary. `RegexFilter.java`
+54-93 splits with source literal `"(?<!\\\\),"`, rejects a leading `--`,
+strips one leading sign, drops empty pieces without trimming, and wraps JDK
+syntax errors. Lines 128-170 then sort/deduplicate inclusion and exclusion
+strings, compile atomic-group unions, use exclusion-first `Matcher.find()`, and
+render the generated union rather than the input; 173-213 retain the original
+only for reversal while equality/hash use nullable generated pattern sources.
+`ExecutionInfoModifier.java:38-100,103-152` splits on every literal comma and
+requires every piece to match `^(?<pattern>.+)=(?<sign>[+-])(?<key>.+)$`, so
+empty pieces or missing pattern/key fail. It validates
+`internalToUnicode(pattern)` with DOTALL, later compiles without
+DOTALL, and fully matches `internalToUnicode(mnemonic)`. Duplicate expressions
+remain ordered; later matching same-key entries win. Additive occurrences apply
+in command order, and nonadditive mode uses only the last occurrence.
+AutoValue equality retains the raw option plus ordered expressions, while cache
+text additionally depends on its unpinned generated renderer.
+`PerLabelOptions.java:46-86,88-139` splits at the first `@`, uses the same regex
+delimiter for option text, drops trim-empty options but otherwise preserves
+ordered duplicates, delegates the filter, and renders the canonical filter plus
+ordered options. Repeated occurrences remain ordered. Its three repeat defaults
+and the ExecutionInfo default are special-null empty lists without converter
+calls. Starlark reversal instead uses raw `toOriginalString()` plus the joined
+ordered options at 72-79. `Converters.java:414-430` owns the DOTALL validator, and
+`OptionsBase.java:90-116` routes every nonempty value through Java `toString`.
+Diagnostics retain their source-owned text: RegexFilter distinguishes the
+leading-flag-looking failure from `Failed to build valid regular expression: `
+plus the JDK message; ExecutionInfo uses `malformed expression '<piece>'` or
+`Not a valid regular expression: ` plus that message; PerLabel delegates; and
+Runs embeds the raw input in its positive-count, multiplicity, and numeric
+failures.
+
+`TestConfiguration.java:534-577` first tries Java `Integer.parseInt`; positive
+values retain their exact source spelling as the sole option, nonpositive
+values fail, and only `NumberFormatException` falls back to the general
+`PerLabelOptions` route. Consequently explicit `1`, `01`, and `+1` are not
+equal/cache-identical even though their numeric values agree. The existing
+default-only `runs_per_test="1"` seed remains exact and gains no explicit
+route.
+
+The actual-runtime nearest source remains `jdk25u` tag `jdk-25.0.2+10`, peeled
+commit `405a5699`. `Pattern.java:1101-1182` owns compilation, flags, source
+rendering, and matcher construction; its grammar summary at 140-401 exposes the
+arbitrary Java-regex language that remains a JDK boundary.
+`Matcher.java:742-785` distinguishes whole-region `matches()` from subsequence
+`find()`. `String.java:3396-3424,3450-3513` routes the delimiter through
+`Pattern` and removes trailing empty split results. `PatternSyntaxException.java`
+102-118 makes diagnostics depend on the JDK description/index, platform line
+separator, pattern, and caret. This packet authorizes no JDK-compatible engine,
+Rust approximation, JVM/delegation, or runtime dependency for that surface.
+
+Three annotated defaults are nevertheless finite exact seeds. Both `-.*`
+defaults normalize/render as `-(?:(?>.*))` and reject every Java String because
+`find()` admits the empty `.*` match. The instrumentation default retains raw
+`-/javatests[/:],-/test/java[/:]`, normalizes/renders as
+`-(?:(?>/javatests[/:])|(?>/test/java[/:]))`, and rejects any value containing
+`/javatests/`, `/javatests:`, `/test/java/`, or `/test/java:`. This remains exact
+over arbitrary UTF-16. Raw input is retained separately but does not participate
+in equality. Coverage
+dynamically replaces it only for TestCommand coverage without an explicit flag
+(`TestCommand.java:161-165`). `AnalysisAndExecutionPhaseRunner.java:91-108` and
+`AnalysisPhaseRunner.java:114-131` assign the package-derived heuristic from
+`InstrumentationFilterSupport.java:55-121`; that activation remains REPLAN
+with every explicit occurrence.
+
+Run next only `WP-6-m2-fixed-regex-default-seed-implementation`. Add a private
+owned-original plus finite semantic seed for exactly these three descriptor/
+converter/default tuples, exact canonical cache rendering, and no occurrence
+classification. Allowed Rust is only native `value.rs`, `defaults.rs`,
+`cache_grammar.rs`, and `tests.rs`; terminal scheduling may change the three
+plan documents. Add no registry/convert/Cargo/dependency, Pattern/Matcher,
+dynamic coverage, public reversal/predicate activation, normalization,
+configuration/checksum/DICE, Host, loader, wire, or configured-cycle work.
+Keep the Runs seed and 287/8/5/41 partition unchanged. Caps are 150 production,
+240 test, 100 documentation, and 490 total formatted net lines.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
