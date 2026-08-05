@@ -372,6 +372,26 @@ cfg-excluded. The three locks remain stable, and archive, scope, +9-net/80-line,
 diff, and independent review gates pass. Next map only the query library unit
 target and fixture-free six-case parser integration.
 
+The first query packet stops at `REPLAN`. The standalone parser target passes,
+but the crate-mode target runs 28 cases and deterministically fails
+`external_restricted_visible_uses_canonical_fake_caller_without_a_second_route`
+with `QueryErrorKind::PreparationRestart` under both Bazel (27/28) and Cargo
+`--lib` (27/28). This is the same source-owned failure previously reproduced at
+clean `f9f3c3d8`; BUILD metadata cannot repair it. Do not publish a red target,
+filter the case, or edit Rust under Gate C. Defer the whole unit target until a
+separate semantic repair makes clean Cargo green. The independently passing
+`tests/query.rs` crate advances as
+`WP-10-m8-bazel-query-parser-test-implementation`, still leaving all 53
+loading-query fixture cases at `REPLAN`.
+
+The parser-only successor is accepted. Its one private standalone target owns
+only `tests/query.rs`, depends only on the production query library, and passes
+Bazel plus serial Cargo 6/6. No-repin module evaluation leaves all three lock
+hashes stable; archive, scope, 30-net/80-line, diff, and independent review
+gates pass. The 28-case library target and 53-case loading integration remain
+absent at their distinct semantic and fixture `REPLAN` boundaries. Next map the
+one analysis unit target and four source-owned analysis integrations.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
