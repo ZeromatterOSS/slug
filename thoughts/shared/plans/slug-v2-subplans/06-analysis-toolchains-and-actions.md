@@ -3876,6 +3876,41 @@ one-way ownership/dependency handoff before adding any Host observation or
 contextual converter. Configured-target dependency cycles remain explicitly
 deferred by user approval.
 
+### Host input observation contract design REPLAN (2026-08-05)
+
+`WP-6-m2-host-input-observation-contract-design` stopped at its pinned-source
+path-policy gate. Bazel 9.2's OS/CPU token table, process-lifetime lazy Host
+resource capture, post-ceil integer CPU/RAM keyword inputs, and `user.home`
+replacement behavior closed without a probe. The assumed finite lexical
+`HostPathPolicy::{Unix, Windows}` did not.
+
+On a Windows host, `PathFragment.create` selects
+`WindowsOsPathPolicy.INSTANCE`. A segment matching Bazel's 8.3 short-name
+predicate promotes normalization to `NEEDS_SHORT_PATH_NORMALIZATION`, whose
+default resolver calls `WindowsPathOperations.getLongPath`; success substitutes
+the observed long path and `IOException` falls back to the original. The exact
+result therefore depends on filesystem state/access. Both
+`shell_executable` and `platform_mappings` reach this call through
+`OptionsUtils.convertOptionsPathFragment`; platform-mapping absolute rejection
+happens only afterward.
+
+The first source report incorrectly described this path as lexical-only. Root
+rechecked pinned tag `9.2.0` (`8220c619...`), triggered the manifest stop, and
+retained no proposed Host representation or owner. No plan design, Rust, test,
+probe, Cargo/dependency, Host read, DICE, request, daemon, configuration, or
+runtime edit remains. Schema-only implementation is not authorized while one
+of its five routes has unresolved observation/invalidation ownership.
+
+Run next only
+`WP-6-m2-windows-option-path-short-name-resolution-design`, docs-only. Pin the
+exact 8.3 predicate/GetLongPath/fallback/conversion-order contract and audit
+Slug's existing lossless `WindowsLongPath` path-observation demand/result,
+Host namespace, DICE ownership, and transaction lifecycle. Select the smallest
+supplied observation seam that preserves conversion-before-normalization and
+configuration identity, or record an unsupported boundary/`REPLAN`. Do not
+implement Host inputs, path conversion, IO, DICE, configuration, or request
+wiring. Configured-target cycles remain explicitly deferred.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
