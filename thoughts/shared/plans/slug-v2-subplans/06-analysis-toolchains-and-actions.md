@@ -1514,3 +1514,43 @@ a mechanical fourth test owner under the unchanged caps. Its existing root
 request helpers must return shared `Arc<AnalysisResult>` handles after the
 root-key payload change; cloning an owned result there would violate the
 accepted no-deep-clone boundary. No fixture or assertion semantics may change.
+
+### Root command action-closure implementation accepted (2026-08-04)
+
+Commit `afd2a606` accepts `WP-6-m2-root-action-closure-implementation` at 162
+formatted production, 458 test, and 620 total net lines. Successful root
+analysis values now share `Arc<AnalysisResult>` handles, and the existing build
+command retains one immutable breadth-first action closure over full
+`ConfiguredTargetKey` identities. Requested-root analysis counts remain
+unchanged while declared-action counting and the existing CLI/REAPI iterator
+include recursively owned actions.
+
+The implementation preserves root and declaration order, duplicate-root and
+diamond deduplication, configuration-distinct same-label nodes, Need-before-
+error frontier reduction, direct child invalidation edges, target-local event
+ownership, child edit/delete/recreate and orphan pruning, and full A-to-B-to-A
+command equality. A public CLI regression reports three actions and separately
+borrows the REAPI-style iterator to observe the exact parent/second/first
+outputs without executing them. Cyclic configured-target behavior remains
+deferred by explicit user approval.
+
+Root validation passed all 24 `slug_analysis_v2` tests, four focused action-
+closure tests, the focused recursive CLI test, formatting, and diff checks.
+The full core result was 129/130 library tests plus 13/13 integrations; the sole
+external-visibility diagnostic wording failure is the established clean-
+baseline mismatch. Independent Terra correction review returned `ACCEPT` and
+confirmed the exact five-file allowlist and caps.
+
+Design next only `WP-6-m2-action-query-identity-boundary-design`. The accepted
+closure solves recursive reachability, not Bazel identity. Reconcile the
+existing Bazel 9.2 evidence and live owners for authoritative `BuildOptions`
+configuration identity, configured artifact paths, selected execution-
+platform identity, and Bazel ActionKey. Treat those four facts and the aquery
+consumer as one handoff for adjudication: either freeze one future atomic
+vertical or return `REPLAN` with exact serial prerequisites.
+
+This successor is documentation-only at a 340-line cap. It authorizes no Rust,
+tests, fixtures, oracle runs, dependencies, DICE owners, command wire or
+formatter, paths, platform/action-key representation, REAPI/execution work, or
+partial/hard-coded checksum. `first-build` and REAPI digests are explicitly not
+Bazel configuration or ActionKey identities.
