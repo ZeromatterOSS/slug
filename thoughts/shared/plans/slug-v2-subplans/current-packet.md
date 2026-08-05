@@ -1,98 +1,96 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-host-input-lifetime-partition-design`
+Packet: `WP-6-m2-host-conversion-inputs-schema-implementation`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: docs-only lifetime design for individually lazy process Host sources,
-fresh eligible-conversion home observations, and request-scoped Windows path
-facts.
+Result: config-only, producer-free immutable Arc-backed
+`HostConversionInputs` schema.
 
-Predecessors are authoritative: the accepted 287/8/5/41 partition, private
-pure native kernel, two-context Host/repository design, option-label seam in
-`b035dfbb`, exact Bazel 9.2 Host source audit, Windows option-path observation
-design, and implemented producer-free `WindowsOptionPathLongName` Host/DICE
-fact. The five Host descriptors remain `cpu`, `host_cpu`,
-`shell_executable`, `platform_mappings`, and `default_test_resources`. Add no
-Rust, probe, fixture, Host read, DICE, converter, or runtime behavior.
+## Goal
 
-Read `docs/developers/dice.md` and
-`.codex/skills/slug-buck2-utility-reuse/SKILL.md`. Recheck only the pinned
-Bazel `9.2.0` / JDK owners needed to freeze the independent source contracts:
+Implement the accepted configuration schema only. Core remains the future owner
+and producer of process, request, and per-occurrence observations.
 
-- OS and architecture token retrieval, including timing and unsupported/error
-  behavior;
-- `LocalHostCapacity` CPU/RAM lazy evaluation, failure, byte-to-MiB/`ceil`,
-  numeric-cast, and resource-expression double boundaries; and
-- `user.home`'s valid UTF-16 boundary and its per-eligible-conversion read:
-  literal leading `~/`, replace-every-`~` order, fresh one-shot versus daemon
-  behavior, and an explicit stop for lossy/unpaired conversion.
+## Required implementation
 
-Design one explicit process owner—not a global/static—constructed once per
-one-shot process or daemon process and shared into workspace/request runtimes.
-It must retain independently lazy per-source result cells, not one atomic
-snapshot: each cell records its precise source value or error and when it may
-be read. Distinguish sources that permit a retained lazy cell from `user.home`,
-which must produce a fresh per-eligible-conversion result rather than a reused
-process cell. State how later daemon reads behave and why a workspace runtime
-cannot recapture any source. Do not perform Host capture or implement the Rust
-representation in this packet.
+Add `native/host.rs`, expose it through `native/mod.rs`, and define no
+producer or converter. The schema must contain:
 
-Separately freeze request-scoped option facts. A later command owner may scan
-only eligible Windows-host conversions after the source-required home
-expansion, demand the existing `WindowsOptionPathLongName` operation, retry
-outside DICE, and project a complete raw-UTF-16-sorted/deduplicated Arc slice.
-`Resolved` and `IOExceptionFallback` must remain distinct until later pure
-lexical conversion; no option fact may survive into another request merely
-because a daemon process survives.
+- optional `AutoCpuToken`, exactly the 15 accepted Bazel auto-CPU output
+  values when demanded: `darwin_x86_64`, `darwin_arm64`, `freebsd`, `openbsd`,
+  `x64_windows`, `arm64_windows`, `piii`, `k8`, `ppc`, `arm`, `aarch64`,
+  `s390x`, `mips64`, `riscv64`, and `unknown`;
+- optional Unix/Windows `HostPathFlavor` when path conversion demands it;
+- optional `HostCapacity { host_cpus: i32, host_ram_mib: i32 }` containing the
+  post-ceiling values when a HOST resource expression demands either source;
+- strictly occurrence-ordered, unique
+  `HomeFact { occurrence: u32, home: CompactString }`; and
+- raw-UTF-16, sorted/deduplicated Windows option-path facts, with
+  `Resolved(Arc<[u16]>)` structurally distinct from the fallback outcome.
 
-Specify the smallest pure configuration-owned schema and its exact conversion
-from process-source results, fresh home observations, and the request path
-projection: field types, structural equality/order/hash, `Allocative`, Arc
-sharing/`Dupe`, clone and retained memory cost, invalid/unsupported inputs,
-and no PathBuf, OsString, workspace, IO, or DICE type. Prefer existing compact
-scalar/enum/Arc-slice patterns; add no map, interner, cache, registry, second
-raw-input copy, or new shared crate.
+The exact aggregate data fields are the three optional scalar facts plus
+`Arc<[HomeFact]>` and `Arc<[WindowsOptionPathFact]>`; each Windows fact owns
+one shared raw `Arc<[u16]>` and
+`WindowsOptionPathOutcome::{Resolved(Arc<[u16]>), IOExceptionFallback}`.
+`HostConversionInputs` is a one-Arc wrapper around that immutable data and
+exposes read-only accessors for later pure converters. It and its leaves have
+structural `Eq`, `Ord`, `Hash`, and `Allocative`; `Dupe` is permitted only for
+Arc-backed wrappers. Do not introduce maps, caches, interners, raw source
+copies, or any source error representation. Local constructors must reject
+out-of-order/duplicate home occurrences and out-of-order/duplicate Windows raw
+spellings.
 
-The only permitted future dependency direction is core -> configuration:
-`slug_configuration_v2` owns pure schema/conversion, `slug_core_v2` owns the
-process owner and bridge from workspace facts, and configuration has no
-core/workspace/IO/DICE dependency. Explain how a later DICE configuration key
-depends only on supplied immutable values and how no lock crosses compute or
-retry. Do not design configured-target cycle semantics.
+## Tests
 
-Return one bounded serial implementation sequence or `REPLAN`. Separate pure
-schema, process owner, option pre-scan/retry projection, contextual conversion,
-and command activation whenever their lifetimes, owners, or validation differ.
-The immediate next packet must be the smallest owner that can be implemented
-and validated without Host IO or activation if an exact split exists.
+Use inline tests in `native/host.rs` or `native/tests.rs` where clearer. Cover
+all 15 CPU tokens, both path flavors, full-range `i32` capacity storage,
+accepted and rejected home ordering, raw UTF-16 ordering/deduplication including
+unpaired code units, direct out-of-order and duplicate Windows rejection,
+distinct resolved/fallback outcomes, and aggregate structural equality/order
+changes.
 
-Allowlist:
+## Preconditions
 
+`WP-6-m2-host-input-lifetime-partition-design` is ACCEPT. Its source-error and
+lifetime rules are binding. Reuse only existing `allocative`, `compact_str`,
+and `dupe` dependencies.
+
+## Allowed paths
+
+- `app/slug_configuration_v2/src/native/host.rs`
+- `app/slug_configuration_v2/src/native/mod.rs`
+- `app/slug_configuration_v2/src/native/tests.rs` only if tests are not inline
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
 - `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 - `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- routing only on `REPLAN`:
-  `.codex/skills/slug-agent-orchestration/references/routing-log.md` and
-  `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-Caps: 520 net documentation lines and 600 total changed lines. No Rust, test,
-Cargo/lockfile, dependency, fixture, oracle/probe, generated source,
-filesystem/environment read, DICE key/compute/invalidation edit, Host snapshot
-implementation, option scan, path converter, request/wire, CLI/server/daemon,
-configuration conversion, target, loading/materialization,
-command-tokenization, checksum, or downstream activation edit.
+## Stop conditions
 
-Acceptance requires pinned-source lifetime closure; a live one-shot/daemon
-owner and crate-direction audit; separate process-source and request-fact
-representation with exact timing/error/invalidation/retry ownership; direct
-future daemon, `user.home`, and Windows-branch discriminators; bounded
-implementation allowlists/caps/stops; and independent latest-text source plus
-architecture review.
+Do not add Host I/O, environment/process access, lazy cells, process ownership,
+daemon scanning, workspace outcomes, DICE, option conversion, command or
+configured-target activation, cross-crate dependencies, Cargo changes,
+fixtures, or generated artifacts. If the schema cannot remain configuration-only
+and producer-free, stop and REPLAN before widening scope.
 
-Stop and `REPLAN` if a source requires a global/static or atomic snapshot,
-configuration IO, workspace-local recapture, lossy/unpaired Host property
-acceptance, collapsed option success/fallback, stale cross-request option
-facts, a new DICE producer or lock across computation, config ->
-core/workspace, a new shared crate/dependency cycle, or any configured-target
-edge. Configured-target dependency cycles remain explicitly deferred by user
-approval.
+## Validation
+
+Run `cargo fmt --all -- --check`, `cargo test -p slug_configuration_v2`, and
+`cargo check -p slug_configuration_v2`, plus the Stage 6 GNU-Windows no-run
+check when it covers this crate. Inspect final diff, allowlist, caps, and
+Cargo/dependency status. Do not run daemon, oracle, Bazel, or configured-target
+tests.
+
+## Completion
+
+Complete only when the schema validates ordered facts and has the specified
+traits and discriminators. Later serial work is core process-owner/capture with
+exact source errors, core request pre-scan/fresh projection, then configuration
+converters. A mandatory REPLAN precedes configured-target or command
+activation; configured-target cycle deferral remains in force.
+
+## Diff budget
+
+- Production Rust: at most 240 net lines.
+- Test Rust: at most 340 net lines.
+- Total net change, including terminal records: at most 620 lines.
+- No Cargo, dependency, fixture, generated, baseline, or unrelated changes.

@@ -3944,6 +3944,72 @@ Stop on any proposed global/static, atomic snapshot, configuration IO,
 cross-request option fact reuse, config -> core/workspace edge, new cycle, or
 configured-target semantics.
 
+### Host input lifetime partition design ACCEPT (2026-08-05)
+
+`WP-6-m2-host-input-lifetime-partition-design` is **ACCEPT**. The exact Rust
+design is a lifetime partition, not a generic `OnceLock<Result<...>>` snapshot.
+The older single-snapshot proposal is superseded rather than a future fallback.
+
+Pinned Bazel 9.2 source anchors establish the distinctions: `AutoCpuConverter`
+reads `OS.getCurrent()` first and conditionally reads `CPU.getCurrent()` only
+for Darwin, Windows, and Linux (`src/main/java/com/google/devtools/build/lib/analysis/config/AutoCpuConverter.java:28-65`);
+OS and CPU initialize independent class state (`src/main/java/com/google/devtools/build/lib/util/OS.java:21-84`,
+`src/main/java/com/google/devtools/build/lib/util/CPU.java:23-65`); capacity
+retains successful local values separately from acquisition and post-ceiling
+conversion (`src/main/java/com/google/devtools/build/lib/actions/LocalHostCapacity.java:25-55`,
+`src/main/java/com/google/devtools/build/lib/actions/LocalHostResource.java:21-40`,
+`src/main/java/com/google/devtools/build/lib/util/ResourceConverter.java:45-66`);
+home expansion reads `user.home` during each leading-`~/` conversion
+(`src/main/java/com/google/devtools/build/lib/util/OptionsUtils.java:169-174`);
+and host path policy is class state (`src/main/java/com/google/devtools/build/lib/vfs/OsPathPolicy.java:66-85`,
+`src/main/java/com/google/devtools/build/lib/vfs/PathFragment.java:60`).
+
+`ProcessHostOwner` belongs to core. One-shot execution creates it explicitly
+before its `WorkspaceRuntime`; `Daemon::new` creates the sole daemon owner,
+and `serve` calls that constructor once before its request loop and never
+constructs another. `WorkspaceRuntime` receives only an
+`Arc<ProcessHostOwner>`. OS and CPU use independent lazy class-state cells;
+`HostPathFlavor` is the pure Windows/Unix derivation reached through
+`OsPathPolicy` and `PathFragment` initialization from that same OS state, not a
+third Host observation. A first class-initialization failure becomes erroneous
+reuse on later access. `AutoCpu` reads OS before its conditional CPU read.
+Capacity memoizes only its successful value and retains source-class failure
+state separately, so a pre-assignment retryable failure is not blanket-cached.
+
+Home has no cached value. Every eligible flattened leading-`~/` occurrence
+performs a fresh, lossless read; a missing/read failure is terminal for that
+occurrence and unpaired UTF-16 is `Unsupported`. Before DICE, command-order
+observation produces pure supplied values only: source errors do not enter
+configuration, and no lock may cross a DICE compute or retry.
+
+The accepted configuration-owned boundary is an Arc-backed
+`HostConversionInputs` with no maps, caches, interner, raw source copy, or
+producer logic. It contains an optional finite 15-value `AutoCpuToken`, whose
+source renderings are `darwin_x86_64`, `darwin_arm64`, `freebsd`, `openbsd`,
+`x64_windows`, `arm64_windows`, `piii`, `k8`, `ppc`, `arm`, `aarch64`,
+`s390x`, `mips64`, `riscv64`, and `unknown`,
+optional Unix/Windows `HostPathFlavor`, optional post-ceiling `i32`
+`HostCapacity { host_cpus, host_ram_mib }`, occurrence-ordered unique
+`HomeFact { occurrence: u32, home: CompactString }`, and raw-UTF-16
+sorted/deduplicated Windows facts. A Windows fact keeps
+`Resolved(Arc<[u16]>)` structurally distinct from its fallback outcome. The
+schema has structural `Eq`, `Ord`, `Hash`, and `Allocative`; only Arc-backed
+wrappers may be `Dupe`.
+
+Later core bridges the existing workspace Windows outcome without importing
+workspace types into configuration. Before a new request's pre-scan and first
+DICE epoch injection/compute, it removes every inherited
+`WindowsOptionPathLongName` demand. It then freshly observes every eligible
+expanded raw input, merges only those new facts, and omits Windows facts when
+none are demanded. The only dependency direction is core -> configuration.
+
+Run next `WP-6-m2-host-conversion-inputs-schema-implementation`, limited to
+the producer-free configuration schema in `native/host.rs` and `native/mod.rs`.
+Later serial work is core process-owner/capture with exact source errors, core
+request pre-scan/fresh projection, then configuration converters. A mandatory
+REPLAN precedes configured-target or command activation; configured-target
+cycle deferral remains unchanged.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
