@@ -1,43 +1,52 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-action-query-identity-boundary-design`
-Milestone: M2 configured action-query handoff
+Packet: `WP-6-m2-action-query-identity-evidence`
+Milestone: M2 configured action-query prerequisites
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: adjudicate the remaining identity prerequisites after the accepted root
-action closure, without authorizing implementation.
-Predecessor: accepted root toolchain context `1533569f`, internal semantic
-string-setting configurations `dfc1705e`, retained recursive action closure
-`afd2a606`, and the existing Bazel 9.2 cquery/aquery evidence.
+Role: pin Bazel 9.2 source and isolated oracle discriminators for the four
+identity owners required before action-query implementation.
+Predecessor: action-query identity boundary `REPLAN`, accepted root action
+closure `afd2a606`, and the protected recursive action-ownership fixture.
 
-This is a documentation-only design packet. Reconcile the accepted evidence
-with the live owners for all four facts required by an exact action-query
-handoff:
+This is source/oracle evidence only. Do not modify the protected
+`recursive-custom-rule-providers-actions` fixture. Add one isolated Bazel 9.2
+fixture and use one retained Bazel server to distinguish:
 
-- authoritative Bazel `BuildOptions` / configured-target identity;
-- configured artifact paths;
-- selected execution-platform identity on each action; and
-- Bazel ActionKey identity, distinct from a REAPI execution digest.
+- `C0 -> C1 -> C0` target-configuration and output-root identity;
+- default-exec-group selected platform `P0 -> P1 -> P0`, including its
+  ActionKey and structured platform field;
+- FileWrite content-only ActionKey change and restoration; and
+- FileWrite declared-output-path change and restoration.
 
-Decide whether one future atomic vertical can own all four facts and the
-`aquery` consumer without invented semantics. If it cannot, return `REPLAN`
-and name the exact serial prerequisite chain, ownership, invalidation,
-equality, evidence, and stop gates. The accepted action closure already owns
-recursive reachability and target-local actions; do not redesign it.
+Capture raw text plus Bazel's `--output=jsonproto` action graph only to identify
+stable fields and equality/invalidation inputs. The fixture has exactly 18
+commands: paired text/jsonproto rows for baseline `C0/P0/content-A/path-A`,
+configuration `C1` and restored `C0`, selected platform `P1` and restored
+`P0`, content B and restored A, and output path B and restored A. Mutations run
+before the text row; its immediately following jsonproto row observes the same
+state. Do not freeze one observed checksum,
+path fragment, platform label, or ActionKey as a Slug algorithm. Pin Bazel
+9.2 source anchors for `BuildOptions` / `BuildConfigurationValue` /
+`OutputDirectories`, `StarlarkActionFactory` execution-platform selection,
+`ActionKeyComputer#getKey`, and `FileWriteAction#computeKey`.
 
-Documentation allowlist:
+The packet may only name the serial semantic owners supported by the evidence:
+complete target configuration, configured artifacts/output roots, per-action
+execution platform, Bazel ActionKey, and then the aquery consumer. After this
+evidence, design the general target-configuration substrate first; do not jump
+directly to action-query implementation.
 
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-- scheduling synchronization in this manifest and the canonical plan
-- one terminal routing-log row after review
+Scope and cap:
 
-Cap the design record at 340 formatted documentation lines. No production,
-test, fixture, oracle-record, dependency, or generated-file change is
-authorized.
+- one isolated Bazel 9.2 oracle fixture and its generated record;
+- Stage 6 evidence/acceptance text and scheduling synchronization;
+- no production or test Rust, Slug command, daemon, wire, DICE, or dependency
+  change;
+- at most 340 formatted authored fixture/documentation lines.
 
-Stop on any Rust implementation; a new DICE key/cache/global/lock/interner;
-partial or hard-coded configuration checksums; exposure of `first-build`;
-configuration/aquery formatting or command wire changes; configured output
-paths; platform or action-key implementation; reuse of REAPI digests as Bazel
-ActionKeys; execution, scheduling, or cache behavior; general flag/transition
-diagnostics; V1/Buck configuration semantics; or any claim not supported by
-the accepted Bazel 9.2 evidence and pinned source.
+Stop and return `REPLAN` on a non-9.2 source anchor, inability to isolate the
+default-platform discriminator, treating unstable identity bytes as fixed
+values, modifying protected evidence, any Slug implementation or public
+formatter, reuse of REAPI identity, scope beyond FileWrite and the default
+execution group, execution/cache/materialization work, credential exposure,
+or cap breach.

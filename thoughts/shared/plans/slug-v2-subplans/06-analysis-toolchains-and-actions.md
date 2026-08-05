@@ -1554,3 +1554,53 @@ tests, fixtures, oracle runs, dependencies, DICE owners, command wire or
 formatter, paths, platform/action-key representation, REAPI/execution work, or
 partial/hard-coded checksum. `first-build` and REAPI digests are explicitly not
 Bazel configuration or ActionKey identities.
+
+### Action-query identity boundary design result (2026-08-04)
+
+**Status: REPLAN; no atomic implementation vertical is authorized.** The raw
+Bazel 9.2 recursive action record visibly includes `k8-fastbuild`
+configuration, `bazel-out/k8-fastbuild/bin/...` outputs, the host execution
+platform, and a distinct 64-hex ActionKey for each parent/second/first
+FileWrite. Its accepted normalization deliberately ignores configuration and
+action-key noise, so it proves recursive ownership and visibility only—not
+identity equality, invalidation, or algorithms.
+
+The live gaps reside in serial owners. Build and cquery requests carry bzlmod
+inputs and still construct `target:first-build`; no shared transactional
+target-options producer exists. Action declarations retain package-relative
+strings, not configured artifacts or output roots. Integrated toolchain
+selection drops the selected platform before `PreparedToolchain` and action
+registration; `ActionSpec` retains exec properties/group but no selected
+platform. No Bazel ActionKey type or computation exists. The later REAPI digest
+hashes protocol command/action bytes, input-root digest, timeout, and remote
+properties and is not a Bazel ActionKey. Aquery remains a query-like parser and
+CLI placeholder with no core root, daemon request, action container, or
+formatter.
+
+The required order is: a complete DICE-owned target configuration and command
+input owner; typed configured artifact/output-root identity; retained
+per-action execution-platform and exec-group identity; action-kind-specific
+Bazel ActionKey ownership; then an aquery root/container/formatter consuming
+the accepted action closure without re-analysis. A partial checksum, string
+path shim, platform inferred from remote properties, or REAPI digest alias
+would make every downstream layer observably false.
+
+Run next only `WP-6-m2-action-query-identity-evidence`. Add an isolated Bazel
+9.2 source/oracle fixture—never modify the protected recursive fixture—to pin
+configuration/output-root `C0 -> C1 -> C0`, a default execution-platform
+`P0 -> P1 -> P0` selection lifecycle, and FileWrite content/output-path
+ActionKey changes and restorations. Capture paired raw text and
+`--output=jsonproto` for exactly nine states: baseline, each changed state,
+and each restoration, for 18 total commands. Anchor
+`BuildOptions`, `BuildConfigurationValue`, `OutputDirectories`,
+`StarlarkActionFactory`, `ActionKeyComputer#getKey`, and
+`FileWriteAction#computeKey`. Evidence may name stable inputs and serial owners
+only; it must not prescribe a Slug checksum, path, platform, or ActionKey
+algorithm.
+
+The evidence packet allows zero Rust and at most 340 formatted authored
+fixture/documentation lines. Stop on non-9.2 source, an unavailable isolated
+platform discriminator, protected-fixture edits, unstable identity treated as
+a constant, any Slug command/wire/DICE/formatter change, REAPI reuse,
+execution/cache/materialization work, broader action kinds or exec groups, or
+cap breach.
