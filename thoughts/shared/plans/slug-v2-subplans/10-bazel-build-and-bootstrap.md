@@ -344,6 +344,17 @@ the live source files; it adds no unit target, suite, env, data, tool, fixture,
 platform restriction, process, daemon, generated input, Cargo execution, or
 lock change.
 
+The simple V2 integration packet is accepted. Exactly six source-owned private
+`rust_test` targets cover the BEP, four build-API, and commands integration
+crates; their direct local dependency lists match the source imports without
+restating transitive production edges. Credential-free nightly Bazel passed
+all six targets, and serial Cargo passed all 40 cases. No-repin module
+evaluation left the Cargo, rendering, and module lock hashes stable. Archive,
+scope, cap, and diff gates passed, and independent latest-diff review returned
+`ACCEPT`. No Rust, Cargo input, lock, unit target, suite, env, data, tool,
+fixture, platform, process, daemon, generated input, or remote surface changed.
+The next packet maps only the fixture-free events and identity tests.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

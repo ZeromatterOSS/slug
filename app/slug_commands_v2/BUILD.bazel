@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
@@ -12,6 +12,19 @@ rust_library(
         "//app/slug_bep_v2",
         "//app/slug_bzlmod_v2",
         "//app/slug_identity_v2",
+        "//app/slug_query_v2",
+    ],
+)
+
+rust_test(
+    name = "commands_test",
+    srcs = ["tests/commands.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [
+        ":slug_commands_v2",
+        "//app/slug_bzlmod_v2",
         "//app/slug_query_v2",
     ],
 )

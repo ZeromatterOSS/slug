@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
@@ -15,4 +15,43 @@ rust_library(
         "//starlark-rust/starlark_map",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "actions_test",
+    srcs = ["tests/actions.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_build_api_v2"],
+)
+
+rust_test(
+    name = "ctx_test",
+    srcs = ["tests/ctx.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [
+        ":slug_build_api_v2",
+        "//app/slug_identity_v2",
+    ],
+)
+
+rust_test(
+    name = "depset_test",
+    srcs = ["tests/depset.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_build_api_v2"],
+)
+
+rust_test(
+    name = "providers_test",
+    srcs = ["tests/providers.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_build_api_v2"],
 )
