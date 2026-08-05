@@ -1,75 +1,55 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-positive-string-build-setting-transition-oracle`
+Packet: `WP-6-m2-positive-string-build-setting-transition-design`
 Milestone: M2 semantic target configuration inputs and transitions
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: Bazel 9.2 oracle-only discriminator before configuration design
-Evidence: accepted recursive configured analysis and bounded cquery consumer;
-parallel Terra aquery/owner audits; reserved scheduling review selecting the
-first provider-visible semantic configuration input instead of a speculative
-general checksum representation; stopped full fixture proving that Bazel's
-invalid-transition diagnostic exposes the unavailable checksum; reserved
-positive-successor review.
+Role: design-only ownership and implementation-boundary decision
+Evidence: accepted positive Bazel 9.2 fixture `b12774b9`; recursive configured
+analysis; bounded root Starlark-label cquery; invalid-transition checksum stop.
 
-Create one isolated fixture:
+Design only the successful root string build-setting and outgoing user-
+transition vertical proven by
+`tests/v2_oracle/fixtures/string-build-setting-transition/`. Add no Rust,
+fixture, expected artifact, Cargo, wire, command, or harness change.
 
-`tests/v2_oracle/fixtures/string-build-setting-transition/`
+The design must decide and freeze:
 
-The fixture must use Bazel 9.2.0 and a root-repository string build setting,
-custom provider, consumer rule, and user transition. Observe configured values
-only through `cquery --output=starlark --starlark:file=...`; formatter output
-must contain provider values and stable labels but no configuration checksum,
-mnemonic, output path, action key, or platform.
+1. the immutable semantic representation for one root string build-setting
+   value, its equality/hash/`Allocative` behavior, and its relationship to the
+   existing opaque `ConfigurationKey` without claiming Bazel's checksum;
+2. the DICE/command input owner for the default and explicit
+   `--//:setting=<value>` states, including same-daemon A-to-B-to-A restoration
+   with no process-global or direct filesystem state;
+3. the loading and evaluator owner for `config.string(flag = True)`,
+   `build_setting_default`, `ctx.build_setting_value`, transition definitions,
+   and `attr.label(cfg = transition)` in exactly the accepted fixture shape;
+4. how recursive analysis applies each transition before constructing the
+   dependency `ConfiguredTargetKey`, so two edges to the same label compute
+   distinct values through the existing analysis graph and preserve declared
+   attribute order;
+5. whether a truthful bounded command observation can reuse the current cquery
+   boundary, or whether Starlark-file/provider rendering must remain an oracle-
+   only acceptance gate and the first implementation stay internal;
+6. exact activation/equality evidence for default, command override, two
+   transitioned children, warm reuse, transition edit/restoration, and default
+   edit/restoration;
+7. the precise production/test allowlists, formatted line caps, serial
+   validation, GNU-Windows applicability, and independent review boundary; and
+8. retained utility reuse under the Stage 9/Buck2 audit, with no default hash
+   collection, duplicated label/configuration identity, or unbounded owned-
+   string graph churn.
 
-Required rows in one retained Bazel server:
+Successful semantics only. Invalid or missing transition programs and every
+configured-analysis failure diagnostic remain deferred because Bazel's error
+envelope prints the unavailable configuration checksum. The design must make
+that unsupported boundary explicit without normalizing, parsing, fabricating,
+or exposing `first-build`.
 
-1. direct consumer with the build-setting default;
-2. direct consumer with an explicit `--//:setting=<value>` command input;
-3. a parent whose two dependency edges transition the same child target to
-   distinct string values, proving distinct outgoing configured analyses;
-4. unchanged warm replay of the parent;
-5. a transition implementation edit changing one outgoing value;
-6. restoration of that transition value;
-7. a build-setting default edit observed without a command override; and
-8. restoration of the default plus successful same-server replay.
-
-The exact fixture may add only:
-
-- `fixture.toml` with Bazel 9.2.0 commit/source provenance and generation plus
-  verification commands;
-- `workspace/MODULE.bazel`;
-- root-package BUILD/Starlark sources and one cquery formatter file; and
-- generated `expected/oracle.json`.
-
-Cap the fixture at eight regular files, zero links, 450 non-generated text
-lines, and twelve commands. Do not edit an existing fixture, harness, Rust,
-Cargo manifest, lockfile, server schema, or command implementation. Scheduling
-documents may change only when the packet reaches terminal review.
-
-Mandatory evidence:
-
-- generate with `/usr/bin/bazel` 9.2.0 through the existing oracle runner and
-  then pass a no-update replay;
-- exact successful exit/stdout/stderr plus mutation and manifest recording for
-  every row;
-- prove command input, two distinct transitioned dependency values, warm
-  stability, transition edit/restoration, and default edit/restoration without
-  matching or printing a configuration ID;
-- pin Bazel 9.2 `BuildOptions`, Starlark build-setting, transition application,
-  configured-target-key, and cquery formatter source anchors;
-- run fixture list/validation, the focused oracle runner tests, JSON checks,
-  file/link/line/cap inventory, provenance and credential-pattern scans,
-  `scripts/v2_archive_status.sh`, and `git diff --check`; and
-- obtain independent latest-diff fixture review before commit.
-
-Invalid or missing transition programs and every configured-analysis failure
-diagnostic are explicitly deferred because Bazel names the configured edge with
-its checksum. Do not add, normalize, redact, regex-remove, or wildcard such a
-row. Stop and `REPLAN` if any successful discriminator requires default/label
-cquery output, configuration checksum text, a hard-coded platform or output
-path, native option-universe modeling, exec/host/split/repository transitions,
-select or config-setting breadth, toolchain/action execution, REAPI, a second
-configured graph, an existing fixture edit, or any Rust change. This packet
-authorizes no configuration implementation; its accepted result must first
-drive a bounded design packet, and failure semantics remain gated on general
-configuration identity.
+Use parallel read-only live-owner and pinned Bazel/Buck2/utility audits, root
+synthesis, and independent reserved review. Reuse the accepted oracle; do not
+invoke Bazel. Return `REPLAN` if the bounded semantic slice needs general
+native option modeling, default/label cquery output, arbitrary cquery Starlark
+execution, a second configured graph/key family, command-owned analysis,
+direct filesystem discovery, exec/host/split/repository transitions,
+`select`/`config_setting`, platform/toolchain/action execution, REAPI, or a
+lock across DICE computation.

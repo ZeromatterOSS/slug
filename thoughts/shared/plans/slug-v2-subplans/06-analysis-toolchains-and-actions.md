@@ -930,3 +930,31 @@ Retain the same fixture-only scope and caps, replace the invalid/recovery pair
 with transition-value restoration and build-setting-default restoration, and
 stop if any successful output exposes configuration identity. No Rust,
 normalization, or failure-diagnostic claim is authorized.
+
+### Positive string build-setting transition oracle acceptance (2026-08-04)
+
+**Status: ACCEPTED at `b12774b9`.** The isolated Bazel 9.2 fixture has six
+regular files, zero links, eight commands, 169 authored non-generated lines,
+and 451 total generated lines. Exact Starlark cquery output proves the direct
+default `default`, command input `command`, and two dependency edges from one
+parent to the same `//:consumer` under distinct `left` and `right` string
+values. The retained server then proves unchanged warm output, transition edit
+to `changed,right`, transition restoration, build-setting default edit, and
+default restoration.
+
+Generation and no-update replay pass with `/usr/bin/bazel` 9.2.0. Fixture
+list, JSON, inventory/caps, provenance, credential-pattern, archive, and diff
+checks pass; focused pytest is unavailable in the environment. Independent
+review required and accepted the pinned
+`StarlarkConfig.java#stringSetting` source anchor. No successful formatter
+output contains a configuration ID, configured path, platform, action key, or
+mnemonic. Invalid transition programs remain explicitly gated on the general
+configuration identity required by their Bazel diagnostic.
+
+Design next only `WP-6-m2-positive-string-build-setting-transition-design`.
+It must decide whether a bounded successful internal configuration-input and
+transition vertical can reuse the existing configured-analysis graph without
+claiming general cquery Starlark-file support or failure diagnostics. No Rust
+is authorized until the semantic value/equality, DICE input, loading/evaluator,
+dependency-transition, command-observability, utility, allowlist, and cap
+boundaries are independently accepted.
