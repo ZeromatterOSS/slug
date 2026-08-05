@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B: Bazel 9.2/rules_rust 0.73 metadata, stable Cargo/rendering/module locks, all 33 production packages, hermetic REAPI proto generation, and `//app/slug_cli_v2:slug` build locally; Gate C0 freezes the CLI runfiles boundary and the CLI library unit test passes under Bazel/Cargo | the two CLI integration crates span 163 files/105 nested fixture packages and remain **REPLAN** without fixture or test semantic redesign; the other 13 V2 packages' tests are not mapped; cache/RBE and self-hosting remain | `WP-10-m8-bazel-transitive-v2-test-boundary-design` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B: Bazel 9.2/rules_rust 0.73 metadata, stable Cargo/rendering/module locks, all 33 production packages, hermetic REAPI proto generation, and `//app/slug_cli_v2:slug` build locally; Gate C0 freezes the CLI runfiles boundary and the CLI library unit test passes under Bazel/Cargo; Gate C1 inventories all 1,005 source-declared tests in the other 13 V2 packages and partitions their exact adapters | the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; Bzlmod lockfile scratch and core host-tool ownership need separate designs; cache/RBE and self-hosting remain | `WP-10-m8-bazel-simple-v2-integration-tests-implementation` |
 
 ### Current packet
 
-`WP-10-m8-bazel-transitive-v2-test-boundary-design`.
+`WP-10-m8-bazel-simple-v2-integration-tests-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

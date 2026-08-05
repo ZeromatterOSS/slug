@@ -250,6 +250,100 @@ evaluation left all three lock hashes stable; formatting, archive, scope, cap,
 and diff gates passed. The two integration crates remain exactly at the C0
 `REPLAN` boundary.
 
+#### Gate C1 transitive V2 test boundary (2026-08-05)
+
+`WP-10-m8-bazel-transitive-v2-test-boundary-design` mechanically reconciles
+the 13 non-CLI V2 Cargo manifests, accepted production BUILD targets, source
+test attributes, and every `tests/*.rs` crate. They own 1,005 source-declared
+cases: 592 unit cases and 413 integration cases in 33 standalone integration
+crates. Platform `cfg` attributes make the executed count host-specific; the
+inventory deliberately counts source ownership rather than claiming one
+cross-platform runtime total.
+
+| Package | Unit | Integration | Integration crates | Route |
+|---------|-----:|------------:|-------------------:|-------|
+| `slug_analysis_v2` | 1 | 23 | 4 | fixture-free packet |
+| `slug_bep_v2` | 0 | 2 | 1 | first packet |
+| `slug_build_api_v2` | 0 | 22 | 4 | first packet |
+| `slug_bzlmod_v2` | 278 | 186 | 11 | core packet plus scratch-path redesign |
+| `slug_commands_v2` | 0 | 16 | 1 | first packet |
+| `slug_core_v2` | 141 | 13 | 1 | host-tool boundary first |
+| `slug_events_v2` | 9 | 0 | 0 | fixture-free packet |
+| `slug_identity_v2` | 1 | 19 | 3 | fixture-free packet |
+| `slug_loading_v2` | 59 | 59 | 5 | isolated platform/scratch packet |
+| `slug_query_v2` | 28 | 59 | 2 | fixture-free pair plus fixture `REPLAN` |
+| `slug_reapi_v2` | 0 | 14 | 1 | generated-library packet |
+| `slug_server_v2` | 34 | 0 | 0 | fixture `REPLAN` |
+| `slug_workspace_v2` | 41 | 0 | 0 | fixture-free packet |
+| **Total** | **592** | **413** | **33** | **1,005 cases** |
+
+Unit ownership stays one `rust_test(crate = ...)` per library: this reuses the
+accepted production source graph and preserves the library test module. Each
+integration source stays a separate `rust_test`; combining files would change
+Cargo's crate namespaces and diagnostics. Integration targets declare only the
+direct local/external crates their source imports. Dev-only crate-universe
+edges use the generated `normal_dev`/`proc_macro_dev` helpers where required;
+no target receives a broad fixture, env, binary, or tool adapter by default.
+
+The following boundaries are not interchangeable:
+
+- `slug_query_v2/tests/loading_query.rs` owns 53 cases and traverses five of
+  the nested fixture workspaces already rejected by Gate C0. The 28 library
+  cases and six-case `tests/query.rs` parser crate are independent, but the
+  loading integration remains whole-target `REPLAN`; filtering its cases would
+  change test semantics.
+- Three `slug_server_v2` unit functions traverse four Gate C0 fixture
+  workspaces. Because crate-mode testing compiles all 34 unit cases together,
+  the complete unit target remains `REPLAN`; no partial source or synthetic
+  `CARGO_MANIFEST_DIR` target is valid.
+- `slug_bzlmod_v2/tests/lockfile.rs` owns 22 cases and derives a writable path
+  under `env!("CARGO_MANIFEST_DIR")/../../.codex-cargo-target`. A source/runfile
+  manifest directory is not writable test scratch, so that integration waits
+  for a separate exact adapter design. The other 442 Bzlmod cases need no
+  fixture tree. One unit case re-executes `current_exe()` with a private child
+  marker; it needs only the test executable already owned by the target.
+- `slug_core_v2` library tests invoke host `git` and `tar`; the runtime
+  integration only needs isolated temporary directories and platform-gated
+  Unix sockets. The two targets stay separate from low-risk work until a
+  hermetic supported-tool owner is frozen; ambient PATH is not evidence.
+- `slug_reapi_v2/tests/reapi.rs` has 14 cases. Its NativeLink transport case is
+  already ignored and is the sole consumer of `SLUG_V2_NATIVELINK_ENDPOINT`.
+  The Bazel target must leave it ignored and supply no service env; the other
+  13 cases reuse the accepted generated REAPI library output.
+- `slug_loading_v2` synthesizes unique temporary workspaces and owns
+  platform-gated symlink/non-UTF-8 tests but no checked-in fixture. It receives
+  a dedicated packet so Bazel sandbox/TMPDIR behavior is validated without a
+  source rewrite or serial-test assumption.
+
+The accepted serial implementation sequence is therefore:
+
+1. Map the six pure integration crates in `slug_bep_v2`,
+   `slug_build_api_v2`, and `slug_commands_v2` (40 cases) in exactly those
+   three BUILD files, with a 180-line metadata/documentation cap.
+2. Map `slug_events_v2` and `slug_identity_v2` (five targets, 29 cases) in two
+   BUILD files at 140 lines; then map the one 41-case `slug_workspace_v2` unit
+   target in its BUILD file at 80 lines.
+3. Map the fixture-free `slug_query_v2` unit and parser integration targets
+   (34 cases) in its BUILD file at 120 lines, then the five `slug_analysis_v2`
+   targets (24 cases) in its BUILD file at 190 lines.
+4. Map the one REAPI integration target in its BUILD file at 100 lines,
+   retaining its default 13/14 execution boundary and generated-source graph.
+5. Map the six `slug_loading_v2` targets (118 cases) alone in its BUILD file at
+   190 lines, including platform and scratch-directory validation.
+6. Map the Bzlmod unit target and ten fixture-free integration crates (442
+   cases) in its BUILD file at 380 lines. Design the 22-case lockfile scratch
+   adapter separately before authorizing that final integration crate.
+7. Design the core host-tool owner before authorizing its two targets. Keep the
+   CLI integrations, query loading integration, and server unit target at the
+   shared nested-fixture `REPLAN` boundary until fixture ownership or test
+   semantics are deliberately redesigned.
+
+The first packet is `WP-10-m8-bazel-simple-v2-integration-tests-implementation`.
+It adds only the six private, small, standalone integration targets named by
+the live source files; it adds no unit target, suite, env, data, tool, fixture,
+platform restriction, process, daemon, generated input, Cargo execution, or
+lock change.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

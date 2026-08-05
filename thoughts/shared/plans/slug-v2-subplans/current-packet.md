@@ -1,51 +1,54 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-transitive-v2-test-boundary-design`
+Packet: `WP-10-m8-bazel-simple-v2-integration-tests-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: an exact, review-bounded implementation sequence for the tests owned by
-the 13 non-CLI V2 packages in the accepted production closure.
+Result: six private Bazel integration-test targets covering the 40 pure cases
+owned by `slug_bep_v2`, `slug_build_api_v2`, and `slug_commands_v2`.
 
 ## Goal
 
-Inventory every live unit and integration test owned by the 13 non-CLI V2
-packages. Freeze source ownership, dev-only dependencies, generated inputs,
-fixtures/runfiles, compile/runtime env, platform constraints, process/daemon
-lifecycle, and the smallest serial implementation packets. Do not map tests or
-edit Rust/BUILD/Cargo/fixtures in this design packet.
+Map the one BEP, four build-API, and one commands integration crates as exact
+standalone `rust_test` targets. Preserve Cargo's per-file crate ownership and
+run all 40 cases under credential-free nightly Bazel and serial Cargo.
 
 ## Required design
 
-Reconcile all 13 Cargo manifests, accepted production BUILD targets, `#[test]`
-modules, and `tests/**/*.rs` integration crates. Distinguish unit tests reusable
-through `rust_test(crate = ...)` from standalone integration crates. Identify
-every `CARGO_MANIFEST_DIR`, binary, fixture, generated-source, host-platform,
-filesystem, socket, process, and serialization requirement. Group only targets
-that share one exact adapter and validation envelope; keep large test owners and
-new runfiles boundaries separate. Preserve the CLI integration `REPLAN` and
-name the first implementation packet with exact allowed files and line cap.
+Add one private, small `rust_test` for each live source: `bep.rs`, `actions.rs`,
+`ctx.rs`, `depset.rs`, `providers.rs`, and `commands.rs`. Each target owns only
+its source, its package library, and any other directly imported local library.
+Do not add unit targets or test suites. Do not restate transitive dependencies
+or add env, data, tools, fixtures, generated inputs, platform restrictions,
+processes, daemons, or serialization.
 
 ## Allowed paths
 
+- `app/slug_bep_v2/BUILD.bazel`
+- `app/slug_build_api_v2/BUILD.bazel`
+- `app/slug_commands_v2/BUILD.bazel`
 - the canonical plan, Stage 10 owner, and this manifest
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
 ## Required validation
 
-Inspect the live manifests, accepted Bazel metadata, test sources, and only the
-fixtures they reference. Reconcile package/source/test counts mechanically.
-Run documentation, scope, cap, archive, credential-pattern, and
-`git diff --check` gates. No Cargo or Bazel build/test command is needed.
+Run the six labels in one credential-free Bazel command with
+`--ignore_all_rc_files` and the pinned nightly channel. Run the three packages'
+integration tests in one serial Cargo command. Run no-repin `bazel mod deps` and
+prove the Cargo, rendering, and module lock hashes unchanged. Run formatting,
+archive, scope, cap, credential-pattern, and `git diff --check` gates. Clean
+stale `slugd` before and after test execution even though these tests must not
+activate it.
 
 ## Stop conditions
 
-Stop with REPLAN on any production/test/BUILD/Cargo/lock/fixture/generated-source
-change, Cargo execution from Bazel, copied fixture, repository-layout or
-canonical external path, ambient daemon/process state, rc/credential inspection,
-or M2/M5/M6/self-hosting coupling. Do not add a WORKSPACE, `.bazelrc`, test
-target, CI, BuildBuddy/cache/RBE, query, cquery, or aquery surface.
+Stop with REPLAN on any Rust/Cargo/lock/fixture/generated-source change, unit
+target, suite, shared macro, broad dependency restatement, env/data/tool input,
+platform exclusion, process/daemon behavior, Cargo execution from Bazel, rc or
+credential inspection, or M2/M5/M6/self-hosting coupling. Do not add a
+WORKSPACE, `.bazelrc`, CI, BuildBuddy/cache/RBE, query, cquery, or aquery
+surface.
 
 ## Diff budget
 
-- Documentation only: at most 720 net lines. No production, test, BUILD, Cargo,
-  lock, fixture, generated-source, CI, or unrelated change.
+- At most 180 net metadata/documentation lines. No Rust, Cargo, lock, fixture,
+  generated-source, CI, or unrelated change.
