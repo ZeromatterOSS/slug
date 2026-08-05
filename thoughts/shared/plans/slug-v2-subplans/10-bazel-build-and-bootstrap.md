@@ -296,10 +296,10 @@ The following boundaries are not interchangeable:
   workspaces. Because crate-mode testing compiles all 34 unit cases together,
   the complete unit target remains `REPLAN`; no partial source or synthetic
   `CARGO_MANIFEST_DIR` target is valid.
-- `slug_bzlmod_v2/tests/lockfile.rs` owns 22 cases and derives a writable path
+- `slug_bzlmod_v2/tests/lockfile.rs` owns 11 cases and derives a writable path
   under `env!("CARGO_MANIFEST_DIR")/../../.codex-cargo-target`. A source/runfile
   manifest directory is not writable test scratch, so that integration waits
-  for a separate exact adapter design. The other 442 Bzlmod cases need no
+  for a separate exact adapter design. The other 453 Bzlmod cases need no
   fixture tree. One unit case re-executes `current_exe()` with a private child
   marker; it needs only the test executable already owned by the target.
 - `slug_core_v2` library tests invoke host `git` and `tar`; the runtime
@@ -330,8 +330,8 @@ The accepted serial implementation sequence is therefore:
    retaining its default 13/14 execution boundary and generated-source graph.
 5. Map the six `slug_loading_v2` targets (118 cases) alone in its BUILD file at
    190 lines, including platform and scratch-directory validation.
-6. Map the Bzlmod unit target and ten fixture-free integration crates (442
-   cases) in its BUILD file at 380 lines. Design the 22-case lockfile scratch
+6. Map the Bzlmod unit target and ten fixture-free integration crates (453
+   cases) in its BUILD file at 380 lines. Design the 11-case lockfile scratch
    adapter separately before authorizing that final integration crate.
 7. Design the core host-tool owner before authorizing its two targets. Keep the
    CLI integrations, query loading integration, and server unit target at the
@@ -419,9 +419,30 @@ test sources without a broad helper. The source-defined unique temporary
 workspaces work inside Bazel's sandbox without path rewrites, serialization,
 fixtures, env, data, tools, processes, or platform exclusions. All three lock
 hashes remain stable; archive, scope, cap, diff, and independent platform review
-gates pass at 93 net lines against the 190-line cap. Next map the Bzlmod unit
-target and ten fixture-free integrations,
-leaving the writable manifest-relative lockfile integration deferred.
+gates pass at 93 net lines against the 190-line cap. Next attempt the Bzlmod
+unit target and ten fixture-free integrations, leaving the writable
+manifest-relative lockfile integration deferred.
+
+The first Bzlmod packet stops at `REPLAN`. The crate-mode target reproduces the
+known clean-baseline
+`records_exact_proxy_tag_and_innate_call_spans` failure identically under Bazel
+and Cargo: 277/278 pass, with actual span 2:22–22 versus expected 2:9–39. Its
+private `current_exe()` child test passes, so no subprocess or sandbox adapter
+is missing. Publishing a red target or filtering one unit case is invalid; the
+whole unit target waits for a separate semantic repair. Execution also
+corrects the design inventory: `lockfile.rs` has 11 cases, not 22—the earlier
+mechanical command counted that file once explicitly and once through its
+glob. Bzlmod still owns 278 unit plus 186 integration cases, and the project
+total remains 1,005; the correct split is 278 unit, 175 across the ten
+fixture-free integrations, and 11 lockfile cases.
+
+The ten-integration successor is accepted. Each private target owns one named
+source and exact direct dependencies; all ten pass credential-free nightly
+Bazel and one serial Cargo command, 175/175. No unit or lockfile target, env,
+data, tool, fixture, platform exclusion, process, daemon, or writable-path
+adapter enters the BUILD graph. All three lock hashes remain stable; archive,
+scope, 141-net/380-line, diff, and independent review gates pass. Next design
+only the exact writable scratch owner for the remaining 11 lockfile cases.
 
 ### 10.2 Bazel/BuildBuddy Developer Gate
 

@@ -1,5 +1,5 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
-load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,4 +20,130 @@ rust_library(
         "//starlark-rust/starlark_map",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "dice_inputs_test",
+    srcs = ["tests/dice_inputs.rs"],
+    edition = crate_edition(),
+    proc_macro_deps = crate_deps(["async-trait"]),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["tokio"]) + [
+        ":slug_bzlmod_v2",
+        "//allocative/allocative",
+        "//app/slug_identity_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//dice/dice_futures",
+        "//gazebo/dupe",
+    ],
+)
+
+rust_test(
+    name = "nonroot_module_eval_test",
+    srcs = ["tests/nonroot_module_eval.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["compact_str"]) + [
+        ":slug_bzlmod_v2",
+        "//starlark-rust/starlark_map",
+    ],
+)
+
+rust_test(
+    name = "parser_test",
+    srcs = ["tests/parser.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_bzlmod_v2"],
+)
+
+rust_test(
+    name = "registry_dice_test",
+    srcs = ["tests/registry_dice.rs"],
+    edition = crate_edition(),
+    proc_macro_deps = crate_deps(["async-trait"]),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["hex", "serde_json", "sha2", "tokio"]) + [
+        ":slug_bzlmod_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//starlark-rust/starlark_map",
+    ],
+)
+
+rust_test(
+    name = "registry_mvs_test",
+    srcs = ["tests/registry_mvs.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_bzlmod_v2"],
+)
+
+rust_test(
+    name = "registry_snapshot_test",
+    srcs = ["tests/registry_snapshot.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_bzlmod_v2"],
+)
+
+rust_test(
+    name = "registry_source_test",
+    srcs = ["tests/registry_source.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_bzlmod_v2"],
+)
+
+rust_test(
+    name = "resolution_test",
+    srcs = ["tests/resolution.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_bzlmod_v2"],
+)
+
+rust_test(
+    name = "root_module_dice_test",
+    srcs = ["tests/root_module_dice.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["compact_str", "tokio"]) + [
+        ":slug_bzlmod_v2",
+        "//app/slug_events_v2",
+        "//app/slug_identity_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//gazebo/dupe",
+        "//starlark-rust/starlark_map",
+    ],
+)
+
+rust_test(
+    name = "source_preparation_dice_test",
+    srcs = ["tests/source_preparation_dice.rs"],
+    edition = crate_edition(),
+    proc_macro_deps = crate_deps(["async-trait"]),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["compact_str", "hex", "sha2", "tempfile", "tokio"]) + [
+        ":slug_bzlmod_v2",
+        "//allocative/allocative",
+        "//app/slug_identity_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//dice/dice_futures",
+        "//gazebo/dupe",
+        "//starlark-rust/starlark_map",
+    ],
 )
