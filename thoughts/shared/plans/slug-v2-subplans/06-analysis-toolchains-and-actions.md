@@ -3359,6 +3359,33 @@ now-closed 287-family/default/cache contract in the bounded seven-file
 `slug_configuration_v2` owner. Preserve all contextual, normalization,
 checksum/wire, DICE, and configured-target-cycle deferrals.
 
+### Pure native kernel retry 2 REPLAN (2026-08-05)
+
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-2` stopped after
+its one permitted correction. Two Terra writers built a private seven-file
+draft that compiled and passed seven focused tests, but the correction review
+found multiple material mismatches with already accepted contracts: explicit
+Void `null` used a text sentinel instead of absence; timeout did not implement
+the frozen `.limit(6)` split/rejection cases; Dotted accepted arbitrary
+digit-prefixed text without the component/descriptive grammar, signed-i32
+bounds, or early stop; and ordered maps used compact-string pairs instead of
+the frozen `Arc<[(NativeValue, NativeValue)]>` representation. Its tests also
+did not discriminate those failures. The entire unaccepted crate diff was
+discarded with `apply_patch`; HEAD returned cleanly to `d6570a74`.
+
+Run next only
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-3` with the same
+seven crate files and 1,550 production/1,250 test/2,800 total caps. Before
+implementing breadth, freeze typed focused tests for Void absence, exact
+timeout split cases, full Dotted bounds/underscore/early-stop/original-text
+identity, exact NativeValue ordered-map pairs, Bool/Tri versus reference/repeat
+annotation-null semantics, and a positive typed private Runs seed. Then reuse
+the accepted retry-7 and 287-row ledgers for the remaining routes. Add no new
+source/oracle evidence or public API. Any new material correction is `REPLAN`.
+Preserve all Java-regex, Host, repository/loading, command/repeat,
+normalization, checksum/wire, DICE, downstream activation, and user-approved
+configured-target-cycle deferrals.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu

@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-2`
+Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-3`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Result: implement the closed context-free native value/default/cache kernel for
@@ -10,6 +10,18 @@ Predecessors are authoritative: the committed 341 registry, accepted
 `287 + 8 + 5 + 41` cohort, renderer and forced-identity evidence, retry-7
 family contracts, and 287-row attachment ledger. Reuse them; add no source or
 oracle evidence.
+
+Retry 2 was discarded cleanly after its permitted correction exposed further
+material misses. Before writing breadth, freeze these implementation seams in
+types and focused tests: occurrence conversion represents Void `E("null")` as
+absence rather than a sentinel value; timeout implements the accepted decimal
+`.limit(6)` split/rejection discriminators; Dotted validates the full accepted
+component/descriptive grammar, signed-i32 capture bounds, underscore/early-stop
+behavior, and full-original-input identity; ordered maps use exactly
+`Arc<[(NativeValue, NativeValue)]>`; Bool annotation `null` materializes
+`false`, Tri annotation `null` materializes `AUTO`, and reference/repeat
+special-null remains distinct; Runs uses a positive typed private seed rather
+than pre-rendered text. These are frozen predecessor facts, not new evidence.
 
 Implement one closed `NativeValue` algebra, source-default materializer,
 per-occurrence converter, and exact Java cache projection inside
@@ -85,6 +97,6 @@ formatting, applicable GNU-Windows no-run check, `scripts/v2_archive_status.sh`,
 Stop and `REPLAN` on a route/count/byte disagreement, Java-regex need, lone
 surrogate or lossy conversion, Host/repository/loading context, command-layer
 behavior including repeat merging, whole P/C/T normalization, runtime registry/interner/hash, new
-identity issue, dependency/lockfile expansion, cap breach, or a second material
-correction. Defer normalization, checksum/wire integration, DICE, downstream
+identity issue, dependency/lockfile expansion, cap breach, or any new material
+correction beyond the retry-2 correction set frozen above. Defer normalization, checksum/wire integration, DICE, downstream
 activation, and user-approved later configured-target dependency cycles.
