@@ -4209,14 +4209,34 @@ direction remains core -> configuration only, with no DICE or configured-target
 cycle. Native capture and the production driver remain prerequisites for the
 first consumer; user-approved configured-target-cycle deferral is unchanged.
 
-Run next `WP-6-m2-host-conversion-inputs-event-schema-correction`. It changes
-only `app/slug_configuration_v2/src/native/host.rs` plus the three scheduling
-documents, within 150 production/220 test/120 documentation/490 total net
-lines. Test call-ID ordering/duplicates, same-ID cross-stream facts, duplicate
-raw distinct outcomes, optional process facts, structural Arc identity/order/
-hash, and rejected invalid streams; run focused configuration tests/check,
-GNU-Windows no-run, formatting, archive/scope/cap/no-Cargo/diff gates. Add no
-core, Cargo, converter, DICE, driver, command, or native-capture work.
+### Host conversion inputs event-schema correction ACCEPT (2026-08-05)
+
+`WP-6-m2-host-conversion-inputs-event-schema-correction` is **ACCEPT**. Its
+one-file Rust change (`app/slug_configuration_v2/src/native/host.rs`) is
+`+168/-168` net zero, including `+54/-17` production and `+114/-151` test
+lines. `ConverterCallId(u32)` provides checked stepping for the future dense
+schedule ordinal; Home and Windows facts carry call IDs, while Windows facts
+retain raw UTF-16 and their exact outcome.
+Each stream accepts only strictly ascending, unique call IDs, but permits gaps,
+duplicate raw Windows values with distinct outcomes, and a call ID in both
+streams. Optional shared process facts and the Arc-backed aggregate remain
+structural and immutable.
+
+Source and representation reviews accepted the result after one test-only
+correction that restored all public-leaf `Allocative` checks and full aggregate
+Eq/Ord/Hash mutation coverage. Validation passed: focused configuration tests
+`17/17`, focused check, GNU-Windows no-run, formatting, archive, scope, cap,
+no-Cargo, and diff gates. No converter, core, DICE, driver, capture, Cargo, or
+command/configured-target behavior changed.
+
+Run next only `WP-6-m2-production-native-conversion-schedule-driver-design`,
+docs-only. Audit and freeze the full production command entrypoint: parse
+batches/default memoization/priority/expansion/policy event production,
+request-versus-attempt/retry lifetime, first-input binding, and preflight
+stale-Windows filtering, while preserving core -> configuration direction. Add
+no Rust, Cargo, native capture, converter, DICE, configured-target, or driver
+implementation. Native capture remains **REPLAN** and user-approved
+configured-target-cycle deferral remains unchanged.
 
 ### Windows option-path short-name resolution design (2026-08-05)
 

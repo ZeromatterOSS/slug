@@ -92,19 +92,43 @@ impl HostCapacity {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub struct ConverterCallId(u32);
+
+impl ConverterCallId {
+    pub const fn first() -> Self {
+        Self(0)
+    }
+
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    pub const fn next(self) -> Option<Self> {
+        match self.0.checked_add(1) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
+    pub const fn value(self) -> u32 {
+        self.0
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct HomeFact {
-    occurrence: u32,
+    call_id: ConverterCallId,
     home: CompactString,
 }
 
 impl HomeFact {
-    pub fn new(occurrence: u32, home: CompactString) -> Self {
-        Self { occurrence, home }
+    pub fn new(call_id: ConverterCallId, home: CompactString) -> Self {
+        Self { call_id, home }
     }
 
-    pub fn occurrence(&self) -> u32 {
-        self.occurrence
+    pub const fn call_id(&self) -> ConverterCallId {
+        self.call_id
     }
 
     pub fn home(&self) -> &str {
@@ -120,13 +144,26 @@ pub enum WindowsOptionPathOutcome {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct WindowsOptionPathFact {
+    call_id: ConverterCallId,
     raw: Arc<[u16]>,
     outcome: WindowsOptionPathOutcome,
 }
 
 impl WindowsOptionPathFact {
-    pub fn new(raw: Arc<[u16]>, outcome: WindowsOptionPathOutcome) -> Self {
-        Self { raw, outcome }
+    pub fn new(
+        call_id: ConverterCallId,
+        raw: Arc<[u16]>,
+        outcome: WindowsOptionPathOutcome,
+    ) -> Self {
+        Self {
+            call_id,
+            raw,
+            outcome,
+        }
+    }
+
+    pub const fn call_id(&self) -> ConverterCallId {
+        self.call_id
     }
 
     pub fn raw(&self) -> &[u16] {
@@ -140,10 +177,10 @@ impl WindowsOptionPathFact {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum HostConversionInputsError {
-    DuplicateHomeOccurrence,
-    OutOfOrderHomeOccurrence,
-    DuplicateWindowsOptionPathRaw,
-    OutOfOrderWindowsOptionPathRaw,
+    DuplicateHomeCallId,
+    OutOfOrderHomeCallId,
+    DuplicateWindowsOptionPathCallId,
+    OutOfOrderWindowsOptionPathCallId,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -200,13 +237,13 @@ impl HostConversionInputs {
 
 fn validate_home_facts(facts: &[HomeFact]) -> Result<(), HostConversionInputsError> {
     for pair in facts.windows(2) {
-        match pair[0].occurrence.cmp(&pair[1].occurrence) {
+        match pair[0].call_id.cmp(&pair[1].call_id) {
             std::cmp::Ordering::Less => {}
             std::cmp::Ordering::Equal => {
-                return Err(HostConversionInputsError::DuplicateHomeOccurrence);
+                return Err(HostConversionInputsError::DuplicateHomeCallId);
             }
             std::cmp::Ordering::Greater => {
-                return Err(HostConversionInputsError::OutOfOrderHomeOccurrence);
+                return Err(HostConversionInputsError::OutOfOrderHomeCallId);
             }
         }
     }
@@ -217,13 +254,13 @@ fn validate_windows_option_path_facts(
     facts: &[WindowsOptionPathFact],
 ) -> Result<(), HostConversionInputsError> {
     for pair in facts.windows(2) {
-        match pair[0].raw.cmp(&pair[1].raw) {
+        match pair[0].call_id.cmp(&pair[1].call_id) {
             std::cmp::Ordering::Less => {}
             std::cmp::Ordering::Equal => {
-                return Err(HostConversionInputsError::DuplicateWindowsOptionPathRaw);
+                return Err(HostConversionInputsError::DuplicateWindowsOptionPathCallId);
             }
             std::cmp::Ordering::Greater => {
-                return Err(HostConversionInputsError::OutOfOrderWindowsOptionPathRaw);
+                return Err(HostConversionInputsError::OutOfOrderWindowsOptionPathCallId);
             }
         }
     }
@@ -244,6 +281,10 @@ mod tests {
 
     fn raw(values: &[u16]) -> Arc<[u16]> {
         Arc::from(values)
+    }
+
+    fn call(value: u32) -> ConverterCallId {
+        ConverterCallId::new(value)
     }
 
     fn inputs(
@@ -267,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn tokens_flavors_and_capacity_are_structural() {
+    fn tokens_process_facts_and_call_ids_are_structural() {
         let spellings = [
             "darwin_x86_64",
             "darwin_arm64",
@@ -286,94 +327,89 @@ mod tests {
             "unknown",
         ];
         assert_eq!(AutoCpuToken::ALL.len(), spellings.len());
-        for (index, token) in AutoCpuToken::ALL.iter().enumerate() {
-            assert_eq!(
-                AutoCpuToken::ALL
-                    .iter()
-                    .filter(|other| *other == token)
-                    .count(),
-                1
-            );
-            assert_eq!(token.cmp(token), std::cmp::Ordering::Equal);
-            assert_eq!(hash(token), hash(&AutoCpuToken::ALL[index]));
-            assert_eq!(token.as_str(), spellings[index]);
+        for (token, spelling) in AutoCpuToken::ALL.into_iter().zip(spellings) {
+            assert_eq!(token.as_str(), spelling);
         }
         assert_ne!(HostPathFlavor::Unix, HostPathFlavor::Windows);
-        let capacity = HostCapacity::new(i32::MIN, i32::MAX);
         assert_eq!(
-            (capacity.host_cpus(), capacity.host_ram_mib()),
-            (i32::MIN, i32::MAX)
+            HostCapacity::new(i32::MIN, i32::MAX),
+            HostCapacity::new(i32::MIN, i32::MAX)
         );
+        assert_eq!(ConverterCallId::first().next(), Some(call(1)));
+        assert_eq!(call(u32::MAX).next(), None);
+        assert_eq!(call(7).value(), 7);
+        assert_eq!(hash(&call(7)), hash(&call(7)));
     }
 
     #[test]
-    fn home_facts_require_strict_occurrence_order() {
-        let ordered = Arc::from([
-            HomeFact::new(2, CompactString::new("two")),
-            HomeFact::new(9, CompactString::new("nine")),
-        ]);
-        assert_eq!(
-            inputs(ordered, Arc::from([])).home_facts()[1].home(),
-            "nine"
+    fn home_facts_require_strict_call_id_order_but_not_consecutiveness() {
+        let value = inputs(
+            Arc::from([
+                HomeFact::new(call(2), CompactString::new("two")),
+                HomeFact::new(call(9), CompactString::new("nine")),
+            ]),
+            Arc::from([]),
         );
-        assert_eq!(
-            HostConversionInputs::new(
-                None,
-                None,
-                None,
+        assert_eq!(value.home_facts()[1].call_id(), call(9));
+        assert_eq!(value.home_facts()[1].home(), "nine");
+        for (facts, error) in [
+            (
                 Arc::from([
-                    HomeFact::new(2, CompactString::new("a")),
-                    HomeFact::new(2, CompactString::new("b"))
+                    HomeFact::new(call(2), CompactString::new("a")),
+                    HomeFact::new(call(2), CompactString::new("b")),
                 ]),
-                Arc::from([]),
+                HostConversionInputsError::DuplicateHomeCallId,
             ),
-            Err(HostConversionInputsError::DuplicateHomeOccurrence),
-        );
-        assert_eq!(
-            HostConversionInputs::new(
-                None,
-                None,
-                None,
+            (
                 Arc::from([
-                    HomeFact::new(3, CompactString::new("a")),
-                    HomeFact::new(2, CompactString::new("b"))
+                    HomeFact::new(call(3), CompactString::new("a")),
+                    HomeFact::new(call(2), CompactString::new("b")),
                 ]),
-                Arc::from([]),
+                HostConversionInputsError::OutOfOrderHomeCallId,
             ),
-            Err(HostConversionInputsError::OutOfOrderHomeOccurrence),
-        );
+        ] {
+            assert_eq!(
+                HostConversionInputs::new(None, None, None, facts, Arc::from([])),
+                Err(error)
+            );
+        }
     }
 
     #[test]
-    fn windows_facts_preserve_raw_order_and_outcome() {
-        let unpaired = WindowsOptionPathFact::new(
+    fn windows_facts_keep_duplicate_raw_outcomes_and_share_call_ids_with_home() {
+        let fallback = WindowsOptionPathFact::new(
+            call(2),
             raw(&[0xd800]),
             WindowsOptionPathOutcome::IOExceptionFallback,
         );
         let resolved = WindowsOptionPathFact::new(
-            raw(&[0xd801]),
+            call(9),
+            raw(&[0xd800]),
             WindowsOptionPathOutcome::Resolved(raw(&[0xd802])),
         );
         let value = inputs(
-            Arc::from([]),
-            Arc::from([unpaired.clone(), resolved.clone()]),
+            Arc::from([HomeFact::new(call(2), CompactString::new("home"))]),
+            Arc::from([fallback.clone(), resolved.clone()]),
         );
-        assert_eq!(value.windows_option_path_facts()[0].raw(), [0xd800]);
-        assert_ne!(resolved.outcome(), unpaired.outcome());
+        assert_eq!(value.home_facts()[0].call_id(), call(2));
+        assert_eq!(value.windows_option_path_facts()[0].call_id(), call(2));
+        assert_eq!(value.windows_option_path_facts()[1].raw(), [0xd800]);
+        assert_ne!(fallback.outcome(), resolved.outcome());
         for (facts, error) in [
             (
-                Arc::from([resolved.clone(), unpaired.clone()]),
-                HostConversionInputsError::OutOfOrderWindowsOptionPathRaw,
+                Arc::from([resolved.clone(), fallback.clone()]),
+                HostConversionInputsError::OutOfOrderWindowsOptionPathCallId,
             ),
             (
                 Arc::from([
-                    unpaired.clone(),
+                    fallback.clone(),
                     WindowsOptionPathFact::new(
-                        raw(&[0xd800]),
+                        call(2),
+                        raw(&[0xd801]),
                         WindowsOptionPathOutcome::Resolved(raw(&[0xd803])),
                     ),
                 ]),
-                HostConversionInputsError::DuplicateWindowsOptionPathRaw,
+                HostConversionInputsError::DuplicateWindowsOptionPathCallId,
             ),
         ] {
             assert_eq!(
@@ -384,121 +420,85 @@ mod tests {
     }
 
     #[test]
-    fn aggregate_is_arc_backed_and_structural() {
+    fn aggregate_is_arc_backed_structural_and_allows_empty_process_schedule() {
         fn allocative<T: Allocative>() {}
         fn dupe<T: Dupe>() {}
         allocative::<AutoCpuToken>();
         allocative::<HostPathFlavor>();
         allocative::<HostCapacity>();
+        allocative::<ConverterCallId>();
+        allocative::<HomeFact>();
         allocative::<WindowsOptionPathOutcome>();
+        allocative::<WindowsOptionPathFact>();
         allocative::<HostConversionInputsError>();
         allocative::<HostConversionInputs>();
-        allocative::<HomeFact>();
-        allocative::<WindowsOptionPathFact>();
         dupe::<HostConversionInputs>();
 
-        let make = |auto_cpu, path_flavor, capacity, occurrence, home, raw_input, outcome| {
+        let empty =
+            HostConversionInputs::new(None, None, None, Arc::from([]), Arc::from([])).unwrap();
+        assert_eq!(empty.auto_cpu(), None);
+        assert_eq!(empty.path_flavor(), None);
+        assert_eq!(empty.capacity(), None);
+
+        let make = |home_call, windows_call, outcome| {
             HostConversionInputs::new(
-                Some(auto_cpu),
-                Some(path_flavor),
-                Some(capacity),
-                Arc::from([HomeFact::new(occurrence, CompactString::new(home))]),
-                Arc::from([WindowsOptionPathFact::new(raw(raw_input), outcome)]),
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                Some(HostCapacity::new(2, 8)),
+                Arc::from([HomeFact::new(call(home_call), CompactString::new("home"))]),
+                Arc::from([WindowsOptionPathFact::new(
+                    call(windows_call),
+                    raw(&[1]),
+                    outcome,
+                )]),
             )
             .unwrap()
         };
-        let original = make(
-            AutoCpuToken::K8,
-            HostPathFlavor::Unix,
-            HostCapacity::new(2, 8),
-            1,
-            "home",
-            &[1],
-            WindowsOptionPathOutcome::Resolved(raw(&[2])),
-        );
+        let original = make(1, 1, WindowsOptionPathOutcome::Resolved(raw(&[2])));
         let duplicate = original.dupe();
         assert_eq!(original, duplicate);
         assert_eq!(hash(&original), hash(&duplicate));
         assert!(std::ptr::eq(original.0.as_ref(), duplicate.0.as_ref()));
 
-        let changed = [
-            make(
-                AutoCpuToken::Unknown,
-                HostPathFlavor::Unix,
-                HostCapacity::new(2, 8),
-                1,
-                "home",
-                &[1],
-                WindowsOptionPathOutcome::Resolved(raw(&[2])),
-            ),
-            make(
-                AutoCpuToken::K8,
-                HostPathFlavor::Windows,
-                HostCapacity::new(2, 8),
-                1,
-                "home",
-                &[1],
-                WindowsOptionPathOutcome::Resolved(raw(&[2])),
-            ),
-            make(
-                AutoCpuToken::K8,
-                HostPathFlavor::Unix,
-                HostCapacity::new(3, 8),
-                1,
-                "home",
-                &[1],
-                WindowsOptionPathOutcome::Resolved(raw(&[2])),
-            ),
-            make(
-                AutoCpuToken::K8,
-                HostPathFlavor::Unix,
-                HostCapacity::new(2, 8),
-                2,
-                "home",
-                &[1],
-                WindowsOptionPathOutcome::Resolved(raw(&[2])),
-            ),
-            make(
-                AutoCpuToken::K8,
-                HostPathFlavor::Unix,
-                HostCapacity::new(2, 8),
-                1,
-                "other",
-                &[1],
-                WindowsOptionPathOutcome::Resolved(raw(&[2])),
-            ),
-            make(
-                AutoCpuToken::K8,
-                HostPathFlavor::Unix,
-                HostCapacity::new(2, 8),
-                1,
-                "home",
-                &[3],
-                WindowsOptionPathOutcome::Resolved(raw(&[2])),
-            ),
-            make(
-                AutoCpuToken::K8,
-                HostPathFlavor::Unix,
-                HostCapacity::new(2, 8),
-                1,
-                "home",
-                &[1],
-                WindowsOptionPathOutcome::Resolved(raw(&[3])),
-            ),
-            make(
-                AutoCpuToken::K8,
-                HostPathFlavor::Unix,
-                HostCapacity::new(2, 8),
-                1,
-                "home",
-                &[1],
-                WindowsOptionPathOutcome::IOExceptionFallback,
-            ),
-        ];
-        for value in changed {
-            assert_ne!(original, value);
-            assert_ne!(original.cmp(&value), std::cmp::Ordering::Equal);
-            assert_ne!(hash(&original), hash(&value));
+        let with_changed = |data: HostConversionInputsData| HostConversionInputs(Arc::new(data));
+        for changed in [
+            with_changed({
+                let mut data = original.0.as_ref().clone();
+                data.auto_cpu = Some(AutoCpuToken::Unknown);
+                data
+            }),
+            with_changed({
+                let mut data = original.0.as_ref().clone();
+                data.path_flavor = Some(HostPathFlavor::Windows);
+                data
+            }),
+            with_changed({
+                let mut data = original.0.as_ref().clone();
+                data.capacity = Some(HostCapacity::new(3, 8));
+                data
+            }),
+            with_changed({
+                let mut data = original.0.as_ref().clone();
+                data.home_facts = Arc::from([HomeFact::new(call(1), CompactString::new("other"))]);
+                data
+            }),
+            with_changed({
+                let mut data = original.0.as_ref().clone();
+                data.windows_option_path_facts = Arc::from([WindowsOptionPathFact::new(
+                    call(1),
+                    raw(&[3]),
+                    WindowsOptionPathOutcome::Resolved(raw(&[2])),
+                )]);
+                data
+            }),
+            make(2, 1, WindowsOptionPathOutcome::Resolved(raw(&[2]))),
+            make(1, 2, WindowsOptionPathOutcome::Resolved(raw(&[2]))),
+            make(1, 1, WindowsOptionPathOutcome::Resolved(raw(&[3]))),
+            make(1, 1, WindowsOptionPathOutcome::IOExceptionFallback),
+        ] {
+            assert_ne!(original, changed);
+            assert_ne!(original.cmp(&changed), std::cmp::Ordering::Equal);
+            assert_ne!(hash(&original), hash(&changed));
         }
     }
 }
